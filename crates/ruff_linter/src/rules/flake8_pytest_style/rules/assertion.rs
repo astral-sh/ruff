@@ -23,12 +23,14 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::cst::helpers::negate;
 use crate::cst::matchers::match_indented_block;
 use crate::cst::matchers::match_module;
 use crate::fix::codemods::CodegenStylist;
 use crate::importer::ImportRequest;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::preview::is_fix_pytest_composite_assertion_enabled;
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::unittest_assert::UnittestAssert;
 
@@ -60,8 +62,16 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something
 ///     assert not something_else
 /// ```
+///
+/// ## Fix safety
+///
+/// On stable, the rule's fix is always unsafe and not offered when it would remove comments in the
+/// compound assertion. In [preview], the fix is only unsafe when it would delete such comments and
+/// safe otherwise.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
@@ -119,7 +129,7 @@ impl Violation for PytestCompositeAssertion {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestAssertInExcept {
     name: String,
 }
@@ -161,7 +171,7 @@ impl Violation for PytestAssertInExcept {
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestAssertAlwaysFalse;
 
 impl Violation for PytestAssertAlwaysFalse {
@@ -201,7 +211,7 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
@@ -225,7 +235,11 @@ impl Violation for PytestUnittestAssertion {
 /// the exception name.
 struct ExceptionHandlerVisitor<'a, 'b> {
     exception_name: &'a str,
-    current_assert: Option<&'a Stmt>,
+    /// The `assert` statement that is currently being visited, if it has not been reported yet.
+    ///
+    /// This is set to `None` as soon as a diagnostic is reported, so that an `assert` that refers
+    /// to the exception more than once is only reported once.
+    pending_assert: Option<&'a Stmt>,
     checker: &'a Checker<'b>,
 }
 
@@ -233,7 +247,7 @@ impl<'a, 'b> ExceptionHandlerVisitor<'a, 'b> {
     const fn new(checker: &'a Checker<'b>, exception_name: &'a str) -> Self {
         Self {
             exception_name,
-            current_assert: None,
+            pending_assert: None,
             checker,
         }
     }
@@ -243,9 +257,9 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Assert(_) => {
-                self.current_assert = Some(stmt);
+                self.pending_assert = Some(stmt);
                 visitor::walk_stmt(self, stmt);
-                self.current_assert = None;
+                self.pending_assert = None;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -254,15 +268,16 @@ impl<'a> Visitor<'a> for ExceptionHandlerVisitor<'a, '_> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(ast::ExprName { id, .. }) => {
-                if let Some(current_assert) = self.current_assert {
-                    if id.as_str() == self.exception_name {
-                        self.checker.report_diagnostic(
-                            PytestAssertInExcept {
-                                name: id.to_string(),
-                            },
-                            current_assert.range(),
-                        );
-                    }
+                if let Some(pending_assert) = self.pending_assert
+                    && id.as_str() == self.exception_name
+                {
+                    self.checker.report_diagnostic(
+                        PytestAssertInExcept {
+                            name: id.to_string(),
+                        },
+                        pending_assert.range(),
+                    );
+                    self.pending_assert = None;
                 }
             }
             _ => visitor::walk_expr(self, expr),
@@ -356,7 +371,7 @@ pub(crate) fn unittest_assertion(
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Pedantic)]
 pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }
@@ -829,16 +844,24 @@ pub(crate) fn composite_condition(checker: &Checker, stmt: &Stmt, test: &Expr, m
     let composite = is_composite_condition(test);
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let mut diagnostic = checker.report_diagnostic(PytestCompositeAssertion, stmt.range());
+        let preview_fix = is_fix_pytest_composite_assertion_enabled(checker.settings());
         if matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !checker.comment_ranges().intersects(stmt.range())
+            && (preview_fix || !checker.comment_ranges().intersects(stmt.range()))
             && !checker
                 .indexer()
                 .in_multi_statement_line(stmt, checker.source())
         {
             diagnostic.try_set_fix(|| {
-                fix_composite_condition(stmt, checker.locator(), checker.stylist())
-                    .map(Fix::unsafe_edit)
+                fix_composite_condition(stmt, checker.locator(), checker.stylist()).map(|edit| {
+                    let applicability =
+                        if preview_fix && !checker.comment_ranges().intersects(edit.range()) {
+                            Applicability::Safe
+                        } else {
+                            Applicability::Unsafe
+                        };
+                    Fix::applicable_edit(edit, applicability)
+                })
             });
         }
     }

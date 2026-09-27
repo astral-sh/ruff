@@ -5,18 +5,7 @@ expression: triple_quoted_eol(UNIX_EOL)
 ## Tokens
 ```
 [
-    (
-        String(
-            "\n test string\n ",
-        ),
-        0..21,
-        TokenFlags(
-            DOUBLE_QUOTES | TRIPLE_QUOTED_STRING,
-        ),
-    ),
-    (
-        Newline,
-        21..21,
-    ),
+    String 0..21 (flags = DOUBLE_QUOTES | TRIPLE_QUOTED_STRING),
+    Newline 21..21,
 ]
 ```

@@ -1,11 +1,12 @@
-use lsp_types::request::{
-    CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
-};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams, CallHierarchyItem,
     CallHierarchyOutgoingCall, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
     WorkDoneProgressParams,
+};
+use lsp_types::{
+    CallHierarchyIncomingCallsRequest, CallHierarchyOutgoingCallsRequest,
+    CallHierarchyPrepareRequest,
 };
 
 use crate::TestServerBuilder;
@@ -271,7 +272,7 @@ fn prepare(
     path: impl AsRef<ruff_db::system::SystemPath>,
     position: Position,
 ) -> Option<Vec<CallHierarchyItem>> {
-    server.send_request_await::<CallHierarchyPrepare>(CallHierarchyPrepareParams {
+    server.send_request_await::<CallHierarchyPrepareRequest>(CallHierarchyPrepareParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier {
                 uri: server.file_uri(path),
@@ -286,20 +287,24 @@ fn incoming(
     server: &mut crate::TestServer,
     item: CallHierarchyItem,
 ) -> Option<Vec<CallHierarchyIncomingCall>> {
-    server.send_request_await::<CallHierarchyIncomingCalls>(CallHierarchyIncomingCallsParams {
-        item,
-        work_done_progress_params: WorkDoneProgressParams::default(),
-        partial_result_params: PartialResultParams::default(),
-    })
+    server.send_request_await::<CallHierarchyIncomingCallsRequest>(
+        CallHierarchyIncomingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        },
+    )
 }
 
 fn outgoing(
     server: &mut crate::TestServer,
     item: CallHierarchyItem,
 ) -> Option<Vec<CallHierarchyOutgoingCall>> {
-    server.send_request_await::<CallHierarchyOutgoingCalls>(CallHierarchyOutgoingCallsParams {
-        item,
-        work_done_progress_params: WorkDoneProgressParams::default(),
-        partial_result_params: PartialResultParams::default(),
-    })
+    server.send_request_await::<CallHierarchyOutgoingCallsRequest>(
+        CallHierarchyOutgoingCallsParams {
+            item,
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        },
+    )
 }

@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
@@ -43,7 +44,7 @@ use crate::{Edit, Fix};
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", category = Category::Correctness)]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
     is_star: bool,
@@ -91,7 +92,7 @@ impl Violation for DuplicateTryBlockException {
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", category = Category::Correctness)]
 pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
@@ -212,6 +213,10 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                 }
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "each distinct exception name updates independent set and map entries"
+                )]
                 for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);
@@ -225,6 +230,10 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
     }
 
     if checker.is_rule_enabled(Rule::DuplicateTryBlockException) {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "iteration order does not affect the diagnostics produced"
+        )]
         for (name, exprs) in duplicates {
             for expr in exprs {
                 let is_star = checker

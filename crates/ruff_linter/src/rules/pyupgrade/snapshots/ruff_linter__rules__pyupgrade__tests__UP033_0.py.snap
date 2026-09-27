@@ -10,14 +10,12 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 6 |     pass
   |
 help: Rewrite with `@functools.cache
-1 | import functools
-2 |
+  |
 3 |
   - @functools.lru_cache(maxsize=None)
 4 + @functools.cache
 5 | def fixme():
-6 |     pass
-7 |
+  |
 
 UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   --> UP033_0.py:10:21
@@ -29,14 +27,12 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 12 |     pass
    |
 help: Rewrite with `@functools.cache
-7  |
-8  |
+   |
 9  | @other_decorator
    - @functools.lru_cache(maxsize=None)
 10 + @functools.cache
 11 | def fixme():
-12 |     pass
-13 |
+   |
 
 UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   --> UP033_0.py:15:21
@@ -47,14 +43,12 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 17 | def fixme():
    |
 help: Rewrite with `@functools.cache
-12 |     pass
-13 |
+   |
 14 |
    - @functools.lru_cache(maxsize=None)
 15 + @functools.cache
 16 | @other_decorator
-17 | def fixme():
-18 |     pass
+   |
 
 UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   --> UP033_0.py:50:21
@@ -68,13 +62,12 @@ UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
 54 |       pass
    |
 help: Rewrite with `@functools.cache
-47 |
-48 |
+   |
 49 |
    - @functools.lru_cache(
    -     maxsize=None,  # text
    - )
 50 + @functools.cache
 51 | def fixme_unsafe():
-52 |     pass
+   |
 note: This is an unsafe fix and may change runtime behavior

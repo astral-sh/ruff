@@ -10,6 +10,7 @@ use ruff_python_semantic::{Modules, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -17,7 +18,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// their first arguments are not raw strings:
 ///
 /// - For `regex` and `re`: `compile`, `findall`, `finditer`,
-///   `fullmatch`, `match`, `search`, `split`, `sub`, `subn`.
+///   `fullmatch`, `match`, `prefixmatch`, `search`, `split`, `sub`, `subn`.
 /// - `regex`-specific: `splititer`, `subf`, `subfn`, `template`.
 ///
 /// ## Why is this bad?
@@ -59,7 +60,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// re.compile(r"foo\bar")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.0")]
+#[violation_metadata(preview_since = "0.8.0", category = Category::Pedantic)]
 pub(crate) struct UnrawRePattern {
     module: RegexModule,
     func: String,
@@ -96,8 +97,8 @@ enum RegexModule {
 impl RegexModule {
     fn is_function_taking_pattern(self, name: &str) -> bool {
         match name {
-            "compile" | "findall" | "finditer" | "fullmatch" | "match" | "search" | "split"
-            | "sub" | "subn" => true,
+            "compile" | "findall" | "finditer" | "fullmatch" | "match" | "prefixmatch"
+            | "search" | "split" | "sub" | "subn" => true,
             "splititer" | "subf" | "subfn" | "template" => self == Self::Regex,
             _ => false,
         }

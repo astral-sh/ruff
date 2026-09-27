@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pylint::helpers::is_known_dunder_method;
 
 /// ## What it does
@@ -45,7 +46,7 @@ use crate::rules::pylint::helpers::is_known_dunder_method;
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.285")]
+#[violation_metadata(preview_since = "v0.0.285", category = Category::Pedantic)]
 pub(crate) struct BadDunderMethodName {
     name: String,
 }

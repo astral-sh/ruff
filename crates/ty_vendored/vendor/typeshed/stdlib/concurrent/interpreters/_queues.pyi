@@ -92,7 +92,8 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
                 underlying data is actually shared.  Furthermore, some types
                 can be sent through a queue more efficiently than others.  This
                 group includes various immutable types like int, str, bytes, and
-                tuple (if the items are likewise efficiently shareable).  See interpreters.is_shareable().
+                tuple (if the items are likewise efficiently shareable).
+                See interpreters.is_shareable().
 
                 "unbounditems" controls the behavior of Queue.get() for the given
                 object if the current interpreter (calling put()) is later
@@ -116,6 +117,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
                 If "unbounditems" is UNBOUND then it is returned by get() in place
                 of the unbound item.
                 """
+
         else:
             def put(
                 self,
@@ -137,6 +139,7 @@ if sys.version_info >= (3, 14):  # needed to satisfy pyright checks for Python <
                 then the "next object" is determined by the value of the
                 "unbounditems" argument to put().
                 """
+
         else:
             def get(self, timeout: SupportsIndex | None = None, *, _delay: float = 0.01) -> object: ...
 

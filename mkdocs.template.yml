@@ -52,6 +52,9 @@ markdown_extensions:
       anchor_linenums: true
   - pymdownx.inlinehilite:
   - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - markdown.extensions.attr_list:
   - pymdownx.keys:
   - pymdownx.tasklist:
@@ -101,8 +104,10 @@ plugins:
           - faq.md
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/rule-filters.css
 extra_javascript:
   - js/extra.js
+  - js/rule-filters.js
 not_in_nav: |
   /rules/*
   /formatter/*

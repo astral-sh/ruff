@@ -9,19 +9,22 @@ from typing_extensions import deprecated
 class Loader(metaclass=ABCMeta):
     """Abstract base class for import loaders."""
 
-    def load_module(self, fullname: str) -> types.ModuleType:
-        """Return the loaded module.
+    if sys.version_info < (3, 15):
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `exec_module()` instead.")
+        def load_module(self, fullname: str) -> types.ModuleType:
+            """Return the loaded module.
 
-        The module must be added to sys.modules and have import-related
-        attributes set properly.  The fullname is a str.
+            The module must be added to sys.modules and have import-related
+            attributes set properly.  The fullname is a str.
 
-        ImportError is raised on failure.
+            ImportError is raised on failure.
 
-        This method is deprecated in favor of loader.exec_module(). If
-        exec_module() exists then it is used to provide a backwards-compatible
-        functionality for this method.
+            This method is deprecated in favor of loader.exec_module(). If
+            exec_module() exists then it is used to provide a backwards-compatible
+            functionality for this method.
 
-        """
+            """
+
     if sys.version_info < (3, 12):
         @deprecated(
             "Deprecated since Python 3.4; removed in Python 3.12. "
@@ -44,6 +47,7 @@ class Loader(metaclass=ABCMeta):
         from creating a new module.  It may return None to indicate
         that the spec should create the new module.
         """
+
     # Not defined on the actual class for backwards-compatibility reasons,
     # but expected in new code.
     def exec_module(self, module: types.ModuleType) -> None: ...

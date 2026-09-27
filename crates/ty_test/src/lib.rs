@@ -1,6 +1,7 @@
 use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use anyhow::{anyhow, bail};
 use camino::Utf8Path;
+pub use mdtest::RunOptions;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self};
 use mdtest::{
@@ -13,17 +14,20 @@ use ruff_db::files::{FileRootKind, system_path_to_file};
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_diagnostics::Applicability;
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::OneIndexed;
+use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
+use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, ProgramSettings};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::UNDEFINED_REVEAL;
 use ty_python_semantic::{
-    PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
+    Db as _, PythonEnvironment, PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
     fix_all_diagnostics,
 };
 
@@ -44,8 +48,14 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    options: RunOptions,
 ) -> anyhow::Result<()> {
     let mut db = db::Db::setup();
+    let fixture_paths = FixturePaths {
+        absolute: absolute_fixture_path,
+        relative: relative_fixture_path,
+        snapshots: snapshot_path,
+    };
 
     let suite =
         parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
@@ -60,26 +70,37 @@ pub fn run(
         |test, assertion, output_format| {
             run_test(
                 &mut db,
-                absolute_fixture_path,
-                relative_fixture_path,
-                snapshot_path,
+                fixture_paths,
                 test,
                 assertion,
                 output_format,
+                options,
             )
         },
     )
 }
 
+#[derive(Clone, Copy)]
+struct FixturePaths<'a> {
+    absolute: &'a Utf8Path,
+    relative: &'a Utf8Path,
+    snapshots: &'a Utf8Path,
+}
+
 fn run_test(
     db: &mut db::Db,
-    absolute_fixture_path: &Utf8Path,
-    relative_fixture_path: &Utf8Path,
-    snapshot_path: &Utf8Path,
+    fixture_paths: FixturePaths<'_>,
     test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
     assertion: &mut String,
     output_format: OutputFormat,
+    options: RunOptions,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
+    let FixturePaths {
+        absolute: absolute_fixture_path,
+        relative: relative_fixture_path,
+        snapshots: snapshot_path,
+    } = fixture_paths;
+
     let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
         Log::Bool(enabled) => enabled.then(setup_logging),
         Log::Filter(filter) => setup_logging_with_filter(filter),
@@ -149,12 +170,10 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(
-                    embedded.lang,
-                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
-                ),
-                "Supported file types are: py (or python), pyi, text, cfg and ignore"
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "text" | "cfg" | "pth",
+                "Supported file types are: py (or python), pyi, ipynb, text, cfg and ignore"
             );
 
             let mut full_path = embedded.full_path(&project_root);
@@ -170,24 +189,10 @@ fn run_test(
                 {
                     typeshed_files.push(relative_path_to_custom_typeshed.to_path_buf());
                 }
-            } else if let Some(component_index) = full_path
-                .components()
-                .position(|c| c.as_str() == "<path-to-site-packages>")
+            } else if let Some(site_packages_path) =
+                expand_site_packages_placeholder(&full_path, python_version)
             {
-                // If the path contains `<path-to-site-packages>`, we need to replace it with the
-                // actual site-packages directory based on the Python platform and version.
-                let mut components = full_path.components();
-                let mut new_path: SystemPathBuf =
-                    components.by_ref().take(component_index).collect();
-                if cfg!(target_os = "windows") {
-                    new_path.extend(["Lib", "site-packages"]);
-                } else {
-                    new_path.push("lib");
-                    new_path.push(format!("python{python_version}"));
-                    new_path.push("site-packages");
-                }
-                new_path.extend(components.skip(1));
-                full_path = new_path;
+                full_path = site_packages_path;
             }
 
             let temp_string;
@@ -202,7 +207,7 @@ fn run_test(
             db.write_file(&full_path, to_write).unwrap();
 
             if !(full_path.starts_with(&src_path)
-                && matches!(embedded.lang, "py" | "python" | "pyi"))
+                && matches!(embedded.lang, "py" | "python" | "pyi" | "ipynb"))
             {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
@@ -212,7 +217,7 @@ fn run_test(
 
             Some(TestFile {
                 file,
-                code_blocks: embedded.python_code_blocks.clone(),
+                code_blocks: embedded.code_blocks.clone(),
             })
         })
         .collect();
@@ -220,7 +225,7 @@ fn run_test(
     // Create a custom typeshed `VERSIONS` file if none was provided.
     if let Some(typeshed_path) = custom_typeshed_path {
         db.files()
-            .try_add_root(db, typeshed_path, FileRootKind::LibrarySearchPath);
+            .try_add_root(db, typeshed_path, FileRootKind::SearchPath);
         if !has_custom_versions_file {
             let versions_file = typeshed_path.join("stdlib/VERSIONS");
             let contents = typeshed_files
@@ -241,29 +246,25 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let site_packages_paths = if configuration.dependencies().is_some() {
+    let python = if configuration.dependencies().is_some() {
         // If dependencies were specified, use the venv we just set up
-        let environment = PythonEnvironment::new(
-            &venv_for_external_dependencies,
-            SysPrefixPathOrigin::PythonCliFlag,
-            db.system(),
-        )
-        .expect("Python environment to point to a valid path");
-        environment
-            .site_packages_paths(db.system())
-            .expect("Python environment to be valid")
-            .into_vec()
-    } else if let Some(python) = configuration.python() {
-        let environment =
-            PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
-                .expect("Python environment to point to a valid path");
-        environment
-            .site_packages_paths(db.system())
-            .expect("Python environment to be valid")
-            .into_vec()
+        Some(venv_for_external_dependencies.as_path())
     } else {
-        vec![]
+        configuration.python()
     };
+    let python_environment = python.map(|python| {
+        PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
+            .expect("Python environment to point to a valid path")
+    });
+    let site_packages_paths = python_environment
+        .as_ref()
+        .map(|environment| {
+            environment
+                .site_packages_paths(db.system())
+                .expect("Python environment to be valid")
+                .into_vec()
+        })
+        .unwrap_or_default();
 
     // Make any relative extra-paths be relative to src_path
     let extra_paths = configuration
@@ -271,15 +272,19 @@ fn run_test(
         .unwrap_or_default()
         .iter()
         .map(|path| {
-            if path.is_absolute() {
+            let path = if path.is_absolute() {
                 path.clone()
             } else {
                 src_path.join(path)
-            }
+            };
+            expand_site_packages_placeholder(&path, python_version).unwrap_or(path)
         })
         .collect();
 
     let settings = ProgramSettings {
+        virtual_environment: python_environment
+            .filter(PythonEnvironment::is_virtual)
+            .map(|environment| environment.sys_prefix().to_path_buf()),
         python_version: PythonVersionWithSource {
             version: python_version,
             source: PythonVersionSource::Cli,
@@ -298,9 +303,15 @@ fn run_test(
         .expect("Failed to resolve search path settings"),
     };
 
-    Program::init_or_update(db, settings);
+    db.update_program(settings);
     db.update_analysis_options(configuration.analysis.as_ref());
-    db.update_mdtest_rule_selection(configuration.rules.as_ref());
+    db.update_dependency_metadata(
+        configuration
+            .dependency_metadata
+            .as_ref()
+            .map(|fixture| &fixture.metadata),
+    );
+    db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 
     let mut all_diagnostics = vec![];
@@ -330,17 +341,23 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
-                |inline_diagnostics| {
-                    mdtest::validate_inline_snapshot(
-                        db,
-                        "ty",
-                        test_file,
-                        &inline_diagnostics,
-                        &mut markdown_edits,
-                    )
-                },
-            ) {
+            let failure = match matcher::match_file(
+                db,
+                test_file.file,
+                python_version,
+                &diagnostics,
+                options,
+            )
+            .and_then(|inline_diagnostics| {
+                mdtest::validate_inline_snapshot(
+                    db,
+                    "ty",
+                    test_file,
+                    &inline_diagnostics,
+                    &mut markdown_edits,
+                    |rendered| normalize_site_packages_paths(rendered, python_version),
+                )
+            }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),
@@ -350,7 +367,8 @@ fn run_test(
 
             all_diagnostics.extend(diagnostics);
 
-            let pull_types_result = attempt_test(|file| pull_types(db, file), test_file);
+            let pull_types_result =
+                attempt_test(|file| pull_types(db, db.program_file(file)), test_file);
             match pull_types_result {
                 Ok(()) => {}
                 Err(failures) => {
@@ -481,22 +499,25 @@ struct ModuleInconsistency<'db> {
 /// `list_module`.
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
-    for from_list in list_modules(db).iter().copied() {
+    let environment = db.program().resolver_environment(db);
+    for from_list in list_modules(db, environment).iter().copied() {
         // TODO: For now list_modules does not partake in desperate module resolution so
         // only compare against confident module resolution.
-        errs.push(match resolve_module_confident(db, from_list.name(db)) {
-            None => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: None,
+        errs.push(
+            match resolve_module_confident(db, environment, from_list.name(db)) {
+                None => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: None,
+                },
+                Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
+                    db,
+                    from_list,
+                    from_resolve: Some(from_resolve),
+                },
+                _ => continue,
             },
-            Some(from_resolve) if from_list != from_resolve => ModuleInconsistency {
-                db,
-                from_list,
-                from_resolve: Some(from_resolve),
-            },
-            _ => continue,
-        });
+        );
     }
     if errs.is_empty() { Ok(()) } else { Err(errs) }
 }
@@ -549,6 +570,50 @@ impl std::fmt::Display for ModuleInconsistency<'_> {
     }
 }
 
+// Site-packages placeholders are specific to ty's fixtures. Keeping their normalization outside
+// the shared mdtest crate avoids rewriting Ruff snapshots or paths in displayed source and messages.
+fn normalize_site_packages_paths(rendered: &str, python_version: PythonVersion) -> String {
+    let unix_site_packages_path = format!("/lib/python{python_version}/site-packages/");
+    let mut normalized = String::with_capacity(rendered.len());
+
+    for line in rendered.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+
+        if trimmed.starts_with("--> ") || trimmed.starts_with("::: ") {
+            let line = line
+                .replace(&unix_site_packages_path, "/<path-to-site-packages>/")
+                .replace("/Lib/site-packages/", "/<path-to-site-packages>/");
+            normalized.push_str(&line);
+        } else {
+            normalized.push_str(line);
+        }
+    }
+
+    normalized
+}
+
+fn expand_site_packages_placeholder(
+    path: &SystemPath,
+    python_version: PythonVersion,
+) -> Option<SystemPathBuf> {
+    let component_index = path
+        .components()
+        .position(|component| component.as_str() == "<path-to-site-packages>")?;
+
+    let mut components = path.components();
+    let mut expanded: SystemPathBuf = components.by_ref().take(component_index).collect();
+    if cfg!(target_os = "windows") {
+        expanded.extend(["Lib", "site-packages"]);
+    } else {
+        expanded.push("lib");
+        expanded.push(format!("python{python_version}"));
+        expanded.push("site-packages");
+    }
+    expanded.extend(components.skip(1));
+
+    Some(expanded)
+}
+
 fn parse<'s>(
     short_title: &'s str,
     source: &'s str,
@@ -570,7 +635,31 @@ fn parse<'s>(
 
 #[cfg(test)]
 mod tests {
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
+
+    #[test]
+    fn normalizes_site_packages_paths_only_in_diagnostic_locations() {
+        let rendered = "warning[example]: Invalid value\n\
+             --> .venv/lib/python3.10/site-packages/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/Lib/site-packages/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+        let expected = "warning[example]: Invalid value\n\
+             --> .venv/<path-to-site-packages>/dependency.py:1:5\n\
+              |\n\
+            1 | path = \".venv/lib/python3.10/site-packages/dependency.py\"\n\
+              |\n\
+             ::: .venv/<path-to-site-packages>/other.py:2:1\n\
+            help: Inspect .venv/lib/python3.10/site-packages/dependency.py";
+
+        assert_eq!(
+            super::normalize_site_packages_paths(rendered, PythonVersion::PY310),
+            expected,
+        );
+    }
 
     #[test]
     fn multiple_sections_with_dependencies_not_allowed() {

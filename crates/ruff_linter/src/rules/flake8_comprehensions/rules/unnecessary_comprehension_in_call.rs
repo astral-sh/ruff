@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::FixAvailability;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_comprehension_with_min_max_sum_enabled;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{Edit, Fix, Violation};
@@ -67,7 +68,7 @@ use crate::{Edit, Fix, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", category = Category::Complexity)]
 pub(crate) struct UnnecessaryComprehensionInCall {
     comprehension_kind: ComprehensionKind,
 }
@@ -154,10 +155,6 @@ pub(crate) fn unnecessary_comprehension_in_call(
         }
     };
     if args.len() == 1 {
-        if elt.is_starred_expr() {
-            // The LibCST-based fixer does not yet support PEP 798 unpacking comprehensions.
-            return;
-        }
         // If there's only one argument, remove the list or set brackets.
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_comprehension_in_call(expr, checker.locator(), checker.stylist())

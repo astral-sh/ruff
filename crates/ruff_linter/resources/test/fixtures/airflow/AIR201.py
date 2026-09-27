@@ -114,6 +114,26 @@ task_17 = BashOperator(
     bash_command="{{ ti.xcom_pull(task_ids='unknown_task') }}",  # AIR201 (no fix)
 )
 
+# Referencing a builtin does not imply that a task variable is visible (no fix)
+task_26 = PythonOperator(
+    task_id="task_26",
+    op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (no fix)
+)
+
+# The same is true if the builtin was materialized by an earlier load
+print(max)
+task_27 = PythonOperator(
+    task_id="task_27",
+    op_args="{{ ti.xcom_pull(task_ids='max') }}",  # AIR201 (no fix)
+)
+
+# A variable that shadows a builtin is still eligible for a fix
+len = PythonOperator(task_id="len", python_callable=my_callable)
+task_28 = PythonOperator(
+    task_id="task_28",
+    op_args="{{ ti.xcom_pull(task_ids='len') }}",  # AIR201 (fix: len.output)
+)
+
 
 # Cases that should NOT trigger AIR201:
 

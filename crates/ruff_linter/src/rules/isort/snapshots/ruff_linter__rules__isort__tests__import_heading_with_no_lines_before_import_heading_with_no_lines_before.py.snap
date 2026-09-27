@@ -16,8 +16,8 @@ I001 [*] Import block is un-sorted or un-formatted
 10 | |
 11 | | from . import my_local_folder_object
    | |____________________________________^
-   |
 help: Organize imports
+   |
 1  + # Future imports
 2  | from __future__ import annotations
 3  |
@@ -35,3 +35,4 @@ help: Organize imports
    -
 14 + # Local folder imports
 15 | from . import my_local_folder_object
+   |

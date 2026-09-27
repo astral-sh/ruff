@@ -1,0 +1,50 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: diagnostics
+---
+{
+  "file://<temp_dir>/src/lib.py": [],
+  "file://<temp_dir>/src/main.py": [
+    {
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 0
+        },
+        "end": {
+          "line": 3,
+          "character": 19
+        }
+      },
+      "severity": 1,
+      "code": "type-assertion-failure",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#type-assertion-failure"
+      },
+      "source": "ty",
+      "message": "Type `int` does not match asserted type `str`\n\ninfo: `str` and `int` are not equivalent types"
+    }
+  ],
+  "vscode-notebook-cell://src/notebook.ipynb#0": [],
+  "vscode-notebook-cell://src/notebook.ipynb#1": [
+    {
+      "range": {
+        "start": {
+          "line": 2,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 19
+        }
+      },
+      "severity": 1,
+      "code": "type-assertion-failure",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#type-assertion-failure"
+      },
+      "source": "ty",
+      "message": "Type `int` does not match asserted type `str`\n\ninfo: `str` and `int` are not equivalent types"
+    }
+  ]
+}

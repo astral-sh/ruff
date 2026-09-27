@@ -10,6 +10,7 @@ use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::preview::{
     is_annotated_assignment_redefinition_enabled, is_f811_shadowing_in_type_checking_enabled,
@@ -70,7 +71,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.171")]
+#[violation_metadata(stable_since = "v0.0.171", category = Category::Suspicious)]
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,
@@ -213,6 +214,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each source statement gets an independent fix entry"
+    )]
     for entries in redefinitions.values() {
         let Some(source) = entries.iter().find_map(|info| info.runtime_import) else {
             continue;
@@ -256,6 +261,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     }
 
     // Create diagnostics for each statement.
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics or fixes produced"
+    )]
     for entries in redefinitions.values() {
         for info in entries {
             let name = info.binding.name(checker.source());
@@ -274,7 +283,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 info.shadowed,
             );
 
-            diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
+            diagnostic.set_primary_annotation_message(format_args!("`{name}` redefined here"));
 
             if let Some(range) = info.binding.parent_range(checker.semantic()) {
                 diagnostic.set_parent(range.start());

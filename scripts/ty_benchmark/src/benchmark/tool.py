@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import abc
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
@@ -147,18 +146,26 @@ class Mypy(Tool):
                 ]
             )
 
+        prepare = None
+
         if not self.warm:
+            cache_dir = ".mypy_cache_benchmark"
             command.extend(
                 [
-                    "--no-incremental",
                     "--cache-dir",
-                    os.devnull,
+                    cache_dir,
                 ]
             )
+            prepare = [
+                sys.executable,
+                "-c",
+                f"import shutil; shutil.rmtree({cache_dir!r}, ignore_errors=True)",
+            ]
 
         return Command(
             name="mypy (warm)" if self.warm else "mypy",
             command=command,
+            prepare=prepare,
         )
 
     @override
@@ -255,7 +262,6 @@ class Pyrefly(Tool):
             python-interpreter-path = "{venv.python.as_posix()}"
             python-version = "{project.python_version}"
             site-package-path = ["{venv.path.as_posix()}"]
-            ignore-missing-source = true
             untyped-def-behavior="check-and-infer-return-any"
             """,
         )

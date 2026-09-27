@@ -27,7 +27,6 @@ error[RUF075]: Context manager does not catch exceptions
   |
 7 |     yield  # snapshot: fallible-context-manager
   |     ^^^^^
-  |
 ```
 
 ## Yield inside a nested `with`, not last

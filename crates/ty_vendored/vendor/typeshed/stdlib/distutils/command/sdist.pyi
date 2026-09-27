@@ -21,6 +21,7 @@ class sdist(Command):
 
         Placed here so user_options can view it
         """
+
     user_options: ClassVar[list[tuple[str, str | None, str]]]
     boolean_options: ClassVar[list[str]]
     help_options: ClassVar[list[tuple[str, str | None, str, Callable[[], Unused]]]]

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-#[cfg(any(feature = "ty_instrumented", feature = "ruff_instrumented"))]
+#[cfg(any(feature = "ruff_instrumented", feature = "ty_instrumented"))]
 pub mod criterion;
 #[cfg(any(feature = "ty_instrumented", feature = "ty_walltime"))]
 pub mod real_world_projects;
@@ -31,70 +31,6 @@ pub static LARGE_DATASET: TestFile = TestFile::new(
     include_str!("../resources/large/dataset.py"),
 );
 
-/// Relative size of a test case. Benchmarks can use it to configure the time for how long a benchmark should run to get stable results.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub enum TestCaseSpeed {
-    /// A test case that is fast to run
-    Fast,
-
-    /// A normal test case
-    Normal,
-
-    /// A slow test case
-    Slow,
-}
-
-#[derive(Debug, Clone)]
-pub struct TestCase {
-    file: TestFile,
-    speed: TestCaseSpeed,
-}
-
-impl TestCase {
-    pub const fn fast(file: TestFile) -> Self {
-        Self {
-            file,
-            speed: TestCaseSpeed::Fast,
-        }
-    }
-
-    pub const fn normal(file: TestFile) -> Self {
-        Self {
-            file,
-            speed: TestCaseSpeed::Normal,
-        }
-    }
-
-    pub const fn slow(file: TestFile) -> Self {
-        Self {
-            file,
-            speed: TestCaseSpeed::Slow,
-        }
-    }
-
-    pub fn code(&self) -> &str {
-        self.file.code
-    }
-
-    pub fn name(&self) -> &str {
-        self.file.name
-    }
-
-    pub fn speed(&self) -> TestCaseSpeed {
-        self.speed
-    }
-
-    pub fn path(&self) -> PathBuf {
-        PathBuf::from(file!())
-            .parent()
-            .unwrap()
-            .parent()
-            .unwrap()
-            .join("resources")
-            .join(self.name())
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct TestFile {
     name: &'static str,
@@ -112,5 +48,15 @@ impl TestFile {
 
     pub fn name(&self) -> &str {
         self.name
+    }
+
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(file!())
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("resources")
+            .join(self.name())
     }
 }

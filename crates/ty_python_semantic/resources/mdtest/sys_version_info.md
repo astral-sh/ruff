@@ -145,3 +145,19 @@ reveal_type(sys.version_info[:3] >= (3, 10, 1))  # revealed: Literal[False]
 reveal_type(sys.version_info[3] == "final")  # revealed: bool
 reveal_type(sys.version_info[3] == "finalllllll")  # revealed: Literal[False]
 ```
+
+## `sys.implementation.version`
+
+The `version` field of `sys.implementation` is also a `_version_info`, but not necessarily the
+Python language version. For example, non-CPython implementations can use a different versioning
+scheme. Only the singleton `sys.version_info` should use ty's configured Python version:
+
+```py
+import sys
+
+reveal_type(sys.implementation.version)  # revealed: _version_info
+reveal_type(sys.implementation.version.major)  # revealed: int
+reveal_type(sys.implementation.version.minor)  # revealed: int
+reveal_type(sys.implementation.version[:2])  # revealed: tuple[int, int]
+reveal_type(sys.implementation.version >= (3, 9))  # revealed: bool
+```

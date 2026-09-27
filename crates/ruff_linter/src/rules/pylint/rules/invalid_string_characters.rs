@@ -1,9 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::token::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -26,7 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// x = "\b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterBackspace;
 
 impl Violation for InvalidCharacterBackspace {
@@ -62,7 +64,7 @@ impl Violation for InvalidCharacterBackspace {
 /// x = "\x1a"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterSub;
 
 impl Violation for InvalidCharacterSub {
@@ -98,7 +100,7 @@ impl Violation for InvalidCharacterSub {
 /// x = "\x1b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterEsc;
 
 impl Violation for InvalidCharacterEsc {
@@ -134,7 +136,7 @@ impl Violation for InvalidCharacterEsc {
 /// x = "\0"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterNul;
 
 impl Violation for InvalidCharacterNul {
@@ -169,7 +171,7 @@ impl Violation for InvalidCharacterNul {
 /// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterZeroWidthSpace;
 
 impl Violation for InvalidCharacterZeroWidthSpace {
@@ -186,7 +188,13 @@ impl Violation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, locator: &Locator) {
+pub(crate) fn invalid_string_characters(
+    context: &LintContext,
+    token: &Token,
+    locator: &Locator,
+    target_version: PythonVersion,
+    inside_interpolation: bool,
+) {
     let text = match token.kind() {
         // We can't use the `value` field since it's decoded and e.g. for f-strings removed a curly
         // brace that escaped another curly brace, which would gives us wrong column information.
@@ -239,7 +247,10 @@ pub(crate) fn invalid_string_characters(context: &LintContext, token: &Token, lo
             continue;
         };
 
-        if !token.unwrap_string_flags().is_raw_string() && !is_escaped {
+        if !(token.unwrap_string_flags().is_raw_string()
+            || is_escaped
+            || (!target_version.supports_pep_701() && inside_interpolation))
+        {
             let edit = Edit::range_replacement(replacement.to_string(), range);
             diagnostic.set_fix(Fix::safe_edit(edit));
         }

@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
     in_airflow_task_function, is_airflow_builtin_or_provider, is_airflow_task,
@@ -43,7 +44,7 @@ use ruff_text_size::TextRange;
 /// yesterday = today - timedelta(days=1)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct Airflow3Removal {
     deprecated: String,
     replacement: Replacement,
@@ -539,7 +540,7 @@ fn is_kwarg_parameter(semantic: &SemanticModel, name: &ExprName) -> bool {
 /// from airflow.datasets.manager import DatasetManager
 ///
 /// manager = DatasetManager()
-/// manager.register_datsaet_change()
+/// manager.register_dataset_change()
 /// ```
 fn check_method(checker: &Checker, call_expr: &ExprCall) {
     let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {

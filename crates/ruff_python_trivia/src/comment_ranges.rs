@@ -2,13 +2,69 @@ use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 
 use itertools::Itertools;
+use rustc_hash::FxHashSet;
 
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{has_leading_content, has_trailing_content, is_python_whitespace};
 
-/// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
+/// Token-derived range indexes shared by comment placement and formatting.
+#[derive(Clone, Default)]
+pub struct TriviaRanges {
+    comments: CommentRanges,
+    parenthesized_expressions: ParenthesizedExpressions,
+}
+
+impl TriviaRanges {
+    /// Creates a combined set of token-derived range indexes.
+    pub fn new(
+        comments: CommentRanges,
+        parenthesized_expressions: ParenthesizedExpressions,
+    ) -> Self {
+        Self {
+            comments,
+            parenthesized_expressions,
+        }
+    }
+
+    /// Returns the indexed comment ranges.
+    pub fn comments(&self) -> &CommentRanges {
+        &self.comments
+    }
+
+    /// Returns the indexed parenthesized expression ranges.
+    pub fn parenthesized(&self) -> &ParenthesizedExpressions {
+        &self.parenthesized_expressions
+    }
+}
+
+impl Debug for TriviaRanges {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.comments.fmt(f)
+    }
+}
+
+/// Index of source ranges enclosed by matching parentheses.
+#[derive(Clone, Default)]
+pub struct ParenthesizedExpressions {
+    ranges: FxHashSet<TextRange>,
+}
+
+impl ParenthesizedExpressions {
+    /// Creates an index from parenthesized expression ranges.
+    pub fn new(ranges: FxHashSet<TextRange>) -> Self {
+        Self { ranges }
+    }
+
+    /// Returns `true` if the index contains `range`.
+    pub fn contains(&self, range: TextRange) -> bool {
+        self.ranges.contains(&range)
+    }
+}
+
+/// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges
+/// are overlapping.
 #[derive(Clone, Default)]
 pub struct CommentRanges {
     raw: Vec<TextRange>,

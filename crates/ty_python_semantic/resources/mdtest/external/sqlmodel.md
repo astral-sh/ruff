@@ -23,7 +23,7 @@ user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 
-reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
+reveal_type(User.__init__)  # revealed: (self: User, *, id: LaxInt, name: LaxStr, **extra: Any) -> None
 
 User()  # error: [missing-argument]
 ```

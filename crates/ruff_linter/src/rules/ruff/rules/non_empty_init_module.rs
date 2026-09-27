@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{Violation, checkers::ast::Checker};
 
 /// ## What it does
@@ -73,7 +74,7 @@ use crate::{Violation, checkers::ast::Checker};
 ///
 /// [PEP-562]: https://peps.python.org/pep-0562/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.11", category = Category::Pedantic)]
 pub(crate) struct NonEmptyInitModule {
     strictly_empty_init_modules: bool,
 }

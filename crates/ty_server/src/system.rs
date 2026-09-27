@@ -3,32 +3,34 @@ use std::fmt;
 use std::fmt::Display;
 use std::hash::{DefaultHasher, Hash, Hasher as _};
 use std::panic::RefUnwindSafe;
+use std::process::Output;
 use std::sync::Arc;
 
 use crate::Db;
 use crate::document::{DocumentKey, LanguageId};
 use crate::session::index::{Document, Index};
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
+    Command, CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use serde::{Deserialize, Deserializer};
 use ty_ide::cached_vendored_path;
 
-/// Returns a [`Url`] for the given [`File`].
-pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
+/// Returns a [`Uri`] for the given [`File`].
+pub(crate) fn file_to_uri(db: &dyn Db, file: File) -> Option<Uri> {
     match file.path(db) {
-        FilePath::System(system) => Url::from_file_path(system.as_std_path()).ok(),
-        FilePath::SystemVirtual(path) => Url::parse(path.as_str()).ok(),
+        FilePath::System(system) => Uri::from_file_path(system.as_std_path()).ok(),
+        FilePath::SystemVirtual(path) => Uri::parse(path.as_str()).ok(),
         FilePath::Vendored(path) => {
             let system_path = cached_vendored_path(db, path)?;
 
-            Url::from_file_path(system_path.as_std_path()).ok()
+            Uri::from_file_path(system_path.as_std_path()).ok()
         }
     }
 }
@@ -49,7 +51,7 @@ impl AnySystemPath {
     }
 
     #[expect(unused)]
-    pub(crate) const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
+    const fn as_virtual(&self) -> Option<&SystemVirtualPath> {
         match self {
             AnySystemPath::SystemVirtual(path) => Some(path.as_path()),
             AnySystemPath::System(_) => None,
@@ -82,16 +84,20 @@ pub(crate) struct LSPSystem {
     /// This is used to delegate method calls that are not handled by the LSP system. It is also
     /// used as a fallback when the documents are not found in the LSP index.
     native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+
+    workspace_trust: WorkspaceTrust,
 }
 
 impl LSPSystem {
     pub(crate) fn new(
         index: Arc<Index>,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        workspace_trust: WorkspaceTrust,
     ) -> Self {
         Self {
             index: Some(index),
             native_system,
+            workspace_trust,
         }
     }
 
@@ -177,8 +183,8 @@ impl System for LSPSystem {
         self.native_system.canonicalize_path(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.native_system.path_exists_case_sensitive(path, prefix)
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.native_system.is_same_file(first, second)
     }
 
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
@@ -275,16 +281,56 @@ impl System for LSPSystem {
         self
     }
 
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.native_system.case_sensitivity()
-    }
-
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         self.native_system.env_var(name)
     }
 
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        match self.workspace_trust {
+            WorkspaceTrust::Trusted => self.native_system.command_executor(),
+            WorkspaceTrust::Untrusted => Some(&UntrustedWorkspaceExecutor),
+        }
+    }
+
     fn dyn_clone(&self) -> Box<dyn System> {
         Box::new(self.clone())
+    }
+}
+
+/// Whether the client trusts the files in the workspace.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum WorkspaceTrust {
+    #[default]
+    Trusted,
+    Untrusted,
+}
+
+impl<'de> Deserialize<'de> for WorkspaceTrust {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // The LSP option is `untrustedWorkspace`, so `true` means untrusted.
+        Ok(match Option::<bool>::deserialize(deserializer)? {
+            Some(true) => Self::Untrusted,
+            Some(false) | None => Self::Trusted,
+        })
+    }
+}
+
+/// Rejects commands without retaining the LSP document index.
+struct UntrustedWorkspaceExecutor;
+
+impl CommandExecutor for UntrustedWorkspaceExecutor {
+    fn execute(&self, _command: Command) -> Result<Output> {
+        Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "external commands are disabled in an untrusted workspace",
+        ))
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
+        Box::new(Self)
     }
 }
 
@@ -318,8 +364,8 @@ fn document_revision(document: &Document, index: &Index) -> FileRevision {
             // The notification updating the cell content on paste re-used the same version as when the cell was added.
             // Because of that, hash all cell versions and the notebook versions together.
             let mut hasher = DefaultHasher::new();
-            for cell_url in notebook.cell_urls() {
-                if let Ok(cell) = index.document(&DocumentKey::from_url(cell_url)) {
+            for cell_uri in notebook.cell_uris() {
+                if let Ok(cell) = index.document(&DocumentKey::from_uri(cell_uri)) {
                     cell.version().hash(&mut hasher);
                 }
             }

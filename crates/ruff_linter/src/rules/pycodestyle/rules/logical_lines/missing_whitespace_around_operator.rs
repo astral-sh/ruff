@@ -3,6 +3,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::rules::pycodestyle::helpers::is_non_logical_token;
 use crate::rules::pycodestyle::rules::logical_lines::{DefinitionState, LogicalLine};
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -30,7 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#pet-peeves
 // E225
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespaceAroundOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
@@ -70,7 +71,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E226
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespaceAroundArithmeticOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
@@ -110,7 +111,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundArithmeticOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E227
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespaceAroundBitwiseOrShiftOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
@@ -150,7 +151,7 @@ impl AlwaysFixableViolation for MissingWhitespaceAroundBitwiseOrShiftOperator {
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 // E228
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.269")]
+#[violation_metadata(preview_since = "v0.0.269", category = Category::Formatting)]
 pub(crate) struct MissingWhitespaceAroundModuloOperator;
 
 impl AlwaysFixableViolation for MissingWhitespaceAroundModuloOperator {
@@ -357,7 +358,7 @@ fn diagnostic_kind_for_operator<'a>(
 }
 
 fn is_whitespace_needed(kind: TokenKind) -> bool {
-    matches!(
+    if matches!(
         kind,
         TokenKind::DoubleStarEqual
             | TokenKind::StarEqual
@@ -386,8 +387,14 @@ fn is_whitespace_needed(kind: TokenKind) -> bool {
             | TokenKind::ColonEqual
             | TokenKind::Slash
             | TokenKind::Percent
-    ) || kind.is_arithmetic()
-        || (kind.is_bitwise_or_shift() &&
-            // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
-            !matches!(kind, TokenKind::Tilde))
+    ) {
+        return true;
+    }
+
+    if kind.is_arithmetic() {
+        return true;
+    }
+
+    // As a special-case, pycodestyle seems to ignore whitespace around the tilde.
+    kind.is_bitwise_or_shift() && kind != TokenKind::Tilde
 }

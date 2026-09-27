@@ -32,6 +32,13 @@ impl EnvVars {
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
 
+    /// Perturbs constraint-set variable ordering to help detect order-dependent inference.
+    ///
+    /// Set to `reverse` to reverse builder-local IDs, or to an integer to select an arbitrary
+    /// permutation of the naturally chosen variable ordering.
+    #[attr_hidden]
+    pub const TY_CONSTRAINT_SET_ORDER: &'static str = "TY_CONSTRAINT_SET_ORDER";
+
     /// Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
     ///
     /// For example, how many files should be checked in parallel.
@@ -53,6 +60,20 @@ impl EnvVars {
     ///
     /// Accepts the same values as the `--output-format` command-line argument.
     pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
+
+    /// Enable uv integration.
+    ///
+    /// When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
+    /// root and initialize script environments. When set to `"scripts"`, only script environments
+    /// are initialized.
+    #[attr_hidden]
+    pub const TY_UV: &'static str = "TY_UV";
+
+    /// The path to the uv executable to use for workspace discovery and script environments.
+    ///
+    /// ty uses this path when uv integration is enabled by `TY_UV`.
+    #[attr_hidden]
+    pub const UV: &'static str = "UV";
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";

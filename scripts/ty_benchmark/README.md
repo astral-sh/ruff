@@ -5,6 +5,7 @@
     - Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
 1. Build ty: `cargo build --bin ty --release`
 1. `cd` into the benchmark directory: `cd scripts/ty_benchmark`
+1. Install npm 11.10.0 or newer, which supports the dependency cooldown in `.npmrc`
 1. Install Pyright: `npm ci --ignore-scripts`
 1. Run benchmarks: `uv run benchmark`
 
@@ -64,6 +65,9 @@ uv run --python 3.14 pytest src/benchmark/test_lsp_diagnostics.py::test_incremen
 
 The tested type checkers implement Python's type system to varying degrees and
 some projects only successfully pass type checking using a specific type checker.
+We benchmark against the latest version of each type checker, but some projects
+may use another version in practice, leading to different diagnostic results
+between benchmarking and reality.
 
 ## Updating the benchmark
 

@@ -1,3 +1,5 @@
+"""Interface to the standard Tk message boxes."""
+
 from tkinter import Misc
 from tkinter.commondialog import Dialog
 from typing import ClassVar, Final, Literal
@@ -68,7 +70,7 @@ def askquestion(
     default: Literal["yes", "no"] = ...,
     parent: Misc = ...,
 ) -> str:
-    """Ask a question"""
+    """Ask a question; return the symbolic name of the selected button"""
 
 def askokcancel(
     title: str | None = None,
@@ -79,7 +81,7 @@ def askokcancel(
     default: Literal["ok", "cancel"] = ...,
     parent: Misc = ...,
 ) -> bool:
-    """Ask if operation should proceed; return true if the answer is ok"""
+    """Ask if operation should proceed; return True if the answer is ok"""
 
 def askyesno(
     title: str | None = None,
@@ -90,7 +92,7 @@ def askyesno(
     default: Literal["yes", "no"] = ...,
     parent: Misc = ...,
 ) -> bool:
-    """Ask a question; return true if the answer is yes"""
+    """Ask a question; return True if the answer is yes"""
 
 def askyesnocancel(
     title: str | None = None,
@@ -101,7 +103,7 @@ def askyesnocancel(
     default: Literal["cancel", "yes", "no"] = ...,
     parent: Misc = ...,
 ) -> bool | None:
-    """Ask a question; return true if the answer is yes, None if cancelled."""
+    """Ask a question; return True if the answer is yes, None if cancelled"""
 
 def askretrycancel(
     title: str | None = None,
@@ -112,4 +114,4 @@ def askretrycancel(
     default: Literal["retry", "cancel"] = ...,
     parent: Misc = ...,
 ) -> bool:
-    """Ask if operation should be retried; return true if the answer is yes"""
+    """Ask if operation should be retried; return True if the answer is retry"""

@@ -7,6 +7,7 @@ use ruff_python_semantic::Binding;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,7 +40,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.84")]
+#[violation_metadata(stable_since = "v0.0.84", category = Category::Pedantic)]
 pub(crate) struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
     name: String,
@@ -96,6 +97,10 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         finder.names
     };
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics or fixes produced"
+    )]
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
         if checker.settings().dummy_variable_rgx.is_match(name) {

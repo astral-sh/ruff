@@ -17,16 +17,14 @@ TC004 [*] Move import `datetime` out of type-checking block. Import is used for 
 21 |     pass
    |
 help: Move out of type-checking block
-4  |
-5  | import fastapi
+   |
 6  | from fastapi import FastAPI as Api
 7  + import datetime
 8  |
 9  | if TYPE_CHECKING:
    -     import datetime  # TC004
 10 |     from array import array  # TC004
-11 |
-12 | app = fastapi.FastAPI("First application")
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC004 [*] Move import `array.array` out of type-checking block. Import is used for more than type hinting.
@@ -47,8 +45,7 @@ TC004 [*] Move import `array.array` out of type-checking block. Import is used f
 25 |     pass
    |
 help: Move out of type-checking block
-4  |
-5  | import fastapi
+   |
 6  | from fastapi import FastAPI as Api
 7  + from array import array
 8  |
@@ -56,6 +53,5 @@ help: Move out of type-checking block
 10 |     import datetime  # TC004
    -     from array import array  # TC004
 11 |
-12 | app = fastapi.FastAPI("First application")
-13 |
+   |
 note: This is an unsafe fix and may change runtime behavior

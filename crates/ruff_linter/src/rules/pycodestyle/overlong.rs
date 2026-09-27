@@ -1,11 +1,10 @@
 use std::ops::Deref;
 
-use ruff_python_trivia::{CommentRanges, find_trailing_pragma_offset, is_pragma_comment};
+use ruff_python_trivia::CommentRanges;
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
-use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder};
-use crate::preview::is_trailing_pragma_in_line_length_enabled;
+use crate::line_width::{IndentWidth, LineLength, LineWidthBuilder, pragma_offset_for_line_length};
 use crate::settings::types::PreviewMode;
 
 #[derive(Debug)]
@@ -134,18 +133,10 @@ impl<'a> StrippedLine<'a> {
         let comment = &line.as_str()[comment_range];
 
         // Ex) `# type: ignore` or (in preview) `# some comment # noqa: F401`
-        if is_trailing_pragma_in_line_length_enabled(preview) {
-            if let Some(offset) = find_trailing_pragma_offset(comment) {
-                // Strip only the pragma suffix from the comment, preserving any
-                // preceding non-pragma comment text.
-                let pragma_start = usize::from(comment_range.start()) + offset;
-                let prefix = line[..pragma_start].trim_end();
-                return Self::WithoutPragma(Line::new(prefix, line.start()));
-            }
-        }
-        // Stable behavior: only strip when the entire comment is a pragma.
-        else if is_pragma_comment(comment) {
-            let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
+        if let Some(offset) = pragma_offset_for_line_length(comment, preview) {
+            // Strip the pragma from the line, preserving any preceding non-pragma comment text.
+            let pragma_start = usize::from(comment_range.start()) + offset;
+            let prefix = line[..pragma_start].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
         }
 

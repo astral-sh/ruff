@@ -119,6 +119,7 @@ if sys.platform != "win32":
 
     def nl_langinfo(key: int, /) -> str:
         """Return the value for the locale information associated with key."""
+
     # This is dependent on `libintl.h` which is a part of `gettext`
     # system dependency. These functions might be missing.
     # But, we always say that they are present.

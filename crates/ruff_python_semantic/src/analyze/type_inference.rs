@@ -49,6 +49,8 @@ impl ResolvedPythonType {
                 Self::Union(a)
             }
             (Self::Union(mut a), Self::Union(b)) => {
+                let mut b = b.into_iter().collect::<Vec<_>>();
+                b.sort_unstable();
                 for b_element in b {
                     // If `b_element` is a subtype of any of the types in `a`, then
                     // `b_element` is redundant.
@@ -441,7 +443,7 @@ pub enum NumberLike {
 impl NumberLike {
     /// Coerces two number-like types to the "highest" number-like type.
     #[must_use]
-    pub fn coerce(self, other: NumberLike) -> NumberLike {
+    fn coerce(self, other: NumberLike) -> NumberLike {
         match (self, other) {
             (NumberLike::Complex, _) | (_, NumberLike::Complex) => NumberLike::Complex,
             (NumberLike::Float, _) | (_, NumberLike::Float) => NumberLike::Float,

@@ -85,6 +85,7 @@ class BaseFix:
 
         The new name is guaranteed not to conflict with other identifiers.
         """
+
     first_log: bool
     def log_message(self, message: str) -> None: ...
     def cannot_convert(self, node: Base, reason: str | None = None) -> None:

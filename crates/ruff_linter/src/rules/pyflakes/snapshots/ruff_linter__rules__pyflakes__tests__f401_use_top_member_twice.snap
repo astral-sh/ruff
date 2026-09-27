@@ -11,8 +11,8 @@ F401 [*] `a.b` imported but unused
 5 | a.bar()
   |
 help: Remove unused import: `a.b`
-1 |
+  |
 2 | import a
   - import a.b
 3 | a.foo()
-4 | a.bar()
+  |

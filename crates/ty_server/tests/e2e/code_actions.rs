@@ -1,11 +1,11 @@
 use crate::{TestServer, TestServerBuilder};
 use anyhow::Result;
-use lsp_types::{DocumentDiagnosticReportResult, Position, Range, request::CodeActionRequest};
+use lsp_types::{CodeActionRequest, DocumentDiagnosticReport, Position, Range};
 use ruff_db::system::SystemPath;
 
 fn code_actions_at(
     server: &TestServer,
-    diagnostics: DocumentDiagnosticReportResult,
+    diagnostics: DocumentDiagnosticReport,
     file: &SystemPath,
     range: Range,
 ) -> lsp_types::CodeActionParams {
@@ -16,10 +16,12 @@ fn code_actions_at(
         range,
         context: lsp_types::CodeActionContext {
             diagnostics: match diagnostics {
-                lsp_types::DocumentDiagnosticReportResult::Report(
-                    lsp_types::DocumentDiagnosticReport::Full(report),
-                ) => report.full_document_diagnostic_report.items,
-                _ => panic!("Expected full diagnostic report"),
+                DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
+                    report.full_document_diagnostic_report.items
+                }
+                DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+                    panic!("Expected full diagnostic report")
+                }
             },
             only: None,
             trigger_kind: None,
@@ -74,6 +76,69 @@ unused-ignore-comment = \"warn\"
     // Get code actions for the line with the unused ignore comment.
     let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
     let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+#[test]
+fn code_action_unsafe_fix() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    // Removing the suppression is unsafe because it would activate `fmt: off`.
+    let foo_content = "\
+# ty: ignore[division-by-zero] # fmt: off
+x = 20 / 2
+";
+
+    let ty_toml = SystemPath::new("ty.toml");
+    let ty_toml_content = "\
+[rules]
+unused-ignore-comment = \"warn\"
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(ty_toml, ty_toml_content)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let code_action_params = code_actions_at(&server, diagnostics, foo, full_range(foo_content));
+    let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
+    let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+#[test]
+fn code_action_undefined_reveal() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "reveal_type(1)\n";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(
+            SystemPath::new("src/ty.toml"),
+            "[environment]\npython-version = '3.11'\n",
+        )?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let params = code_actions_at(&server, diagnostics, foo, full_range(foo_content));
+    let request_id = server.send_request::<CodeActionRequest>(params);
+    let code_actions = server.await_response::<CodeActionRequest>(&request_id);
 
     insta::assert_json_snapshot!(code_actions);
 
@@ -147,6 +212,44 @@ x: Literal[1] = 1
     let code_action_params = code_actions_at(&server, diagnostics, foo, range);
 
     // Get code actions
+    let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
+    let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+#[test]
+fn code_action_with_full_diagnostic_output_link() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+x: Literal[1] = 1
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(SystemPath::new("ty.toml"), "")?
+        .with_file(foo, foo_content)?
+        .with_full_diagnostic_output()
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let mut code_action_params =
+        code_actions_at(&server, diagnostics, foo, full_range(foo_content));
+
+    // The ty VS Code extension replaces the diagnostic code with a link label.
+    // The original diagnostic ID in `data` must still drive lazy code actions.
+    for diagnostic in &mut code_action_params.context.diagnostics {
+        diagnostic.code = Some(lsp_types::Code::String(
+            "Click for full diagnostic".to_string(),
+        ));
+    }
+
     let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
     let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
 

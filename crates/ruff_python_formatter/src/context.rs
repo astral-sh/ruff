@@ -2,8 +2,11 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::ExprRef;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_trivia::TriviaRanges;
+use ruff_text_size::Ranged;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
@@ -13,6 +16,7 @@ pub struct PyFormatContext<'a> {
     options: PyFormatOptions,
     contents: &'a str,
     comments: Comments<'a>,
+    trivia: &'a TriviaRanges,
     tokens: &'a Tokens,
     node_level: NodeLevel,
     indent_level: IndentLevel,
@@ -34,12 +38,14 @@ impl<'a> PyFormatContext<'a> {
         options: PyFormatOptions,
         contents: &'a str,
         comments: Comments<'a>,
+        trivia: &'a TriviaRanges,
         tokens: &'a Tokens,
     ) -> Self {
         Self {
             options,
             contents,
             comments,
+            trivia,
             tokens,
             node_level: NodeLevel::TopLevel(TopLevelStatementPosition::Other),
             indent_level: IndentLevel::new(0),
@@ -72,8 +78,16 @@ impl<'a> PyFormatContext<'a> {
         &self.comments
     }
 
+    pub(crate) fn trivia(&self) -> &'a TriviaRanges {
+        self.trivia
+    }
+
     pub(crate) fn tokens(&self) -> &'a Tokens {
         self.tokens
+    }
+
+    pub(crate) fn is_expression_parenthesized(&self, expression: ExprRef) -> bool {
+        self.trivia.parenthesized().contains(expression.range())
     }
 
     /// Returns a non-None value only if the formatter is running on a code
@@ -101,7 +115,7 @@ impl<'a> PyFormatContext<'a> {
         self.interpolated_string_state
     }
 
-    pub(crate) fn set_interpolated_string_state(
+    fn set_interpolated_string_state(
         &mut self,
         interpolated_string_state: InterpolatedStringState,
     ) {
@@ -139,12 +153,14 @@ impl Debug for PyFormatContext<'_> {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) enum InterpolatedStringState {
-    /// The formatter is inside an f-string expression element i.e., between the
-    /// curly brace in `f"foo {x}"`.
+    /// The formatter is inside the elements of an f-string or t-string, including
+    /// literal text and interpolations. In `f"foo {x}"`, this state is active
+    /// while formatting both `foo ` and `{x}`.
     ///
-    /// The containing `FStringContext` is the surrounding f-string context.
+    /// The containing `InterpolatedStringContext` is the surrounding f-string context.
     InsideInterpolatedElement(InterpolatedStringContext),
-    /// The formatter is inside more than one nested f-string, such as in `nested` in:
+    /// The formatter is inside more than one nested interpolated string, such as
+    /// in `nested` in:
     ///
     /// ```py
     /// f"{f'''{'nested'} inner'''} outer"
@@ -156,6 +172,16 @@ pub(crate) enum InterpolatedStringState {
 }
 
 impl InterpolatedStringState {
+    /// Entering another interpolated string increases the nesting depth.
+    pub(crate) fn enter_string(self, context: InterpolatedStringContext) -> Self {
+        match self {
+            Self::Outside => Self::InsideInterpolatedElement(context),
+            Self::InsideInterpolatedElement(_) | Self::NestedInterpolatedElement(_) => {
+                Self::NestedInterpolatedElement(context)
+            }
+        }
+    }
+
     pub(crate) fn can_contain_line_breaks(self) -> Option<bool> {
         match self {
             InterpolatedStringState::InsideInterpolatedElement(context)

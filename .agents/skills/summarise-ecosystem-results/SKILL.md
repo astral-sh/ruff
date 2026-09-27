@@ -5,70 +5,51 @@ description: Use when a user says "summarise ecosystem results", "summarize this
 
 # Summarise Ecosystem Results
 
-Use this skill when asked to summarise ecosystem results for a Ruff PR with the `ty` label.
+## Priorities
 
-## Find the Report
+1. **Produce a readable document that pulls out common themes and patterns across the ecosystem.** Explain what changed, why it changed, and which recurring code patterns account for the effects. But don't be too verbose in your prose: show the changes through examples, and keep prose descriptions of these examples reasonably concise. Exhaustive reproduction, minimized examples, and complete entry inventories provide the evidence for your synthesis.
+2. Reproduce every retained source-attributable behavior with the exact environment used by the Actions run.
+3. Minimize every distinct source-attributable behavior change using the [minimizing-ty-ecosystem-changes skill](../minimizing-ty-ecosystem-changes/SKILL.md).
+4. Highlight new or meaningfully changed project failures, including intermittent severe failures, in the opening summary.
+5. Keep execution, audit, and traceability bookkeeping out of the report, except for the entry inventories and concise reproduction information required by the template.
 
-Accept any of these inputs:
+## GitHub CLI Telemetry
 
-- A PR number.
-- A GitHub PR URL.
-- A GitHub comment URL on a PR, such as `https://github.com/astral-sh/ruff/pull/25342#issuecomment-4525002693`.
-- A full detailed HTML ecosystem report URL.
+Prefix every direct or indirect `gh` invocation with `GH_TELEMETRY=false`, including `GH_TELEMETRY=false uv run --script scripts/collect_ty_ecosystem_run_metadata.py ...`. Require the same of subagents. Codex tool calls may start separate shells, so an `export` in an earlier call is insufficient.
 
-Determine the PR number first. If the user gave only a PR number, open `https://github.com/astral-sh/ruff/pull/<number>`.
+## Deliverable
 
-Find the ty ecosystem-results comment on the PR. Search PR comments for terms such as "ecosystem", "full report", "HTML report", and "detailed report". From that comment, open the linked full detailed HTML report.
+Create `PR_<number>_ECOSYSTEM_SUMMARY.md` at the repository root by adapting [assets/report-template.md](assets/report-template.md). The finished artifact must be GitHub-flavored Markdown suitable for a GitHub comment, with each prose paragraph and list item on one source line.
 
-Use the PR comment as the change list and the full detailed HTML report as the source of detailed evidence. When the report includes exact project revisions, use those revisions rather than current upstream checkouts.
+Use the template's structure and omissions as the report contract. Remove all placeholders and HTML comments. Link external source locations with permalinks such as `[project file.py:123](permalink)`; never emit raw URLs.
 
-Start every summary from a clean slate. DO NOT trust retained memories of previous summaries or minimizations, and DO NOT trust local artifacts left by previous investigations. Independently rerun the current workflow, including reproduction and minimization, using fresh artifacts prepared at the start of the task.
+If summarising an ecosystem report is the only thing you're asked to do in a Codex App thread, you should rename that thread to "PR <number> ecosystem summary".
 
-## Minimize in Parallel
+## Reporting Policy
 
-Before minimizing, load and apply the `minimizing-ty-ecosystem-changes` skill to each ecosystem change.
+- Focus on new or meaningfully changed behavior relative to the merge base. Evaluate individual diagnostics and failure outcomes, not a project's overall flaky or persistent status.
+- Ignore all `unknown-rule` diagnostic changes from ecosystem-analyzer. Exclude them from reproduction assignments, report entries, and hit counts.
+- Omit flaky diagnostic changes, unchanged failures, and frequency fluctuations that leave the observed outcomes unchanged.
+- Report new, fixed, or meaningfully changed panics, crashes, overflows, and timeouts, including merge-base and PR run frequencies when intermittent behavior is involved.
 
-Follow that skill's `Building ty` section once at the start of the task: build ty on the PR branch and the PR's merge base, then copy both executables and the PR branch's ecosystem config to stable paths. If delegating minimization work, the primary agent MUST prepare these fresh shared artifacts before spawning any subagents. It is safe for every subagent to use the same two copied executables and copied config concurrently: treat those artifacts as read-only inputs.
+## Workflow
 
-If possible, use subagents to parallelize this work. Decide how to batch changes so the overall task finishes as quickly as possible while still allowing each subagent to work methodically. Reasonable batching strategies include grouping related changes by project, diagnostic code, suspected cause, or report section, while keeping large groups split enough to avoid one slow subagent blocking the whole task. DO NOT spawn more subagents than you can run in parallel.
+1. **Freeze the evidence.** Preserve any report URL or ecosystem-results comment explicitly supplied by the user before identifying the PR. For PR-only input, find its ecosystem-results comment and linked detailed report. Capture the matching Actions run and attempt as described in [references/evidence-acquisition.md](references/evidence-acquisition.md); never replace a supplied report with the PR's current report. Recover exact-run metadata promptly, review runtime evidence as described in the minimizing skill, then prepare both exact-revision profiling binaries and the shared configuration in the chosen execution environment before assigning subagent work. Ignore later comment edits, PR updates, and workflow runs. Prefer the selected attempt's validated `full-report/diff.json` as the authoritative structured change inventory, retain its matching frozen HTML report, and use the comment for orientation when available. Fall back to the frozen HTML report if the JSON report is unavailable.
+2. **Identify changed outcomes.** Inspect the structured diff for added, removed, and modified projects; stable diagnostic additions, removals, and rewrites; project failures; and intermittent exit-status changes. Preserve diagnostic levels, duplicate occurrences, source permalinks, project strictness, panic evidence, and observed run frequencies. Apply Reporting Policy above without excluding stable diagnostics or changed severe failures merely because they come from flaky projects. Use the matching HTML report for visual context, or as the primary evidence when structured JSON cannot be obtained safely.
+3. **Reproduce from scratch.** Ignore retained memories and previous local artifacts. Load the `minimizing-ty-ecosystem-changes` skill, collect exact-run metadata once, and reproduce every retained, source-attributable diagnostic or panic before explaining or minimizing it. Reproduce intermittent severe failure changes with the reported merge-base and PR run counts. Verify retained outcomes without recoverable source against their captured statuses, stderr, panic evidence, and run frequencies.
+4. **Minimize to completion with provenance.** For each distinct source-attributable behavior change, complete the minimizing skill's advanced-minimization workflow and final audit. If a genuine external blocker prevents completion, report that blocker to the user and identify the report as incomplete.
+5. **Deduplicate and synthesize.** After reproducing every retained diagnostic, deduplicate reproducers only when the same base-to-PR behavior, underlying trigger, explanation, and reproducer account for every represented entry. Identical diagnostic text or displayed `@Todo` types do not establish equivalence. Review the complete set of findings together, including results from different subagents, to identify recurring code patterns and shared causes across projects. Build the report around those themes, explaining the connections between representative examples and the broader ecosystem effects, following the report template.
+6. **Find existing ty issues.** When a diagnostic change exposes a pre-existing shortcoming in ty, search the `astral-sh/ty` issue tracker for the precise underlying behavior. Link matching issues directly from the relevant report section; do not mistake incorrect or incomplete third-party annotations for ty shortcomings.
+7. **Write and verify.** First verify that a reader can understand the main ecosystem patterns and their significance from the narrative and representative examples. Check the report template's presentation and coverage requirements. Verify that every source-attributable behavior change has a reproducer that satisfies the minimizing skill's completion criteria. The primary agent must verify that every retained import is necessary: neither removing it nor inlining its definitions preserves the underlying behavior. For retained third-party imports, also verify that the library's identity or third-party search-path classification is essential to identified ty behavior. Verify that each minimized example and its explanation make the original real-world code pattern understandable. If minimization has obscured that pattern, restore meaningful names or enough surrounding structure to make the connection clear, then reverify both revisions. Preserve the minimizing skill’s priority for removing avoidable imports and inlining definitions; when inlining makes the original pattern less recognizable, briefly explain the connection in prose. Ensure the prose accurately describes the final example. Check every change number, link, diagnostic, reproducer's source provenance, and causal fingerprint when required. Present the Markdown file as the finished product only after these checks pass.
 
-If subagents are not available, batch the minimization work manually and minimize the batches sequentially. Keep batches small enough that each pass can still be checked carefully.
+## Parallel execution
 
-Give each subagent a self-contained assignment:
+This skill explicitly requests subagents when the report contains multiple affected projects or independently investigable entries.
 
-- The PR number, PR URL, ecosystem comment URL, and detailed HTML report URL.
-- The exact ecosystem changes assigned to that subagent.
-- The requirement to use the `minimizing-ty-ecosystem-changes` process rigorously.
-- The exact paths to the fresh copied merge-base binary, PR binary, and PR ecosystem config prepared by the primary agent.
-- The requirement to reuse those shared artifacts as read-only inputs. Subagents MUST NOT rebuild ty, check out Ruff refs, or overwrite the shared artifacts.
-- The requirement to independently reproduce and minimize the assigned changes from the report using a fresh, uniquely named temporary project directory, without trusting retained memories or local project artifacts left by previous investigations.
-- The expected Markdown output format for each minimized change.
+Once the exact-run metadata, both profiling binaries, and shared configuration are ready, spawn as many subagents as the available concurrency budget and independent work allow, reserving one slot for the primary agent. Keep available slots occupied by assigning further work as subagents finish.
 
-Each subagent should proceed methodically through all assigned changes. If a subagent moves on to a new change and that change appears very similar to one it has already minimized, it may skip the new change without completing the full minimisation skill, but it must record why the skipped change appears to demonstrate the same behavior.
+Assign disjoint projects or explicit report entries. Apparent similarity may guide scheduling, but does not establish causal equivalence. Follow all existing requirements for exhaustive reproduction, verified reduction chains, exhaustive minimization, and grouping by verified cause.
 
-## Collect Results
+The primary agent owns the frozen evidence, shared profiling binaries, configuration, coordination, and final report. Follow [references/subagent-handoff.md](references/subagent-handoff.md) for handoff and shared-artifact requirements.
 
-After all subagents finish, collect their minimizations into one Markdown file at the repository root:
-
-```text
-PR_<number>_ECOSYSTEM_SUMMARY.md
-```
-
-Remove minimizations that appear to demonstrate the same behavior change. Prefer the smallest and clearest minimized reproducer, especially one that is single-file and has fewer imports.
-
-At the top of the file, add prose summarising the distinct behavior changes demonstrated by the retained minimizations. Then include the retained minimizations with enough detail for a reader to understand and reproduce them.
-
-For each retained minimization, include:
-
-- The original project and report entry.
-- The diagnostic or behavior change on `main` versus the PR.
-- The minimized code.
-- An import audit: attempt to delete every import, inline third-party definitions where possible, and explain why each surviving third-party import is necessary.
-
-If the minimized behavior change is a diagnostic change, the minimized Python snippet MUST include the full diagnostic message and error code on both branches, as a comment above or on the relevant line of code. Include duplicated diagnostics when relevant.
-
-At the bottom of the file, after the analysis and retained minimizations, add a verification section with the commands or comparison method used to verify each retained minimization.
-
-ANY reference to a line number in an external project MUST use a permalink in the form `[project file.py:123](permalink)`. Referring to an external line number without a permalink is unacceptable. The finished report should NEVER include "raw" URL links; it should ALWAYS use inline Markdown links with square brackets and parentheses.
-
-Present `PR_<number>_ECOSYSTEM_SUMMARY.md` as the finished product.
+If multiple independent assignments exist but no subagents are spawned, record the specific reason.

@@ -292,6 +292,10 @@ where
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut builder = f.debug_map();
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "Debug output intentionally reflects the map's unspecified order"
+        )]
         for (key, entry) in &self.index {
             builder.entry(&key, &LeadingDanglingTrailing::from_entry(entry, self));
         }

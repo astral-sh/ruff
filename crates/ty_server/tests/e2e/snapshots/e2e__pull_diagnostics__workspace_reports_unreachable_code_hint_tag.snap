@@ -5,7 +5,6 @@ expression: diagnostics
 {
   "items": [
     {
-      "kind": "full",
       "uri": "file://<temp_dir>/src/foo.py",
       "version": null,
       "resultId": "[RESULT_ID]",
@@ -28,7 +27,8 @@ expression: diagnostics
             1
           ]
         }
-      ]
+      ],
+      "kind": "full"
     }
   ]
 }

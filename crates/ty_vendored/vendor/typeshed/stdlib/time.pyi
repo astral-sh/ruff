@@ -117,6 +117,7 @@ class struct_time(structseq[Any | int], _TimeTuple):
     @property
     def tm_isdst(self) -> int:
         """1 if summer time is in effect, 0 if not, and -1 if unknown"""
+
     # These final two properties only exist if a 10- or 11-item sequence was passed to the constructor.
     @property
     def tm_zone(self) -> str:

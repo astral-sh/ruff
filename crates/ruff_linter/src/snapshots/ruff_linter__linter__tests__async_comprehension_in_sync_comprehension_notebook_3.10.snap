@@ -8,4 +8,3 @@ invalid-syntax: cannot use an asynchronous comprehension inside of a synchronous
 2 | [x async for x in elements(5)]  # okay, async at top level
 3 | [[x async for x in elements(5)] for i in range(5)]  # error on 3.10, okay after
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

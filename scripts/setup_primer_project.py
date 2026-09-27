@@ -4,28 +4,41 @@
 # requires-python = ">=3.11"
 # dependencies = ["mypy-primer"]
 #
+# [tool.ty.rules]
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
+#
 # [tool.uv]
-# # The only direct dependency of this script is mypy-primer,
-# # and mypy-primer is a git dependency, so it is unaffected
-# # by the `exclude-newer` setting:
-# #
-# # > The --exclude-newer option is only applied to packages
-# # > that are read from a registry (as opposed to, e.g., Git dependencies).
-# # -- https://docs.astral.sh/uv/concepts/resolution/#reproducible-resolutions
-# #
-# # That's probably desirable: we usually want the latest
-# # version of mypy-primer anyway. But it's still worth setting
-# # `exclude-newer` here for any transitive dependencies of
-# # mypy-primer.
-# exclude-newer = "7 days"
+# no-build = true
+# no-binary-package = ["mypy-primer"]
+# build-constraint-dependencies = ["setuptools==84.0.0"]
+# # This is the default for ad hoc use. Historical ecosystem reproduction must
+# # bypass the adjacent lock and select ecosystem-analyzer's exact mypy-primer
+# # revision and project Python version, as shown in the module docstring.
+# # `exclude-newer` still constrains mypy-primer's registry dependencies.
+# exclude-newer = "P7D"
 #
 # [tool.uv.sources]
+# # Keep the script's lockfile in sync with the mypy-primer pin in the project's uv.lock file
+# # so memory reports and ecosystem jobs use the same project definitions.
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
 
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
 
-Usage: uv run --no-project scripts/setup_primer_project.py <project-name> [directory] [options]
+For ecosystem-report reproduction, always select the project's ecosystem-analyzer Python version and bypass the adjacent lock with the exact mypy-primer revision pinned by ecosystem-analyzer:
+
+uv run --python <version> --with "mypy-primer @ git+https://github.com/hauntsaninja/mypy_primer@<mypy-primer-revision>" --no-project python scripts/setup_primer_project.py <project-name> [directory] [options]
 """
 
 from __future__ import annotations
@@ -81,6 +94,41 @@ def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
     return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
 
 
+def run(*args: str, cwd: Path | None = None) -> None:
+    subprocess.run(args, cwd=cwd, check=True)
+
+
+def clone_project(
+    location: str, target_dir: Path, revision: str | None, *, full_history: bool
+) -> None:
+    depth = [] if full_history else ["--depth", "1"]
+    if revision and not full_history:
+        # Fetch the requested commit without first downloading the default branch.
+        run("git", "init", str(target_dir))
+        run("git", "remote", "add", "origin", location, cwd=target_dir)
+        run("git", "fetch", *depth, "origin", revision, cwd=target_dir)
+        checkout = "FETCH_HEAD"
+    else:
+        run("git", "clone", *depth, location, str(target_dir))
+        checkout = revision
+
+    if checkout:
+        run("git", "checkout", checkout, "--", cwd=target_dir)
+
+    # Initialize only the selected revision's submodules. Force checkout so that
+    # configured merge/rebase strategies cannot override the recorded gitlinks.
+    run(
+        "git",
+        "submodule",
+        "update",
+        "--init",
+        "--recursive",
+        "--checkout",
+        *(depth or ["--no-recommend-shallow"]),
+        cwd=target_dir,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", help="Name of a mypy-primer project")
@@ -94,8 +142,18 @@ def main() -> None:
         help="Git revision to check out before installing dependencies",
     )
     parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Clone full history and tags if setup requires them or shallow fetches fail",
+    )
+    parser.add_argument(
         "--exclude-newer",
         help="Limit dependency resolution to packages uploaded before this timestamp",
+    )
+    parser.add_argument(
+        "--print-ty-command",
+        action="store_true",
+        help="Print the project-specific ty command without setting up the project",
     )
     args = parser.parse_args()
 
@@ -103,28 +161,25 @@ def main() -> None:
     revision = args.revision or project.revision
 
     target_dir = Path(args.directory or project.name).resolve()
+    if args.print_ty_command:
+        print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
+        return
 
-    # Use a full clone only when a historical ecosystem report revision must be checked out.
-    clone_cmd = [
-        "git",
-        "clone",
-        "--recurse-submodules",
-        project.location,
-        str(target_dir),
-    ]
-    if not revision:
-        clone_cmd += ["--depth", "1"]
-    print(f"Cloning {project.location} into {target_dir}...")
-    subprocess.run(clone_cmd, check=True)
-
-    if revision:
-        print(f"Checking out revision {revision}...")
-        subprocess.run(["git", "checkout", revision], cwd=target_dir, check=True)
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--recursive"],
-            cwd=target_dir,
-            check=True,
+    if target_dir.exists() and (not target_dir.is_dir() or any(target_dir.iterdir())):
+        parser.error(
+            f"destination {target_dir} already exists and is not an empty directory"
         )
+
+    print(f"Cloning {project.location} into {target_dir}...")
+    try:
+        clone_project(
+            project.location, target_dir, revision, full_history=args.full_history
+        )
+    except subprocess.CalledProcessError as error:
+        message = f"Git checkout failed: {error}.\n"
+        if not args.full_history:
+            message += "If the server rejects shallow fetches, retry in a fresh directory with --full-history.\n"
+        parser.exit(1, message)
 
     # Create venv (matching primer's Venv.make_venv())
     venv_dir = target_dir / ".venv"
@@ -145,7 +200,7 @@ def main() -> None:
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
         # Primer install commands are trusted project metadata and may use shell syntax.
-        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # noqa: S602
+        subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
     if project.deps:
@@ -157,7 +212,8 @@ def main() -> None:
     print(f"Activate the venv with: source {venv_dir}/bin/activate")
     print("\nProject-specific ty command:")
     print("  ty_binary=/path/to/ty")
-    print(f"  {get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)}")
+    ty_command = get_ty_command(project, ty_binary='"$ty_binary"', venv_dir=venv_dir)
+    print(f"  {ty_command}")
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ PYI019 [*] Use `Self` instead of custom TypeVar `T`
 8 |               return cls
   |
 help: Replace TypeVar `T` with `Self`
+  |
 1 |
   - from typing import TypeVar
 2 + from typing import TypeVar, Self
@@ -20,3 +21,4 @@ help: Replace TypeVar `T` with `Self`
   - 	def __new__(cls: type[T]) -> T:
 7 + 	def __new__(cls) -> Self:
 8 |               return cls
+  |

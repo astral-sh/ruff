@@ -194,28 +194,141 @@ reveal_type(C() + C())  # revealed: int
 ## Reflected precedence for subtypes (in some cases)
 
 If the right-hand operand is a subtype of the left-hand operand and has a different implementation
-of the reflected method, the reflected method on the right-hand operand takes precedence.
+of the reflected method, its reflected method may take precedence. The static types do not tell us
+whether the left operand has runtime class `A` or a subclass such as `B`, so both methods can be
+called at runtime.
 
 ```py
+from typing import Literal
+
 class A:
-    def __add__(self, other) -> str:
-        return "foo"
-
-    def __radd__(self, other) -> str:
-        return "foo"
-
-class MyString(str): ...
+    def __add__(self, other) -> Literal["left"]:
+        return "left"
 
 class B(A):
-    def __radd__(self, other) -> MyString:
-        return MyString()
+    def __radd__(self, other) -> Literal["right"]:
+        return "right"
 
-reveal_type(A() + B())  # revealed: MyString
+reveal_type(A() + B())  # revealed: Literal["right", "left"]
 
 # N.B. Still a subtype of `A`, even though `A` does not appear directly in the class's `__bases__`
 class C(B): ...
 
-reveal_type(A() + C())  # revealed: MyString
+reveal_type(A() + C())  # revealed: Literal["right", "left"]
+```
+
+## Reflected precedence uses runtime classes
+
+`IntFlag` values are commonly accumulated into a mask that starts at the integer zero. At runtime,
+the first `|=` produces a `Permission`, because reflected-method precedence depends on the operands'
+runtime classes. The enum literal is not a subtype of the specific integer literal `0`, but its
+runtime class is a strict subclass of `int`. The same applies when the right operand is a TypeVar
+whose upper bound has that runtime-class relationship:
+
+```py
+from enum import IntFlag, auto
+from typing import TypeVar
+
+class Permission(IntFlag):
+    READ = auto()
+    WRITE = auto()
+
+def permissions_for(editable: bool) -> Permission:
+    permissions = 0
+    permissions |= Permission.READ
+    reveal_type(permissions)  # revealed: Literal[Permission.READ]
+
+    if editable:
+        permissions |= Permission.WRITE
+
+    return permissions
+
+P = TypeVar("P", bound=Permission)
+
+def add_permission(permission: P) -> P:
+    reveal_type(0 | permission)  # revealed: P@add_permission
+    return 0 | permission
+```
+
+## Runtime-class precedence ignores generic specializations
+
+Generic specializations do not exist at runtime, so they cannot affect whether the right operand's
+runtime class is a strict subclass of the left operand's runtime class:
+
+```py
+from typing import Generic, Literal, TypeVar
+
+T = TypeVar("T")
+
+class GenericBase(Generic[T]):
+    def __add__(self, other: object) -> Literal["left"]:
+        return "left"
+
+class GenericChild(GenericBase[T]):
+    def __radd__(self, other: object) -> Literal["right"]:
+        return "right"
+
+def add_generic(left: GenericBase[int], right: GenericChild[str]) -> Literal["left", "right"]:
+    reveal_type(left + right)  # revealed: Literal["right", "left"]
+    return left + right
+```
+
+## Class objects use their metaclasses for reflected precedence
+
+The runtime classes of class objects are their metaclasses. If the right operand's metaclass is a
+strict subclass of the left operand's metaclass, its reflected method takes precedence:
+
+```py
+from typing import Literal
+
+class LeftMeta(type):
+    def __add__(cls, other: object) -> Literal["left"]:
+        return "left"
+
+class RightMeta(LeftMeta):
+    def __radd__(cls, other: object) -> Literal["right"]:
+        return "right"
+
+class A(metaclass=LeftMeta): ...
+class B(metaclass=RightMeta): ...
+
+reveal_type(A + B)  # revealed: Literal["right"]
+```
+
+## TypeVars and NewTypes do not have an exact runtime class
+
+The upper bound of a TypeVar is not necessarily its runtime class, so it cannot decide definitively
+whether the right-hand operand's reflected method takes precedence. A `NewType` constructor also
+returns its argument unchanged, so an inhabitant can have a runtime class below the NewType's base:
+
+```py
+from typing import Literal, NewType, TypeVar
+
+class Base:
+    def __add__(self, other: object) -> Literal["base"]:
+        return "base"
+
+class Child(Base):
+    def __radd__(self, other: object) -> Literal["child"]:
+        return "child"
+
+T = TypeVar("T", bound=Base)
+
+def add_child(left: T) -> Literal["base", "child"]:
+    reveal_type(left + Child())  # revealed: Literal["child", "base"]
+    return left + Child()
+
+U = TypeVar("U", bound=Child)
+
+def add_typevar(left: Base, right: U) -> Literal["base", "child"]:
+    reveal_type(left + right)  # revealed: Literal["child", "base"]
+    return left + right
+
+NewChild = NewType("NewChild", Child)
+
+def add_newtype(left: Base, right: NewChild) -> Literal["base", "child"]:
+    reveal_type(left + right)  # revealed: Literal["child", "base"]
+    return left + right
 ```
 
 ## Reflected precedence 2
@@ -292,17 +405,17 @@ dunder methods. Perhaps we could have a special-case on the special-case, to exc
 return annotations from the widening, and preserve a bit more precision here?
 
 ```py
-reveal_type(3j + 3.14)  # revealed: int | float | complex
-reveal_type(4.2 + 42)  # revealed: int | float
-reveal_type(3j + 3)  # revealed: int | float | complex
-reveal_type(3.14 + 3j)  # revealed: int | float | complex
-reveal_type(42 + 4.2)  # revealed: int | float
-reveal_type(3 + 3j)  # revealed: int | float | complex
+reveal_type(3j + 3.14)  # revealed: complex
+reveal_type(4.2 + 42)  # revealed: float
+reveal_type(3j + 3)  # revealed: complex
+reveal_type(3.14 + 3j)  # revealed: complex
+reveal_type(42 + 4.2)  # revealed: float
+reveal_type(3 + 3j)  # revealed: complex
 
 def _(x: bool, y: int):
     reveal_type(x + y)  # revealed: int
-    reveal_type(4.2 + x)  # revealed: int | float
-    reveal_type(y + 4.12)  # revealed: int | float
+    reveal_type(4.2 + x)  # revealed: float
+    reveal_type(y + 4.12)  # revealed: float
 ```
 
 ## With literal types
@@ -381,7 +494,6 @@ error[unsupported-bool-conversion]: Boolean conversion is not supported for type
   |
 7 | 10 and a and True
   |        ^
-  |
 info: `__bool__` on `NotBoolable` must be callable
 ```
 

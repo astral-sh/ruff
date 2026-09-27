@@ -12,16 +12,15 @@ use crate::codes::{self};
 
 mod rule_set;
 
-pub trait AsRule {
-    fn rule(&self) -> Rule;
-}
-
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
         linter
             .all_rules()
-            .find(|rule| rule.noqa_code().suffix() == code)
+            .find(|rule| {
+                rule.noqa_code()
+                    .is_some_and(|rule_code| rule_code.suffix() == code)
+            })
             .ok_or(FromCodeError::Unknown)
     }
 }
@@ -241,7 +240,8 @@ pub enum LintSource {
     Imports,
     Noqa,
     Filesystem,
-    PyprojectToml,
+    /// A TOML config file, either `pyproject.toml`, `ruff.toml`, or `.ruff.toml`.
+    Toml,
 }
 
 impl Rule {
@@ -249,8 +249,12 @@ impl Rule {
     /// physical lines).
     pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::InvalidPyprojectToml => LintSource::PyprojectToml,
-            Rule::BlanketNOQA | Rule::RedirectedNOQA | Rule::UnusedNOQA => LintSource::Noqa,
+            Rule::InvalidPyprojectToml | Rule::RuleCodesInSelectors => LintSource::Toml,
+            Rule::BlanketNOQA
+            | Rule::NoqaComments
+            | Rule::RedirectedNOQA
+            | Rule::RuleCodesInSuppressionComments
+            | Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
@@ -301,7 +305,7 @@ impl Rule {
             | Rule::TooManyBlankLines
             | Rule::TooManyNewlinesAtEndOfFile
             | Rule::TrailingCommaOnBareTuple
-            | Rule::TypeCommentInStub
+            | Rule::LegacyTypeComment
             | Rule::UselessSemicolon
             | Rule::UTF8EncodingDeclaration => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
@@ -362,6 +366,31 @@ impl Rule {
         let name: &'static str = self.into();
         LintName::of(name)
     }
+
+    /// Return the rule's name, followed by its code in parentheses when available.
+    ///
+    /// For example:
+    ///
+    /// ```text
+    /// unused-import (F401)
+    /// ```
+    ///
+    /// When formatted with the `#` flag, both the name and code will be surrounded by backticks:
+    ///
+    /// ```text
+    /// `unused-import` (`F401`)
+    /// ```
+    pub fn name_and_code(&self) -> impl std::fmt::Display + use<> {
+        let rule = *self;
+        std::fmt::from_fn(move |f| {
+            let quote = if f.alternate() { "`" } else { "" };
+            write!(f, "{quote}{}{quote}", rule.name())?;
+            if let Some(code) = rule.noqa_code() {
+                write!(f, " ({quote}{code}{quote})")?;
+            }
+            Ok(())
+        })
+    }
 }
 
 /// Pairs of checks that shouldn't be enabled together.
@@ -369,7 +398,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
     (
         Rule::BlankLineBeforeClass,
         Rule::IncorrectBlankLineBeforeClass,
-        "`incorrect-blank-line-before-class` (D203) and `no-blank-line-before-class` (D211) are \
+        "`incorrect-blank-line-before-class` (D203) and `blank-line-before-class` (D211) are \
          incompatible. Ignoring `incorrect-blank-line-before-class`.",
     ),
     (
@@ -382,13 +411,34 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(feature = "clap")]
 pub mod clap_completion {
-    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use clap::builder::{
+        PossibleValue, PossibleValuesParser, TypedValueParser, ValueParserFactory,
+    };
+    use clap::error::ContextKind;
     use strum::IntoEnumIterator;
 
     use crate::registry::Rule;
 
     #[derive(Clone)]
     pub struct RuleParser;
+
+    impl RuleParser {
+        fn values() -> impl Iterator<Item = PossibleValue> {
+            Rule::iter().flat_map(|rule| {
+                let name = rule.name().as_str();
+                let (code, name) = if let Some(code) = rule.noqa_code() {
+                    let code = code.to_string();
+                    (
+                        Some(PossibleValue::new(&code).help(name)),
+                        PossibleValue::new(name).help(code),
+                    )
+                } else {
+                    (None, PossibleValue::new(name))
+                };
+                code.into_iter().chain(std::iter::once(name))
+            })
+        }
+    }
 
     impl ValueParserFactory for Rule {
         type Parser = RuleParser;
@@ -407,33 +457,17 @@ pub mod clap_completion {
             arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
-            let value = value
-                .to_str()
-                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
-
-            Rule::from_code(value).map_err(|_| {
-                let mut error =
-                    clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                if let Some(arg) = arg {
-                    error.insert(
-                        clap::error::ContextKind::InvalidArg,
-                        clap::error::ContextValue::String(arg.to_string()),
-                    );
-                }
-                error.insert(
-                    clap::error::ContextKind::InvalidValue,
-                    clap::error::ContextValue::String(value.to_string()),
-                );
-                error
-            })
+            PossibleValuesParser::new(Self::values())
+                .try_map(|value| Rule::from_code(&value).or_else(|_| Rule::from_name(&value)))
+                .parse_ref(cmd, arg, value)
+                .map_err(|mut error| {
+                    error.remove(ContextKind::ValidValue);
+                    error
+                })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(Rule::iter().map(|rule| {
-                let name = rule.noqa_code().to_string();
-                let help = rule.name().as_str();
-                PossibleValue::new(name).help(help)
-            })))
+            Some(Box::new(Self::values()))
         }
     }
 }
@@ -483,8 +517,12 @@ mod tests {
     #[test]
     fn check_code_serialization() {
         for rule in Rule::iter() {
+            let Some(code) = rule.noqa_code() else {
+                continue;
+            };
+
             assert!(
-                Rule::from_code(&format!("{}", rule.noqa_code())).is_ok(),
+                Rule::from_code(&code.to_string()).is_ok(),
                 "{rule:?} could not be round-trip serialized."
             );
         }
@@ -493,7 +531,10 @@ mod tests {
     #[test]
     fn linter_parse_code() {
         for rule in Rule::iter() {
-            let code = format!("{}", rule.noqa_code());
+            let Some(code) = rule.noqa_code() else {
+                continue;
+            };
+            let code = code.to_string();
             let (linter, rest) =
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));

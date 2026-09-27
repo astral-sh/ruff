@@ -182,15 +182,7 @@ impl<I: Idx, T, const N: usize> From<[T; N]> for IndexVec<I, T> {
 #[expect(unsafe_code)]
 unsafe impl<I: Idx, T> Send for IndexVec<I, T> where T: Send {}
 
+// SAFETY: `IndexVec` owns its elements; `I` is only a marker.
 #[expect(unsafe_code)]
 #[cfg(feature = "salsa")]
-unsafe impl<I, T> salsa::Update for IndexVec<I, T>
-where
-    T: salsa::Update,
-{
-    #[expect(unsafe_code)]
-    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
-        let old_vec: &mut IndexVec<I, T> = unsafe { &mut *old_pointer };
-        unsafe { salsa::Update::maybe_update(&raw mut old_vec.raw, new_value.raw) }
-    }
-}
+unsafe impl<I, T: salsa::SalsaValue> salsa::SalsaValue for IndexVec<I, T> {}

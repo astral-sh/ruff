@@ -248,10 +248,13 @@ def store_any(cls: type[Any], value: Any) -> None:
     reveal_type(cls.count)  # revealed: Any
 ```
 
+## Assignments through generic aliases
+
 Assignments through generic aliases still resolve class variables.
 
 ```py
-from typing import ClassVar, Generic, TypeVar, reveal_type
+from typing import ClassVar, Generic, TypeVar
+from typing_extensions import reveal_type
 
 T = TypeVar("T")
 
@@ -395,7 +398,7 @@ python-version = "3.12"
 
 ```py
 from typing import ClassVar, TypedDict
-from ty_extensions import reveal_mro
+from ty_extensions._internal import reveal_mro
 
 # error: [invalid-type-form] "`ClassVar` is only allowed in class bodies"
 x: ClassVar[int] = 1

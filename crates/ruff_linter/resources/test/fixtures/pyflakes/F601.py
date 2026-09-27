@@ -68,3 +68,15 @@ x = {
     0: "bar",
     False: "baz",
 }
+
+x = {(f(), 2): 1, (f(), 2.0): 2}
+x = {9007199254740993: 1, 9007199254740993 + 0j: 2}
+
+# Regression test for: https://github.com/astral-sh/ruff/pull/25982#pullrequestreview-4495269928
+x = {False: 1, -0: 2}
+x = {-0: 1, False: 2}
+x = {True: 1, 1 + 0j: 2}
+x = {1 + 0j: 1, True: 2}
+x = {-1: 1, -1 + 0j: 2}
+x = {-1 + 0j: 1, -1: 2}
+x = {-1 + 2j: 1, -1 + 2j: 2}

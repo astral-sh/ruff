@@ -883,6 +883,36 @@ def funcmod(x: int) -> int:
     return x
 ```
 
+## Re-export Nameclash Problems After Conditional Raise
+
+`from` imports in an `__init__.py` at file scope should overwrite the submodule attribute even when
+earlier ambiguous control flow causes us to consider more bindings from nested functions.
+
+`mypackage/__init__.py`:
+
+```py
+def should_raise() -> bool:
+    return True
+
+if should_raise():
+    raise RuntimeError
+
+from .funcmod import funcmod
+
+reveal_type(funcmod)  # revealed: def funcmod(x: int) -> int
+
+def run():
+    reveal_type(funcmod)  # revealed: def funcmod(x: int) -> int
+    funcmod(1)
+```
+
+`mypackage/funcmod.py`:
+
+```py
+def funcmod(x: int) -> int:
+    return x
+```
+
 ## Re-export Nameclash Problems In Try-Blocks
 
 `from` imports in an `__init__.py` at file scope in a `try` block should be visible to functions
@@ -897,8 +927,6 @@ try:
     funcmod(1)
 
     def run():
-        # TODO: this is a bug in how we analyze try-blocks
-        # error: [call-non-callable]
         funcmod(2)
 
 finally:

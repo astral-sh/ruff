@@ -9,6 +9,7 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) document_changes: bool,
     pub(crate) workspace_refresh: bool,
     pub(crate) pull_diagnostics: bool,
+    pub(crate) diagnostic_related_information: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -50,6 +51,17 @@ impl ResolvedClientCapabilities {
             .and_then(|text_document| text_document.diagnostic.as_ref())
             .is_some();
 
+        let diagnostic_related_information = client_capabilities
+            .text_document
+            .as_ref()
+            .and_then(|text_document| text_document.publish_diagnostics.as_ref())
+            .and_then(|publish_diagnostics| {
+                publish_diagnostics
+                    .diagnostics_capabilities
+                    .related_information
+            })
+            .unwrap_or_default();
+
         Self {
             code_action_deferred_edit_resolution: code_action_data_support
                 && code_action_edit_resolution,
@@ -57,6 +69,7 @@ impl ResolvedClientCapabilities {
             document_changes,
             workspace_refresh,
             pull_diagnostics,
+            diagnostic_related_information,
         }
     }
 }
@@ -72,6 +85,7 @@ impl std::fmt::Display for ResolvedClientCapabilities {
                 self.document_changes,
                 self.workspace_refresh,
                 self.pull_diagnostics,
+                self.diagnostic_related_information,
             ]
         };
         Ok(())

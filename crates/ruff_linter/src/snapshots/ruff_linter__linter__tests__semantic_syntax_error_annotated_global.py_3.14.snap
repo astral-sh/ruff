@@ -71,4 +71,3 @@ invalid-syntax: annotated name `x` can't be global
 37 |     global x  # error
 38 |     x: str
    |     ^
-   |

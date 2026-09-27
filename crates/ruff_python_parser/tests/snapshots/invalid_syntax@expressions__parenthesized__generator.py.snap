@@ -83,16 +83,13 @@ Module(
   |
 1 | (x := 1, for x in y)
   |          ^^^ Syntax Error: Expected `)`, found `for`
-  |
 
 
   |
 1 | (x := 1, for x in y)
   |                    ^ Syntax Error: Expected `:`, found `)`
-  |
 
 
   |
 1 | (x := 1, for x in y)
   |                     ^ Syntax Error: Expected a statement
-  |

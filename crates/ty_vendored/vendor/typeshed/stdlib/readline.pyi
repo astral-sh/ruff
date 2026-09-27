@@ -126,5 +126,6 @@ if sys.platform != "win32":
           function(substitution, [matches], longest_match_length)
         once each time matches need to be displayed.
         """
+
     if sys.version_info >= (3, 13):
         backend: Literal["readline", "editline"]

@@ -4,13 +4,15 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, helpers::is_dunder, name::QualifiedName};
-use ruff_python_semantic::{FromImport, Import, Imported, ResolvedReference, Scope};
+use ruff_python_semantic::{AnyImport, FromImport, Import, Imported, ResolvedReference, Scope};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::package::PackageRoot;
+use crate::rules::pylint::helpers::is_underscore_prefixed_public_member;
 
 /// ## What it does
 /// Checks for import statements that import a private name (a name starting
@@ -51,7 +53,7 @@ use crate::package::PackageRoot;
 /// [PEP 8]: https://peps.python.org/pep-0008/
 /// [PEP 420]: https://peps.python.org/pep-0420/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.14")]
+#[violation_metadata(preview_since = "v0.1.14", category = Category::Pedantic)]
 pub(crate) struct ImportPrivateName {
     name: String,
     module: Option<String>,
@@ -79,9 +81,9 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         };
 
         let import_info = match import {
-            import if import.is_import() => ImportInfo::from(import.import().unwrap()),
-            import if import.is_from_import() => ImportInfo::from(import.from_import().unwrap()),
-            _ => continue,
+            AnyImport::Import(import) => ImportInfo::from(import),
+            AnyImport::FromImport(import) => ImportInfo::from(import),
+            AnyImport::SubmoduleImport(_) => continue,
         };
 
         let Some(root_module) = import_info.module_name.first() else {
@@ -121,6 +123,10 @@ pub(crate) fn import_private_name(checker: &Checker, scope: &Scope) {
         else {
             continue;
         };
+
+        if is_underscore_prefixed_public_member(import_info.qualified_name) {
+            continue;
+        }
 
         // Ignore private imports used exclusively for typing.
         if !binding.references.is_empty()

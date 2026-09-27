@@ -128,3 +128,7 @@ var = [1, 2, 3][lambda: 0]
 
 # Should emit for invalid access using generator
 var = [1, 2, 3][(x for x in ())]
+
+# Should still emit for a later invalid bound, even if an earlier bound is unrecognized
+x = "x"
+var = [1, 2, 3][x:"y"]

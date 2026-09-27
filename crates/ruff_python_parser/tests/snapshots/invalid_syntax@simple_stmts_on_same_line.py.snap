@@ -153,7 +153,6 @@ Module(
 2 | a + b c + d
 3 | break; continue pass; continue break
   |                 ^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |
 
 
   |
@@ -161,4 +160,3 @@ Module(
 2 | a + b c + d
 3 | break; continue pass; continue break
   |                                ^^^^^ Syntax Error: Simple statements must be separated by newlines or semicolons
-  |

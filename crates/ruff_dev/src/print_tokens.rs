@@ -4,9 +4,9 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
+use ruff_linter::linter::parse_unchecked_source;
 use ruff_linter::source_kind::SourceKind;
-use ruff_python_ast::{PySourceType, SourceType};
-use ruff_python_parser::parse_unchecked_source;
+use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -24,7 +24,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
                 args.file.display()
             )
         })?;
-    let parsed = parse_unchecked_source(source_kind.source_code(), source_type);
+    let parsed = parse_unchecked_source(&source_kind, source_type, PythonVersion::default());
     for token in parsed.tokens() {
         println!("{token:#?}");
     }

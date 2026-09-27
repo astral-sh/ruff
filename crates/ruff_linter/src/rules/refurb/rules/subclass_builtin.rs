@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, StmtClassDef, helpers::map_subscript};
 use ruff_text_size::Ranged;
 
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 use crate::{checkers::ast::Checker, importer::ImportRequest};
 
@@ -14,6 +15,9 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// Use the `UserDict`, `UserList`, and `UserString` objects from the `collections` module
 /// instead.
+///
+/// This rule does not apply to stub files, which should faithfully represent the runtime
+/// implementation and may be out of the author's control.
 ///
 /// ## Example
 ///
@@ -57,7 +61,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// - [Python documentation: `collections`](https://docs.python.org/3/library/collections.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.7.3")]
+#[violation_metadata(preview_since = "0.7.3", category = Category::Suspicious)]
 pub(crate) struct SubclassBuiltin {
     subclass: String,
     replacement: String,
@@ -83,6 +87,10 @@ impl AlwaysFixableViolation for SubclassBuiltin {
 
 /// FURB189
 pub(crate) fn subclass_builtin(checker: &Checker, class: &StmtClassDef) {
+    if checker.source_type.is_stub() {
+        return;
+    }
+
     let Some(Arguments { args: bases, .. }) = class.arguments.as_deref() else {
         return;
     };

@@ -92,11 +92,12 @@ def signal(signalnum: _SIGNUM, handler: _HANDLER) -> _HANDLER:
     """Set the action for the given signal.
 
     The action can be SIG_DFL, SIG_IGN, or a callable Python object.
-    The previous action is returned.  See getsignal() for possible return values.
+    The previous action is returned.  See getsignal() for possible return
+    values.
 
     *** IMPORTANT NOTICE ***
-    A signal handler function is called with two arguments:
-    the first is the signal number, the second is the interrupted stack frame.
+    A signal handler function is called with two arguments: the first is
+    the signal number, the second is the interrupted stack frame.
     """
 
 SIGABRT: Final = Signals.SIGABRT
@@ -172,8 +173,8 @@ else:
     def setitimer(which: int, seconds: float, interval: float = 0.0, /) -> tuple[float, float]:
         """Sets given itimer (one of ITIMER_REAL, ITIMER_VIRTUAL or ITIMER_PROF).
 
-        The timer will fire after value seconds and after that every interval seconds.
-        The itimer can be cleared by setting seconds to zero.
+        The timer will fire after value seconds and after that every interval
+        seconds.  The itimer can be cleared by setting seconds to zero.
 
         Returns old values as a tuple: (delay, interval).
         """
@@ -196,9 +197,10 @@ else:
         """Wait for a signal.
 
         Suspend execution of the calling thread until the delivery of one of the
-        signals specified in the signal set sigset.  The function accepts the signal
-        and returns the signal number.
+        signals specified in the signal set sigset.  The function accepts the
+        signal and returns the signal number.
         """
+
     if sys.platform != "darwin":
         SIGCLD: Final = Signals.SIGCHLD  # alias
         SIGPOLL: Final = Signals.SIGIO  # alias
@@ -250,7 +252,7 @@ else:
         def sigtimedwait(sigset: Iterable[int], timeout: float, /) -> struct_siginfo | None:
             """Like sigwaitinfo(), but with a timeout.
 
-            The timeout is specified in seconds, with floating-point numbers allowed.
+            The timeout is specified in seconds, rounded up to nanoseconds.
             """
 
         def sigwaitinfo(sigset: Iterable[int], /) -> struct_siginfo:

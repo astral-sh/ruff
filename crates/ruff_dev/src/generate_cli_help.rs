@@ -5,12 +5,11 @@ use std::{fs, str};
 
 use anyhow::{Context, Result, bail};
 use clap::CommandFactory;
-use pretty_assertions::StrComparison;
 
 use ruff::args;
 
 use crate::ROOT_DIR;
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
 
 const COMMAND_HELP_BEGIN_PRAGMA: &str = "<!-- Begin auto-generated command help. -->\n";
 const COMMAND_HELP_END_PRAGMA: &str = "<!-- End auto-generated command help. -->";
@@ -99,7 +98,7 @@ pub(super) fn main(args: &Args) -> Result<()> {
             if existing == new {
                 println!("up-to-date: {filename}");
             } else {
-                let comparison = StrComparison::new(&existing, &new);
+                let comparison = generated_file_diff(&existing, &new);
                 bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }

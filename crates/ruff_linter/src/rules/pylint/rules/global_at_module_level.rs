@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the `global` keyword at the module level.
@@ -15,7 +16,7 @@ use crate::checkers::ast::Checker;
 /// At the module level, all names are global by default, so the `global`
 /// keyword is redundant.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct GlobalAtModuleLevel;
 
 impl Violation for GlobalAtModuleLevel {

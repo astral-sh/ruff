@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of multi-character strings in `.strip()`, `.lstrip()`, and
@@ -45,7 +46,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `str.strip`](https://docs.python.org/3/library/stdtypes.html#str.strip)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.106")]
+#[violation_metadata(stable_since = "v0.0.106", category = Category::Correctness)]
 pub(crate) struct StripWithMultiCharacters;
 
 impl Violation for StripWithMultiCharacters {

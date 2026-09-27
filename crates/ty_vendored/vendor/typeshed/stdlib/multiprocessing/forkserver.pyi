@@ -13,7 +13,14 @@ class ForkServer:
     if sys.version_info >= (3, 15):
         def set_forkserver_preload(
             self, modules_names: list[str], *, on_error: Literal["ignore", "warn", "fail"] = "ignore"
-        ) -> None: ...
+        ) -> None:
+            """Set list of module names to try to load in forkserver process.
+
+            The on_error parameter controls how import failures are handled:
+            "ignore" (default) silently ignores failures, "warn" emits warnings,
+            and "fail" raises exceptions breaking the forkserver context.
+            """
+
     else:
         def set_forkserver_preload(self, modules_names: list[str]) -> None:
             """Set list of module names to try to load in forkserver process."""
@@ -53,7 +60,8 @@ if sys.version_info >= (3, 15):
         sys_argv: list[str] | None = None,
         authkey_r: int | None = None,
         on_error: str = "ignore",
-    ) -> None: ...
+    ) -> None:
+        """Run forkserver."""
 
 elif sys.version_info >= (3, 14):
     # `sys_argv` parameter added in Python 3.14.3
@@ -121,4 +129,9 @@ process data.
 """
 
 set_forkserver_preload = _forkserver.set_forkserver_preload
-"""Set list of module names to try to load in forkserver process."""
+"""Set list of module names to try to load in forkserver process.
+
+The on_error parameter controls how import failures are handled:
+"ignore" (default) silently ignores failures, "warn" emits warnings,
+and "fail" raises exceptions breaking the forkserver context.
+"""

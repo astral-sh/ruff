@@ -1,5 +1,6 @@
-use lsp_types::request::CallHierarchyIncomingCalls;
+use lsp_types::CallHierarchyIncomingCallsRequest;
 use lsp_types::{CallHierarchyIncomingCall, CallHierarchyIncomingCallsParams};
+use ty_project::SemanticDb as _;
 
 use crate::document::{ToRangeExt as _, resolve_file_uri_range};
 use crate::server::api::requests::prepare_call_hierarchy::convert_to_lsp_item;
@@ -17,7 +18,7 @@ use crate::session::client::Client;
 pub(crate) struct CallHierarchyIncomingCallsRequestHandler;
 
 impl RequestHandler for CallHierarchyIncomingCallsRequestHandler {
-    type RequestType = CallHierarchyIncomingCalls;
+    type RequestType = CallHierarchyIncomingCallsRequest;
 }
 
 impl BackgroundRequestHandler for CallHierarchyIncomingCallsRequestHandler {
@@ -40,7 +41,7 @@ impl BackgroundRequestHandler for CallHierarchyIncomingCallsRequestHandler {
                 continue;
             };
 
-            for call in ty_ide::incoming_calls(db, file, offset) {
+            for call in ty_ide::incoming_calls(db, db.program_file(file), offset) {
                 // `from_ranges` are byte offsets into `call.from.file` (the caller),
                 // NOT into `file` (the prepared/queried symbol). Capture the caller
                 // file before moving `call.from` into `convert_to_lsp_item`.

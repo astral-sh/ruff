@@ -1,20 +1,27 @@
 use std::ops::Deref;
 
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use smallvec::SmallVec;
 
-use crate::Db;
-use crate::LoopToken;
+use crate::LoopHeaderId;
+use crate::ProgramFile;
 use crate::ast_node_ref::AstNodeRef;
+use crate::member::ScopedMemberId;
 use crate::node_key::NodeKey;
 use crate::place::ScopedPlaceId;
+use crate::predicate::PatternPredicate;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
 use crate::unpack::{Unpack, UnpackPosition};
+use crate::use_def::BindingWithConstraintsIterator;
+use crate::{Db, Program, SemanticIndex};
 
 /// A definition of a place.
 ///
@@ -25,16 +32,23 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    debug,
+    constructor = new_internal,
+    heap_size = ruff_memory_usage::heap_size
+)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
-    /// The file in which the definition occurs.
-    pub file: File,
-
     /// The scope in which the definition occurs.
-    pub file_scope: FileScopeId,
+    ///
+    /// Storing the interned scope avoids retaining the file and file-local scope separately, at
+    /// the cost of database lookups when either of those values is needed.
+    #[returns(copy)]
+    pub scope_id: ScopeId<'db>,
 
-    /// The place ID of the definition.
-    pub place: ScopedPlaceId,
+    /// The place ID and re-export state of the definition.
+    #[returns(copy)]
+    place_info: DefinitionPlace,
 
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
@@ -42,17 +56,57 @@ pub struct Definition<'db> {
     #[returns(ref)]
     #[tracked]
     pub kind: DefinitionKind<'db>,
-
-    /// This is a dedicated field to avoid accessing `kind` to compute this value.
-    pub is_reexported: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Definition<'_> {}
 
 impl<'db> Definition<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        scope_id: ScopeId<'db>,
+        place: ScopedPlaceId,
+        kind: DefinitionKind<'db>,
+        is_reexported: bool,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            scope_id,
+            DefinitionPlace::new(place, is_reexported),
+            kind,
+        )
+    }
+
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.scope_id(db)
+    }
+
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.scope_id(db).file(db)
+    }
+
+    pub fn python_file(self, db: &'db dyn Db) -> PythonFile<'db> {
+        self.scope_id(db).python_file(db)
+    }
+
+    pub fn program_file(self, db: &'db dyn Db) -> ProgramFile<'db> {
+        self.scope_id(db).program_file(db)
+    }
+
+    pub fn program(self, db: &'db dyn Db) -> Program<'db> {
+        self.scope_id(db).program(db)
+    }
+
+    pub fn file_scope(self, db: &'db dyn Db) -> FileScopeId {
+        self.scope_id(db).file_scope_id(db)
+    }
+
+    pub fn place(self, db: &'db dyn Db) -> ScopedPlaceId {
+        self.place_info(db).place()
+    }
+
+    pub fn is_reexported(self, db: &'db dyn Db) -> bool {
+        self.place_info(db).is_reexported()
     }
 
     pub fn full_range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> FileRange {
@@ -65,8 +119,7 @@ impl<'db> Definition<'db> {
 
     /// Returns the name of the item being defined, if applicable.
     pub fn name(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
         match kind {
             DefinitionKind::Function(def) => {
@@ -102,8 +155,7 @@ impl<'db> Definition<'db> {
     /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
-        let file = self.file(db);
-        let module = parsed_module(db, file).load(db);
+        let module = parsed_module(db, self.python_file(db)).load(db);
         let kind = self.kind(db);
 
         match kind {
@@ -128,6 +180,47 @@ impl<'db> Definition<'db> {
                     .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
             }
             _ => None,
+        }
+    }
+}
+
+/// The identity of the place defined by a [`Definition`] and whether it is re-exported.
+///
+/// Keeping the re-export state in the enum lets it share the place ID's otherwise-unused
+/// representation space. Storing it as a separate field on [`Definition`] would add padding to
+/// every tracked definition.
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
+pub enum DefinitionPlace {
+    Symbol {
+        id: ScopedSymbolId,
+        is_reexported: bool,
+    },
+    Member {
+        id: ScopedMemberId,
+        is_reexported: bool,
+    },
+}
+
+impl DefinitionPlace {
+    fn new(place: ScopedPlaceId, is_reexported: bool) -> Self {
+        match place {
+            ScopedPlaceId::Symbol(id) => Self::Symbol { id, is_reexported },
+            ScopedPlaceId::Member(id) => Self::Member { id, is_reexported },
+        }
+    }
+
+    fn place(self) -> ScopedPlaceId {
+        match self {
+            Self::Symbol { id, .. } => ScopedPlaceId::Symbol(id),
+            Self::Member { id, .. } => ScopedPlaceId::Member(id),
+        }
+    }
+
+    fn is_reexported(self) -> bool {
+        match self {
+            Self::Symbol { is_reexported, .. } | Self::Member { is_reexported, .. } => {
+                is_reexported
+            }
         }
     }
 }
@@ -184,20 +277,18 @@ fn attribute_docstring<'a>(
 }
 
 /// One or more [`Definition`]s.
-#[derive(Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize)]
 pub struct Definitions<'db> {
     definitions: smallvec::SmallVec<[Definition<'db>; 1]>,
 }
 
 impl<'db> Definitions<'db> {
-    pub fn single(definition: Definition<'db>) -> Self {
-        Self {
-            definitions: smallvec::smallvec_inline![definition],
-        }
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
+        self.definitions.push(definition);
     }
 
-    pub fn push(&mut self, definition: Definition<'db>) {
-        self.definitions.push(definition);
+    pub(crate) fn into_boxed_slice(self) -> Box<[Definition<'db>]> {
+        self.definitions.into_vec().into_boxed_slice()
     }
 }
 
@@ -218,7 +309,7 @@ impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub enum DefinitionState<'db> {
     Defined(Definition<'db>),
     /// Represents the implicit "unbound"/"undeclared" definition of every place.
@@ -266,12 +357,12 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Parameter(ParameterDefinitionNodeRef<'ast>),
     LambdaParameter(LambdaParameterDefinitionNodeRef<'ast>),
     WithItem(WithItemDefinitionNodeRef<'ast, 'db>),
-    MatchPattern(MatchPatternDefinitionNodeRef<'ast>),
+    MatchPattern(MatchPatternDefinitionNodeRef<'ast, 'db>),
     ExceptHandler(ExceptHandlerDefinitionNodeRef<'ast>),
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
-    LoopHeader(LoopHeaderDefinitionNodeRef<'ast, 'db>),
+    LoopHeader(LoopHeaderDefinitionNodeRef<'ast>),
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -322,8 +413,8 @@ impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_
     }
 }
 
-impl<'ast, 'db> From<LoopHeaderDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
-    fn from(value: LoopHeaderDefinitionNodeRef<'ast, 'db>) -> Self {
+impl<'ast> From<LoopHeaderDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(value: LoopHeaderDefinitionNodeRef<'ast>) -> Self {
         Self::LoopHeader(value)
     }
 }
@@ -394,8 +485,8 @@ impl<'ast> From<LambdaParameterDefinitionNodeRef<'ast>> for DefinitionNodeRef<'a
     }
 }
 
-impl<'ast> From<MatchPatternDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
-    fn from(node: MatchPatternDefinitionNodeRef<'ast>) -> Self {
+impl<'ast, 'db> From<MatchPatternDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node: MatchPatternDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::MatchPattern(node)
     }
 }
@@ -429,23 +520,20 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
-    pub(crate) module: &'ast ast::Identifier,
     pub(crate) module_index: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'ast, 'db> {
-    pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
+    pub(crate) unpack: Option<Unpack<'db>>,
     pub(crate) value: &'ast ast::Expr,
     pub(crate) target: &'ast ast::Expr,
+    pub(crate) owner: BindingsOwner,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtAnnAssign,
-    pub(crate) annotation: &'ast ast::Expr,
-    pub(crate) value: Option<&'ast ast::Expr>,
-    pub(crate) target: &'ast ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -458,7 +546,7 @@ pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) context_expr: &'ast ast::Expr,
+    pub(crate) item: &'ast ast::WithItem,
     pub(crate) target: &'ast ast::Expr,
     pub(crate) is_async: bool,
 }
@@ -466,9 +554,8 @@ pub(crate) struct WithItemDefinitionNodeRef<'ast, 'db> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) node: &'ast ast::StmtFor,
     pub(crate) target: &'ast ast::Expr,
-    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -478,10 +565,10 @@ pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
+pub(crate) struct LoopHeaderDefinitionNodeRef<'ast> {
     pub(crate) loop_stmt: LoopStmtRef<'ast>,
     pub(crate) place: ScopedPlaceId,
-    pub(crate) loop_token: LoopToken<'db>,
+    pub(crate) loop_header_id: LoopHeaderId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -493,10 +580,9 @@ pub(crate) enum LoopStmtRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'ast, 'db> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'db>)>,
-    pub(crate) iterable: &'ast ast::Expr,
+    pub(crate) node: &'ast ast::Comprehension,
     pub(crate) target: &'ast ast::Expr,
     pub(crate) first: bool,
-    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -507,7 +593,7 @@ pub(crate) enum ParameterDefinitionNodeRef<'ast> {
 }
 
 impl ParameterDefinitionNodeRef<'_> {
-    pub(super) fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
+    fn into_owned(self, parsed: &ParsedModuleRef) -> ParameterDefinitionNodeKind {
         match self {
             Self::VariadicPositionalParameter(parameter) => {
                 ParameterDefinitionNodeKind::VariadicPositionalParameter(AstNodeRef::new(
@@ -525,11 +611,11 @@ impl ParameterDefinitionNodeRef<'_> {
         }
     }
 
-    pub(super) fn key(self) -> DefinitionNodeKey {
+    fn key(self) -> DefinitionNodeKey {
         match self {
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
-            Self::Parameter(node) => node.into(),
+            Self::Parameter(node) => (&node.parameter).into(),
         }
     }
 }
@@ -542,14 +628,13 @@ pub(crate) struct LambdaParameterDefinitionNodeRef<'ast> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct MatchPatternDefinitionNodeRef<'ast> {
+pub(crate) struct MatchPatternDefinitionNodeRef<'ast, 'db> {
     /// The outermost pattern node in which the identifier being defined occurs.
     pub(crate) pattern: &'ast ast::Pattern,
     /// The identifier being defined.
     pub(crate) identifier: &'ast ast::Identifier,
-    /// The index of the identifier in the pattern when visiting the `pattern` node in evaluation
-    /// order.
-    pub(crate) index: u32,
+    /// The predicate for the complete match case containing this binding.
+    pub(crate) predicate: PatternPredicate<'db>,
 }
 
 impl<'db> DefinitionNodeRef<'_, 'db> {
@@ -579,11 +664,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
-                module,
                 module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
-                module: AstNodeRef::new(parsed, module),
                 module_index: module_index
                     .try_into()
                     .expect("import-from submodule index should fit in u32"),
@@ -596,7 +679,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 })
             }
             DefinitionNodeRef::Function(function) => {
-                DefinitionKind::Function(AstNodeRef::new(parsed, function))
+                DefinitionKind::Function(FunctionDefinitionKind {
+                    node: AstNodeRef::new(parsed, function),
+                    has_decorators: !function.decorator_list.is_empty(),
+                })
             }
             DefinitionNodeRef::Class(class) => {
                 DefinitionKind::Class(AstNodeRef::new(parsed, class))
@@ -611,20 +697,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 unpack,
                 value,
                 target,
+                owner,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                target_kind: TargetKind::from(unpack),
+                unpack,
                 value: AstNodeRef::new(parsed, value),
                 target: AstNodeRef::new(parsed, target),
+                owner,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
-                node: _,
-                annotation,
-                value,
-                target,
+                node,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                target: AstNodeRef::new(parsed, target),
-                annotation: AstNodeRef::new(parsed, annotation),
-                value: value.map(|v| AstNodeRef::new(parsed, v)),
+                node: AstNodeRef::new(parsed, node),
+                has_value: node.value.is_some(),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
@@ -640,27 +724,27 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
-                iterable,
+                node,
                 target,
-                is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed, iterable),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                node: AstNodeRef::new(parsed, node),
                 target: AstNodeRef::new(parsed, target),
-                is_async,
+                is_async: node.is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 unpack,
-                iterable,
+                node,
                 target,
                 first,
-                is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed, iterable),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                node: AstNodeRef::new(parsed, node),
                 target: AstNodeRef::new(parsed, target),
                 first,
-                is_async,
+                is_async: node.is_async,
             }),
             DefinitionNodeRef::Parameter(parameter) => {
                 DefinitionKind::Parameter(parameter.into_owned(parsed))
@@ -670,29 +754,32 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 parameter,
                 lambda,
             }) => DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
-                index,
+                index: index
+                    .try_into()
+                    .expect("lambda parameter index should fit in u32"),
                 parameter: parameter.into_owned(parsed),
                 lambda: AstNodeRef::new(parsed, lambda),
             }),
             DefinitionNodeRef::WithItem(WithItemDefinitionNodeRef {
                 unpack,
-                context_expr,
+                item,
                 target,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                context_expr: AstNodeRef::new(parsed, context_expr),
+                unpack: unpack.map(|(_, unpack)| unpack),
+                unpack_position: unpack.map_or(UnpackPosition::First, |(position, _)| position),
+                item: AstNodeRef::new(parsed, item),
                 target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
                 identifier,
-                index,
+                predicate,
             }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
                 pattern: AstNodeRef::new(parsed, pattern),
                 identifier: AstNodeRef::new(parsed, identifier),
-                index,
+                predicate,
             }),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                 handler,
@@ -713,9 +800,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
                 loop_stmt,
                 place,
-                loop_token,
+                loop_header_id,
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
-                loop_token,
+                loop_header_id,
                 loop_stmt: match loop_stmt {
                     LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
                     LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
@@ -760,15 +847,15 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 value: _,
                 unpack: _,
                 target,
+                owner: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
-                iterable: _,
+                node: _,
                 unpack: _,
-                is_async: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => {
                 DefinitionNodeKey(NodeKey::from_node(target))
@@ -778,7 +865,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }
             Self::Parameter(parameter) => parameter.key(),
             Self::WithItem(WithItemDefinitionNodeRef {
-                context_expr: _,
+                item: _,
                 unpack: _,
                 is_async: _,
                 target,
@@ -814,7 +901,7 @@ impl DefinitionCategory {
     /// If so, any assignments reached by this definition are in error if they assign a value of a
     /// type not assignable to the declared type.
     ///
-    /// Annotations establish a declared type. So do function and class definitions, and imports.
+    /// Annotations establish a declared type. So do function and class definitions.
     pub fn is_declaration(self) -> bool {
         matches!(
             self,
@@ -840,13 +927,13 @@ impl DefinitionCategory {
 /// [`DefinitionKind`] fields in salsa tracked structs should be tracked (attributed with `#[tracked]`)
 /// because the kind is a thin wrapper around [`AstNodeRef`]. See the [`AstNodeRef`] documentation
 /// for an in-depth explanation of why this is necessary.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
     ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
-    Function(AstNodeRef<ast::StmtFunctionDef>),
+    Function(FunctionDefinitionKind),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
@@ -859,16 +946,18 @@ pub enum DefinitionKind<'db> {
     Parameter(ParameterDefinitionNodeKind),
     LambdaParameter(LambdaParameterDefinitionNodeKind),
     WithItem(WithItemDefinitionKind<'db>),
-    MatchPattern(MatchPatternDefinitionKind),
+    MatchPattern(MatchPatternDefinitionKind<'db>),
     ExceptHandler(ExceptHandlerDefinitionKind),
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
-    LoopHeader(LoopHeaderDefinitionKind<'db>),
+    LoopHeader(LoopHeaderDefinitionKind),
+    // Boxing here helps avoid growing the memory footprint of this enum.
+    NestedBindings(Box<NestedBindingsDefinitionKind>),
 }
 
 impl<'db> DefinitionKind<'db> {
-    pub fn is_reexported(&self) -> bool {
+    pub(crate) fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
@@ -905,7 +994,7 @@ impl<'db> DefinitionKind<'db> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+    pub(crate) fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
         match self {
             DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
             _ => None,
@@ -925,9 +1014,12 @@ impl<'db> DefinitionKind<'db> {
     }
 
     /// Returns `true` if this definition is user-visible (i.e., not an internal
-    /// control-flow construct like a loop header definition).
+    /// synthetic definition like a loop header or nested bindings definition).
     pub const fn is_user_visible(&self) -> bool {
-        !self.is_loop_header()
+        !matches!(
+            self,
+            DefinitionKind::LoopHeader(_) | DefinitionKind::NestedBindings(_)
+        )
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -944,22 +1036,22 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::Class(class) => class.node(module).name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).name.range(),
             DefinitionKind::NamedExpression(named) => named.node(module).target.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.node(module).range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
+            DefinitionKind::Assignment(assignment) => assignment.target(module).range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target(module).range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
             }
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
                 dict_key_assignment.key.node(module).range()
             }
-            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::Parameter(parameter) => parameter.target_range(module),
             DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
                 parameter,
                 ..
             }) => parameter.target_range(module),
-            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::WithItem(with_item) => with_item.target(module).range(),
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
             }
@@ -974,6 +1066,12 @@ impl<'db> DefinitionKind<'db> {
                 type_var_tuple.node(module).name.range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
@@ -989,16 +1087,16 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::TypeAlias(type_alias) => type_alias.node(module).range(),
             DefinitionKind::NamedExpression(named) => named.node(module).range(),
             DefinitionKind::Assignment(assign) => {
-                let target_range = assign.target.node(module).range();
-                let value_range = assign.value.node(module).range();
+                let target_range = assign.target(module).range();
+                let value_range = assign.value(module).range();
                 target_range.cover(value_range)
             }
             DefinitionKind::AnnotatedAssignment(assign) => {
-                let mut full_range = assign.target.node(module).range();
-                full_range = full_range.cover(assign.annotation.node(module).range());
+                let mut full_range = assign.target(module).range();
+                full_range = full_range.cover(assign.annotation(module).range());
 
-                if let Some(ref value) = assign.value {
-                    full_range = full_range.cover(value.node(module).range());
+                if let Some(value) = assign.value(module) {
+                    full_range = full_range.cover(value.range());
                 }
 
                 full_range
@@ -1007,14 +1105,14 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
                 dict_key_assignment.key.node(module).range()
             }
-            DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::Parameter(parameter) => parameter.full_range(module),
             DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
                 parameter,
                 ..
             }) => parameter.full_range(module),
-            DefinitionKind::WithItem(with_item) => with_item.target.node(module).range(),
+            DefinitionKind::WithItem(with_item) => with_item.target(module).range(),
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
             }
@@ -1023,18 +1121,21 @@ impl<'db> DefinitionKind<'db> {
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
+            DefinitionKind::NestedBindings(nested_bindings) => {
+                // TODO: We only return the `TextRange` of one of the `nonlocal` or `global`
+                // declarations that affect this variable, even if there's more than one. We could
+                // find a way to return all of them, or split up the synthetic definition somehow.
+                nested_bindings.nested_declarations[0].range
+            }
         }
     }
 
     pub fn category(&self, in_stub: bool, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
-            // functions, classes, and imports always bind, and we consider them declarations
+            // Functions and classes always bind, and we consider them declarations.
             DefinitionKind::Function(_)
             | DefinitionKind::Class(_)
             | DefinitionKind::TypeAlias(_)
-            | DefinitionKind::Import(_)
-            | DefinitionKind::ImportFrom(_)
-            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
@@ -1046,7 +1147,7 @@ impl<'db> DefinitionKind<'db> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value.is_some() {
+                if in_stub || ann_assign.has_value() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -1061,9 +1162,13 @@ impl<'db> DefinitionKind<'db> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::Import(_)
+            | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => DefinitionCategory::Binding,
         }
     }
 
@@ -1080,6 +1185,27 @@ impl<'db> DefinitionKind<'db> {
     }
 }
 
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct FunctionDefinitionKind {
+    node: AstNodeRef<ast::StmtFunctionDef>,
+    has_decorators: bool,
+}
+
+impl FunctionDefinitionKind {
+    pub fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtFunctionDef {
+        self.node.node(module)
+    }
+
+    pub fn node_key(&self) -> NodeKey {
+        NodeKey::from_node_ref(&self.node)
+    }
+
+    /// Whether the function has decorators, without loading its module's AST.
+    pub fn has_decorators(&self) -> bool {
+        self.has_decorators
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Hash, get_size2::GetSize)]
 pub enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
@@ -1087,10 +1213,10 @@ pub enum TargetKind<'db> {
     Single,
 }
 
-impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
-    fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
-        match value {
-            Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
+impl<'db> TargetKind<'db> {
+    fn from_unpack(unpack: Option<Unpack<'db>>, unpack_position: UnpackPosition) -> Self {
+        match unpack {
+            Some(unpack) => TargetKind::Sequence(unpack_position, unpack),
             None => TargetKind::Single,
         }
     }
@@ -1126,20 +1252,20 @@ impl StarImportDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
-pub struct MatchPatternDefinitionKind {
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
+pub struct MatchPatternDefinitionKind<'db> {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
-    index: u32,
+    predicate: PatternPredicate<'db>,
 }
 
-impl MatchPatternDefinitionKind {
+impl<'db> MatchPatternDefinitionKind<'db> {
     pub fn pattern<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Pattern {
         self.pattern.node(module)
     }
 
-    pub fn index(&self) -> u32 {
-        self.index
+    pub fn predicate(&self) -> PatternPredicate<'db> {
+        self.predicate
     }
 }
 
@@ -1148,22 +1274,23 @@ impl MatchPatternDefinitionKind {
 /// But if the target is an attribute or subscript, its definition is not in the comprehension's scope;
 /// it is in the scope in which the root variable is bound.
 /// TODO: currently we don't model this correctly and simply assume that it is in a scope outside the comprehension.
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ComprehensionDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    iterable: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    node: AstNodeRef<ast::Comprehension>,
     target: AstNodeRef<ast::Expr>,
     first: bool,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
     pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.iterable.node(module)
+        &self.node.node(module).iter
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1187,7 +1314,7 @@ pub enum ParameterDefinitionNodeKind {
 }
 
 impl ParameterDefinitionNodeKind {
-    pub(crate) fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).name.range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).name.range(),
@@ -1195,7 +1322,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
             Self::VariadicPositionalParameter(parameter) => parameter.node(module).range(),
             Self::VariadicKeywordParameter(parameter) => parameter.node(module).range(),
@@ -1203,7 +1330,7 @@ impl ParameterDefinitionNodeKind {
         }
     }
 
-    pub(crate) fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
+    fn category(&self, module: &ParsedModuleRef) -> DefinitionCategory {
         match self {
             // a parameter always binds a value, but is only a declaration if annotated
             Self::VariadicPositionalParameter(parameter)
@@ -1229,11 +1356,25 @@ impl ParameterDefinitionNodeKind {
             }
         }
     }
+
+    pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            Self::VariadicPositionalParameter(parameter)
+            | Self::VariadicKeywordParameter(parameter) => {
+                parameter.node(module).annotation.as_deref()
+            }
+            Self::Parameter(parameter_with_default) => parameter_with_default
+                .node(module)
+                .parameter
+                .annotation
+                .as_deref(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct LambdaParameterDefinitionNodeKind {
-    pub index: usize,
+    pub index: u32,
     pub lambda: AstNodeRef<ast::ExprLambda>,
     pub parameter: ParameterDefinitionNodeKind,
 }
@@ -1254,7 +1395,7 @@ impl ImportDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
@@ -1275,14 +1416,13 @@ impl ImportFromDefinitionKind {
         &self.node.node(module).names[self.alias_index as usize]
     }
 
-    pub fn is_reexported(&self) -> bool {
+    fn is_reexported(&self) -> bool {
         self.is_reexported
     }
 }
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
-    module: AstNodeRef<ast::Identifier>,
     module_index: u32,
 }
 
@@ -1291,11 +1431,14 @@ impl ImportFromSubmoduleDefinitionKind {
         self.node.node(module)
     }
 
-    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
-        self.module.node(module)
+    fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.import(module)
+            .module
+            .as_ref()
+            .expect("import-from submodule definitions should always have a module identifier")
     }
 
-    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         let module_ident = self.module(module);
         let module_str = module_ident.as_str();
 
@@ -1321,16 +1464,26 @@ impl ImportFromSubmoduleDefinitionKind {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+/// The inference region that owns bindings created while evaluating an assignment's value.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum BindingsOwner {
+    /// A simple-name assignment is represented by its definition.
+    Definition,
+    /// An assignment with multiple, unpacking, or non-name targets is represented by its statement.
+    Statement,
+}
+
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct AssignmentDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
+    unpack: Option<Unpack<'db>>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
+    owner: BindingsOwner,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
-    pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+    pub fn unpack(&self) -> Option<Unpack<'db>> {
+        self.unpack
     }
 
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1340,34 +1493,46 @@ impl<'db> AssignmentDefinitionKind<'db> {
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
     }
+
+    pub fn owner(&self) -> BindingsOwner {
+        self.owner
+    }
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AnnotatedAssignmentDefinitionKind {
-    annotation: AstNodeRef<ast::Expr>,
-    value: Option<AstNodeRef<ast::Expr>>,
-    target: AstNodeRef<ast::Expr>,
+    node: AstNodeRef<ast::StmtAnnAssign>,
+    has_value: bool,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
+    fn node<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtAnnAssign {
+        self.node.node(module)
+    }
+
     pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
-        self.value.as_ref().map(|value| value.node(module))
+        self.node(module).value.as_deref()
+    }
+
+    /// Returns whether this annotated assignment has a right-hand-side value.
+    pub const fn has_value(&self) -> bool {
+        self.has_value
     }
 
     pub fn annotation<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.annotation.node(module)
+        &self.node(module).annotation
     }
 
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.target.node(module)
+        &self.node(module).target
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct DictKeyAssignmentKind<'db> {
-    pub(crate) key: AstNodeRef<ast::Expr>,
-    pub(crate) value: AstNodeRef<ast::Expr>,
-    pub(crate) assignment: Definition<'db>,
+    key: AstNodeRef<ast::Expr>,
+    value: AstNodeRef<ast::Expr>,
+    assignment: Definition<'db>,
 }
 
 impl<'db> DictKeyAssignmentKind<'db> {
@@ -1384,21 +1549,22 @@ impl<'db> DictKeyAssignmentKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct WithItemDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    context_expr: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    item: AstNodeRef<ast::WithItem>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> WithItemDefinitionKind<'db> {
     pub fn context_expr<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.context_expr.node(module)
+        &self.item.node(module).context_expr
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1410,21 +1576,22 @@ impl<'db> WithItemDefinitionKind<'db> {
     }
 }
 
-#[derive(Clone, Debug, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub struct ForStmtDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    iterable: AstNodeRef<ast::Expr>,
+    unpack: Option<Unpack<'db>>,
+    node: AstNodeRef<ast::StmtFor>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
+    unpack_position: UnpackPosition,
 }
 
 impl<'db> ForStmtDefinitionKind<'db> {
     pub fn iterable<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
-        self.iterable.node(module)
+        &self.node.node(module).iter
     }
 
     pub fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        TargetKind::from_unpack(self.unpack, self.unpack_position)
     }
 
     pub fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
@@ -1464,10 +1631,9 @@ impl ExceptHandlerDefinitionKind {
 
 /// Definition kind for a loop header entry.
 #[derive(Clone, Debug, get_size2::GetSize)]
-pub struct LoopHeaderDefinitionKind<'db> {
-    /// The `LoopHeader` struct isn't ready when this type of definition is created. Instead we
-    /// look it up later by passing this token to `get_loop_header`.
-    loop_token: LoopToken<'db>,
+pub struct LoopHeaderDefinitionKind {
+    /// The `LoopHeader` is reserved before walking the loop and populated afterward.
+    loop_header_id: LoopHeaderId,
     loop_stmt: LoopStmtKind,
     place: ScopedPlaceId,
 }
@@ -1478,16 +1644,16 @@ pub(crate) enum LoopStmtKind {
     For(AstNodeRef<ast::StmtFor>),
 }
 
-impl<'db> LoopHeaderDefinitionKind<'db> {
-    pub fn loop_token(&self) -> LoopToken<'db> {
-        self.loop_token
+impl LoopHeaderDefinitionKind {
+    pub fn loop_header_id(&self) -> LoopHeaderId {
+        self.loop_header_id
     }
 
     pub fn place(&self) -> ScopedPlaceId {
         self.place
     }
 
-    pub fn range(&self, module: &ParsedModuleRef) -> TextRange {
+    fn range(&self, module: &ParsedModuleRef) -> TextRange {
         match &self.loop_stmt {
             LoopStmtKind::While(stmt) => stmt.node(module).range(),
             LoopStmtKind::For(stmt) => stmt.node(module).range(),
@@ -1495,12 +1661,106 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct NestedBindingsDefinitionKind {
+    pub name: Name,
+    pub execution: NestedBindingExecution,
+    // Note that in general this can include both `global` and `nonlocal` declarations from
+    // different nested scopes, because we don't necessarily know at synthesis time which of those
+    // kind will be visible in the current scope.
+    pub nested_declarations: SmallVec<[crate::builder::NestedDeclaration; 1]>,
+}
+
+impl NestedBindingsDefinitionKind {
+    /// Returns every nested binding source and whether it was declared `global`.
+    ///
+    /// Use [`Self::visible_binding_sources`] when resolving the binding in a particular scope.
+    fn binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+    ) -> impl Iterator<Item = (bool, BindingWithConstraintsIterator<'index, 'db>)> + 'index {
+        self.nested_declarations.iter().filter_map(|declaration| {
+            debug_assert!(declaration.is_bound);
+            let symbol = index
+                .place_table(declaration.file_scope_id)
+                .symbol_id(&self.name)?;
+            let use_def = index.use_def_map(declaration.file_scope_id);
+            let bindings = match self.execution {
+                NestedBindingExecution::Lazy => use_def.reachable_bindings(symbol.into()),
+                NestedBindingExecution::Eager => use_def.end_of_scope_bindings(symbol.into()),
+            };
+            Some((declaration.is_global(), bindings))
+        })
+    }
+
+    /// Returns nested binding sources that can update the same variable as `scope`.
+    ///
+    /// A synthetic binding can collect both `global` and `nonlocal` writes to one name:
+    ///
+    /// ```python
+    /// x = 0
+    ///
+    /// def outer():
+    ///     x = 1
+    ///
+    ///     def change_global():
+    ///         global x
+    ///         x = 2
+    ///
+    ///     def change_nonlocal():
+    ///         nonlocal x
+    ///         x = 3
+    /// ```
+    ///
+    /// Only `change_nonlocal` can update `outer`'s local `x`. Nested functions also cannot
+    /// capture a class-local variable, so class scopes do not see nonlocal writes to their
+    /// own bindings.
+    pub fn visible_binding_sources<'index, 'db>(
+        &'index self,
+        index: &'index SemanticIndex<'db>,
+        scope: FileScopeId,
+    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'index, 'db>> + 'index {
+        let symbol_id = index.place_table(scope).symbol_id(&self.name);
+        let sees_global = symbol_id
+            .is_some_and(|symbol_id| index.symbol_resolves_to_global_scope(symbol_id, scope));
+        let sees_nonlocal = !sees_global
+            && symbol_id.is_some_and(|symbol_id| {
+                !(index.scope(scope).kind().is_class()
+                    && index.place_table(scope).symbol(symbol_id).is_local())
+            });
+
+        self.binding_sources(index)
+            .filter_map(move |(is_global, bindings)| {
+                (if is_global {
+                    sees_global
+                } else {
+                    sees_nonlocal
+                })
+                .then_some(bindings)
+            })
+    }
+}
+
+/// Describes when writes from a nested scope can affect its containing scope.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub enum NestedBindingExecution {
+    /// The nested scope can run later or repeatedly, as with a function body.
+    Lazy,
+    /// The nested scope is modeled as running while evaluating the containing expression.
+    Eager,
+}
+
+#[derive(
+    Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug, get_size2::GetSize, salsa::SalsaValue,
+)]
 pub struct DefinitionNodeKey(NodeKey);
 
 impl DefinitionNodeKey {
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
-        Self(NodeKey::from_node(node))
+        match node {
+            ast::AnyNodeRef::ParameterWithDefault(parameter) => parameter.into(),
+            _ => Self(NodeKey::from_node(node)),
+        }
     }
 
     pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
@@ -1596,7 +1856,7 @@ impl From<&ast::Parameter> for DefinitionNodeKey {
 
 impl From<&ast::ParameterWithDefault> for DefinitionNodeKey {
     fn from(node: &ast::ParameterWithDefault) -> Self {
-        Self(NodeKey::from_node(node))
+        Self(NodeKey::from_node(&node.parameter))
     }
 }
 
@@ -1604,7 +1864,7 @@ impl From<ast::AnyParameterRef<'_>> for DefinitionNodeKey {
     fn from(value: ast::AnyParameterRef) -> Self {
         Self(match value {
             ast::AnyParameterRef::Variadic(node) => NodeKey::from_node(node),
-            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(node),
+            ast::AnyParameterRef::NonVariadic(node) => NodeKey::from_node(&node.parameter),
         })
     }
 }

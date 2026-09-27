@@ -40,7 +40,8 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let mut arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    arguments.extend_exclude = Some(vec![FilePattern::Builtin("*.md")]);
     let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }
@@ -295,7 +296,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
         // Default without the spinner
         ProgressStyle::with_template("{span_child_prefix} {span_name}{{{span_fields}}}").unwrap(),
     );
-    let indicitif_compatible_writer_layer = tracing_subscriber::fmt::layer()
+    let indicatif_compatible_writer_layer = tracing_subscriber::fmt::layer()
         .with_writer(indicatif_layer.get_stderr_writer())
         .with_target(false);
     let log_layer = log_file.map(File::create).transpose()?.map(|log_file| {
@@ -305,7 +306,7 @@ fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::
     });
     tracing_subscriber::registry()
         .with(filter_layer)
-        .with(indicitif_compatible_writer_layer)
+        .with(indicatif_compatible_writer_layer)
         .with(indicatif_layer)
         .with(log_layer)
         .init();
@@ -554,7 +555,10 @@ fn format_dir_entry(
 ) -> anyhow::Result<(Result<Statistics, CheckFileError>, PathBuf), Error> {
     let resolved_file = resolved_file.context("Iterating the files in the repository failed")?;
     // For some reason it does not filter in the beginning
-    if resolved_file.file_name() == "pyproject.toml" {
+    if ["pyproject.toml", "ruff.toml", ".ruff.toml"]
+        .iter()
+        .any(|&path| resolved_file.file_name() == path)
+    {
         return Ok((Ok(Statistics::default()), resolved_file.into_path()));
     }
 
@@ -958,6 +962,7 @@ impl BlackOptions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::path::Path;
 
     use indoc::indoc;
@@ -978,10 +983,7 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Respect
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Respect);
     }
 
     #[test]
@@ -997,9 +999,6 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Ignore
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Ignore);
     }
 }

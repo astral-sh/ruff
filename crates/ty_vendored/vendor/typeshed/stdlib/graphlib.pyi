@@ -90,11 +90,13 @@ class TopologicalSorter(Generic[_T]):
         Using this method does not require to call "prepare" or "done". If any
         cycle is detected, :exc:`CycleError` will be raised.
         """
+
     if sys.version_info >= (3, 11):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class CycleError(ValueError):

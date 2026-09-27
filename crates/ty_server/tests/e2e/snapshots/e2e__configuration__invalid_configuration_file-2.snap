@@ -3,7 +3,6 @@ source: crates/ty_server/tests/e2e/configuration.rs
 expression: diagnostics
 ---
 {
-  "kind": "full",
   "resultId": "[RESULT_ID]",
   "items": [
     {
@@ -17,7 +16,7 @@ expression: diagnostics
           "character": 12
         }
       },
-      "severity": 1,
+      "severity": 2,
       "code": "unresolved-reference",
       "codeDescription": {
         "href": "https://ty.dev/rules#unresolved-reference"
@@ -25,5 +24,6 @@ expression: diagnostics
       "source": "ty",
       "message": "Name `a` used when not defined"
     }
-  ]
+  ],
+  "kind": "full"
 }

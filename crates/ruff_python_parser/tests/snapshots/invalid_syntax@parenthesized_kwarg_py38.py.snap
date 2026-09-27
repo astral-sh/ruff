@@ -180,4 +180,3 @@ Module(
 3 | f((a) = 1)
 4 | f( ( a ) = 1)
   |    ^^^^^ Syntax Error: Cannot use parenthesized keyword argument name on Python 3.8 (syntax was removed in Python 3.8)
-  |

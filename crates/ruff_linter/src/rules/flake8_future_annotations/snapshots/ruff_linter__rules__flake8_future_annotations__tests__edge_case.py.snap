@@ -10,10 +10,10 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
 7 |     a_list.append("hello")
   |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | from typing import List
-3 | import typing as t
-4 |
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
@@ -25,8 +25,8 @@ FA100 [*] Add `from __future__ import annotations` to simplify `typing.List`
 7 |     a_list.append("hello")
   |
 help: Add `from __future__ import annotations`
+  |
 1 + from __future__ import annotations
 2 | from typing import List
-3 | import typing as t
-4 |
+  |
 note: This is an unsafe fix and may change runtime behavior

@@ -3,8 +3,8 @@ use crate::session::Session;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::{ErrorCode, RequestId};
-use lsp_types::notification::Notification;
-use lsp_types::request::Request;
+use lsp_types::{LspNotificationMethod, Notification};
+use lsp_types::{LspRequestMethod, Request};
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
@@ -18,8 +18,9 @@ mod type_hierarchy;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
-pub(crate) use diagnostics::publish_settings_diagnostics;
-pub use requests::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
+pub(crate) use diagnostics::{
+    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -31,7 +32,7 @@ use ruff_db::panic::PanicError;
 pub(super) fn request(req: server::Request) -> Task {
     let id = req.id.clone();
 
-    match req.method.as_str() {
+    match LspRequestMethod::from(req.method.as_str()) {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
         requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
             requests::CodeActionRequestHandler,
@@ -53,6 +54,11 @@ pub(super) fn request(req: server::Request) -> Task {
         ),
         requests::GotoDeclarationRequestHandler::METHOD => background_document_request_task::<
             requests::GotoDeclarationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoImplementationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoImplementationRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
@@ -142,7 +148,7 @@ pub(super) fn request(req: server::Request) -> Task {
                 BackgroundSchedule::Worker,
             )
         }
-        lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
+        lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
@@ -178,7 +184,7 @@ pub(super) fn request(req: server::Request) -> Task {
 }
 
 pub(super) fn notification(notif: server::Notification) -> Task {
-    match notif.method.as_str() {
+    match LspNotificationMethod::from(notif.method.as_str()) {
         notifications::DidCloseTextDocumentHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseTextDocumentHandler>(notif)
         }
@@ -197,16 +203,19 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidCloseNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
+        notifications::DidSaveTextDocumentHandler::METHOD => {
+            sync_notification_task::<notifications::DidSaveTextDocumentHandler>(notif)
+        }
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
         notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
             sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
         }
-        lsp_types::notification::Cancel::METHOD => {
+        lsp_types::CancelNotification::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
-        lsp_types::notification::SetTrace::METHOD => {
+        lsp_types::SetTraceNotification::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
@@ -235,7 +244,7 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
@@ -264,7 +273,7 @@ where
         let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -306,10 +315,10 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params);
+        let uri = R::document_uri(&params);
 
-        let Ok(document) = session.snapshot_document(&url) else {
-            let reason = format!("Document {url} is not open in the session");
+        let Ok(snapshot) = session.snapshot_document(&uri) else {
+            let reason = format!("Document {uri} is neither open nor a supported closed file");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -327,12 +336,12 @@ where
             });
         };
 
-        let path = document.notebook_or_file_path();
+        let path = snapshot.document().notebook_or_file_path();
         let db = session.project_db(path).clone();
-        let log_guidance = document.client_name().log_guidance();
+        let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
@@ -349,7 +358,7 @@ where
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
                 salsa::attach(&db, || {
-                    R::handle_request(&id, &db, document, client, params);
+                    R::handle_request(&id, &db, snapshot, client, params);
                 });
             }) {
                 panic_response::<R>(&id, client, &error, retry, log_guidance);
@@ -403,7 +412,7 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             client.show_error_message(format!(
@@ -431,9 +440,15 @@ where
 {
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
-        let url = N::document_url(&params);
-        let Ok(snapshot) = session.snapshot_document(&url) else {
-            let reason = format!("Document {url} is not open in the session");
+        let uri = N::document_uri(&params);
+        // Requiring an open document here assumes the notification is invalid for closed documents.
+        // TODO: Revisit this check before routing a notification that can target closed documents through
+        // `background_notification_thread`. Note that `snapshot_document` can already resolve closed files.
+        let Ok(snapshot) = session
+            .open_document_handle(&uri)
+            .and_then(|_| session.snapshot_document(&uri))
+        else {
+            let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring notification id={id} method={} because {reason}",
                 N::METHOD
@@ -444,7 +459,7 @@ where
         let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing::debug_span!("notification", method = %N::METHOD).entered();
 
             let result = match ruff_db::panic::catch_unwind(|| {
                 N::run_with_snapshot(snapshot, client, params)
@@ -480,14 +495,17 @@ where
     <<Req as RequestHandler>::RequestType as Request>::Params: UnwindSafe,
 {
     request
-        .extract(Req::METHOD)
+        .extract(Req::METHOD.as_str())
         .map_err(|err| match err {
             json_err @ server::ExtractError::JsonError { .. } => {
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
-                    than the one whose method name was matched against earlier.")
+                unreachable!(
+                    "A method mismatch should not be possible here \
+                    unless you've used a different handler (`Req`) \
+                    than the one whose method name was matched against earlier."
+                )
             }
         })
         .with_failure_code(server::ErrorCode::InvalidParams)
@@ -520,7 +538,7 @@ fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::Respo
 fn cast_notification<N>(
     notification: server::Notification,
 ) -> Result<(
-    &'static str,
+    LspNotificationMethod<'static>,
     <<N as NotificationHandler>::NotificationType as Notification>::Params,
 )>
 where
@@ -529,14 +547,17 @@ where
     Ok((
         N::METHOD,
         notification
-            .extract(N::METHOD)
+            .extract(N::METHOD.as_str())
             .map_err(|err| match err {
                 json_err @ server::ExtractError::JsonError { .. } => {
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
-                        than the one whose method name was matched against earlier.")
+                    unreachable!(
+                        "A method mismatch should not be possible here \
+                        unless you've used a different handler (`N`) \
+                        than the one whose method name was matched against earlier."
+                    )
                 }
             })
             .with_failure_code(server::ErrorCode::InvalidParams)?,
@@ -560,7 +581,7 @@ impl<T, E: Into<anyhow::Error>> LSPResult<T> for core::result::Result<T, E> {
 }
 
 impl Error {
-    pub(crate) fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
+    fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
         Self { code, error: err }
     }
 }

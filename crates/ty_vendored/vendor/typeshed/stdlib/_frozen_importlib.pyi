@@ -36,6 +36,7 @@ def __import__(
 
     """
 
+# TODO: Revise the protocol for 'loader' param
 def spec_from_loader(
     name: str, loader: LoaderProtocol | None, *, origin: str | None = None, is_package: bool | None = None
 ) -> importlib.machinery.ModuleSpec | None:
@@ -69,8 +70,7 @@ class ModuleSpec:
     `has_location` indicates that a spec's "origin" reflects a location.
     When this is True, `__file__` attribute of the module is set.
 
-    `cached` is the location of the cached bytecode file, if any.  It
-    corresponds to the `__cached__` attribute.
+    `cached` is the location of the cached bytecode file, if any.
 
     `submodule_search_locations` is the sequence of path entries to
     search when importing submodules.  If set, is_package should be
@@ -103,6 +103,7 @@ class ModuleSpec:
     @property
     def parent(self) -> str | None:
         """The name of the module's parent."""
+
     has_location: bool
     def __eq__(self, other: object) -> bool: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
@@ -138,20 +139,23 @@ class BuiltinImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader)
         """Return False as built-in modules are never packages."""
 
     @classmethod
-    def load_module(cls, fullname: str) -> types.ModuleType:
-        """Load the specified module into sys.modules and return it.
-
-        This method is deprecated.  Use loader.exec_module() instead.
-
-        """
-
-    @classmethod
     def get_code(cls, fullname: str) -> None:
         """Return None as built-in modules do not have code objects."""
 
     @classmethod
     def get_source(cls, fullname: str) -> None:
         """Return None as built-in modules do not have source code."""
+
+    if sys.version_info < (3, 15):
+        @classmethod
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `exec_module()` instead.")
+        def load_module(cls, fullname: str) -> types.ModuleType:
+            """Load the specified module into sys.modules and return it.
+
+            This method is deprecated.  Use loader.exec_module() instead.
+
+            """
+
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod
@@ -203,20 +207,23 @@ class FrozenImporter(importlib.abc.MetaPathFinder, importlib.abc.InspectLoader):
         """Return True if the frozen module is a package."""
 
     @classmethod
-    def load_module(cls, fullname: str) -> types.ModuleType:
-        """Load a frozen module.
-
-        This method is deprecated.  Use exec_module() instead.
-
-        """
-
-    @classmethod
     def get_code(cls, fullname: str) -> None:
         """Return the code object for the frozen module."""
 
     @classmethod
     def get_source(cls, fullname: str) -> None:
         """Return None as frozen modules do not have source code."""
+
+    if sys.version_info < (3, 15):
+        @classmethod
+        @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `exec_module()` instead.")
+        def load_module(cls, fullname: str) -> types.ModuleType:
+            """Load a frozen module.
+
+            This method is deprecated.  Use exec_module() instead.
+
+            """
+
     # Loader
     if sys.version_info < (3, 12):
         @staticmethod

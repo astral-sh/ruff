@@ -1,4 +1,5 @@
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::{
     ProviderReplacement, generate_import_edit, generate_remove_and_runtime_import_edit,
     is_guarded_by_try_except,
@@ -35,7 +36,7 @@ use crate::{FixAvailability, Violation};
 /// fab_auth_manager_app = FabAuthManager().get_fastapi_app()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Pedantic)]
 pub(crate) struct Airflow3MovedToProvider<'a> {
     deprecated: QualifiedName<'a>,
     replacement: ProviderReplacement,

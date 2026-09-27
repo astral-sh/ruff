@@ -7,7 +7,7 @@
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtFunctionDef, StmtImportFrom,
-    comparable::ComparableExpr,
+    comparable::HashableExpr,
     helpers,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
@@ -211,6 +211,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
+                    Self::type_parameter_default_order(type_params, ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
@@ -226,10 +227,19 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
+                type_params,
+                arguments,
                 ..
-            })
-            | Stmt::TypeAlias(ast::StmtTypeAlias {
+            }) => {
+                if let Some(type_params) = type_params {
+                    Self::duplicate_type_parameter_name(type_params, ctx);
+                    Self::type_parameter_default_order(type_params, ctx);
+                }
+                if let Some(arguments) = arguments {
+                    Self::duplicate_keyword_args(arguments, ctx);
+                }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
                 type_params: Some(type_params),
                 ..
             }) => {
@@ -323,7 +333,13 @@ impl SemanticSyntaxChecker {
 
                 if !ctx.in_module_scope() {
                     for name in names {
-                        if !ctx.has_nonlocal_binding(name) {
+                        if ctx.is_bound_parameter(name) {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::NonlocalParameter(name.to_string()),
+                                name.range,
+                            );
+                        } else if !ctx.has_nonlocal_binding(name) {
                             Self::add_error(
                                 ctx,
                                 SemanticSyntaxErrorKind::NonlocalWithoutBinding(name.to_string()),
@@ -585,6 +601,7 @@ impl SemanticSyntaxChecker {
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
+                // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
@@ -725,6 +742,7 @@ impl SemanticSyntaxChecker {
                 // test_err type_parameter_default_order
                 // class C[T = int, U]: ...
                 // class C[T1, T2 = int, T3, T4]: ...
+                // def f[T = int, U](): ...
                 // type Alias[T = int, U] = ...
                 Self::add_error(
                     ctx,
@@ -760,6 +778,40 @@ impl SemanticSyntaxChecker {
                 Self::add_error(
                     ctx,
                     SemanticSyntaxErrorKind::DuplicateParameter(param_name.to_string()),
+                    range,
+                );
+            }
+        }
+    }
+
+    fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(args: &ast::Arguments, ctx: &Ctx) {
+        if args.keywords.len() < 2 {
+            return;
+        }
+
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(args.keywords.len(), FxBuildHasher);
+
+        for (ident, range) in args
+            .keywords
+            .iter()
+            .filter_map(|keyword| keyword.arg.as_ref().map(|arg| (arg, keyword.range)))
+        {
+            if !all_arg_names.insert(ident.as_str()) {
+                // test_err duplicate_keyword_args
+                // def foo(x): ...
+                // foo(x=1, x=2)
+                // def baz(x, y, z): ...
+                // baz(x, y=1, z=3, y=4)
+
+                // test_ok non_duplicate_keyword_args
+                // def foo(x): ...
+                // foo(x=1)
+                // def bar(x, y, z): ...
+                // foo(x="a", y=1, z=True)
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::DuplicateKeywordArgument(ident.to_string()),
                     range,
                 );
             }
@@ -1010,7 +1062,13 @@ impl SemanticSyntaxChecker {
                 parameters: Some(parameters),
                 ..
             }) => {
+                for parameter in parameters {
+                    Self::check_identifier(parameter.name(), ctx);
+                }
                 Self::duplicate_parameter_name(parameters, ctx);
+            }
+            Expr::Call(ast::ExprCall { arguments, .. }) => {
+                Self::duplicate_keyword_args(arguments, ctx);
             }
             _ => {}
         }
@@ -1111,7 +1169,14 @@ impl SemanticSyntaxChecker {
         generators: &[ast::Comprehension],
         ctx: &Ctx,
     ) {
+        // test_ok starred_comprehension_target
+        // [item for (*items,) in source]
+
+        // test_err starred_comprehension_target
+        // [item for *items in source]
         for (index, generator) in generators.iter().enumerate() {
+            Self::invalid_star_expression(&generator.target, ctx);
+
             for if_expr in &generator.ifs {
                 Self::check_rebound_variables(
                     if_expr,
@@ -1301,6 +1366,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
                 write!(f, "multiple assignments to name `{name}` in pattern")
             }
+            SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern => {
+                f.write_str("multiple starred names in sequence pattern")
+            }
             SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
                 // These error messages are taken from CPython's syntax errors
                 IrrefutablePatternKind::Name(name) => {
@@ -1369,6 +1437,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 write!(f, "nonlocal declaration not allowed at module level")
             }
+            SemanticSyntaxErrorKind::DuplicateKeywordArgument(name) => {
+                write!(f, "Duplicate keyword argument `{name}`")
+            }
             SemanticSyntaxErrorKind::NonlocalAndGlobal(name) => {
                 write!(f, "name `{name}` is nonlocal and global")
             }
@@ -1414,6 +1485,12 @@ impl Display for SemanticSyntaxError {
                 write!(
                     f,
                     "name `{name}` cannot refer to a parameter and a global variable"
+                )
+            }
+            SemanticSyntaxErrorKind::NonlocalParameter(name) => {
+                write!(
+                    f,
+                    "name `{name}` cannot refer to a parameter and a nonlocal variable"
                 )
             }
             SemanticSyntaxErrorKind::DifferentMatchPatternBindings => {
@@ -1522,6 +1599,16 @@ pub enum SemanticSyntaxErrorKind {
     ///     case Class(x=1, x=2): ...
     /// ```
     MultipleCaseAssignment(ast::name::Name),
+
+    /// Represents multiple starred names in a sequence pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case [*head, middle, *tail]: ...
+    /// ```
+    MultipleStarredNamesInSequencePattern,
 
     /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
     ///
@@ -1804,6 +1891,17 @@ pub enum SemanticSyntaxErrorKind {
     /// ```
     DuplicateParameter(String),
 
+    /// Represents duplicated keyword arguments in a function call or class definition.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(x): ...
+    /// f(x=1, x=2)
+    /// class C(metaclass=type, metaclass=type): ...
+    /// ```
+    DuplicateKeywordArgument(String),
+
     /// Represents a nonlocal declaration at module level
     NonlocalDeclarationAtModuleLevel,
 
@@ -1844,6 +1942,13 @@ pub enum SemanticSyntaxErrorKind {
     /// bound in the local scope of the function. Using `global` on them introduces
     /// ambiguity and will result in a `SyntaxError`.
     GlobalParameter(String),
+
+    /// Represents a function parameter that is also declared as `nonlocal`.
+    ///
+    /// Declaring a parameter as `nonlocal` is invalid, since parameters are already
+    /// bound in a local scope of the function. using `nonlocal` on them introduces
+    /// ambiguity and will result in a `SyntaxError`.
+    NonlocalParameter(String),
 
     /// Represents the use of alternative patterns in a `match` statement that bind different names.
     ///
@@ -2109,6 +2214,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         //     case Class(y=x, z=x): ...  # MatchClass keyword
         //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
+
+        // test_err multiple_starred_names_in_sequence_pattern
+        // match subject:
+        //     case *first, *second, *third: ...
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
@@ -2117,7 +2226,18 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                let mut seen_star_pattern = false;
                 for pattern in patterns {
+                    if pattern.is_match_star() {
+                        if seen_star_pattern {
+                            SemanticSyntaxChecker::add_error(
+                                self.ctx,
+                                SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern,
+                                pattern.range(),
+                            );
+                        }
+                        seen_star_pattern = true;
+                    }
                     self.visit_pattern(pattern);
                 }
             }
@@ -2137,12 +2257,13 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 let mut seen = FxHashSet::default();
                 for key in keys
                     .iter()
-                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
-                    // because they are represented as a `BinOp::Add` between a real number and
-                    // an imaginary number
-                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                    // Signed and complex numbers are allowed as keys but are represented as unary
+                    // or binary expressions rather than literals.
+                    .filter(|key| {
+                        key.is_literal_expr() || key.is_unary_op_expr() || key.is_bin_op_expr()
+                    })
                 {
-                    if !seen.insert(ComparableExpr::from(key)) {
+                    if !seen.insert(HashableExpr::from(key)) {
                         let key_range = key.range();
                         let duplicate_key = self.ctx.source()[key_range].to_string();
                         // test_ok duplicate_match_key_attr
@@ -2158,6 +2279,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
                         //     case {True: 1, True: 2}: ...
                         //     case {None: 1, None: 2}: ...
+                        //     case {0: 1, False: 2}: ...
+                        //     case {1.0: 1, True: 2}: ...
+                        //     case {-0: 1, False: 2}: ...
+                        //     case {1 + 0j: 1, True: 2}: ...
                         //     case {
                         //     """x
                         //     y
@@ -2172,6 +2297,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case [{"x": 1, "x": 2}]: ...
                         //     case Foo(x=1, y={"x": 1, "x": 2}): ...
                         //     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+                        //     case {2: 1, 2.0: 2}: ...
+                        //     case {9007199254740993: 1, 9007199254740993 + 0j: 2}: ...
                         SemanticSyntaxChecker::add_error(
                             self.ctx,
                             SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),

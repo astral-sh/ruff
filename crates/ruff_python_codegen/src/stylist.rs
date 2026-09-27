@@ -1,8 +1,7 @@
 //! Detect code style from Python source code.
 
-use std::borrow::Cow;
-use std::cell::OnceCell;
 use std::ops::Deref;
+use std::sync::OnceLock;
 
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
@@ -11,10 +10,9 @@ use ruff_text_size::Ranged;
 
 #[derive(Debug, Clone)]
 pub struct Stylist<'a> {
-    source: Cow<'a, str>,
     indentation: Indentation,
     quote: Quote,
-    line_ending: OnceCell<LineEnding>,
+    line_ending: LineEndingDetection<'a>,
 }
 
 impl<'a> Stylist<'a> {
@@ -27,19 +25,14 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn line_ending(&self) -> LineEnding {
-        *self.line_ending.get_or_init(|| {
-            find_newline(&self.source)
-                .map(|(_, ending)| ending)
-                .unwrap_or_default()
-        })
+        self.line_ending.get()
     }
 
     pub fn into_owned(self) -> Stylist<'static> {
         Stylist {
-            source: Cow::Owned(self.source.into_owned()),
             indentation: self.indentation,
             quote: self.quote,
-            line_ending: self.line_ending,
+            line_ending: LineEndingDetection::Detected(self.line_ending.get()),
         }
     }
 
@@ -47,10 +40,36 @@ impl<'a> Stylist<'a> {
         let indentation = detect_indentation(tokens, source);
 
         Self {
-            source: Cow::Borrowed(source),
             indentation,
             quote: detect_quote(tokens),
-            line_ending: OnceCell::default(),
+            line_ending: LineEndingDetection::Lazy {
+                source,
+                detected: OnceLock::new(),
+            },
+        }
+    }
+}
+
+/// Borrowed stylists detect line endings on demand. Owned stylists keep only the result,
+/// so they do not need to retain or copy the source text.
+#[derive(Debug, Clone)]
+enum LineEndingDetection<'a> {
+    Lazy {
+        source: &'a str,
+        detected: OnceLock<LineEnding>,
+    },
+    Detected(LineEnding),
+}
+
+impl LineEndingDetection<'_> {
+    fn get(&self) -> LineEnding {
+        match self {
+            Self::Lazy { source, detected } => *detected.get_or_init(|| {
+                find_newline(source)
+                    .map(|(_, ending)| ending)
+                    .unwrap_or_default()
+            }),
+            Self::Detected(line_ending) => *line_ending,
         }
     }
 }
@@ -162,6 +181,19 @@ mod tests {
     use ruff_source_file::{LineEnding, find_newline};
 
     use super::{Indentation, Quote, Stylist};
+
+    #[test]
+    fn owned_style_preserves_source_style() {
+        let stylist = {
+            let source = String::from("def f():\r\n  return 'value'\r\n");
+            let parsed = parse_module(&source).unwrap();
+            Stylist::from_tokens(parsed.tokens(), &source).into_owned()
+        };
+
+        assert_eq!(stylist.indentation().as_str(), "  ");
+        assert_eq!(stylist.quote(), Quote::Single);
+        assert_eq!(stylist.line_ending(), LineEnding::CrLf);
+    }
 
     #[test]
     fn indentation() {

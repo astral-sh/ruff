@@ -145,7 +145,7 @@ ConfigParser -- responsible for parsing a list of
 
 import sys
 from _typeshed import BytesPath, GenericPath, MaybeNone, StrOrBytesPath, StrPath, SupportsWrite
-from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence
+from collections.abc import Callable, ItemsView, Iterable, Iterator, Mapping, MutableMapping, Sequence, ValuesView
 from re import Pattern
 from typing import Any, AnyStr, ClassVar, Final, Literal, TypeAlias, TypeVar, overload, type_check_only
 from typing_extensions import deprecated
@@ -505,6 +505,7 @@ class RawConfigParser(_Parser):
         Optional second argument is the `source` specifying the name of the
         dictionary being read.
         """
+
     if sys.version_info < (3, 12):
         @deprecated("Deprecated since Python 3.2; removed in Python 3.12. Use `parser.read_file()` instead.")
         def readfp(self, fp: Iterable[str], filename: str | None = None) -> None:
@@ -580,6 +581,17 @@ class RawConfigParser(_Parser):
         """
     @overload
     def items(self, section: _SectionName, raw: bool = False, vars: _Section | None = None) -> list[tuple[str, str]]: ...
+
+    def values(self) -> ValuesView[SectionProxy]:
+        """D.values() -> an object providing a view on D's values"""
+
+    def popitem(self) -> tuple[str, SectionProxy]:
+        """Remove a section from the parser and return it as
+        a (section_name, section_proxy) tuple. If no section is present, raise
+        KeyError.
+
+        The section DEFAULT is never returned because it cannot be removed.
+        """
 
     def set(self, section: _SectionName, option: str, value: str | None = None) -> None:
         """Set an option."""

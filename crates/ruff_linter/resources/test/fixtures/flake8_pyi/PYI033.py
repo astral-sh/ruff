@@ -3,20 +3,20 @@
 from collections.abc import Sequence
 from typing import TypeAlias
 
-A: TypeAlias = None  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-F: TypeAlias = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+A: TypeAlias = None  # type: int  # error
+B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # error
+C: TypeAlias = None  #type: int  # error
+D: TypeAlias = None  #      type: int  # error
+E: TypeAlias = None#    type: int  # error
+F: TypeAlias = None#type:int  # error
 
 def func(
-    arg1,  # type: dict[str, int]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
-    arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+    arg1,  # type: dict[str, int]  # error
+    arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # error
 ): ...
 
 class Foo:
-    Attr: TypeAlias = None  # type: set[str]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+    Attr: TypeAlias = None  # type: set[str]  # error
 
 G: TypeAlias = None  # type: ignore
 H: TypeAlias = None  # type: ignore[attr-defined]

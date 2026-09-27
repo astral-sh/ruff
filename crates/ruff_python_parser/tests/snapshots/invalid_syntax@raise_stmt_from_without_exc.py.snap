@@ -59,4 +59,3 @@ Module(
 1 | raise from exc
 2 | raise from None
   |       ^^^^ Syntax Error: Exception missing in `raise` statement with cause
-  |

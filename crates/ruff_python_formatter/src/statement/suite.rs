@@ -526,34 +526,33 @@ fn trailing_function_or_class_def<'a>(
         preceding.map(AnyNodeRef::from),
         AnyNodeRef::last_child_in_body,
     )
-    .take_while(|last_child|
-        // If there is a comment between preceding and following the empty lines were
-        // inserted before the comment by preceding and there are no extra empty lines
-        // after the comment.
-        // ```python
-        // class Test:
-        //     def a(self):
-        //         pass
-        //         # trailing comment
-        //
-        //
-        // # two lines before, one line after
-        //
-        // c = 30
-        // ````
-        // This also includes nested class/function definitions, so we stop recursing
-        // once we see a node with a trailing own line comment:
-        // ```python
-        // def f():
-        //     if True:
-        //
-        //         def double(s):
-        //             return s + s
-        //
-        //         # nested trailing own line comment
-        //     print("below function with trailing own line comment")
-        // ```
-        !comments.has_trailing_own_line(*last_child))
+    // If there is a comment between preceding and following the empty lines were
+    // inserted before the comment by preceding and there are no extra empty lines
+    // after the comment.
+    // ```python
+    // class Test:
+    //     def a(self):
+    //         pass
+    //         # trailing comment
+    //
+    //
+    // # two lines before, one line after
+    //
+    // c = 30
+    // ````
+    // This also includes nested class/function definitions, so we stop recursing
+    // once we see a node with a trailing own line comment:
+    // ```python
+    // def f():
+    //     if True:
+    //
+    //         def double(s):
+    //             return s + s
+    //
+    //         # nested trailing own line comment
+    //     print("below function with trailing own line comment")
+    // ```
+    .take_while(|last_child| !comments.has_trailing_own_line(*last_child))
     .find(|last_child| {
         matches!(
             last_child,
@@ -740,7 +739,7 @@ fn stub_suite_can_omit_empty_line(preceding: &Stmt, following: &Stmt, f: &PyForm
 }
 
 /// Returns `true` if a function or class body contains only an ellipsis with no comments.
-pub(crate) fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
+fn contains_only_an_ellipsis(body: &[Stmt], comments: &Comments) -> bool {
     as_only_an_ellipsis(body, comments).is_some()
 }
 
@@ -985,7 +984,7 @@ fn new_logical_line_between_statements(source: &str, between_statement_range: Te
 mod tests {
     use ruff_formatter::format;
     use ruff_python_parser::parse_module;
-    use ruff_python_trivia::CommentRanges;
+    use ruff_python_trivia::TriviaRanges;
 
     use crate::PyFormatOptions;
     use crate::comments::Comments;
@@ -1015,12 +1014,13 @@ def trailing_func():
 ";
 
         let parsed = parse_module(source).unwrap();
-        let comment_ranges = CommentRanges::from(parsed.tokens());
+        let trivia = TriviaRanges::from(parsed.tokens());
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
-            Comments::from_ranges(&comment_ranges),
+            Comments::empty(),
+            &trivia,
             parsed.tokens(),
         );
 

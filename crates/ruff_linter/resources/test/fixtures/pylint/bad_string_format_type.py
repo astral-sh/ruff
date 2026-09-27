@@ -63,3 +63,9 @@ r'\%03o' % (ord(c),)
 "%c" % ("x",)
 "%c" % "x"
 "%c" % "œ"
+
+# No errors here, will be reported separately by bad-string-format-character.
+"%b" % b"xx"
+
+# bool is acceptable as int/float/character.
+"%d %c %f" % (True, True, True)

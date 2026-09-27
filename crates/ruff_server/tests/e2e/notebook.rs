@@ -2,12 +2,15 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use insta::assert_json_snapshot;
-use lsp_types::notification::{DidChangeNotebookDocument, DidOpenNotebookDocument};
 use lsp_types::{
-    DidChangeNotebookDocumentParams, DidOpenNotebookDocumentParams, LSPObject, NotebookDocument,
-    NotebookDocumentCellChange, NotebookDocumentChangeEvent, NotebookDocumentChangeTextContent,
-    Position, Range, TextDocumentContentChangeEvent, TextDocumentItem,
-    VersionedNotebookDocumentIdentifier, VersionedTextDocumentIdentifier,
+    DidChangeNotebookDocumentNotification, DidOpenNotebookDocumentNotification,
+    NotebookDocumentCellContentChanges, TextDocumentContentChangePartial, TextDocumentIdentifier,
+};
+use lsp_types::{
+    DidChangeNotebookDocumentParams, DidOpenNotebookDocumentParams, LspObject, NotebookDocument,
+    NotebookDocumentCellChanges, NotebookDocumentChangeEvent, Position, Range,
+    TextDocumentContentChangeEvent, TextDocumentItem, VersionedNotebookDocumentIdentifier,
+    VersionedTextDocumentIdentifier,
 };
 use ruff_notebook::SourceValue;
 
@@ -17,134 +20,324 @@ const NOTEBOOK_FIXTURE_PATH: &str = "resources/test/fixtures/tensorflow_test_not
 
 struct NotebookChange {
     version: i32,
-    metadata: Option<LSPObject>,
-    updated_cells: NotebookDocumentCellChange,
+    metadata: Option<LspObject>,
+    updated_cells: NotebookDocumentCellChanges,
+}
+
+#[test]
+fn pull_diagnostics_for_notebook_cells() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            "[tool.ruff.lint]\nselect = [\"F401\", \"F811\"]\n",
+        )?
+        .build();
+
+    let notebook_path = server.file_path("test.ipynb");
+    let cell_uris = [
+        make_cell_uri(&notebook_path, 0),
+        make_cell_uri(&notebook_path, 1),
+        make_cell_uri(&notebook_path, 2),
+    ];
+    let cells = cell_uris
+        .iter()
+        .cloned()
+        .map(|uri| lsp_types::NotebookCell {
+            kind: lsp_types::NotebookCellKind::Code,
+            document: uri,
+            metadata: None,
+            execution_summary: None,
+        })
+        .collect();
+    let cell_text_documents = cell_uris
+        .iter()
+        .cloned()
+        .zip(["import sys\n", "import os\nimport os\n", "os.getcwd()\n"])
+        .map(|(uri, source)| {
+            TextDocumentItem::new(uri, lsp_types::LanguageKind::Python, 0, source.to_string())
+        })
+        .collect();
+
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document: NotebookDocument {
+                uri: server.file_uri("test.ipynb"),
+                notebook_type: "jupyter-notebook".to_string(),
+                version: 0,
+                metadata: None,
+                cells,
+            },
+            cell_text_documents,
+        },
+    );
+
+    let expected_diagnostics = server.collect_publish_diagnostic_notifications(cell_uris.len());
+    assert_eq!(expected_diagnostics[&cell_uris[0]].len(), 1);
+    assert_eq!(expected_diagnostics[&cell_uris[1]].len(), 1);
+    assert!(expected_diagnostics[&cell_uris[2]].is_empty());
+
+    for uri in cell_uris {
+        let request_id = server.send_request::<lsp_types::DocumentDiagnosticRequest>(
+            lsp_types::DocumentDiagnosticParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                identifier: Some("ruff".to_string()),
+                previous_result_id: None,
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: lsp_types::PartialResultParams::default(),
+            },
+        );
+        let report = server.await_response::<lsp_types::DocumentDiagnosticRequest>(&request_id);
+
+        let lsp_types::DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) =
+            report
+        else {
+            panic!("Expected a full diagnostic report for {uri}");
+        };
+
+        assert_eq!(
+            report.full_document_diagnostic_report.items, expected_diagnostics[&uri],
+            "Pull diagnostics do not match published diagnostics for {uri}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn related_information() -> Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(".")?
+        .with_file(
+            "pyproject.toml",
+            r#"
+[tool.ruff.lint]
+select = ["F811"]
+"#,
+        )?
+        .enable_diagnostic_related_information(true)
+        .build();
+
+    let notebook_path = server.file_path("test.ipynb");
+    let cell_uris = [
+        make_cell_uri(&notebook_path, 0),
+        make_cell_uri(&notebook_path, 1),
+    ];
+    let cells = cell_uris
+        .iter()
+        .cloned()
+        .map(|uri| lsp_types::NotebookCell {
+            kind: lsp_types::NotebookCellKind::Code,
+            document: uri,
+            metadata: None,
+            execution_summary: None,
+        })
+        .collect();
+    let cell_text_documents = cell_uris
+        .iter()
+        .cloned()
+        .zip(["import os\n", "import os\n"])
+        .map(|(uri, source)| {
+            TextDocumentItem::new(uri, lsp_types::LanguageKind::Python, 0, source.to_string())
+        })
+        .collect();
+
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document: NotebookDocument {
+                uri: server.file_uri("test.ipynb"),
+                notebook_type: "jupyter-notebook".to_string(),
+                version: 0,
+                metadata: None,
+                cells,
+            },
+            cell_text_documents,
+        },
+    );
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(cell_uris.len());
+    assert!(
+        diagnostics
+            .get(&cell_uris[0])
+            .expect("first cell to have diagnostics published")
+            .is_empty()
+    );
+    let [diagnostic] = diagnostics
+        .get(&cell_uris[1])
+        .expect("second cell to have diagnostics published")
+        .as_slice()
+    else {
+        panic!("second cell to have one diagnostic");
+    };
+    let [related_information] = diagnostic
+        .related_information
+        .as_deref()
+        .expect("client supports diagnostic related information")
+    else {
+        panic!("diagnostic to have one related information entry");
+    };
+
+    assert_eq!(related_information.location.uri, cell_uris[0]);
+    assert_eq!(
+        related_information.location.range,
+        Range {
+            start: Position {
+                line: 0,
+                character: 7,
+            },
+            end: Position {
+                line: 0,
+                character: 9,
+            },
+        }
+    );
+    assert_eq!(
+        related_information.message,
+        "previous definition of `os` here"
+    );
+
+    Ok(())
 }
 
 #[test]
 fn super_resolution_overview() -> Result<()> {
-    let fixture_path = fixture_path(NOTEBOOK_FIXTURE_PATH)?;
-    let workspace_dir = fixture_path
-        .parent()
-        .expect("notebook fixture should have a parent");
+    let fixture = std::fs::read_to_string(fixture_path(NOTEBOOK_FIXTURE_PATH)?)?;
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_dir)?
+        .with_workspace(".")?
+        .with_file(NOTEBOOK_FIXTURE_PATH, fixture)?
         .build();
 
+    let fixture_path = server.file_path(NOTEBOOK_FIXTURE_PATH);
     let (notebook_document, cell_text_documents) =
         create_lsp_notebook(&fixture_path, fixture_path.clone())?;
     let notebook_uri = notebook_document.uri.clone();
     let cell_count = cell_text_documents.len();
 
-    server.send_notification::<DidOpenNotebookDocument>(DidOpenNotebookDocumentParams {
-        notebook_document,
-        cell_text_documents,
-    });
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document,
+            cell_text_documents,
+        },
+    );
 
     let diagnostics = server.collect_publish_diagnostic_notifications(cell_count);
     assert_json_snapshot!("super_resolution_overview_open", diagnostics);
 
-    let changes = [NotebookChange {
-        version: 0,
-        metadata: None,
-        updated_cells: NotebookDocumentCellChange {
-            structure: None,
-            data: None,
-            text_content: Some(vec![NotebookDocumentChangeTextContent {
-                document: VersionedTextDocumentIdentifier {
-                    uri: make_cell_uri(&fixture_path, 5),
-                    version: 2,
-                },
-                changes: vec![
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 18,
-                                character: 61,
-                            },
-                            end: Position {
-                                line: 18,
-                                character: 62,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 18,
-                                character: 55,
-                            },
-                            end: Position {
-                                line: 18,
-                                character: 56,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 14,
-                                character: 46,
-                            },
-                            end: Position {
-                                line: 14,
-                                character: 47,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                    TextDocumentContentChangeEvent {
-                        range: Some(Range {
-                            start: Position {
-                                line: 14,
-                                character: 40,
-                            },
-                            end: Position {
-                                line: 14,
-                                character: 41,
-                            },
-                        }),
-                        range_length: Some(1),
-                        text: "\"".to_string(),
-                    },
-                ],
-            }]),
-        },
-    },
-    NotebookChange {
-        version: 1,
-        metadata: None,
-        updated_cells: NotebookDocumentCellChange {
-            structure: None,
-            data: None,
-            text_content: Some(vec![NotebookDocumentChangeTextContent {
-                document: VersionedTextDocumentIdentifier {
-                    uri: make_cell_uri(&fixture_path, 4),
-                    version: 2,
-                },
-                changes: vec![TextDocumentContentChangeEvent {
-                    range: Some(Range {
-                        start: Position {
-                            line: 0,
-                            character: 0,
+    let changes = [
+        NotebookChange {
+            version: 0,
+            metadata: None,
+            updated_cells: NotebookDocumentCellChanges {
+                structure: None,
+                data: None,
+                text_content: Some(vec![NotebookDocumentCellContentChanges {
+                    document: VersionedTextDocumentIdentifier {
+                        text_document_identifier: TextDocumentIdentifier {
+                            uri: make_cell_uri(&fixture_path, 5),
                         },
-                        end: Position {
-                            line: 0,
-                            character: 181,
-                        },
-                    }),
-                    range_length: Some(181),
-                    text: "test_img_path = tf.keras.utils.get_file(\n    \"lr.jpg\",\n    \"https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg\",\n)".to_string(),
-                }],
-            }]),
+                        version: 2,
+                    },
+                    changes: vec![
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 18,
+                                        character: 61,
+                                    },
+                                    end: Position {
+                                        line: 18,
+                                        character: 62,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 18,
+                                        character: 55,
+                                    },
+                                    end: Position {
+                                        line: 18,
+                                        character: 56,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 14,
+                                        character: 46,
+                                    },
+                                    end: Position {
+                                        line: 14,
+                                        character: 47,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                        TextDocumentContentChangeEvent::TextDocumentContentChangePartial(
+                            TextDocumentContentChangePartial {
+                                range: Range {
+                                    start: Position {
+                                        line: 14,
+                                        character: 40,
+                                    },
+                                    end: Position {
+                                        line: 14,
+                                        character: 41,
+                                    },
+                                },
+                                text: "\"".to_string(),
+                                ..Default::default()
+                            },
+                        ),
+                    ],
+                }]),
+            },
         },
-    }];
+        NotebookChange {
+            version: 1,
+            metadata: None,
+            updated_cells: NotebookDocumentCellChanges {
+                structure: None,
+                data: None,
+                text_content: Some(vec![NotebookDocumentCellContentChanges {
+                    document: VersionedTextDocumentIdentifier {
+                        text_document_identifier: TextDocumentIdentifier {
+                            uri: make_cell_uri(&fixture_path, 4),
+                        },
+                        version: 2,
+                    },
+                    changes: vec![TextDocumentContentChangeEvent::TextDocumentContentChangePartial(TextDocumentContentChangePartial {
+                        range: Range {
+                            start: Position {
+                                line: 0,
+                                character: 0,
+                            },
+                            end: Position {
+                                line: 0,
+                                character: 181,
+                            },
+                        },
+                        text: "test_img_path = tf.keras.utils.get_file(\n    \"lr.jpg\",\n    \"https://raw.githubusercontent.com/tensorflow/examples/master/lite/examples/super_resolution/android/app/src/main/assets/lr-1.jpg\",\n)".to_string(),
+                        ..Default::default()
+                    })],
+                }]),
+            },
+        },
+    ];
 
     let mut final_diagnostics = None;
 
@@ -154,16 +347,18 @@ fn super_resolution_overview() -> Result<()> {
         updated_cells,
     } in changes
     {
-        server.send_notification::<DidChangeNotebookDocument>(DidChangeNotebookDocumentParams {
-            notebook_document: VersionedNotebookDocumentIdentifier {
-                uri: notebook_uri.clone(),
-                version,
+        server.send_notification::<DidChangeNotebookDocumentNotification>(
+            DidChangeNotebookDocumentParams {
+                notebook_document: VersionedNotebookDocumentIdentifier {
+                    uri: notebook_uri.clone(),
+                    version,
+                },
+                change: NotebookDocumentChangeEvent {
+                    metadata,
+                    cells: Some(updated_cells),
+                },
             },
-            change: NotebookDocumentChangeEvent {
-                metadata,
-                cells: Some(updated_cells),
-            },
-        });
+        );
 
         final_diagnostics = Some(server.collect_publish_diagnostic_notifications(cell_count));
     }
@@ -178,23 +373,25 @@ fn super_resolution_overview() -> Result<()> {
 
 #[test]
 fn notebook_without_ipynb_extension() -> Result<()> {
-    let fixture_path = fixture_path(NOTEBOOK_FIXTURE_PATH)?;
-    let workspace_dir = fixture_path
-        .parent()
-        .expect("notebook fixture should have a parent");
+    let fixture = std::fs::read_to_string(fixture_path(NOTEBOOK_FIXTURE_PATH)?)?;
 
     let mut server = TestServerBuilder::new()?
-        .with_workspace(workspace_dir)?
+        .with_workspace(".")?
+        .with_file(NOTEBOOK_FIXTURE_PATH, fixture)?
         .build();
 
-    let (notebook_document, cell_text_documents) =
-        create_lsp_notebook(&fixture_path, workspace_dir.join("notebook.py"))?;
+    let (notebook_document, cell_text_documents) = create_lsp_notebook(
+        &server.file_path(NOTEBOOK_FIXTURE_PATH),
+        server.file_path("notebook.py"),
+    )?;
     let cell_count = cell_text_documents.len();
 
-    server.send_notification::<DidOpenNotebookDocument>(DidOpenNotebookDocumentParams {
-        notebook_document,
-        cell_text_documents,
-    });
+    server.send_notification::<DidOpenNotebookDocumentNotification>(
+        DidOpenNotebookDocumentParams {
+            notebook_document,
+            cell_text_documents,
+        },
+    );
 
     let diagnostics = server.collect_publish_diagnostic_notifications(cell_count);
     assert_json_snapshot!("notebook_without_ipynb_extension_open", diagnostics);
@@ -213,7 +410,7 @@ fn create_lsp_notebook(
     open_uri_path: PathBuf,
 ) -> Result<(NotebookDocument, Vec<TextDocumentItem>)> {
     let notebook = ruff_notebook::Notebook::from_path(file_path)?;
-    let notebook_uri = lsp_types::Url::from_file_path(open_uri_path).unwrap();
+    let notebook_uri = lsp_types::Uri::from_file_path(open_uri_path).unwrap();
 
     let mut cells = Vec::new();
     let mut cell_text_documents = Vec::new();
@@ -242,8 +439,8 @@ fn create_lsp_notebook(
     ))
 }
 
-fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Url {
-    lsp_types::Url::parse(&format!(
+fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Uri {
+    lsp_types::Uri::parse(&format!(
         "notebook-cell:///Users/test/notebooks/{}.ipynb?cell={index}",
         path.file_name().unwrap().to_string_lossy()
     ))
@@ -252,7 +449,7 @@ fn make_cell_uri(path: &Path, index: usize) -> lsp_types::Url {
 
 fn cell_to_lsp_cell(
     cell: &ruff_notebook::Cell,
-    cell_uri: lsp_types::Url,
+    cell_uri: lsp_types::Uri,
 ) -> Result<(lsp_types::NotebookCell, TextDocumentItem)> {
     let contents = match cell.source() {
         SourceValue::String(string) => string.clone(),
@@ -260,7 +457,7 @@ fn cell_to_lsp_cell(
     };
     let metadata = match serde_json::to_value(cell.metadata())? {
         serde_json::Value::Null => None,
-        serde_json::Value::Object(metadata) => Some(metadata),
+        metadata @ serde_json::Value::Object(_) => Some(serde_json::from_value(metadata)?),
         _ => anyhow::bail!("Notebook cell metadata was not an object"),
     };
     Ok((
@@ -274,6 +471,6 @@ fn cell_to_lsp_cell(
             metadata,
             execution_summary: None,
         },
-        TextDocumentItem::new(cell_uri, "python".to_string(), 0, contents),
+        TextDocumentItem::new(cell_uri, lsp_types::LanguageKind::Python, 0, contents),
     ))
 }

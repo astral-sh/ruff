@@ -12,13 +12,14 @@ corresponding to PATTERN.  (It does not compile it.)
 
 import sys
 from collections.abc import Iterable
+from os import PathLike
 from typing import AnyStr
 
 __all__ = ["filter", "fnmatch", "fnmatchcase", "translate"]
 if sys.version_info >= (3, 14):
     __all__ += ["filterfalse"]
 
-def fnmatch(name: AnyStr, pat: AnyStr) -> bool:
+def fnmatch(name: AnyStr | PathLike[AnyStr], pat: AnyStr | PathLike[AnyStr]) -> bool:
     """Test whether FILENAME matches PATTERN.
 
     Patterns are Unix shell style:
@@ -41,7 +42,7 @@ def fnmatchcase(name: AnyStr, pat: AnyStr) -> bool:
     its arguments.
     """
 
-def filter(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
+def filter(names: Iterable[AnyStr | PathLike[AnyStr]], pat: AnyStr | PathLike[AnyStr]) -> list[AnyStr]:
     """Construct a list from those elements of the iterable NAMES that match PAT."""
 
 def translate(pat: str) -> str:
@@ -51,5 +52,5 @@ def translate(pat: str) -> str:
     """
 
 if sys.version_info >= (3, 14):
-    def filterfalse(names: Iterable[AnyStr], pat: AnyStr) -> list[AnyStr]:
+    def filterfalse(names: Iterable[AnyStr | PathLike[AnyStr]], pat: AnyStr | PathLike[AnyStr]) -> list[AnyStr]:
         """Construct a list from those elements of the iterable NAMES that do not match PAT."""

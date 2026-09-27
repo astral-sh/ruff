@@ -1,11 +1,11 @@
 use std::borrow::Cow;
 
-use lsp_types::request::FoldingRangeRequest;
-use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Url};
+use lsp_types::FoldingRangeRequest;
+use lsp_types::{FoldingRange, FoldingRangeKind, FoldingRangeParams, Uri};
 use ruff_db::source::source_text;
 use ruff_text_size::TextRange;
 use ty_ide::folding_ranges;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::db::Db;
 use crate::document::ToRangeExt;
@@ -22,7 +22,7 @@ impl RequestHandler for FoldingRangeRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
-    fn document_url(params: &FoldingRangeParams) -> Cow<'_, Url> {
+    fn document_uri(params: &FoldingRangeParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -39,7 +39,7 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
@@ -52,11 +52,11 @@ impl BackgroundDocumentRequestHandler for FoldingRangeRequestHandler {
             && let Some(notebook_document) = db.notebook_document(file)
             && let Some(notebook) = source_text(db, file).as_notebook()
         {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.document().uri());
             cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
 
-        let results: Vec<_> = folding_ranges(db, file, cell_range)
+        let results: Vec<_> = folding_ranges(db, db.program_file(file).python_file(db), cell_range)
             .into_iter()
             .filter_map(|folding_range| {
                 let lsp_range = folding_range

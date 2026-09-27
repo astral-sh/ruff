@@ -39,7 +39,6 @@ error[invalid-context-manager]: Object of type `GoodManager | MissingExitManager
    |
 15 |     with context_expr as f:
    |          ^^^^^^^^^^^^
-   |
 info: `NotAContextManager` does not implement `__enter__` or `__exit__`
 info: `MissingExitManager` does not implement `__exit__`
 

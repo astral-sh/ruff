@@ -101,6 +101,7 @@ class _IPAddressBase:
         '1.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa'
 
         """
+
     if sys.version_info < (3, 14):
         @property
         def version(self) -> int: ...
@@ -141,6 +142,7 @@ class _BaseAddress(_IPAddressBase):
 
         def __le__(self, other: Self) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __ge__(self, other: Self, NotImplemented: Any = ...) -> bool:
             """Return a >= b.  Computed by @total_ordering from (not a < b)."""
@@ -175,6 +177,7 @@ class _BaseNetwork(_IPAddressBase, Generic[_A]):
 
         def __le__(self, other: Self) -> bool:
             """Return a <= b.  Computed by @total_ordering from (a < b) or (a == b)."""
+
     else:
         def __ge__(self, other: Self, NotImplemented: Any = ...) -> bool:
             """Return a >= b.  Computed by @total_ordering from (not a < b)."""
@@ -529,6 +532,7 @@ class IPv4Address(_BaseV4, _BaseAddress):
     @property
     def packed(self) -> bytes:
         """The binary representation of this address."""
+
     if sys.version_info >= (3, 13):
         @property
         def ipv6_mapped(self) -> IPv6Address:

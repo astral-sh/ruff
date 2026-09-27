@@ -12,6 +12,23 @@ def _(x: int | None):
     reveal_type(x)  # revealed: int | None
 ```
 
+Calls in both branches must not prevent complementary narrowing paths from recombining into the
+original type.
+
+```py
+class Base: ...
+class Child(Base): ...
+
+def consume(value: object) -> None: ...
+def _(value: Base):
+    if isinstance(value, Child):
+        consume(value)
+    else:
+        consume(value)
+
+    reveal_type(value)  # revealed: Base
+```
+
 ## Narrowing can have a persistent effect if the variable is mutated in one branch
 
 ```py
@@ -70,7 +87,7 @@ def _(x: A | B | C):
 
     # Only the if-branch (A) and elif-branch (B) flow through.
     # The else-branch returned, so its narrowing doesn't participate.
-    reveal_type(x)  # revealed: B | (A & ~B)
+    reveal_type(x)  # revealed: B | A
 ```
 
 ## Narrowing is preserved with multiple terminal branches
@@ -92,7 +109,7 @@ def _(x: A | B | C | D):
         return
 
     # Only the elif-B and elif-C branches flow through.
-    reveal_type(x)  # revealed: (C & ~A) | (B & ~A & ~C)
+    reveal_type(x)  # revealed: (C & ~A & ~B) | (B & ~A)
 ```
 
 ## Opaque branch predicates should not manufacture narrowing
@@ -160,6 +177,31 @@ def _(val: int | None):
     reveal_type(val)  # revealed: int
 ```
 
+Narrowing from the terminal branch is also preserved when deciding whether a later overloaded call
+returns:
+
+```py
+from typing import Literal, overload
+from typing_extensions import Never
+
+def abort() -> Never:
+    raise RuntimeError
+
+@overload
+def terminal(value: Literal[0]) -> Never: ...
+@overload
+def terminal(value: Literal[1]) -> None: ...
+def terminal(value: Literal[0, 1]) -> None:
+    if value == 0:
+        raise RuntimeError
+
+def _(value: Literal[0, 1]) -> None:
+    if value == 1:
+        abort()
+    terminal(value)
+    return "unreachable"
+```
+
 This also works when the `NoReturn` function is called in the else branch:
 
 ```py
@@ -171,6 +213,90 @@ def _(val: int | None):
     else:
         sys.exit()
     reveal_type(val)  # revealed: int
+```
+
+Narrowing that occurs after the `NoReturn` call must also be discarded with the unreachable branch:
+
+```py
+from typing_extensions import Never
+
+def fail() -> Never:
+    raise RuntimeError
+
+def _(x: int | None, flag: bool):
+    if flag:
+        fail()
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+```
+
+Call constraints that precede a nested merge must still gate narrowing later in the outer branch:
+
+```py
+from typing_extensions import Never
+
+def fail_nested_merge() -> Never:
+    raise RuntimeError
+
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        fail_nested_merge()
+
+        if inner:
+            pass
+        else:
+            pass
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+```
+
+Call constraints introduced inside the nested branches are still discarded at that merge:
+
+```py
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        if inner:
+            pass
+        else:
+            fail_nested_merge()
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: None | int
+```
+
+If every nested branch contains a call, their combined call constraint must be preserved:
+
+```py
+def _(x: int | None, outer: bool, inner: bool) -> None:
+    if outer:
+        if inner:
+            fail_nested_merge()
+        else:
+            fail_nested_merge()
+
+        if x is not None:
+            return
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
 ```
 
 And for elif branches:
@@ -188,10 +314,10 @@ def _(val: int | str | None):
     reveal_type(val)  # revealed: int
 ```
 
-## Narrowing through always-true branches
+## Narrowing through statically known branches
 
-When a terminal (`return`) is inside an always-true branch, narrowing propagates through because the
-else-branch is unreachable and contributes `Never` to the union.
+When a terminal (`return`) is inside the reachable branch of a statically known condition, narrowing
+propagates through because the unreachable branch contributes `Never` to the union.
 
 ```py
 def _(x: int | None):
@@ -203,27 +329,119 @@ def _(x: int | None):
 ```
 
 ```py
+from typing import Final
+
 def _(x: int | None):
     if 1 + 1 == 2:
         if x is None:
             return
         reveal_type(x)  # revealed: int
 
-    # TODO: should be `int` (the else-branch of `1 + 1 == 2` is unreachable)
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None):
+    if 1 + 1 != 2:
+        pass
+    else:
+        if x is None:
+            return
+        reveal_type(x)  # revealed: int
+
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None, flag: bool):
+    if 1 + 1 == 2 or flag:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None, flag: bool):
+    if 1 + 1 != 2 and flag:
+        pass
+    else:
+        if x is None:
+            return
+
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None, flag: bool):
+    if flag:
+        if x is None:
+            return
+
+    # An ambiguous condition must not make its other branch unreachable.
     reveal_type(x)  # revealed: int | None
+
+needs_inference: Final = True
+
+def _(x: int | None):
+    if needs_inference:
+        if x is None:
+            return
+        reveal_type(x)  # revealed: int
+
+    reveal_type(x)  # revealed: int
 ```
 
 This also works when the always-true condition is nested inside a narrowing branch:
 
 ```py
+from typing import Literal
+
 def _(x: int | None):
     if x is None:
         if 1 + 1 == 2:
             return
 
-    # TODO: should be `int` (the inner always-true branch makes the outer
-    # if-branch terminal)
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None):
+    if x is None:
+        if needs_inference:
+            return
+
+    reveal_type(x)  # revealed: int
+
+def always_true(value: object) -> Literal[True]:
+    return True
+
+def _(x: int | None):
+    if x is None:
+        if always_true(x):
+            return
+
+    reveal_type(x)  # revealed: int
+```
+
+## Statically known branches inside module and class loops
+
+Narrowing also propagates through a statically known branch inside a module-level loop.
+
+```py
+def get_value() -> int | None:
+    return None
+
+while bool(input()):
+    value = get_value()
+    if 1 + 1 == 2:
+        if value is None:
+            raise RuntimeError
+
+    reveal_type(value)  # revealed: int
+```
+
+The same condition narrows a value inside a class-body loop.
+
+```py
+class Example:
+    while bool(input()):
+        value = get_value()
+        if 1 + 1 == 2:
+            if value is None:
+                raise RuntimeError
+
+        reveal_type(value)  # revealed: int
 ```
 
 ## Narrowing from `assert` should not affect reassigned variables
@@ -286,8 +504,8 @@ async def main(val: int | None):
 data: dict[str, str] = {}
 api_key = data.get("api_key")
 
-if not api_key:
+if api_key is None:
     exit(1)
 
-reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+reveal_type(api_key)  # revealed: str
 ```

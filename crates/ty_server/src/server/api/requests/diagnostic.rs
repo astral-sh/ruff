@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use lsp_types::request::DocumentDiagnosticRequest;
+use lsp_types::DocumentDiagnosticRequest;
 use lsp_types::{
-    DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticReportResult,
-    FullDocumentDiagnosticReport, RelatedFullDocumentDiagnosticReport,
-    RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Url,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, FullDocumentDiagnosticReport,
+    RelatedFullDocumentDiagnosticReport, RelatedUnchangedDocumentDiagnosticReport,
+    UnchangedDocumentDiagnosticReport, Uri,
 };
 
 use crate::server::Result;
@@ -23,7 +23,7 @@ impl RequestHandler for DocumentDiagnosticRequestHandler {
 }
 
 impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
-    fn document_url(params: &DocumentDiagnosticParams) -> Cow<'_, Url> {
+    fn document_uri(params: &DocumentDiagnosticParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -32,52 +32,49 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         params: DocumentDiagnosticParams,
-    ) -> Result<DocumentDiagnosticReportResult> {
+    ) -> Result<DocumentDiagnosticReport> {
         if snapshot.global_settings().diagnostic_mode().is_off() {
-            return Ok(DocumentDiagnosticReportResult::Report(
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
-            ));
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         }
 
-        let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
+        let diagnostics = snapshot
+            .document()
+            .to_notebook_or_file(db)
+            .and_then(|file| {
+                compute_diagnostics(db, file, snapshot.encoding(), snapshot.global_settings())
+            });
 
         let Some(diagnostics) = diagnostics else {
-            return Ok(DocumentDiagnosticReportResult::Report(
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
-            ));
+            return Ok(RelatedFullDocumentDiagnosticReport::default().into());
         };
 
-        let result_id = diagnostics.result_id();
+        let result_id = diagnostics.result_id(db, snapshot.resolved_client_capabilities());
 
         let report = match result_id {
             Some(new_id) if Some(&new_id) == params.previous_result_id.as_ref() => {
-                DocumentDiagnosticReport::Unchanged(RelatedUnchangedDocumentDiagnosticReport {
+                RelatedUnchangedDocumentDiagnosticReport {
                     related_documents: None,
                     unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
                         result_id: new_id,
                     },
-                })
+                }
+                .into()
             }
-            new_id => {
-                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
-                    related_documents: None,
-                    full_document_diagnostic_report: FullDocumentDiagnosticReport {
-                        result_id: new_id,
-                        // SAFETY: Pull diagnostic requests are only called for text documents, not for
-                        // notebook documents.
-                        items: diagnostics
-                            .to_lsp_diagnostics(
-                                db,
-                                snapshot.resolved_client_capabilities(),
-                                snapshot.global_settings(),
-                            )
-                            .expect_text_document(),
-                    },
-                })
+            new_id => RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: new_id,
+                    // A notebook is checked as a whole, but a pull response only includes
+                    // diagnostics for the requested cell.
+                    items: diagnostics
+                        .to_lsp_diagnostics(db, snapshot.resolved_client_capabilities())
+                        .into_document_diagnostics(snapshot.document().uri()),
+                },
             }
+            .into(),
         };
 
-        Ok(DocumentDiagnosticReportResult::Report(report))
+        Ok(report)
     }
 }
 

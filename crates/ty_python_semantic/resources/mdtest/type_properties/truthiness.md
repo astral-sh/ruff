@@ -106,7 +106,8 @@ python-version = "3.12"
 import types
 import typing
 import sys
-from ty_extensions import AlwaysTruthy, static_assert, is_subtype_of
+from ty_extensions import AlwaysTruthy, static_assert
+from ty_extensions._internal import is_subtype_of
 from typing_extensions import _NoDefaultType
 
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))
@@ -121,23 +122,44 @@ static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
 
-### `Callable` types always have ambiguous truthiness
+### Subclassable special-cased classes
+
+`Path` and `super` cannot be inferred as always truthy because subclasses can override `__bool__`.
 
 ```py
-from typing import Callable
+from pathlib import Path
 
-def f(x: Callable, y: Callable[[int], str]):
+def _(path: Path, superclass: super):
+    reveal_type(bool(path))  # revealed: bool
+    reveal_type(bool(superclass))  # revealed: bool
+```
+
+### Callable objects
+
+Callable objects can define `__bool__`, so `Callable` parameters have ambiguous truthiness.
+
+```py
+from typing import Any, Callable
+
+def f(x: Callable[..., Any], y: Callable[[int], str]):
     reveal_type(bool(x))  # revealed: bool
     reveal_type(bool(y))  # revealed: bool
 ```
 
-But certain callable single-valued types are known to be always truthy:
+But instances of `types.FunctionType` (whether they're defined using a `def` statement or a `lambda`
+expression) are always truthy, and this is also true for bound methods:
 
 ```py
 from types import FunctionType
 
 class A:
     def method(self): ...
+
+reveal_type(bool(f))  # revealed: Literal[True]
+reveal_type(bool(lambda: False))  # revealed: Literal[True]
+
+lambda_function = lambda: False
+reveal_type(bool(lambda_function))  # revealed: Literal[True]
 
 reveal_type(bool(A().method))  # revealed: Literal[True]
 reveal_type(bool(f.__get__))  # revealed: Literal[True]

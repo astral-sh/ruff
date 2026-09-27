@@ -7,6 +7,7 @@ use std::num::{
 };
 use std::path::{Path, PathBuf};
 
+use char_str::CharStr;
 use glob::Pattern;
 use itertools::Itertools;
 use regex::Regex;
@@ -253,6 +254,13 @@ impl CacheKey for String {
     #[inline]
     fn cache_key(&self, state: &mut CacheKeyHasher) {
         self.hash(&mut *state);
+    }
+}
+
+impl CacheKey for CharStr {
+    #[inline]
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        self.as_str().cache_key(state);
     }
 }
 

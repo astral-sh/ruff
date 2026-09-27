@@ -23,6 +23,77 @@ def f() -> None:
     reveal_type(x)  # revealed: int | str
 ```
 
+## Runtime classes
+
+On Python 3.12, aliases defined by a `type` statement or the `typing.TypeAliasType` constructor are
+instances of the standard-library class, while aliases created with
+`typing_extensions.TypeAliasType` are instances of the distinct backport class.
+
+```py
+from typing import TypeAliasType as StdlibTypeAliasType
+from typing_extensions import TypeAliasType as ExtensionsTypeAliasType
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_subtype_of
+
+type StatementAlias = int
+StdlibAlias = StdlibTypeAliasType("StdlibAlias", int)
+ExtensionsAlias = ExtensionsTypeAliasType("ExtensionsAlias", int)
+
+static_assert(is_subtype_of(TypeOf[StatementAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StatementAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[StdlibAlias], StdlibTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[StdlibAlias], ExtensionsTypeAliasType))
+
+static_assert(is_subtype_of(TypeOf[ExtensionsAlias], ExtensionsTypeAliasType))
+static_assert(not is_subtype_of(TypeOf[ExtensionsAlias], StdlibTypeAliasType))
+```
+
+## Type aliases in `type[...]`
+
+```py
+from typing import Type, TypeAliasType, assert_never
+
+class A: ...
+class B: ...
+
+type IntAlias = int
+type ChainedIntAlias = IntAlias
+type UnionAlias = A | B
+type NestedUnionAlias = IntAlias | str
+type GenericAlias[T] = T
+ManualIntAlias = TypeAliasType("ManualIntAlias", int)
+
+def _(
+    simple: type[IntAlias],
+    chained: type[ChainedIntAlias],
+    union: type[UnionAlias],
+    nested_union: type[NestedUnionAlias],
+    direct_union: type[IntAlias | str],
+    generic: type[GenericAlias[int]],
+    manual: type[ManualIntAlias],
+    typing_type: Type[IntAlias],
+):
+    reveal_type(simple)  # revealed: type[int]
+    reveal_type(chained)  # revealed: type[int]
+    reveal_type(union)  # revealed: type[A | B]
+    reveal_type(nested_union)  # revealed: type[int | str]
+    reveal_type(direct_union)  # revealed: type[int | str]
+    reveal_type(generic)  # revealed: type[int]
+    reveal_type(manual)  # revealed: type[int]
+    reveal_type(typing_type)  # revealed: type[int]
+
+# error: [invalid-assignment]
+bad: type[IntAlias] = str
+
+def exhaust_union(value: type[UnionAlias]) -> str:
+    if issubclass(value, A):
+        return "A"
+    if issubclass(value, B):
+        return "B"
+    assert_never(value)
+```
+
 ## `__value__` attribute
 
 ```py
@@ -38,6 +109,20 @@ type OptionalInt = int | None
 
 # error: [invalid-assignment]
 x: OptionalInt = "1"
+```
+
+Attribute-assignment diagnostics retain the declared alias name, including aliases within a union:
+
+```py
+class C:
+    value: OptionalInt = None
+    combined: OptionalInt | bytes = None
+
+def assign(c: C) -> None:
+    # error: [invalid-assignment] "attribute `value` of type `OptionalInt`"
+    c.value = "incorrect"
+    # error: [invalid-assignment] "attribute `combined` of type `OptionalInt | bytes`"
+    c.combined = "incorrect"
 ```
 
 ## No type qualifiers
@@ -80,6 +165,29 @@ x: IntOrStrOrBytes = 1
 
 def f() -> None:
     reveal_type(x)  # revealed: int | str | bytes
+```
+
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` in alias type-parameter bounds and defaults.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing import Annotated, Self, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Alias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    type Simplified = object | Self
+
+    type Metadata = Annotated[int, cast(Self, object())]
 ```
 
 ## Aliased type aliases
@@ -135,7 +243,8 @@ def _(flag: bool):
 
 ```py
 type ListOrSet[T] = list[T] | set[T]
-reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+# revealed: tuple[typing.TypeVar | typing_extensions.TypeVar | typing.ParamSpec | typing_extensions.ParamSpec | typing.TypeVarTuple | typing_extensions.TypeVarTuple, ...]
+reveal_type(ListOrSet.__type_params__)
 type Tuple1[T] = tuple[T]
 
 def _(cond: bool):
@@ -159,6 +268,50 @@ except Exception:
 
 def f(x: Foo[int]):
     reveal_type(x.foo())  # revealed: int
+```
+
+## Unpacking tuple aliases
+
+Both unpack spellings accept a tuple alias and preserve positional argument types and arity.
+
+```py
+from typing import Unpack
+
+type Pair = tuple[int, str]
+
+def starred(*args: *Pair) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+def explicit(*args: Unpack[Pair]) -> None:
+    reveal_type(args)  # revealed: tuple[int, str]
+
+starred(1, "a")
+starred(1)  # error: [missing-argument]
+starred(1, 2)  # error: [invalid-argument-type]
+explicit(1, "a")
+explicit(1, "a", 3)  # error: [too-many-positional-arguments]
+```
+
+Unpacking also follows alias chains and applies generic substitutions.
+
+```py
+type GenericPair[T] = tuple[T, str]
+type SpecializedPair = GenericPair[bytes]
+
+def specialized(*args: *SpecializedPair) -> None:
+    reveal_type(args)  # revealed: tuple[bytes, str]
+
+specialized(b"a", "b")
+specialized(1, "a")  # error: [invalid-argument-type]
+```
+
+Non-tuple aliases remain invalid.
+
+```py
+type NotTuple = list[int]
+
+def invalid_starred(*args: *NotTuple) -> None: ...  # error: [invalid-type-form]
+def invalid_explicit(*args: Unpack[NotTuple]) -> None: ...  # error: [invalid-type-form]
 ```
 
 ## Stringified values
@@ -193,7 +346,6 @@ error[unsupported-operator]: Unsupported `|` operation
   |          |       |
   |          |       Has type `<class 'str'>`
   |          Has type `Literal["int"]`
-  |
 info: A type alias scope is lazy but will be executed at runtime if the `__value__` property is accessed
 ```
 
@@ -244,7 +396,8 @@ type W = A | B
 type X = C | D
 type Y = W | X
 
-from ty_extensions import is_equivalent_to, static_assert
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
 
 static_assert(is_equivalent_to(Y, A | B | C | D))
 ```
@@ -311,7 +464,8 @@ def _(x: X, y: tuple[Literal[1], Literal[3]]):
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
 
 ```py
-from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, TypeOf
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_disjoint_from
 
 type Alias1 = int
 type Alias2 = int
@@ -349,16 +503,296 @@ def f(x: IntOrStr) -> None:
 
 ### Generic example
 
+Manual aliases can be specialized in annotations and value positions, including when they are used
+in `type[...]` or nested inside another alias.
+
 ```py
-from typing_extensions import TypeAliasType, TypeVar
+from typing import Callable, Concatenate, Generic
+from typing_extensions import ParamSpec, TypeAliasType, TypeVar, TypeVarTuple, Union, Unpack
 
 T = TypeVar("T")
 
 IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAndT[str]) -> None:
-    # TODO: This should be `tuple[int, str]`
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: tuple[int, str]
+
+reveal_type(IntAndT[str])  # revealed: <type alias 'IntAndT[str]'>
+
+def generic_meta(value: type[IntAndT[str]]) -> None:
+    reveal_type(value)  # revealed: type[tuple[int, str]]
+
+Nested = TypeAliasType("Nested", list[IntAndT[T]], type_params=(T,))
+
+def nested(value: Nested[str]) -> None:
+    reveal_type(value)  # revealed: list[IntAndT[str]]
+```
+
+Defaults apply to unspecialized aliases, and the order of `type_params` determines how type
+arguments are mapped even if the parameters appear in a different order in the alias value.
+
+```py
+U = TypeVar("U", default=str)
+
+ListOrSet = TypeAliasType("ListOrSet", Union[list[U], set[U]], type_params=(U,))
+MyDict = TypeAliasType("MyDict", dict[T, U], type_params=(T, U))
+Reordered = TypeAliasType("Reordered", tuple[U, T], type_params=(T, U))
+
+def g(
+    list_or_set_of_int: ListOrSet[int],
+    list_or_set_of_str: ListOrSet,
+    dict_int_str: MyDict[int, str],
+    dict_unknown_str: MyDict,
+    reordered: Reordered[int, str],
+) -> None:
+    reveal_type(list_or_set_of_int)  # revealed: list[int] | set[int]
+    reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+    reveal_type(dict_int_str)  # revealed: dict[int, str]
+    reveal_type(dict_unknown_str)  # revealed: dict[Unknown, str]
+    reveal_type(reordered)  # revealed: tuple[str, int]
+```
+
+Constructor inference sees through the specialized `ModelAlias[T]`: passing `Model` infers `T` as
+`Model` in `ViaAlias[T]`.
+
+```py
+ModelAlias = TypeAliasType("ModelAlias", type[T], type_params=(T,))
+
+class Model: ...
+
+class ViaAlias(Generic[T]):
+    def __init__(self, value: ModelAlias[T]) -> None: ...
+
+reveal_type(ViaAlias(Model))  # revealed: ViaAlias[Model]
+```
+
+`ParamSpec` parameters can be specialized alongside regular type variables and are preserved when a
+callable alias is used as a decorator return type.
+
+```py
+P = ParamSpec("P")
+R = TypeVar("R")
+WrappedMethod = TypeAliasType("WrappedMethod", Callable[Concatenate[T, P], R], type_params=(T, P, R))
+
+def wrapped_method(value: WrappedMethod[int, P, str]) -> None:
+    reveal_type(value)  # revealed: (int, /, *args: P@wrapped_method.args, **kwargs: P@wrapped_method.kwargs) -> str
+
+WrapsMethod = TypeAliasType("WrapsMethod", Callable[Concatenate[T, ...], R], type_params=(T, R))
+
+def decorate(value: WrapsMethod[T, R], /) -> WrappedMethod[T, P, R]:
+    return value
+
+@decorate
+def decorated(value: int) -> int:
+    return value
+
+reveal_type(decorated)  # revealed: [**P'return](int, /, *args: P'return.args, **kwargs: P'return.kwargs) -> int
+```
+
+`TypeVarTuple` parameters accept multiple type arguments when specializing a variadic alias.
+
+```py
+Ts = TypeVarTuple("Ts")
+Variadic = TypeAliasType("Variadic", tuple[Unpack[Ts]], type_params=(Ts,))
+
+def variadic(value: Variadic[int, str]) -> None:
+    reveal_type(value)  # revealed: tuple[int, str]
+```
+
+### Recursive generic example
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType, TypeVar, Union
+
+T = TypeVar("T")
+Recursive = TypeAliasType("Recursive", Union[T, list["Recursive[T]"]], type_params=(T,))
+RecursiveCallable = Callable[[Recursive[T]], None]
+
+def recursive(value: Recursive[int]) -> None:
+    reveal_type(value)  # revealed: int | list[Recursive[int]]
+
+def recursive_callable(value: RecursiveCallable[int]) -> None:
+    reveal_type(value)  # revealed: (Recursive[int], /) -> None
+```
+
+### Generic specialization errors
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+BoundedT = TypeVar("BoundedT", bound=int)
+
+GenericAlias = TypeAliasType("GenericAlias", list[T], type_params=(T,))
+BoundedAlias = TypeAliasType("BoundedAlias", list[BoundedT], type_params=(BoundedT,))
+NonGenericAlias = TypeAliasType("NonGenericAlias", list[int])
+DefaultedT = TypeVar("DefaultedT", default=str)
+
+# error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+InvalidOrder = TypeAliasType("InvalidOrder", tuple[DefaultedT, T], type_params=(DefaultedT, T))
+
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+reveal_type(GenericAlias[int, str])  # revealed: <type alias 'GenericAlias[Unknown]'>
+
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@BoundedAlias`"
+reveal_type(BoundedAlias[str])  # revealed: <type alias 'BoundedAlias[Unknown]'>
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias `NonGenericAlias`"
+reveal_type(NonGenericAlias[int])  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot specialize non-generic type alias `NonGenericAlias`"
+def non_generic(value: NonGenericAlias[int]) -> None:
+    reveal_type(value)  # revealed: Unknown
+```
+
+### Invalid type parameters
+
+```py
+from typing_extensions import TypeAliasType, TypeVar, TypeVarTuple, Union, Unpack
+
+T = TypeVar("T")
+U = TypeVar("U")
+Ts = TypeVarTuple("Ts")
+Us = TypeVarTuple("Us")
+
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidList = TypeAliasType("InvalidList", list[T], type_params=[T])
+
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidBare = TypeAliasType("InvalidBare", list[T], type_params=T)
+
+params = (T,)
+# error: [invalid-type-alias-type] "The `type_params` argument to `TypeAliasType` must be a tuple literal"
+InvalidTupleVariable = TypeAliasType("InvalidTupleVariable", list[T], type_params=params)
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidUnpack = TypeAliasType("InvalidUnpack", list[T], type_params=(*params,))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidNested = TypeAliasType("InvalidNested", list[T], type_params=(list[T],))
+
+# error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+InvalidMixed = TypeAliasType("InvalidMixed", list[T], type_params=(int, T))
+
+# error: [invalid-type-alias-type] "Type parameter `U` used in the alias value must be included in `type_params`"
+Missing = TypeAliasType("Missing", dict[T, U], type_params=(T,))
+
+# error: [invalid-type-alias-type] "Type parameter `T` used in the alias value must be included in `type_params`"
+MissingAll = TypeAliasType("MissingAll", list[T])
+
+# error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
+Duplicate = TypeAliasType("Duplicate", tuple[T, U], type_params=(T, U, T))
+
+MultipleTypeVarTuples = TypeAliasType(
+    "MultipleTypeVarTuples",
+    Union[tuple[Unpack[Ts]], tuple[Unpack[Us]]],
+    # error: [invalid-type-alias-type] "Only one `TypeVarTuple` parameter is allowed in `type_params`"
+    type_params=(Ts, Us),
+)
+
+DefaultedT = TypeVar("DefaultedT", default=int)
+
+DefaultAfterTypeVarTuple = TypeAliasType(
+    "DefaultAfterTypeVarTuple",
+    tuple[Unpack[Ts], DefaultedT],
+    # error: [invalid-type-variable-default] "Type parameter `DefaultedT` with a default follows TypeVarTuple `Ts`"
+    type_params=(Ts, DefaultedT),
+)
+
+InvalidOrderAndEntries = TypeAliasType(
+    "InvalidOrderAndEntries",
+    tuple[DefaultedT, T],
+    # error: [invalid-type-variable-default] "Type parameter `T` without a default cannot follow earlier parameter `DefaultedT` with a default"
+    # error: [invalid-type-alias-type] "Type parameter `T` is duplicated in `type_params`"
+    # error: [invalid-type-alias-type] "Each `type_params` entry for `TypeAliasType` must be a type variable"
+    type_params=(DefaultedT, T, T, "V"),
+)
+```
+
+### Scoped type parameters
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable
+from typing_extensions import TypeAliasType, TypeVar
+
+LegacyT = TypeVar("LegacyT")
+
+def pep695_outer[T]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `T` is bound in an outer scope and cannot be used in `type_params`"
+    Pep695Alias = TypeAliasType("Pep695Alias", list[T], type_params=(T,))
+    # error: [not-subscriptable] "Cannot specialize non-generic type alias `Pep695Alias`"
+    def check(value: Pep695Alias[int]) -> None: ...
+
+def legacy_outer(value: LegacyT) -> None:
+    # error: [invalid-type-alias-type] "Type parameter `LegacyT` is bound in an outer scope and cannot be used in `type_params`"
+    LegacyAlias = TypeAliasType("LegacyAlias", list[LegacyT], type_params=(LegacyT,))
+    # error: [not-subscriptable] "Cannot specialize non-generic type alias `LegacyAlias`"
+    def check(value: LegacyAlias[int]) -> None: ...
+
+class Pep695Outer[T]:
+    # error: [invalid-type-alias-type] "Type parameter `T` is bound in an outer scope and cannot be used in `type_params`"
+    ClassAlias = TypeAliasType("ClassAlias", list[T], type_params=(T,))
+
+def paramspec_outer[**P]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `P` is bound in an outer scope and cannot be used in `type_params`"
+    ParamSpecAlias = TypeAliasType("ParamSpecAlias", Callable[P, int], type_params=(P,))
+
+def variadic_outer[*Ts]() -> None:
+    # error: [invalid-type-alias-type] "Type parameter `Ts` is bound in an outer scope and cannot be used in `type_params`"
+    VariadicAlias = TypeAliasType("VariadicAlias", tuple[*Ts], type_params=(Ts,))
+```
+
+### Generic alias from `typing`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeAliasType, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+MyDict = TypeAliasType("MyDict", dict[K, V], type_params=(K, V))
+
+def generic_from_typing(value: MyDict[str, int]) -> None:
+    reveal_type(value)  # revealed: dict[str, int]
+```
+
+### PEP 695 aliases in `Callable`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T")
+
+type Pep695List[A] = list[A]
+Pep695ConcreteCallable = Callable[[Pep695List[int]], None]
+Pep695GenericCallable = Callable[[Pep695List[T]], None]
+
+type Recursive[A] = A | list[Recursive[A]]
+RecursiveCallable = Callable[[Recursive[int]], None]
+
+def _(
+    concrete: Pep695ConcreteCallable,
+    generic: Pep695GenericCallable[str],
+    recursive: RecursiveCallable,
+) -> None:
+    reveal_type(concrete)  # revealed: (Pep695List[int], /) -> None
+    reveal_type(generic)  # revealed: (Pep695List[str], /) -> None
+    reveal_type(recursive)  # revealed: (Recursive[int], /) -> None
 ```
 
 ### Generic value binds type variables to alias definition
@@ -433,6 +867,78 @@ def g(x: B) -> None:
     reveal_type(x)  # revealed: list[A]
 ```
 
+### Invalid cyclic `TypeAliasType` definitions
+
+An alias cannot refer only to itself, either directly or through other aliases. The same check
+applies to aliases created by calling `TypeAliasType` as to aliases declared with `type`.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+# snapshot: cyclic-type-alias-definition
+Itself = TypeAliasType("Itself", "Itself")
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `Itself` has a circular definition
+ --> src/mdtest_snippet.py:4:34
+  |
+4 | Itself = TypeAliasType("Itself", "Itself")
+  |                                  ^^^^^^^^
+```
+
+The same restriction applies to mutually recursive and generic aliases.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+First = TypeAliasType("First", "Second")
+# error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
+Second = TypeAliasType("Second", First)
+
+T = TypeVar("T")
+
+# error: [cyclic-type-alias-definition] "Type alias `GenericCycle` has a circular definition"
+GenericCycle = TypeAliasType("GenericCycle", "GenericCycle[T]", type_params=(T,))
+```
+
+### Cyclic unions created with `TypeAliasType`
+
+Adding a union member does not make a circular definition valid. In contrast, recursion through a
+container describes nested values and is allowed.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar, Union
+
+T = TypeVar("T")
+
+# error: [cyclic-type-alias-definition] "Type alias `IntOr` has a circular definition"
+IntOr = TypeAliasType("IntOr", "int | IntOr")
+# error: [cyclic-type-alias-definition] "Type alias `GenericCycle` has a circular definition"
+GenericCycle = TypeAliasType("GenericCycle", T | "GenericCycle[str]", type_params=(T,))
+# error: [cyclic-type-alias-definition] "Type alias `UnionCycle` has a circular definition"
+UnionCycle = TypeAliasType("UnionCycle", Union[int, "UnionCycle"])
+
+Tree = TypeAliasType("Tree", T | "list[Tree[T]]", type_params=(T,))
+
+tree: Tree[int] = [1, [2]]
+```
+
+### Cycles across alias syntaxes
+
+A cycle is also invalid when it passes through aliases defined using different syntaxes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import TypeAliasType
+
+type Statement = Functional  # error: [cyclic-type-alias-definition]
+Functional = TypeAliasType("Functional", "Statement")  # error: [cyclic-type-alias-definition]
+```
+
 ## Cyclic aliases
 
 ### Self-referential
@@ -453,9 +959,26 @@ def g(x: RecursiveList):
 
 ### Invalid self-referential
 
+An alias cannot be a member of its own union. We still recover the non-recursive union members so
+that uses of the invalid alias can be checked.
+
 ```py
-# TODO emit a diagnostic on these two lines
+# snapshot: cyclic-type-alias-definition
 type IntOr = int | IntOr
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:2:14
+  |
+2 | type IntOr = int | IntOr
+  |              ^^^^^^^^^^^
+```
+
+The order of the union members does not affect the diagnostic or recovery.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `OrInt` has a circular definition"
 type OrInt = OrInt | int
 
 def f(x: IntOr, y: OrInt):
@@ -466,7 +989,7 @@ def f(x: IntOr, y: OrInt):
     if not isinstance(y, int):
         reveal_type(y)  # revealed: Never
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+# error: [cyclic-type-alias-definition] "Type alias `Itself` has a circular definition"
 type Itself = Itself
 
 def foo(
@@ -480,31 +1003,217 @@ def foo(
 foo(42)
 foo("hello")
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+# error: [cyclic-type-alias-definition] "Type alias `A` has a circular definition"
 type A = B
-# error: [cyclic-type-alias-definition] "Cyclic definition of `B`"
+# error: [cyclic-type-alias-definition] "Type alias `B` has a circular definition"
 type B = A
 
 def bar(B: B):
     x: B
     reveal_type(B)  # revealed: Divergent
 
-# error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
+# error: [cyclic-type-alias-definition] "Type alias `G` has a circular definition"
 type G[T] = G[T]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `H`"
+# error: [cyclic-type-alias-definition] "Type alias `H` has a circular definition"
 type H[T] = I[T]
-# error: [cyclic-type-alias-definition] "Cyclic definition of `I`"
+# error: [cyclic-type-alias-definition] "Type alias `I` has a circular definition"
 type I[T] = H[T]
 
 # It's not possible to create an element of this type, but it's not an error for now
 type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
 
-# TODO: this should probably be a cyclic-type-alias-definition error
+# error: [cyclic-type-alias-definition] "Type alias `Foo` has a circular definition"
 type Foo[T] = list[T] | Bar[T]
+# error: [cyclic-type-alias-definition] "Type alias `Bar` has a circular definition"
 type Bar[T] = int | Foo[T]
 
 def _(x: Bar[int]):
     reveal_type(x)  # revealed: int | list[int]
+```
+
+### Cyclic unions with specialized aliases
+
+Changing the type arguments on a recursive reference does not break a cycle through unions. This
+also applies when the arguments become more deeply nested on each expansion.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `Cycle` has a circular definition"
+type Cycle[T] = T | Cycle[str]
+# error: [cyclic-type-alias-definition] "Type alias `Growing` has a circular definition"
+type Growing[T] = T | Growing[list[T]]
+```
+
+Repeated applications of a non-recursive alias are valid. A generic alias can also introduce the
+container that makes recursion valid.
+
+```py
+type Identity[T] = T
+type Repeated = Identity[Identity[int]]
+type Items[T] = list[T]
+type Tree = int | Items[Tree]
+
+repeated: Repeated = 1
+tree: Tree = [1, [2]]
+```
+
+An unused type argument does not make the alias recursive: `Constant[T]` always expands to `int`.
+
+```py
+type Constant[T] = int
+type UnusedArgument = Constant[UnusedArgument]
+
+unused: UnusedArgument = 1
+```
+
+A generic alias that returns its type argument does not introduce a container and cannot break a
+cycle.
+
+```py
+# error: [cyclic-type-alias-definition] "Type alias `ThroughIdentity` has a circular definition"
+type ThroughIdentity = Identity[ThroughIdentity]
+```
+
+Subsequent operations recover from these cycles. Repeated applications of the helper have the same
+result.
+
+```py
+type RepeatedIdentity = Identity[Identity[RepeatedIdentity]]  # error: [cyclic-type-alias-definition]
+
+def inspect_identity(direct: ThroughIdentity, repeated: RepeatedIdentity):
+    reveal_type(direct)  # revealed: Divergent
+    reveal_type(repeated)  # revealed: Divergent
+    direct[0]
+    repeated[0]
+```
+
+A non-recursive union member remains available for recovery.
+
+```py
+type WithLeaf = int | Identity[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+def inspect_union(value: WithLeaf):
+    reveal_type(value)  # revealed: int
+    value[0]  # error: [not-subscriptable]
+```
+
+### Subscribing to an unguarded recursive alias
+
+Using an invalid alias directly in an expression does not prevent reporting its cyclic definition.
+
+```py
+type Identity[T] = T
+type Cyclic = Identity[Cyclic]  # error: [cyclic-type-alias-definition]
+
+def use(value: Cyclic):
+    value[0]
+```
+
+### Subscribing to an unguarded manual alias
+
+The same recovery applies to `TypeAliasType`. Its non-recursive union member determines the
+diagnostic for the subscription.
+
+```py
+from typing_extensions import TypeAliasType
+
+Cycle = TypeAliasType("Cycle", "int | Cycle")  # error: [cyclic-type-alias-definition]
+
+def use(value: Cycle):
+    value[0]  # error: [not-subscriptable]
+```
+
+### Recursive arguments inside implicit containers
+
+An implicit recursive alias can keep an enclosing alias's self-reference inside a container. These
+references are valid even when they occur in the implicit alias's type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Lists = list["Lists[T]"]
+type Recursive = Lists[Recursive]
+type Nested = list[Lists[Nested]]
+
+recursive: Recursive = []
+nested: Nested = []
+```
+
+The argument can also occur directly as a tuple element: the tuple still separates successive
+recursive references.
+
+```py
+Pairs = tuple[T, list["Pairs[T]"]]
+type RecursivePair = Pairs[RecursivePair]
+```
+
+### Finite nested applications of recursive aliases
+
+A recursive alias can appear in its own type arguments without creating a cycle in its expansion.
+Here, expanding the two applications exposes `int`; the remaining recursion is inside `list`.
+
+```py
+type Recursive[T] = T | list[Recursive[list[T]]]
+type Repeated = Recursive[Recursive[int]]
+
+value: Repeated = 1
+```
+
+An exposed type argument can still close a cycle. Unlike the finite nested applications above, this
+argument leads back to the alias being defined.
+
+```py
+type Cycle = Recursive[Cycle]  # error: [cyclic-type-alias-definition]
+```
+
+The same rule applies to aliases created with `TypeAliasType`.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Functional = TypeAliasType("Functional", T | "list[Functional[list[T]]]", type_params=(T,))
+RepeatedFunctional = TypeAliasType("RepeatedFunctional", Functional[Functional[int]])
+
+functional_value: RepeatedFunctional = 1
+FunctionalCycle = TypeAliasType("FunctionalCycle", Functional["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Cycles through implicit recursive alias arguments
+
+A type argument exposed outside containers can close an invalid cycle, even when the wrapper's own
+recursive reference is inside a list. Rejecting that cycle preserves the other union alternatives.
+
+```py
+from typing import TypeVar
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[T]"]
+
+type Cycle = Wrapper[Cycle]  # error: [cyclic-type-alias-definition]
+type WithLeaf = int | Wrapper[WithLeaf]  # error: [cyclic-type-alias-definition]
+
+valid: WithLeaf = 1
+invalid: WithLeaf = "wrong"  # error: [invalid-assignment]
+
+FunctionalCycle = TypeAliasType("FunctionalCycle", Wrapper["FunctionalCycle"])  # error: [cyclic-type-alias-definition]
+```
+
+### Finite nested applications of implicit recursive aliases
+
+Nested applications of the same wrapper are finite. Recursion beneath `list` does not make the
+exposed argument recursive, even when successive list elements have different type arguments.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Wrapper = T | list["Wrapper[list[T]]"]
+type Nested = Wrapper[Wrapper[int]]
+
+valid: Nested = 1
+invalid: Nested = "wrong"  # error: [invalid-assignment]
 ```
 
 ### With legacy generic
@@ -560,10 +1269,288 @@ def _(x: C):
     reveal_type(x)  # revealed: () -> C | None
 ```
 
+### Growing recursive alias relations without unions
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type Left[T] = tuple[Left[list[T]]]
+type Right[T] = tuple[Right[list[T]]]
+
+# TODO: Left[int] should be equivalent to (subtype of) Right[int]
+static_assert(not is_subtype_of(Left[int], Right[int]))
+
+type Box[T] = list[T]
+type WrappedLeft[T] = tuple[Box[Box[WrappedLeft[list[T]]]]]
+type WrappedRight[T] = tuple[Box[Box[WrappedRight[list[T]]]]]
+
+# A repeated non-recursive alias must not hide the recursive reference in its type arguments.
+# TODO: WrappedLeft[int] should be equivalent to (subtype of) WrappedRight[int]
+static_assert(not is_subtype_of(WrappedLeft[int], WrappedRight[int]))
+```
+
+### Recursive alias relations with finite specialization orbits
+
+A recursive specialization can change its arguments while still reaching an exact repetition after
+finitely many expansions. This includes shifting arguments to the left and resetting arguments to
+types that do not depend on the current specialization.
+
+```py
+from typing import Protocol
+
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_subtype_of
+
+# Resetting the recursive argument makes these aliases reach a fixed specialization.
+type L[T] = tuple[T] | tuple[T, L[int]]
+type R[T] = tuple[T] | tuple[T, R[int]]
+
+def _(left: L[str], right: R[str]):
+    right = left
+    left = right
+
+type ShiftingLeft[A, B, C, D, E, F, G, H, I, J, K, L] = tuple[A, ShiftingLeft[B, C, D, E, F, G, H, I, J, K, L, None]]
+type ShiftingRight[A, B, C, D, E, F, G, H, I, J, K, L] = tuple[A, ShiftingRight[B, C, D, E, F, G, H, I, J, K, L, None]]
+
+static_assert(
+    is_subtype_of(
+        ShiftingLeft[int, int, int, int, int, int, int, int, int, int, int, int],
+        ShiftingRight[int, int, int, int, int, int, int, int, int, int, int, int],
+    )
+)
+
+type ShiftingSource = ShiftingLeft[int, int, int, int, int, int, int, int, int, int, int, int]
+type ShiftingRightAfterTwo = ShiftingRight[int, int, int, int, int, int, int, int, int, int, None, None]
+type ShiftingShortcut = tuple[int, tuple[int, ShiftingRightAfterTwo]]
+type ShiftingLongPath = ShiftingRight[int, int, int, int, int, int, int, int, int, int, int, int]
+
+static_assert(is_subtype_of(ShiftingSource, ShiftingShortcut))
+static_assert(is_subtype_of(ShiftingSource, ShiftingShortcut | ShiftingLongPath))
+static_assert(is_subtype_of(ShiftingSource, ShiftingLongPath | ShiftingShortcut))
+
+type MutualLeft[T] = tuple[T, MutualLeftHelper[list[T]]]
+type MutualLeftHelper[U] = tuple[U, MutualLeft[int]]
+type MutualRight[T] = tuple[T, MutualRightHelper[list[T]]]
+type MutualRightHelper[U] = tuple[U, MutualRight[int]]
+
+static_assert(is_subtype_of(MutualLeft[str], MutualRight[str]))
+
+# Repeatedly adding the same union element reaches a fixed point after one expansion.
+type SaturatingLeft[T] = tuple[T, SaturatingLeft[T | int]]
+type SaturatingRight[T] = tuple[T, SaturatingRight[T | int]]
+
+static_assert(is_subtype_of(SaturatingLeft[bytes], SaturatingRight[bytes]))
+
+# Repeatedly intersecting with the same type also reaches a fixed point.
+type IntersectingLeft[T] = tuple[T, IntersectingLeft[Intersection[T, int]]]
+type IntersectingRight[T] = tuple[T, IntersectingRight[Intersection[T, int]]]
+
+static_assert(is_subtype_of(IntersectingLeft[object], IntersectingRight[object]))
+
+# A structural wrapper still grows when it appears alongside or outside a saturating union.
+type MixedGrowingLeft[T] = tuple[T, MixedGrowingLeft[T | list[T]]]
+type MixedGrowingRight[T] = tuple[T, MixedGrowingRight[T | list[T]]]
+type NestedSetGrowingLeft[T] = tuple[T, NestedSetGrowingLeft[list[T | int]]]
+type NestedSetGrowingRight[T] = tuple[T, NestedSetGrowingRight[list[T | int]]]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(MixedGrowingLeft[int], MixedGrowingRight[int]))
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(NestedSetGrowingLeft[int], NestedSetGrowingRight[int]))
+
+# Alternating normalized set operations also reach a fixed point.
+class SetElementA(Protocol):
+    a: int
+
+class SetElementB(Protocol):
+    b: int
+
+class SetElementC(Protocol):
+    c: int
+
+type AlternatingSetLeft[T] = tuple[T, AlternatingSetLeftHelper[T | SetElementB]]
+type AlternatingSetLeftHelper[U] = tuple[U, AlternatingSetLeft[Intersection[U, SetElementC]]]
+type AlternatingSetRight[T] = tuple[T, AlternatingSetRightHelper[T | SetElementB]]
+type AlternatingSetRightHelper[U] = tuple[U, AlternatingSetRight[Intersection[U, SetElementC]]]
+
+static_assert(is_subtype_of(AlternatingSetLeft[SetElementA], AlternatingSetRight[SetElementA]))
+
+# A specialization can also have a finite period greater than one.
+type PeriodicLeft[A, B] = tuple[A, B, PeriodicLeft[B, A | int]]
+type PeriodicRight[A, B] = tuple[A, B, PeriodicRight[B, A | int]]
+
+static_assert(is_subtype_of(PeriodicLeft[bytes, str], PeriodicRight[bytes, str]))
+
+# A helper alias can erase an argument before the recursive reference sees it, so the recursive
+# specialization reaches a fixed point after one step.
+type ErasingArgument[T] = int
+type ErasingLeft[T] = tuple[T, ErasingLeft[ErasingArgument[T]]]
+type ErasingRight[T] = tuple[T, ErasingRight[ErasingArgument[T]]]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(ErasingLeft[str], ErasingRight[str]))
+
+# Neither recursive occurrence grows indefinitely by itself, but alternating between them adds
+# another list layer on every cycle.
+type AlternatingLeft[X, Y] = tuple[
+    AlternatingLeft[Y, None],
+    AlternatingLeft[None, list[X]],
+]
+type AlternatingRight[X, Y] = tuple[
+    AlternatingRight[Y, None],
+    AlternatingRight[None, list[X]],
+]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(AlternatingLeft[int, str], AlternatingRight[int, str]))
+
+# The nested aliases grow their first argument, but the references back to the outer aliases erase
+# that argument. The outer specialization orbits are therefore finite.
+type OuterLeft[A, B] = NodeLeft[A, B]
+type NodeLeft[A, B] = tuple[A, NodeLeft[list[A], B], OuterLeft[B, None]]
+type OuterRight[A, B] = NodeRight[A, B]
+type NodeRight[A, B] = tuple[A, NodeRight[list[A], B], OuterRight[B, None]]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(OuterLeft[int, str], OuterRight[int, str]))
+
+# If the reference back to the outer alias retains the growing argument, the outer specialization
+# can grow transitively.
+type TransitiveOuterLeft[T] = TransitiveNodeLeft[T]
+type TransitiveNodeLeft[T] = tuple[
+    T,
+    TransitiveNodeLeft[list[T]],
+    TransitiveOuterLeft[T],
+]
+type TransitiveOuterRight[T] = TransitiveNodeRight[T]
+type TransitiveNodeRight[T] = tuple[
+    T,
+    TransitiveNodeRight[list[T]],
+    TransitiveOuterRight[T],
+]
+
+# TODO: These structurally equivalent aliases should be recognized as subtypes.
+static_assert(not is_subtype_of(TransitiveOuterLeft[int], TransitiveOuterRight[int]))
+```
+
+### Non-recursive nested generic aliases
+
+A repeated use of the same generic alias can be a finite alias application instead of recursion.
+
+```py
+from typing import Literal
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+type NonRecursiveId[T] = T
+
+static_assert(is_subtype_of(NonRecursiveId[NonRecursiveId[int]], int))
+static_assert(not is_subtype_of(NonRecursiveId[NonRecursiveId[int]], str))
+
+truth: NonRecursiveId[NonRecursiveId[Literal[True]]] = True
+static_assert(truth)
+
+one: NonRecursiveId[NonRecursiveId[Literal[1]]] = 1
+reveal_type(one + 1)  # revealed: Literal[2]
+reveal_type(one == 1)  # revealed: Literal[True]
+
+def nested_union(
+    value: list[NonRecursiveId[NonRecursiveId[int]]] | list[int],
+):
+    reveal_type(value)  # revealed: list[NonRecursiveId[NonRecursiveId[int]]]
+
+# A finite nested application can also be hidden behind another named alias.
+type Intermediate[T] = T
+type LeftIntAlias = NonRecursiveId[int]
+type RightIntAlias = NonRecursiveId[int]
+
+def finite_alias_chain(x: NonRecursiveId[Intermediate[NonRecursiveId[int]]]):
+    reveal_type(x + 1)  # revealed: int
+    reveal_type(x == 1)  # revealed: bool
+    # error: [invalid-assignment]
+    invalid: str = x
+
+def equivalent_finite_aliases(x: NonRecursiveId[LeftIntAlias]):
+    valid: NonRecursiveId[RightIntAlias] = x
+
+type IntAlias = int
+
+def unchanged_alias_pair(x: NonRecursiveId[NonRecursiveId[bool]]):
+    # `bool` is a subtype of `int`. The unchanged target alias must not cause the finite source
+    # expansion to be treated as recursive.
+    valid: IntAlias = x
+
+type NoneAlias = NonRecursiveId[None]
+type NestedNoneAlias = NonRecursiveId[NoneAlias]
+
+def finite_alias_union(x: NonRecursiveId[NestedNoneAlias], condition: bool):
+    reveal_type(x if condition else 1)  # revealed: None | Literal[1]
+```
+
+### Generic self-recursive aliases with deeper specializations
+
+Regression test for <https://github.com/astral-sh/ty/issues/3452>.
+
+A recursive alias may refer to itself with a more deeply nested specialization. This should still
+terminate and preserve the alias at the recursive position.
+
+```py
+from typing import Callable, Concatenate
+
+# error: [cyclic-type-alias-definition]
+type Recursive[T] = int | Recursive[list[T]]
+
+def _(value: Recursive[int]):
+    reveal_type(value + 1)  # revealed: int
+    reveal_type(1 + value)  # revealed: int
+
+type RecursiveParamspec[**P] = Callable[[], RecursiveParamspec[Concatenate[int, P]]]
+
+def paramspec_alias(func: RecursiveParamspec):
+    reveal_type(func)  # revealed: () -> RecursiveParamspec[(int, /, *args: Unknown, **kwargs: Unknown)]
+
+type RecursiveCallable[T] = Callable[[RecursiveCallable[T]], RecursiveCallable[T | RecursiveCallable[T]]]
+
+def callable_alias(x: RecursiveCallable[int]):
+    reveal_type(x)  # revealed: (RecursiveCallable[int], /) -> RecursiveCallable[int | RecursiveCallable[int]]
+
+type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
+
+def growing_list(x: GrowingList[int]):
+    reveal_type(x)  # revealed: list[GrowingList[int | GrowingList[int]]]
+
+type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
+
+def growing_callable(x: GrowingCallable[int]):
+    # revealed: (() -> GrowingCallable[int | GrowingCallable[int] | GrowingCallable[int | GrowingCallable[int]]] | None) | None
+    reveal_type(x())
+```
+
+If a type parameter never appears outside an unchanged recursive reference, different
+specializations satisfy the same recursive equation and are equivalent.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type StableWrapped[T] = list[StableWrapped[T]]
+
+static_assert(is_equivalent_to(StableWrapped[int], StableWrapped[str]))
+
+def stable_wrapped(x: StableWrapped[int], y: StableWrapped[str]):
+    reveal_type(x)  # revealed: list[StableWrapped[int]]
+    reveal_type(y)  # revealed: list[StableWrapped[str]]
+    x = y
+    y = x
+```
+
 ### Subtyping of materializations of cyclic aliases
 
 ```py
-from ty_extensions import static_assert, is_subtype_of, Bottom, Top
+from ty_extensions import static_assert, Bottom, Top
+from ty_extensions._internal import is_subtype_of
 
 type JsonValue = None | JsonDict
 type JsonDict = dict[str, JsonValue]
@@ -578,7 +1565,8 @@ static_assert(is_subtype_of(Bottom[JsonDict], Top[JsonDict]))
 
 ```py
 from typing import Callable
-from ty_extensions import static_assert, is_equivalent_to, is_subtype_of, Top
+from ty_extensions import static_assert, Top
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class Box[T]:
     pass
@@ -603,6 +1591,17 @@ x: JSON_OBJECT = {"hello": 23}
 
 def f() -> JSON_OBJECT:
     return {"hello": 23}
+```
+
+### Aliased union in a self-recursive type alias
+
+Regression test for <https://github.com/astral-sh/ty/issues/3835>.
+
+```py
+from collections.abc import Sequence
+
+type JSONScalar = str | int
+type JSONValue = JSONScalar | Sequence[JSONValue] | dict[str, JSONValue]
 ```
 
 ### Recursive dict alias in method return
@@ -678,6 +1677,32 @@ def f(x: A):
         reveal_type(item)  # revealed: list[A | str | None] | str | None
 ```
 
+### Recursive alias contexts in generic calls
+
+When a recursive alias appears inside a list parameter, the argument's elements supply the type
+argument for the enclosing generic function.
+
+```py
+from typing import TypeVar
+
+W = TypeVar("W")
+type Tree[T] = T | tuple[Tree[T]]
+
+def first_list(value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+def modern_first_list[W](value: list[Tree[W]]) -> W:
+    raise NotImplementedError
+
+reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(first_list([((1,),)]))
+# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+reveal_type(modern_first_list([((1,),)]))
+```
+
 ### Tuple comparison
 
 ```py
@@ -733,9 +1758,12 @@ reveal_type(CallableGuard)  # revealed: TypeAliasType
 
 ### Recursive alias in binary operators doesn't stack overflow
 
+An invalid union cycle still recovers its non-recursive member when checking operators.
+
 ```py
 from typing import reveal_type
 
+# error: [cyclic-type-alias-definition]
 type A = int | A
 
 def foo(x: A):

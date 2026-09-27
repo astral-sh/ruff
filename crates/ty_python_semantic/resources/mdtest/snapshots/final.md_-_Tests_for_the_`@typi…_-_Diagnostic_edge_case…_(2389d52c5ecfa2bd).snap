@@ -37,7 +37,6 @@ error[override-of-final-method]: Cannot override `module1.Foo.f`
   |
 4 |     def f(self): ...  # error: [override-of-final-method]
   |         ^ Overrides a definition from superclass `module1.Foo`
-  |
 info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
  --> src/module1.py:4:5
   |
@@ -45,13 +44,12 @@ info: `module1.Foo.f` is decorated with `@final`, forbidding overrides
   |     ------
 5 |     def f(self): ...
   |         - `module1.Foo.f` defined here
-  |
 help: Remove the override of `f`
-1 | import module1
-2 |
+  |
 3 | class Foo(module1.Foo):
   -     def f(self): ...  # error: [override-of-final-method]
 4 +     pass  # error: [override-of-final-method]
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 ```

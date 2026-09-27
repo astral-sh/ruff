@@ -3,6 +3,7 @@ use ruff_python_ast::str::Quote;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::docstrings::Docstring;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -47,7 +48,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.69")]
+#[violation_metadata(stable_since = "v0.0.69", category = Category::Formatting)]
 pub(crate) struct TripleSingleQuotes {
     expected_quote: Quote,
 }

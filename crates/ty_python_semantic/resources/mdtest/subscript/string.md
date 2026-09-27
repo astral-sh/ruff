@@ -94,10 +94,8 @@ def f(x: LiteralString):
 ## Unsupported slice types
 
 ```py
-# TODO: It would be great if we raised an error here. This can be done once
-# we have support for overloads and generics, and once typeshed has a more
-# precise annotation for `str.__getitem__`, that makes use of the generic
-# `slice[..]` type. We could then infer `slice[str, str]` here and see that
-# it doesn't match the signature of `str.__getitem__`.
-"foo"["bar":"baz"]
+def invalid_slice_bounds(s: str, start: float, end: float) -> str:
+    return s[start:end]  # error: [invalid-argument-type]
+
+"foo"["bar":"baz"]  # error: [invalid-argument-type]
 ```

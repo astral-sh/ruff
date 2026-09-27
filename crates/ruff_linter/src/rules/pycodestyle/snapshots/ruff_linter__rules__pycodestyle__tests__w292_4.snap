@@ -6,7 +6,8 @@ W292 [*] No newline at end of file
   |
 1 |  
   |  ^
-  |
 help: Add trailing newline
+  |
   -  
-1 +
+1 +  
+  |

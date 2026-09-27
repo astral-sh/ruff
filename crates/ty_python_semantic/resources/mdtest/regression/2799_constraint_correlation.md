@@ -17,7 +17,7 @@ python-version = "3.13"
 from typing import Generic, Protocol, TypeVar, overload
 
 T = TypeVar("T")
-T_contra = TypeVar("T_contra")
+T_contra = TypeVar("T_contra", contravariant=True)
 S2 = TypeVar("S2")
 
 class ElementOpsMixin(Generic[S2]):

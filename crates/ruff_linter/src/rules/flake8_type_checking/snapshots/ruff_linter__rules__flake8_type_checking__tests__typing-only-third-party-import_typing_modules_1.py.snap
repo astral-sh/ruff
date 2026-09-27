@@ -11,8 +11,7 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 9 |     df: DataFrame
   |
 help: Move into type-checking block
-1  | from __future__ import annotations
-2  |
+   |
 3  | from typing_extensions import Self
 4  + from typing import TYPE_CHECKING
 5  +
@@ -23,5 +22,5 @@ help: Move into type-checking block
 10 | def func():
    -     from pandas import DataFrame
 11 |
-12 |     df: DataFrame
+   |
 note: This is an unsafe fix and may change runtime behavior

@@ -8,7 +8,7 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_ast::{AnyNodeRef, Stmt, StmtMatch, StmtTry};
 use ruff_python_parser::{ParseOptions, parse};
 use ruff_python_trivia::{
-    BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, indentation_at_offset,
+    BackwardsTokenizer, SimpleToken, SimpleTokenKind, TriviaRanges, indentation_at_offset,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -76,13 +76,14 @@ pub fn format_range(
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
-    let comment_ranges = CommentRanges::from(parsed.tokens());
-    let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let trivia = TriviaRanges::from(parsed.tokens());
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &trivia);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
         source,
         comments,
+        &trivia,
         parsed.tokens(),
     );
 
@@ -506,7 +507,7 @@ impl NarrowRange<'_> {
             }) = BackwardsTokenizer::up_to(
                 first_child.start(),
                 self.context.source(),
-                self.context.comments().ranges(),
+                self.context.trivia().comments(),
             )
             .skip_trivia()
             .next()
@@ -540,32 +541,26 @@ impl NarrowRange<'_> {
             // The challenge here is that the second line of the multiline string uses a 4 space indentation. Using `dedent` would
             // dedent the second line to 0 spaces and the `indent` then adds a 2 space indentation to match the indentation in the source.
             // This is incorrect because the leading whitespace is the content of the string and not indentation, resulting in changed string content.
-            if let Some(indentation) =
-                indentation_at_offset(first_child.start(), self.context.source())
-            {
-                let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
-                let expected_indents = self.level;
+            // Missing indentation indicates a simple-statement body of a compound statement (not a suite body).
+            // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+            let indentation = indentation_at_offset(first_child.start(), self.context.source())?;
+            let relative_indent = indentation.strip_prefix(self.enclosing_indent).unwrap();
+            let expected_indents = self.level;
 
-                // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
-                let has_expected_indentation = match self.context.options().indent_style() {
-                    IndentStyle::Tab => {
-                        relative_indent.len() == expected_indents
-                            && relative_indent.chars().all(|c| c == '\t')
-                    }
-                    IndentStyle::Space => {
-                        relative_indent.len()
-                            == expected_indents
-                                * self.context.options().indent_width().value() as usize
-                            && relative_indent.chars().all(|c| c == ' ')
-                    }
-                };
-
-                if !has_expected_indentation {
-                    return None;
+            // Each level must always add one level of indent. That's why an empty relative indent to the parent node tells us that the enclosing node is the Module.
+            let has_expected_indentation = match self.context.options().indent_style() {
+                IndentStyle::Tab => {
+                    relative_indent.len() == expected_indents
+                        && relative_indent.chars().all(|c| c == '\t')
                 }
-            } else {
-                // Simple-statement body of a compound statement (not a suite body).
-                // Don't narrow the range because the formatter must run `FormatClauseBody` to determine if the body should be collapsed or not.
+                IndentStyle::Space => {
+                    relative_indent.len()
+                        == expected_indents * self.context.options().indent_width().value() as usize
+                        && relative_indent.chars().all(|c| c == ' ')
+                }
+            };
+
+            if !has_expected_indentation {
                 return None;
             }
         }

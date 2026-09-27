@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 
@@ -40,7 +41,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct PandasUseOfDotIx;
 
 impl Violation for PandasUseOfDotIx {
@@ -83,7 +84,7 @@ impl Violation for PandasUseOfDotIx {
 /// - [Pandas documentation: `loc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.loc.html)
 /// - [Pandas documentation: `at`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.at.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct PandasUseOfDotAt;
 
 impl Violation for PandasUseOfDotAt {
@@ -135,7 +136,7 @@ impl Violation for PandasUseOfDotAt {
 /// - [Pandas documentation: `iloc`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iloc.html)
 /// - [Pandas documentation: `iat`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.iat.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.188")]
+#[violation_metadata(stable_since = "v0.0.188", category = Category::Pedantic)]
 pub(crate) struct PandasUseOfDotIat;
 
 impl Violation for PandasUseOfDotIat {

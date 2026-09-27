@@ -4,13 +4,12 @@ use crate::server::api::LSPResult;
 use crate::server::api::diagnostics::publish_diagnostics_for_document;
 use crate::session::{Client, Session};
 use lsp_server::ErrorCode;
-use lsp_types as types;
-use lsp_types::notification as notif;
+use lsp_types::{self as types, DidOpenNotebookDocumentNotification};
 
 pub(crate) struct DidOpenNotebook;
 
 impl super::NotificationHandler for DidOpenNotebook {
-    type NotificationType = notif::DidOpenNotebookDocument;
+    type NotificationType = DidOpenNotebookDocumentNotification;
 }
 
 impl super::SyncNotificationHandler for DidOpenNotebook {

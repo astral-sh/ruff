@@ -2,13 +2,13 @@ use crate::Session;
 use crate::server::api::traits::{RequestHandler, SyncRequestHandler};
 use crate::session::client::Client;
 
-use lsp_types::{WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult};
+use lsp_types::WorkspaceDiagnosticReport;
 use salsa::Database;
 
 pub(crate) struct ShutdownHandler;
 
 impl RequestHandler for ShutdownHandler {
-    type RequestType = lsp_types::request::Shutdown;
+    type RequestType = lsp_types::ShutdownRequest;
 }
 
 impl SyncRequestHandler for ShutdownHandler {
@@ -21,9 +21,7 @@ impl SyncRequestHandler for ShutdownHandler {
         {
             client.respond(
                 &suspended_workspace_request.id,
-                Ok(WorkspaceDiagnosticReportResult::Report(
-                    WorkspaceDiagnosticReport::default(),
-                )),
+                Ok(WorkspaceDiagnosticReport::default()),
             );
         }
 

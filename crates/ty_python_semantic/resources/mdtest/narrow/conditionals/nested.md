@@ -7,7 +7,7 @@ def _(x: int):
     if x != 1:
         if x != 2:
             if x != 3:
-                reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[2] & ~Literal[3]
+                reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
 
 ## Multiple negative contributions with simplification
@@ -52,7 +52,8 @@ def _(xs: list[int | None], ys: list[str | bytes], list_of_optional_lists: list[
 
     [_ for x in xs if x is not None if reveal_type(x) // 3 != 0]  # revealed: int
 
-    [reveal_type(x) for x in xs if x is not None if x != 0 if x != 1]  # revealed: int & ~Literal[0] & ~Literal[1]
+    # revealed: int & ~Literal[0] & ~Literal[False] & ~Literal[1] & ~Literal[True]
+    [reveal_type(x) for x in xs if x is not None if x != 0 if x != 1]
 
     [reveal_type((x, y)) for x in xs if x is not None for y in ys if isinstance(y, str)]  # revealed: tuple[int, str]
     [reveal_type((x, y)) for y in ys if isinstance(y, str) for x in xs if x is not None]  # revealed: tuple[int, str]
@@ -362,6 +363,39 @@ def f(non_local: str | None):
     if non_local is not None:
         def _():
             reveal_type(non_local)  # revealed: str | None
+```
+
+Nonlocal writes do not invalidate snapshots for other names. Eager scopes retain their narrowing
+even when a lazy scope can write the same name.
+
+```py
+def f(value: str | None, other: str | None):
+    if value is not None and other is not None:
+        class Eager:
+            reveal_type(value)  # revealed: str
+
+        def read():
+            reveal_type(value)  # revealed: str | None
+            reveal_type(other)  # revealed: str
+
+        def write():
+            nonlocal value
+            value = None
+```
+
+A nonlocal write in an earlier, unrelated scope does not invalidate a later snapshot of the same
+name.
+
+```py
+def earlier(value: str | None):
+    def write():
+        nonlocal value
+        value = None
+
+def later(value: str | None):
+    if value is not None:
+        def read():
+            reveal_type(value)  # revealed: str
 ```
 
 The same goes for public variables, attributes, and subscripts, because it is difficult to track all

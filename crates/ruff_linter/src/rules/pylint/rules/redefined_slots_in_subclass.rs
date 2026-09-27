@@ -9,6 +9,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for a re-defined slot in a subclass.
@@ -38,7 +39,7 @@ use crate::checkers::ast::Checker;
 ///     __slots__ = "d"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.3")]
+#[violation_metadata(preview_since = "0.9.3", category = Category::Correctness)]
 pub(crate) struct RedefinedSlotsInSubclass {
     base: String,
     slot_name: String,
@@ -67,6 +68,10 @@ pub(crate) fn redefined_slots_in_subclass(checker: &Checker, class_def: &ast::St
         return;
     }
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each slot is checked independently against the base classes"
+    )]
     for slot in class_slots {
         check_super_slots(checker, class_def, &slot);
     }

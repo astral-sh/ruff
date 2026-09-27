@@ -4,16 +4,13 @@ import difflib
 import logging
 import re
 import subprocess
-import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, NamedTuple
-
-if sys.platform == "win32":
-    import mslex as shlex
-else:
-    import shlex
+from typing import NamedTuple
 
 from benchmark import Command
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_output(output: str, cwd: Path) -> str:
@@ -72,9 +69,9 @@ class SnapshotRunner(NamedTuple):
 
             # Run the prepare command if provided.
             if command.prepare:
-                logging.info(f"Running prepare: {command.prepare}")
+                logger.info(f"Running prepare: {command.prepare}")
                 subprocess.run(
-                    shlex.split(command.prepare),
+                    command.prepare,
                     cwd=cwd,
                     env=env,
                     capture_output=True,
@@ -82,13 +79,14 @@ class SnapshotRunner(NamedTuple):
                 )
 
             # Run the actual command and capture output.
-            logging.info(f"Running {command.command}")
+            logger.info(f"Running {command.command}")
             result = subprocess.run(
                 command.command,
                 cwd=cwd,
                 env=env,
                 capture_output=True,
                 text=True,
+                check=False,
             )
 
             # Get the actual output and combine stdout and stderr for the snapshot.

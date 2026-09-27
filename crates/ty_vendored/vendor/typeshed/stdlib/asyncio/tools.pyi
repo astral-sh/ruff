@@ -59,8 +59,11 @@ if sys.version_info >= (3, 14):
         """
 
 if sys.version_info >= (3, 15):
-    def display_awaited_by_tasks_table(pid: SupportsIndex, retries: SupportsIndex = 3) -> None: ...
-    def display_awaited_by_tasks_tree(pid: SupportsIndex, retries: SupportsIndex = 3) -> None: ...
+    def display_awaited_by_tasks_table(pid: SupportsIndex, retries: SupportsIndex = 3) -> None:
+        """Build and print a table of all pending tasks under `pid`."""
+
+    def display_awaited_by_tasks_tree(pid: SupportsIndex, retries: SupportsIndex = 3) -> None:
+        """Build and print a tree of all pending tasks under `pid`."""
 
 else:
     def display_awaited_by_tasks_table(pid: SupportsIndex) -> None:

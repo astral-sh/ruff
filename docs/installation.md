@@ -5,8 +5,8 @@ Ruff is available as [`ruff`](https://pypi.org/project/ruff/) on PyPI.
 Ruff can be invoked directly with [`uvx`](https://docs.astral.sh/uv/):
 
 ```shell
-uvx ruff check   # Lint all files in the current directory.
-uvx ruff format  # Format all files in the current directory.
+uvx ruff@0.16.9 check   # Lint all files in the current directory.
+uvx ruff@0.16.9 format  # Format all files in the current directory.
 ```
 
 Or installed with `uv` (recommended), `pip`, or `pipx`:
@@ -74,8 +74,8 @@ on the official repositories:
 $ pacman -S ruff
 ```
 
-For **Alpine** users, Ruff is also available as [`ruff`](https://pkgs.alpinelinux.org/package/edge/testing/x86_64/ruff)
-on the testing repositories:
+For **Alpine** users, Ruff is also available as [`ruff`](https://pkgs.alpinelinux.org/package/edge/community/x86_64/ruff)
+on the community repositories:
 
 ```console
 $ apk add ruff

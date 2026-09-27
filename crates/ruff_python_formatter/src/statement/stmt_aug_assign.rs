@@ -1,7 +1,6 @@
 use ruff_formatter::write;
 use ruff_python_ast::StmtAugAssign;
 
-use crate::expression::parentheses::is_expression_parenthesized;
 use crate::prelude::*;
 use crate::statement::stmt_assign::{
     AnyAssignmentOperator, AnyBeforeOperator, FormatStatementsLastExpression,
@@ -24,11 +23,7 @@ impl FormatNodeRule<StmtAugAssign> for FormatStmtAugAssign {
         } = item;
 
         if has_target_own_parentheses(target, f.context())
-            && !is_expression_parenthesized(
-                target.into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            )
+            && !f.context().is_expression_parenthesized(target.into())
         {
             FormatStatementsLastExpression::RightToLeft {
                 before_operator: AnyBeforeOperator::Expression(target),

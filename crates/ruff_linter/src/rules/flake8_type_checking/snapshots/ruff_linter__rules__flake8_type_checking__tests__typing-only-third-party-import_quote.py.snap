@@ -11,6 +11,7 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 4 |     def baz() -> DataFrame:
   |
 help: Move into type-checking block
+  |
   - def f():
 1 + from typing import TYPE_CHECKING
 2 +
@@ -18,8 +19,7 @@ help: Move into type-checking block
 4 |     from pandas import DataFrame
 5 + def f():
 6 |
-7 |     def baz() -> DataFrame:
-8 |         ...
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -32,21 +32,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 11 |     def baz() -> DataFrame[int]:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-10 |
-11 |
 12 | def f():
    -     from pandas import DataFrame
 13 |
-14 |     def baz() -> DataFrame[int]:
-15 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -59,21 +55,17 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 18 |     def baz() -> pd.DataFrame:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     import pandas as pd
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-17 |
-18 |
 19 | def f():
    -     import pandas as pd
 20 |
-21 |     def baz() -> pd.DataFrame:
-22 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -86,21 +78,17 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 25 |     def baz() -> pd.DataFrame.Extra:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     import pandas as pd
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-24 |
-25 |
 26 | def f():
    -     import pandas as pd
 27 |
-28 |     def baz() -> pd.DataFrame.Extra:
-29 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas` into a type-checking block
@@ -113,21 +101,17 @@ TC002 [*] Move third-party import `pandas` into a type-checking block
 32 |     def baz() -> pd.DataFrame | int:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     import pandas as pd
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-31 |
-32 |
 33 | def f():
    -     import pandas as pd
 34 |
-35 |     def baz() -> pd.DataFrame | int:
-36 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -140,21 +124,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 40 |     def baz() -> DataFrame():
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-39 |
-40 |
 41 | def f():
    -     from pandas import DataFrame
 42 |
-43 |     def baz() -> DataFrame():
-44 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -168,21 +148,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 49 |     def baz() -> DataFrame[Literal["int"]]:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-48 | def f():
-49 |     from typing import Literal
 50 |
    -     from pandas import DataFrame
 51 |
-52 |     def baz() -> DataFrame[Literal["int"]]:
-53 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -195,21 +171,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 66 |     def baz() -> DataFrame | Series:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-65 |
-66 |
 67 | def f():
    -     from pandas import DataFrame, Series
 68 |
-69 |     def baz() -> DataFrame | Series:
-70 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
@@ -222,21 +194,17 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
 66 |     def baz() -> DataFrame | Series:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-65 |
-66 |
 67 | def f():
    -     from pandas import DataFrame, Series
 68 |
-69 |     def baz() -> DataFrame | Series:
-70 |         ...
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -249,21 +217,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 73 |     def baz() -> (
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-72 |
-73 |
 74 | def f():
    -     from pandas import DataFrame, Series
 75 |
-76 |     def baz() -> (
-77 |         DataFrame |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
@@ -276,21 +240,17 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
 73 |     def baz() -> (
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-72 |
-73 |
 74 | def f():
    -     from pandas import DataFrame, Series
 75 |
-76 |     def baz() -> (
-77 |         DataFrame |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
@@ -303,21 +263,17 @@ TC002 [*] Move third-party import `pandas.DataFrame` into a type-checking block
 91 |     def func(self) -> DataFrame | list[Series]:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-90 |
-91 |
 92 | def f():
    -     from pandas import DataFrame, Series
 93 |
-94 |     def func(self) -> DataFrame | list[Series]:
-95 |         pass
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `pandas.Series` into a type-checking block
@@ -330,19 +286,15 @@ TC002 [*] Move third-party import `pandas.Series` into a type-checking block
 91 |     def func(self) -> DataFrame | list[Series]:
    |
 help: Move into type-checking block
+   |
 1  + from typing import TYPE_CHECKING
 2  +
 3  + if TYPE_CHECKING:
 4  +     from pandas import DataFrame, Series
 5  | def f():
-6  |     from pandas import DataFrame
-7  |
 --------------------------------------------------------------------------------
-90 |
-91 |
 92 | def f():
    -     from pandas import DataFrame, Series
 93 |
-94 |     def func(self) -> DataFrame | list[Series]:
-95 |         pass
+   |
 note: This is an unsafe fix and may change runtime behavior

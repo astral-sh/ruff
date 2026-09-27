@@ -92,9 +92,11 @@ class zipimporter(_LoaderBasics):
         Return the filename for the specified module or raise ZipImportError
         if it couldn't be imported.
         """
+
     if sys.version_info >= (3, 14):
         def get_resource_reader(self, fullname: str) -> ZipReader:  # undocumented
             """Return the ResourceReader for a module in a zip file."""
+
     else:
         def get_resource_reader(self, fullname: str) -> ZipReader | None:  # undocumented
             """Return the ResourceReader for a module in a zip file."""
@@ -113,6 +115,7 @@ class zipimporter(_LoaderBasics):
         Return True if the module specified by fullname is a package.
         Raise ZipImportError if the module couldn't be found.
         """
+
     if sys.version_info < (3, 15):
         @deprecated("Deprecated since Python 3.10; removed in Python 3.15. Use `exec_module()` instead.")
         def load_module(self, fullname: str) -> ModuleType:

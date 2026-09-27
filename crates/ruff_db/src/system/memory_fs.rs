@@ -13,8 +13,8 @@ use crate::system::{
 };
 
 use super::walk_directory::{
-    DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration, WalkDirectoryVisitor,
-    WalkDirectoryVisitorBuilder, WalkState,
+    DirectoryWalker, IgnoreIncremental, WalkDirectoryBuilder, WalkDirectoryConfiguration,
+    WalkDirectoryVisitor, WalkDirectoryVisitorBuilder, WalkState,
 };
 
 /// File system that stores all content in memory.
@@ -168,10 +168,14 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         match by_path.entry(normalized) {
             btree_map::Entry::Vacant(entry) => {
+                let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                 entry.insert(Entry::File(File {
                     content: Box::default(),
                     last_modified: file_time_now(),
                 }));
+                if let Some(parent) = parent {
+                    touch_directory(&mut by_path, &parent);
+                }
 
                 Ok(())
             }
@@ -193,7 +197,6 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = self.normalize_path(path.as_ref());
-
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.as_ref().to_vec().into_boxed_slice();
         file.last_modified = file_time_now();
@@ -278,7 +281,11 @@ impl MemoryFileSystem {
             match by_path.entry(normalized) {
                 btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::File(_) => {
+                        let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                         entry.remove();
+                        if let Some(parent) = parent {
+                            touch_directory(&mut by_path, &parent);
+                        }
                         Ok(())
                     }
                     Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
@@ -345,7 +352,11 @@ impl MemoryFileSystem {
             match by_path.entry(normalized.clone()) {
                 btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::Directory(_) => {
+                        let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                         entry.remove();
+                        if let Some(parent) = parent {
+                            touch_directory(&mut by_path, &parent);
+                        }
                         Ok(())
                     }
                     Entry::File(_) => Err(io::Error::from(io::ErrorKind::NotADirectory)),
@@ -473,7 +484,9 @@ fn create_dir_all(
 
     for component in normalized.components() {
         path.push(component);
+        let mut inserted = false;
         let entry = paths.entry(path.clone()).or_insert_with(|| {
+            inserted = true;
             Entry::Directory(Directory {
                 last_modified: file_time_now(),
             })
@@ -482,9 +495,19 @@ fn create_dir_all(
         if entry.is_file() {
             return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
+
+        if inserted && let Some(parent) = path.parent().map(Utf8Path::to_path_buf) {
+            touch_directory(paths, &parent);
+        }
     }
 
     Ok(())
+}
+
+fn touch_directory(paths: &mut RwLockWriteGuard<BTreeMap<Utf8PathBuf, Entry>>, path: &Utf8Path) {
+    if let Some(Entry::Directory(directory)) = paths.get_mut(path) {
+        directory.last_modified = file_time_now();
+    }
 }
 
 fn get_or_create_file<'a>(
@@ -497,6 +520,12 @@ fn get_or_create_file<'a>(
         if parent_entry.is_file() {
             return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
+    }
+
+    if let Some(parent) = normalized.parent().map(Utf8Path::to_path_buf)
+        && !paths.contains_key(normalized)
+    {
+        touch_directory(paths, &parent);
     }
 
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
@@ -535,6 +564,20 @@ impl Iterator for ReadDirectory {
 
 impl FusedIterator for ReadDirectory {}
 
+struct MemoryIgnoreIncremental {
+    ignore_hidden: bool,
+}
+
+impl IgnoreIncremental for MemoryIgnoreIncremental {
+    fn is_ignored(&mut self, path: &SystemPath, is_directory: bool) -> bool {
+        // This matches the semantics of the in-memory recursive
+        // directory traversal. That is, the only thing we care
+        // about filtering is hidden files. We let everything else
+        // through.
+        self.ignore_hidden && !is_directory && is_hidden(path)
+    }
+}
+
 /// Recursively walks a directory in the memory file system.
 #[derive(Debug)]
 struct MemoryWalker {
@@ -563,12 +606,7 @@ impl MemoryWalker {
             }
 
             state
-        } else if ignore_hidden
-            && entry
-                .path
-                .file_name()
-                .is_some_and(|name| name.starts_with('.'))
-        {
+        } else if ignore_hidden && is_hidden(&entry.path) {
             WalkState::Skip
         } else {
             visitor.visit(Ok(entry))
@@ -673,6 +711,14 @@ impl DirectoryWalker for MemoryWalker {
             }
         }
     }
+
+    fn incremental_matcher(
+        &self,
+        configuration: WalkDirectoryConfiguration,
+    ) -> Box<dyn IgnoreIncremental> {
+        let WalkDirectoryConfiguration { ignore_hidden, .. } = configuration;
+        Box::new(MemoryIgnoreIncremental { ignore_hidden })
+    }
 }
 
 #[derive(Debug)]
@@ -682,6 +728,10 @@ enum WalkerState {
 
     /// Traverse into the directory with the given path at the given depth.
     Nested { path: SystemPathBuf, depth: usize },
+}
+
+fn is_hidden(path: &SystemPath) -> bool {
+    path.file_name().is_some_and(|name| name.starts_with('.'))
 }
 
 #[cfg(test)]
@@ -779,6 +829,24 @@ mod tests {
         let timestamp2 = fs.metadata(path)?.revision();
 
         assert_ne!(timestamp1, timestamp2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn touch_new_file_updates_parent_directory() -> Result<()> {
+        let fs = MemoryFileSystem::new();
+        let directory = SystemPath::new("src");
+        fs.create_directory_all(directory)?;
+        let before = fs.metadata(directory)?.revision();
+
+        // Sleep to ensure that the timestamp changes
+        std::thread::sleep(Duration::from_millis(1));
+
+        fs.touch(SystemPath::new("src/new.py"))?;
+        let after = fs.metadata(directory)?.revision();
+
+        assert_ne!(before, after);
 
         Ok(())
     }

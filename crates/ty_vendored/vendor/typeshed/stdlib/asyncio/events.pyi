@@ -13,7 +13,7 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Sequence
 from concurrent.futures import Executor
 from contextvars import Context
-from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, _Address, _GetAddrInfoResult, _RetAddress, socket
 from typing import IO, Any, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
 from typing_extensions import Self, TypeVarTuple, Unpack, deprecated
 
@@ -121,6 +121,7 @@ class AbstractServer:
     @abstractmethod
     def close(self) -> None:
         """Stop serving.  This leaves existing connections open."""
+
     if sys.version_info >= (3, 13):
         @abstractmethod
         def close_clients(self) -> None:
@@ -204,6 +205,7 @@ class AbstractEventLoop:
     @abstractmethod
     async def shutdown_asyncgens(self) -> None:
         """Shutdown all active asynchronous generators."""
+
     # Methods scheduling callbacks.  All these return Handles.
     # "context" added in 3.9.10/3.10.2 for call_*
     @abstractmethod
@@ -224,7 +226,8 @@ class AbstractEventLoop:
     @abstractmethod
     def create_future(self) -> Future[Any]: ...
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         @abstractmethod
         def create_task(
             self,
@@ -268,7 +271,7 @@ class AbstractEventLoop:
         type: int = 0,
         proto: int = 0,
         flags: int = 0,
-    ) -> list[tuple[AddressFamily, SocketKind, int, str, tuple[str, int] | tuple[str, int, int, int] | tuple[int, bytes]]]: ...
+    ) -> _GetAddrInfoResult: ...
     @abstractmethod
     async def getnameinfo(self, sockaddr: tuple[str, int] | tuple[str, int, int, int], flags: int = 0) -> tuple[str, str]: ...
 
@@ -360,8 +363,8 @@ class AbstractEventLoop:
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -382,8 +385,8 @@ class AbstractEventLoop:
 
             If host is an empty string or None all interfaces are assumed
             and a list of multiple sockets will be returned (most likely
-            one for IPv4 and another one for IPv6). The host parameter can also be
-            a sequence (e.g. list) of hosts to bind to.
+            one for IPv4 and another one for IPv6). The host parameter can also
+            be a sequence (e.g. list) of hosts to bind to.
 
             family can be set to either AF_INET or AF_INET6 to force the
             socket to use IPv4 or IPv6. If not set it will be determined
@@ -423,9 +426,50 @@ class AbstractEventLoop:
 
             start_serving set to True (default) causes the created server
             to start accepting connections immediately.  When set to False,
-            the user should await Server.start_serving() or Server.serve_forever()
-            to make the server to start accepting connections.
+            the user should await Server.start_serving() or
+            Server.serve_forever() to make the server to start accepting
+            connections.
             """
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
         @overload
         @abstractmethod
         async def create_server(
@@ -436,7 +480,7 @@ class AbstractEventLoop:
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -452,8 +496,8 @@ class AbstractEventLoop:
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -519,12 +563,50 @@ class AbstractEventLoop:
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
             host: None = None,
             port: None = None,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -539,8 +621,8 @@ class AbstractEventLoop:
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -601,12 +683,48 @@ class AbstractEventLoop:
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        @abstractmethod
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
             host: None = None,
             port: None = None,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -633,7 +751,69 @@ class AbstractEventLoop:
             Return a new transport that *protocol* should start using
             immediately.
             """
+    else:
+        @abstractmethod
+        async def start_tls(
+            self,
+            transport: BaseTransport,
+            protocol: BaseProtocol,
+            sslcontext: ssl.SSLContext,
+            *,
+            server_side: bool = False,
+            server_hostname: str | None = None,
+            ssl_handshake_timeout: float | None = None,
+        ) -> Transport | None:
+            """Upgrade a transport to TLS.
 
+            Return a new transport that *protocol* should start using
+            immediately.
+            """
+
+    if sys.version_info >= (3, 13):
+        async def create_unix_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            path: StrPath | None = None,
+            *,
+            sock: socket | None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+            cleanup_socket: bool = True,
+        ) -> Server:
+            """A coroutine which creates a UNIX Domain Socket server.
+
+            The return value is a Server object, which can be used to stop
+            the service.
+
+            path is a str, representing a file system path to bind the
+            server socket to.
+
+            sock can optionally be specified in order to use a preexisting
+            socket object.
+
+            backlog is the maximum number of queued connections passed to
+            listen() (defaults to 100).
+
+            ssl can be set to an SSLContext to enable SSL over the
+            accepted connections.
+
+            ssl_handshake_timeout is the time in seconds that an SSL server
+            will wait for the SSL handshake to complete (defaults to 60s).
+
+            ssl_shutdown_timeout is the time in seconds that an SSL server
+            will wait for the SSL shutdown to finish (defaults to 30s).
+
+            start_serving set to True (default) causes the created server
+            to start accepting connections immediately.  When set to False,
+            the user should await Server.start_serving() or
+            Server.serve_forever() to make the server to start accepting
+            connections.
+            """
+
+    elif sys.version_info >= (3, 11):
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -674,24 +854,8 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
     else:
-        @abstractmethod
-        async def start_tls(
-            self,
-            transport: BaseTransport,
-            protocol: BaseProtocol,
-            sslcontext: ssl.SSLContext,
-            *,
-            server_side: bool = False,
-            server_hostname: str | None = None,
-            ssl_handshake_timeout: float | None = None,
-        ) -> Transport | None:
-            """Upgrade a transport to TLS.
-
-            Return a new transport that *protocol* should start using
-            immediately.
-            """
-
         async def create_unix_server(
             self,
             protocol_factory: _ProtocolFactory,
@@ -728,6 +892,7 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
     if sys.version_info >= (3, 11):
         async def connect_accepted_socket(
             self,
@@ -746,6 +911,7 @@ class AbstractEventLoop:
             This method is a coroutine.  When completed, the coroutine
             returns a (transport, protocol) pair.
             """
+
     else:
         async def connect_accepted_socket(
             self,
@@ -763,6 +929,7 @@ class AbstractEventLoop:
             This method is a coroutine.  When completed, the coroutine
             returns a (transport, protocol) pair.
             """
+
     if sys.version_info >= (3, 11):
         async def create_unix_connection(
             self,
@@ -822,8 +989,8 @@ class AbstractEventLoop:
 
         protocol_factory must be a callable returning a protocol instance.
 
-        socket family AF_INET, socket.AF_INET6 or socket.AF_UNIX depending on
-        host (or family if specified), socket type SOCK_DGRAM.
+        socket family AF_INET, socket.AF_INET6 or socket.AF_UNIX depending
+        on host (or family if specified), socket type SOCK_DGRAM.
 
         reuse_address tells the kernel to reuse a local socket in
         TIME_WAIT state, without waiting for its natural timeout to
@@ -843,6 +1010,7 @@ class AbstractEventLoop:
         sock can optionally be specified in order to use a preexisting
         socket object.
         """
+
     # Pipes and subprocesses.
     @abstractmethod
     async def connect_read_pipe(self, protocol_factory: Callable[[], _ProtocolT], pipe: Any) -> tuple[ReadTransport, _ProtocolT]:
@@ -860,7 +1028,8 @@ class AbstractEventLoop:
     ) -> tuple[WriteTransport, _ProtocolT]:
         """Register write pipe in event loop.
 
-        protocol_factory should instantiate object with BaseProtocol interface.
+        protocol_factory should instantiate object with BaseProtocol
+        interface.
         Pipe is file-like object already switched to nonblocking.
         Return pair (transport, protocol), where transport support
         WriteTransport interface.
@@ -984,10 +1153,10 @@ else:
         def new_event_loop(self) -> AbstractEventLoop: ...
         # Child processes handling (Unix only).
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def get_child_watcher(self) -> AbstractChildWatcher: ...
         @abstractmethod
-        @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+        @deprecated("Deprecated; removed in Python 3.14.")
         def set_child_watcher(self, watcher: AbstractChildWatcher) -> None: ...
 
     AbstractEventLoopPolicy = _AbstractEventLoopPolicy
@@ -1062,11 +1231,11 @@ if sys.version_info >= (3, 14):
         If policy is None, the default policy is restored.
         """
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def get_event_loop_policy() -> _AbstractEventLoopPolicy:
     """Get the current event loop policy."""
 
-@deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+@deprecated("Deprecated; will be removed in Python 3.16.")
 def set_event_loop_policy(policy: _AbstractEventLoopPolicy | None) -> None:
     """Set the current event loop policy.
 
@@ -1080,11 +1249,11 @@ def new_event_loop() -> AbstractEventLoop:
     """Equivalent to calling get_event_loop_policy().new_event_loop()."""
 
 if sys.version_info < (3, 14):
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def get_child_watcher() -> AbstractChildWatcher:
         """Equivalent to calling get_event_loop_policy().get_child_watcher()."""
 
-    @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
+    @deprecated("Deprecated; removed in Python 3.14.")
     def set_child_watcher(watcher: AbstractChildWatcher) -> None:
         """Equivalent to calling
         get_event_loop_policy().set_child_watcher(watcher).

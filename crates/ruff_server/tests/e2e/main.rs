@@ -25,8 +25,10 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod capabilities;
 mod code_action;
 mod custom_extension;
+mod diagnostics;
 mod hover;
 mod notebook;
 mod workspace;
@@ -43,24 +45,26 @@ use anyhow::{Context, Result, anyhow};
 use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
-use lsp_types::notification::{
-    DidChangeTextDocument, DidChangeWatchedFiles, DidChangeWorkspaceFolders, DidCloseTextDocument,
-    DidOpenTextDocument, Exit, Initialized, Notification,
-};
-use lsp_types::request::{
-    CodeActionRequest, DocumentDiagnosticRequest, HoverRequest, Initialize, Request, Shutdown,
-};
 use lsp_types::{
     ClientCapabilities, CodeActionContext, CodeActionParams, CodeActionResponse,
     DiagnosticClientCapabilities, DidChangeTextDocumentParams, DidChangeWatchedFilesParams,
     DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, NumberOrString, PartialResultParams,
-    Position, PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
+    DocumentDiagnosticParams, DocumentDiagnosticReport, FileEvent, Hover, HoverParams,
+    InitializeParams, InitializeResult, InitializedParams, PartialResultParams, Position,
+    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, TextEdit, Url, VersionedTextDocumentIdentifier,
-    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder,
-    WorkspaceFoldersChangeEvent,
+    TextDocumentPositionParams, TextEdit, Uri, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceFolder, WorkspaceFolders,
+    WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
+};
+use lsp_types::{
+    CodeActionRequest, DocumentDiagnosticRequest, HoverRequest, InitializeRequest, Request,
+    ShutdownRequest,
+};
+use lsp_types::{
+    DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification,
+    DidChangeWorkspaceFoldersNotification, DidCloseTextDocumentNotification,
+    DidOpenTextDocumentNotification, ExitNotification, InitializedNotification, Notification,
 };
 use ruff_server::{ConnectionInitializer, LogLevel, Server, init_logging};
 use rustc_hash::FxHashMap;
@@ -109,9 +113,6 @@ pub(crate) enum AwaitResponseError {
     /// The response came back, but was an error response, not a successful one.
     #[error("request failed because the server replied with an error: {0:?}")]
     RequestFailed(ResponseError),
-
-    #[error("malformed response message with both result and error: {0:#?}")]
-    MalformedResponse(Box<Response>),
 
     #[error("received multiple responses for the same request ID: {0:#?}")]
     MultipleResponses(Box<[Response]>),
@@ -245,14 +246,16 @@ impl TestServer {
     ) -> Self {
         let init_params = InitializeParams {
             capabilities,
-            workspace_folders: Some(workspace_folders),
+            workspace_folders_initialize_params: WorkspaceFoldersInitializeParams {
+                workspace_folders: Some(WorkspaceFolders::WorkspaceFolderList(workspace_folders)),
+            },
             initialization_options,
             ..Default::default()
         };
 
-        let init_request_id = self.send_request::<Initialize>(init_params);
-        self.initialize_response = Some(self.await_response::<Initialize>(&init_request_id));
-        self.send_notification::<Initialized>(InitializedParams {});
+        let init_request_id = self.send_request::<InitializeRequest>(init_params);
+        self.initialize_response = Some(self.await_response::<InitializeRequest>(&init_request_id));
+        self.send_notification::<InitializedNotification>(InitializedParams {});
 
         self
     }
@@ -331,7 +334,7 @@ impl TestServer {
         R: Request,
     {
         // Track if an Exit notification is being sent
-        if R::METHOD == lsp_types::request::Shutdown::METHOD {
+        if R::METHOD == lsp_types::ShutdownRequest::METHOD {
             self.shutdown_requested = true;
         }
 
@@ -413,23 +416,12 @@ impl TestServer {
 
                 let response = responses.pop().unwrap();
 
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
+                    Err(err) => {
                         return Err(AwaitResponseError::RequestFailed(err));
-                    }
-                    response => {
-                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
@@ -483,7 +475,7 @@ impl TestServer {
             let notification = self
                 .notifications
                 .iter()
-                .position(|notification| N::METHOD == notification.method)
+                .position(|notification| N::METHOD.as_str() == notification.method)
                 .and_then(|index| self.notifications.remove(index));
             if let Some(notification) = notification {
                 let params = serde_json::from_value(notification.params)?;
@@ -496,7 +488,7 @@ impl TestServer {
         Err(ServerMessageError::Timeout)
     }
 
-    /// Collects `N` publish diagnostic notifications into a map, indexed by the document url.
+    /// Collects `N` publish diagnostic notifications into a map, indexed by the document uri.
     ///
     /// ## Panics
     /// If there are multiple publish diagnostics notifications for the same document.
@@ -504,19 +496,19 @@ impl TestServer {
     pub(crate) fn collect_publish_diagnostic_notifications(
         &mut self,
         count: usize,
-    ) -> BTreeMap<lsp_types::Url, Vec<lsp_types::Diagnostic>> {
+    ) -> BTreeMap<lsp_types::Uri, Vec<lsp_types::Diagnostic>> {
         let mut results = BTreeMap::default();
 
         for _ in 0..count {
             let notification =
-                self.await_notification::<lsp_types::notification::PublishDiagnostics>();
+                self.await_notification::<lsp_types::PublishDiagnosticsNotification>();
 
             if let Some(existing) =
                 results.insert(notification.uri.clone(), notification.diagnostics)
             {
                 panic!(
-                    "Received multiple publish diagnostic notifications for {url}: ({existing:#?})",
-                    url = &notification.uri
+                    "Received multiple publish diagnostic notifications for {uri}: ({existing:#?})",
+                    uri = notification.uri
                 );
             }
         }
@@ -539,7 +531,6 @@ impl TestServer {
     ///
     /// If receiving the request fails.
     #[track_caller]
-    #[expect(dead_code)]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
         match self.try_await_request::<R>(None) {
             Ok(result) => result,
@@ -571,7 +562,7 @@ impl TestServer {
             let request = self
                 .requests
                 .iter()
-                .position(|request| R::METHOD == request.method)
+                .position(|request| R::METHOD.as_str() == request.method)
                 .and_then(|index| self.requests.remove(index));
             if let Some(request) = request {
                 let params = serde_json::from_value(request.params)?;
@@ -653,22 +644,21 @@ impl TestServer {
     #[expect(dead_code)]
     pub(crate) fn cancel(&mut self, request_id: &RequestId) {
         let id_string = request_id.to_string();
-        self.send_notification::<lsp_types::notification::Cancel>(lsp_types::CancelParams {
+        self.send_notification::<lsp_types::CancelNotification>(lsp_types::CancelParams {
             id: match id_string.parse() {
-                Ok(id) => NumberOrString::Number(id),
-                Err(_) => NumberOrString::String(id_string),
+                Ok(id) => lsp_types::Id::Int(id),
+                Err(_) => lsp_types::Id::String(id_string),
             },
         });
     }
 
     /// Get the initialization result
-    #[expect(dead_code)]
     pub(crate) fn initialization_result(&self) -> Option<&InitializeResult> {
         self.initialize_response.as_ref()
     }
 
-    pub(crate) fn file_uri(&self, path: impl AsRef<Path>) -> Url {
-        Url::from_file_path(self.file_path(path)).expect("Path must be a valid URL")
+    pub(crate) fn file_uri(&self, path: impl AsRef<Path>) -> Uri {
+        Uri::from_file_path(self.file_path(path)).expect("Path must be a valid URI")
     }
 
     pub(crate) fn file_path(&self, path: impl AsRef<Path>) -> PathBuf {
@@ -711,12 +701,12 @@ impl TestServer {
         let params = DidOpenTextDocumentParams {
             text_document: TextDocumentItem {
                 uri: self.file_uri(path),
-                language_id: language_id.to_string(),
+                language_id: language_id.to_string().into(),
                 version,
                 text: content.as_ref().to_string(),
             },
         };
-        self.send_notification::<DidOpenTextDocument>(params);
+        self.send_notification::<DidOpenTextDocumentNotification>(params);
     }
 
     /// Send a `textDocument/didChange` notification with the given content changes
@@ -729,12 +719,14 @@ impl TestServer {
     ) {
         let params = DidChangeTextDocumentParams {
             text_document: VersionedTextDocumentIdentifier {
-                uri: self.file_uri(path),
+                text_document_identifier: TextDocumentIdentifier {
+                    uri: self.file_uri(path),
+                },
                 version,
             },
             content_changes: changes,
         };
-        self.send_notification::<DidChangeTextDocument>(params);
+        self.send_notification::<DidChangeTextDocumentNotification>(params);
     }
 
     /// Send a `textDocument/didClose` notification
@@ -745,14 +737,14 @@ impl TestServer {
                 uri: self.file_uri(path),
             },
         };
-        self.send_notification::<DidCloseTextDocument>(params);
+        self.send_notification::<DidCloseTextDocumentNotification>(params);
     }
 
     /// Send a `workspace/didChangeWatchedFiles` notification with the given file events
     #[expect(dead_code)]
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
-        self.send_notification::<DidChangeWatchedFiles>(params);
+        self.send_notification::<DidChangeWatchedFilesNotification>(params);
     }
 
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
@@ -786,7 +778,7 @@ impl TestServer {
                     .collect(),
             },
         };
-        self.send_notification::<DidChangeWorkspaceFolders>(params);
+        self.send_notification::<DidChangeWorkspaceFoldersNotification>(params);
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
@@ -794,7 +786,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<Path>,
         previous_result_id: Option<String>,
-    ) -> DocumentDiagnosticReportResult {
+    ) -> DocumentDiagnosticReport {
         let params = DocumentDiagnosticParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -829,7 +821,7 @@ impl TestServer {
 
     /// Send a `textDocument/formatting` request for the document at the given path.
     pub(crate) fn format_request(&mut self, path: impl AsRef<Path>) -> Option<Vec<TextEdit>> {
-        let id = self.send_request::<lsp_types::request::Formatting>(
+        let id = self.send_request::<lsp_types::DocumentFormattingRequest>(
             lsp_types::DocumentFormattingParams {
                 text_document: TextDocumentIdentifier {
                     uri: self.file_uri(path),
@@ -839,7 +831,7 @@ impl TestServer {
             },
         );
 
-        self.await_response::<lsp_types::request::Formatting>(&id)
+        self.await_response::<lsp_types::DocumentFormattingRequest>(&id)
     }
 
     /// Send a `textDocument/rangeFormatting` request for the document at the given path.
@@ -848,7 +840,7 @@ impl TestServer {
         path: impl AsRef<Path>,
         range: Range,
     ) -> Option<Vec<TextEdit>> {
-        let id = self.send_request::<lsp_types::request::RangeFormatting>(
+        let id = self.send_request::<lsp_types::DocumentRangeFormattingRequest>(
             lsp_types::DocumentRangeFormattingParams {
                 text_document: TextDocumentIdentifier {
                     uri: self.file_uri(path),
@@ -858,7 +850,7 @@ impl TestServer {
                 work_done_progress_params: WorkDoneProgressParams::default(),
             },
         );
-        self.await_response::<lsp_types::request::RangeFormatting>(&id)
+        self.await_response::<lsp_types::DocumentRangeFormattingRequest>(&id)
     }
 
     /// Send a `textDocument/codeAction` request for the document at the given path.
@@ -866,7 +858,7 @@ impl TestServer {
         &mut self,
         path: impl AsRef<Path>,
         diagnostics: Vec<lsp_types::Diagnostic>,
-    ) -> Option<CodeActionResponse> {
+    ) -> Option<Vec<CodeActionResponse>> {
         let params = CodeActionParams {
             text_document: TextDocumentIdentifier {
                 uri: self.file_uri(path),
@@ -913,10 +905,10 @@ impl Drop for TestServer {
         // The `server_thread` could be `None` if the server exited unexpectedly or panicked or if
         // it dropped the client connection.
         let shutdown_error = if self.server_thread.is_some() && !self.shutdown_requested {
-            let shutdown_id = self.send_request::<Shutdown>(());
-            match self.try_await_response::<Shutdown>(&shutdown_id, None) {
+            let shutdown_id = self.send_request::<ShutdownRequest>(());
+            match self.try_await_response::<ShutdownRequest>(&shutdown_id, None) {
                 Ok(()) => {
-                    self.send_notification::<Exit>(());
+                    self.send_notification::<ExitNotification>(());
 
                     None
                 }
@@ -1027,9 +1019,9 @@ impl TestServerBuilder {
         fs::create_dir_all(&workspace_path)?;
 
         self.workspaces.push(WorkspaceFolder {
-            uri: Url::from_file_path(&workspace_path).map_err(|()| {
+            uri: Uri::from_file_path(&workspace_path).map_err(|()| {
                 anyhow!(
-                    "Failed to convert workspace path to URL: {}",
+                    "Failed to convert workspace path to URI: {}",
                     workspace_path.display()
                 )
             })?,
@@ -1069,6 +1061,26 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .formatting
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_range_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .range_formatting
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
     /// Enable or disable workspace configuration capability
     #[expect(dead_code)]
     pub(crate) fn enable_workspace_configuration(mut self, enabled: bool) -> Self {
@@ -1079,13 +1091,13 @@ impl TestServerBuilder {
         self
     }
 
-    #[expect(dead_code)]
     pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
         self.client_capabilities
             .text_document
             .get_or_insert_default()
             .publish_diagnostics
             .get_or_insert_default()
+            .diagnostics_capabilities
             .related_information = Some(enabled);
         self
     }
@@ -1170,13 +1182,13 @@ impl TestContext {
         .to_path_buf();
 
         let mut settings = insta::Settings::clone_current();
-        let project_dir_url = Url::from_file_path(&project_dir)
-            .map_err(|()| anyhow!("Failed to convert root directory to url"))?;
+        let project_dir_uri = Uri::from_file_path(&project_dir)
+            .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(
             &tempdir_filter(project_dir.to_string_lossy().as_ref()),
             "<temp_dir>/",
         );
-        settings.add_filter(&tempdir_filter(project_dir_url.path()), "<temp_dir>/");
+        settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,
             "No such file or directory",

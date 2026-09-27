@@ -31,12 +31,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_dia
 
 ```
 error[invalid-key]: Unknown key "legs" for TypedDict `Person`
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:12:11
    |
 12 |     being["legs"] = 4  # error: [invalid-key]
    |     ----- ^^^^^^ Unknown key "legs"
    |     |
    |     TypedDict `Person` in union type `Person | Animal`
-   |
 
 ```

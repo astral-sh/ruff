@@ -19,6 +19,7 @@ use ruff_text_size::TextSize;
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -69,7 +70,7 @@ pub(crate) trait TestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.0.0")]
+#[violation_metadata(stable_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct StableTestRule;
 
 impl Violation for StableTestRule {
@@ -103,7 +104,7 @@ impl TestRule for StableTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.0.0")]
+#[violation_metadata(stable_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct StableTestRuleSafeFix;
 
 impl Violation for StableTestRuleSafeFix {
@@ -142,7 +143,7 @@ impl TestRule for StableTestRuleSafeFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.0.0")]
+#[violation_metadata(stable_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct StableTestRuleUnsafeFix;
 
 impl Violation for StableTestRuleUnsafeFix {
@@ -184,7 +185,7 @@ impl TestRule for StableTestRuleUnsafeFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.0.0")]
+#[violation_metadata(stable_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct StableTestRuleDisplayOnlyFix;
 
 impl Violation for StableTestRuleDisplayOnlyFix {
@@ -229,7 +230,7 @@ impl TestRule for StableTestRuleDisplayOnlyFix {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.0.0")]
+#[violation_metadata(preview_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct PreviewTestRule;
 
 impl Violation for PreviewTestRule {
@@ -263,7 +264,7 @@ impl TestRule for PreviewTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(deprecated_since = "0.0.0")]
+#[violation_metadata(deprecated_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct DeprecatedTestRule;
 
 impl Violation for DeprecatedTestRule {
@@ -297,7 +298,7 @@ impl TestRule for DeprecatedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(deprecated_since = "0.0.0")]
+#[violation_metadata(deprecated_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct AnotherDeprecatedTestRule;
 
 impl Violation for AnotherDeprecatedTestRule {
@@ -334,7 +335,7 @@ impl TestRule for AnotherDeprecatedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RemovedTestRule;
 
 impl Violation for RemovedTestRule {
@@ -368,7 +369,7 @@ impl TestRule for RemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct AnotherRemovedTestRule;
 
 impl Violation for AnotherRemovedTestRule {
@@ -402,7 +403,7 @@ impl TestRule for AnotherRemovedTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RedirectedFromTestRule;
 
 impl Violation for RedirectedFromTestRule {
@@ -436,7 +437,7 @@ impl TestRule for RedirectedFromTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.0.0")]
+#[violation_metadata(stable_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RedirectedToTestRule;
 
 impl Violation for RedirectedToTestRule {
@@ -470,7 +471,7 @@ impl TestRule for RedirectedToTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.0.0")]
+#[violation_metadata(removed_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct RedirectedFromPrefixTestRule;
 
 impl Violation for RedirectedFromPrefixTestRule {
@@ -507,7 +508,7 @@ impl TestRule for RedirectedFromPrefixTestRule {
 /// bar
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.0.0")]
+#[violation_metadata(preview_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct PanicyTestRule;
 
 impl Violation for PanicyTestRule {

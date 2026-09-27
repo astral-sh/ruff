@@ -1,3 +1,4 @@
+pub use command::{Command, CommandExecutor};
 pub use memory_fs::MemoryFileSystem;
 
 #[cfg(all(feature = "testing", feature = "os"))]
@@ -11,7 +12,8 @@ use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
 use std::error::Error;
 use std::fmt;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
+use std::process::Output;
 pub use test::{DbWithTestSystem, DbWithWritableSystem, InMemorySystem, TestSystem};
 use walk_directory::WalkDirectoryBuilder;
 
@@ -21,6 +23,7 @@ pub use self::path::{
 };
 use crate::file_revision::FileRevision;
 
+mod command;
 mod memory_fs;
 #[cfg(feature = "os")]
 mod os;
@@ -65,6 +68,9 @@ pub trait System: Debug + Sync + Send {
     /// See [dunce::canonicalize] for more information.
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
+    /// Returns `true` if both paths refer to the same file.
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool>;
+
     /// Returns the source type for `path` if known or `None`.
     ///
     /// The default is to always return `None`, assuming the system
@@ -97,6 +103,23 @@ pub trait System: Debug + Sync + Send {
     /// Find an executable binary's path by name.
     fn which(&self, binary_name: &str) -> WhichResult;
 
+    /// Runs `command` and captures its standard output and standard error.
+    fn run_command(&self, command: Command) -> Result<Output> {
+        let Some(executor) = self.command_executor() else {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                "running commands is not supported by this system",
+            ));
+        };
+
+        executor.execute(command)
+    }
+
+    /// Returns the system's command executor, if it supports running commands.
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        None
+    }
+
     /// Reads the content of the file at `path` into a [`String`].
     fn read_to_string(&self, path: &SystemPath) -> Result<String>;
 
@@ -120,20 +143,6 @@ pub trait System: Debug + Sync + Send {
     fn path_exists(&self, path: &SystemPath) -> bool {
         self.path_metadata(path).is_ok()
     }
-
-    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
-    ///
-    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
-    ///
-    /// ## The use of prefix
-    ///
-    /// Prefix is only intended as an optimization for systems that can't efficiently check
-    /// if an entire path exists with the exact casing as specified in `path`. However,
-    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
-
-    /// Returns the [`CaseSensitivity`] of the system's file system.
-    fn case_sensitivity(&self) -> CaseSensitivity;
 
     /// Returns `true` if `path` exists and is a directory.
     fn is_directory(&self, path: &SystemPath) -> bool {
@@ -217,39 +226,6 @@ pub trait System: Debug + Sync + Send {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 
     fn dyn_clone(&self) -> Box<dyn System>;
-}
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
-pub enum CaseSensitivity {
-    /// The case sensitivity of the file system is unknown.
-    ///
-    /// The file system is either case-sensitive or case-insensitive. A caller
-    /// should not assume either case.
-    #[default]
-    Unknown,
-
-    /// The file system is case-sensitive.
-    CaseSensitive,
-
-    /// The file system is case-insensitive.
-    CaseInsensitive,
-}
-
-impl CaseSensitivity {
-    /// Returns `true` if the file system is known to be case-sensitive.
-    pub const fn is_case_sensitive(self) -> bool {
-        matches!(self, Self::CaseSensitive)
-    }
-}
-
-impl fmt::Display for CaseSensitivity {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            CaseSensitivity::Unknown => f.write_str("unknown"),
-            CaseSensitivity::CaseSensitive => f.write_str("case-sensitive"),
-            CaseSensitivity::CaseInsensitive => f.write_str("case-insensitive"),
-        }
-    }
 }
 
 /// System trait for non-readonly systems.
@@ -338,7 +314,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize)]
 pub enum FileType {
     File,
     Directory,

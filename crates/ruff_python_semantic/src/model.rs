@@ -1,11 +1,13 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::{from_relative_import, map_subscript};
+use ruff_python_ast::helpers::{from_relative_import, map_subscript, resolve_imported_module_path};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
+use ruff_python_ast::{self as ast, Alias, Expr, ExprContext, PySourceType, PythonVersion, Stmt};
+use ruff_python_stdlib::builtins::{is_python_builtin, python_builtins, python_magic_globals};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
@@ -27,9 +29,38 @@ use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 pub mod all;
 
+/// The result of looking up a symbol in a [`SemanticModel`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Symbol {
+    /// The symbol resolves to a concrete binding.
+    Binding(BindingId),
+    /// The symbol resolves to a builtin that has not been materialized yet.
+    Builtin,
+    /// The symbol does not resolve to any binding.
+    Unbound,
+}
+
+impl Symbol {
+    /// Returns the [`BindingId`] if this symbol resolves to a concrete binding.
+    pub const fn binding_id(self) -> Option<BindingId> {
+        match self {
+            Self::Binding(binding_id) => Some(binding_id),
+            Self::Builtin | Self::Unbound => None,
+        }
+    }
+
+    /// Returns `true` if this symbol resolves to any binding, including a builtin.
+    pub const fn is_bound(self) -> bool {
+        !matches!(self, Self::Unbound)
+    }
+}
+
 /// A semantic model for a Python module, to enable querying the module's semantic information.
 pub struct SemanticModel<'a> {
     typing_modules: &'a [String],
+    custom_builtins: &'a [String],
+    target_version: PythonVersion,
+    source_type: PySourceType,
     module: Module<'a>,
 
     /// Stack of all AST nodes in the program.
@@ -124,6 +155,33 @@ pub struct SemanticModel<'a> {
     /// Modules that have been seen by the semantic model.
     pub seen: Modules,
 
+    /// Module names and their laziness inferred from module-level `__lazy_modules__` assignments.
+    ///
+    /// A declaration affects subsequent imports, without changing earlier imports:
+    ///
+    /// ```python
+    /// import json  # Eager.
+    /// __lazy_modules__ = ["json", "pathlib"]
+    /// import pathlib  # Lazy.
+    /// ```
+    ///
+    /// Conditional assignments are merged with the current state:
+    ///
+    /// ```python
+    /// __lazy_modules__ = ["json"]
+    /// if condition:
+    ///     __lazy_modules__ = ["json", "pathlib"]
+    /// else:
+    ///     __lazy_modules__ = ["json"]
+    /// ```
+    ///
+    /// Here, `json` remains definitely lazy, but `pathlib`'s laziness is unknown.
+    ///
+    /// Without an earlier declaration, both modules remain unknown because we merge with the
+    /// default eager state, rather than exhaustively tracking each branch to guarantee an
+    /// assignment occurs.
+    pub lazy_modules: Option<LazyModules<'a>>,
+
     /// Exceptions that are handled by the current `try` block.
     ///
     /// For example, if we're visiting the `x = 1` assignment below,
@@ -147,9 +205,19 @@ pub struct SemanticModel<'a> {
 }
 
 impl<'a> SemanticModel<'a> {
-    pub fn new(typing_modules: &'a [String], path: &Path, module: Module<'a>) -> Self {
-        Self {
+    pub fn new(
+        typing_modules: &'a [String],
+        custom_builtins: &'a [String],
+        target_version: PythonVersion,
+        source_type: PySourceType,
+        path: &Path,
+        module: Module<'a>,
+    ) -> Self {
+        let mut semantic = Self {
             typing_modules,
+            custom_builtins,
+            target_version,
+            source_type,
             module,
             nodes: Nodes::default(),
             node_id: None,
@@ -168,9 +236,22 @@ impl<'a> SemanticModel<'a> {
             rebinding_scopes: FxHashMap::default(),
             flags: SemanticModelFlags::new(path),
             seen: Modules::empty(),
+            lazy_modules: None,
             handled_exceptions: Vec::default(),
             resolved_names: FxHashMap::default(),
-        }
+        };
+
+        let builtin_count = python_builtins(target_version.minor, source_type.is_ipynb()).count()
+            + python_magic_globals(target_version.minor).count()
+            + custom_builtins.len();
+        // Match the capacity that repeated `push` calls would reach while avoiding the
+        // intermediate allocations.
+        semantic
+            .bindings
+            .reserve_exact(builtin_count.next_power_of_two());
+        semantic.global_scope_mut().reserve_bindings(builtin_count);
+
+        semantic
     }
 
     /// Return the [`Binding`] for the given [`BindingId`].
@@ -226,8 +307,36 @@ impl<'a> SemanticModel<'a> {
             .chain(self.typing_modules.iter().map(String::as_str))
     }
 
+    /// Returns `true` if `name` is provided by the configured Python runtime.
+    ///
+    /// This includes version- and source-type-specific builtins, magic globals, and custom
+    /// builtins. It does not account for bindings that shadow the name in a scope.
+    fn is_builtin_name(&self, name: &str) -> bool {
+        is_python_builtin(name, self.target_version.minor, self.source_type.is_ipynb())
+            || python_magic_globals(self.target_version.minor).any(|builtin| builtin == name)
+            || self.custom_builtins.iter().any(|builtin| builtin == name)
+    }
+
+    /// Creates and returns a concrete binding for an unmaterialized builtin.
+    fn materialize_builtin_binding(&mut self, name: &'a str) -> Option<BindingId> {
+        if let Some(binding_id) = self.global_scope().get(name) {
+            return self.bindings[binding_id]
+                .kind
+                .is_builtin()
+                .then_some(binding_id);
+        }
+
+        if !self.is_builtin_name(name) {
+            return None;
+        }
+
+        let binding_id = self.push_builtin();
+        self.global_scope_mut().add(name, binding_id);
+        Some(binding_id)
+    }
+
     /// Create a new [`Binding`] for a builtin.
-    pub fn push_builtin(&mut self) -> BindingId {
+    fn push_builtin(&mut self) -> BindingId {
         self.bindings.push(Binding {
             range: TextRange::default(),
             kind: BindingKind::Builtin,
@@ -243,10 +352,13 @@ impl<'a> SemanticModel<'a> {
     /// Create a new [`Binding`] for the given `name` and `range`.
     pub fn push_binding(
         &mut self,
+        name: &'a str,
         range: TextRange,
         kind: BindingKind<'a>,
         flags: BindingFlags,
     ) -> BindingId {
+        self.materialize_builtin_binding(name);
+
         self.bindings.push(Binding {
             range,
             kind,
@@ -281,9 +393,11 @@ impl<'a> SemanticModel<'a> {
     /// module, e.g. `import builtins; builtins.open`. It *only* includes the bindings
     /// that are pre-populated in Python's global scope before any imports have taken place.
     pub fn has_builtin_binding_in_scope(&self, member: &str, scope: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_some_and(|binding| binding.kind.is_builtin())
+        match self.lookup_symbol_in_scope(member, scope, false) {
+            Symbol::Binding(binding_id) => self.bindings[binding_id].kind.is_builtin(),
+            Symbol::Builtin => true,
+            Symbol::Unbound => false,
+        }
     }
 
     /// If `expr` is a reference to a builtins symbol,
@@ -343,13 +457,16 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if `member` is an "available" symbol in a given scope, i.e.,
     /// a symbol that has not been bound in that current scope, or in any containing scope.
     pub fn is_available_in_scope(&self, member: &str, scope_id: ScopeId) -> bool {
-        self.lookup_symbol_in_scope(member, scope_id, false)
-            .map(|binding_id| &self.bindings[binding_id])
-            .is_none_or(|binding| binding.kind.is_builtin())
+        match self.lookup_symbol_in_scope(member, scope_id, false) {
+            Symbol::Binding(binding_id) => self.bindings[binding_id].kind.is_builtin(),
+            Symbol::Builtin | Symbol::Unbound => true,
+        }
     }
 
     /// Resolve a `del` reference to `symbol` at `range`.
-    pub fn resolve_del(&mut self, symbol: &str, range: TextRange) {
+    pub fn resolve_del(&mut self, symbol: &'a str, range: TextRange) {
+        self.materialize_builtin_binding(symbol);
+
         let is_unbound = self.scopes[self.scope_id]
             .get(symbol)
             .is_none_or(|binding_id| {
@@ -370,7 +487,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Resolve a `load` reference to an [`ast::ExprName`].
-    pub fn resolve_load(&mut self, name: &ast::ExprName) -> ReadResult {
+    pub fn resolve_load(&mut self, name: &'a ast::ExprName) -> ReadResult {
         // PEP 563 indicates that if a forward reference can be resolved in the module scope, we
         // should prefer it over local resolutions.
         if self.in_forward_reference() {
@@ -671,6 +788,19 @@ impl<'a> SemanticModel<'a> {
             import_starred = import_starred || scope.uses_star_imports();
         }
 
+        if let Some(binding_id) = self.materialize_builtin_binding(name.id.as_str()) {
+            let reference_id = self.resolved_references.push(
+                self.scope_id,
+                self.node_id,
+                ExprContext::Load,
+                self.flags,
+                name.range,
+            );
+            self.bindings[binding_id].references.push(reference_id);
+            self.resolved_names.insert(name.into(), binding_id);
+            return ReadResult::Resolved(binding_id);
+        }
+
         if import_starred {
             self.unresolved_references.push(
                 name.range,
@@ -690,12 +820,43 @@ impl<'a> SemanticModel<'a> {
         }
     }
 
-    /// Lookup a symbol in the current scope.
-    pub fn lookup_symbol(&self, symbol: &str) -> Option<BindingId> {
+    /// Lookup a symbol in the current scope without materializing lazy builtins.
+    pub fn lookup_symbol(&self, symbol: &str) -> Symbol {
         self.lookup_symbol_in_scope(symbol, self.scope_id, self.in_forward_reference())
     }
 
-    /// Lookup a symbol in a certain scope
+    /// Lookup a concrete binding in the current scope.
+    ///
+    /// If `symbol` resolves to an unmaterialized builtin, this creates its binding before
+    /// returning the [`BindingId`].
+    pub fn lookup_binding(&mut self, symbol: &'a str) -> Option<BindingId> {
+        self.lookup_binding_in_scope(symbol, self.scope_id, self.in_forward_reference())
+    }
+
+    /// Return a binding from the global scope, materializing it first if it is a builtin.
+    pub fn global_binding(&mut self, symbol: &'a str) -> Option<BindingId> {
+        self.materialize_builtin_binding(symbol);
+        self.global_scope().get(symbol)
+    }
+
+    /// Lookup a concrete binding in a certain scope.
+    ///
+    /// If `symbol` resolves to an unmaterialized builtin, this creates its binding before
+    /// returning the [`BindingId`].
+    fn lookup_binding_in_scope(
+        &mut self,
+        symbol: &'a str,
+        scope_id: ScopeId,
+        in_forward_reference: bool,
+    ) -> Option<BindingId> {
+        match self.lookup_symbol_in_scope(symbol, scope_id, in_forward_reference) {
+            Symbol::Binding(binding_id) => Some(binding_id),
+            Symbol::Builtin => self.materialize_builtin_binding(symbol),
+            Symbol::Unbound => None,
+        }
+    }
+
+    /// Lookup a symbol in a certain scope without materializing lazy builtins.
     ///
     /// This is a carbon copy of [`Self::resolve_load`], but
     /// doesn't add any read references to the resolved symbol.
@@ -704,11 +865,11 @@ impl<'a> SemanticModel<'a> {
         symbol: &str,
         scope_id: ScopeId,
         in_forward_reference: bool,
-    ) -> Option<BindingId> {
+    ) -> Symbol {
         if in_forward_reference {
             if let Some(binding_id) = self.scopes.global().get(symbol) {
                 if !self.bindings[binding_id].is_unbound() {
-                    return Some(binding_id);
+                    return Symbol::Binding(binding_id);
                 }
             }
         }
@@ -730,20 +891,28 @@ impl<'a> SemanticModel<'a> {
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
                     BindingKind::Annotation => continue,
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => return None,
-                    BindingKind::UnboundException(Some(binding_id)) => return Some(binding_id),
-                    _ => return Some(binding_id),
+                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                        return Symbol::Unbound;
+                    }
+                    BindingKind::UnboundException(Some(binding_id)) => {
+                        return Symbol::Binding(binding_id);
+                    }
+                    _ => return Symbol::Binding(binding_id),
                 }
             }
 
             if index == 0 && scope.kind.is_class() {
                 if matches!(symbol, "__module__" | "__qualname__") {
-                    return None;
+                    return Symbol::Unbound;
                 }
             }
         }
 
-        None
+        if self.is_builtin_name(symbol) {
+            Symbol::Builtin
+        } else {
+            Symbol::Unbound
+        }
     }
 
     /// Simulates a runtime load of a given [`ast::ExprName`].
@@ -926,8 +1095,9 @@ impl<'a> SemanticModel<'a> {
 
         // Find the symbol in the current scope.
         let (symbol, attribute) = unqualified_name.segments().split_first()?;
-        let mut binding_id =
-            self.lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())?;
+        let mut binding_id = self
+            .lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())
+            .binding_id()?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
         let mut tail = attribute;
@@ -1032,10 +1202,25 @@ impl<'a> SemanticModel<'a> {
 
         // If the name was already resolved, look it up; otherwise, search for the symbol.
         let head = match_head(value)?;
-        let binding = self
+        let symbol = self
             .resolve_name(head)
-            .or_else(|| self.lookup_symbol(&head.id))
-            .map(|id| self.binding(id))?;
+            .map_or_else(|| self.lookup_symbol(&head.id), Symbol::Binding);
+        let binding = match symbol {
+            Symbol::Binding(binding_id) => self.binding(binding_id),
+            Symbol::Builtin => {
+                if value.is_name_expr() {
+                    return Some(QualifiedName::builtin(head.id.as_str()));
+                }
+
+                let value_name = UnqualifiedName::from_expr(value)?;
+                return Some(
+                    std::iter::once("")
+                        .chain(value_name.segments().iter().copied())
+                        .collect(),
+                );
+            }
+            Symbol::Unbound => return None,
+        };
 
         match &binding.kind {
             BindingKind::Import(Import { qualified_name }) => {
@@ -1375,7 +1560,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns a mutable reference to the global [`Scope`].
-    pub fn global_scope_mut(&mut self) -> &mut Scope<'a> {
+    fn global_scope_mut(&mut self) -> &mut Scope<'a> {
         self.scopes.global_mut()
     }
 
@@ -1400,12 +1585,12 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Returns the parent of the given [`Scope`], if any.
-    pub fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
+    fn parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         scope.parent.map(|scope_id| &self.scopes[scope_id])
     }
 
     /// Returns the ID of the parent of the given [`ScopeId`], if any.
-    pub fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
+    fn parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         self.scopes[scope_id].parent
     }
 
@@ -1448,7 +1633,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Given a [`NodeId`], return its parent, if any.
     #[inline]
-    pub fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
+    pub(crate) fn parent_expression(&self, node_id: NodeId) -> Option<&'a Expr> {
         let parent_node_id = self.nodes.ancestor_ids(node_id).nth(1)?;
         self.nodes[parent_node_id].as_expression()
     }
@@ -1589,6 +1774,10 @@ impl<'a> SemanticModel<'a> {
         // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
+                // Global pre-scanning synthesizes an assignment when no global binding exists.
+                // Materialize builtins first so `global range` doesn't replace the builtin with
+                // that synthetic assignment.
+                self.materialize_builtin_binding(name);
                 if self
                     .global_scope()
                     .get(name)
@@ -1881,7 +2070,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
-    pub fn exceptions(&self) -> Exceptions {
+    fn exceptions(&self) -> Exceptions {
         let mut exceptions = Exceptions::empty();
         for exception in &self.handled_exceptions {
             exceptions.insert(*exception);
@@ -1976,7 +2165,7 @@ impl<'a> SemanticModel<'a> {
 
     /// Return `true` if the model is visiting a "`__future__` type definition"
     /// that was previously deferred when initially traversing the AST
-    pub const fn in_future_type_definition(&self) -> bool {
+    const fn in_future_type_definition(&self) -> bool {
         self.flags
             .intersects(SemanticModelFlags::FUTURE_TYPE_DEFINITION)
     }
@@ -2003,7 +2192,7 @@ impl<'a> SemanticModel<'a> {
     /// cast("Thread", x)  # Forward reference
     /// cast(Thread, x)  # Non-forward reference
     /// ```
-    pub const fn in_forward_reference(&self) -> bool {
+    const fn in_forward_reference(&self) -> bool {
         self.in_string_type_definition()
             || (self.in_future_type_definition() && self.in_typing_only_annotation())
     }
@@ -2065,7 +2254,7 @@ impl<'a> SemanticModel<'a> {
     }
 
     /// Return `true` if the model is in a t-string.
-    pub const fn in_t_string(&self) -> bool {
+    const fn in_t_string(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::T_STRING)
     }
 
@@ -2236,6 +2425,150 @@ impl<'a> SemanticModel<'a> {
             _ => false,
         })
     }
+
+    /// Classify an import using its syntax and the current `__lazy_modules__` declaration.
+    /// The caller must check that the import occurs in a context where laziness is allowed.
+    pub fn import_laziness(&self, statement: &Stmt, alias: &Alias) -> ImportLaziness {
+        let explicit = match statement {
+            Stmt::Import(import) => import.is_lazy,
+            Stmt::ImportFrom(import) => import.is_lazy,
+            _ => return ImportLaziness::Unknown,
+        };
+        if explicit {
+            return ImportLaziness::Lazy;
+        }
+        if self.lazy_modules.is_none() {
+            return ImportLaziness::Eager;
+        }
+        let Some(module) = self.import_module_name(statement, alias) else {
+            return ImportLaziness::Unknown;
+        };
+        self.module_laziness(&module)
+    }
+
+    /// Test exact module membership in the current `__lazy_modules__` declaration.
+    /// Returns [`ImportLaziness::Unknown`] for dynamic declarations or uncertain conditional membership.
+    pub fn module_laziness(&self, module: &str) -> ImportLaziness {
+        match &self.lazy_modules {
+            None => ImportLaziness::Eager,
+            Some(LazyModules::Unknown) => ImportLaziness::Unknown,
+            Some(LazyModules::Known(modules)) => modules
+                .get(module)
+                .copied()
+                .unwrap_or(ImportLaziness::Eager),
+        }
+    }
+
+    /// Extract literal module names, merging conditional assignments with the current state.
+    pub fn set_lazy_modules(&mut self, value: &'a Expr) {
+        let names = match value {
+            Expr::List(ast::ExprList { elts, .. })
+            | Expr::Tuple(ast::ExprTuple { elts, .. })
+            | Expr::Set(ast::ExprSet { elts, .. }) => elts
+                .iter()
+                .map(|element| {
+                    element
+                        .as_string_literal_expr()
+                        .map(|literal| (literal.value.to_str(), ImportLaziness::Lazy))
+                })
+                .collect::<Option<FxHashMap<_, _>>>(),
+            _ => None,
+        };
+        let Some(mut modules) = names else {
+            self.lazy_modules = Some(LazyModules::Unknown);
+            return;
+        };
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each module's laziness is merged independently"
+        )]
+        if self.branch_id.is_some() {
+            if matches!(self.lazy_modules, Some(LazyModules::Unknown)) {
+                return;
+            }
+
+            // The assignment may not execute. Only modules already known to be lazy remain so.
+            for (module, laziness) in &mut modules {
+                if !self.module_laziness(module).is_lazy() {
+                    *laziness = ImportLaziness::Unknown;
+                }
+            }
+
+            // A removed entry may still be lazy on paths where the assignment does not execute.
+            if let Some(LazyModules::Known(previous)) = &self.lazy_modules {
+                for module in previous.keys() {
+                    modules.entry(module).or_insert(ImportLaziness::Unknown);
+                }
+            }
+        }
+
+        self.lazy_modules = Some(LazyModules::Known(modules));
+    }
+
+    /// Return the module tested for membership in `__lazy_modules__`.
+    /// A `from package import member` statement tests `package`, not `package.member`.
+    fn import_module_name<'b>(
+        &self,
+        statement: &'b Stmt,
+        alias: &'b Alias,
+    ) -> Option<Cow<'b, str>> {
+        match statement {
+            Stmt::Import(_) => Some(Cow::Borrowed(alias.name.as_str())),
+            Stmt::ImportFrom(ast::StmtImportFrom { level, module, .. }) => {
+                resolve_imported_module_path(
+                    *level,
+                    module.as_deref(),
+                    self.module.qualified_name(),
+                )
+            }
+            _ => None,
+        }
+    }
+}
+
+/// Module names and their inferred laziness from `__lazy_modules__` declarations.
+#[derive(Debug)]
+pub enum LazyModules<'a> {
+    /// Names from literal lists, sets, or tuples, with per-module laziness.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// __lazy_modules__ = ["a", "list"]
+    /// ```
+    ///
+    /// Conditional assignments can leave a listed name's laziness unknown.
+    Known(FxHashMap<&'a str, ImportLaziness>),
+
+    /// The declaration is present but not a literal collection that can be analyzed.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// class LazyImporter:
+    ///     def __contains__(self, name): return True
+    ///
+    /// __lazy_modules__ = LazyImporter()
+    /// ```
+    Unknown,
+}
+
+/// Whether an import is lazy, as determined statically.
+///
+/// Dynamic assignments and conditional membership changes are classified as unknown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportLaziness {
+    Lazy,
+    Eager,
+    Unknown,
+}
+
+impl ImportLaziness {
+    /// Returns `true` if the import laziness is [`Self::Lazy`].
+    pub fn is_lazy(&self) -> bool {
+        matches!(self, Self::Lazy)
+    }
 }
 
 pub struct ShadowedBinding {
@@ -2272,7 +2605,7 @@ impl TypingOnlyBindingsStatus {
         matches!(self, TypingOnlyBindingsStatus::Allowed)
     }
 
-    pub const fn is_disallowed(self) -> bool {
+    const fn is_disallowed(self) -> bool {
         matches!(self, TypingOnlyBindingsStatus::Disallowed)
     }
 }
@@ -2758,7 +3091,7 @@ bitflags! {
 }
 
 impl SemanticModelFlags {
-    pub fn new(path: &Path) -> Self {
+    fn new(path: &Path) -> Self {
         if PySourceType::from(path).is_stub() {
             Self::STUB_FILE
         } else {

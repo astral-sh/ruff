@@ -97,7 +97,7 @@ else:
         Directories are *not* resources.
         """
 
-    @deprecated("Deprecated since Python 3.11. Use `files(anchor).iterdir()`.")
+    @deprecated("Deprecated; limited resource support. Use `files(anchor).iterdir()`.")
     def contents(package: Package) -> Iterator[str]:
         """Return an iterable of entries in `package`.
 

@@ -72,7 +72,6 @@ PLE0116 `continue` not supported inside `finally` clause
 48 |             finally:
 49 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^
-   |
 
 PLE0116 `continue` not supported inside `finally` clause
   --> continue_in_finally.py:56:9
@@ -136,4 +135,3 @@ PLE0116 `continue` not supported inside `finally` clause
 94 |             else:
 95 |                 continue  # [continue-in-finally]
    |                 ^^^^^^^^
-   |

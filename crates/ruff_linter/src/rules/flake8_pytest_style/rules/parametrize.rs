@@ -9,6 +9,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -65,7 +66,7 @@ use crate::rules::flake8_pytest_style::types;
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestParametrizeNamesWrongType {
     single_argument: bool,
     expected: types::ParametrizeNameType,
@@ -200,24 +201,41 @@ impl Violation for PytestParametrizeNamesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", category = Category::Pedantic)]
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
+    is_single_param: bool,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_single_param,
+        } = self;
+        if *is_single_param {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}`")
+        } else {
+            format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        Some(format!("Use `{values}` of `{row}` for parameter values"))
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_single_param,
+        } = self;
+        if *is_single_param {
+            Some(format!("Use `{values}` for parameter values"))
+        } else {
+            Some(format!("Use `{values}` of `{row}` for parameter values"))
+        }
     }
 }
 
@@ -265,7 +283,7 @@ impl Violation for PytestParametrizeValuesWrongType {
 /// ## References
 /// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", category = Category::Correctness)]
 pub(crate) struct PytestDuplicateParametrizeTestCases {
     index: usize,
 }
@@ -524,6 +542,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: !is_multi_named,
                     },
                     values.range(),
                 );
@@ -571,6 +590,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: !is_multi_named,
                     },
                     values.range(),
                 );
@@ -704,7 +724,20 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     // def test_foo(x):
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
-    let argvalues_edits = unpack_single_element_items(checker, argvalues);
+    //
+    // In some cases, it's not possible to unpack all `argvalues`:
+    //
+    // ```python
+    // @pytest.mark.parametrize(("x",), [(1,), variable])
+    // def test_foo(x):
+    //     assert isinstance(x, int)
+    //
+    // In this case, it is left unchanged.
+    // ```
+    let Some(argvalues_edits) = unpack_single_element_items(checker, argvalues) else {
+        return;
+    };
+
     let argnames_edit =
         Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
@@ -721,10 +754,13 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
 
 /// Generate [`Edit`]s to unpack single-element lists or tuples in the given [`Expr`].
 /// For instance, `[(1,) (2,)]` will be transformed into `[1, 2]`.
-fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
+///
+/// If the elements of `expr` are not literal lists or tuples, `None` is returned to avoid changing
+/// behavior.
+fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Option<Vec<Edit>> {
     let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) = expr
     else {
-        return vec![];
+        return None;
     };
 
     let mut edits = Vec::with_capacity(elts.len());
@@ -732,15 +768,15 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         let (Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. })) =
             value
         else {
-            return vec![];
+            return None;
         };
 
         let [elt] = elts.as_slice() else {
-            return vec![];
+            return None;
         };
 
         if matches!(elt, Expr::Starred(_)) {
-            return vec![];
+            return None;
         }
 
         edits.push(Edit::range_replacement(
@@ -748,7 +784,7 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
             value.range(),
         ));
     }
-    edits
+    Some(edits)
 }
 
 fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
@@ -776,6 +812,7 @@ fn handle_value_rows(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: false,
                     },
                     elt.range(),
                 );
@@ -815,6 +852,7 @@ fn handle_value_rows(
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_single_param: false,
                     },
                     elt.range(),
                 );

@@ -142,8 +142,8 @@ def dumps(
 
     If ``indent`` is a non-negative integer, then JSON array elements and
     object members will be pretty-printed with that indent level. An indent
-    level of 0 will only insert newlines. ``None`` is the most compact
-    representation.
+    level of 0 will only insert newlines. ``None`` is the default and gives
+    a representation with no newlines inserted.
 
     If specified, ``separators`` should be an ``(item_separator,
     key_separator)`` tuple.  The default is ``(', ', ': ')`` if *indent* is
@@ -201,8 +201,8 @@ def dump(
 
     If ``indent`` is a non-negative integer, then JSON array elements and
     object members will be pretty-printed with that indent level. An indent
-    level of 0 will only insert newlines. ``None`` is the most compact
-    representation.
+    level of 0 will only insert newlines. ``None`` is the default and gives
+    a representation with no newlines inserted.
 
     If specified, ``separators`` should be an ``(item_separator,
     key_separator)`` tuple.  The default is ``(', ', ': ')`` if *indent* is
@@ -234,7 +234,49 @@ if sys.version_info >= (3, 15):
         object_pairs_hook: Callable[[list[tuple[Any, Any]]], Any] | None = None,
         array_hook: Callable[[list[Any]], Any] | None = None,
         **kwds: Any,
-    ) -> Any: ...
+    ) -> Any:
+        """Deserialize ``s`` (a ``str``, ``bytes`` or ``bytearray`` instance
+        containing a JSON document) to a Python object.
+
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+
+        ``object_pairs_hook`` is an optional function that will be called with
+        the result of any object literal decoded with an ordered list of pairs.
+        The return value of ``object_pairs_hook`` will be used instead of the
+        ``dict``.  This feature can be used to implement custom decoders.  If
+        ``object_hook`` is also defined, the ``object_pairs_hook`` takes
+        priority.
+
+        ``array_hook`` is an optional function that will be called with the
+        result of any literal array decode (a ``list``).  The return value of
+        this function will be used instead of the ``list``.  This feature can
+        be used along ``object_pairs_hook`` to customize the resulting data
+        structure - for example, by setting that to ``frozendict`` and
+        ``array_hook`` to ``tuple``, one can get a deep immutable data structure
+        from any JSON data.
+
+        ``parse_float``, if specified, will be called with the string
+        of every JSON float to be decoded. By default this is equivalent to
+        float(num_str). This can be used to use another datatype or parser
+        for JSON floats (e.g. decimal.Decimal).
+
+        ``parse_int``, if specified, will be called with the string
+        of every JSON int to be decoded. By default this is equivalent to
+        int(num_str). This can be used to use another datatype or parser
+        for JSON integers (e.g. float).
+
+        ``parse_constant``, if specified, will be called with one of the
+        following strings: -Infinity, Infinity, NaN.
+        This can be used to raise an exception if invalid JSON numbers
+        are encountered.
+
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
+
     def load(
         fp: SupportsRead[str | bytes],
         *,
@@ -246,7 +288,33 @@ if sys.version_info >= (3, 15):
         object_pairs_hook: Callable[[list[tuple[Any, Any]]], Any] | None = None,
         array_hook: Callable[[list[Any]], Any] | None = None,
         **kwds: Any,
-    ) -> Any: ...
+    ) -> Any:
+        """Deserialize ``fp`` (a ``.read()``-supporting file-like object containing
+        a JSON document) to a Python object.
+
+        ``object_hook`` is an optional function that will be called with the
+        result of any object literal decode (a ``dict``). The return value of
+        ``object_hook`` will be used instead of the ``dict``. This feature
+        can be used to implement custom decoders (e.g. JSON-RPC class hinting).
+
+        ``object_pairs_hook`` is an optional function that will be called with
+        the result of any object literal decoded with an ordered list of pairs.
+        The return value of ``object_pairs_hook`` will be used instead of the
+        ``dict``.  This feature can be used to implement custom decoders.  If
+        ``object_hook`` is also defined, the ``object_pairs_hook`` takes
+        priority.
+
+        ``array_hook`` is an optional function that will be called with the
+        result of any literal array decode (a ``list``).  The return value of
+        this function will be used instead of the ``list``.  This feature can
+        be used along ``object_pairs_hook`` to customize the resulting data
+        structure - for example, by setting that to ``frozendict`` and
+        ``array_hook`` to ``tuple``, one can get a deep immutable data structure
+        from any JSON data.
+
+        To use a custom ``JSONDecoder`` subclass, specify it with the ``cls``
+        kwarg; otherwise ``JSONDecoder`` is used.
+        """
 
 else:
     def loads(

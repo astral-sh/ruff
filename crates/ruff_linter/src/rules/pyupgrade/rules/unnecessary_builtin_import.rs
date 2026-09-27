@@ -5,16 +5,18 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
-/// Checks for unnecessary imports of builtins.
+/// Checks for imports of Python 3 builtins from Python 2 compatibility shims
+/// such as `python-future` and `six`.
 ///
 /// ## Why is this bad?
-/// Builtins are always available. Importing them is unnecessary and should be
-/// removed to avoid confusion.
+/// These shims existed to access Python 3 builtins from code that also ran on
+/// Python 2. On Python 3-only code, the imports are redundant.
 ///
 /// ## Example
 /// ```python
@@ -40,7 +42,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Suspicious)]
 pub(crate) struct UnnecessaryBuiltinImport {
     pub names: Vec<String>,
 }
@@ -136,7 +138,7 @@ pub(crate) fn unnecessary_builtin_import(
             if &alias.name == "*" {
                 return true;
             }
-            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()) else {
+            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()).binding_id() else {
                 return false;
             };
             let binding = semantic.binding(binding_id);

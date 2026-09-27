@@ -1,8 +1,9 @@
 use std::{iter::FusedIterator, ops::Deref};
 
 use super::{Token, TokenKind};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_trivia::{CommentRanges, ParenthesizedExpressions, TriviaRanges};
 use ruff_text_size::{Ranged as _, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 
 /// Tokens represents a vector of lexed [`Token`].
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,7 +27,7 @@ impl Tokens {
     /// Unlike `binary_search_by_key`, this method ensures that if multiple tokens start at the same offset,
     /// it returns the index of the first one. Multiple tokens can start at the same offset in cases where
     /// zero-length tokens are involved (like `Dedent` or `Newline` at the end of the file).
-    pub fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
+    fn binary_search_by_start(&self, offset: TextSize) -> Result<usize, usize> {
         let partition_point = self.partition_point(|token| token.start() < offset);
 
         let after = &self[partition_point..];
@@ -49,7 +50,7 @@ impl Tokens {
     /// | Token               | Range     |
     /// |---------------------|-----------|
     /// | `Def`               | `0..3`    |
-    /// | `Name`              | `4..7`    |
+    /// | `Identifier`        | `4..7`    |
     /// | `Lpar`              | `7..8`    |
     /// | `Rpar`              | `8..9`    |
     /// | `Colon`             | `9..10`   |
@@ -64,7 +65,7 @@ impl Tokens {
     /// token which are 12, 13, and 14.
     ///
     /// Examples:
-    /// 1) `4..10` would give `Name`, `Lpar`, `Rpar`, `Colon`
+    /// 1) `4..10` would give `Identifier`, `Lpar`, `Rpar`, `Colon`
     /// 2) `11..25` would give `Comment`, `NonLogicalNewline`
     /// 3) `12..25` would give same as (2) and offset 12 is in the "gap"
     /// 4) `9..12` would give `Colon`, `Newline` and offset 12 is in the "gap"
@@ -225,6 +226,15 @@ impl Tokens {
     }
 }
 
+impl IntoIterator for Tokens {
+    type Item = Token;
+    type IntoIter = std::vec::IntoIter<Token>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.raw.into_iter()
+    }
+}
+
 impl<'a> IntoIterator for &'a Tokens {
     type Item = &'a Token;
     type IntoIter = std::slice::Iter<'a, Token>;
@@ -279,21 +289,66 @@ impl FusedIterator for TokenAt {}
 impl From<&Tokens> for CommentRanges {
     fn from(tokens: &Tokens) -> Self {
         let mut ranges = vec![];
+
         for token in tokens {
             if token.kind() == TokenKind::Comment {
                 ranges.push(token.range());
             }
         }
+
         CommentRanges::new(ranges)
+    }
+}
+
+impl From<&Tokens> for TriviaRanges {
+    fn from(tokens: &Tokens) -> Self {
+        let mut comments = vec![];
+        let mut parenthesized = FxHashSet::default();
+        let mut stack = Vec::<Option<TextSize>>::new();
+        let mut previous_end = None;
+
+        for token in tokens {
+            if token.kind() == TokenKind::Comment {
+                comments.push(token.range());
+            }
+
+            if token.kind().is_trivia() {
+                continue;
+            }
+
+            match token.kind() {
+                TokenKind::Lpar => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                    stack.push(None);
+                }
+                TokenKind::Rpar => {
+                    if let (Some(Some(start)), Some(end)) = (stack.pop(), previous_end) {
+                        parenthesized.insert(TextRange::new(start, end));
+                    }
+                }
+                _ => {
+                    if let Some(start) = stack.last_mut() {
+                        start.get_or_insert(token.start());
+                    }
+                }
+            }
+
+            previous_end = Some(token.end());
+        }
+
+        TriviaRanges::new(
+            CommentRanges::new(comments),
+            ParenthesizedExpressions::new(parenthesized),
+        )
     }
 }
 
 /// An iterator over the [`Token`]s with context.
 ///
-/// This struct is created by the [`iter_with_context`] method on [`Tokens`]. Refer to its
-/// documentation for more details.
-///
-/// [`iter_with_context`]: Tokens::iter_with_context
+/// Use [`Tokens::iter_with_context`] to iterate over all tokens, or [`Self::new`] to iterate over a
+/// token slice.
 #[derive(Debug, Clone)]
 pub struct TokenIterWithContext<'a> {
     inner: std::slice::Iter<'a, Token>,
@@ -301,7 +356,8 @@ pub struct TokenIterWithContext<'a> {
 }
 
 impl<'a> TokenIterWithContext<'a> {
-    fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
+    /// Creates an iterator with a nesting level of zero at the start of the token slice.
+    pub fn new(tokens: &'a [Token]) -> TokenIterWithContext<'a> {
         TokenIterWithContext {
             inner: tokens.iter(),
             nesting: 0,
@@ -365,7 +421,7 @@ mod tests {
     /// Code: <https://play.ruff.rs/a3658340-6df8-42c5-be80-178744bf1193>
     const TEST_CASE_WITH_GAP: [(TokenKind, Range<u32>); 10] = [
         (TokenKind::Def, 0..3),
-        (TokenKind::Name, 4..7),
+        (TokenKind::Identifier, 4..7),
         (TokenKind::Lpar, 7..8),
         (TokenKind::Rpar, 8..9),
         (TokenKind::Colon, 9..10),
@@ -425,7 +481,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_after_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.after(TextSize::new(5));
@@ -487,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_before_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.before(TextSize::new(5));
@@ -498,7 +554,7 @@ mod tests {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         let in_range = tokens.in_range(TextRange::new(4.into(), 10.into()));
         assert_eq!(in_range.len(), 4);
-        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Name);
+        assert_eq!(in_range.first().unwrap().kind(), TokenKind::Identifier);
         assert_eq!(in_range.last().unwrap().kind(), TokenKind::Colon);
     }
 
@@ -539,14 +595,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 5 is inside token `Identifier 4..7`")]
     fn tokens_in_range_start_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(5.into(), 10.into()));
     }
 
     #[test]
-    #[should_panic(expected = "Offset 6 is inside token `Name 4..7`")]
+    #[should_panic(expected = "Offset 6 is inside token `Identifier 4..7`")]
     fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(0.into(), 6.into()));
@@ -599,7 +655,7 @@ mod tests {
         let tokens = new_tokens(
             [
                 (TokenKind::If, 0..2),
-                (TokenKind::Name, 3..4),
+                (TokenKind::Identifier, 3..4),
                 (TokenKind::Colon, 4..5),
                 (TokenKind::Newline, 5..6),
                 (TokenKind::Indent, 6..7),
@@ -607,7 +663,7 @@ mod tests {
                 (TokenKind::Newline, 11..12),
                 (TokenKind::NonLogicalNewline, 12..13),
                 (TokenKind::Dedent, 13..13),
-                (TokenKind::Name, 13..14),
+                (TokenKind::Identifier, 13..14),
                 (TokenKind::Newline, 14..14),
             ]
             .into_iter(),

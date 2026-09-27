@@ -9,15 +9,13 @@ XXX TO DO:
 - seems to contain a bug when updating...
 
 - reclaim free space (currently, space once occupied by deleted or expanded
-items is never reused)
+items is not reused except if .reorganize() is called)
 
 - support concurrent access (currently, if two processes take turns making
 updates, they can mess up the index)
 
 - support efficient access to large databases (currently, the whole index
 is read when the database is opened, and some updates rewrite the whole index)
-
-- support opening for read-only (flag = 'm')
 
 """
 

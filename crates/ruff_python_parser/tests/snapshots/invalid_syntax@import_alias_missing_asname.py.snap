@@ -38,4 +38,3 @@ Module(
   |
 1 | import x as
   |            ^ Syntax Error: Expected symbol after `as`
-  |

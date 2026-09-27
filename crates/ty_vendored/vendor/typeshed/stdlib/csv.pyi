@@ -197,7 +197,8 @@ class DictReader(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class DictWriter(Generic[_T]):
@@ -229,7 +230,8 @@ class DictWriter(Generic[_T]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type
 
-            E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+            For example, for t = list[int], t.__origin__ is list and t.__args__
+            is (int,).
             """
 
 class Sniffer:
@@ -242,6 +244,10 @@ class Sniffer:
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
         """
         Returns a dialect (or None) corresponding to the sample
+
+        If several delimiters fit the sample equally well, the
+        delimiters listed in the preferred attribute are preferred, in
+        that order, no matter how many times each of them occurs.
         """
 
     def has_header(self, sample: str) -> bool: ...

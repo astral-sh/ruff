@@ -7,17 +7,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 4 | def f_a():
 5 |     raise RuntimeError("This is an example exception")
   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Assign to variable; remove string literal
-2 |
-3 |
+  |
 4 | def f_a():
   -     raise RuntimeError("This is an example exception")
 5 +     msg = "This is an example exception"
 6 +     raise RuntimeError(msg)
 7 |
-8 |
-9 | def f_a_short():
+  |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -26,17 +23,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 8 | def f_a_short():
 9 |     raise RuntimeError("Error")
   |                        ^^^^^^^
-  |
 help: Assign to variable; remove string literal
-6  |
-7  |
+   |
 8  | def f_a_short():
    -     raise RuntimeError("Error")
 9  +     msg = "Error"
 10 +     raise RuntimeError(msg)
 11 |
-12 |
-13 | def f_a_empty():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -45,17 +39,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 12 | def f_a_empty():
 13 |     raise RuntimeError("")
    |                        ^^
-   |
 help: Assign to variable; remove string literal
-10 |
-11 |
+   |
 12 | def f_a_empty():
    -     raise RuntimeError("")
 13 +     msg = ""
 14 +     raise RuntimeError(msg)
 15 |
-16 |
-17 | def f_b():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM102 [*] Exception must not use an f-string literal, assign to variable first
@@ -65,17 +56,14 @@ EM102 [*] Exception must not use an f-string literal, assign to variable first
 17 |     example = "example"
 18 |     raise RuntimeError(f"This is an {example} exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove f-string literal
-15 |
-16 | def f_b():
+   |
 17 |     example = "example"
    -     raise RuntimeError(f"This is an {example} exception")
 18 +     msg = f"This is an {example} exception"
 19 +     raise RuntimeError(msg)
 20 |
-21 |
-22 | def f_c():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
@@ -84,17 +72,14 @@ EM103 [*] Exception must not use a `.format()` string directly, assign to variab
 21 | def f_c():
 22 |     raise RuntimeError("This is an {example} exception".format(example="example"))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove `.format()` string
-19 |
-20 |
+   |
 21 | def f_c():
    -     raise RuntimeError("This is an {example} exception".format(example="example"))
 22 +     msg = "This is an {example} exception".format(example="example")
 23 +     raise RuntimeError(msg)
 24 |
-25 |
-26 | def f_ok():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -104,17 +89,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 31 |     msg = "hello"
 32 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove string literal
-29 |
-30 | def f_msg_defined():
+   |
 31 |     msg = "hello"
    -     raise RuntimeError("This is an example exception")
 32 +     msg_0 = "This is an example exception"
 33 +     raise RuntimeError(msg_0)
 34 |
-35 |
-36 | def f_msg_in_nested_scope():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -124,17 +106,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 38 |
 39 |     raise RuntimeError("This is an example exception")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove string literal
-36 |     def nested():
-37 |         msg = "hello"
+   |
 38 |
    -     raise RuntimeError("This is an example exception")
 39 +     msg = "This is an example exception"
 40 +     raise RuntimeError(msg)
 41 |
-42 |
-43 | def f_msg_in_parent_scope():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -143,17 +122,14 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 45 |     def nested():
 46 |         raise RuntimeError("This is an example exception")
    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove string literal
-43 |     msg = "hello"
-44 |
+   |
 45 |     def nested():
    -         raise RuntimeError("This is an example exception")
 46 +         msg_0 = "This is an example exception"
 47 +         raise RuntimeError(msg_0)
 48 |
-49 |
-50 | def f_fix_indentation_check(foo):
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -167,15 +143,13 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 53 |         if foo == "foo":
    |
 help: Assign to variable; remove string literal
-48 |
-49 | def f_fix_indentation_check(foo):
+   |
 50 |     if foo:
    -         raise RuntimeError("This is an example exception")
 51 +         msg = "This is an example exception"
 52 +         raise RuntimeError(msg)
 53 |     else:
-54 |         if foo == "foo":
-55 |             raise RuntimeError(f"This is an exception: {foo}")
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM102 [*] Exception must not use an f-string literal, assign to variable first
@@ -188,15 +162,13 @@ EM102 [*] Exception must not use an f-string literal, assign to variable first
 55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |
 help: Assign to variable; remove f-string literal
-51 |         raise RuntimeError("This is an example exception")
-52 |     else:
+   |
 53 |         if foo == "foo":
    -             raise RuntimeError(f"This is an exception: {foo}")
 54 +             msg = f"This is an exception: {foo}"
 55 +             raise RuntimeError(msg)
 56 |     raise RuntimeError("This is an exception: {}".format(foo))
-57 |
-58 |
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
@@ -206,17 +178,14 @@ EM103 [*] Exception must not use a `.format()` string directly, assign to variab
 54 |             raise RuntimeError(f"This is an exception: {foo}")
 55 |     raise RuntimeError("This is an exception: {}".format(foo))
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove `.format()` string
-52 |     else:
-53 |         if foo == "foo":
+   |
 54 |             raise RuntimeError(f"This is an exception: {foo}")
    -     raise RuntimeError("This is an exception: {}".format(foo))
 55 +     msg = "This is an exception: {}".format(foo)
 56 +     raise RuntimeError(msg)
 57 |
-58 |
-59 | # Report these, but don't fix them
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 Exception must not use a string literal, assign to variable first
@@ -236,7 +205,6 @@ EM101 Exception must not use a string literal, assign to variable first
 59 | if foo: raise RuntimeError("This is an example exception")
 60 | if foo: x = 1; raise RuntimeError("This is an example exception")
    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove string literal
 
 EM102 [*] Exception must not use an f-string literal, assign to variable first
@@ -245,17 +213,14 @@ EM102 [*] Exception must not use an f-string literal, assign to variable first
 63 | def f_triple_quoted_string():
 64 |     raise RuntimeError(f"""This is an {"example"} exception""")
    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Assign to variable; remove f-string literal
-61 |
-62 |
+   |
 63 | def f_triple_quoted_string():
    -     raise RuntimeError(f"""This is an {"example"} exception""")
 64 +     msg = f"""This is an {"example"} exception"""
 65 +     raise RuntimeError(msg)
 66 |
-67 |
-68 | def f_multi_line_string():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -269,8 +234,7 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 71 |       )
    |
 help: Assign to variable; remove string literal
-65 |
-66 |
+   |
 67 | def f_multi_line_string():
    -     raise RuntimeError(
 68 +     msg = (
@@ -281,8 +245,7 @@ help: Assign to variable; remove string literal
 73 +         msg
 74 +     )
 75 |
-76 |
-77 | def f_multi_line_string2():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
@@ -297,8 +260,7 @@ EM103 [*] Exception must not use a `.format()` string directly, assign to variab
 79 |       )
    |
 help: Assign to variable; remove `.format()` string
-72 |
-73 |
+   |
 74 | def f_multi_line_string2():
    -     raise RuntimeError(
 75 +     msg = (
@@ -310,8 +272,7 @@ help: Assign to variable; remove `.format()` string
 81 +         msg
 82 +     )
 83 |
-84 |
-85 | def f_multi_line_string2():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
@@ -329,24 +290,18 @@ EM103 [*] Exception must not use a `.format()` string directly, assign to variab
 90 |       )
    |
 help: Assign to variable; remove `.format()` string
-80 |
-81 |
+   |
 82 | def f_multi_line_string2():
    -     raise RuntimeError(
 83 +     msg = (
 84 |         (
-85 |             "This is an "
-86 |             "{example} exception"
 --------------------------------------------------------------------------------
-88 |             example="example"
-89 |         )
 90 |     )
 91 +     raise RuntimeError(
 92 +         msg
 93 +     )
 94 |
-95 |
-96 | def raise_typing_cast_exception():
+   |
 note: This is an unsafe fix and may change runtime behavior
 
 EM101 [*] Exception must not use a string literal, assign to variable first
@@ -360,12 +315,11 @@ EM101 [*] Exception must not use a string literal, assign to variable first
 120 |         return msg
     |
 help: Assign to variable; remove string literal
-115 | def f():
-116 |     msg = "."
+    |
 117 |     try:
     -         raise RuntimeError("!")
 118 +         msg_0 = "!"
 119 +         raise RuntimeError(msg_0)
 120 |     except RuntimeError:
-121 |         return msg
+    |
 note: This is an unsafe fix and may change runtime behavior

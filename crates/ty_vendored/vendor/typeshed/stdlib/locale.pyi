@@ -211,7 +211,7 @@ def normalize(localename: _str) -> _str:
     """
 
 if sys.version_info < (3, 13):
-    @deprecated("Deprecated since Python 3.11; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
+    @deprecated("Deprecated; removed in Python 3.13. Use `locale.setlocale(locale.LC_ALL, '')` instead.")
     def resetlocale(category: int = ...) -> None:
         """Sets the locale for category to the default setting.
 
@@ -231,7 +231,7 @@ def format_string(f: _str, val: Any, grouping: bool = False, monetary: bool = Fa
 
     Grouping is applied if the third parameter is true.
     Conversion uses monetary thousands separator and grouping strings if
-    forth parameter monetary is true.
+    fourth parameter monetary is true.
     """
 
 def currency(val: float | Decimal, symbol: bool = True, grouping: bool = False, international: bool = False) -> _str:

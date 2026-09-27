@@ -90,6 +90,7 @@ class Cmd:
         sys.stdin and sys.stdout are used.
 
         """
+
     old_completer: Callable[[str, int], str | None] | None
     def cmdloop(self, intro: Any | None = None) -> None:
         """Repeatedly issue a prompt, accept input, parse an initial prefix

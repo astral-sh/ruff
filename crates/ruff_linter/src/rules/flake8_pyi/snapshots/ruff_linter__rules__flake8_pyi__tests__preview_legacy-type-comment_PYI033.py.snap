@@ -1,0 +1,134 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 11
+
+--- Added ---
+PYI033 Don't use type comments
+ --> PYI033.py:6:22
+  |
+4 | from typing import TypeAlias
+5 |
+6 | A: TypeAlias = None  # type: int  # error
+  |                      ^^^^^^^^^^^^^^^^^^^^
+7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # error
+8 | C: TypeAlias = None  #type: int  # error
+  |
+
+
+PYI033 Don't use type comments
+ --> PYI033.py:7:22
+  |
+6 | A: TypeAlias = None  # type: int  # error
+7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # error
+  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 | C: TypeAlias = None  #type: int  # error
+9 | D: TypeAlias = None  #      type: int  # error
+  |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:8:22
+   |
+ 6 | A: TypeAlias = None  # type: int  # error
+ 7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # error
+ 8 | C: TypeAlias = None  #type: int  # error
+   |                      ^^^^^^^^^^^^^^^^^^^
+ 9 | D: TypeAlias = None  #      type: int  # error
+10 | E: TypeAlias = None#    type: int  # error
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:9:22
+   |
+ 7 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # error
+ 8 | C: TypeAlias = None  #type: int  # error
+ 9 | D: TypeAlias = None  #      type: int  # error
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | E: TypeAlias = None#    type: int  # error
+11 | F: TypeAlias = None#type:int  # error
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:10:20
+   |
+ 8 | C: TypeAlias = None  #type: int  # error
+ 9 | D: TypeAlias = None  #      type: int  # error
+10 | E: TypeAlias = None#    type: int  # error
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^
+11 | F: TypeAlias = None#type:int  # error
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:11:20
+   |
+ 9 | D: TypeAlias = None  #      type: int  # error
+10 | E: TypeAlias = None#    type: int  # error
+11 | F: TypeAlias = None#type:int  # error
+   |                    ^^^^^^^^^^^^^^^^^^
+12 |
+13 | def func(
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:14:12
+   |
+13 | def func(
+14 |     arg1,  # type: dict[str, int]  # error
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |     arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # error
+16 | ): ...
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:15:11
+   |
+13 | def func(
+14 |     arg1,  # type: dict[str, int]  # error
+15 |     arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # error
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 | ): ...
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:19:29
+   |
+18 | class Foo:
+19 |     Attr: TypeAlias = None  # type: set[str]  # error
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^
+20 |
+21 | G: TypeAlias = None  # type: ignore
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:29:22
+   |
+28 | # Whole line commented out  # type: int
+29 | M: TypeAlias = None  # type: can't parse me!
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^
+30 |
+31 | class Bar:
+   |
+
+
+PYI033 Don't use type comments
+  --> PYI033.py:32:26
+   |
+31 | class Bar:
+32 |     N: TypeAlias = None  # type: can't parse me either!
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+33 |     # This whole line is commented out and indented # type: str
+   |

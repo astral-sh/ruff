@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation,
     is_ctypes_structure_fields, is_final_annotation, is_special_attribute,
@@ -85,7 +86,7 @@ use crate::rules::ruff::helpers::{
 ///
 /// [ClassVar]: https://docs.python.org/3/library/typing.html#typing.ClassVar
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.273")]
+#[violation_metadata(stable_since = "v0.0.273", category = Category::Suspicious)]
 pub(crate) struct MutableClassDefault;
 
 impl Violation for MutableClassDefault {

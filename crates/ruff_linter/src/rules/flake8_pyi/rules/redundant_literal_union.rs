@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 
 /// ## What it does
@@ -36,8 +37,14 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// x: Literal[b"B"] | str
 /// ```
+///
+/// ## Known issues
+/// This rule is opinionated and may not be appropriate for projects that keep
+/// literal members for editor suggestions, generated documentation, or another
+/// non-type-checking purpose. In those cases, disabling this rule for the
+/// affected annotations may be reasonable.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Pedantic)]
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,

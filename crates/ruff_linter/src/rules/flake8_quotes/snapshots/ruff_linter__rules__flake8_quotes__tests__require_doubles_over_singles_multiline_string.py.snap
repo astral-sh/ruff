@@ -13,11 +13,11 @@ Q001 [*] Single quote multiline found but double quotes preferred
 5 |   s = """ This 'should'
   |
 help: Replace single multiline quotes with double quotes
+  |
   - s = ''' This 'should'
 1 + s = """ This 'should'
 2 | be
   - 'linted' '''
 3 + 'linted' """
 4 |
-5 | s = """ This 'should'
-6 | 'not' be
+  |

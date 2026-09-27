@@ -1,0 +1,24 @@
+---
+source: crates/ruff/tests/cli/lint.rs
+info:
+  program: ruff
+  args:
+    - check
+    - "--no-cache"
+    - "--output-format"
+    - github
+    - "--select"
+    - "F401,F821"
+    - "--target-version"
+    - py39
+    - "--preview"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+::error title=ruff (unused-import),file=[TMP]/input.py,line=1,col=8,endLine=1,endColumn=10::input.py:1:8: unused-import: `os` imported but unused%0A  help: Remove unused import: `os`
+::error title=ruff (undefined-name),file=[TMP]/input.py,line=2,col=5,endLine=2,endColumn=6::input.py:2:5: undefined-name: Undefined name `y`
+::error title=ruff (invalid-syntax),file=[TMP]/input.py,line=3,col=1,endLine=3,endColumn=6::input.py:3:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+----- stderr -----

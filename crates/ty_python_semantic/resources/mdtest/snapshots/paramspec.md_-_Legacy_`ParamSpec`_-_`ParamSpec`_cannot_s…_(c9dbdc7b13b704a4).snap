@@ -56,7 +56,6 @@ error[invalid-type-arguments]: ParamSpec `P` cannot be used to specialize type v
    | - Type variable `T` defined here
  4 | P = ParamSpec("P")
    | - ParamSpec `P` defined here
-   |
 
 ```
 
@@ -66,6 +65,5 @@ error[invalid-type-arguments]: Type argument for `ParamSpec` must be either a li
    |
 26 | def func3(c: ParamSpecAndTypeVar[T, int], other: T): ...
    |                                  ^
-   |
 
 ```

@@ -25,32 +25,26 @@ that are ready for contributions.
 ty is written in Rust. You'll need to install the
 [Rust toolchain](https://www.rust-lang.org/tools/install) for development.
 
-You'll also need [Insta](https://insta.rs/docs/) to update snapshot tests:
+You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) to
+run Python utility commands. uv also manages our development toolchain.
+
+We use [Insta](https://insta.rs/docs/) to update snapshot tests. It's already part
+of the development toolchain:
 
 ```shell
-cargo install cargo-insta
+uv run --only-dev cargo insta --version
 ```
-
-You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
-run Python utility commands.
 
 You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install prek
-prek install
+uv run --only-dev --locked prek install
 ```
 
-We recommend [nextest](https://nexte.st/) to run ty's test suite (via `cargo nextest run`),
-though it's not strictly necessary:
-
-```shell
-cargo install cargo-nextest --locked
-```
-
-Throughout this guide, any usages of `cargo test` can be replaced with `cargo nextest run`,
-if you choose to install `nextest`.
+We recommend [nextest](https://nexte.st/) to run ty's test suite (via `uv run --only-dev cargo nextest run`),
+though it's not strictly necessary. Throughout this guide, any usages of `cargo test` can be
+replaced with `uv run --only-dev cargo nextest run`.
 
 ### Development
 
@@ -66,7 +60,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 cargo test  # Rust testing
-uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
+uv run --only-dev --locked prek run --all-files  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -78,7 +72,7 @@ Note that many code changes also require updating the snapshot tests, which is d
 after running `cargo test` like so:
 
 ```shell
-cargo insta review
+uv run --only-dev cargo insta review
 ```
 
 Include the text `[ty]` at the beginning of your pull request title, to distinguish ty pull requests
@@ -145,7 +139,7 @@ ensure that the changes do not break any of the properties.
 ## Ecosystem CI (`ecosystem-analyzer`)
 
 GitHub Actions will run your changes against a number of real-world projects from GitHub and report
-any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](./scripts/setup_primer_project.py)
+any differences in ty's diagnostic output. You can use [`setup_primer_project.py`](../../scripts/setup_primer_project.py)
 to reproduce the same testing conditions locally.
 
 ## Coding guidelines

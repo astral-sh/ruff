@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// This is not a regular diagnostic; instead, it's raised when a file cannot be read
@@ -25,7 +26,7 @@ use crate::Violation;
 /// - [UNIX Permissions introduction](https://mason.gmu.edu/~montecin/UNIXpermiss.htm)
 /// - [Command Line Basics: Symbolic Links](https://www.digitalocean.com/community/tutorials/workflow-symbolic-links)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Correctness)]
 pub struct IOError {
     pub message: String,
 }
@@ -66,7 +67,7 @@ impl Violation for IOError {
 /// - [Python documentation: Syntax Errors](https://docs.python.org/3/tutorial/errors.html#syntax-errors)
 #[derive(ViolationMetadata)]
 #[deprecated(note = "E999 has been removed")]
-#[violation_metadata(removed_since = "0.8.0")]
+#[violation_metadata(removed_since = "0.8.0", category = Category::Correctness)]
 pub(crate) struct SyntaxError;
 
 #[expect(deprecated)]

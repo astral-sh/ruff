@@ -1,5 +1,17 @@
 # Generic builtins
 
+## Unbound inherited methods
+
+In typeshed, `list` inherits `clear` from `MutableSequence`, and `dict` inherits it from
+`MutableMapping`. We can call these methods through `list` and `dict` without supplying type
+arguments.
+
+```py
+def clear_containers(items: list[int], mapping: dict[str, int]) -> None:
+    list.clear(items)
+    dict.clear(mapping)
+```
+
 ## Variadic keyword arguments with a custom `dict`
 
 When we define `dict` in a custom typeshed, we must take care to define it as a generic class in the

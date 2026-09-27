@@ -12,14 +12,12 @@ UP024 [*] Replace aliased errors with `OSError`
 7 | except (OSError, socket.error, KeyError):
   |
 help: Replace with builtin `OSError`
-2 |
-3 | try:
+  |
 4 |     pass
   - except (OSError, mmap.error, IOError):
 5 + except OSError:
 6 |     pass
-7 | except (OSError, socket.error, KeyError):
-8 |     pass
+  |
 
 UP024 [*] Replace aliased errors with `OSError`
  --> UP024_1.py:7:8
@@ -31,14 +29,12 @@ UP024 [*] Replace aliased errors with `OSError`
 8 |     pass
   |
 help: Replace with builtin `OSError`
-4  |     pass
-5  | except (OSError, mmap.error, IOError):
-6  |     pass
-   - except (OSError, socket.error, KeyError):
-7  + except (OSError, KeyError):
-8  |     pass
-9  |
-10 | try:
+  |
+6 |     pass
+  - except (OSError, socket.error, KeyError):
+7 + except (OSError, KeyError):
+8 |     pass
+  |
 
 UP024 [*] Replace aliased errors with `OSError`
   --> UP024_1.py:12:8
@@ -55,8 +51,7 @@ UP024 [*] Replace aliased errors with `OSError`
 17 |       pass
    |
 help: Replace with builtin `OSError`
-9  |
-10 | try:
+   |
 11 |     pass
    - except (
    -     OSError,
@@ -65,3 +60,4 @@ help: Replace with builtin `OSError`
    - ):
 12 + except OSError:
 13 |     pass
+   |

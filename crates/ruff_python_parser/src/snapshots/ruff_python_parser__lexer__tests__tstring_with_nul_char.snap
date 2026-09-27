@@ -5,32 +5,9 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        TStringStart,
-        0..2,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "\\0",
-        ),
-        2..4,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        TStringEnd,
-        4..5,
-        TokenFlags(
-            T_STRING,
-        ),
-    ),
-    (
-        Newline,
-        5..5,
-    ),
+    TStringStart 0..2 (flags = T_STRING),
+    TStringMiddle 2..4 (flags = T_STRING),
+    TStringEnd 4..5 (flags = T_STRING),
+    Newline 5..5,
 ]
 ```

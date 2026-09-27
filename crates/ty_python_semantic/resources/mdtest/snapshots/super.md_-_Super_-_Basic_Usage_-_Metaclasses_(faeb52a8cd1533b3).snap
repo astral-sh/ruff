@@ -63,7 +63,6 @@ error[invalid-super-argument]: `<class 'OtherBase'>` is not an instance or subcl
    |
 34 | super(Meta, OtherBase)  # error: [invalid-super-argument]
    | ^^^^^^^^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -73,7 +72,6 @@ error[invalid-super-argument]: `type[T@__call__]` is not an instance or subclass
    |
 40 |         return super(BoundIntMeta, cls).__call__()  # error: [invalid-super-argument]
    |                ^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 info: Type variable `T` has upper bound `int`
 info: `type[int]` is not an instance or subclass of `<class 'BoundIntMeta'>`
 

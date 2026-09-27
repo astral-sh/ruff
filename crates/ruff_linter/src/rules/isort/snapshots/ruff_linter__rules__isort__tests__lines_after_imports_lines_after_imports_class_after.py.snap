@@ -18,8 +18,7 @@ I001 [*] Import block is un-sorted or un-formatted
 11 |     name: str
    |
 help: Organize imports
-2  |
-3  | from typing import Any
+   |
 4  |
 5  + from my_first_party import my_first_party_object
 6  | from requests import Session
@@ -31,5 +30,4 @@ help: Organize imports
 11 |
    - from . import my_local_folder_object
 12 | class Thing(object):
-13 |   name: str
-14 |   def __init__(self, name: str):
+   |

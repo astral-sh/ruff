@@ -5,18 +5,7 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        String(
-            "\\N{EN SPACE}",
-        ),
-        0..14,
-        TokenFlags(
-            DOUBLE_QUOTES,
-        ),
-    ),
-    (
-        Newline,
-        14..14,
-    ),
+    String 0..14 (flags = DOUBLE_QUOTES),
+    Newline 14..14,
 ]
 ```

@@ -181,7 +181,18 @@ if sys.version_info >= (3, 15):
         *,
         serializer: Callable[[Any], bytes] | None = None,
         deserializer: Callable[[bytes], Any] | None = None,
-    ) -> Shelf[Any]: ...
+    ) -> Shelf[Any]:
+        """Open a persistent dictionary for reading and writing.
+
+        The filename parameter is the base filename for the underlying
+        database.  As a side-effect, an extension may be added to the
+        filename and more than one file may be created.  The optional flag
+        parameter has the same interpretation as the flag parameter of
+        dbm.open(). The optional protocol parameter specifies the
+        version of the pickle protocol.
+
+        See the module's __doc__ string for an overview of the interface.
+        """
 
 elif sys.version_info >= (3, 11):
     def open(filename: StrOrBytesPath, flag: _TFlags = "c", protocol: int | None = None, writeback: bool = False) -> Shelf[Any]:

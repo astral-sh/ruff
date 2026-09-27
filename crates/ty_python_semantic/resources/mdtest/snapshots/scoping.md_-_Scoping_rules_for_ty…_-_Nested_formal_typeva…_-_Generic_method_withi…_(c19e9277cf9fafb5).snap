@@ -33,6 +33,5 @@ error[shadowed-type-variable]: Generic function `bad` uses type variable `T` alr
   |
 1 | class C[T]:
   |       - Type variable `T` is bound in this enclosing scope
-  |
 
 ```

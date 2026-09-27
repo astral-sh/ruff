@@ -5,7 +5,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 use anyhow::{Context, Result};
 use anyhow::{anyhow, bail};
@@ -68,12 +68,7 @@ pub enum PyprojectDiscoveryStrategy {
 
 impl PyprojectDiscoveryStrategy {
     #[inline]
-    pub const fn is_fixed(self) -> bool {
-        matches!(self, PyprojectDiscoveryStrategy::Fixed)
-    }
-
-    #[inline]
-    pub const fn is_hierarchical(self) -> bool {
+    const fn is_hierarchical(self) -> bool {
         matches!(self, PyprojectDiscoveryStrategy::Hierarchical)
     }
 }
@@ -89,7 +84,7 @@ pub enum Relativity {
 }
 
 impl Relativity {
-    pub fn resolve(self, path: &Path) -> &Path {
+    fn resolve(self, path: &Path) -> &Path {
         match self {
             Relativity::Parent => path
                 .parent()
@@ -126,7 +121,7 @@ impl<'a> Resolver<'a> {
 
     /// Return `true` if the [`Resolver`] is using a hierarchical discovery strategy.
     #[inline]
-    pub fn is_hierarchical(&self) -> bool {
+    fn is_hierarchical(&self) -> bool {
         self.pyproject_config.strategy.is_hierarchical()
     }
 
@@ -138,7 +133,7 @@ impl<'a> Resolver<'a> {
 
     /// Return `true` if the [`Resolver`] should respect `.gitignore` files.
     #[inline]
-    pub fn respect_gitignore(&self) -> bool {
+    fn respect_gitignore(&self) -> bool {
         self.pyproject_config
             .settings
             .file_resolver
@@ -306,16 +301,57 @@ pub trait ConfigurationTransformer {
     fn transform(&self, config: Configuration) -> Configuration;
 }
 
+/// Configurations shared during one traversal, before inheritance and overrides.
+///
+/// Paths are already normalized, so the project root is part of the cache key.
+/// Target-version fallbacks and CLI overrides remain specific to each chain.
+#[derive(Default)]
+struct ConfigurationCache {
+    configurations: RwLock<FxHashMap<(PathBuf, PathBuf), Arc<Configuration>>>,
+}
+
+impl ConfigurationCache {
+    fn get_or_try_insert_with(
+        &self,
+        path: &Path,
+        project_root: &Path,
+        load: impl FnOnce() -> Result<Configuration>,
+    ) -> Result<Configuration> {
+        let key = (path.to_path_buf(), project_root.to_path_buf());
+        let cached = self.configurations.read().unwrap().get(&key).cloned();
+        if let Some(configuration) = cached {
+            return Ok((*configuration).clone());
+        }
+
+        // Parsing, conversion, and cloning stay outside the lock so unrelated
+        // configurations can load in parallel.
+        let configuration = Arc::new(load()?);
+        let shared = self
+            .configurations
+            .write()
+            .unwrap()
+            .entry(key)
+            .or_insert_with(|| Arc::clone(&configuration))
+            .clone();
+        Ok((*shared).clone())
+    }
+}
+
 /// Recursively resolve a [`Configuration`] from a `pyproject.toml` file at the
 /// specified [`Path`].
-// TODO(charlie): This whole system could do with some caching. Right now, if a
-// configuration file extends another in the same path, we'll re-parse the same
-// file at least twice (possibly more than twice, since we'll also parse it when
-// resolving the "default" configuration).
 pub fn resolve_configuration(
     initial_config_path: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
+) -> Result<Configuration> {
+    resolve_configuration_with_cache(initial_config_path, transformer, origin, None)
+}
+
+fn resolve_configuration_with_cache(
+    initial_config_path: &Path,
+    transformer: &dyn ConfigurationTransformer,
+    origin: ConfigurationOrigin,
+    configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<Configuration> {
     let relativity = Relativity::from(origin);
     let mut configurations = indexmap::IndexMap::new();
@@ -332,27 +368,33 @@ pub fn resolve_configuration(
             ));
         }
 
-        let options = pyproject::load_options(&path).with_context(|| {
-            if configurations.is_empty() {
-                format!(
-                    "Failed to load configuration `{path}`",
-                    path = path.display()
-                )
-            } else {
-                let chain = configurations
-                    .keys()
-                    .chain([&path])
-                    .map(|p| format!("`{}`", p.display()))
-                    .join(" extends ");
-                format!(
-                    "Failed to load extended configuration `{path}` ({chain})",
-                    path = path.display()
-                )
-            }
-        })?;
-
         let project_root = relativity.resolve(&path);
-        let configuration = Configuration::from_options(options, Some(&path), project_root)?;
+        let load = || {
+            let options = pyproject::load_options(&path).with_context(|| {
+                if configurations.is_empty() {
+                    format!(
+                        "Failed to load configuration `{path}`",
+                        path = path.display()
+                    )
+                } else {
+                    let chain = configurations
+                        .keys()
+                        .chain([&path])
+                        .map(|p| format!("`{}`", p.display()))
+                        .join(" extends ");
+                    format!(
+                        "Failed to load extended configuration `{path}` ({chain})",
+                        path = path.display()
+                    )
+                }
+            })?;
+            Configuration::from_options(options, Some(&path), project_root)
+        };
+        let configuration = if let Some(cache) = configuration_cache {
+            cache.get_or_try_insert_with(&path, project_root, load)?
+        } else {
+            load()?
+        };
 
         // If extending, continue to collect.
         next = configuration.extend.as_ref().map(|extend| {
@@ -386,10 +428,12 @@ fn resolve_scoped_settings(
     pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
+    configuration_cache: Option<&ConfigurationCache>,
 ) -> Result<(PathBuf, Settings)> {
     let relativity = Relativity::from(origin);
 
-    let configuration = resolve_configuration(pyproject, transformer, origin)?;
+    let configuration =
+        resolve_configuration_with_cache(pyproject, transformer, origin, configuration_cache)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
     Ok((project_root.to_path_buf(), settings))
@@ -402,7 +446,7 @@ pub fn resolve_root_settings(
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<Settings> {
-    let (_project_root, settings) = resolve_scoped_settings(pyproject, transformer, origin)?;
+    let (_project_root, settings) = resolve_scoped_settings(pyproject, transformer, origin, None)?;
     Ok(settings)
 }
 
@@ -442,6 +486,7 @@ pub fn project_files_in_path<'a>(
     // Search for `pyproject.toml` files in all parent directories.
     let mut resolver = Resolver::new(pyproject_config);
     let mut seen = FxHashSet::default();
+    let configuration_cache = ConfigurationCache::default();
 
     // Insert the path to the root configuration to avoid parsing the configuration a second time.
     if let Some(config_path) = &pyproject_config.path {
@@ -457,6 +502,7 @@ pub fn project_files_in_path<'a>(
                             &pyproject,
                             transformer,
                             ConfigurationOrigin::Ancestor,
+                            Some(&configuration_cache),
                         )?;
                         resolver.add(&root, settings, pyproject);
                         // We found the closest configuration.
@@ -503,7 +549,7 @@ pub fn project_files_in_path<'a>(
     let walker = builder.build_parallel();
 
     // Run the `WalkParallel` to collect all files.
-    let state = WalkPythonFilesState::new(resolver);
+    let state = WalkPythonFilesState::new(resolver, configuration_cache);
     let mut visitor = PythonFilesVisitorBuilder::new(transformer, &state);
     walker.visit(&mut visitor);
 
@@ -516,14 +562,16 @@ struct WalkPythonFilesState<'config> {
     is_hierarchical: bool,
     merged: std::sync::Mutex<(ResolvedFiles, Result<()>)>,
     resolver: RwLock<Resolver<'config>>,
+    configuration_cache: ConfigurationCache,
 }
 
 impl<'config> WalkPythonFilesState<'config> {
-    fn new(resolver: Resolver<'config>) -> Self {
+    fn new(resolver: Resolver<'config>, configuration_cache: ConfigurationCache) -> Self {
         Self {
             is_hierarchical: resolver.is_hierarchical(),
             merged: std::sync::Mutex::new((Vec::new(), Ok(()))),
             resolver: RwLock::new(resolver),
+            configuration_cache,
         }
     }
 
@@ -648,6 +696,7 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             &pyproject,
                             self.transformer,
                             ConfigurationOrigin::Ancestor,
+                            Some(&self.global.configuration_cache),
                         ) {
                             Ok((root, settings)) => {
                                 self.global
@@ -772,8 +821,12 @@ pub fn project_file_at_path(
     if resolver.is_hierarchical() {
         for ancestor in path.ancestors() {
             if let Some(pyproject) = settings_toml(ancestor)? {
-                let (root, settings) =
-                    resolve_scoped_settings(&pyproject, transformer, ConfigurationOrigin::Unknown)?;
+                let (root, settings) = resolve_scoped_settings(
+                    &pyproject,
+                    transformer,
+                    ConfigurationOrigin::Unknown,
+                    None,
+                )?;
                 resolver.add(&root, settings, pyproject);
                 break;
             }
@@ -836,7 +889,7 @@ pub fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
 
 /// Return `true` if the given candidates should be ignored based on the exclusion
 /// criteria.
-pub fn match_candidate_exclusion(
+fn match_candidate_exclusion(
     file_path: &Candidate,
     file_basename: &Candidate,
     exclusion: &GlobSet,
@@ -1048,7 +1101,7 @@ mod tests {
     fn exclusions() {
         let project_root = Path::new("/tmp/");
 
-        let path = Path::new("foo").absolutize_from(project_root).unwrap();
+        let path = Path::new("foo").absolutize_from(project_root);
         let exclude =
             FilePattern::User("foo".to_string(), GlobPath::normalize("foo", project_root));
         let file_path = &path;
@@ -1059,7 +1112,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
+        let path = Path::new("foo/bar").absolutize_from(project_root);
         let exclude =
             FilePattern::User("bar".to_string(), GlobPath::normalize("bar", project_root));
         let file_path = &path;
@@ -1070,9 +1123,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar/baz.py")
-            .absolutize_from(project_root)
-            .unwrap();
+        let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
         let exclude = FilePattern::User(
             "baz.py".to_string(),
             GlobPath::normalize("baz.py", project_root),
@@ -1085,7 +1136,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar").absolutize_from(project_root).unwrap();
+        let path = Path::new("foo/bar").absolutize_from(project_root);
         let exclude = FilePattern::User(
             "foo/bar".to_string(),
             GlobPath::normalize("foo/bar", project_root),
@@ -1098,9 +1149,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar/baz.py")
-            .absolutize_from(project_root)
-            .unwrap();
+        let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
         let exclude = FilePattern::User(
             "foo/bar/baz.py".to_string(),
             GlobPath::normalize("foo/bar/baz.py", project_root),
@@ -1113,9 +1162,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar/baz.py")
-            .absolutize_from(project_root)
-            .unwrap();
+        let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
         let exclude = FilePattern::User(
             "foo/bar/*.py".to_string(),
             GlobPath::normalize("foo/bar/*.py", project_root),
@@ -1128,9 +1175,7 @@ mod tests {
             &make_exclusion(exclude),
         ));
 
-        let path = Path::new("foo/bar/baz.py")
-            .absolutize_from(project_root)
-            .unwrap();
+        let path = Path::new("foo/bar/baz.py").absolutize_from(project_root);
         let exclude =
             FilePattern::User("baz".to_string(), GlobPath::normalize("baz", project_root));
         let file_path = &path;

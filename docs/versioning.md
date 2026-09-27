@@ -2,6 +2,21 @@
 
 Ruff uses a custom versioning scheme that uses the **minor** version number for breaking changes and the **patch** version number for bug fixes. Ruff does not yet have a stable API; once Ruff's API is stable, the **major** version number and semantic versioning will be used.
 
+## Crate versioning
+
+Ruff's crates are published to [crates.io](https://crates.io). The following crates follow Ruff's
+normal versioning policy:
+
+- `ruff`
+- `ruff_linter`
+- `ruff_wasm`
+
+The Rust interfaces of these crates do not follow semantic versioning.
+
+The remaining crates published as part of Ruff releases provide **no stability guarantees**. Their
+Rust interfaces are considered internal and unstable. Consequently, they are versioned as `0.0.x`.
+The patch version is incremented on every Ruff release, regardless of changes to the crate.
+
 ## Version changes
 
 **Minor** version increases will occur when:

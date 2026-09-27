@@ -5,8 +5,11 @@ use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
 use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
-use lsp_server::Connection;
-use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
+use lsp_server::{Connection, ErrorCode, Message, Response};
+use lsp_types::{
+    ClientCapabilities, InitializeParams, MessageType, Uri, WorkspaceFolders,
+    WorkspaceFoldersInitializeParams,
+};
 use ruff_db::system::System;
 use std::num::NonZeroUsize;
 use std::panic::{PanicHookInfo, RefUnwindSafe};
@@ -16,15 +19,19 @@ mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
+mod script_progress;
 
 use crate::session::client::Client;
 pub(crate) use api::Error;
-pub(crate) use api::publish_settings_diagnostics;
+pub(crate) use api::{
+    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
+pub(crate) use lazy_work_done_progress::LazyWorkDoneProgress;
 pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
+pub(crate) use script_progress::ScriptProgress;
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
-pub use api::{PartialWorkspaceProgress, PartialWorkspaceProgressParams};
 
 pub struct Server {
     connection: Connection,
@@ -46,14 +53,25 @@ impl Server {
         let InitializeParams {
             initialization_options,
             capabilities: client_capabilities,
-            workspace_folders,
+            workspace_folders_initialize_params:
+                WorkspaceFoldersInitializeParams { workspace_folders },
             client_info,
             ..
         } = serde_json::from_value(init_value)
             .context("Failed to deserialize initialization parameters")?;
 
         let (initialization_options, deserialization_error) =
-            InitializationOptions::from_value(initialization_options);
+            match InitializationOptions::from_value(initialization_options) {
+                Ok(options) => options,
+                Err(error) => {
+                    connection.sender.send(Message::Response(Response::new_err(
+                        id,
+                        ErrorCode::InvalidParams as i32,
+                        format!("Invalid initialization options: {error:#}"),
+                    )))?;
+                    return Err(error).context("Failed to deserialize initialization options");
+                }
+            };
 
         if !in_test {
             crate::logging::init_logging(
@@ -103,7 +121,15 @@ impl Server {
 
         // Get workspace URLs without settings - settings will come from workspace/configuration
         let workspace_urls = workspace_folders
-            .filter(|folders| !folders.is_empty())
+            .and_then(|folders| {
+                if let WorkspaceFolders::WorkspaceFolderList(folders) = folders
+                    && !folders.is_empty()
+                {
+                    Some(folders)
+                } else {
+                    None
+                }
+            })
             .map(|folders| {
                 folders
                     .into_iter()
@@ -121,7 +147,7 @@ impl Server {
                     default workspace: {}",
                     current_dir.display()
                 );
-                let uri = Url::from_file_path(current_dir).ok()?;
+                let uri = Uri::from_file_path(current_dir).ok()?;
                 Some(vec![uri])
             })
             .ok_or_else(|| {
@@ -207,7 +233,7 @@ impl ServerPanicHookHandler {
             if let Some(client) = hook_client.upgrade() {
                 client.show_message(
                     "The ty language server exited with a panic. See the logs for more details.",
-                    MessageType::ERROR,
+                    MessageType::Error,
                 );
             }
         }));

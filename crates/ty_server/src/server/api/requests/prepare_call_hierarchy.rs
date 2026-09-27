@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use lsp_types::request::CallHierarchyPrepare;
-use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Url};
-use ty_project::ProjectDatabase;
+use lsp_types::CallHierarchyPrepareRequest;
+use lsp_types::{CallHierarchyItem, CallHierarchyPrepareParams, Uri};
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 use crate::PositionEncoding;
 use crate::document::{PositionExt, ToRangeExt as _};
@@ -12,7 +12,7 @@ use crate::server::api::traits::{
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
 /// Handles `textDocument/prepareCallHierarchy`.
 ///
@@ -23,11 +23,11 @@ use crate::system::file_to_url;
 pub(crate) struct PrepareCallHierarchyRequestHandler;
 
 impl RequestHandler for PrepareCallHierarchyRequestHandler {
-    type RequestType = CallHierarchyPrepare;
+    type RequestType = CallHierarchyPrepareRequest;
 }
 
 impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
-    fn document_url(params: &CallHierarchyPrepareParams) -> Cow<'_, Url> {
+    fn document_uri(params: &CallHierarchyPrepareParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -44,20 +44,20 @@ impl BackgroundDocumentRequestHandler for PrepareCallHierarchyRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.url(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
         };
 
-        let Some(items) = ty_ide::prepare_call_hierarchy(db, file, offset) else {
+        let Some(items) = ty_ide::prepare_call_hierarchy(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 
@@ -81,7 +81,7 @@ pub(super) fn convert_to_lsp_item(
     item: ty_ide::CallHierarchyItem,
     encoding: PositionEncoding,
 ) -> Option<CallHierarchyItem> {
-    let uri = file_to_url(db, item.file)?;
+    let uri = file_to_uri(db, item.file)?;
     let full_range = item.full_range.to_lsp_range(db, item.file, encoding)?;
     let selection_range = item.selection_range.to_lsp_range(db, item.file, encoding)?;
 

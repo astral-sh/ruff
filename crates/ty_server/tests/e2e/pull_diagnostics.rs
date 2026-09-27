@@ -3,15 +3,17 @@ use std::time::Duration;
 use anyhow::Result;
 use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
-use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
-    NumberOrString, PartialResultParams, PreviousResultId, Url, WorkDoneProgressParams,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceDocumentDiagnosticReport,
+    DocumentDiagnosticReport, PartialResultParams, PreviousResultId, ProgressNotification, Uri,
+    WorkDoneProgressBegin, WorkDoneProgressEnd, WorkDoneProgressParams, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
+    WorkspaceDocumentDiagnosticReport,
 };
+use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticRequest};
 use ruff_db::system::SystemPath;
-use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
+use ty_server::{ClientOptions, DiagnosticMode};
 
-use crate::workspace_folders::condensed_document_diagnostic_snapshot;
+use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]
@@ -273,7 +275,7 @@ def buy_sell_once(prices: list[float]) -> float:
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
 
     Ok(())
 }
@@ -301,7 +303,7 @@ def foo() -> str:
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
 
     Ok(())
 }
@@ -323,32 +325,22 @@ def foo(
         )?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default()
+            &ClientOptions::default()
                 .with_show_syntax_errors(false)
                 .with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized();
 
-    let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
-    assert_compact_json_snapshot!(workspace_diagnostics, @r#"
-    {
-      "items": [
-        {
-          "kind": "full",
-          "uri": "file://<temp_dir>/src/foo.py",
-          "version": null,
-          "resultId": "[RESULT_ID]",
-          "items": []
-        }
-      ]
-    }
-    "#);
-
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
-    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "resultId": "[RESULT_ID]", "items": []}"#);
+    assert_compact_json_snapshot!(diagnostics, @r#"{"items": [], "kind": "full"}"#);
+
+    let request_id = send_workspace_diagnostic_request(&mut server);
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+    let workspace_diagnostics = shutdown_and_await_workspace_diagnostic(server, &request_id);
+    assert_compact_json_snapshot!(workspace_diagnostics, @r#"{"items": []}"#);
 
     Ok(())
 }
@@ -392,7 +384,7 @@ fn pull_excluded_file() -> Result<()> {
     let _filter = filter_result_id();
 
     let main_path = SystemPath::new("src/foo.py");
-    let main_content = r#"reveal_type("included")"#;
+    let main_content = "reveal_type(\"included\")\n";
 
     let excluded_path = SystemPath::new("src/excluded/lib.py");
     let excluded_content = r#"reveal_type("Excluded")"#;
@@ -445,15 +437,15 @@ def foo() -> str:
 
     // Extract result ID from first response
     let result_id = match &first_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => report
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
             .full_document_diagnostic_report
             .result_id
             .as_ref()
             .expect("First response should have a result ID")
             .clone(),
-        _ => panic!("First response should be a full report"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
     };
 
     // Second request with the previous result ID - should return Unchanged
@@ -461,12 +453,12 @@ def foo() -> str:
 
     // Verify it's an unchanged report
     match second_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Unchanged(_),
-        ) => {
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
             // Success - got unchanged report as expected
         }
-        _ => panic!("Expected an unchanged report when diagnostics haven't changed"),
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(_) => {
+            panic!("Expected an unchanged report when diagnostics haven't changed")
+        }
     }
 
     Ok(())
@@ -500,25 +492,27 @@ def foo() -> str:
 
     // Extract result ID from first response
     let result_id = match &first_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => report
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
             .full_document_diagnostic_report
             .result_id
             .as_ref()
             .expect("First response should have a result ID")
             .clone(),
-        _ => panic!("First response should be a full report"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
     };
 
     // Change the document to fix the error
     server.change_text_document(
         foo,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: foo_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -527,14 +521,124 @@ def foo() -> str:
 
     // Verify it's a full report (not unchanged)
     match second_response {
-        lsp_types::DocumentDiagnosticReportResult::Report(
-            lsp_types::DocumentDiagnosticReport::Full(report),
-        ) => {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => {
             // Should have no diagnostics now
             assert_eq!(report.full_document_diagnostic_report.items.len(), 0);
         }
-        _ => panic!("Expected a full report when diagnostics have changed"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("Expected a full report when diagnostics have changed")
+        }
     }
+
+    Ok(())
+}
+
+#[test]
+fn document_diagnostic_caching_rendered_source_changed() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content_v1 = "\
+def foo() -> str:
+    return 42  # before
+";
+    let foo_content_v2 = "\
+def foo() -> str:
+    return 42  # after!
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content_v1)?
+        .with_full_diagnostic_output()
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content_v1, 1);
+
+    let first_response = server.document_diagnostic_request(foo, None);
+    let result_id = match &first_response {
+        DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) => report
+            .full_document_diagnostic_report
+            .result_id
+            .clone()
+            .expect("First response should have a result ID"),
+        DocumentDiagnosticReport::RelatedUnchangedDocumentDiagnosticReport(_) => {
+            panic!("First response should be a full report")
+        }
+    };
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_before",
+        first_response
+    );
+
+    server.change_text_document(
+        foo,
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: foo_content_v2.to_string(),
+                },
+            ),
+        ],
+        2,
+    );
+
+    let second_response = server.document_diagnostic_request(foo, Some(result_id));
+    assert_debug_snapshot!(
+        "document_diagnostic_caching_rendered_source_after",
+        second_response
+    );
+
+    Ok(())
+}
+
+/// Settings invalidate cached workspace results only when the reported diagnostics change.
+#[test]
+fn workspace_diagnostic_caching_settings_changed() -> Result<()> {
+    let root = SystemPath::new("src");
+    let extra = SystemPath::new("extra");
+    let main = root.join("main.py");
+    let unchanged = root.join("unchanged.py");
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .with_workspace(root, None)?
+        .with_file(&main, "(")?
+        .with_file(&unchanged, "missing")?
+        .with_file(extra.join("empty.py"), "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let first_response = server.workspace_diagnostic_request(None, None);
+    let previous_result_ids = extract_result_ids_from_response(&first_response);
+
+    // Adding a workspace can change global settings for existing workspaces, without edits.
+    server.add_workspace_folder(
+        extra,
+        Some(ClientOptions::default().with_show_syntax_errors(false)),
+    )?;
+    server.change_workspace_folders([extra], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let mut response = server.workspace_diagnostic_request(None, Some(previous_result_ids));
+    sort_workspace_diagnostic_response(&mut response);
+    let [
+        WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report),
+        WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
+            unchanged_report,
+        ),
+    ] = response.items.as_slice()
+    else {
+        anyhow::bail!("Expected syntax errors to be cleared and other diagnostics to be unchanged");
+    };
+    assert_eq!(report.uri, server.file_uri(&main));
+    assert!(report.full_document_diagnostic_report.items.is_empty());
+    assert!(report.full_document_diagnostic_report.result_id.is_none());
+    assert_eq!(unchanged_report.uri, server.file_uri(&unchanged));
 
     Ok(())
 }
@@ -602,7 +706,7 @@ def foo() -> str:
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .with_file(file_a, file_a_content)?
         .with_file(file_b, file_b_content_v1)?
@@ -615,8 +719,10 @@ def foo() -> str:
     server.open_text_document(file_a, file_a_content, 1);
 
     // First request with no previous result IDs
-    let mut first_response = server
-        .workspace_diagnostic_request(Some(NumberOrString::String("progress-1".to_string())), None);
+    let mut first_response = server.workspace_diagnostic_request(
+        Some(lsp_types::ProgressToken::String("progress-1".to_string())),
+        None,
+    );
     sort_workspace_diagnostic_response(&mut first_response);
 
     assert_debug_snapshot!("workspace_diagnostic_initial_state", first_response);
@@ -637,44 +743,52 @@ def foo() -> str:
     // File B: Add a new error
     server.change_text_document(
         file_b,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_b_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_b_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File C: Fix the error
     server.change_text_document(
         file_c,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_c_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_c_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File D: Change the error
     server.change_text_document(
         file_d,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_d_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_d_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     // File E: Modify the file but keep the same diagnostic
     server.change_text_document(
         file_e,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_e_content_v2.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_e_content_v2.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -686,7 +800,7 @@ def foo() -> str:
     // - File D: Full report (diagnostic content changed)
     // - File E: Full report (the range changes)
     let mut second_response = server.workspace_diagnostic_request(
-        Some(NumberOrString::String("progress-2".to_string())),
+        Some(lsp_types::ProgressToken::String("progress-2".to_string())),
         Some(previous_result_ids),
     );
     sort_workspace_diagnostic_response(&mut second_response);
@@ -715,7 +829,7 @@ def foo() -> str:
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized();
@@ -726,7 +840,7 @@ def foo() -> str:
     let mut previous_result_ids = extract_result_ids_from_response(&first_response);
 
     for previous_id in &mut previous_result_ids {
-        // VS Code URL encodes paths, so that `:` is encoded as `%3A`.
+        // VS Code URI encodes paths, so that `:` is encoded as `%3A`.
         previous_id
             .uri
             .set_path(&previous_id.uri.path().replace(':', "%3A"));
@@ -740,13 +854,13 @@ def foo() -> str:
             partial_result_params: PartialResultParams::default(),
         });
 
-    // The URL mismatch shouldn't result in a full document report.
-    // The server needs to match the previous result IDs by the path, not the URL.
+    // The URI mismatch shouldn't result in a full document report.
+    // The server needs to match the previous result IDs by the path, not the URI.
     assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &workspace_request_id);
 
     let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id);
 
-    insta::assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
+    insta::assert_compact_debug_snapshot!(second_response, @"WorkspaceDiagnosticReport { items: [] }");
 
     Ok(())
 }
@@ -760,23 +874,19 @@ pub(crate) fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
 
 fn consume_all_progress_notifications(server: &mut TestServer) -> Result<()> {
     // Always consume Begin
-    let begin_params = server.await_notification::<lsp_types::notification::Progress>();
+    let begin_params = server.await_notification::<lsp_types::ProgressNotification>();
 
     // The params are already the ProgressParams type
-    let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::Begin(_)) =
-        begin_params.value
-    else {
+    let Ok(_) = serde_json::from_value::<WorkDoneProgressBegin>(begin_params.value) else {
         return Err(anyhow::anyhow!("Expected Begin progress notification"));
     };
 
     // Consume Report notifications - there may be multiple based on number of files
     // Keep consuming until we hit the End notification
     loop {
-        let params = server.await_notification::<lsp_types::notification::Progress>();
+        let params = server.await_notification::<lsp_types::ProgressNotification>();
 
-        if let lsp_types::ProgressParamsValue::WorkDone(lsp_types::WorkDoneProgress::End(_)) =
-            params.value
-        {
+        if serde_json::from_value::<WorkDoneProgressEnd>(params.value).is_ok() {
             // Found the End notification, we're done
             break;
         }
@@ -809,7 +919,7 @@ def foo() -> str:
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -839,13 +949,7 @@ def foo() -> str:
     let final_response = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
 
     // Process the final report.
-    // This should always be a partial report. However, the type definition in the LSP specification
-    // is broken in the sense that both `Report` and `Partial` have the exact same shape
-    // and deserializing a previously serialized `Partial` result will yield a `Report` type.
-    let response_items = match final_response {
-        WorkspaceDiagnosticReportResult::Report(report) => report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-    };
+    let response_items = final_response.items;
 
     // The last batch should contain 1 item because the server sends a partial result with
     // 2 items each.
@@ -854,18 +958,13 @@ def foo() -> str:
 
     // Collect any partial results sent via progress notifications
     while let Ok(params) =
-        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+        server.try_await_notification::<ProgressNotification>(Some(Duration::from_secs(1)))
     {
         if params.token == partial_token {
-            let streamed_items = match params.value {
-                // Ideally we'd assert that only the first response is a full report
-                // However, the type definition in the LSP specification is broken
-                // in the sense that both `Report` and `Partial` have the exact same structure
-                // but it also doesn't use a tag to tell them apart...
-                // That means, a client can never tell if it's a full report or a partial report
-                WorkspaceDiagnosticReportResult::Report(report) => report.items,
-                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-            };
+            let report =
+                serde_json::from_value::<WorkspaceDiagnosticReportPartialResult>(params.value)
+                    .unwrap();
+            let streamed_items = report.items;
 
             // All streamed batches should contain 2 items (test behavior).
             assert_eq!(streamed_items.len(), 2);
@@ -897,7 +996,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let mut builder = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         );
 
     for i in 0..NUM_FILES {
@@ -922,31 +1021,37 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     // Fix three errors
     server.change_text_document(
         SystemPath::new("src/error_0.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     server.change_text_document(
         SystemPath::new("src/error_1.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
     server.change_text_document(
         SystemPath::new("src/error_2.py"),
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: changed_content.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: changed_content.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -969,10 +1074,7 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     let mut all_items = Vec::new();
 
     // The final response should contain one fixed file and all unchanged files
-    let items = match final_response2 {
-        WorkspaceDiagnosticReportResult::Report(report) => report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-    };
+    let items = final_response2.items;
 
     assert_eq!(items.len(), NUM_FILES - 3 + 1); // 3 fixed, 4 unchanged, 1 full report for fixed file
 
@@ -980,18 +1082,13 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
 
     // Collect any partial results sent via progress notifications
     while let Ok(params) =
-        server.try_await_notification::<PartialWorkspaceProgress>(Some(Duration::from_secs(1)))
+        server.try_await_notification::<ProgressNotification>(Some(Duration::from_secs(1)))
     {
         if params.token == partial_token {
-            let streamed_items = match params.value {
-                // Ideally we'd assert that only the first response is a full report
-                // However, the type definition in the LSP specification is broken
-                // in the sense that both `Report` and `Partial` have the exact same structure
-                // but it also doesn't use a tag to tell them apart...
-                // That means, a client can never tell if it's a full report or a partial report
-                WorkspaceDiagnosticReportResult::Report(report) => report.items,
-                WorkspaceDiagnosticReportResult::Partial(partial) => partial.items,
-            };
+            let report =
+                serde_json::from_value::<WorkspaceDiagnosticReportPartialResult>(params.value)
+                    .unwrap();
+            let streamed_items = report.items;
 
             // All streamed batches should contain 2 items.
             assert_eq!(streamed_items.len(), 2);
@@ -1010,20 +1107,19 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
     Ok(())
 }
 
-fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReportResult) {
-    let items = match response {
-        WorkspaceDiagnosticReportResult::Report(report) => &mut report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => &mut partial.items,
-    };
-
-    sort_workspace_report_items(items);
+pub(crate) fn sort_workspace_diagnostic_response(response: &mut WorkspaceDiagnosticReport) {
+    sort_workspace_report_items(&mut response.items);
 }
 
 fn sort_workspace_report_items(items: &mut [WorkspaceDocumentDiagnosticReport]) {
-    fn item_uri(item: &WorkspaceDocumentDiagnosticReport) -> &Url {
+    fn item_uri(item: &WorkspaceDocumentDiagnosticReport) -> &Uri {
         match item {
-            WorkspaceDocumentDiagnosticReport::Full(full_report) => &full_report.uri,
-            WorkspaceDocumentDiagnosticReport::Unchanged(unchanged_report) => &unchanged_report.uri,
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                full_report,
+            ) => &full_report.uri,
+            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(
+                unchanged_report,
+            ) => &unchanged_report.uri,
         }
     }
 
@@ -1100,11 +1196,13 @@ def hello() -> str:
     // Now introduce an error to the file - this should trigger the long-polling request to complete
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_with_error.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_with_error.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -1200,11 +1298,13 @@ def hello() -> str:
     // PHASE 2: Introduce error to trigger response
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_with_error.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_with_error.to_string(),
+                },
+            ),
+        ],
         2,
     );
 
@@ -1233,11 +1333,13 @@ def hello() -> str:
     // PHASE 4: Fix the error to trigger the second response
     server.change_text_document(
         file_path,
-        vec![lsp_types::TextDocumentContentChangeEvent {
-            range: None,
-            range_length: None,
-            text: file_content_fixed.to_string(),
-        }],
+        vec![
+            lsp_types::TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                TextDocumentContentChangeWholeDocument {
+                    text: file_content_fixed.to_string(),
+                },
+            ),
+        ],
         3,
     );
 
@@ -1328,7 +1430,7 @@ fn create_workspace_server_with_file(
         .with_workspace(workspace_root, None)?
         .with_file(file_path, file_content)?
         .with_initialization_options(
-            ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
+            &ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace),
         )
         .build()
         .wait_until_workspaces_are_initialized())
@@ -1353,16 +1455,16 @@ pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_
 pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
-) -> WorkspaceDiagnosticReportResult {
+) -> WorkspaceDiagnosticReport {
     // Send shutdown request - this should cause the suspended workspace diagnostic request to respond
-    let shutdown_id = server.send_request::<lsp_types::request::Shutdown>(());
+    let shutdown_id = server.send_request::<lsp_types::ShutdownRequest>(());
 
     // The workspace diagnostic request should now respond with an empty report
     let workspace_response = server.await_response::<WorkspaceDiagnosticRequest>(request_id);
 
     // Complete shutdown sequence
-    server.await_response::<lsp_types::request::Shutdown>(&shutdown_id);
-    server.send_notification::<lsp_types::notification::Exit>(());
+    server.await_response::<lsp_types::ShutdownRequest>(&shutdown_id);
+    server.send_notification::<lsp_types::ExitNotification>(());
 
     workspace_response
 }
@@ -1389,21 +1491,15 @@ pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     }
 }
 
-fn extract_result_ids_from_response(
-    response: &WorkspaceDiagnosticReportResult,
-) -> Vec<PreviousResultId> {
-    let items = match response {
-        WorkspaceDiagnosticReportResult::Report(report) => &report.items,
-        WorkspaceDiagnosticReportResult::Partial(partial) => {
-            // For partial results, extract from items the same way
-            &partial.items
-        }
-    };
+fn extract_result_ids_from_response(response: &WorkspaceDiagnosticReport) -> Vec<PreviousResultId> {
+    let items = &response.items;
 
     items
         .iter()
         .filter_map(|item| match item {
-            WorkspaceDocumentDiagnosticReport::Full(full_report) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(
+                full_report,
+            ) => {
                 let result_id = full_report
                     .full_document_diagnostic_report
                     .result_id
@@ -1414,10 +1510,166 @@ fn extract_result_ids_from_response(
                     value: result_id.clone(),
                 })
             }
-            WorkspaceDocumentDiagnosticReport::Unchanged(_) => {
+            WorkspaceDocumentDiagnosticReport::WorkspaceUnchangedDocumentDiagnosticReport(_) => {
                 // Unchanged reports don't provide new result IDs
                 None
             }
         })
         .collect()
+}
+
+mod uv_metadata {
+    use lsp_types::{
+        Code, Position, Range, TextDocumentContentChangeEvent,
+        TextDocumentContentChangeWholeDocument,
+    };
+    use ty_project::UseUv;
+
+    use super::{
+        ClientOptions, DiagnosticMode, DocumentDiagnosticReport, Result, SystemPath,
+        TestServerBuilder, WorkspaceDocumentDiagnosticReport,
+    };
+
+    #[test]
+    fn opening_new_file_updates_workspace_index() -> Result<()> {
+        let added = SystemPath::new("src/added.py");
+        let source = "missing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(
+                SystemPath::new("src"),
+                Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+            )?
+            .with_file(SystemPath::new("src/initial.py"), source)?
+            .with_use_uv(UseUv::Scripts)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        // Build the index before creating the file, without sending a watcher event.
+        let _ = server.workspace_diagnostic_request(None, None);
+        server.write_file(added, source)?;
+        server.open_text_document(added, source, 1);
+
+        let uri = server.file_uri(added);
+        let diagnostics = server.workspace_diagnostic_request(None, None);
+        assert!(diagnostics.items.iter().any(|report| matches!(
+            report,
+            WorkspaceDocumentDiagnosticReport::WorkspaceFullDocumentDiagnosticReport(report)
+                if report.uri == uri
+        )));
+
+        Ok(())
+    }
+
+    #[test]
+    fn synchronization_failure_highlights_script_metadata() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let source =
+            "#!/usr/bin/env python3\n\n# /// script\n# dependencies = []\n# ///\nvalue = 1\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, source)?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, source, 1);
+        server.await_diagnostic_refresh();
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the script");
+        };
+
+        let diagnostic = report
+            .full_document_diagnostic_report
+            .items
+            .iter()
+            .find(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+            .ok_or_else(|| {
+                anyhow::anyhow!("expected the script synchronization error: {report:?}")
+            })?;
+
+        assert_eq!(
+            diagnostic.range,
+            Range::new(Position::new(2, 0), Position::new(4, 5))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsaved_script_uses_its_settings_and_keeps_diagnostics() -> Result<()> {
+        let workspace_root = SystemPath::new("src");
+        let script = SystemPath::new("src/script.py");
+        let initial = "PythonFinalizationError\nmissing\n";
+        let updated = "# /// script\n# requires-python = '>=3.13'\n# dependencies = []\n# ///\nPythonFinalizationError\nmissing\n";
+
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(script, initial)?
+            .with_file(
+                SystemPath::new("src/ty.toml"),
+                "[environment]\npython-version = '3.12'\n",
+            )?
+            .with_use_uv(UseUv::Scripts)
+            .with_env_var("UV", "missing-ty-script-uv-executable")
+            .enable_workspace_diagnostic_refresh(true)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(script, initial, 1);
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the ordinary file");
+        };
+        assert_eq!(report.full_document_diagnostic_report.items.len(), 2);
+
+        server.change_text_document(
+            script,
+            vec![
+                TextDocumentContentChangeEvent::TextDocumentContentChangeWholeDocument(
+                    TextDocumentContentChangeWholeDocument {
+                        text: updated.to_string(),
+                    },
+                ),
+            ],
+            2,
+        );
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the provisional script");
+        };
+        let [diagnostic] = report.full_document_diagnostic_report.items.as_slice() else {
+            anyhow::bail!("expected only the unresolved `missing` reference");
+        };
+        assert_eq!(
+            diagnostic.code,
+            Some(Code::String("unresolved-reference".to_string()))
+        );
+        assert_eq!(diagnostic.range.start.line, 5);
+
+        server.write_file(script, updated)?;
+        server.save_text_document(script);
+        server.await_diagnostic_refresh();
+
+        let report = server.document_diagnostic_request(script, None);
+        let DocumentDiagnosticReport::RelatedFullDocumentDiagnosticReport(report) = report else {
+            anyhow::bail!("expected a full diagnostic report for the synchronized script");
+        };
+        assert!(
+            report
+                .full_document_diagnostic_report
+                .items
+                .iter()
+                .any(|diagnostic| diagnostic.code == Some(Code::String("uv-metadata".to_string())))
+        );
+
+        Ok(())
+    }
 }

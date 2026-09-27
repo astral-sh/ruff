@@ -6,6 +6,7 @@
 use ordermap::OrderMap;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
+use ruff_ranged_value::RangedValue;
 use std::{collections::HashMap, hash::BuildHasher};
 
 /// Combine two values, preferring the values in `self`.
@@ -63,6 +64,15 @@ pub trait Combine {
     }
 
     fn combine_with(&mut self, other: Self);
+}
+
+impl<T> Combine for RangedValue<T>
+where
+    T: Combine,
+{
+    fn combine_with(&mut self, other: Self) {
+        (**self).combine_with(other.into_inner());
+    }
 }
 
 impl<T> Combine for Option<T>

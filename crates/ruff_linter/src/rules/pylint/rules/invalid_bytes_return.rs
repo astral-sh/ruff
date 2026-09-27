@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `__bytes__` implementations that return types other than `bytes`.
@@ -35,7 +36,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bytes__` method](https://docs.python.org/3/reference/datamodel.html#object.__bytes__)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.6.0")]
+#[violation_metadata(stable_since = "0.6.0", category = Category::Suspicious)]
 pub(crate) struct InvalidBytesReturnType;
 
 impl Violation for InvalidBytesReturnType {

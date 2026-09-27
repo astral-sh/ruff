@@ -1,11 +1,13 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::token::parenthesized_range;
-use ruff_python_ast::{self as ast, Expr, Operator};
+use ruff_python_ast::token::{TokenKind, parenthesized_range};
+use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -33,6 +35,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// )
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is marked as unsafe when it would create a docstring.
+///
 /// ## Options
 ///
 /// Setting `lint.flake8-implicit-str-concat.allow-multiline = false` will disable this rule because
@@ -40,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-implicit-str-concat.allow-multiline`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.201")]
+#[violation_metadata(stable_since = "v0.0.201", category = Category::Restriction)]
 pub(crate) struct ExplicitStringConcatenation;
 
 impl Violation for ExplicitStringConcatenation {
@@ -105,18 +111,66 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     return;
                 }
 
-                diagnostic.set_fix(generate_fix(checker, bin_op));
+                if let Some(fix) = generate_fix(checker, bin_op) {
+                    diagnostic.set_fix(fix);
+                }
             }
         }
     }
 }
 
-fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
+/// Returns `true` if removing the `+` operator would turn the enclosing
+/// expression statement into a docstring, which would change the program's
+/// behavior (e.g., by setting `__doc__`). See #27979.
+fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
+    // Only concatenations of plain string literals can produce a docstring
+    // after the fix; f-strings, byte strings, and template strings are not
+    // recognized as docstrings by Python.
+    if !matches!(
+        (expr.left.as_ref(), expr.right.as_ref()),
+        (Expr::StringLiteral(_), Expr::StringLiteral(_))
+    ) {
+        return false;
+    }
+
+    let semantic = checker.semantic();
+    let stmt = semantic.current_statement();
+    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
+        return false;
+    };
+    // The concatenation must be the entire expression statement.
+    if value.range() != expr.range() {
+        return false;
+    }
+
+    // A docstring must be the first statement in the body of a module,
+    // function, or class.
+    let body = match semantic.current_statement_parent() {
+        Some(Stmt::FunctionDef(function)) => &function.body,
+        Some(Stmt::ClassDef(class)) => &class.body,
+        // No parent statement: the statement is at module level.
+        None => checker.module.python_ast,
+        _ => return false,
+    };
+    body.first() == Some(stmt)
+}
+
+fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {
     let ast::ExprBinOp { left, right, .. } = expr_bin_op;
 
     let between_operands_range = TextRange::new(left.end(), right.start());
-    let between_operands = checker.locator().slice(between_operands_range);
-    let (before_plus, after_plus) = between_operands.split_once('+').unwrap();
+    let plus_token = checker
+        .tokens()
+        .in_range(between_operands_range)
+        .iter()
+        .find(|token| token.kind() == TokenKind::Plus)?;
+
+    let before_plus = checker
+        .locator()
+        .slice(TextRange::new(left.end(), plus_token.start()));
+    let after_plus = checker
+        .locator()
+        .slice(TextRange::new(plus_token.end(), right.start()));
 
     let linebreak_before_operator =
         before_plus.contains_line_break(TextRange::at(TextSize::new(0), before_plus.text_len()));
@@ -129,8 +183,14 @@ fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Fix {
         before_plus.trim_end_matches(is_python_whitespace)
     };
 
-    Fix::safe_edit(Edit::range_replacement(
-        format!("{before_plus}{after_plus}"),
-        between_operands_range,
+    let applicability = if fix_creates_docstring(checker, expr_bin_op) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edit(
+        Edit::range_replacement(format!("{before_plus}{after_plus}"), between_operands_range),
+        applicability,
     ))
 }

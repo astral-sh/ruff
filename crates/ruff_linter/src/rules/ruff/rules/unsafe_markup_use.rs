@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## Removed
 /// This rule was implemented in `bandit` and has been remapped to
@@ -73,7 +74,7 @@ use crate::Violation;
 /// [markupsafe-markup]: https://markupsafe.palletsprojects.com/en/stable/escaping/#markupsafe.Markup
 /// [flake8-markupsafe]: https://github.com/vmagamedov/flake8-markupsafe
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.10.0")]
+#[violation_metadata(removed_since = "0.10.0", category = Category::Security)]
 pub(crate) struct RuffUnsafeMarkupUse {
     name: String,
 }

@@ -82,6 +82,7 @@ class Queue(Generic[_T]):
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
         """
+
     if sys.version_info >= (3, 13):
         def shutdown(self, immediate: bool = False) -> None:
             """Shut-down the queue, making queue gets and puts raise ShutDown.
@@ -151,7 +152,8 @@ class Queue(Generic[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """Represent a PEP 585 generic type
 
-        E.g. for t = list[int], t.__origin__ is list and t.__args__ is (int,).
+        For example, for t = list[int], t.__origin__ is list and t.__args__
+        is (int,).
         """
 
 class PriorityQueue(Queue[SupportsRichComparisonT]):

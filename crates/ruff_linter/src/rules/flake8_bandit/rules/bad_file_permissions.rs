@@ -7,6 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_s103_extended_dangerous_bits_enabled;
 
 /// ## What it does
@@ -42,7 +43,7 @@ use crate::preview::is_s103_extended_dangerous_bits_enabled;
 /// - [Python documentation: `stat`](https://docs.python.org/3/library/stat.html)
 /// - [Common Weakness Enumeration: CWE-732](https://cwe.mitre.org/data/definitions/732.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", category = Category::Security)]
 pub(crate) struct BadFilePermissions {
     reason: Reason,
 }

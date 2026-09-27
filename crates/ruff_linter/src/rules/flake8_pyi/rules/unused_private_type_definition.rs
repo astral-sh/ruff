@@ -5,6 +5,7 @@ use ruff_python_semantic::{Scope, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix;
 use crate::{Fix, FixAvailability, Violation};
 
@@ -30,14 +31,14 @@ use crate::{Fix, FixAvailability, Violation};
 /// The fix is always marked as unsafe, as it would break your code if the type
 /// variable is imported by another module.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct UnusedPrivateTypeVar {
     type_var_like_name: String,
     type_var_like_kind: String,
 }
 
 impl Violation for UnusedPrivateTypeVar {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -87,7 +88,7 @@ impl Violation for UnusedPrivateTypeVar {
 /// def func(arg: _PrivateProtocol) -> None: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct UnusedPrivateProtocol {
     name: String,
 }
@@ -126,7 +127,7 @@ impl Violation for UnusedPrivateProtocol {
 /// def func(arg: _UsedTypeAlias) -> _UsedTypeAlias: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct UnusedPrivateTypeAlias {
     name: String,
 }
@@ -167,7 +168,7 @@ impl Violation for UnusedPrivateTypeAlias {
 /// def func(arg: _UsedPrivateTypedDict) -> _UsedPrivateTypedDict: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.281")]
+#[violation_metadata(stable_since = "v0.0.281", category = Category::Suspicious)]
 pub(crate) struct UnusedPrivateTypedDict {
     name: String,
 }

@@ -1,19 +1,133 @@
-use crate::{
-    Db,
-    types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType,
-        call::CallErrorKind,
-        context::InferContext,
-        diagnostic::NOT_ITERABLE,
-        todo_type,
-        tuple::{TupleSpec, TupleSpecBuilder},
-    },
+use crate::Db;
+use crate::ProgramEnvironment;
+use crate::types::{
+    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
+    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
+    UnionType,
+    call::CallErrorKind,
+    context::InferContext,
+    diagnostic::NOT_ITERABLE,
+    function::function_has_stub_body,
+    infer::infer_expression_types,
+    todo_type,
+    tuple::{TupleSpec, TupleSpecBuilder},
 };
+use compact_str::ToCompactString;
+use ruff_db::diagnostic::{Annotation, Span};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
+use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
-use ty_python_core::EvaluationMode;
+use ty_module_resolver::{SearchPath, file_to_module};
+use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::{EvaluationMode, semantic_index};
+
+/// Points to a coroutine declaration that may have been intended to describe an async generator.
+pub(super) fn add_async_generator_stub_help<'db>(
+    db: &'db dyn Db,
+    diagnostic: &mut LintDiagnosticGuard<'_, '_>,
+    definition: Definition<'db>,
+) {
+    let Some((span, name)) = async_generator_stub_declaration(db, definition) else {
+        return;
+    };
+    let is_first_party = diagnostic
+        .primary_span()
+        .is_some_and(|primary| primary.file() == span.file())
+        || file_to_module(db, definition.program_file(db).resolver_file(db))
+            .and_then(|module| module.search_path(db))
+            .is_some_and(SearchPath::is_first_party);
+
+    diagnostic.annotate(
+        Annotation::secondary(span.clone())
+            .message("Without `yield` in the function body this function returns a coroutine"),
+    );
+    if is_first_party {
+        diagnostic.help(format_args!(
+            "To declare `{name}` as an async generator, use `def` rather than `async def` or add `yield` to the body"
+        ));
+    } else {
+        diagnostic.help(
+            "If an async generator was intended, report this stub to the library maintainers",
+        );
+    }
+}
+
+/// Only stub-like bodies warrant advice about changing the declaration. A coroutine with an
+/// implementation can intentionally return an async iterator, which its caller must await.
+#[salsa::tracked]
+fn async_generator_stub_declaration<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<(Span, Name)> {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return None;
+    };
+    let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
+    let node = function.node(&module);
+    if !node.is_async || !function_has_stub_body(node) {
+        return None;
+    }
+    // Start at `async`, excluding any decorators from the declaration's range.
+    let start = module
+        .tokens()
+        .in_range(TextRange::new(node.start(), node.name.start()))
+        .iter()
+        .rfind(|token| token.kind() == TokenKind::Async)?
+        .start();
+    let end = node
+        .returns
+        .as_ref()
+        .map_or(node.parameters.end(), |returns| returns.end());
+    Some((
+        Span::from(definition.file(db)).with_range(TextRange::new(start, end)),
+        node.name.id.clone(),
+    ))
+}
+
+/// Finds the declaration for a directly called, non-overloaded iterable factory.
+///
+/// The iterable has already been inferred as a standalone expression. Reuse that result rather
+/// than inferring its enclosing scope while that scope's diagnostics are still being collected.
+fn iterable_factory_definition<'db>(
+    context: &InferContext<'db, '_>,
+    iterable_node: ast::AnyNodeRef,
+) -> Option<Definition<'db>> {
+    let call = *iterable_node.as_expr_call()?;
+    let db = context.db();
+    let expression = semantic_index(db, context.program_file()).try_expression(call)?;
+    let inference = infer_expression_types(db, expression, TypeContext::default());
+    let bindings = inference
+        .expression_type(call.func.as_ref())
+        .bindings(db, context.program_environment());
+    let [overload] = bindings.single_element()?.overloads() else {
+        return None;
+    };
+    overload.signature.definition()
+}
+
+/// Extract precise element types for membership in an immediately consumed list or set display.
+///
+/// The ordinary inferred container type remains unchanged. Set construction can remove duplicates,
+/// so these elements do not describe an iteration order or an exact length.
+pub(super) fn extract_literal_container_element_types<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    expression: &ast::Expr,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Box<[Type<'db>]>> {
+    match expression {
+        ast::Expr::List(_) => {
+            extract_fixed_length_iterable_element_types(db, env, expression, expression_type)
+        }
+        ast::Expr::Set(set) if !set.elts.iter().any(ast::Expr::is_starred_expr) => {
+            Some(set.elts.iter().map(expression_type).collect())
+        }
+        _ => None,
+    }
+}
 
 /// Extract the element types from an expression with a statically known fixed-length iteration.
 ///
@@ -21,11 +135,13 @@ use ty_python_core::EvaluationMode;
 /// recursively unpacking starred elements whose iterables are also fixed-length.
 pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     iterable: &ast::Expr,
     mut expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
 ) -> Option<Box<[Type<'db>]>> {
     fn extend_fixed_length_iterable<'db>(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         iterable: &ast::Expr,
         expression_type: &mut impl FnMut(&ast::Expr) -> Type<'db>,
         element_types: &mut Vec<Type<'db>>,
@@ -41,6 +157,7 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
                 if let ast::Expr::Starred(starred) = element {
                     extend_fixed_length_iterable(
                         db,
+                        env,
                         starred.value.as_ref(),
                         expression_type,
                         element_types,
@@ -53,25 +170,55 @@ pub(crate) fn extract_fixed_length_iterable_element_types<'db>(
         }
 
         let iterable_type = expression_type(iterable);
-        let spec = iterable_type.try_iterate(db).ok()?;
+        let spec = iterable_type.try_iterate(db, env).ok()?;
         let tuple = spec.as_fixed_length()?;
         element_types.extend(tuple.all_elements().iter().copied());
         Some(())
     }
 
     let mut element_types = Vec::new();
-    extend_fixed_length_iterable(db, iterable, &mut expression_type, &mut element_types)?;
+    extend_fixed_length_iterable(db, env, iterable, &mut expression_type, &mut element_types)?;
     Some(element_types.into_boxed_slice())
 }
 
 impl<'db> Type<'db> {
+    /// Recognizes coroutines whose results can be iterated over asynchronously.
+    ///
+    /// These can arise from async generator stubs that omit `yield`, or from
+    /// coroutine functions whose results need to be awaited before iteration.
+    pub(super) fn coroutine_returning_async_iterable(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        let Type::NominalInstance(instance) = self else {
+            return None;
+        };
+        if !instance.has_known_class(db, KnownClass::CoroutineType) {
+            return None;
+        }
+        let result = self.try_await(db, env).ok()?;
+        if result.is_dynamic() || result.is_never() {
+            return None;
+        }
+        result
+            .try_iterate_with_mode(db, env, EvaluationMode::Async)
+            .ok()?;
+        Some(result)
+    }
+
     /// Returns a tuple spec describing the elements that are produced when iterating over `self`.
     ///
     /// This method should only be used outside of type checking because it omits any errors.
     /// For type checking, use [`try_iterate`](Self::try_iterate) instead.
-    pub(super) fn iterate(self, db: &'db dyn Db) -> Cow<'db, TupleSpec<'db>> {
-        self.try_iterate(db)
-            .unwrap_or_else(|err| Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db))))
+    pub(super) fn iterate(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Cow<'db, TupleSpec<'db>> {
+        self.try_iterate(db, env).unwrap_or_else(|err| {
+            Cow::Owned(TupleSpec::homogeneous(err.fallback_element_type(db, env)))
+        })
     }
 
     /// Given the type of an object that is iterated over in some way,
@@ -85,17 +232,20 @@ impl<'db> Type<'db> {
     pub(super) fn try_iterate(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
-        self.try_iterate_with_mode(db, EvaluationMode::Sync)
+        self.try_iterate_with_mode(db, env, EvaluationMode::Sync)
     }
 
     pub(super) fn try_iterate_with_mode(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         mode: EvaluationMode,
     ) -> Result<Cow<'db, TupleSpec<'db>>, IterationError<'db>> {
         fn non_async_special_case<'db>(
             db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             ty: Type<'db>,
         ) -> Option<Cow<'db, TupleSpec<'db>>> {
             // We will not infer precise heterogeneous tuple specs for literals with lengths above this threshold.
@@ -105,13 +255,16 @@ impl<'db> Type<'db> {
             const MAX_TUPLE_LENGTH: usize = 128;
 
             match ty {
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
-                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
-                    Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
-                        "*tuple[] annotations"
-                    ))))
+                Type::RecursiveVar(_) => {
+                    unreachable!("semantic operation on an unbound recursive variable")
                 }
+                Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
+                Type::NewTypeInstance(newtype) => {
+                    non_async_special_case(db, env, newtype.concrete_base_type(db))
+                }
+                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => Some(Cow::Owned(
+                    TupleSpec::homogeneous(todo_type!("*tuple[] annotations")),
+                )),
                 Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bytes(bytes) => {
                         let bytes_literal = bytes.value(db);
@@ -119,20 +272,20 @@ impl<'db> Type<'db> {
                             TupleSpec::heterogeneous(
                                 bytes_literal
                                     .iter()
-                                    .map(|b| Type::int_literal( i64::from(*b))),
+                                    .map(|b| Type::int_literal(i64::from(*b))),
                             )
                         } else {
-                            TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
+                            TupleSpec::homogeneous(KnownClass::Int.to_instance(db, env))
                         };
                         Some(Cow::Owned(spec))
-                    },
+                    }
                     LiteralValueTypeKind::String(string_literal_ty) => {
                         let string_literal = string_literal_ty.value(db);
                         let spec = if string_literal.len() < MAX_TUPLE_LENGTH {
                             TupleSpec::heterogeneous(
                                 string_literal
                                     .chars()
-                                    .map(|c| Type::string_literal(db, &c.to_string())),
+                                    .map(|c| Type::string_literal(db, c.to_compact_string())),
                             )
                         } else {
                             TupleSpec::homogeneous(Type::literal_string())
@@ -143,8 +296,8 @@ impl<'db> Type<'db> {
                     LiteralValueTypeKind::LiteralString => {
                         Some(Cow::Owned(TupleSpec::homogeneous(ty)))
                     }
-                    _ => None
-                }
+                    _ => None,
+                },
                 Type::Never => {
                     // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
                     // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
@@ -153,23 +306,35 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => {
-                    non_async_special_case(db, alias.value_type(db))
+                Type::TypeAlias(alias) => non_async_special_case(db, env, alias.value_type(db)),
+                Type::Recursive(recursive) => {
+                    non_async_special_case(db, env, recursive.unfold(db, env).into_unfolded()?)
                 }
-                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
+                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db, env)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        non_async_special_case(db, bound)
+                        non_async_special_case(db, env, bound)
                     }
-                    TypeVarBoundOrConstraints::Constraints(constraints) => non_async_special_case(db, constraints.as_type(db)),
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        non_async_special_case(db, env, constraints.as_type(db, env))
+                    }
                 },
                 Type::Union(union) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
                         let mut elements_iter = elements.iter();
-                        let first_element_spec = elements_iter.next()?.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?;
+                        let first_element_spec = elements_iter
+                            .next()?
+                            .try_iterate_with_mode(db, env, EvaluationMode::Sync)
+                            .ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
-                            builder = builder.union(db, &*element.try_iterate_with_mode(db, EvaluationMode::Sync).ok()?);
+                            builder = builder.union(
+                                db,
+                                env,
+                                &*element
+                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
+                                    .ok()?,
+                            );
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
@@ -190,20 +355,24 @@ impl<'db> Type<'db> {
                     // - A simpler type (if it fully simplified).
                     //
                     // We then iterate over the flattened type.
-                    let flattened = ty.flatten_typevars(db);
+                    let flattened = ty.flatten_typevars(db, env);
 
                     // If flattening didn't change anything, iterate the intersection directly.
                     if flattened == ty {
-                        let mut specs_iter = intersection.positive_elements_or_object(db).filter_map(
-                            |element| element.try_iterate_with_mode(db, EvaluationMode::Sync).ok(),
-                        );
+                        let mut specs_iter = intersection
+                            .positive_elements_or_object(db)
+                            .filter_map(|element| {
+                                element
+                                    .try_iterate_with_mode(db, env, EvaluationMode::Sync)
+                                    .ok()
+                            });
                         let first_spec = specs_iter.next()?;
                         let mut builder = TupleSpecBuilder::from(&*first_spec);
                         for spec in specs_iter {
                             // Two tuples cannot have incompatible specs unless the tuples themselves
                             // are disjoint. `IntersectionBuilder` eagerly simplifies such
                             // intersections to `Never`, so this should always return `Some`.
-                            let Some(intersected) = builder.intersect(db, &spec) else {
+                            let Some(intersected) = builder.intersect(db, env, &spec) else {
                                 return Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())));
                             };
                             builder = intersected;
@@ -212,10 +381,10 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db).ok()
+                    flattened.try_iterate(db, env).ok()
                 }
                 Type::EnumComplement(complement) => {
-                    non_async_special_case(db, complement.remaining_literal_union(db))
+                    non_async_special_case(db, env, complement.remaining_literal_union(db, env))
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
@@ -230,31 +399,33 @@ impl<'db> Type<'db> {
                 | Type::DataclassTransformer(_)
                 | Type::Callable(_)
                 | Type::ModuleLiteral(_)
-                // We could infer a precise tuple spec for enum classes with members,
-                // but it's not clear whether that's worth the added complexity:
-                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
-                // (enums can have `EnumMeta` subclasses as their metaclasses).
-                | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::ProtocolInstance(_)
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
+                | Type::SlotDescriptor(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::BoundSuper(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypeForm(_)
-                | Type::TypedDict(_) => None
+                | Type::TypedDict(_) => None,
+
+                // We could infer a precise tuple spec for enum classes with members,
+                // but it's not clear whether that's worth the added complexity:
+                // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
+                // (enums can have `EnumMeta` subclasses as their metaclasses).
+                Type::ClassLiteral(_) => None,
             }
         }
 
         if mode.is_async() {
             if let Type::Intersection(_) = self {
-                let flattened = self.flatten_typevars(db);
+                let flattened = self.flatten_typevars(db, env);
                 if flattened != self {
-                    return flattened.try_iterate_with_mode(db, mode);
+                    return flattened.try_iterate_with_mode(db, env, mode);
                 }
             }
 
@@ -265,21 +436,25 @@ impl<'db> Type<'db> {
                 iterator
                     .try_call_dunder(
                         db,
+                        env,
                         "__anext__",
                         CallArguments::none(),
                         TypeContext::default(),
                     )
-                    .map(|dunder_anext_outcome| dunder_anext_outcome.return_type(db).try_await(db))
+                    .map(|dunder_anext_outcome| {
+                        dunder_anext_outcome.return_type(db, env).try_await(db, env)
+                    })
             };
 
             return match self.try_call_dunder(
                 db,
+                env,
                 "__aiter__",
                 CallArguments::none(),
                 TypeContext::default(),
             ) {
                 Ok(dunder_aiter_bindings) => {
-                    let iterator = dunder_aiter_bindings.return_type(db);
+                    let iterator = dunder_aiter_bindings.return_type(db, env);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(Ok(result)) => Ok(Cow::Owned(TupleSpec::homogeneous(result))),
                         Ok(Err(AwaitError::InvalidReturnType(..))) => {
@@ -298,7 +473,7 @@ impl<'db> Type<'db> {
                     bindings: dunder_aiter_bindings,
                     ..
                 }) => {
-                    let iterator = dunder_aiter_bindings.return_type(db);
+                    let iterator = dunder_aiter_bindings.return_type(db, env);
                     match try_call_dunder_anext_on_iterator(iterator) {
                         Ok(_) => Err(IterationError::IterCallError {
                             kind: CallErrorKind::PossiblyNotCallable,
@@ -314,7 +489,7 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-                Err(CallDunderError::CallError(kind, bindings)) => {
+                Err(CallDunderError::CallError(kind, bindings, _)) => {
                     Err(IterationError::IterCallError {
                         kind,
                         bindings,
@@ -325,39 +500,42 @@ impl<'db> Type<'db> {
             };
         }
 
-        if let Some(special_case) = non_async_special_case(db, self) {
+        if let Some(special_case) = non_async_special_case(db, env, self) {
             return Ok(special_case);
         }
 
         let try_call_dunder_getitem = || {
             self.try_call_dunder(
                 db,
+                env,
                 "__getitem__",
-                CallArguments::positional([KnownClass::Int.to_instance(db)]),
+                CallArguments::positional([KnownClass::Int.to_instance(db, env)]),
                 TypeContext::default(),
             )
-            .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
+            .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db, env))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
                 .try_call_dunder(
                     db,
+                    env,
                     "__next__",
                     CallArguments::none(),
                     TypeContext::default(),
                 )
-                .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
+                .map(|dunder_next_outcome| dunder_next_outcome.return_type(db, env))
         };
 
         let dunder_iter_result = self
             .try_call_dunder(
                 db,
+                env,
                 "__iter__",
                 CallArguments::none(),
                 TypeContext::default(),
             )
-            .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
+            .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db, env));
 
         match dunder_iter_result {
             Ok(iterator) => {
@@ -379,7 +557,7 @@ impl<'db> Type<'db> {
                 bindings: dunder_iter_outcome,
                 unbound_on: unbound_on_iter,
             }) => {
-                let iterator = dunder_iter_outcome.return_type(db);
+                let iterator = dunder_iter_outcome.return_type(db, env);
 
                 match try_call_dunder_next_on_iterator(iterator) {
                     Ok(dunder_next_return) => {
@@ -394,6 +572,7 @@ impl<'db> Type<'db> {
                                 // No diagnostic is emitted; iteration will always succeed!
                                 Cow::Owned(TupleSpec::homogeneous(UnionType::from_two_elements(
                                     db,
+                                    env,
                                     dunder_next_return,
                                     dunder_getitem_return_type,
                                 )))
@@ -416,11 +595,13 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is definitely bound but it can't be called with the expected arguments
-            Err(CallDunderError::CallError(kind, bindings)) => Err(IterationError::IterCallError {
-                kind,
-                bindings,
-                mode,
-            }),
+            Err(CallDunderError::CallError(kind, bindings, _)) => {
+                Err(IterationError::IterCallError {
+                    kind,
+                    bindings,
+                    mode,
+                })
+            }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
@@ -485,24 +666,32 @@ pub(super) enum IterationError<'db> {
 }
 
 impl<'db> IterationError<'db> {
-    pub(super) fn fallback_element_type(&self, db: &'db dyn Db) -> Type<'db> {
-        self.element_type(db).unwrap_or(Type::unknown())
+    pub(super) fn fallback_element_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        self.element_type(db, env).unwrap_or(Type::unknown())
     }
 
     /// Returns the element type if it is known, or `None` if the type is never iterable.
-    fn element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn element_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
         let return_type = |result: Result<Bindings<'db>, CallDunderError<'db>>| {
             result
-                .map(|outcome| Some(outcome.return_type(db)))
-                .unwrap_or_else(|call_error| call_error.return_type(db))
+                .map(|outcome| Some(outcome.return_type(db, env)))
+                .unwrap_or_else(|call_error| call_error.return_type(db, env))
         };
 
         match self {
             Self::IterReturnsInvalidIterator {
                 dunder_error, mode, ..
-            } => dunder_error.return_type(db).and_then(|ty| {
+            } => dunder_error.return_type(db, env).and_then(|ty| {
                 if mode.is_async() {
-                    ty.try_await(db).ok()
+                    ty.try_await(db, env).ok()
                 } else {
                     Some(ty)
                 }
@@ -514,16 +703,18 @@ impl<'db> IterationError<'db> {
                 mode,
             } => {
                 if mode.is_async() {
-                    return_type(dunder_iter_bindings.return_type(db).try_call_dunder(
+                    return_type(dunder_iter_bindings.return_type(db, env).try_call_dunder(
                         db,
+                        env,
                         "__anext__",
                         CallArguments::none(),
                         TypeContext::default(),
                     ))
-                    .and_then(|ty| ty.try_await(db).ok())
+                    .and_then(|ty| ty.try_await(db, env).ok())
                 } else {
-                    return_type(dunder_iter_bindings.return_type(db).try_call_dunder(
+                    return_type(dunder_iter_bindings.return_type(db, env).try_call_dunder(
                         db,
+                        env,
                         "__next__",
                         CallArguments::none(),
                         TypeContext::default(),
@@ -542,16 +733,18 @@ impl<'db> IterationError<'db> {
                     ..
                 } => Some(UnionType::from_two_elements(
                     db,
+                    env,
                     *dunder_next_return,
-                    dunder_getitem_outcome.return_type(db),
+                    dunder_getitem_outcome.return_type(db, env),
                 )),
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     Some(*dunder_next_return)
                 }
-                CallDunderError::CallError(_, dunder_getitem_bindings) => {
-                    let dunder_getitem_return = dunder_getitem_bindings.return_type(db);
+                CallDunderError::CallError(_, dunder_getitem_bindings, _) => {
+                    let dunder_getitem_return = dunder_getitem_bindings.return_type(db, env);
                     Some(UnionType::from_two_elements(
                         db,
+                        env,
                         *dunder_next_return,
                         dunder_getitem_return,
                     ))
@@ -560,7 +753,7 @@ impl<'db> IterationError<'db> {
 
             Self::UnboundIterAndGetitemError {
                 dunder_getitem_error,
-            } => dunder_getitem_error.return_type(db),
+            } => dunder_getitem_error.return_type(db, env),
 
             Self::UnboundAiterError => None,
         }
@@ -584,51 +777,94 @@ impl<'db> IterationError<'db> {
         iterable_type: Type<'db>,
         iterable_node: ast::AnyNodeRef,
     ) {
+        #[derive(Copy, Clone)]
+        enum ErrorContext {
+            Enabled,
+            Disabled,
+        }
+
         /// A little helper type for emitting a diagnostic
         /// based on the variant of iteration error.
-        struct Reporter<'a> {
+        struct Reporter<'env, 'a> {
             db: &'a dyn Db,
+            env: &'env ProgramEnvironment<'a>,
             builder: LintDiagnosticGuardBuilder<'a, 'a>,
             iterable_type: Type<'a>,
             mode: EvaluationMode,
         }
 
-        impl<'a> Reporter<'a> {
+        impl<'a> Reporter<'_, 'a> {
             /// Emit a diagnostic that is certain that `iterable_type` is not iterable.
             ///
             /// `because` should explain why `iterable_type` is not iterable.
             #[expect(clippy::wrong_self_convention)]
-            fn is_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
+            fn is_not(
+                self,
+                because: impl std::fmt::Display,
+                error_context: ErrorContext,
+            ) -> LintDiagnosticGuard<'a, 'a> {
+                let db = self.db;
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` is not {maybe_async}iterable",
-                    iterable_type = self.iterable_type.display(self.db),
+                    iterable_type = self.iterable_type.display(db, self.env),
                     maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
+
+                if let ErrorContext::Enabled = error_context {
+                    let target = if self.mode.is_async() {
+                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(db, self.env)
+                    } else {
+                        KnownClass::TyExtensionsIterable.to_instance_unknown(db, self.env)
+                    };
+                    self.iterable_type
+                        .assignability_error_context(db, self.env, target)
+                        .attach_to(db, self.env, &mut diag);
+                }
+
                 diag
             }
 
             /// Emit a diagnostic that is uncertain that `iterable_type` is not iterable.
             ///
             /// `because` should explain why `iterable_type` is likely not iterable.
-            fn may_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
+            fn may_not(
+                self,
+                because: impl std::fmt::Display,
+                error_context: ErrorContext,
+            ) -> LintDiagnosticGuard<'a, 'a> {
+                let db = self.db;
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` may not be {maybe_async}iterable",
-                    iterable_type = self.iterable_type.display(self.db),
+                    iterable_type = self.iterable_type.display(db, self.env),
                     maybe_async = if self.mode.is_async() { "async-" } else { "" }
                 ));
                 diag.info(because);
+
+                if let ErrorContext::Enabled = error_context {
+                    let target = if self.mode.is_async() {
+                        KnownClass::TyExtensionsAsyncIterable.to_instance_unknown(db, self.env)
+                    } else {
+                        KnownClass::TyExtensionsIterable.to_instance_unknown(db, self.env)
+                    };
+                    self.iterable_type
+                        .assignability_error_context(db, self.env, target)
+                        .attach_to(db, self.env, &mut diag);
+                }
+
                 diag
             }
         }
+        let db = context.db();
 
         let Some(builder) = context.report_lint(&NOT_ITERABLE, iterable_node) else {
             return;
         };
-        let db = context.db();
+        let env = context.program_environment();
         let mode = self.mode();
         let reporter = Reporter {
             db,
+            env,
             builder,
             iterable_type,
             mode,
@@ -651,32 +887,41 @@ impl<'db> IterationError<'db> {
 
                 match kind {
                     CallErrorKind::NotCallable => {
-                        reporter.is_not(format_args!(
-                        "Its `{method}` attribute has type `{dunder_iter_type}`, which is not callable",
-                        dunder_iter_type = bindings.callable_type().display(db),
-                    ));
+                        reporter.is_not(
+                            format_args!(
+                                "Its `{method}` attribute has type `{dunder_iter_type}`, \
+                                which is not callable",
+                                dunder_iter_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        );
                     }
                     CallErrorKind::PossiblyNotCallable => {
-                        reporter.may_not(format_args!(
-                            "Its `{method}` attribute (with type `{dunder_iter_type}`) \
-                             may not be callable",
-                            dunder_iter_type = bindings.callable_type().display(db),
-                        ));
+                        reporter.may_not(
+                            format_args!(
+                                "Its `{method}` attribute (with type `{dunder_iter_type}`) \
+                                 may not be callable",
+                                dunder_iter_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        );
                     }
                     CallErrorKind::BindingError => {
                         if bindings.is_single() {
                             reporter
-                                .is_not(format_args!(
-                                    "Its `{method}` method has an invalid signature"
-                                ))
+                                .is_not(
+                                    format_args!("Its `{method}` method has an invalid signature"),
+                                    ErrorContext::Enabled,
+                                )
                                 .info(format_args!("Expected signature `def {method}(self): ...`"));
                         } else {
-                            let mut diag = reporter.may_not(format_args!(
-                                "Its `{method}` method may have an invalid signature"
-                            ));
+                            let mut diag = reporter.may_not(
+                                format_args!("Its `{method}` method may have an invalid signature"),
+                                ErrorContext::Enabled,
+                            );
                             diag.info(format_args!(
                                 "Type of `{method}` is `{dunder_iter_type}`",
-                                dunder_iter_type = bindings.callable_type().display(db),
+                                dunder_iter_type = bindings.callable_type().display(db, env),
                             ));
                             diag.info(format_args!(
                                 "Expected signature for `{method}` is `def {method}(self): ...`",
@@ -703,52 +948,83 @@ impl<'db> IterationError<'db> {
                 };
                 match dunder_next_error {
                     CallDunderError::MethodNotAvailable => {
-                        reporter.is_not(format_args!(
-                        "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                         which has no `{dunder_next_name}` method",
-                        iterator_type = iterator.display(db),
-                    ));
+                        reporter.is_not(
+                            format_args!(
+                                "Its `{dunder_iter_name}` method returns an object of type \
+                                 `{iterator_type}`, which has no `{dunder_next_name}` method",
+                                iterator_type = iterator.display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        );
                     }
                     CallDunderError::PossiblyUnbound { .. } => {
-                        reporter.may_not(format_args!(
-                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                            which may not have a `{dunder_next_name}` method",
-                            iterator_type = iterator.display(db),
-                        ));
+                        reporter.may_not(
+                            format_args!(
+                                "Its `{dunder_iter_name}` method returns \
+                                an object of type `{iterator_type}`, \
+                                which may not have a `{dunder_next_name}` method",
+                                iterator_type = iterator.display(db, env),
+                            ),
+                            ErrorContext::Enabled,
+                        );
                     }
-                    CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
-                        reporter.is_not(format_args!(
-                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                            which has a `{dunder_next_name}` attribute that is not callable",
-                            iterator_type = iterator.display(db),
-                        ));
+                    CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
+                        reporter.is_not(
+                            format_args!(
+                                "Its `{dunder_iter_name}` method returns \
+                                an object of type `{iterator_type}`, \
+                                which has a `{dunder_next_name}` attribute \
+                                that is not callable",
+                                iterator_type = iterator.display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        );
                     }
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
-                        reporter.may_not(format_args!(
-                            "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                            which has a `{dunder_next_name}` attribute that may not be callable",
-                            iterator_type = iterator.display(db),
-                        ));
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
+                        reporter.may_not(
+                            format_args!(
+                                "Its `{dunder_iter_name}` method returns \
+                                an object of type `{iterator_type}`, \
+                                which has a `{dunder_next_name}` attribute \
+                                that may not be callable",
+                                iterator_type = iterator.display(db, env),
+                            ),
+                            ErrorContext::Enabled,
+                        );
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                         if bindings.is_single() =>
                     {
                         reporter
-                            .is_not(format_args!(
-                                "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                                which has an invalid `{dunder_next_name}` method",
-                                iterator_type = iterator.display(db),
-                            ))
-                            .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
+                            .is_not(
+                                format_args!(
+                                    "Its `{dunder_iter_name}` method returns \
+                                    an object of type `{iterator_type}`, \
+                                    which has an invalid `{dunder_next_name}` method",
+                                    iterator_type = iterator.display(db, env),
+                                ),
+                                ErrorContext::Enabled,
+                            )
+                            .info(format_args!(
+                                "Expected signature for `{dunder_next_name}` is \
+                                `def {dunder_next_name}(self): ...`"
+                            ));
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                    CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                         reporter
-                            .may_not(format_args!(
-                                "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
-                                which may have an invalid `{dunder_next_name}` method",
-                                iterator_type = iterator.display(db),
-                            ))
-                            .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
+                            .may_not(
+                                format_args!(
+                                    "Its `{dunder_iter_name}` method returns an object \
+                                    of type `{iterator_type}`, which may have \
+                                    an invalid `{dunder_next_name}` method",
+                                    iterator_type = iterator.display(db, env),
+                                ),
+                                ErrorContext::Enabled,
+                            )
+                            .info(format_args!(
+                                "Expected signature for `{dunder_next_name}` is \
+                                `def {dunder_next_name}(self): ...`"
+                            ));
                     }
                 }
             }
@@ -762,39 +1038,51 @@ impl<'db> IterationError<'db> {
                     CallDunderError::MethodNotAvailable => reporter.may_not(
                         "It may not have an `__iter__` method \
                          and it doesn't have a `__getitem__` method",
+                        ErrorContext::Disabled,
                     ),
-                    CallDunderError::PossiblyUnbound { .. } => reporter
-                        .may_not("It may not have an `__iter__` method or a `__getitem__` method"),
-                    CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => reporter
-                        .may_not(format_args!(
-                            "It may not have an `__iter__` method \
-                             and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
-                             which is not callable",
-                            dunder_getitem_type = bindings.callable_type().display(db),
-                        )),
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
+                    CallDunderError::PossiblyUnbound { .. } => reporter.may_not(
+                        "It may not have an `__iter__` method or a `__getitem__` method",
+                        ErrorContext::Disabled,
+                    ),
+                    CallDunderError::CallError(CallErrorKind::NotCallable, bindings, _) => reporter
+                        .may_not(
+                            format_args!(
+                                "It may not have an `__iter__` method \
+                                and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
+                                which is not callable",
+                                dunder_getitem_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        ),
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _)
                         if bindings.is_single() =>
                     {
                         reporter.may_not(
                             "It may not have an `__iter__` method \
                              and its `__getitem__` attribute may not be callable",
+                            ErrorContext::Disabled,
                         )
                     }
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
-                        reporter.may_not(format_args!(
-                            "It may not have an `__iter__` method \
-                             and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
-                             may not be callable",
-                            dunder_getitem_type = bindings.callable_type().display(db),
-                        ))
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _) => {
+                        reporter.may_not(
+                            format_args!(
+                                "It may not have an `__iter__` method \
+                                and its `__getitem__` attribute \
+                                (with type `{dunder_getitem_type}`) \
+                                may not be callable",
+                                dunder_getitem_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        )
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                         if bindings.is_single() =>
                     {
                         let mut diag = reporter.may_not(
                             "It may not have an `__iter__` method \
                              and its `__getitem__` method has an incorrect signature \
                              for the old-style iteration protocol",
+                            ErrorContext::Disabled,
                         );
                         diag.info(
                             "`__getitem__` must be at least as permissive as \
@@ -803,13 +1091,18 @@ impl<'db> IterationError<'db> {
                         );
                         diag
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
-                        let mut diag = reporter.may_not(format_args!(
-                            "It may not have an `__iter__` method \
-                             and its `__getitem__` method (with type `{dunder_getitem_type}`) \
-                             may have an incorrect signature for the old-style iteration protocol",
-                            dunder_getitem_type = bindings.callable_type().display(db),
-                        ));
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _) => {
+                        let mut diag = reporter.may_not(
+                            format_args!(
+                                "It may not have an `__iter__` method \
+                                and its `__getitem__` method \
+                                (with type `{dunder_getitem_type}`) \
+                                may have an incorrect signature \
+                                for the old-style iteration protocol",
+                                dunder_getitem_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        );
                         diag.info(
                             "`__getitem__` must be at least as permissive as \
                              `def __getitem__(self, key: int): ...` \
@@ -822,7 +1115,7 @@ impl<'db> IterationError<'db> {
                     for ty in unbound_on.iter().copied() {
                         diag.info(format_args!(
                             "`{}` does not implement `__iter__`",
-                            ty.display(db)
+                            ty.display(db, env)
                         ));
                     }
                 }
@@ -832,39 +1125,50 @@ impl<'db> IterationError<'db> {
                 dunder_getitem_error,
             } => match dunder_getitem_error {
                 CallDunderError::MethodNotAvailable => {
-                    reporter
-                        .is_not("It doesn't have an `__iter__` method or a `__getitem__` method");
+                    reporter.is_not(
+                        "It doesn't have an `__iter__` method or a `__getitem__` method",
+                        ErrorContext::Disabled,
+                    );
                 }
                 CallDunderError::PossiblyUnbound { .. } => {
                     reporter.is_not(
                         "It has no `__iter__` method and it may not have a `__getitem__` method",
+                        ErrorContext::Disabled,
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => {
-                    reporter.is_not(format_args!(
-                        "It has no `__iter__` method and \
-                         its `__getitem__` attribute has type `{dunder_getitem_type}`, \
-                         which is not callable",
-                        dunder_getitem_type = bindings.callable_type().display(db),
-                    ));
+                CallDunderError::CallError(CallErrorKind::NotCallable, bindings, _) => {
+                    reporter.is_not(
+                        format_args!(
+                            "It has no `__iter__` method and \
+                            its `__getitem__` attribute has type `{dunder_getitem_type}`, \
+                            which is not callable",
+                            dunder_getitem_type = bindings.callable_type().display(db, env),
+                        ),
+                        ErrorContext::Disabled,
+                    );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _)
                     if bindings.is_single() =>
                 {
                     reporter.may_not(
                         "It has no `__iter__` method and its `__getitem__` attribute \
                          may not be callable",
+                        ErrorContext::Disabled,
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
-                    reporter.may_not(
-                        "It has no `__iter__` method and its `__getitem__` attribute is invalid",
-                    ).info(format_args!(
-                        "`__getitem__` has type `{dunder_getitem_type}`, which is not callable",
-                        dunder_getitem_type = bindings.callable_type().display(db),
-                    ));
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _) => {
+                    reporter
+                        .may_not(
+                            "It has no `__iter__` method \
+                            and its `__getitem__` attribute is invalid",
+                            ErrorContext::Disabled,
+                        )
+                        .info(format_args!(
+                            "`__getitem__` has type `{dunder_getitem_type}`, which is not callable",
+                            dunder_getitem_type = bindings.callable_type().display(db, env),
+                        ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                     if bindings.is_single() =>
                 {
                     reporter
@@ -872,6 +1176,7 @@ impl<'db> IterationError<'db> {
                             "It has no `__iter__` method and \
                              its `__getitem__` method has an incorrect signature \
                              for the old-style iteration protocol",
+                            ErrorContext::Disabled,
                         )
                         .info(
                             "`__getitem__` must be at least as permissive as \
@@ -879,14 +1184,19 @@ impl<'db> IterationError<'db> {
                              to satisfy the old-style iteration protocol",
                         );
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, bindings, _) => {
                     reporter
-                        .may_not(format_args!(
-                            "It has no `__iter__` method and \
-                             its `__getitem__` method (with type `{dunder_getitem_type}`) \
-                             may have an incorrect signature for the old-style iteration protocol",
-                            dunder_getitem_type = bindings.callable_type().display(db),
-                        ))
+                        .may_not(
+                            format_args!(
+                                "It has no `__iter__` method and \
+                                its `__getitem__` method \
+                                (with type `{dunder_getitem_type}`) \
+                                may have an incorrect signature \
+                                for the old-style iteration protocol",
+                                dunder_getitem_type = bindings.callable_type().display(db, env),
+                            ),
+                            ErrorContext::Disabled,
+                        )
                         .info(
                             "`__getitem__` must be at least as permissive as \
                              `def __getitem__(self, key: int): ...` \
@@ -896,7 +1206,17 @@ impl<'db> IterationError<'db> {
             },
 
             IterationError::UnboundAiterError => {
-                reporter.is_not("It has no `__aiter__` method");
+                let mut diagnostic =
+                    reporter.is_not("It has no `__aiter__` method", ErrorContext::Disabled);
+                if iterable_type
+                    .coroutine_returning_async_iterable(db, env)
+                    .is_some()
+                {
+                    diagnostic.help("`await` the coroutine before iterating over its result");
+                    if let Some(definition) = iterable_factory_definition(context, iterable_node) {
+                        add_async_generator_stub_help(db, &mut diagnostic, definition);
+                    }
+                }
             }
         }
     }

@@ -69,14 +69,14 @@ f = urllib.request.urlopen('https://www.python.org/')
 
 import ssl
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath, SupportsRead
+from _typeshed import ReadableBuffer, StrOrBytesPath, SupportsItems, SupportsRead
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
 from http.cookiejar import CookieJar
 from re import Pattern
-from typing import IO, Any, ClassVar, Literal, NoReturn, Protocol, TypeAlias, TypeVar, overload, type_check_only
-from typing_extensions import deprecated
+from typing import IO, Any, ClassVar, Literal, Protocol, TypeAlias, TypeVar, overload, type_check_only
+from typing_extensions import Never, deprecated
 from urllib.error import HTTPError as HTTPError
 from urllib.response import addclosehook, addinfourl
 
@@ -360,7 +360,7 @@ class Request:
         self,
         url: str,
         data: _DataType = None,
-        headers: MutableMapping[str, str] = {},
+        headers: SupportsItems[str, str] = {},
         origin_req_host: str | None = None,
         unverifiable: bool = False,
         method: str | None = None,
@@ -587,7 +587,7 @@ class CacheFTPHandler(FTPHandler):
     def clear_cache(self) -> None: ...  # undocumented
 
 class UnknownHandler(BaseHandler):
-    def unknown_open(self, req: Request) -> NoReturn: ...
+    def unknown_open(self, req: Request) -> Never: ...
 
 class HTTPErrorProcessor(BaseHandler):
     """Process HTTP error responses."""
@@ -721,6 +721,7 @@ if sys.version_info < (3, 14):
             self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None
         ) -> _UrlopenRet | addinfourl | None:  # undocumented
             """Error 307 -- relocated, but turn POST into error."""
+
         if sys.version_info >= (3, 11):
             def http_error_308(
                 self, url: str, fp: IO[bytes], errcode: int, errmsg: str, headers: HTTPMessage, data: ReadableBuffer | None = None

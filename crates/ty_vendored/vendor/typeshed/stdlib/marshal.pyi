@@ -27,7 +27,6 @@ dumps() -- marshal value as a bytes object
 loads() -- read value from a bytes-like object
 """
 
-import builtins
 import sys
 import types
 from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
@@ -39,7 +38,7 @@ _Marshallable: TypeAlias = (
     # handled in w_object() in marshal.c
     None
     | type[StopIteration]
-    | builtins.ellipsis
+    | types.EllipsisType
     | bool
     # handled in w_complex_object() in marshal.c
     | int
@@ -57,8 +56,36 @@ _Marshallable: TypeAlias = (
 )
 
 if sys.version_info >= (3, 15):
-    def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 6, /, *, allow_code: bool = True) -> None: ...
-    def dumps(value: _Marshallable, version: int = 6, /, *, allow_code: bool = True) -> bytes: ...
+    def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 6, /, *, allow_code: bool = True) -> None:
+        """Write the value on the open file.
+
+          value
+            Must be a supported type.
+          file
+            Must be a writeable binary file.
+          version
+            Indicates the data format that dump should use.
+          allow_code
+            Allow to write code objects.
+
+        If the value has (or contains an object that has) an unsupported type, a
+        ValueError exception is raised - but garbage data will also be written
+        to the file. The object will not be properly read back by load().
+        """
+
+    def dumps(value: _Marshallable, version: int = 6, /, *, allow_code: bool = True) -> bytes:
+        """Return the bytes object that would be written to a file by dump(value, file).
+
+          value
+            Must be a supported type.
+          version
+            Indicates the data format that dumps should use.
+          allow_code
+            Allow to write code objects.
+
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
+        """
 
 elif sys.version_info >= (3, 14):
     def dump(value: _Marshallable, file: SupportsWrite[bytes], version: int = 5, /, *, allow_code: bool = True) -> None:
@@ -88,8 +115,8 @@ elif sys.version_info >= (3, 14):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 elif sys.version_info >= (3, 13):
@@ -120,8 +147,8 @@ elif sys.version_info >= (3, 13):
           allow_code
             Allow to write code objects.
 
-        Raise a ValueError exception if value has (or contains an object that has) an
-        unsupported type.
+        Raise a ValueError exception if value has (or contains an object that
+        has) an unsupported type.
         """
 
 else:
@@ -175,8 +202,8 @@ if sys.version_info >= (3, 13):
           allow_code
             Allow to load code objects.
 
-        If no valid value is found, raise EOFError, ValueError or TypeError.  Extra
-        bytes in the input are ignored.
+        If no valid value is found, raise EOFError, ValueError or TypeError.
+        Extra bytes in the input are ignored.
         """
 
 else:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import abc
 import dataclasses
 import difflib
 from collections.abc import Iterable, Iterator, Sequence
@@ -11,7 +10,7 @@ if TYPE_CHECKING:
     from ruff_ecosystem.projects import ClonedRepository, Project
 
 
-class Serializable(abc.ABC):
+class Serializable:
     """
     Allows serialization of content by casting to a JSON-compatible type.
     """

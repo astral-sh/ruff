@@ -135,6 +135,7 @@ class Fraction(Rational):
 
         The ratio is in lowest terms and has a positive denominator.
         """
+
     if sys.version_info >= (3, 12):
         def is_integer(self) -> bool:
             """Return True if the Fraction is an integer."""
@@ -339,6 +340,7 @@ class Fraction(Rational):
     if sys.version_info >= (3, 11):
         def __int__(a, _index: Callable[[SupportsIndex], int] = ...) -> int:
             """int(a)"""
+
     # Not actually defined within fractions.py, but provides more useful
     # overrides
     @property
@@ -351,6 +353,7 @@ class Fraction(Rational):
 
     def conjugate(self) -> Fraction:
         """Conjugate is a no-op for Reals."""
+
     if sys.version_info >= (3, 14):
         @classmethod
         def from_number(cls, number: float | Rational | _ConvertibleToIntegerRatio) -> Self:

@@ -28,7 +28,7 @@ impl<'stmt> ControlFlowGraph<'stmt> {
     }
 
     /// Index of terminal block
-    pub fn terminal(&self) -> BlockId {
+    pub(crate) fn terminal(&self) -> BlockId {
         self.terminal
     }
 
@@ -126,12 +126,12 @@ impl Edges {
     }
 
     /// Returns iterator over indices of blocks targeted by given edges
-    pub fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
+    pub(crate) fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
         self.targets.iter().copied()
     }
 
     /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
-    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
+    pub(crate) fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
         self.conditions.iter()
     }
 

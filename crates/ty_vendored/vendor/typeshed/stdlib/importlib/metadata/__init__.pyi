@@ -1,3 +1,12 @@
+"""
+APIs exposing metadata from third-party Python packages.
+
+This codebase is shared between importlib.metadata in the stdlib
+and importlib_metadata in PyPI. See
+https://github.com/python/importlib_metadata/wiki/Development-Methodology
+for more detail.
+"""
+
 import abc
 import pathlib
 import sys
@@ -54,7 +63,8 @@ class PackageNotFoundError(ModuleNotFoundError):
     def name(self) -> str: ...  # type: ignore[override]
 
 if sys.version_info >= (3, 15):
-    class MetadataNotFound(FileNotFoundError): ...
+    class MetadataNotFound(FileNotFoundError):
+        """No metadata file is present in the distribution."""
 
 if sys.version_info >= (3, 13):
     _EntryPointBase = object
@@ -99,6 +109,30 @@ if sys.version_info >= (3, 11):
         'attr'
         >>> ep.extras
         ['extra1', 'extra2']
+
+        If the value package or module are not valid identifiers, a
+        ValueError is raised on access.
+
+        >>> EntryPoint(name=None, group=None, value='invalid-name').module
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+        >>> EntryPoint(name=None, group=None, value='invalid-name').attr
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+        >>> EntryPoint(name=None, group=None, value='invalid-name').extras
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+
+        The same thing happens on construction.
+
+        >>> EntryPoint(name=None, group=None, value='invalid-name')
+        Traceback (most recent call last):
+        ...
+        ValueError: ('Invalid object reference...invalid-name...
+
         """
 
         pattern: ClassVar[Pattern[str]]
@@ -424,6 +458,7 @@ class PackagePath(pathlib.PurePosixPath):
     def read_binary(self) -> bytes: ...
     def locate(self) -> PathLike[str]:
         """Return a path-like object for this path"""
+
     # The following attributes are not defined on PackagePath, but are dynamically added by Distribution.files:
     hash: FileHash | None
     size: int | None
@@ -481,6 +516,17 @@ class Distribution(_distribution_parent):
         """
         Given a path to a file in this distribution, return a SimplePath
         to it.
+
+        This method is used by callers of ``Distribution.files()`` to
+        locate files within the distribution. If it's possible for a
+        Distribution to represent files in the distribution as
+        ``SimplePath`` objects, it should implement this method
+        to resolve such objects.
+
+        Some Distribution providers may elect not to resolve SimplePath
+        objects within the distribution by raising a
+        NotImplementedError, but consumers of such a Distribution would
+        be unable to invoke ``Distribution.files()``.
         """
 
     @classmethod
@@ -531,6 +577,8 @@ class Distribution(_distribution_parent):
 
         Custom providers may provide the METADATA file or override this
         property.
+
+        :raises MetadataNotFound: If no metadata file is present.
         """
 
     @property
@@ -569,6 +617,7 @@ class Distribution(_distribution_parent):
     @property
     def name(self) -> str:
         """Return the 'Name' metadata for the distribution package."""
+
     if sys.version_info >= (3, 13):
         @property
         def origin(self) -> types.SimpleNamespace | None: ...
@@ -637,6 +686,7 @@ class MetadataPathFinder(DistributionFinder):
         (or all names if ``None`` indicated) along the paths in the list
         of directories ``context.path``.
         """
+
     if sys.version_info >= (3, 11):
         @classmethod
         def invalidate_caches(cls) -> None: ...
@@ -699,6 +749,7 @@ def metadata(distribution_name: str) -> PackageMetadata:
 
     :param distribution_name: The name of the distribution package to query.
     :return: A PackageMetadata containing the parsed metadata.
+    :raises MetadataNotFound: If no metadata file is present in the distribution.
     """
 
 if sys.version_info >= (3, 12):

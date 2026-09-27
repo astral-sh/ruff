@@ -36,4 +36,3 @@ FBT003 Boolean positional value in function call
     |
 123 | settings(True)
     |          ^^^^
-    |

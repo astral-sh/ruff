@@ -66,6 +66,11 @@ impl<'a> Binding<'a> {
         self.flags.intersects(BindingFlags::EXTERNAL)
     }
 
+    /// Return `true` if this binding was imported lazily, including through `__lazy_modules__`.
+    pub const fn is_lazy(&self) -> bool {
+        self.flags.intersects(BindingFlags::LAZY)
+    }
+
     /// Return `true` if this [`Binding`] represents an aliased symbol
     /// (e.g., `app` in `from fastapi import FastAPI as app`).
     pub const fn is_alias(&self) -> bool {
@@ -431,6 +436,9 @@ bitflags! {
         /// ```
         const IN_ASSERT_STATEMENT = 1 << 13;
 
+        /// The import was lazy when its binding was created.
+        const LAZY = 1 << 14;
+
         /// The binding represents any type alias.
         const TYPE_ALIAS = Self::ANNOTATED_TYPE_ALIAS.bits() | Self::DEFERRED_TYPE_ALIAS.bits();
     }
@@ -457,8 +465,13 @@ pub struct BindingId;
 pub struct Bindings<'a>(IndexVec<BindingId, Binding<'a>>);
 
 impl<'a> Bindings<'a> {
+    /// Reserves capacity for at least `additional` more bindings.
+    pub(crate) fn reserve_exact(&mut self, additional: usize) {
+        self.0.raw.reserve_exact(additional);
+    }
+
     /// Pushes a new [`Binding`] and returns its [`BindingId`].
-    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
+    pub(crate) fn push(&mut self, binding: Binding<'a>) -> BindingId {
         self.0.push(binding)
     }
 }

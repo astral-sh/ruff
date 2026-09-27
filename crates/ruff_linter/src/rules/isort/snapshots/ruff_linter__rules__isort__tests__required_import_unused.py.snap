@@ -11,13 +11,11 @@ F401 [*] `sys` imported but unused
 7 | # Unused, _not_ marked as required (due to the alias).
   |
 help: Remove unused import: `sys`
-2 | import os
-3 |
+  |
 4 | # Unused, _not_ marked as required.
   - import sys
 5 |
-6 | # Unused, _not_ marked as required (due to the alias).
-7 | import pathlib as non_alias
+  |
 
 F401 [*] `pathlib` imported but unused
   --> unused.py:8:19
@@ -29,10 +27,8 @@ F401 [*] `pathlib` imported but unused
 10 | # Unused, marked as required.
    |
 help: Remove unused import: `pathlib`
-5  | import sys
-6  |
-7  | # Unused, _not_ marked as required (due to the alias).
-   - import pathlib as non_alias
-8  |
-9  | # Unused, marked as required.
-10 | import shelve as alias
+  |
+7 | # Unused, _not_ marked as required (due to the alias).
+  - import pathlib as non_alias
+8 |
+  |

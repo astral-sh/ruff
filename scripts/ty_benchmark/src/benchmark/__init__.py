@@ -3,13 +3,17 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Mapping, NamedTuple
+from typing import NamedTuple
 
 if sys.platform == "win32":
     import mslex as shlex
 else:
     import shlex
+
+
+logger = logging.getLogger(__name__)
 
 
 class Command(NamedTuple):
@@ -19,7 +23,7 @@ class Command(NamedTuple):
     command: list[str]
     """The command to benchmark."""
 
-    prepare: str | None = None
+    prepare: list[str] | None = None
     """The command to run before each benchmark run."""
 
 
@@ -70,12 +74,12 @@ class Hyperfine(NamedTuple):
 
         # Add all prepare statements.
         for command in self.commands:
-            args.extend(["--prepare", command.prepare or ""])
+            args.extend(["--prepare", shlex.join(command.prepare or [])])
 
         # Add all commands.
         for command in self.commands:
             args.append(shlex.join(command.command))
 
-        logging.info(f"Running {args}")
+        logger.info(f"Running {args}")
 
-        subprocess.run(args, cwd=cwd, env=env)
+        subprocess.run(args, cwd=cwd, env=env, check=True)

@@ -79,7 +79,7 @@ impl LineIndex {
     ///
     /// For files starting with a UTF-8 BOM marker, the byte offsets
     /// in the range `0...3` are all mapped to line 0 and column 0.
-    /// Because of this, the conversion isn't losless.
+    /// Because of this, the conversion isn't lossless.
     ///
     /// ## Examples
     ///
@@ -224,7 +224,7 @@ impl LineIndex {
     }
 
     /// Returns `true` if the text only consists of ASCII characters
-    pub fn is_ascii(&self) -> bool {
+    fn is_ascii(&self) -> bool {
         self.kind().is_ascii()
     }
 
@@ -286,7 +286,7 @@ impl LineIndex {
 
     /// Returns the [byte offset](TextSize) of the `line`'s end.
     /// The offset is the end of the line, excluding the newline character ending the line (if any).
-    pub fn line_end_exclusive(&self, line: OneIndexed, contents: &str) -> TextSize {
+    pub(crate) fn line_end_exclusive(&self, line: OneIndexed, contents: &str) -> TextSize {
         let row_index = line.to_zero_indexed();
         let starts = self.line_starts();
 
@@ -294,7 +294,15 @@ impl LineIndex {
         if row_index.saturating_add(1) >= starts.len() {
             contents.text_len()
         } else {
-            starts[row_index + 1] - TextSize::new(1)
+            let next_line_start = starts[row_index + 1].to_usize();
+            let bytes = contents.as_bytes();
+
+            let line_ending_len = if bytes[..next_line_start].ends_with(b"\r\n") {
+                2
+            } else {
+                1
+            };
+            starts[row_index + 1] - TextSize::new(line_ending_len)
         }
     }
 
@@ -572,7 +580,7 @@ impl OneIndexed {
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
     pub const MIN: Self = Self::new(1).unwrap();
-    pub const ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
+    const ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     /// Creates a non-zero if the given value is not zero.
     pub const fn new(value: usize) -> Option<Self> {
@@ -809,6 +817,42 @@ mod tests {
                 line: OneIndexed::from_zero_indexed(1),
                 column: OneIndexed::from_zero_indexed(1)
             }
+        );
+    }
+
+    #[test]
+    fn line_end_exclusive_handles_different_line_endings() {
+        let lf_contents = "a\nb";
+        let lf_index = LineIndex::from_source_text(lf_contents);
+        assert_eq!(
+            lf_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), lf_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            lf_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), lf_contents),
+            TextSize::from(3)
+        );
+
+        let crlf_contents = "a\r\nb";
+        let crlf_index = LineIndex::from_source_text(crlf_contents);
+        assert_eq!(
+            crlf_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), crlf_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            crlf_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), crlf_contents),
+            TextSize::from(4)
+        );
+
+        let cr_contents = "a\rb";
+        let cr_index = LineIndex::from_source_text(cr_contents);
+        assert_eq!(
+            cr_index.line_end_exclusive(OneIndexed::from_zero_indexed(0), cr_contents),
+            TextSize::from(1)
+        );
+        assert_eq!(
+            cr_index.line_end_exclusive(OneIndexed::from_zero_indexed(1), cr_contents),
+            TextSize::from(3)
         );
     }
 

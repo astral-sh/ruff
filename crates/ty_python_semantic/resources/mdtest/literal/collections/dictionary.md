@@ -147,6 +147,22 @@ reveal_type(x12[0][2]["a"])  # revealed: int
 reveal_type(x12[0][3]["b"])  # revealed: int
 ```
 
+## Key narrowing through dictionary unpacking
+
+Unpacking a dictionary literal preserves its key bindings. Later entries replace earlier entries,
+including any narrowing for their nested keys.
+
+```py
+d = {"outer": {"stale": 1}, **{"outer": {"current": 2}}}
+reveal_type(d["outer"]["current"])  # revealed: Literal[2]
+reveal_type(d["outer"]["stale"])  # revealed: int
+
+d = {"keep": 1, **{**{"outer": {"current": 2}}}, "outer": {"last": "value"}}
+reveal_type(d["keep"])  # revealed: Literal[1]
+reveal_type(d["outer"]["last"])  # revealed: Literal["value"]
+reveal_type(d["outer"]["current"])  # revealed: str
+```
+
 ## Dict unpacking in function calls
 
 Narrowing is also performed for dictionary unpacking expressions:
@@ -155,6 +171,7 @@ Narrowing is also performed for dictionary unpacking expressions:
 def f1(a: int): ...
 def f2(a: int, b: str): ...
 def f3(a: int, b: str, c: float): ...
+def accepts_inner(inner: dict[str, int]): ...
 
 x1: dict[str, float | str] = {"a": 1, "b": "a"}
 
@@ -216,10 +233,22 @@ def _(x: dict[str, object]):
     # error: [invalid-argument-type]
     f3(**x["inner"])
 
+    # The rejected annotation does not widen the assigned dictionary's value type.
+    # error: [invalid-assignment]
     x["inner"]["c"] = 1.0
-    f3(**x["inner"])  # ok
 
     x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
+    # error: [invalid-argument-type]
+    f1(**x["inner"])
+
+def _(x: dict[str, object]):
+    # An annotation-only subscript likewise cannot declare the nested dictionary's type.
+    # error: [invalid-type-form]
+    x["inner"]: dict[str, float | str]
+
+    x["inner"] = {"inner": {"a": 1}}
+    accepts_inner(**x["inner"])  # ok
     # error: [invalid-argument-type]
     f1(**x["inner"])
 
@@ -227,7 +256,7 @@ def _(x: dict[str, dict[str, float | str]]):
     # A rejected dictionary assignment does not establish known key types.
     # error: [invalid-assignment]
     x["kwargs"] = {"nested": {"a": 1}}
-    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
     # error: [invalid-argument-type]
     f1(**x["kwargs"])
 
@@ -238,13 +267,13 @@ def _(x: dict[str, dict[str, float | str]]):
     # A rejected replacement also invalidates a prior known-key type.
     # error: [invalid-assignment]
     x["kwargs"] = {"nested": {"a": 1}}
-    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
 
 def accepts_value(**kwargs: object): ...
 def _(x: dict[str, dict[str, float | str]]):
     # error: [invalid-assignment]
     x = {"kwargs": {"nested": {"a": object()}}}
-    reveal_type(x["kwargs"]["nested"])  # revealed: int | float | str
+    reveal_type(x["kwargs"]["nested"])  # revealed: float | str
     # error: [invalid-argument-type]
     accepts_value(**x["kwargs"]["nested"])
 
@@ -289,6 +318,15 @@ class Y:
     inner: dict[str, object]
 
 def _(y: Y):
+    # error: [invalid-type-form]
+    y.inner: dict[str, float | str] = {"a": 1, "b": "a"}
+
+    y.inner = {"inner": {"a": 1}}
+    accepts_inner(**y.inner)  # ok
+    # error: [invalid-argument-type]
+    f1(**y.inner)
+
+def _(y: Y):
     y.inner = {"a": 1, "b": "a"}
 
     f2(**y.inner)  # ok
@@ -302,4 +340,89 @@ def _(y: Y):
     y.inner = {"inner": {"a": 1}}
     # error: [invalid-argument-type]
     f1(**y.inner)
+```
+
+## Known key values after loop replacements
+
+An accepted dictionary replacement contributes its known key values to subsequent iterations.
+
+```py
+def accepted():
+    values: dict[str, int] = {"a": 1}
+    for _ in range(2):
+        reveal_type(values["a"])  # revealed: Literal[1, 2]
+        values = {"a": 2}
+    reveal_type(values["a"])  # revealed: Literal[2]
+```
+
+## Rejected dictionary replacements in loops
+
+A rejected replacement instead falls back to the declared value type. An assertion after the
+replacement narrows that fallback on the next iteration, rather than preserving the original key's
+literal type or using the rejected value.
+
+```py
+def rejected(repeat: bool):
+    values: dict[str, int | None] = {"a": 1}
+    while repeat:
+        reveal_type(values["a"])  # revealed: int
+        values = {"a": "bad"}  # error: [invalid-assignment]
+        assert values["a"] is not None
+    reveal_type(values["a"])  # revealed: int
+```
+
+## Setter dictionary assignments in loops
+
+A property setter need not store the assigned dictionary. Key reads use the getter's value type,
+including when a key was already read before the loop and the setter accepts a different value type.
+
+```py
+class C:
+    @property
+    def values(self) -> dict[str, int]:
+        return {"a": 1}
+
+    @values.setter
+    def values(self, value: dict[str, str]) -> None:
+        pass
+
+def f(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": "bad"}
+    return c.values["a"]
+```
+
+The same applies when the assigned dictionary depends on a key read from an earlier iteration.
+Inferring that assignment must converge without using the setter's input type for getter reads.
+
+```py
+def loop_carried_value(c: C, repeat: bool) -> int:
+    reveal_type(c.values["a"])  # revealed: int
+    while repeat:
+        reveal_type(c.values["a"])  # revealed: int
+        c.values = {"a": str(c.values["a"])}
+    return c.values["a"]
+```
+
+## Rejected annotations in stubs
+
+Annotation-only declarations in stubs are also bindings. A rejected annotation should fall back to
+the type obtained by normal member lookup:
+
+`stub.pyi`:
+
+```pyi
+x: dict[str, object]
+# error: [invalid-type-form]
+x["a"]: int
+reveal_type(x["a"])  # revealed: object
+
+x["b"] = ...
+reveal_type(x["b"])  # revealed: Unknown
+
+# error: [invalid-type-form]
+x["c"]: int = ...
+reveal_type(x["c"])  # revealed: Unknown
 ```

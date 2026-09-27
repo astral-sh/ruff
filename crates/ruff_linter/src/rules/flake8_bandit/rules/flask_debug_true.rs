@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `debug=True` in Flask.
@@ -39,7 +40,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Flask documentation: Debug Mode](https://flask.palletsprojects.com/en/latest/quickstart/#debug-mode)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Security)]
 pub(crate) struct FlaskDebugTrue;
 
 impl Violation for FlaskDebugTrue {

@@ -128,6 +128,7 @@ if sys.version_info >= (3, 12):
                 *mark_as_current* inserts a '-->' marker arrow as part of the line
                 *offset_width* sets the width of the instruction offset field
                 """
+
         if sys.version_info >= (3, 13):
             @property
             def oparg(self) -> int:
@@ -165,6 +166,7 @@ if sys.version_info >= (3, 12):
             @property
             def is_jump_target(self) -> bool:
                 """True if other code jumps to here, otherwise False"""
+
         if sys.version_info >= (3, 14):
             @staticmethod
             def make(

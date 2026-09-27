@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `os.getenv` calls with invalid default values.
@@ -33,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// int(os.getenv("FOO", "1"))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.255")]
+#[violation_metadata(stable_since = "v0.0.255", category = Category::Suspicious)]
 pub(crate) struct InvalidEnvvarDefault;
 
 impl Violation for InvalidEnvvarDefault {

@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for invalid use of literals in assert message arguments.
@@ -15,18 +16,18 @@ use crate::checkers::ast::Checker;
 /// ## Example
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits), 2  # True unless the list is empty
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// fruits = ["apples", "plums", "pears"]
-/// fruits.filter(lambda fruit: fruit.startwith("p"))
+/// fruits.filter(lambda fruit: fruit.startswith("p"))
 /// assert len(fruits) == 2
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Suspicious)]
 pub(crate) struct InvalidAssertMessageLiteralArgument;
 
 impl Violation for InvalidAssertMessageLiteralArgument {

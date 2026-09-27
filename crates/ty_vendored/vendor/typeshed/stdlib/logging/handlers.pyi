@@ -368,6 +368,7 @@ class SysLogHandler(Handler):
             socktype of None, in which case socket.SOCK_DGRAM will be used, falling
             back to socket.SOCK_STREAM.
             """
+
     else:
         def __init__(
             self, address: tuple[str, int] | str = ("localhost", 514), facility: str | int = 1, socktype: SocketKind | None = None
@@ -383,6 +384,7 @@ class SysLogHandler(Handler):
             socktype of None, in which case socket.SOCK_DGRAM will be used, falling
             back to socket.SOCK_STREAM.
             """
+
     if sys.version_info >= (3, 11):
         def createSocket(self) -> None:
             """
@@ -414,7 +416,7 @@ class NTEventLogHandler(Handler):
     """
     A handler class which sends events to the NT Event Log. Adds a
     registry entry for the specified application name. If no dllname is
-    provided, win32service.pyd (which contains some basic message
+    provided and pywin32 installed, win32service.pyd (which contains some basic message
     placeholders) is used. Note that use of these placeholders will make
     your event logs big, as the entire message source is held in the log.
     If you want slimmer logs, you have to pass in the name of your own DLL
@@ -429,6 +431,7 @@ class NTEventLogHandler(Handler):
         Override this if you want to specify your own categories. This version
         returns 0.
         """
+
     # TODO: correct return value?
     def getEventType(self, record: LogRecord) -> int:
         """
@@ -641,6 +644,7 @@ class QueueHandler(Handler):
         this method if you want to use blocking, timeouts or custom queue
         implementations.
         """
+
     if sys.version_info >= (3, 12):
         listener: QueueListener | None
 
@@ -711,6 +715,7 @@ class QueueListener:
         This just loops through the handlers offering them the record
         to handle.
         """
+
     if sys.version_info >= (3, 14):
         def __enter__(self) -> Self:
             """

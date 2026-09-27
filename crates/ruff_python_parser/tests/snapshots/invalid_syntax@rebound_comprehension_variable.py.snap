@@ -1021,7 +1021,6 @@ Module(
 8 | [(a := 0) for a in range (0) for b in range(0)]
 9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
   |    ^ Syntax Error: assignment expression cannot rebind comprehension variable
-  |
 
 
   |
@@ -1029,4 +1028,3 @@ Module(
 8 | [(a := 0) for a in range (0) for b in range(0)]
 9 | [((a := 0), (b := 1)) for a in range (0) for b in range(0)]
   |              ^ Syntax Error: assignment expression cannot rebind comprehension variable
-  |

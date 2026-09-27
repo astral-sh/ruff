@@ -632,9 +632,11 @@ class NormalDist:
 
     def __neg__(x1) -> NormalDist:
         """Negates mu while keeping sigma the same."""
+
     __radd__ = __add__
     def __rsub__(x1, x2: float | NormalDist) -> NormalDist:
         """Subtract a NormalDist from a constant or another NormalDist."""
+
     __rmul__ = __mul__
     def __hash__(self) -> int:
         """NormalDist objects hash equal if their mu and sigma are both equal."""

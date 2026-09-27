@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for repeated keyword arguments in function calls.
@@ -23,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RepeatedKeywordArgument {
     duplicate_keyword: String,
 }
@@ -40,21 +41,26 @@ impl Violation for RepeatedKeywordArgument {
 pub(crate) fn repeated_keyword_argument(checker: &Checker, call: &ExprCall) {
     let ExprCall { arguments, .. } = call;
 
+    // Avoid allocating if there's only one non-unpacked keyword argument, or the unpacked value is
+    // not a dict literal.
+    if let [keyword] = &*arguments.keywords {
+        if keyword.arg.is_some() || !keyword.value.is_dict_expr() {
+            return;
+        }
+    }
+
     let mut seen = FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
     for keyword in &*arguments.keywords {
         if let Some(id) = &keyword.arg {
-            // Ex) `func(a=1, a=2)`
-            if !seen.insert(id.as_str()) {
-                checker.report_diagnostic(
-                    RepeatedKeywordArgument {
-                        duplicate_keyword: id.to_string(),
-                    },
-                    keyword.range(),
-                );
-            }
-        } else if let Expr::Dict(dict) = &keyword.value {
-            // Ex) `func(**{"a": 1, "a": 2})`
+            seen.insert(id.as_str());
+        }
+    }
+
+    for keyword in &*arguments.keywords {
+        if keyword.arg.is_none()
+            && let Expr::Dict(dict) = &keyword.value
+        {
             for key in dict.iter_keys().flatten() {
                 if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = key {
                     if !seen.insert(value.to_str()) {

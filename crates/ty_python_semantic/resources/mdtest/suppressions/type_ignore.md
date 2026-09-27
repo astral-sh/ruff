@@ -170,16 +170,13 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
   |
 9 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the unused suppression comment
-6  |   + 2  # type: ignore # fmt: skip
-7  | a = (3
+   |
 8  |   # snapshot
    -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
 9  +   + 2)  # fmt: skip
 10 | a = (3
-11 |   # snapshot
-12 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+   |
 ```
 
 ```py
@@ -194,13 +191,12 @@ warning[unused-ignore-comment]: Unused `ty: ignore` directive
    |
 12 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove the unused suppression comment
-9  |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
-10 | a = (3
+   |
 11 |   # snapshot
    -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
 12 +   + 2)  # fmt: skip
+   |
 ```
 
 ## Misspelled `type: ignore`
@@ -267,6 +263,19 @@ a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
 ```
 
+Unlike `ty: ignore`, an own-line `type: ignore` does not suppress the following line (unless it
+appears before any Python statements in the file, in which case it suppresses the entire file). This
+preserves the standardized semantics of `type: ignore` comments.
+
+```py
+seen_code = True
+
+# error: [unused-type-ignore-comment]
+# type: ignore
+# error: [unresolved-reference]
+value = missing
+```
+
 ## `respect-type-ignore-comments=false`
 
 ty ignore `type-ignore` comments if `respect-type-ignore-comments` is set to false.
@@ -308,11 +317,12 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive: 'division-
   |
 2 | a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
   |                                       ^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the unused suppression code
+  |
 1 | # snapshot
   - a = 10 / 2  # type: ignore[mypy-code, ty:division-by-zero]
 2 + a = 10 / 2  # type: ignore[mypy-code]
+  |
 ```
 
 ## Unused ignore comment
@@ -328,11 +338,12 @@ warning[unused-type-ignore-comment]: Unused `type: ignore` directive
   |
 2 | a = 10 / 2  # type: ignore[ty:division-by-zero]
   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Remove the unused suppression comment
+  |
 1 | # snapshot
   - a = 10 / 2  # type: ignore[ty:division-by-zero]
 2 + a = 10 / 2
+  |
 ```
 
 ## Unknown ignore code
@@ -348,5 +359,4 @@ warning[ignore-comment-unknown-rule]: Unknown rule `division-by`. Did you mean `
   |
 2 | a = 10 / 2  # type: ignore[ty:division-by]
   |                            ^^^^^^^^^^^^^^
-  |
 ```

@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -42,7 +43,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the expression contains comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Complexity)]
 pub(crate) struct SliceToRemovePrefixOrSuffix {
     affix_kind: AffixKind,
     stmt_or_expression: StmtOrExpr,
@@ -358,7 +359,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
         (
             AffixKind::StartsWith,
             ast::Expr::Call(ast::ExprCall {
-                range: _,
+                range_start: _,
                 node_index: _,
                 func,
                 arguments,
@@ -386,15 +387,16 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
                 node_index: _,
                 value: string_val,
             }),
-        ) if operand.is_number_literal_expr() => operand.as_number_literal_expr().is_some_and(
-            |ast::ExprNumberLiteral { value, .. }| {
-                // Only support prefix removal for size at most `u32::MAX`
-                value
-                    .as_int()
-                    .and_then(ast::Int::as_usize)
-                    .is_some_and(|x| x == string_val.chars().count())
-            },
-        ),
+        ) if let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: ast::Number::Int(value),
+            ..
+        }) = &**operand =>
+        {
+            // Only support prefix removal for size at most `u32::MAX`
+            value
+                .as_usize()
+                .is_some_and(|x| x == string_val.chars().count())
+        }
         (
             AffixKind::EndsWith,
             ast::Expr::UnaryOp(ast::ExprUnaryOp {
@@ -406,7 +408,7 @@ fn affix_matches_slice_bound(data: &RemoveAffixData, semantic: &SemanticModel) -
             _,
         ) => operand.as_call_expr().is_some_and(
             |ast::ExprCall {
-                 range: _,
+                 range_start: _,
                  node_index: _,
                  func,
                  arguments,

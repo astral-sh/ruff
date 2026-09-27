@@ -103,4 +103,3 @@ Module(
 1 | x and *y
 2 | x or *y
   |      ^^ Syntax Error: Starred expression cannot be used here
-  |

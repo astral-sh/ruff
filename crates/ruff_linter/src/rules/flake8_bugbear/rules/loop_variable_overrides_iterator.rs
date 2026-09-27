@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for loop control variables that override the loop iterable.
@@ -37,7 +38,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `for` statement](https://docs.python.org/3/reference/compound_stmts.html#the-for-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.121")]
+#[violation_metadata(stable_since = "v0.0.121", category = Category::Suspicious)]
 pub(crate) struct LoopVariableOverridesIterator {
     name: String,
 }
@@ -63,6 +64,10 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
         iter_finder.names
     };
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics produced"
+    )]
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.report_diagnostic(
@@ -87,10 +92,14 @@ impl<'a> Visitor<'a> for NameFinder<'a> {
                 self.names.insert(id, expr);
             }
             Expr::ListComp(ast::ExprListComp { generators, .. })
-            | Expr::DictComp(ast::ExprDictComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
             | Expr::Generator(ast::ExprGenerator { generators, .. }) => {
                 for comp in generators {
+                    self.visit_expr(&comp.iter);
+                }
+            }
+            Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+                for comp in generators.as_ref() {
                     self.visit_expr(&comp.iter);
                 }
             }

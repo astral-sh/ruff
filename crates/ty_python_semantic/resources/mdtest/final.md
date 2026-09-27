@@ -35,9 +35,10 @@ class H(
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import final, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, final
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class Parent:
     @final
@@ -85,7 +86,7 @@ class Child(Parent):
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
-    def my_proeprty3(self) -> None: ...
+    def my_property3(self) -> None: ...
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
     @staticmethod
@@ -101,13 +102,10 @@ class Child(Parent):
 class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
-    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
-    # type or on an instance, it will behave the same from the caller's perspective. The only
-    # difference is whether the method body gets access to `self`, which is not a
-    # concern of Liskov.
+    # The static method accepts the same instance calls as the inherited method, but
+    # overriding a final method is still prohibited.
     @staticmethod
     # error: [override-of-final-method]
-    # error: [invalid-method-override]
     def foo(): ...
     @property
     # TODO: we should emit a Liskov violation here too
@@ -449,6 +447,65 @@ class F:
     def method(self):
         @final  # error: [final-on-non-method]
         def not_a_method(): ...
+```
+
+## A method cannot be both abstract and final
+
+An abstract method must be overridden for a subclass to become concrete, but a final method cannot
+be overridden.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+class A:
+    @final
+    @abstractmethod
+    def first(self) -> None: ...  # error: [abstract-and-final-method]
+
+    # Decorator order does not matter.
+    @abstractmethod
+    @final
+    def second(self) -> None: ...  # error: [abstract-and-final-method]
+    @abstractmethod
+    def abstract(self) -> None: ...
+    @final
+    def final(self) -> None: ...
+```
+
+## An overloaded method cannot be both abstract and final
+
+`runtime.py`:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final, overload
+
+class A(ABC):
+    @overload
+    def method(self, value: int) -> int: ...
+    @overload
+    def method(self, value: str) -> str: ...
+    @final
+    @abstractmethod
+    def method(self, value: int | str) -> int | str:  # error: [abstract-and-final-method]
+        raise NotImplementedError
+```
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import final, overload
+
+class A:
+    @overload
+    @final
+    @abstractmethod
+    def method(self, value: int) -> int: ...  # error: [abstract-and-final-method]
+    @overload
+    @abstractmethod
+    def method(self, value: str) -> str: ...
 ```
 
 ## An `@final` method is overridden by an implicit instance attribute
@@ -931,7 +988,8 @@ way as an `@final` non-`Protocol` class:
 
 ```py
 from typing import final, Protocol
-from ty_extensions import static_assert, is_subtype_of
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class Base(Protocol):
     def abstract(self) -> int: ...
@@ -1062,7 +1120,7 @@ class ConcreteOrdered(AbstractOrdered): ...  # fine
 # exists in the MRO is abstract!
 @final
 @total_ordering
-class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+class AlsoConcreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
     def __gt__(self, other): ...
 ```
 
@@ -1221,7 +1279,8 @@ class Child2(Base):
 ### Annotation doesn't override abstract method
 
 A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
-method. Attempting to instantiate the class will still fail at runtime.
+method. Attempting to instantiate the class will still fail at runtime. The diagnostic identifies
+the abstract declaration and explains why the attribute annotation does not implement it.
 
 ```py
 from abc import ABC, abstractmethod
@@ -1232,8 +1291,30 @@ class Base(ABC):
     def method(self) -> int: ...
 
 @final
-class Bad(Base):  # error: [abstract-method-in-final-class]
+# snapshot: abstract-method-in-final-class
+class Bad(Base):
     method: int
+```
+
+```snapshot
+error[abstract-method-in-final-class]: Final class `Bad` has unimplemented abstract methods
+  --> src/mdtest_snippet.py:10:7
+   |
+ 5 | /     @abstractmethod
+ 6 | |     def method(self) -> int: ...
+   | |________________________________- `method` declared as abstract on superclass `Base`
+ 7 |
+ 8 |   @final
+   |   ------
+ 9 |   # snapshot: abstract-method-in-final-class
+10 |   class Bad(Base):
+   |         ^^^ `method` is unimplemented
+info: The instance-attribute annotation for `method` does not override the abstract method
+help: Either assign a value or add `ClassVar` to this declaration
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     method: int
+   |     ------ Instance-attribute declaration
 ```
 
 The same applies to abstract properties:
@@ -1248,8 +1329,29 @@ class Base(ABC):
     def f(self) -> int: ...
 
 @final
-class BadChild(Base):  # error: [abstract-method-in-final-class]
+# snapshot: abstract-method-in-final-class
+class BadChild(Base):
     f: int
+```
+
+```snapshot
+error[abstract-method-in-final-class]: Final class `BadChild` has unimplemented abstract methods
+  --> src/mdtest_snippet.py:22:7
+   |
+18 |     def f(self) -> int: ...
+   |         - `f` declared as abstract on superclass `Base`
+19 |
+20 | @final
+   | ------
+21 | # snapshot: abstract-method-in-final-class
+22 | class BadChild(Base):
+   |       ^^^^^^^^ `f` is unimplemented
+info: The instance-attribute annotation for `f` does not override the abstract method
+help: Either assign a value or add `ClassVar` to this declaration
+  --> src/mdtest_snippet.py:23:5
+   |
+23 |     f: int
+   |     - Instance-attribute declaration
 ```
 
 But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
