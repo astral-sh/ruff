@@ -1135,7 +1135,7 @@ def filter_holders(holder: IntHolder | StrHolder) -> None:
 
 ## Class patterns with multiple attributes
 
-Each attribute pattern is checked separately, even when the attributes have the same type:
+Each attribute is narrowed by its own pattern, even when the attributes have the same type:
 
 ```py
 class Pair:
@@ -1150,8 +1150,7 @@ def match_pair(value: Pair) -> None:
 
 ## Nested class captures over recursive unions
 
-`Branch` and `Leaf` can share subclasses through multiple inheritance. The nested capture retains
-the declared type of `child`:
+The `child` attribute is itself a `Node`, so a nested capture can be either a `Branch` or a `Leaf`:
 
 ```py
 from __future__ import annotations
@@ -2568,8 +2567,9 @@ def distinguish_subjects(value: IntWrapper | StrWrapper) -> None:
 
 ## Recursive `TypedDict` mapping patterns
 
-Matching nested `child` fields retains their recursive union type. If the first `child` is `None`,
-the nested pattern fails and the next case can still match:
+The two `TypedDict`s have different tags but share the same recursive `child` type. Matching nested
+`child` fields retains that type. If the first `child` is `None`, the nested pattern fails and the
+next case can still match:
 
 ```py
 from __future__ import annotations
