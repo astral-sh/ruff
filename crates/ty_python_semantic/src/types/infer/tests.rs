@@ -1025,6 +1025,87 @@ fn alias_cycle_summary_updates_after_dependency_changes() -> anyhow::Result<()> 
     Ok(())
 }
 
+#[test]
+fn alias_cycle_summary_with_recursive_typevar_bound() -> anyhow::Result<()> {
+    // B's bound refers to A, so even the non-recursive A = B[int] requires cycle recovery.
+    // Checking C first changes which queries participate in that cycle.
+    for check_unrelated_first in [false, true] {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()?;
+        db.write_files([
+            (
+                "/src/b.py",
+                "from a import A\ntype B[T: A | int] = T | str",
+            ),
+            (
+                "/src/unrelated.py",
+                "from typing import reveal_type\nfrom b import B\ntype C = B[int]\ndef f(x: C): reveal_type(x)",
+            ),
+        ])?;
+
+        for (index, (expression, expected, cyclic)) in [
+            ("B[int]", "int | str", false),
+            ("B[A]", "str", true),
+            ("B[list[A]]", "list[A] | str", false),
+            ("B[int]", "int | str", false),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            db.write_file(
+                "/src/a.py",
+                format!(
+                    "from typing import reveal_type\nfrom b import B\ntype A = {expression}\ndef f(x: A): reveal_type(x)"
+                ),
+            )?;
+            if check_unrelated_first {
+                assert_revealed_type(&db, "/src/unrelated.py", "int | str");
+            }
+            let file = system_path_to_file(&db, "/src/a.py")?;
+            let diagnostics = check_types(&db, program_file(&db, file));
+            let expected_messages: &[&str] = if cyclic {
+                &["Type alias `A` has a circular definition", "Revealed type"]
+            } else {
+                &["Revealed type"]
+            };
+            assert_diagnostic_messages(&diagnostics, expected_messages);
+            let revealed = diagnostics
+                .iter()
+                .find(|diagnostic| diagnostic.id() == DiagnosticId::RevealedType)
+                .and_then(Diagnostic::primary_annotation)
+                .and_then(|annotation| annotation.get_message());
+            assert_eq!(revealed, Some(format!("`{expected}`").as_str()));
+            if !check_unrelated_first {
+                assert_revealed_type(&db, "/src/unrelated.py", "int | str");
+            }
+
+            if index == 0 {
+                let events = db.take_salsa_events();
+                let cycles = salsa::attach(&db, || {
+                    events
+                        .iter()
+                        .filter_map(|event| match event.kind {
+                            salsa::EventKind::WillIterateCycle { database_key, .. } => {
+                                Some(format!("{database_key:?}"))
+                            }
+                            _ => None,
+                        })
+                        .collect::<Vec<_>>()
+                });
+                assert!(
+                    cycles.iter().any(|query| {
+                        query.starts_with("cycle_summary(")
+                            || query.contains("cached_expand_aliases_")
+                    }),
+                    "{cycles:#?}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
     let scope = global_scope(db, program_file(db, file));

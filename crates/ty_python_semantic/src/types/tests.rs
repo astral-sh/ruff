@@ -368,6 +368,15 @@ fn todo_types() {
 }
 
 #[test]
+fn unrelated_divergence_does_not_indicate_an_alias_cycle() {
+    let db = setup_db();
+    let id = salsa::plumbing::Id::from_bits(1);
+
+    assert!(!Type::divergent(id).has_unguarded_alias_cycle(&db));
+    assert!(Type::divergent_alias(id).has_unguarded_alias_cycle(&db));
+}
+
+#[test]
 fn divergent_type() {
     let db = setup_db();
     let db = &db;

@@ -43,7 +43,12 @@ pub(super) struct AliasCycleSummary<'db> {
     /// The point at which an unguarded cycle was detected.
     pub(super) cycle: Option<AliasCycle<'db>>,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
-    /// A provisional type was encountered, so this summary may be incomplete.
+    /// This summary may be incomplete: its Salsa query was reentered, or the walk encountered
+    /// a divergent type.
+    ///
+    /// During Salsa cycle iteration, even a result with no cycle is provisional: the queries
+    /// read by the walk register dependencies, keeping the caller's result provisional as well.
+    /// A later walk must recompute the summary because those dependencies may have changed.
     pending: bool,
 }
 
@@ -83,7 +88,7 @@ impl<'db> AliasCycleSummary<'db> {
         }
     }
 
-    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         Self::from_type_inner(db, ty, &mut AliasCycleAnalysis::default())
     }
 
