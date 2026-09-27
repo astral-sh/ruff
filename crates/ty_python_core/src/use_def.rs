@@ -615,7 +615,7 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct RetainedPlaceStates {
     end_of_scope: InternedPlaceStateId,
     /// The reachable histories exclude their implicit initial unbound/undeclared entries.
@@ -685,7 +685,7 @@ impl PredicateNarrowingTargets {
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
 struct UseDefMapExtra {
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+    bindings_by_use: Arc<FrozenIndexVec<ScopedUseId, InternedBindingsId>>,
 
     /// Bindings before an `if` chain, for uses in its final `elif` condition.
     if_chain_start_by_use: FrozenMap<ScopedUseId, InternedBindingsId>,
@@ -697,10 +697,11 @@ struct UseDefMapExtra {
     multi_bindings_by_use: MultiBindingsByUse,
 
     /// Retained [`PlaceState`] values for each member.
-    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>,
+    member_states: Arc<FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>>,
 
     /// Snapshots of bindings used to resolve references from nested scopes.
-    enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
+    enclosing_snapshots:
+        Arc<FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>>,
 
     /// Completed loop headers in this scope.
     loop_headers: FrozenIndexVec<LoopHeaderId, LoopHeader>,
@@ -715,6 +716,18 @@ struct UseDefMapExtra {
     /// binary search.
     boolean_test_roots: Box<[NodeIndex]>,
 }
+
+// These arrays contain only scope-local IDs and have no database lifetime. Sharing the empty
+// cases across files avoids a separate reference-counted allocation for each indexed file.
+static EMPTY_SYMBOL_STATES: LazyLock<Arc<FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>>> =
+    LazyLock::new(|| Arc::new(IndexVec::new().into()));
+static EMPTY_MEMBER_STATES: LazyLock<Arc<FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>>> =
+    LazyLock::new(|| Arc::new(IndexVec::new().into()));
+static EMPTY_BINDINGS_BY_USE: LazyLock<Arc<FrozenIndexVec<ScopedUseId, InternedBindingsId>>> =
+    LazyLock::new(|| Arc::new(IndexVec::new().into()));
+static EMPTY_ENCLOSING_SNAPSHOTS: LazyLock<
+    Arc<FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>>,
+> = LazyLock::new(|| Arc::new(IndexVec::new().into()));
 
 static EMPTY_CONSTRAINT_TABLES: LazyLock<ConstraintTables<'static>> =
     LazyLock::new(|| ConstraintTables {
@@ -841,10 +854,10 @@ pub struct UseDefMap<'db> {
     >,
 
     /// Retained [`PlaceState`] values for each symbol.
-    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+    symbol_states: Arc<FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>>,
 
     /// Collection fields omitted when they would all be empty.
-    extra: Option<Box<UseDefMapExtra>>,
+    extra: Option<Arc<UseDefMapExtra>>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -866,22 +879,109 @@ pub struct UseDefMap<'db> {
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
-/// Shares equivalent scope-local binding and declaration tables within a file.
+/// Shares equivalent scope-local use-def data within a file.
 ///
-/// Their IDs are interpreted through each scope's own definitions and constraints, so
-/// identical tables can share storage without sharing the scope-specific data they reference.
+/// The IDs in these tables are interpreted through each scope's own definitions and constraints,
+/// so identical tables can share storage without sharing the data they reference.
 #[derive(Default)]
-pub(super) struct UseDefMapInterner {
+pub(super) struct UseDefMapInterner<'db> {
     bindings: FxHashSet<Arc<RetainedBindings>>,
     declarations: FxHashSet<Arc<RetainedDeclarations>>,
+    symbols: FxHashSet<Arc<FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>>>,
+    members: FxHashSet<Arc<FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>>>,
+    uses: FxHashSet<Arc<FrozenIndexVec<ScopedUseId, InternedBindingsId>>>,
+    snapshots:
+        FxHashSet<Arc<FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>>>,
+    extras: FxHashMap<u64, SmallVec<[Arc<UseDefMapExtra>; 1]>>,
+    maps: FxHashMap<u64, SmallVec<[Arc<UseDefMap<'db>>; 1]>>,
 }
 
-impl UseDefMapInterner {
-    pub(super) fn intern<'db>(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
+impl<'db> UseDefMapInterner<'db> {
+    pub(super) fn intern(&mut self, mut map: UseDefMap<'db>) -> Arc<UseDefMap<'db>> {
         map.interned_bindings = Self::intern_table(&mut self.bindings, map.interned_bindings);
         map.interned_declarations =
             Self::intern_table(&mut self.declarations, map.interned_declarations);
+        map.symbol_states = if map.symbol_states.is_empty() {
+            Arc::clone(&EMPTY_SYMBOL_STATES)
+        } else {
+            Self::intern_table(&mut self.symbols, map.symbol_states)
+        };
+        if let Some(extra) = &mut map.extra {
+            let extra = Arc::get_mut(extra).expect("new use-def extras are uniquely owned");
+            extra.member_states = if extra.member_states.is_empty() {
+                Arc::clone(&EMPTY_MEMBER_STATES)
+            } else {
+                Self::intern_table(&mut self.members, Arc::clone(&extra.member_states))
+            };
+            extra.bindings_by_use = if extra.bindings_by_use.is_empty() {
+                Arc::clone(&EMPTY_BINDINGS_BY_USE)
+            } else {
+                Self::intern_table(&mut self.uses, Arc::clone(&extra.bindings_by_use))
+            };
+            extra.enclosing_snapshots = if extra.enclosing_snapshots.is_empty() {
+                Arc::clone(&EMPTY_ENCLOSING_SNAPSHOTS)
+            } else {
+                Self::intern_table(&mut self.snapshots, Arc::clone(&extra.enclosing_snapshots))
+            };
+        }
+        if let Some(extra) = &mut map.extra {
+            // These IDs are resolved through the owning map, so equal auxiliary data can be
+            // shared even when the definitions or constraints it refers to differ. Hash the
+            // common sequences and compare every field before reusing an allocation.
+            let mut hasher = FxHasher::default();
+            extra.bindings_by_use.raw.hash(&mut hasher);
+            extra.member_states.raw.hash(&mut hasher);
+            extra.enclosing_snapshots.raw.hash(&mut hasher);
+            extra.loop_headers.len().hash(&mut hasher);
+            extra.boolean_test_roots.hash(&mut hasher);
+            let candidates = self.extras.entry(hasher.finish()).or_default();
+            if let Some(existing) = candidates.iter().find(|candidate| *candidate == extra) {
+                *extra = Arc::clone(existing);
+            } else {
+                candidates.push(Arc::clone(extra));
+            }
+        }
+
+        // Scope-local IDs can be shared even when the corresponding names differ. Only consider
+        // maps without definitions or control flow, and compare the complete maps after hashing.
+        if map.all_definitions.states.is_empty()
+            && !map.symbol_states.is_empty()
+            && map.constraint_tables.is_none()
+            && map.range_reachability.is_empty()
+            && let Some(hash) = Self::simple_map_hash(&map)
+        {
+            let candidates = self.maps.entry(hash).or_default();
+            if let Some(existing) = candidates
+                .iter()
+                .find(|candidate| candidate.as_ref() == &map)
+            {
+                return Arc::clone(existing);
+            }
+            let map = Arc::new(map);
+            candidates.push(Arc::clone(&map));
+            return map;
+        }
+
         Arc::new(map)
+    }
+
+    fn simple_map_hash(map: &UseDefMap<'db>) -> Option<u64> {
+        let mut hasher = FxHasher::default();
+        map.symbol_states.raw.hash(&mut hasher);
+        map.end_of_scope_reachability.hash(&mut hasher);
+        if let Some(extra) = map.extra.as_deref() {
+            if extra.if_chain_start_by_use.iter().next().is_some()
+                || !extra.multi_bindings_by_use.0.is_empty()
+                || !extra.enclosing_snapshots.is_empty()
+                || !extra.loop_headers.is_empty()
+                || !extra.boolean_test_roots.is_empty()
+            {
+                return None;
+            }
+            extra.bindings_by_use.raw.hash(&mut hasher);
+            extra.member_states.raw.hash(&mut hasher);
+        }
+        Some(hasher.finish())
     }
 
     fn intern_table<T: Eq + std::hash::Hash>(
@@ -3263,12 +3363,12 @@ impl<'db> UseDefMapBuilder<'db> {
             || !loop_headers.is_empty()
             || !boolean_test_roots.is_empty())
         .then(|| {
-            Box::new(UseDefMapExtra {
-                bindings_by_use: bindings_by_use.into(),
+            Arc::new(UseDefMapExtra {
+                bindings_by_use: Arc::new(bindings_by_use.into()),
                 if_chain_start_by_use,
                 multi_bindings_by_use,
-                member_states,
-                enclosing_snapshots: enclosing_snapshots.into(),
+                member_states: Arc::new(member_states),
+                enclosing_snapshots: Arc::new(enclosing_snapshots.into()),
                 loop_headers: loop_headers.into(),
                 boolean_test_roots: boolean_test_roots.into_boxed_slice(),
             })
@@ -3296,7 +3396,7 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_bindings: Arc::new(interned_bindings),
             interned_declarations: Arc::new(interned_declarations),
             range_reachability: self.range_reachability.into_boxed_slice(),
-            symbol_states,
+            symbol_states: Arc::new(symbol_states),
             definitions_by_definition,
             extra,
             end_of_scope_reachability: self.reachability,
@@ -3480,5 +3580,108 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+
+    use super::*;
+    use crate::db::{TestProgramDb, tests::TestDbBuilder};
+    use crate::semantic_index;
+
+    #[test]
+    fn shared_scope_local_tables_resolve_within_each_scope() {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "test.py",
+                "\
+def first():
+    missing
+def second():
+    other
+def different():
+    other
+    other
+def with_parameter(value):
+    value
+def with_other_parameter(item):
+    item
+",
+            )
+            .with_file(
+                "other.py",
+                "def same(value):\n    value\ndef empty():\n    pass\n",
+            )
+            .build()
+            .unwrap();
+        let file = system_path_to_file(&db, "test.py").unwrap();
+        let program_file = db.program().program_file(&db, file);
+        let index = semantic_index(&db, program_file);
+        let scopes: Vec<_> = index
+            .child_scopes(FileScopeId::global())
+            .map(|(id, _)| id)
+            .collect();
+        assert_eq!(scopes.len(), 5);
+
+        let [
+            first,
+            second,
+            different,
+            with_parameter,
+            with_other_parameter,
+        ]: [_; 5] = scopes.try_into().unwrap();
+        assert!(Arc::ptr_eq(
+            &index.use_def_maps[first],
+            &index.use_def_maps[second]
+        ));
+        assert!(!Arc::ptr_eq(
+            &index.use_def_maps[first],
+            &index.use_def_maps[different]
+        ));
+
+        let first_map = index.use_def_map(with_parameter);
+        let second_map = index.use_def_map(with_other_parameter);
+        assert!(!Arc::ptr_eq(
+            &index.use_def_maps[with_parameter],
+            &index.use_def_maps[with_other_parameter]
+        ));
+        assert!(Arc::ptr_eq(
+            first_map.extra.as_ref().unwrap(),
+            second_map.extra.as_ref().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            &first_map.symbol_states,
+            &second_map.symbol_states
+        ));
+        assert!(Arc::ptr_eq(
+            &first_map.extra().bindings_by_use,
+            &second_map.extra().bindings_by_use
+        ));
+        let first_definition = first_map
+            .end_of_scope_symbol_bindings(ScopedSymbolId::new(0))
+            .find_map(|binding| binding.binding.definition())
+            .unwrap();
+        let second_definition = second_map
+            .end_of_scope_symbol_bindings(ScopedSymbolId::new(0))
+            .find_map(|binding| binding.binding.definition())
+            .unwrap();
+        assert_ne!(first_definition, second_definition);
+
+        let other_file = system_path_to_file(&db, "other.py").unwrap();
+        let other_index = semantic_index(&db, db.program().program_file(&db, other_file));
+        let mut other_scopes = other_index.child_scopes(FileScopeId::global());
+        let same = other_index.use_def_map(other_scopes.next().unwrap().0);
+        let empty = other_index.use_def_map(other_scopes.next().unwrap().0);
+        assert!(Arc::ptr_eq(
+            &first_map.extra().member_states,
+            &same.extra().member_states
+        ));
+        assert!(Arc::ptr_eq(
+            &first_map.extra().enclosing_snapshots,
+            &same.extra().enclosing_snapshots
+        ));
+        assert!(Arc::ptr_eq(&empty.symbol_states, &EMPTY_SYMBOL_STATES));
     }
 }

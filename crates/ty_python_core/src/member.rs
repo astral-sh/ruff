@@ -17,18 +17,15 @@ use std::ops::{Deref, DerefMut};
 const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, get_size2::GetSize)]
 pub struct Member {
     expression: MemberExpr,
-    flags: MemberFlags,
 }
 
 impl Member {
-    pub(crate) fn new(expression: MemberExpr) -> Self {
-        Self {
-            expression,
-            flags: MemberFlags::empty(),
-        }
+    pub(crate) fn new(mut expression: MemberExpr) -> Self {
+        expression.segments.clear_flags();
+        Self { expression }
     }
 
     pub(crate) fn expression(&self) -> &MemberExpr {
@@ -36,13 +33,13 @@ impl Member {
     }
 
     /// Is the place given a value in its containing scope?
-    pub(crate) const fn is_bound(&self) -> bool {
-        self.flags.contains(MemberFlags::IS_BOUND)
+    pub(crate) fn is_bound(&self) -> bool {
+        self.flags().contains(MemberFlags::IS_BOUND)
     }
 
     /// Is the place declared in its containing scope?
     pub(crate) fn is_declared(&self) -> bool {
-        self.flags.contains(MemberFlags::IS_DECLARED)
+        self.flags().contains(MemberFlags::IS_DECLARED)
     }
 
     pub(super) fn mark_bound(&mut self) {
@@ -54,12 +51,12 @@ impl Member {
     }
 
     pub(super) fn mark_instance_attribute(&mut self) {
-        self.flags.insert(MemberFlags::IS_INSTANCE_ATTRIBUTE);
+        self.insert_flags(MemberFlags::IS_INSTANCE_ATTRIBUTE);
     }
 
     /// Is the place an instance attribute?
     pub fn is_instance_attribute(&self) -> bool {
-        let is_instance_attribute = self.flags.contains(MemberFlags::IS_INSTANCE_ATTRIBUTE);
+        let is_instance_attribute = self.flags().contains(MemberFlags::IS_INSTANCE_ATTRIBUTE);
         if is_instance_attribute {
             debug_assert!(self.is_instance_attribute_candidate());
         }
@@ -67,7 +64,11 @@ impl Member {
     }
 
     fn insert_flags(&mut self, flags: MemberFlags) {
-        self.flags.insert(flags);
+        self.expression.segments.insert_flags(flags);
+    }
+
+    fn flags(&self) -> MemberFlags {
+        self.expression.segments.flags()
     }
 
     /// If the place expression has the form `<NAME>.<MEMBER>`
@@ -117,6 +118,23 @@ impl Member {
         } else {
             None
         }
+    }
+}
+
+impl PartialEq for Member {
+    fn eq(&self, other: &Self) -> bool {
+        self.expression == other.expression && self.flags() == other.flags()
+    }
+}
+
+impl Eq for Member {}
+
+impl std::fmt::Debug for Member {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Member")
+            .field("expression", &self.expression)
+            .field("flags", &self.flags())
+            .finish()
     }
 }
 
@@ -626,8 +644,8 @@ impl MemberTableBuilder {
             Entry::Occupied(entry) => {
                 let id = *entry.get();
 
-                if !member.flags.is_empty() {
-                    self.members[id].flags.insert(member.flags);
+                if !member.flags().is_empty() {
+                    self.members[id].insert_flags(member.flags());
                 }
 
                 (id, false)
@@ -675,11 +693,12 @@ impl DerefMut for MemberTableBuilder {
 /// Design choices:
 /// - Uses `Box<[SegmentInfo]>` instead of `ThinVec` because even with a `ThinVec`, the size of `Segments` is still 128 bytes.
 /// - Uses u64 for inline storage. That's the largest size without increasing the overall size of `Segments` and allows to encode up to 7 segments.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, get_size2::GetSize)]
 enum Segments {
     /// Inline storage for up to 7 segments with 6-bit relative offsets (max 63 bytes per segment)
     Small(SmallSegments),
-    /// Heap storage for expressions that don't fit inline
+    /// Heap storage for expressions that don't fit inline. The first word stores member flags,
+    /// followed by the segment metadata.
     Heap(Box<[SegmentInfo]>),
 }
 
@@ -696,21 +715,73 @@ impl Segments {
         if let Some(small) = SmallSegments::try_from_slice(&segments) {
             Self::Small(small)
         } else {
-            Self::Heap(segments.into_vec().into_boxed_slice())
+            let mut segments = segments.into_vec();
+            segments.insert(0, SegmentInfo(0));
+            Self::Heap(segments.into_boxed_slice())
         }
     }
 
     fn len(&self) -> usize {
         match self {
             Self::Small(small) => small.len(),
-            Self::Heap(segments) => segments.len(),
+            Self::Heap(segments) => segments.len() - 1,
         }
     }
 
     fn iter(&self) -> impl Iterator<Item = SegmentInfo> + '_ {
         match self {
             Self::Small(small) => itertools::Either::Left(small.iter()),
-            Self::Heap(heap) => itertools::Either::Right(heap.iter().copied()),
+            Self::Heap(heap) => itertools::Either::Right(heap[1..].iter().copied()),
+        }
+    }
+
+    fn flags(&self) -> MemberFlags {
+        let bits = match self {
+            Self::Small(small) => u8::try_from(small.0 >> INLINE_FLAGS_SHIFT)
+                .expect("inline member flags fit into a byte"),
+            Self::Heap(segments) => {
+                u8::try_from(segments[0].0).expect("heap member flags fit into a byte")
+            }
+        };
+        MemberFlags::from_bits_retain(bits)
+    }
+
+    fn clear_flags(&mut self) {
+        match self {
+            Self::Small(small) => small.0 &= (1 << INLINE_FLAGS_SHIFT) - 1,
+            Self::Heap(segments) => segments[0].0 = 0,
+        }
+    }
+
+    fn insert_flags(&mut self, flags: MemberFlags) {
+        match self {
+            Self::Small(small) => small.0 |= u64::from(flags.bits()) << INLINE_FLAGS_SHIFT,
+            Self::Heap(segments) => segments[0].0 |= u32::from(flags.bits()),
+        }
+    }
+}
+
+// Flags belong to a Member, not its expression's identity.
+impl PartialEq for Segments {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Small(left), Self::Small(right)) => {
+                let mask = (1 << INLINE_FLAGS_SHIFT) - 1;
+                left.0 & mask == right.0 & mask
+            }
+            (Self::Heap(left), Self::Heap(right)) => left[1..] == right[1..],
+            _ => self.len() == other.len() && self.iter().eq(other.iter()),
+        }
+    }
+}
+
+impl Eq for Segments {}
+
+impl std::fmt::Debug for Segments {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Small(small) => f.debug_tuple("Small").field(small).finish(),
+            Self::Heap(segments) => f.debug_tuple("Heap").field(&&segments[1..]).finish(),
         }
     }
 }
@@ -830,6 +901,10 @@ const INLINE_PREV_LEN_BITS: u32 = 6;
 const INLINE_PREV_LEN_MASK: u64 = (1 << INLINE_PREV_LEN_BITS) - 1;
 const INLINE_MAX_SEGMENTS: usize = 7;
 const INLINE_MAX_RELATIVE_OFFSET: u32 = (1 << INLINE_PREV_LEN_BITS) - 1; // 63
+const INLINE_FLAGS_SHIFT: u32 = 59;
+static_assertions::const_assert!(
+    MemberFlags::all().bits() < (1 << (u64::BITS - INLINE_FLAGS_SHIFT))
+);
 
 /// Compact representation that can store up to 7 segments inline in a u64.
 ///
@@ -842,7 +917,7 @@ const INLINE_MAX_RELATIVE_OFFSET: u32 = (1 << INLINE_PREV_LEN_BITS) - 1; // 63
 /// - Bits 35-42: Segment 4 (2 bits kind + 6 bits relative offset, max 63 bytes)
 /// - Bits 43-50: Segment 5 (2 bits kind + 6 bits relative offset, max 63 bytes)
 /// - Bits 51-58: Segment 6 (2 bits kind + 6 bits relative offset, max 63 bytes)
-/// - Bits 59-63: Unused (5 bits)
+/// - Bits 59-63: Member flags (three bits used)
 ///
 /// Constraints:
 /// - Maximum 7 segments (realistic limit for member access chains)
@@ -1008,7 +1083,7 @@ impl<'a> From<&'a Segments> for SegmentsRef<'a> {
     fn from(segments: &'a Segments) -> Self {
         match segments {
             Segments::Small(small) => SegmentsRef::Small(*small),
-            Segments::Heap(heap) => SegmentsRef::Heap(heap),
+            Segments::Heap(heap) => SegmentsRef::Heap(&heap[1..]),
         }
     }
 }
@@ -1035,6 +1110,8 @@ fn hash_single<T: Hash>(value: &T) -> u64 {
 #[cfg(test)]
 mod tests {
     use std::assert_matches;
+
+    use ruff_python_parser::parse_expression;
 
     use super::*;
 
@@ -1215,5 +1292,43 @@ mod tests {
         // Should use Heap allocation due to large relative offset
         assert_matches!(long_member.segments, Segments::Heap(_));
         assert_eq!(long_member.num_segments(), 2);
+    }
+
+    #[test]
+    fn member_flags_do_not_change_expression_identity() {
+        let long_symbol = format!("{}.x", "a".repeat(64));
+        for source in ["self.x", "self.a.b.c.d.e.f.g.h", &long_symbol] {
+            let parsed = parse_expression(source).unwrap();
+            let expression = MemberExpr::try_from_expr(parsed.expr().into()).unwrap();
+            let original = Member::new(expression);
+            let mut changed = original.clone();
+            changed.mark_bound();
+            changed.mark_declared();
+            if changed.is_instance_attribute_candidate() {
+                changed.mark_instance_attribute();
+                assert!(changed.is_instance_attribute());
+            }
+
+            assert!(changed.is_bound());
+            assert!(changed.is_declared());
+            assert!(!original.is_bound());
+            assert_eq!(changed.expression(), original.expression());
+            assert_eq!(
+                changed.expression().as_ref(),
+                original.expression().as_ref()
+            );
+            assert_ne!(changed, original);
+            assert_eq!(Member::new(changed.expression().clone()), original);
+
+            let mut builder = MemberTableBuilder::default();
+            let (id, is_new) = builder.add(original);
+            assert!(is_new);
+            let (same_id, is_new) = builder.add(changed);
+            assert_eq!(id, same_id);
+            assert!(!is_new);
+            let table = builder.build();
+            assert!(table.member(id).is_bound());
+            assert!(table.member(id).is_declared());
+        }
     }
 }

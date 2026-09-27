@@ -187,7 +187,7 @@ pub fn attribute_scopes<'db>(
                     // This could be a generic method with a type-params scope.
                     // Go one level deeper to find the function scope. The first
                     // descendant is the (potential) function scope.
-                    let function_scope_id = scope.descendants().start;
+                    let function_scope_id = child_scope_id + 1;
                     (function_scope_id, index.scope(function_scope_id))
                 } else {
                     (child_scope_id, scope)
@@ -339,7 +339,7 @@ pub struct SemanticIndex<'db> {
     enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
-    semantic_syntax_errors: Vec<SemanticSyntaxError>,
+    semantic_syntax_errors: Box<[SemanticSyntaxError]>,
 
     /// Set of all generator functions in this file.
     generator_functions: FrozenSet<FileScopeId>,
@@ -922,7 +922,7 @@ pub(crate) struct DescendantsIter<'a> {
 impl<'a> DescendantsIter<'a> {
     fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
         let scope = &scopes[scope_id];
-        let scopes = &scopes[scope.descendants()];
+        let scopes = &scopes[(scope_id + 1)..scope.descendants_end()];
 
         Self {
             next_id: scope_id + 1,
@@ -2096,11 +2096,30 @@ def x():
             .nth(2)
             .unwrap()
             .0;
+        assert_eq!(index.descendent_scopes(bar_scope).len(), 0);
         let ancestors = index.ancestor_scopes(bar_scope);
 
         assert_eq!(
             scope_names(ancestors, &db, file, db.program(), &module),
             vec!["bar", "foo", "Test", "<module>"]
+        );
+    }
+
+    #[test]
+    fn attribute_scopes_include_generic_methods() {
+        let TestCase { db, file } = test_case(
+            "class C:\n    def generic[T](self):\n        self.x = 1\n    def plain(self):\n        self.y = 2\n",
+        );
+        let program_file = program_file(&db, file);
+        let index = semantic_index(&db, program_file);
+        let class = index.child_scopes(FileScopeId::global()).next().unwrap().0;
+        let class_scope = class.to_scope_id(&db, program_file);
+        let methods: Vec<_> = attribute_scopes(&db, class_scope).collect();
+        assert_eq!(methods.len(), 2);
+        assert!(
+            methods
+                .iter()
+                .all(|&method| index.scope(method).kind() == ScopeKind::Function)
         );
     }
 

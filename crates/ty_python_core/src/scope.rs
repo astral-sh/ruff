@@ -1,5 +1,3 @@
-use std::ops::Range;
-
 use ruff_db::{PythonFile, files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
 use ruff_python_ast::{self as ast, NodeIndex};
@@ -131,20 +129,21 @@ pub struct Scope {
     /// The node that introduces this scope.
     node: NodeWithScopeKind,
 
-    /// The range of [`FileScopeId`]s that are descendants of this scope.
-    descendants: Range<FileScopeId>,
+    /// The exclusive end of this scope's descendants. Scopes are stored in depth-first order,
+    /// so the first descendant is always the scope's own ID plus one.
+    descendants_end: FileScopeId,
 }
 
 impl Scope {
     pub(super) fn new(
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
-        descendants: Range<FileScopeId>,
+        descendants_end: FileScopeId,
     ) -> Self {
         Scope {
             parent,
             node,
-            descendants,
+            descendants_end,
         }
     }
 
@@ -164,12 +163,12 @@ impl Scope {
         self.kind().visibility()
     }
 
-    pub(crate) fn descendants(&self) -> Range<FileScopeId> {
-        self.descendants.clone()
+    pub(crate) fn descendants_end(&self) -> FileScopeId {
+        self.descendants_end
     }
 
     pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
-        self.descendants = self.descendants.start..children_end;
+        self.descendants_end = children_end;
     }
 
     pub fn is_eager(&self) -> bool {

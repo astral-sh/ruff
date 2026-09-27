@@ -525,7 +525,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Note `node` is guaranteed to be a child of `self.module`
         let node_with_kind = node.to_kind(self.module);
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(parent, node_with_kind, children_start);
         let scope_kind = scope.kind();
         self.exception_context_stack_manager.enter_nested_scope();
 
@@ -3359,8 +3359,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);
 
-        let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
-        semantic_syntax_errors.shrink_to_fit();
+        let semantic_syntax_errors = self.semantic_syntax_errors.into_inner().into_boxed_slice();
         // Node indices follow source order, while semantic visitation may not.
         self.annotations.sort_unstable();
         let uses_by_collection = FrozenMap::from_entries(
