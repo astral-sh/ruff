@@ -69,7 +69,11 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
-    /// Apply fixes to resolve errors.
+    /// Apply safe autofixes.
+    ///
+    /// Currently applies fixes for `redundant-cast`, `unused-ignore-comment`, and
+    /// `unused-type-ignore-comment`. Other rules may show fix suggestions that this
+    /// flag does not apply (unsafe or display-only).
     #[arg(long)]
     pub(crate) fix: bool,
 
