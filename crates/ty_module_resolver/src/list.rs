@@ -13,6 +13,15 @@ pub fn all_modules<'db>(
     db: &'db dyn Db,
     resolver_environment: ResolverEnvironment<'db>,
 ) -> Vec<Module<'db>> {
+    all_modules_impl(db, resolver_environment).to_vec()
+}
+
+/// Cache the flattened module tree so repeated requests do not need to traverse and sort it again.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn all_modules_impl<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Box<[Module<'db>]> {
     let mut modules = list_modules(db, resolver_environment).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
@@ -22,7 +31,7 @@ pub fn all_modules<'db>(
         }
     }
     modules.sort_by_key(|module| module.name(db));
-    modules
+    modules.into_boxed_slice()
 }
 
 /// List all available top-level modules.
