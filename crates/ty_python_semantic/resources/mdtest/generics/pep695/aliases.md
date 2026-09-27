@@ -474,6 +474,35 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## A recursive alias in a type parameter bound
+
+The bound refers to an alias whose recursive reference is guarded by `list`.
+
+```py
+type A = B[list[A]]
+type B[T: A] = T | str
+
+def use(value: A):
+    reveal_type(value)  # revealed: list[A] | str
+```
+
+## Nested alias applications and unguarded recursion
+
+Repeated applications of a generic alias can be finite. When an alias is unguardedly recursive, we
+still retain its non-recursive alternatives.
+
+```py
+type Identity[T] = T
+type Twice = Identity[Identity[int]]
+
+# error: [cyclic-type-alias-definition]
+type Cyclic[T] = Cyclic[list[T]] | Identity[Identity[str]]
+
+def use(a: Twice, b: Cyclic[int]):
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable

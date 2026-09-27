@@ -1134,6 +1134,44 @@ class G(Generic[T]):
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
 
+### A recursive alias in a type variable bound
+
+The bound refers to an alias whose recursive reference is guarded by `list`.
+
+```py
+from typing import TypeAlias, TypeVar, Union
+
+T = TypeVar("T", bound="A")
+B: TypeAlias = Union[T, str]
+A: TypeAlias = "B[list[A]]"
+
+def use(value: A):
+    if isinstance(value, str):
+        reveal_type(value)  # revealed: str
+    else:
+        reveal_type(value)  # revealed: list[A]
+        reveal_type(value[0])  # revealed: A
+```
+
+### Nested alias applications and unguarded recursion
+
+Repeated applications of a generic alias can be finite, while an unguardedly recursive alias is
+invalid.
+
+```py
+from typing import TypeAlias, TypeVar, Union
+
+T = TypeVar("T")
+Identity: TypeAlias = T
+Twice: TypeAlias = "Identity[Identity[int]]"
+
+# error: [cyclic-type-alias-definition]
+Cyclic: TypeAlias = "Union[Cyclic[list[T]], Identity[Identity[str]]]"
+
+def use(value: Twice):
+    reveal_type(value)  # revealed: int
+```
+
 ### Invalid specialization in a recursive bound
 
 An invalid specialization in a recursive bound doesn't cause a panic:

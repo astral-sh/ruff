@@ -995,6 +995,36 @@ fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
 }
 
 // Incremental inference tests
+#[test]
+fn alias_cycle_summary_updates_after_dependency_changes() -> anyhow::Result<()> {
+    let mut db = TestDbBuilder::new()
+        .with_python_version(PythonVersion::PY313)
+        .build()?;
+    db.write_files([
+        (
+            "/src/a.py",
+            "from typing import reveal_type\nfrom b import B\ntype A = B | int\ndef f(x: A): reveal_type(x)",
+        ),
+        ("/src/b.py", "type B = str"),
+    ])?;
+
+    assert_revealed_type(&db, "/src/a.py", "str | int");
+
+    db.write_file("/src/b.py", "from a import A\ntype B = A | str")?;
+    let file = system_path_to_file(&db, "/src/a.py")?;
+    let diagnostics = check_types(&db, program_file(&db, file));
+    assert!(
+        diagnostics.iter().any(|diagnostic| diagnostic
+            .headline_message()
+            .contains("Type alias `A` has a circular definition")),
+        "{diagnostics:#?}"
+    );
+
+    db.write_file("/src/b.py", "type B = str")?;
+    assert_revealed_type(&db, "/src/a.py", "str | int");
+    Ok(())
+}
+
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
     let scope = global_scope(db, program_file(db, file));

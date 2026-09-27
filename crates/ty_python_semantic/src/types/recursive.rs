@@ -66,7 +66,7 @@ use ty_python_core::place_table;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
-use super::type_alias::AliasCycleSummary;
+use super::type_alias::{AliasCycle, AliasCycleAnalysis, AliasCycleSummary};
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, GenericContext, MaterializationKind, Type,
@@ -179,7 +179,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(id)),
+            cycle_initial=|_, _, _, ()| AliasCycleSummary::pending(),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary_impl<'db>(
@@ -187,16 +187,27 @@ impl<'db> RecursiveType<'db> {
             recursive: RecursiveType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
-            // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
-            // so recovery never exposes an unbound variable as a standalone type.
-            if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).0));
-            }
-            summary
+            AliasCycleSummary::from_recursive(db, recursive, &mut AliasCycleAnalysis::default())
         }
 
         cycle_summary_impl(db, self.constructor(db), ())
+    }
+
+    /// Summarize the open body using the caller's alias graph walk.
+    pub(super) fn cycle_summary_body(
+        self,
+        db: &'db dyn Db,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> AliasCycleSummary<'db> {
+        let mut summary = AliasCycleSummary::from_type_inner(db, self.body(db), analysis);
+        // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
+        // so recovery never exposes an unbound variable as a standalone type.
+        if let Some(AliasCycle::Marker(Type::RecursiveVar(variable))) = summary.cycle {
+            summary.cycle = Some(AliasCycle::Marker(Type::divergent_alias(
+                variable.cycle(db).0,
+            )));
+        }
+        summary
     }
 
     /// Seed a query cycle with `μa. a`, using the same identity for binder and variable.
