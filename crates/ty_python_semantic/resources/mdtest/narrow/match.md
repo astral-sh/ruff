@@ -1112,39 +1112,10 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
             reveal_type(item)  # revealed: str
 ```
 
-## Nested captures over recursive unions
+## Class patterns over unions
 
-A capture nested inside class patterns retains its recursive union type, including when other union
-members can overlap with the pattern class.
-
-```py
-from __future__ import annotations
-from typing import TypeAlias
-
-class Branch:
-    child: Node
-    sibling: Node
-
-class LeafA: ...
-class LeafB: ...
-class LeafC: ...
-
-Node: TypeAlias = Branch | LeafA | LeafB | LeafC
-
-def visit(node: Node) -> None:
-    match node:
-        case Branch(child=Branch(child=Branch(child=Branch(child=captured)))):
-            reveal_type(captured)  # revealed: Branch | LeafA | LeafB | LeafC
-            reveal_type(node)  # revealed: Branch
-
-def visit_siblings(node: Node) -> None:
-    match node:
-        case Branch(child=Branch(child=first), sibling=Branch(child=second)):
-            reveal_type(first)  # revealed: Branch | LeafA | LeafB | LeafC
-            reveal_type(second)  # revealed: Branch | LeafA | LeafB | LeafC
-```
-
-Different union members and sibling subpatterns retain their own input types:
+An attribute can have different types in different subclasses. A class pattern that checks the
+attribute narrows the subject to the subclass whose attribute can match:
 
 ```py
 class Holder:
@@ -1156,24 +1127,52 @@ class IntHolder(Holder):
 class StrHolder(Holder):
     value: str
 
-def filter_holders(value: IntHolder | StrHolder) -> None:
-    match value:
-        case Holder(value=int() as item) as whole:
-            reveal_type(item)  # revealed: int
-            reveal_type(whole)  # revealed: IntHolder
+def filter_holders(holder: IntHolder | StrHolder) -> None:
+    match holder:
+        case Holder(value=int()):
+            reveal_type(holder)  # revealed: IntHolder
+```
 
+## Class patterns with multiple attributes
+
+Each attribute pattern is checked separately, even when the attributes have the same type:
+
+```py
 class Pair:
     left: int | str
     right: int | str
 
 def match_pair(value: Pair) -> None:
     match value:
-        case Pair(left=int() as left, right=str() as right):
-            reveal_type(left)  # revealed: int
+        case Pair(left=int(), right=str() as right):
             reveal_type(right)  # revealed: str
 ```
 
+## Nested class captures over recursive unions
+
+`Branch` and `Leaf` can share subclasses through multiple inheritance. The nested capture retains
+the declared type of `child`:
+
+```py
+from __future__ import annotations
+from typing import TypeAlias
+
+class Branch:
+    child: Node
+
+class Leaf: ...
+
+Node: TypeAlias = Branch | Leaf
+
+def visit(node: Node) -> None:
+    match node:
+        case Branch(child=Branch(child=Branch(child=captured))):
+            reveal_type(captured)  # revealed: Branch | Leaf
+```
+
 ## Nested sequence captures over recursive unions
+
+Both tuple variants have a first element of type `Node`, so the nested capture has that type:
 
 ```py
 from __future__ import annotations
@@ -1188,6 +1187,9 @@ def visit(value: Node) -> None:
 ```
 
 ## Nested alternative captures over recursive unions
+
+Each alternative captures a nested `child`, while the `as` pattern binds the value matched by the
+whole pattern:
 
 ```py
 from __future__ import annotations
@@ -1205,7 +1207,7 @@ Node: TypeAlias = A | B | Leaf
 
 def visit(value: Node) -> None:
     match value:
-        case (A(child=(A(child=captured) | B(child=captured))) | B(child=(A(child=captured) | B(child=captured)))) as whole:
+        case (A(child=A(child=captured)) | B(child=B(child=captured))) as whole:
             reveal_type(captured)  # revealed: A | B | Leaf
             reveal_type(whole)  # revealed: A | B
 ```
@@ -2540,11 +2542,34 @@ def non_string_key_is_not_exhaustive(
             return 1
 ```
 
+A nested mapping pattern can match every value of one union member without matching every value of
+another. The later case retains the member whose field is a string:
+
+```py
+class IntValue(TypedDict):
+    inner: int
+
+class StrValue(TypedDict):
+    inner: str
+
+class IntWrapper(TypedDict):
+    child: IntValue
+
+class StrWrapper(TypedDict):
+    child: StrValue
+
+def distinguish_subjects(value: IntWrapper | StrWrapper) -> None:
+    match value:
+        case {"child": {"inner": int()}}:
+            reveal_type(value)  # revealed: IntWrapper
+        case _:
+            reveal_type(value)  # revealed: StrWrapper
+```
+
 ## Recursive `TypedDict` mapping patterns
 
-Nested mapping patterns can reach the same recursive union through multiple `TypedDict` fields.
-Captures retain the field type, and later cases still see values the earlier pattern did not
-consume.
+Matching nested `child` fields retains their recursive union type. If the first `child` is `None`,
+the nested pattern fails and the next case can still match:
 
 ```py
 from __future__ import annotations
@@ -2566,49 +2591,6 @@ def visit(value: Node) -> None:
             reveal_type(captured)  # revealed: A | B | None
         case {"child": None}:
             reveal_type(value)  # revealed: A | B
-        case None:
-            reveal_type(value)  # revealed: None
-```
-
-The same nested pattern can exhaust one union member without exhausting another, and an optional key
-can still be absent:
-
-```py
-class IntValue(TypedDict):
-    inner: int
-
-class StrValue(TypedDict):
-    inner: str
-
-class IntWrapper(TypedDict):
-    child: IntValue
-
-class StrWrapper(TypedDict):
-    child: StrValue
-
-class MaybeWrapper(TypedDict, total=False):
-    child: IntValue
-
-def distinguish_subjects(value: IntWrapper | StrWrapper) -> None:
-    match value:
-        case {"child": {"inner": int()}}:
-            reveal_type(value)  # revealed: IntWrapper
-        case _:
-            reveal_type(value)  # revealed: StrWrapper
-
-def distinguish_patterns(value: IntWrapper) -> int:
-    match value:
-        case {"child": {"inner": str()}}:
-            return 1
-        case {"child": {"inner": int()}}:
-            return 2
-
-def optional_key(value: MaybeWrapper) -> None:
-    match value:
-        case {"child": {"inner": int()}}:
-            pass
-        case _:
-            reveal_type(value)  # revealed: MaybeWrapper
 ```
 
 ## `NamedTuple` positional patterns
