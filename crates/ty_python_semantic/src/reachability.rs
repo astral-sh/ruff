@@ -227,7 +227,7 @@ use ty_python_core::{
     place_table,
     predicate::{
         CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-        ScopedPredicateId,
+        Predicates, ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
     scope::ScopeId,
@@ -582,20 +582,14 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// need prefix warming to bound the Salsa stack, so their calls are evaluated entirely on demand.
 fn analyze_non_terminal_call_prefix<'db>(
     db: &'db dyn Db,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicates: &Predicates<'db>,
     root_predicate: ScopedPredicateId,
 ) -> bool {
-    let scope = predicate_scope(db, &predicates[root_predicate]);
-    let has_many_calls = predicates
-        .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
-        .is_some();
-
-    if !has_many_calls {
+    if predicates.non_terminal_call_count() <= NON_TERMINAL_CALL_CHUNK_SIZE {
         return false;
     }
 
+    let scope = predicate_scope(db, &predicates[root_predicate]);
     let call_predicates = non_terminal_call_predicates(db, scope);
     let call_count = call_predicates.partition_point(|predicate| *predicate <= root_predicate);
     let mut start = 0;
@@ -822,11 +816,7 @@ fn evaluate_reachability_checkpoint<'db>(
 ) -> Truthiness {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    let has_many_calls = predicates
-        .iter()
-        .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
-        .nth(NON_TERMINAL_CALL_CHUNK_SIZE)
-        .is_some();
+    let has_many_calls = predicates.non_terminal_call_count() > NON_TERMINAL_CALL_CHUNK_SIZE;
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
     evaluate_reachability_path(
         db,
@@ -844,7 +834,7 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicates: &Predicates<'db>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness;
 }
@@ -854,7 +844,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     fn evaluate(
         &self,
         db: &'db dyn Db,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicates: &Predicates<'db>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         if let Some(reachability) = terminal_reachability(id) {
@@ -2111,7 +2101,7 @@ impl<'db> ReachabilityEvaluationCache<'db> {
         &self,
         db: &'db dyn Db,
         constraints: &ReachabilityConstraints,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicates: &Predicates<'db>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
         match id {
@@ -2156,7 +2146,7 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
     db: &'db dyn Db,
     cache: Option<&ReachabilityEvaluationCache<'db>>,
     constraints: &ReachabilityConstraints,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    predicates: &Predicates<'db>,
     id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     if let Some(cache) = cache {
@@ -2238,6 +2228,44 @@ mod tests {
     use ty_python_core::narrowing_constraints::InteriorNode;
     use ty_python_core::predicate::Predicates;
     use ty_python_core::semantic_index;
+
+    #[test]
+    fn statement_call_prefix_threshold_tracks_scope_edits() -> anyhow::Result<()> {
+        let mut db = setup_db();
+
+        for count in [
+            0,
+            NON_TERMINAL_CALL_CHUNK_SIZE,
+            NON_TERMINAL_CALL_CHUNK_SIZE + 1,
+            0,
+        ] {
+            let source = format!(
+                "def callback() -> None: ...\n\ndef f(flag: bool) -> None:\n    value = callback()\n    if flag:\n        pass\n{}",
+                "    callback()\n".repeat(count)
+            );
+            db.write_file("/src/test.py", &source)?;
+
+            let file = system_path_to_file(&db, "/src/test.py").unwrap();
+            let program_file = ProgramFile::new(&db, file, db.program_environment().program(&db));
+            let index = semantic_index(&db, program_file);
+            let scope = index
+                .child_scopes(FileScopeId::global())
+                .last()
+                .unwrap()
+                .0
+                .to_scope_id(&db, program_file);
+            let predicates = use_def_map(&db, scope).predicates();
+            assert_eq!(predicates.non_terminal_call_count(), count);
+
+            let root = ScopedPredicateId::new(predicates.len() - 1);
+            assert_eq!(
+                analyze_non_terminal_call_prefix(&db, predicates, root),
+                count > NON_TERMINAL_CALL_CHUNK_SIZE
+            );
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn non_terminal_call_range_recovers_cross_file_cycle() -> anyhow::Result<()> {

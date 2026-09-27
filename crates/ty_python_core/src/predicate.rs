@@ -7,13 +7,13 @@
 //! - [_Reachability constraints_][crate::reachability_constraints] determine the
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
-use crate::Program;
+use std::ops::Deref;
+
 use ruff_db::PythonFile;
 use ruff_db::files::File;
-use ruff_index::{FrozenIndexVec, Idx, IndexVec};
+use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec};
 use ruff_python_ast::{self as ast, Singleton, name::Name};
 
-use crate::ProgramFile;
 use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
@@ -21,6 +21,7 @@ use crate::global_scope;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
+use crate::{Program, ProgramFile};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -55,8 +56,47 @@ impl Idx for ScopedPredicateId {
     }
 }
 
-// A collection of predicates for a given scope.
-pub type Predicates<'db> = FrozenIndexVec<ScopedPredicateId, Predicate<'db>>;
+/// A collection of predicates for a given scope.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub struct Predicates<'db> {
+    predicates: FrozenIndexVec<ScopedPredicateId, Predicate<'db>>,
+    // Reachability checks this repeatedly to decide whether it needs to warm call prefixes.
+    non_terminal_call_count: usize,
+}
+
+impl Predicates<'_> {
+    /// Returns the number of statement calls whose completion affects reachability.
+    pub fn non_terminal_call_count(&self) -> usize {
+        self.non_terminal_call_count
+    }
+}
+
+impl<'db> Deref for Predicates<'db> {
+    type Target = IndexSlice<ScopedPredicateId, Predicate<'db>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.predicates
+    }
+}
+
+impl<'db> From<IndexVec<ScopedPredicateId, Predicate<'db>>> for Predicates<'db> {
+    fn from(predicates: IndexVec<ScopedPredicateId, Predicate<'db>>) -> Self {
+        let non_terminal_call_count = predicates
+            .iter()
+            .filter(|predicate| matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)))
+            .count();
+        Self {
+            predicates: predicates.into(),
+            non_terminal_call_count,
+        }
+    }
+}
+
+impl<'db> FromIterator<Predicate<'db>> for Predicates<'db> {
+    fn from_iter<T: IntoIterator<Item = Predicate<'db>>>(iter: T) -> Self {
+        IndexVec::from_iter(iter).into()
+    }
+}
 
 #[derive(Debug, Default)]
 pub(crate) struct PredicatesBuilder<'db> {
