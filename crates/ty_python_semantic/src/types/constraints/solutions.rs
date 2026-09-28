@@ -29,6 +29,18 @@ type CheckCache<'a, 'db, L, B> = dyn FnMut(
     ) -> ControlFlow<B, bool>
     + 'a;
 
+/// A [`CheckCache`] callback that never caches anything, and always processes every node
+/// encountered when walking a BDD.
+fn never_cache<'db, L, B>(
+    _this: &mut SolutionWalker<'db>,
+    _storage: &mut ConstraintSetStorage<'db>,
+    _limits: &mut L,
+    _path: &mut PathAssignments,
+    _node: NodeId,
+) -> ControlFlow<B, bool> {
+    ControlFlow::Continue(true)
+}
+
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
 /// whether we must walk its outgoing edges to determine its satisfiability. (We keep track of the
 /// node's support — the typevars mentioned in any constraints reachable from it. If none of those
@@ -54,6 +66,18 @@ enum PathIs {
     /// The current path is currently satisfied, but the current node can influence the solutions
     /// that we report, and so we must walk its outgoing edges in full.
     Uncertain,
+}
+
+/// A [`PrunePath`] callback that never prunes anything, and always processes the descendants of
+/// every node encountered when walking a BDD.
+fn never_prune<'db, L, B>(
+    _this: &mut SolutionWalker<'db>,
+    _storage: &mut ConstraintSetStorage<'db>,
+    _limits: &mut L,
+    _paths: &mut PathAssignments,
+    _node: NodeId,
+) -> ControlFlow<B, PathIs> {
+    ControlFlow::Continue(PathIs::Uncertain)
 }
 
 /// A callback that is invoked by [`visit_node_and_then`][SolutionWalker::visit_node_and_then]
@@ -357,16 +381,14 @@ impl<'db> SolutionWalker<'db> {
             &mut AllowEarlyBreak(limits),
             path,
             node,
-            // never cache
-            &mut |_this, _storage, _limits, _path, _node| ControlFlow::Continue(true),
-            // fully process every node
-            &mut |_this, _storage, _limits, _path, _node| ControlFlow::Continue(PathIs::Uncertain),
-            // break when we find the first solution
+            &mut never_cache,
+            &mut never_prune,
             &mut |this, storage, _limits, path| {
                 if this
                     .pending_candidate_solution(db, env, storage, path, None)
                     .is_some()
                 {
+                    // break when we find the first solution
                     ControlFlow::Break(Break::FoundSolution)
                 } else {
                     ControlFlow::Continue(())
