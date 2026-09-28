@@ -352,9 +352,10 @@ impl<'db> CallableSignature<'db> {
                         extras: SignatureExtras::new(
                             self_signature.source_overload_index_raw(),
                             self_signature.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                            self_signature.is_paramspec_value(),
                         ),
                         parameters,
-                        return_ty: if self_signature.is_paramspec_value {
+                        return_ty: if self_signature.is_paramspec_value() {
                             self_signature.return_ty
                         } else {
                             self_signature.return_ty.apply_type_mapping_impl(
@@ -364,7 +365,6 @@ impl<'db> CallableSignature<'db> {
                                 visitor,
                             )
                         },
-                        is_paramspec_value: self_signature.is_paramspec_value,
                     }))
                 }
                 Type::Callable(callable)
@@ -383,26 +383,30 @@ impl<'db> CallableSignature<'db> {
                             // Keep the enclosing method's definition for binding `Self` and
                             // other receiver type variables after specializing its parameters.
                             definition: self_signature.definition,
-                            extras: SignatureExtras::new(signature.source_overload_index_raw(), {
-                                let mapped = self_signature.map_receiver_constraints(
-                                    db,
-                                    type_mapping,
-                                    tcx,
-                                    visitor,
-                                );
-                                merge_receiver_constraints(
-                                    db,
-                                    env,
-                                    signature.receiver_constraints(),
-                                    mapped.as_ref(),
-                                )
-                            }),
+                            extras: SignatureExtras::new(
+                                signature.source_overload_index_raw(),
+                                {
+                                    let mapped = self_signature.map_receiver_constraints(
+                                        db,
+                                        type_mapping,
+                                        tcx,
+                                        visitor,
+                                    );
+                                    merge_receiver_constraints(
+                                        db,
+                                        env,
+                                        signature.receiver_constraints(),
+                                        mapped.as_ref(),
+                                    )
+                                },
+                                self_signature.is_paramspec_value(),
+                            ),
                             parameters: signature.parameters().with_prefix(
                                 prefix_parameters.iter().map(|param| {
                                     param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                                 }),
                             ),
-                            return_ty: if self_signature.is_paramspec_value {
+                            return_ty: if self_signature.is_paramspec_value() {
                                 self_signature.return_ty
                             } else {
                                 self_signature.return_ty.apply_type_mapping_impl(
@@ -412,7 +416,6 @@ impl<'db> CallableSignature<'db> {
                                     visitor,
                                 )
                             },
-                            is_paramspec_value: self_signature.is_paramspec_value,
                         }),
                     ))
                 }
@@ -668,18 +671,9 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
-
-    /// Whether this signature is part of the value assigned to a `ParamSpec`.
-    ///
-    /// `ParamSpecs` only match the parameter list of a callable, so the values assigned to them to
-    /// not "have" return types. We store the return type as `Unknown`, since that is usually the
-    /// correct interpretation when _forced_ to consider the non-existent return type. But many
-    /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
-    /// instance, when visiting, mapping, or comparing types.
-    is_paramspec_value: bool,
 }
 
-/// Additional signature data needed for overload diagnostics or receiver binding.
+/// Signature data needed only for overload diagnostics, receiver binding, or `ParamSpec` values.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 struct SignatureExtras<'db> {
     /// Position of this overload in the original function definition.
@@ -690,19 +684,31 @@ struct SignatureExtras<'db> {
 
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
     receiver_constraints: Option<OwnedConstraintSet<'db>>,
+
+    /// Whether this signature is part of the value assigned to a `ParamSpec`.
+    ///
+    /// `ParamSpecs` only match the parameter list of a callable, so the values assigned to them do
+    /// not "have" return types. We store the return type as `Unknown`, since that is usually the
+    /// correct interpretation when _forced_ to consider the non-existent return type. But many
+    /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
+    /// instance, when visiting, mapping, or comparing types.
+    is_paramspec_value: bool,
 }
 
 impl<'db> SignatureExtras<'db> {
     fn new(
         source_overload_index: Option<NonZeroU32>,
         receiver_constraints: Option<OwnedConstraintSet<'db>>,
+        is_paramspec_value: bool,
     ) -> Option<Box<Self>> {
-        (source_overload_index.is_some() || receiver_constraints.is_some()).then(|| {
-            Box::new(Self {
-                source_overload_index,
-                receiver_constraints,
+        (source_overload_index.is_some() || receiver_constraints.is_some() || is_paramspec_value)
+            .then(|| {
+                Box::new(Self {
+                    source_overload_index,
+                    receiver_constraints,
+                    is_paramspec_value,
+                })
             })
-        })
     }
 }
 
@@ -768,7 +774,7 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     for parameter in &signature.parameters {
         visitor.visit_type(db, parameter.annotated_type());
     }
-    if !signature.is_paramspec_value {
+    if !signature.is_paramspec_value() {
         visitor.visit_type(db, signature.return_ty);
     }
 }
@@ -834,7 +840,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
@@ -849,14 +854,23 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
     pub(super) fn into_paramspec_value(mut self) -> Self {
         self.return_ty = Type::unknown();
-        self.is_paramspec_value = true;
+        if let Some(extras) = self.extras.as_mut() {
+            extras.is_paramspec_value = true;
+        } else {
+            self.extras = SignatureExtras::new(None, None, true);
+        }
         self
+    }
+
+    fn is_paramspec_value(&self) -> bool {
+        self.extras
+            .as_ref()
+            .is_some_and(|extras| extras.is_paramspec_value)
     }
 
     /// Return a signature for a dynamic callable
@@ -867,7 +881,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
-            is_paramspec_value: false,
         }
     }
 
@@ -921,7 +934,6 @@ impl<'db> Signature<'db> {
             extras: None,
             parameters,
             return_ty,
-            is_paramspec_value: false,
         }
     }
 
@@ -1015,7 +1027,6 @@ impl<'db> Signature<'db> {
             extras: self.extras.clone(),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1047,7 +1058,6 @@ impl<'db> Signature<'db> {
             extras: self.extras.clone(),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         })
     }
 
@@ -1067,17 +1077,17 @@ impl<'db> Signature<'db> {
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),
                 self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                self.is_paramspec_value(),
             ),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            return_ty: if self.is_paramspec_value {
+            return_ty: if self.is_paramspec_value() {
                 self.return_ty
             } else {
                 self.return_ty
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1315,10 +1325,13 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
-            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                receiver_constraints,
+                self.is_paramspec_value(),
+            ),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -1696,6 +1709,7 @@ impl<'db> Signature<'db> {
                 extras: SignatureExtras::new(
                     self.source_overload_index_raw(),
                     receiver_constraints,
+                    self.is_paramspec_value(),
                 ),
                 ..self.clone()
             };
@@ -1716,10 +1730,13 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
-            extras: SignatureExtras::new(self.source_overload_index_raw(), receiver_constraints),
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                receiver_constraints,
+                self.is_paramspec_value(),
+            ),
             parameters,
             return_ty,
-            is_paramspec_value: self.is_paramspec_value,
         }
     }
 
@@ -2062,7 +2079,7 @@ impl<'db> Signature<'db> {
                     .overloads
                     .iter()
                     .when_any(db, constraints, |other_signature| {
-                        if self.is_paramspec_value || other_signature.is_paramspec_value {
+                        if self.is_paramspec_value() || other_signature.is_paramspec_value() {
                             ConstraintSet::from_bool(constraints, true)
                         } else {
                             self.return_ty.when_constraint_set_assignable_to(
@@ -2124,11 +2141,14 @@ impl<'db> Signature<'db> {
     fn set_source_overload_index(&mut self, index: Option<NonZeroU32>) {
         if let Some(extras) = self.extras.as_deref_mut() {
             extras.source_overload_index = index;
-            if index.is_none() && extras.receiver_constraints.is_none() {
+            if index.is_none()
+                && extras.receiver_constraints.is_none()
+                && !extras.is_paramspec_value
+            {
                 self.extras = None;
             }
         } else {
-            self.extras = SignatureExtras::new(index, None);
+            self.extras = SignatureExtras::new(index, None, false);
         }
     }
 
@@ -2223,9 +2243,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // additional per-signature obligations and `ParamSpec` values have no meaningful return
         // type. Leave those signatures to the ordinary relation.
         if target_signature.receiver_constraints().is_some()
-            || target_signature.is_paramspec_value
+            || target_signature.is_paramspec_value()
             || source_signatures.iter().any(|signature| {
-                signature.receiver_constraints().is_some() || signature.is_paramspec_value
+                signature.receiver_constraints().is_some() || signature.is_paramspec_value()
             })
         {
             return None;
@@ -2624,7 +2644,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.is_paramspec_value || target.is_paramspec_value {
+        if source.is_paramspec_value() || target.is_paramspec_value() {
             self.always()
         } else {
             self.check_type_pair(db, source.return_ty, target.return_ty)
@@ -2637,7 +2657,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if source.is_paramspec_value || target.is_paramspec_value {
+        if source.is_paramspec_value() || target.is_paramspec_value() {
             return self.always();
         }
 
