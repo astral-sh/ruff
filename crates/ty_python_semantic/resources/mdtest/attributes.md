@@ -1403,8 +1403,7 @@ class Intermediate(Base):
 
     overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
-    # TODO: This should be an `invalid-assignment` error
-    pure_overwritten_in_subclass_body = 1
+    pure_overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
     undeclared = "intermediate"
 
@@ -1462,8 +1461,7 @@ reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
 
 reveal_type(Derived().pure_attribute)  # revealed: str | None
 
-# TODO: This should be `str`
-reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: int | str
+reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: str
 
 reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
 
@@ -3112,10 +3110,12 @@ reveal_type(Redeclared.value)  # revealed: str
 
 ### Defaults for attributes declared in methods
 
-Annotations on instance attributes declared in methods do not yet provide context for subclass
-defaults.
+An instance annotation declared in a method also provides context for a subclass default. The
+default can be read through an instance when the base initializer has not assigned the attribute.
 
 ```py
+from typing import Protocol
+
 class Base:
     def __init__(self) -> None:
         self.items: list[int] = [42]
@@ -3123,9 +3123,152 @@ class Base:
 class Child(Base):
     items = []
 
-# TODO: The inherited annotation should provide context for the default.
-reveal_type(Child.items)  # revealed: list[Unknown]
-reveal_type(Child().items)  # revealed: list[Unknown] | list[int]
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child().items)  # revealed: list[int]
+
+class Invalid(Base):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+def check(child: Child) -> None:
+    child.items.append("wrong")  # error: [invalid-argument-type]
+    child.items = [1]
+
+class HasItems(Protocol):
+    items: list[int]
+
+def as_protocol(child: Child) -> HasItems:
+    return child
+```
+
+### Descriptors for attributes declared in methods
+
+A descriptor can satisfy the inherited instance contract without being an instance of the annotated
+type itself.
+
+```py
+from typing import overload
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: None, owner: type[object]) -> "Descriptor": ...
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> int: ...
+    def __get__(self, instance: object | None, owner: type[object]) -> "int | Descriptor":
+        if instance is None:
+            return self
+        return 1
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class Base:
+    def __init__(self) -> None:
+        self.value: int = 1
+
+class Child(Base):
+    value = Descriptor()
+
+reveal_type(Child.value)  # revealed: Descriptor
+reveal_type(Child().value)  # revealed: int
+Child().value = 1
+Child().value = "wrong"  # error: [invalid-assignment]
+
+class IncompatibleDescriptor:
+    def __get__(self, instance: object, owner: type[object]) -> str:
+        return "wrong"
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class Invalid(Base):
+    value = IncompatibleDescriptor()  # error: [invalid-assignment]
+```
+
+### Descriptor setter compatibility with instance annotations
+
+Descriptor setters still need override checking against the inherited instance annotation.
+
+```py
+class WritableBase:
+    def __init__(self) -> None:
+        self.value: int | str = 0
+
+class NarrowSetter:
+    def __get__(self, instance: object, owner: type[object]) -> int | str:
+        return 0
+
+    def __set__(self, instance: object, value: int) -> None:
+        pass
+
+class NarrowSetterChild(WritableBase):
+    # TODO: The setter does not accept every value allowed by the inherited annotation.
+    value = NarrowSetter()
+```
+
+### Instance annotations and method decorators
+
+Only instance methods introduce instance annotations; a static method's first parameter and a class
+method's receiver do not declare instance attributes.
+
+```py
+class Base:
+    @staticmethod
+    def static(other: object) -> None:
+        # error: [invalid-type-form]
+        other.static_value: int = 1  # error: [unresolved-attribute]
+
+    @classmethod
+    def classmethod(cls) -> None:
+        cls.class_value: int = 1
+
+class Child(Base):
+    static_value = "text"
+    class_value = "text"
+
+reveal_type(Child.static_value)  # revealed: str
+reveal_type(Child.class_value)  # revealed: str
+```
+
+### Instance annotations follow the MRO
+
+An inherited default retains the annotation from the base that supplied it, even when another base
+declares the same instance attribute.
+
+```py
+class Root:
+    def __init__(self) -> None:
+        self.value: int | str = 0
+
+class Left(Root):
+    value = "left"
+
+class Right:
+    def __init__(self) -> None:
+        self.value: bytes = b"right"
+
+class Child(Left, Right):
+    value = 1
+
+class Invalid(Left, Right):
+    value = b"wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Child().value)  # revealed: int | str
+```
+
+### Recursive instance annotations
+
+The annotation can refer to the defining class itself.
+
+```py
+class Node:
+    def __init__(self) -> None:
+        self.children: list["Node"] = []
+
+class Leaf(Node):
+    children = []
+
+reveal_type(Leaf.children)  # revealed: list[Node]
 ```
 
 ### Gradual types and class-variable qualifiers are inherited
