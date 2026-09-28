@@ -1,3 +1,6 @@
+#[cfg(unix)]
+use std::{fs, os::unix::fs::PermissionsExt};
+
 use insta_cmd::assert_cmd_snapshot;
 use ty_static::EnvVars;
 
@@ -1343,6 +1346,50 @@ fn unavailable_uv_reports_metadata_error() -> anyhow::Result<()> {
     error[uv-metadata]: Failed to invoke `uv workspace metadata`: No such file or directory (os error 2)
     --> script.py:3:1
 
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn old_uv_reports_upgrade() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("script.py", "# /// script\n# dependencies = []\n# ///\n"),
+        (
+            "uv",
+            "#!/bin/sh\nif [ \"$1\" = '--version' ]; then echo 'uv 0.12.2'; fi\n",
+        ),
+    ])?;
+    let uv = case.root().join("uv");
+    fs::set_permissions(&uv, fs::Permissions::from_mode(0o755))?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("script.py").env(EnvVars::TY_UV, "scripts").env(EnvVars::UV, &uv),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[uv-metadata]: uv 0.12.2 is too old; upgrade `<temp_dir>/uv` to uv 0.12.3 or newer
+    --> script.py:1:1
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+    assert_cmd_snapshot!(
+        case.command().arg("script.py").args(["--output-format", "concise"])
+            .env(EnvVars::TY_UV, "scripts").env(EnvVars::UV, &uv),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    script.py:1:1: error[uv-metadata] uv 0.12.2 is too old; upgrade `<temp_dir>/uv` to uv 0.12.3 or newer
     Found 1 diagnostic
 
     ----- stderr -----
