@@ -28,6 +28,14 @@ pub(super) struct Support {
 const CHUNK_SIZE: usize = usize::BITS as usize;
 
 impl Support {
+    pub(super) fn from_typevars(typevars: impl IntoIterator<Item = TypeVarId>) -> Self {
+        let mut result = Self::default();
+        for typevar in typevars {
+            result.insert(typevar);
+        }
+        result
+    }
+
     pub(super) fn from_typevar_set<'db>(
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
