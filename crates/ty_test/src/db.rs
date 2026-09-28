@@ -592,6 +592,10 @@ impl WritableSystem for MdtestSystem {
             .write_file_bytes(&self.normalize_path(path), content)
     }
 
+    fn remove_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().remove_file(&self.normalize_path(path))
+    }
+
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.as_system()
             .create_directory_all(&self.normalize_path(path))
