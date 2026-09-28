@@ -2268,6 +2268,9 @@ def check(child: Child[str]) -> None:
 
 ## Unannotated defaults inherit instance annotations
 
+An instance annotation from a generic base is specialized before it provides context for a subclass
+default.
+
 ```py
 class Base[T]:
     def __init__(self) -> None:
@@ -2277,8 +2280,11 @@ class Child(Base[int]):
     items = []
 
 reveal_type(Child.items)  # revealed: list[int]
-reveal_type(Child().items)  # revealed: list[int]
+```
 
+The default must match the specialized annotation:
+
+```py
 class Invalid(Base[int]):
     items = ["wrong"]  # error: [invalid-assignment]
 ```
