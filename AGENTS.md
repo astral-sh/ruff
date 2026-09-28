@@ -8,6 +8,17 @@ Before starting work on an issue and again before opening a pull request, follow
 [guidance on avoiding duplicate work](CONTRIBUTING.md#avoiding-duplicate-work). If an open pull
 request already addresses the issue, do not submit a competing one without maintainer agreement.
 
+## PR conventions
+
+Add appropriate GitHub labels to pull requests if you have permission to do so; if you don't,
+there's no need to worry about it. Labels can affect whether and how a pull request appears in the
+Ruff or ty changelog. The `[tool.rooster]` and `[tool.rooster.section-labels]` sections in
+[Ruff's `pyproject.toml`](pyproject.toml) and
+[ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml) specify which
+labels affect each changelog.
+
+When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label.
+
 ## Code Review Rules
 
 For security reviews of Ruff and ty runtime changes, use the
@@ -98,6 +109,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 
 - Write mdtests as readable, literate specifications, and minimize the context a reader must hold in mind. Prefer short, focused code blocks, and define types, fixtures, and helpers close to the assertions that use them. Sections and subsections can be long when they develop a coherent topic through many short examples interspersed with prose. Do not split a subsection, or flag it in review, solely because of its length. Give independent scenarios separate sibling Markdown test headings at the same level; only introduce child headings if any existing code beneath their parent is first moved into child sections. When scenarios need shared setup, interleave short prose-and-code blocks under the same heading.
 - Code blocks for the same file within a section are concatenated into one file. For inline snapshots, keep each example's code block close to its `# snapshot` block. Ideally, any given code block only has one snapshot in it, but one codeblock containing several snapshots is also acceptable. Repeating a short, independent function definition, including one with the same name, is fine if it keeps the code triggering a snapshot close to the snapshot demonstrating the expected diagnostic on that code. Reuse shared setup when clearer, and check that repeated names do not affect other examples.
+- When a Python statement in an mdtest is included only or primarily to check that ty does not emit a diagnostic for it, normally add a `# no diagnostic` comment on or above the statement. Statements used as setup for later assertions do not necessarily need such comments.
 - Prioritize document structure and readability over avoiding duplicated setup. Add a test to an existing section when its heading accurately describes the new scenario, adding or improving introductory prose as needed; otherwise, create a separate sibling section, even if that requires repeating a small fixture.
 - Order mdtests from basic, common behavior to more specialized cases. Place narrow regression tests alongside closely related examples when they fit naturally; otherwise, put them near the end of the relevant section or file. Do not put an obscure special case at the beginning simply because it is the newest regression.
 - Aim for readable documents that serve as both documentation and tests. Use prose to explain the key type checker behavior and its rationale where helpful. A sentence or fragment may suffice; avoid repeating what the heading, surrounding explanation, or assertions already make clear. Use clear, precise terminology. Avoid using jargon where it's unnecessary, and avoid inventing new jargon if there's an existing term of art used in that file. Avoid long paragraphs covering multiple scenarios followed by a single long code block.
@@ -138,7 +150,7 @@ The guidance in this section applies to edits to `ty*` crates, reviews of ty PRs
 
 When the task matches a more specific ty workflow, also read and follow that skill from the repository root:
 
-- Diagnostic changes, diagnostic message changes, or diagnostic reviews: `.agents/skills/adding-ty-diagnostics/SKILL.md`.
+- Adding new ty rules, changing diagnostics or diagnostic messages, or reviewing diagnostics: `.agents/skills/adding-ty-diagnostics/SKILL.md`.
 - Ecosystem report summaries: `.agents/skills/summarise-ecosystem-results/SKILL.md`.
 - Reproducing, investigating, or minimizing ecosystem or primer differences: `.agents/skills/minimizing-ty-ecosystem-changes/SKILL.md`.
 
@@ -157,12 +169,6 @@ To inspect one evaluation task, run `cargo run --package ty_completion_eval -- s
 ### Ad hoc reproductions
 
 When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
-
-### PR conventions
-
-When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label if you have permission to do so;
-if you don't, however, automation should add it anyway, so there's no need to worry about it. Similarly, add the `server`
-label if your change only affects the LSP server and you have permission to add that label.
 
 ### The `db` parameter
 
