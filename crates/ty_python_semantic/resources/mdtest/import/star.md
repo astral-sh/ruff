@@ -916,6 +916,120 @@ reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: Unknown
 ```
 
+### A literal `__all__` after a wildcard import
+
+An explicit `__all__` restricts the names re-exported from a wildcard import, even if the source
+module does not define its own `__all__`.
+
+`source.py`:
+
+```py
+included: int = 1
+excluded: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+# The __all__ list limits what this module exports.
+__all__ = ["included"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(included)  # revealed: int
+# error: [unresolved-reference]
+reveal_type(excluded)  # revealed: Unknown
+```
+
+### An `__all__` assignment followed by conditional changes
+
+The later assignment replaces the names from the wildcard import, and recognized changes apply to
+its new value.
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+excluded: bool = True
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+__all__ = ["first"]
+if True:
+    __all__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+# error: [unresolved-reference]
+reveal_type(excluded)  # revealed: Unknown
+```
+
+### Unicode identifiers can modify `__all__`
+
+Python normalizes identifiers, so a different spelling can refer to the same `__all__` variable.
+
+`exporter.py`:
+
+```py
+first: int = 1
+second: str = ""
+__all__ = ["first"]
+__aℓℓ__.append("second")
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: str
+```
+
+### A later wildcard import can replace `__all__`
+
+`source.py`:
+
+```py
+__all__ = ["__all__", "other"]
+other: str = ""
+```
+
+`exporter.py`:
+
+```py
+included: int = 1
+__all__ = ["included"]
+from source import *
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(other)  # revealed: str
+# error: [unresolved-reference]
+reveal_type(included)  # revealed: Unknown
+```
+
 ### Names excluded from `__all__` do not reassign `Final` symbols
 
 A wildcard import does not bind public or private names that are absent from the exporting module's
