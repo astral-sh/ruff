@@ -231,7 +231,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    commands::server::run_server(args.resolve_preview())
+    commands::server::run_server(args.resolve_preview(), args.resolve_workspace_trust())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {

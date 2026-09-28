@@ -7,10 +7,11 @@ use lsp_types::{ClientCapabilities, FileEvent, NotebookDocumentCellChanges, Uri}
 use settings::ClientSettings;
 
 use crate::edit::{DocumentKey, DocumentVersion, NotebookDocument};
+use crate::format::FormatBackend;
 use crate::session::request_queue::RequestQueue;
 use crate::session::settings::GlobalClientSettings;
 use crate::workspace::Workspaces;
-use crate::{PositionEncoding, TextDocument};
+use crate::{PositionEncoding, TextDocument, WorkspaceTrust};
 
 pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub(crate) use self::index::DocumentQuery;
@@ -34,6 +35,9 @@ pub(crate) struct Session {
     /// Global settings provided by the client.
     global_settings: GlobalClientSettings,
 
+    /// Set at startup so client settings cannot enable external formatting in an untrusted workspace.
+    workspace_trust: WorkspaceTrust,
+
     /// Tracks what LSP features the client supports and doesn't support.
     resolved_client_capabilities: Arc<ResolvedClientCapabilities>,
 
@@ -51,6 +55,7 @@ pub(crate) struct DocumentSnapshot {
     client_settings: Arc<settings::ClientSettings>,
     document_ref: index::DocumentQuery,
     position_encoding: PositionEncoding,
+    workspace_trust: WorkspaceTrust,
 }
 
 impl Session {
@@ -60,11 +65,13 @@ impl Session {
         global: GlobalClientSettings,
         workspaces: &Workspaces,
         client: &Client,
+        workspace_trust: WorkspaceTrust,
     ) -> crate::Result<Self> {
         Ok(Self {
             position_encoding,
             index: index::Index::new(workspaces, &global, client)?,
             global_settings: global,
+            workspace_trust,
             resolved_client_capabilities: Arc::new(ResolvedClientCapabilities::new(
                 client_capabilities,
             )),
@@ -104,6 +111,7 @@ impl Session {
                 .unwrap_or_else(|| self.global_settings.to_settings_arc()),
             document_ref: self.index.make_document_ref(key, &self.global_settings)?,
             position_encoding: self.position_encoding,
+            workspace_trust: self.workspace_trust,
         })
     }
 
@@ -215,6 +223,21 @@ impl Session {
 }
 
 impl DocumentSnapshot {
+    pub(crate) fn format_backend(&self) -> FormatBackend {
+        let backend = self.client_settings.editor_settings().format_backend();
+        match self.workspace_trust {
+            WorkspaceTrust::Trusted => backend,
+            WorkspaceTrust::Untrusted => {
+                if backend == FormatBackend::Uv {
+                    tracing::info!(
+                        "Using the internal formatter because the workspace is untrusted; the uv backend is disabled"
+                    );
+                }
+                FormatBackend::Internal
+            }
+        }
+    }
+
     pub(crate) fn resolved_client_capabilities(&self) -> &ResolvedClientCapabilities {
         &self.resolved_client_capabilities
     }
@@ -240,5 +263,51 @@ impl DocumentSnapshot {
                 ..
             }
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use anyhow::{Context, Result};
+    use lsp_types::Uri;
+    use serde_json::json;
+    use test_case::test_case;
+
+    use super::index::Index;
+    use super::options::GlobalOptions;
+    use super::{Client, Session};
+    use crate::format::FormatBackend;
+    use crate::session::request_queue::RequestQueue;
+    use crate::{PositionEncoding, TextDocument, WorkspaceTrust};
+
+    #[test_case(WorkspaceTrust::Untrusted, FormatBackend::Internal)]
+    #[test_case(WorkspaceTrust::Trusted, FormatBackend::Uv)]
+    fn format_backend(workspace_trust: WorkspaceTrust, expected: FormatBackend) -> Result<()> {
+        let (main_loop_sender, _) = crossbeam::channel::unbounded();
+        let (client_sender, _) = crossbeam::channel::unbounded();
+        let client = Client::new(main_loop_sender, client_sender);
+        let options: GlobalOptions = serde_json::from_value(json!({
+            "format": {"backend": "uv"},
+        }))?;
+        let mut session = Session {
+            index: Index::default(),
+            position_encoding: PositionEncoding::default(),
+            global_settings: options.into_settings(client),
+            workspace_trust,
+            resolved_client_capabilities: Arc::default(),
+            request_queue: RequestQueue::new(),
+            shutdown_requested: false,
+        };
+        let uri: Uri = "untitled:test.py".parse()?;
+        session.open_text_document(uri.clone(), TextDocument::new(String::new(), 1));
+        let snapshot = session
+            .take_snapshot(uri)
+            .context("missing document snapshot")?;
+
+        assert_eq!(snapshot.format_backend(), expected);
+
+        Ok(())
     }
 }
