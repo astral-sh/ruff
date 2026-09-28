@@ -7891,8 +7891,8 @@ static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
 
 def _(extra: Extra, aliased: AliasedExtra) -> None:
-    reveal_type(extra.get("missing"))  # revealed: int | None
-    reveal_type(aliased.get("missing", False))  # revealed: int
+    reveal_type(extra.get("missing"))  # revealed: None
+    reveal_type(aliased.get("missing", False))  # revealed: Literal[False]
 ```
 
 ### Empty closed TypedDict truthiness
@@ -8542,27 +8542,25 @@ def _(closed: Closed, functional: FunctionalClosed, empty: EmptyClosed, key: str
     reveal_type(empty.get(key, False))  # revealed: Literal[False]
 ```
 
-Undesirably, `get` currently includes the declared field types in its return type for a literal key
-outside the closed schema, along with `None` or the supplied default.
+A literal key outside the declared schema returns only `None` or the supplied default. This also
+applies to saved method references, and defaults receive context from the expected result type:
 
 ```py
 from typing import Literal
 
 def _(closed: Closed, functional: FunctionalClosed, missing: Literal["missing", "other"]) -> None:
-    reveal_type(closed.get("missing"))  # revealed: str | int | None
-    reveal_type(closed.get("missing", False))  # revealed: str | int
-    reveal_type(functional.get("missing", 0))  # revealed: str | int
-    reveal_type(closed.get(missing))  # revealed: str | int | None
-    reveal_type(closed.get(missing, False))  # revealed: str | int
+    reveal_type(closed.get("missing"))  # revealed: None
+    reveal_type(closed.get("missing", False))  # revealed: Literal[False]
+    reveal_type(functional.get("missing", 0))  # revealed: Literal[0]
+    reveal_type(closed.get(missing))  # revealed: None
+    reveal_type(closed.get(missing, False))  # revealed: Literal[False]
 
     get = closed.get
-    reveal_type(get("missing"))  # revealed: str | int | None
-    reveal_type(get("missing", False))  # revealed: str | int
+    reveal_type(get("missing"))  # revealed: None
+    reveal_type(get("missing", False))  # revealed: Literal[False]
 
-    # error: [invalid-assignment]
-    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[Unknown]
-    # error: [invalid-assignment]
-    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[Unknown]
+    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[int]
+    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[int]
     wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
 ```
 
