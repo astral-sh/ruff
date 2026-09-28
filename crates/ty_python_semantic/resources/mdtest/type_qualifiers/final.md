@@ -1094,7 +1094,12 @@ class Derived(Base):
     # TODO: This should be an error, but instance attribute override checking is not yet supported
     def __init__(self):
         self.x = 2
+```
 
+An assignment in the subclass body should also be rejected. Until override checking handles this
+case, the `Final` annotation does not provide a type for the subclass default:
+
+```py
 class ClassDefault(Base):
     # TODO: This should be an override-of-final-variable error.
     x = "value"

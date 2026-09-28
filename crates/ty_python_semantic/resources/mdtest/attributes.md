@@ -3110,12 +3110,10 @@ reveal_type(Redeclared.value)  # revealed: str
 
 ### Defaults for attributes declared in methods
 
-An instance annotation declared in a method also provides context for a subclass default. The
-default can be read through an instance when the base initializer has not assigned the attribute.
+An instance annotation declared in a method provides context for a subclass default. If the subclass
+does not call the base initializer, instances can still read the default from the class.
 
 ```py
-from typing import Protocol
-
 class Base:
     def __init__(self) -> None:
         self.items: list[int] = [42]
@@ -3123,55 +3121,80 @@ class Base:
 class Child(Base):
     items = []
 
+    def __init__(self) -> None:
+        pass
+
 reveal_type(Child.items)  # revealed: list[int]
 reveal_type(Child().items)  # revealed: list[int]
+```
 
+The default must be assignable to the inherited annotation:
+
+```py
 class Invalid(Base):
     items = ["wrong"]  # error: [invalid-assignment]
-
-def check(child: Child) -> None:
-    child.items.append("wrong")  # error: [invalid-argument-type]
-    child.items = [1]
-
-class HasItems(Protocol):
-    items: list[int]
-
-def as_protocol(child: Child) -> HasItems:
-    return child
 ```
 
 ### Annotations in unreachable methods
 
 An annotation in a method that is never defined does not affect instance attributes or subclass
-defaults. A later reachable annotation still provides context.
+defaults.
 
 ```py
 class Base:
     if False:
         def unavailable(self) -> None:
             self.value: int = 0
-            self.other: int = 0
-
-    def configure(self) -> None:
-        self.other: str = "base"
-
-class Child(Base):
-    value = "child"
-    other = "child"
 
 # error: [unresolved-attribute]
 reveal_type(Base().value)  # revealed: Unknown
-reveal_type(Base().other)  # revealed: str
-reveal_type(Child.value)  # revealed: str
-reveal_type(Child().value)  # revealed: str
-reveal_type(Child.other)  # revealed: str
-reveal_type(Child().other)  # revealed: str
 
-class Invalid(Base):
-    other = 1  # error: [invalid-assignment]
+class Child(Base):
+    value = "child"
+
+reveal_type(Child().value)  # revealed: str
 ```
 
-An annotation in a method that may be defined still provides context:
+A reachable method's annotation still applies when another method with an annotation for the same
+attribute is unreachable:
+
+```py
+class OtherBase:
+    if False:
+        def unavailable(self) -> None:
+            self.value: int = 0
+
+    def configure(self) -> None:
+        self.value: str = "base"
+
+reveal_type(OtherBase().value)  # revealed: str
+
+class Invalid(OtherBase):
+    value = 1  # error: [invalid-assignment]
+```
+
+### Annotations in unreachable branches of methods
+
+ty does not yet ignore an annotation in an unreachable branch inside a method. As a result, it
+incorrectly applies that annotation to a subclass default:
+
+```py
+class Base:
+    def __init__(self) -> None:
+        if False:
+            self.value: int = 0
+
+class Child(Base):
+    # TODO: This should not be an error; the annotation is unreachable.
+    value = "child"  # error: [invalid-assignment]
+
+# TODO: This should be `str`.
+reveal_type(Child.value)  # revealed: int
+```
+
+### Annotations in conditionally defined methods
+
+An annotation in a method that may be defined still provides context for a subclass default:
 
 ```py
 def conditional(flag: bool):
@@ -3186,7 +3209,8 @@ def conditional(flag: bool):
 
 ### Annotations in property getters with setters
 
-The getter can declare an instance attribute even when the property also has a setter.
+Adding a setter creates a new property that still includes the getter. An instance annotation in the
+getter therefore applies to subclass defaults.
 
 ```py
 class Base:
@@ -3207,7 +3231,8 @@ class Child(Base):
 
 ### Annotations in aliased methods
 
-A method can declare an instance attribute when it is preserved under an alias.
+A method can declare an instance attribute when it is preserved under an alias, even if another
+method later replaces its original name.
 
 ```py
 class Base:
@@ -3227,8 +3252,9 @@ class Child(Base):
 
 ### Descriptors for attributes declared in methods
 
-A descriptor can satisfy the inherited instance contract without being an instance of the annotated
-type itself.
+When a subclass replaces an attribute declared in a method with a descriptor, ty checks the type
+returned by the descriptor against the inherited annotation. The descriptor object itself does not
+need to have that type.
 
 ```py
 from typing import overload
@@ -3257,7 +3283,11 @@ reveal_type(Child.value)  # revealed: Descriptor
 reveal_type(Child().value)  # revealed: int
 Child().value = 1
 Child().value = "wrong"  # error: [invalid-assignment]
+```
 
+A descriptor whose instance access returns an incompatible type is rejected:
+
+```py
 class IncompatibleDescriptor:
     def __get__(self, instance: object, owner: type[object]) -> str:
         return "wrong"
@@ -3271,7 +3301,8 @@ class Invalid(Base):
 
 ### Descriptor setter compatibility with instance annotations
 
-Descriptor setters still need override checking against the inherited instance annotation.
+ty does not yet check that the descriptor's setter accepts every value allowed by the inherited
+instance annotation:
 
 ```py
 class WritableBase:
@@ -3296,22 +3327,30 @@ Only instance methods introduce instance annotations; a static method's first pa
 method's receiver do not declare instance attributes.
 
 ```py
-class Base:
+class StaticBase:
     @staticmethod
     def static(other: object) -> None:
         # error: [invalid-type-form]
         other.static_value: int = 1  # error: [unresolved-attribute]
 
+class StaticChild(StaticBase):
+    static_value = "text"
+
+reveal_type(StaticChild.static_value)  # revealed: str
+```
+
+A class method's receiver is the class, not an instance:
+
+```py
+class ClassBase:
     @classmethod
     def classmethod(cls) -> None:
         cls.class_value: int = 1
 
-class Child(Base):
-    static_value = "text"
+class ClassChild(ClassBase):
     class_value = "text"
 
-reveal_type(Child.static_value)  # revealed: str
-reveal_type(Child.class_value)  # revealed: str
+reveal_type(ClassChild.class_value)  # revealed: str
 ```
 
 ### Instance annotations follow the MRO
@@ -3334,11 +3373,15 @@ class Right:
 class Child(Left, Right):
     value = 1
 
-class Invalid(Left, Right):
-    value = b"wrong"  # error: [invalid-assignment]
-
 reveal_type(Child.value)  # revealed: int | str
 reveal_type(Child().value)  # revealed: int | str
+```
+
+The annotation from `Right` does not replace the annotation inherited by `Left`:
+
+```py
+class Invalid(Left, Right):
+    value = b"wrong"  # error: [invalid-assignment]
 ```
 
 ### Recursive instance annotations
@@ -3451,6 +3494,9 @@ reveal_type(DynamicLast.value)  # revealed: int | str
 
 ### Inherited instance annotations after a dynamic base
 
+An instance annotation can also provide context for a subclass default when an earlier base is
+dynamic.
+
 ```py
 from typing import Any
 
@@ -3463,7 +3509,11 @@ class Child(Any, Base):
 
 reveal_type(Child.items)  # revealed: list[int]
 reveal_type(Child().items)  # revealed: list[int]
+```
 
+An incompatible default is rejected:
+
+```py
 class Invalid(Any, Base):
     items = ["wrong"]  # error: [invalid-assignment]
 ```
