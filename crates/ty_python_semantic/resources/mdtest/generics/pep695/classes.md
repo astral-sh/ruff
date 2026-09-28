@@ -3319,5 +3319,22 @@ class Explicit(String, Integer):
         return ""
 ```
 
+## Unannotated defaults inherit instance annotations
+
+```py
+class Base[T]:
+    def __init__(self) -> None:
+        self.items: list[T] = []
+
+class Child(Base[int]):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child().items)  # revealed: list[int]
+
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
