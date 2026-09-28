@@ -441,6 +441,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 prune_path,
                 process_satisfied,
             ),
+            Constraint::Existential(_) => {
+                // XXX
+                ControlFlow::Continue(())
+            }
         }
     }
 

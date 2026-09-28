@@ -88,6 +88,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::iter;
@@ -131,7 +132,7 @@ mod variables;
 use owned::OwnedConstraintSetBuilder;
 use paths::PathAssignments;
 use solutions::{Polarity, SolutionWalker};
-use variables::{AtomicConstraint, Constraint, ConstraintProvenance};
+use variables::{AtomicConstraint, Constraint, ConstraintProvenance, ExistentialBound};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -341,9 +342,12 @@ impl<'db> OwnedConstraintSet<'db> {
                 .iter()
                 .map(|node| node.constraint)
                 .unique()
-                .flat_map(|constraint| {
-                    inner.constraints[inner.retained_constraint_index(constraint)].types()
+                // The body of each existential node will be stored in the same storage, so we can
+                // skip them here when calculating the types mentioned in the BDD.
+                .filter_map(|constraint| {
+                    inner.constraints[inner.retained_constraint_index(constraint)].as_atomic()
                 })
+                .flat_map(AtomicConstraint::types)
         })
     }
 }
@@ -745,6 +749,34 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut storage = builder.storage.borrow_mut();
         let node = self.node.iff(&mut storage, other.node);
         let source_order = storage.ordered_source_order(self.source_order, other.source_order);
+        Self::from_node(builder, node, source_order)
+    }
+
+    #[expect(dead_code)]
+    pub(crate) fn exists(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: TypeVarSet<'db>,
+    ) -> Self {
+        self.verify_builder(builder);
+        if to_remove == TypeVarSet::None {
+            return self;
+        }
+        let mut storage = builder.storage.borrow_mut();
+        let to_remove = Support::from_typevar_set(db, &mut storage, to_remove);
+        let Some(existential) = ExistentialBound::new(
+            &storage,
+            ConstraintProvenance::Evidence,
+            to_remove,
+            self.node,
+            self.source_order,
+        ) else {
+            return self;
+        };
+        let existential = Constraint::Existential(existential);
+        let (node, source_order) = existential.new_node(db, env, &mut storage);
         Self::from_node(builder, node, source_order)
     }
 
@@ -1286,6 +1318,13 @@ impl<'db> ConstraintSetStorage<'db> {
                 support.insert(self.intern_typevar(db, constraint.left));
                 support.insert(self.intern_typevar(db, constraint.right));
             }
+            Constraint::Existential(existential) => {
+                // The body of an existential is stored in `storage`, and will have already been
+                // interned. And locals only have to be interned if they are mentioned in the body.
+                // All we have to do is update `support` to include the existential's (already
+                // calculated) support.
+                support |= self.node_support(existential.body);
+            }
         }
         support
     }
@@ -1363,7 +1402,6 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn atomic_constraint_data(&self, constraint: AtomicConstraintId) -> AtomicConstraint<'db> {
-        #[expect(irrefutable_let_patterns)]
         let Constraint::Atomic(atomic) = self.constraint_data(constraint.into_inner()) else {
             panic!("atomic constraint should be atomic");
         };
@@ -1428,12 +1466,13 @@ impl<'db> ConstraintSetStorage<'db> {
         }
     }
 
-    fn constraint_source_order(&mut self, constraint: ConstraintId) -> SourceOrderId {
+    fn constraint_source_order(&mut self, constraint: ConstraintId) -> Option<SourceOrderId> {
         let constraint_data = self.constraint_data(constraint);
         match constraint_data {
-            Constraint::Atomic(_) => self.intern_source_order(SourceOrder::AtomicConstraint(
+            Constraint::Atomic(_) => Some(self.intern_source_order(SourceOrder::AtomicConstraint(
                 AtomicConstraintId(constraint),
-            )),
+            ))),
+            Constraint::Existential(existential) => existential.source_order,
         }
     }
 
@@ -1564,10 +1603,16 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
+        type RemappedConstraint = Cell<Option<(NodeId, Option<SourceOrderId>)>>;
+
+        #[expect(clippy::too_many_arguments)]
         fn rebuild_node<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
             inner: &OwnedConstraintSetInner<'db>,
-            constraints: &[(NodeId, Option<SourceOrderId>)],
+            constraints: &[RemappedConstraint],
+            source_orders: &[Option<SourceOrderId>],
             cache: &mut FxHashMap<NodeId, NodeId>,
             old_node: NodeId,
         ) -> NodeId {
@@ -1580,17 +1625,73 @@ impl<'db> ConstraintSetStorage<'db> {
 
             let old_node_index = inner.retained_node_index(old_node);
             let old_interior = inner.nodes[old_node_index];
-            let if_true = rebuild_node(storage, inner, constraints, cache, old_interior.if_true);
-            let if_uncertain = rebuild_node(
+            let if_true = rebuild_node(
+                db,
+                env,
                 storage,
                 inner,
                 constraints,
+                source_orders,
+                cache,
+                old_interior.if_true,
+            );
+            let if_uncertain = rebuild_node(
+                db,
+                env,
+                storage,
+                inner,
+                constraints,
+                source_orders,
                 cache,
                 old_interior.if_uncertain,
             );
-            let if_false = rebuild_node(storage, inner, constraints, cache, old_interior.if_false);
+            let if_false = rebuild_node(
+                db,
+                env,
+                storage,
+                inner,
+                constraints,
+                source_orders,
+                cache,
+                old_interior.if_false,
+            );
             let old_constraint_index = inner.retained_constraint_index(old_interior.constraint);
-            let (condition, _) = constraints[old_constraint_index];
+            constraints[old_constraint_index].update(|mut constraint| {
+                constraint.get_or_insert_with(|| match &inner.constraints[old_constraint_index] {
+                    Constraint::Existential(existential) => {
+                        let body = rebuild_node(
+                            db,
+                            env,
+                            storage,
+                            inner,
+                            constraints,
+                            source_orders,
+                            cache,
+                            existential.body,
+                        );
+                        let source_order = existential
+                            .source_order
+                            .and_then(|old_source_order| source_orders[old_source_order.index()]);
+                        let Some(existential) = ExistentialBound::new(
+                            storage,
+                            existential.provenance,
+                            existential.locals.clone(),
+                            body,
+                            source_order,
+                        ) else {
+                            return (body, source_order);
+                        };
+                        Constraint::Existential(existential).new_node(db, env, storage)
+                    }
+                    Constraint::Atomic(_) => {
+                        panic!("atomic constraints should have already been rebuilt")
+                    }
+                });
+                constraint
+            });
+            let (condition, _) = constraints[old_constraint_index]
+                .get()
+                .expect("constraint should have been rebuilt");
             let remapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
 
             cache.insert(old_node, remapped);
@@ -1618,11 +1719,17 @@ impl<'db> ConstraintSetStorage<'db> {
             self.intern_typevar(db, inner.typevars[typevar]);
         }
 
-        // Rebuild constraints in their saved order, using the destination's typevar ordering.
-        let constraints: Box<[_]> = inner
+        // Rebuild atomic constraints in their saved order, using the destination's typevar
+        // ordering. Existential constraints are rebuilt lazily after their bodies.
+        let constraints: Box<[RemappedConstraint]> = inner
             .constraints
             .iter()
-            .map(|old_constraint| old_constraint.clone().new_node(db, env, self))
+            .map(|old_constraint| {
+                Cell::new(match old_constraint {
+                    Constraint::Atomic(_) => Some(old_constraint.clone().new_node(db, env, self)),
+                    Constraint::Existential(_) => None,
+                })
+            })
             .collect();
 
         let mut source_orders = vec![None; inner.source_orders.len()];
@@ -1636,7 +1743,9 @@ impl<'db> ConstraintSetStorage<'db> {
                 SourceOrder::AtomicConstraint(old_constraint) => {
                     let old_constraint_index =
                         inner.retained_constraint_index(old_constraint.into_inner());
-                    let (_, constraint_source_order) = constraints[old_constraint_index];
+                    let (_, constraint_source_order) = constraints[old_constraint_index]
+                        .get()
+                        .expect("every source-order constraint should have a retained node");
                     source_orders[i] = constraint_source_order;
                 }
             }
@@ -1644,7 +1753,16 @@ impl<'db> ConstraintSetStorage<'db> {
 
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
-        let node = rebuild_node(self, inner, &constraints, &mut cache, other.node);
+        let node = rebuild_node(
+            db,
+            env,
+            self,
+            inner,
+            &constraints,
+            &source_orders,
+            &mut cache,
+            other.node,
+        );
         let old_source_order = other
             .source_order
             .expect("non-terminal constraint set should have a source_order");
@@ -1725,18 +1843,18 @@ pub struct ConstraintId;
 
 impl ConstraintId {
     fn as_atomic(self, storage: &ConstraintSetStorage<'_>) -> Option<AtomicConstraintId> {
+        #[expect(clippy::match_wildcard_for_single_variants)]
         match storage.constraint_data(self) {
             Constraint::Atomic(_) => Some(AtomicConstraintId(self)),
-            #[expect(unreachable_patterns)]
             _ => None,
         }
     }
 
     #[track_caller]
     fn expect_atomic(self, storage: &ConstraintSetStorage<'_>) -> AtomicConstraintId {
+        #[expect(clippy::match_wildcard_for_single_variants)]
         match storage.constraint_data(self) {
             Constraint::Atomic(_) => AtomicConstraintId(self),
-            #[expect(unreachable_patterns)]
             _ => panic!("constraint should be atomic"),
         }
     }
@@ -2284,7 +2402,7 @@ impl Node {
     ) -> (NodeId, Option<SourceOrderId>) {
         (
             NodeId::with_uncertain(storage, constraint, ALWAYS_TRUE, ALWAYS_FALSE, ALWAYS_FALSE),
-            Some(storage.constraint_source_order(constraint)),
+            storage.constraint_source_order(constraint),
         )
     }
 
@@ -2313,7 +2431,7 @@ impl Node {
                 NodeId::with_uncertain(storage, constraint, ALWAYS_FALSE, ALWAYS_TRUE, ALWAYS_FALSE)
             }
         };
-        (node, Some(storage.constraint_source_order(constraint_id)))
+        (node, storage.constraint_source_order(constraint_id))
     }
 }
 
@@ -2454,7 +2572,6 @@ impl NodeId {
                         }
 
                         let constraint = storage.constraint_data(interior.constraint);
-                        #[expect(irrefutable_let_patterns)]
                         let Constraint::Atomic(constraint) = constraint else {
                             return false;
                         };
@@ -4363,18 +4480,23 @@ impl InteriorNode {
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
-        self.node()
-            .for_each_unique_constraint(storage, &mut |constraint| {
-                if let Some(constraint) = constraint.as_atomic(storage) {
-                    constraints.push(constraint);
+        let mut queue = VecDeque::from(vec![self.node()]);
+        while let Some(node) = queue.pop_front() {
+            node.for_each_unique_constraint(storage, &mut |constraint_id| {
+                let constraint = storage.constraint_data(constraint_id);
+                match constraint {
+                    Constraint::Atomic(_) => constraints.push(AtomicConstraintId(constraint_id)),
+                    Constraint::Existential(existential) => queue.push_back(existential.body),
                 }
             });
-        let source_orders = storage.calculate_source_orders(source_order);
+        }
+
         // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
         // and uses that order when constructing non-commutative sequent pairs. Do not replace this
         // with TDD traversal order: doing so can change inference and lose gradual constraints.
         // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
         // constraints, it must preserve their source orders rather than invent an order here.
+        let source_orders = storage.calculate_source_orders(source_order);
         constraints.sort_by_key(|constraint| {
             source_orders
                 .get_index_of(constraint)
@@ -4588,7 +4710,7 @@ impl Assignment<ConstraintId> {
 
         std::fmt::from_fn(move |f| {
             let constraint_data = storage.constraint_data(self.constraint());
-            constraint_data.display(db, env, holds).fmt(f)
+            constraint_data.display(db, env, storage, holds).fmt(f)
         })
     }
 }
