@@ -12,12 +12,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_index::{IndexVec, newtype_index};
 
 use crate::types::constraints::sequents::{Sequent, SequentGroup, SequentMap};
-use crate::types::constraints::variables::Constraint;
-use crate::types::constraints::variables::Constraint::{
+use crate::types::constraints::variables::AtomicConstraint;
+use crate::types::constraints::variables::AtomicConstraint::{
     ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
 };
 use crate::types::constraints::{
-    Assignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
+    Assignment, AtomicConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
     TypeVarId,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
@@ -55,18 +55,18 @@ struct AssignmentIndex;
 #[derive(Debug)]
 pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
-    sequents: Vec<Sequent<ConstraintId, u16>>,
+    sequents: Vec<Sequent<AtomicConstraintId, u16>>,
     /// The sequents that can fire when a particular assignment is added to the path.
-    sequent_antecedents: FxHashMap<Assignment<ConstraintId>, Vec<usize>>,
+    sequent_antecedents: FxHashMap<Assignment<AtomicConstraintId>, Vec<usize>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
-    pub(super) assignments: FxIndexMap<Assignment<ConstraintId>, (ConstraintId, u16)>,
+    pub(super) assignments: FxIndexMap<Assignment<AtomicConstraintId>, (AtomicConstraintId, u16)>,
     /// Constraints that have been _replaced_ with other constraints on this path, because a
     /// sequent substituted an exact type for some typevar.
-    substituted_constraints: FxIndexSet<ConstraintId>,
+    substituted_constraints: FxIndexSet<AtomicConstraintId>,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
     /// replenishment and rollback do not need to update these indices.
-    positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
-    negative_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
+    positive_assignment_indices: IndexVec<AtomicConstraintId, Option<AssignmentIndex>>,
+    negative_assignment_indices: IndexVec<AtomicConstraintId, Option<AssignmentIndex>>,
     /// Previous fuel values, keyed by assignment index, for rolling back replenishments when
     /// leaving a BDD branch. Keeping the maximum in `assignments` makes fuel lookups constant-time.
     fuel_undo: Vec<(usize, u16)>,
@@ -75,26 +75,27 @@ pub(crate) struct PathAssignments {
     /// Constraints that we have discovered, mapped to whether we have processed them yet. (This
     /// ensures a stable order for all of the derived constraints that we create, while still
     /// letting us create them lazily.)
-    discovered: FxIndexMap<ConstraintId, bool>,
+    discovered: FxIndexMap<AtomicConstraintId, bool>,
     /// Constraint pairs that we have already checked and added to `sequents`.
-    elaborated_pairs: FxHashSet<(ConstraintId, ConstraintId)>,
+    elaborated_pairs: FxHashSet<(AtomicConstraintId, AtomicConstraintId)>,
 
     /// Consequents grouped by the discovery call that introduced their sequents.
-    single_replay_consequents: FxHashMap<ConstraintId, Vec<ConstraintId>>,
-    pair_replay_consequents: FxHashMap<(ConstraintId, ConstraintId), Vec<ConstraintId>>,
+    single_replay_consequents: FxHashMap<AtomicConstraintId, Vec<AtomicConstraintId>>,
+    pair_replay_consequents:
+        FxHashMap<(AtomicConstraintId, AtomicConstraintId), Vec<AtomicConstraintId>>,
 
     /// Type variables that only involve concrete constraints and so do not participate in sequent
     /// discovery.
     independent_typevars: FxHashSet<TypeVarId>,
 
     /// Derived assignments that have been queued up to be added to the current path.
-    assignment_queue: VecDeque<(Assignment<ConstraintId>, AssignmentFuel)>,
+    assignment_queue: VecDeque<(Assignment<AtomicConstraintId>, AssignmentFuel)>,
 
     /// The next chunk of derived assignments that have been queued up to add to the current path.
     /// If we derive the same assignment multiple times, we keep the derivation that lets us make
     /// the most additional progress (more remaining fuel for this derivation chain, less overall
     /// fuel consumed).
-    new_assignments: FxIndexMap<Assignment<ConstraintId>, AssignmentFuel>,
+    new_assignments: FxIndexMap<Assignment<AtomicConstraintId>, AssignmentFuel>,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -105,7 +106,10 @@ const OVERALL_FUEL_BUDGET: u16 = 256;
 ///
 /// A concrete lower/upper, lower/equality, or upper/equality pair can relate its type variables
 /// through a shared concrete pivot. Every other pair requires a shared type variable.
-fn can_interact_without_shared_typevars(left: Constraint<'_>, right: Constraint<'_>) -> bool {
+fn can_interact_without_shared_typevars(
+    left: AtomicConstraint<'_>,
+    right: AtomicConstraint<'_>,
+) -> bool {
     match (left, right) {
         (ConcreteLower(_), ConcreteUpper(_) | ConcreteEquivalence(_))
         | (ConcreteUpper(_) | ConcreteEquivalence(_), ConcreteLower(_))
@@ -257,13 +261,13 @@ impl PathAssignments {
             .into_iter()
             .filter(|constraint| emitted.contains(constraint))
             .fold(None, |source_order, constraint| {
-                let next = storage.constraint_source_order(constraint);
+                let next = storage.atomic_constraint_source_order(constraint);
                 storage.ordered_source_order(source_order, Some(next))
             })
     }
 
     pub(super) fn new(
-        constraints: impl IntoIterator<Item = ConstraintId>,
+        constraints: impl IntoIterator<Item = AtomicConstraintId>,
         independent_typevars: FxHashSet<TypeVarId>,
     ) -> Self {
         let discovered = constraints
@@ -308,12 +312,15 @@ impl PathAssignments {
             Node::Interior(interior) => {
                 let interior_value = visitor.enter_interior(db, storage, interior)?;
                 let interior = storage.interior_node_data(node);
+                let Some(constraint) = interior.constraint.as_atomic(storage) else {
+                    panic!("cannot visit non-atomic constraint");
+                };
 
                 let if_true = self.walk_edge(
                     db,
                     env,
                     storage,
-                    interior.constraint.when_true(),
+                    constraint.when_true(),
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -338,7 +345,7 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
-                    interior.constraint.when_unconstrained(),
+                    constraint.when_unconstrained(),
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -363,7 +370,7 @@ impl PathAssignments {
                     db,
                     env,
                     storage,
-                    interior.constraint.when_false(),
+                    constraint.when_false(),
                     |storage, path, new_range, found_conflict| {
                         let subtree = if found_conflict {
                             visitor.visit_impossible(db, storage, path)
@@ -423,7 +430,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        assignment: Assignment<ConstraintId>,
+        assignment: Assignment<AtomicConstraintId>,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
     ) -> R {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -440,10 +447,10 @@ impl PathAssignments {
             before = %format_args!(
                 "[{}]",
                 self.assignments[..start].iter().map(|(assignment, _)| {
-                    assignment.display(db, env, storage)
+                    assignment.into_inner().display(db, env, storage)
                 }).format(", "),
             ),
-            edge = %assignment.display(db, env, storage),
+            edge = %assignment.into_inner().display(db, env, storage),
             "walk edge",
         );
         debug_assert!(self.assignment_queue.is_empty());
@@ -459,7 +466,7 @@ impl PathAssignments {
                 new = %format_args!(
                     "[{}]",
                     self.assignments[start..].iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
+                        assignment.into_inner().display(db, env, storage)
                     }).format(", "),
                 ),
                 "new assignments",
@@ -501,7 +508,7 @@ impl PathAssignments {
 
     pub(super) fn positive_constraints(
         &self,
-    ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
+    ) -> impl Iterator<Item = (AtomicConstraintId, AtomicConstraintId)> + '_ {
         self.assignments.iter().filter_map(
             |(assignment, (source_constraint, _))| match assignment {
                 Assignment::Positive(constraint) => Some((*constraint, *source_constraint)),
@@ -510,15 +517,15 @@ impl PathAssignments {
         )
     }
 
-    pub(super) fn constraint_is_substituted(&self, constraint: ConstraintId) -> bool {
+    pub(super) fn constraint_is_substituted(&self, constraint: AtomicConstraintId) -> bool {
         self.substituted_constraints.contains(&constraint)
     }
 
-    fn assignment_holds(&self, assignment: Assignment<ConstraintId>) -> bool {
+    fn assignment_holds(&self, assignment: Assignment<AtomicConstraintId>) -> bool {
         self.assignment_index(assignment).is_some()
     }
 
-    fn assignment_index(&self, assignment: Assignment<ConstraintId>) -> Option<usize> {
+    fn assignment_index(&self, assignment: Assignment<AtomicConstraintId>) -> Option<usize> {
         let indices = match assignment {
             Assignment::Positive(_) => &self.positive_assignment_indices,
             Assignment::Negative(_) => &self.negative_assignment_indices,
@@ -533,27 +540,31 @@ impl PathAssignments {
             .map(AssignmentIndex::as_usize)
     }
 
-    fn record_assignment_index(&mut self, assignment: Assignment<ConstraintId>, index: usize) {
+    fn record_assignment_index(
+        &mut self,
+        assignment: Assignment<AtomicConstraintId>,
+        index: usize,
+    ) {
         let indices = match assignment {
             Assignment::Positive(_) => &mut self.positive_assignment_indices,
             Assignment::Negative(_) => &mut self.negative_assignment_indices,
             Assignment::Unconstrained(_) => return,
         };
         let constraint = assignment.constraint();
-        if indices.len() <= constraint.as_usize() {
-            indices.resize(constraint.as_usize() + 1, None);
+        if indices.len() <= constraint.into_inner().as_usize() {
+            indices.resize(constraint.into_inner().as_usize() + 1, None);
         }
         indices[constraint] = Some(AssignmentIndex::from_usize(index));
     }
 
-    fn contains_constraint(&self, constraint: ConstraintId) -> bool {
+    fn contains_constraint(&self, constraint: AtomicConstraintId) -> bool {
         self.assignment_holds(constraint.when_true())
             || self.assignment_holds(constraint.when_false())
             || self.assignment_holds(constraint.when_unconstrained())
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
-    fn max_remaining_fuel_for(&self, assignment: Assignment<ConstraintId>) -> Option<u16> {
+    fn max_remaining_fuel_for(&self, assignment: Assignment<AtomicConstraintId>) -> Option<u16> {
         self.assignment_index(assignment)
             .map(|index| self.assignments[index].1)
     }
@@ -569,9 +580,9 @@ impl PathAssignments {
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
-            sequents: &[Sequent<Constraint<'db>>],
-            dest: &mut Vec<Sequent<ConstraintId, u16>>,
-            antecedents: &mut FxHashMap<Assignment<ConstraintId>, Vec<usize>>,
+            sequents: &[Sequent<AtomicConstraint<'db>>],
+            dest: &mut Vec<Sequent<AtomicConstraintId, u16>>,
+            antecedents: &mut FxHashMap<Assignment<AtomicConstraintId>, Vec<usize>>,
         ) {
             for sequent in sequents {
                 let sequent_index = dest.len();
@@ -584,13 +595,13 @@ impl PathAssignments {
 
                 let sequent = match sequent {
                     Sequent::SingleTautology { ante } => {
-                        let ante = storage.intern_constraint(db, env, *ante);
+                        let ante = storage.intern_atomic_constraint(db, env, *ante);
                         add_antecedent(ante.when_false());
                         Sequent::SingleTautology { ante }
                     }
                     Sequent::PairImpossibility { ante1, ante2 } => {
-                        let ante1 = storage.intern_constraint(db, env, *ante1);
-                        let ante2 = storage.intern_constraint(db, env, *ante2);
+                        let ante1 = storage.intern_atomic_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_atomic_constraint(db, env, *ante2);
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         Sequent::PairImpossibility { ante1, ante2 }
@@ -600,9 +611,9 @@ impl PathAssignments {
                         ante2,
                         ante3,
                     } => {
-                        let ante1 = storage.intern_constraint(db, env, *ante1);
-                        let ante2 = storage.intern_constraint(db, env, *ante2);
-                        let ante3 = storage.intern_constraint(db, env, *ante3);
+                        let ante1 = storage.intern_atomic_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_atomic_constraint(db, env, *ante2);
+                        let ante3 = storage.intern_atomic_constraint(db, env, *ante3);
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         add_antecedent(ante3.when_true());
@@ -619,9 +630,9 @@ impl PathAssignments {
                         is_substitution,
                         ..
                     } => {
-                        let ante1 = storage.intern_constraint(db, env, *ante1);
-                        let ante2 = storage.intern_constraint(db, env, *ante2);
-                        let post = storage.intern_constraint(db, env, *post);
+                        let ante1 = storage.intern_atomic_constraint(db, env, *ante1);
+                        let ante2 = storage.intern_atomic_constraint(db, env, *ante2);
+                        let post = storage.intern_atomic_constraint(db, env, *post);
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         let (ante1_depth, _) =
@@ -639,8 +650,8 @@ impl PathAssignments {
                         }
                     }
                     Sequent::SingleImplication { ante, post, .. } => {
-                        let ante = storage.intern_constraint(db, env, *ante);
-                        let post = storage.intern_constraint(db, env, *post);
+                        let ante = storage.intern_atomic_constraint(db, env, *ante);
+                        let post = storage.intern_atomic_constraint(db, env, *post);
                         add_antecedent(ante.when_true());
                         let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
                         let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
@@ -713,7 +724,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        constraint: ConstraintId,
+        constraint: AtomicConstraintId,
     ) {
         // If we've already processed this constraint, we can skip it.
         let (constraint_index, existing) = self.discovered.insert_full(constraint, true);
@@ -722,7 +733,7 @@ impl PathAssignments {
             return;
         }
 
-        let constraint_data = storage.constraint_data(constraint);
+        let constraint_data = storage.atomic_constraint_data(constraint);
         if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
             let added = self.add_sequents(db, env, storage, map);
 
@@ -752,9 +763,9 @@ impl PathAssignments {
                 continue;
             }
 
-            let existing_data = storage.constraint_data(*existing);
-            let existing_support = storage.constraint_support(*existing);
-            let constraint_support = storage.constraint_support(constraint);
+            let existing_data = storage.atomic_constraint_data(*existing);
+            let existing_support = storage.constraint_support(existing.into_inner());
+            let constraint_support = storage.constraint_support(constraint.into_inner());
 
             if existing_support.is_complete()
                 && constraint_support.is_complete()
@@ -813,7 +824,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        source_constraint: ConstraintId,
+        source_constraint: AtomicConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
@@ -829,8 +840,8 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        assignment: Assignment<ConstraintId>,
-        source_constraint: ConstraintId,
+        assignment: Assignment<AtomicConstraintId>,
+        source_constraint: AtomicConstraintId,
         fuel: AssignmentFuel,
     ) -> Result<(), PathAssignmentConflict> {
         if matches!(assignment, Assignment::Unconstrained(_)) {
@@ -854,11 +865,11 @@ impl PathAssignments {
         if self.assignment_holds(assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
-                assignment = %assignment.display(db, env, storage),
+                assignment = %assignment.into_inner().display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
+                        assignment.into_inner().display(db, env, storage)
                     }).format(", "),
                 ),
                 "found contradiction",
@@ -952,7 +963,7 @@ impl PathAssignments {
 
     fn enqueue_assignment(
         &mut self,
-        assignment: Assignment<ConstraintId>,
+        assignment: Assignment<AtomicConstraintId>,
         new_fuel: AssignmentFuel,
     ) {
         self.new_assignments
@@ -968,7 +979,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        sequent: Sequent<ConstraintId, u16>,
+        sequent: Sequent<AtomicConstraintId, u16>,
     ) -> Result<(), PathAssignmentConflict> {
         match sequent {
             Sequent::SingleTautology { ante } => {
@@ -1016,18 +1027,18 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        ante: ConstraintId,
+        ante: AtomicConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
         if self.assignment_holds(ante.when_false()) {
             // The sequent map says (ante1) is always true, and the current path asserts that
             // it's false.
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
-                ante = %ante.display(db, env, storage),
+                ante = %ante.into_inner().display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
+                        assignment.into_inner().display(db, env, storage)
                     }).format(", "),
                 ),
                 "found contradiction",
@@ -1043,20 +1054,20 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
+        ante1: AtomicConstraintId,
+        ante2: AtomicConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
         if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true()) {
             // The sequent map says (ante1 ∧ ante2) is an impossible combination, and the
             // current path asserts that both are true.
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
-                ante1 = %ante1.display(db, env, storage),
-                ante2 = %ante2.display(db, env, storage),
+                ante1 = %ante1.into_inner().display(db, env, storage),
+                ante2 = %ante2.into_inner().display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
+                        assignment.into_inner().display(db, env, storage)
                     }).format(", "),
                 ),
                 "found contradiction",
@@ -1072,9 +1083,9 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-        ante3: ConstraintId,
+        ante1: AtomicConstraintId,
+        ante2: AtomicConstraintId,
+        ante3: AtomicConstraintId,
     ) -> Result<(), PathAssignmentConflict> {
         if self.assignment_holds(ante1.when_true())
             && self.assignment_holds(ante2.when_true())
@@ -1084,13 +1095,13 @@ impl PathAssignments {
             // current path asserts that all three are true.
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
-                ante1 = %ante1.display(db, env, storage),
-                ante2 = %ante2.display(db, env, storage),
-                ante3 = %ante3.display(db, env, storage),
+                ante1 = %ante1.into_inner().display(db, env, storage),
+                ante2 = %ante2.into_inner().display(db, env, storage),
+                ante3 = %ante3.into_inner().display(db, env, storage),
                 facts = %format_args!(
                     "[{}]",
                     self.assignments.iter().map(|(assignment, _)| {
-                        assignment.display(db, env, storage)
+                        assignment.into_inner().display(db, env, storage)
                     }).format(", "),
                 ),
                 "found contradiction",
@@ -1106,16 +1117,14 @@ impl PathAssignments {
         &mut self,
         db: &'db dyn Db,
         storage: &ConstraintSetStorage<'db>,
-        ante1: ConstraintId,
-        ante2: ConstraintId,
-        post: ConstraintId,
+        ante1: AtomicConstraintId,
+        ante2: AtomicConstraintId,
+        post: AtomicConstraintId,
         is_substitution: bool,
         fuel_cost: u16,
     ) {
-        if storage
-            .constraint_data(post)
-            .is_reflexive_typevar_relation(db)
-        {
+        let constraint = storage.atomic_constraint_data(post);
+        if constraint.is_reflexive_typevar_relation(db) {
             return;
         }
         let Some(ante1_fuel) = self.max_remaining_fuel_for(ante1.when_true()) else {
@@ -1140,14 +1149,12 @@ impl PathAssignments {
         &mut self,
         db: &'db dyn Db,
         storage: &ConstraintSetStorage<'db>,
-        ante: ConstraintId,
-        post: ConstraintId,
+        ante: AtomicConstraintId,
+        post: AtomicConstraintId,
         fuel_cost: u16,
     ) {
-        if storage
-            .constraint_data(post)
-            .is_reflexive_typevar_relation(db)
-        {
+        let constraint = storage.atomic_constraint_data(post);
+        if constraint.is_reflexive_typevar_relation(db) {
             return;
         }
         let Some(available_fuel) = self.max_remaining_fuel_for(ante.when_true()) else {
@@ -1257,8 +1264,12 @@ mod tests {
         let path = set
             .node
             .path_assignments(db, &env, &mut storage, set.source_order);
-        let expected =
-            [u_str.node, t_int.node].map(|node| storage.interior_node_data(node).constraint);
+        let expected = [u_str.node, t_int.node].map(|node| {
+            storage
+                .interior_node_data(node)
+                .constraint
+                .expect_atomic(&storage)
+        });
         let actual: Vec<_> = path.discovered.keys().copied().collect();
 
         assert_eq!(actual, expected);

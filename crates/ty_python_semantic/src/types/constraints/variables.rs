@@ -73,11 +73,7 @@ pub(super) struct UnsatisfiableBound;
 /// One condition that can be checked by an interior node in a constraint set BDD
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Constraint<'db> {
-    ConcreteLower(ConcreteLowerBound<'db>),
-    ConcreteUpper(ConcreteUpperBound<'db>),
-    ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
-    TypeVarRange(TypeVarRangeBound<'db>),
-    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+    Atomic(AtomicConstraint<'db>),
 }
 
 impl<'db> Constraint<'db> {
@@ -91,17 +87,22 @@ impl<'db> Constraint<'db> {
         Node::new_constraint(storage, constraint_id)
     }
 
-    pub(super) fn new_nodes(
+    pub(super) fn new_nodes<I, C>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        constraints: impl IntoIterator<Item = Result<Self, UnsatisfiableBound>>,
-    ) -> (NodeId, Option<SourceOrderId>) {
+        constraints: I,
+    ) -> (NodeId, Option<SourceOrderId>)
+    where
+        I: IntoIterator<Item = Result<C, UnsatisfiableBound>>,
+        C: Into<Self>,
+    {
         let (mut node, mut source_order) = (ALWAYS_TRUE, None);
         for constraint in constraints {
             let Ok(constraint) = constraint else {
                 return (ALWAYS_FALSE, None);
             };
+            let constraint = constraint.into();
             let (constraint_node, constraint_source_order) = constraint.new_node(db, env, storage);
             node = node.and(storage, constraint_node);
             source_order = storage.ordered_source_order(source_order, constraint_source_order);
@@ -109,6 +110,59 @@ impl<'db> Constraint<'db> {
         (node, source_order)
     }
 
+    pub(super) fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> (NodeId, Option<SourceOrderId>) {
+        match self {
+            Constraint::Atomic(atomic) => {
+                atomic.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
+            }
+        }
+    }
+
+    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
+        match self {
+            Constraint::Atomic(atomic) => atomic.types(),
+        }
+    }
+
+    pub(super) fn display<'a>(
+        self,
+        db: &'db dyn Db,
+        env: &'a ProgramEnvironment<'db>,
+        holds: Option<bool>,
+    ) -> impl Display + 'a {
+        std::fmt::from_fn(move |f| match self {
+            Constraint::Atomic(atomic) => atomic.display(db, env, holds).fmt(f),
+        })
+    }
+}
+
+/// An atomic [`Constraint`]. These are the constraints that directly constrain individual
+/// typevars. They are allowed to appear in a [`SequentMap`][super::sequents::SequentMap], and are
+/// the elements of the BDD paths that are discovered via
+/// [`PathAssignments`][super::paths::PathAssignments].
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum AtomicConstraint<'db> {
+    ConcreteLower(ConcreteLowerBound<'db>),
+    ConcreteUpper(ConcreteUpperBound<'db>),
+    ConcreteEquivalence(ConcreteEquivalenceBound<'db>),
+    TypeVarRange(TypeVarRangeBound<'db>),
+    TypeVarEquivalence(TypeVarEquivalenceBound<'db>),
+}
+
+impl<'db> From<AtomicConstraint<'db>> for Constraint<'db> {
+    fn from(atomic: AtomicConstraint<'db>) -> Constraint<'db> {
+        Constraint::Atomic(atomic)
+    }
+}
+
+impl<'db> AtomicConstraint<'db> {
     /// Returns the constraints that model the requirement that `bound` must be assignable to
     /// `typevar`. Union lower bounds are broken apart into separate constraints. Returns no
     /// constraints when the relationship always holds (e.g. when comparing a typevar with itself).
@@ -368,52 +422,54 @@ impl<'db> Constraint<'db> {
 
     pub(super) fn provenance(self) -> ConstraintProvenance {
         match self {
-            Constraint::ConcreteLower(this) => this.provenance,
-            Constraint::ConcreteUpper(this) => this.provenance,
-            Constraint::ConcreteEquivalence(this) => this.provenance,
-            Constraint::TypeVarRange(this) => this.provenance,
-            Constraint::TypeVarEquivalence(this) => this.provenance,
+            AtomicConstraint::ConcreteLower(this) => this.provenance,
+            AtomicConstraint::ConcreteUpper(this) => this.provenance,
+            AtomicConstraint::ConcreteEquivalence(this) => this.provenance,
+            AtomicConstraint::TypeVarRange(this) => this.provenance,
+            AtomicConstraint::TypeVarEquivalence(this) => this.provenance,
         }
     }
 
     pub(super) fn with_provenance(mut self, provenance: ConstraintProvenance) -> Self {
         match &mut self {
-            Constraint::ConcreteLower(this) => this.provenance = provenance,
-            Constraint::ConcreteUpper(this) => this.provenance = provenance,
-            Constraint::ConcreteEquivalence(this) => this.provenance = provenance,
-            Constraint::TypeVarRange(this) => this.provenance = provenance,
-            Constraint::TypeVarEquivalence(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteLower(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteUpper(this) => this.provenance = provenance,
+            AtomicConstraint::ConcreteEquivalence(this) => this.provenance = provenance,
+            AtomicConstraint::TypeVarRange(this) => this.provenance = provenance,
+            AtomicConstraint::TypeVarEquivalence(this) => this.provenance = provenance,
         }
         self
     }
 
     pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
         match self {
-            Constraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
-            Constraint::TypeVarEquivalence(this) => this.left.is_same_typevar_as(db, this.right),
-            Constraint::ConcreteLower(_)
-            | Constraint::ConcreteUpper(_)
-            | Constraint::ConcreteEquivalence(_) => false,
+            AtomicConstraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
+            AtomicConstraint::TypeVarEquivalence(this) => {
+                this.left.is_same_typevar_as(db, this.right)
+            }
+            AtomicConstraint::ConcreteLower(_)
+            | AtomicConstraint::ConcreteUpper(_)
+            | AtomicConstraint::ConcreteEquivalence(_) => false,
         }
     }
 
     pub(super) fn provides_lower(self) -> bool {
         matches!(
             self,
-            Constraint::ConcreteLower(_)
-                | Constraint::ConcreteEquivalence(_)
-                | Constraint::TypeVarRange(_)
-                | Constraint::TypeVarEquivalence(_)
+            AtomicConstraint::ConcreteLower(_)
+                | AtomicConstraint::ConcreteEquivalence(_)
+                | AtomicConstraint::TypeVarRange(_)
+                | AtomicConstraint::TypeVarEquivalence(_)
         )
     }
 
     pub(super) fn provides_upper(self) -> bool {
         matches!(
             self,
-            Constraint::ConcreteUpper(_)
-                | Constraint::ConcreteEquivalence(_)
-                | Constraint::TypeVarRange(_)
-                | Constraint::TypeVarEquivalence(_)
+            AtomicConstraint::ConcreteUpper(_)
+                | AtomicConstraint::ConcreteEquivalence(_)
+                | AtomicConstraint::TypeVarRange(_)
+                | AtomicConstraint::TypeVarEquivalence(_)
         )
     }
 
@@ -423,16 +479,20 @@ impl<'db> Constraint<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> bool {
         match self {
-            Constraint::ConcreteLower(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
-            Constraint::ConcreteUpper(bound) => bound.typevar.is_same_typevar_as(db, bound_typevar),
-            Constraint::ConcreteEquivalence(bound) => {
+            AtomicConstraint::ConcreteLower(bound) => {
                 bound.typevar.is_same_typevar_as(db, bound_typevar)
             }
-            Constraint::TypeVarRange(bound) => {
+            AtomicConstraint::ConcreteUpper(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
+            }
+            AtomicConstraint::ConcreteEquivalence(bound) => {
+                bound.typevar.is_same_typevar_as(db, bound_typevar)
+            }
+            AtomicConstraint::TypeVarRange(bound) => {
                 bound.left.is_same_typevar_as(db, bound_typevar)
                     || bound.right.is_same_typevar_as(db, bound_typevar)
             }
-            Constraint::TypeVarEquivalence(bound) => {
+            AtomicConstraint::TypeVarEquivalence(bound) => {
                 bound.left.is_same_typevar_as(db, bound_typevar)
                     || bound.right.is_same_typevar_as(db, bound_typevar)
             }
@@ -445,20 +505,20 @@ impl<'db> Constraint<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Constraint::ConcreteLower(bound) => bound
+            AtomicConstraint::ConcreteLower(bound) => bound
                 .typevar
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(bound.bound),
-            Constraint::ConcreteUpper(_) => None,
-            Constraint::ConcreteEquivalence(bound) => bound
+            AtomicConstraint::ConcreteUpper(_) => None,
+            AtomicConstraint::ConcreteEquivalence(bound) => bound
                 .typevar
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(bound.bound),
-            Constraint::TypeVarRange(bound) => bound
+            AtomicConstraint::TypeVarRange(bound) => bound
                 .right
                 .is_same_typevar_as(db, bound_typevar)
                 .then_some(Type::TypeVar(bound.left)),
-            Constraint::TypeVarEquivalence(bound) => {
+            AtomicConstraint::TypeVarEquivalence(bound) => {
                 bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
             }
         }
@@ -470,17 +530,17 @@ impl<'db> Constraint<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            Constraint::ConcreteLower(_) => None,
-            Constraint::ConcreteUpper(bound) => bound_typevar
+            AtomicConstraint::ConcreteLower(_) => None,
+            AtomicConstraint::ConcreteUpper(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.typevar)
                 .then_some(bound.bound),
-            Constraint::ConcreteEquivalence(bound) => bound_typevar
+            AtomicConstraint::ConcreteEquivalence(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.typevar)
                 .then_some(bound.bound),
-            Constraint::TypeVarRange(bound) => bound_typevar
+            AtomicConstraint::TypeVarRange(bound) => bound_typevar
                 .is_same_typevar_as(db, bound.left)
                 .then_some(Type::TypeVar(bound.right)),
-            Constraint::TypeVarEquivalence(bound) => {
+            AtomicConstraint::TypeVarEquivalence(bound) => {
                 bound.other_typevar(db, bound_typevar).map(Type::TypeVar)
             }
         }
@@ -488,25 +548,25 @@ impl<'db> Constraint<'db> {
 
     pub(super) fn as_concrete(self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         match self {
-            Constraint::ConcreteLower(this) => Some((this.typevar, this.bound)),
-            Constraint::ConcreteUpper(this) => Some((this.typevar, this.bound)),
-            Constraint::ConcreteEquivalence(this) => Some((this.typevar, this.bound)),
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
+            AtomicConstraint::ConcreteLower(this) => Some((this.typevar, this.bound)),
+            AtomicConstraint::ConcreteUpper(this) => Some((this.typevar, this.bound)),
+            AtomicConstraint::ConcreteEquivalence(this) => Some((this.typevar, this.bound)),
+            AtomicConstraint::TypeVarRange(_) | AtomicConstraint::TypeVarEquivalence(_) => None,
         }
     }
 
     pub(crate) fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
         match self {
-            Constraint::ConcreteLower(this) => {
+            AtomicConstraint::ConcreteLower(this) => {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
-            Constraint::ConcreteUpper(this) => {
+            AtomicConstraint::ConcreteUpper(this) => {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
-            Constraint::ConcreteEquivalence(this) => {
+            AtomicConstraint::ConcreteEquivalence(this) => {
                 max_constructor_and_typevar_depth(db, env, this.bound)
             }
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
+            AtomicConstraint::TypeVarRange(_) | AtomicConstraint::TypeVarEquivalence(_) => (0, 0),
         }
     }
 
@@ -519,31 +579,35 @@ impl<'db> Constraint<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
         match self {
-            Constraint::ConcreteLower(this) => {
+            AtomicConstraint::ConcreteLower(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::ConcreteUpper(this) => {
+            AtomicConstraint::ConcreteUpper(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::ConcreteEquivalence(this) => {
+            AtomicConstraint::ConcreteEquivalence(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::TypeVarRange(this) => {
+            AtomicConstraint::TypeVarRange(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::TypeVarEquivalence(this) => {
+            AtomicConstraint::TypeVarEquivalence(this) => {
                 this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
         }
     }
 
-    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
+    fn types(self) -> impl Iterator<Item = Type<'db>> {
         let types = match self {
-            Constraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::ConcreteEquivalence(this) => [Type::TypeVar(this.typevar), this.bound],
-            Constraint::TypeVarRange(this) => [Type::TypeVar(this.left), Type::TypeVar(this.right)],
-            Constraint::TypeVarEquivalence(this) => {
+            AtomicConstraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
+            AtomicConstraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
+            AtomicConstraint::ConcreteEquivalence(this) => {
+                [Type::TypeVar(this.typevar), this.bound]
+            }
+            AtomicConstraint::TypeVarRange(this) => {
+                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
+            }
+            AtomicConstraint::TypeVarEquivalence(this) => {
                 [Type::TypeVar(this.left), Type::TypeVar(this.right)]
             }
         };
@@ -557,16 +621,16 @@ impl<'db> Constraint<'db> {
         holds: Option<bool>,
     ) -> impl Display + 'a {
         std::fmt::from_fn(move |f| match self {
-            Constraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
-            Constraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
-            Constraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
-            Constraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
+            AtomicConstraint::ConcreteLower(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::ConcreteUpper(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::ConcreteEquivalence(this) => this.display(db, env, holds).fmt(f),
+            AtomicConstraint::TypeVarRange(this) => this.display(db, holds).fmt(f),
+            AtomicConstraint::TypeVarEquivalence(this) => this.display(db, holds).fmt(f),
         })
     }
 }
 
-pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<Constraint<'db>> {
+pub(super) trait ProvidesConcreteBound<'db>: Copy + Into<AtomicConstraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn typevar(self) -> BoundTypeVarInstance<'db>;
     fn bound(self) -> Type<'db>;
@@ -582,7 +646,7 @@ pub(super) trait ProvidesConcreteUpperBound<'db>: ProvidesConcreteBound<'db> {
     fn into_upper_bound(self) -> ConcreteUpperBound<'db>;
 }
 
-pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<Constraint<'db>> {
+pub(super) trait ProvidesTypeVarBound<'db>: Copy + Into<AtomicConstraint<'db>> {
     fn provenance(self) -> ConstraintProvenance;
     fn left(self) -> BoundTypeVarInstance<'db>;
     fn right(self) -> BoundTypeVarInstance<'db>;
@@ -641,7 +705,8 @@ impl<'db> ConcreteLowerBound<'db> {
         let mut storage = builder.storage.borrow_mut();
         match subject {
             Type::TypeVar(typevar) => {
-                let applied = Constraint::new_lower_bound(db, self.provenance, typevar, bound);
+                let applied =
+                    AtomicConstraint::new_lower_bound(db, self.provenance, typevar, bound);
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             _ => storage.load(
@@ -674,9 +739,9 @@ impl<'db> ConcreteLowerBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteLowerBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteLowerBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteLower(bound)
+impl<'db> From<ConcreteLowerBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteLowerBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteLower(bound)
     }
 }
 
@@ -759,7 +824,8 @@ impl<'db> ConcreteUpperBound<'db> {
         let mut storage = builder.storage.borrow_mut();
         match subject {
             Type::TypeVar(typevar) => {
-                let applied = Constraint::new_upper_bound(db, env, self.provenance, typevar, bound);
+                let applied =
+                    AtomicConstraint::new_upper_bound(db, env, self.provenance, typevar, bound);
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             _ => storage.load(
@@ -792,9 +858,9 @@ impl<'db> ConcreteUpperBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteUpperBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteUpperBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteUpper(bound)
+impl<'db> From<ConcreteUpperBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteUpperBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteUpper(bound)
     }
 }
 
@@ -874,8 +940,13 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         let mut storage = builder.storage.borrow_mut();
         match subject {
             Type::TypeVar(typevar) => {
-                let applied =
-                    Constraint::new_equivalence_bound(db, env, self.provenance, typevar, bound);
+                let applied = AtomicConstraint::new_equivalence_bound(
+                    db,
+                    env,
+                    self.provenance,
+                    typevar,
+                    bound,
+                );
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             _ => storage.load(
@@ -908,9 +979,9 @@ impl<'db> ConcreteEquivalenceBound<'db> {
     }
 }
 
-impl<'db> From<ConcreteEquivalenceBound<'db>> for Constraint<'db> {
-    fn from(bound: ConcreteEquivalenceBound<'db>) -> Constraint<'db> {
-        Constraint::ConcreteEquivalence(bound)
+impl<'db> From<ConcreteEquivalenceBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: ConcreteEquivalenceBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::ConcreteEquivalence(bound)
     }
 }
 
@@ -1005,12 +1076,18 @@ impl<'db> TypeVarRangeBound<'db> {
         let mut storage = builder.storage.borrow_mut();
         match (left, right) {
             (Type::TypeVar(left_typevar), _) => {
-                let applied =
-                    Constraint::new_upper_bound(db, env, self.provenance, left_typevar, right);
+                let applied = AtomicConstraint::new_upper_bound(
+                    db,
+                    env,
+                    self.provenance,
+                    left_typevar,
+                    right,
+                );
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             (_, Type::TypeVar(right_typevar)) => {
-                let applied = Constraint::new_lower_bound(db, self.provenance, right_typevar, left);
+                let applied =
+                    AtomicConstraint::new_lower_bound(db, self.provenance, right_typevar, left);
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             _ => storage.load(
@@ -1038,9 +1115,9 @@ impl<'db> TypeVarRangeBound<'db> {
     }
 }
 
-impl<'db> From<TypeVarRangeBound<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarRangeBound<'db>) -> Constraint<'db> {
-        Constraint::TypeVarRange(bound)
+impl<'db> From<TypeVarRangeBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarRangeBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarRange(bound)
     }
 }
 
@@ -1152,7 +1229,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         let mut storage = builder.storage.borrow_mut();
         match (left, right) {
             (Type::TypeVar(left_typevar), _) => {
-                let applied = Constraint::new_equivalence_bound(
+                let applied = AtomicConstraint::new_equivalence_bound(
                     db,
                     env,
                     self.provenance,
@@ -1162,7 +1239,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
                 Constraint::new_nodes(db, env, &mut storage, applied)
             }
             (_, Type::TypeVar(right_typevar)) => {
-                let applied = Constraint::new_equivalence_bound(
+                let applied = AtomicConstraint::new_equivalence_bound(
                     db,
                     env,
                     self.provenance,
@@ -1196,18 +1273,18 @@ impl<'db> TypeVarEquivalenceBound<'db> {
     }
 }
 
-impl<'db> From<TypeVarEquivalenceBound<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarEquivalenceBound<'db>) -> Constraint<'db> {
-        Constraint::TypeVarEquivalence(bound)
+impl<'db> From<TypeVarEquivalenceBound<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarEquivalenceBound<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarEquivalence(bound)
     }
 }
 
 #[derive(Clone, Copy)]
 pub(super) struct TypeVarEquivalenceDirectedView<'db>(TypeVarEquivalenceBound<'db>, bool);
 
-impl<'db> From<TypeVarEquivalenceDirectedView<'db>> for Constraint<'db> {
-    fn from(bound: TypeVarEquivalenceDirectedView<'db>) -> Constraint<'db> {
-        Constraint::TypeVarEquivalence(bound.0)
+impl<'db> From<TypeVarEquivalenceDirectedView<'db>> for AtomicConstraint<'db> {
+    fn from(bound: TypeVarEquivalenceDirectedView<'db>) -> AtomicConstraint<'db> {
+        AtomicConstraint::TypeVarEquivalence(bound.0)
     }
 }
 
