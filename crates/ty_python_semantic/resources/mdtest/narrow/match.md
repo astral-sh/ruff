@@ -3627,6 +3627,189 @@ def loop_carried_ambiguous_guard(value: int | str, again: bool) -> None:
                 guard = True
 ```
 
+## Cyclic match subject and guard
+
+The match subject refers to a later pattern capture, and the guard refers to a later binding. We can
+still infer the type of the capture, even though it can never match the subject.
+
+```py
+match lambda: captured:
+    # error: [redundant-condition] "always truthy"
+    case 0 if lambda: module:
+        pass
+    case 0:
+        pass
+    case {**captured}:
+        reveal_type(captured)  # revealed: Never
+    case 0:
+        import sys as module
+```
+
+## Cyclic match subject and comprehension guard
+
+The same dependency can occur through a comprehension in a guard and another guarded pattern.
+
+```py
+from typing import Any
+
+constants: Any = object
+
+match lambda: captured:
+    case 0 if {0: 0 for _ in [lambda: module]}:
+        pass
+    # error: [redundant-condition] "always truthy"
+    case constants.value if (0 for _ in []):
+        pass
+    case {**captured}:
+        reveal_type(captured)  # revealed: Never
+    case 0:
+        import sys as module
+```
+
+## Cyclic match subject and type alias in a guard
+
+The subject can depend directly on a function bound by a later case, while a guard depends on it
+through a type alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+source: Any = []
+guard_source: Any = []
+pattern: Any = object
+type Alias = compute  # error: [invalid-type-form]
+
+match {0: lambda: compute for _ in source}:
+    case pattern() if {Alias: 0 for _ in guard_source}:
+        pass
+    case 0:
+        pass
+    case Alias:  # error: [invalid-assignment]
+        async def compute() -> Alias:
+            pass
+```
+
+## Cyclic pattern capture and type alias
+
+Inferring a type alias can depend on a later pattern capture whose guard also reads that capture.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Alias = captured  # error: [invalid-type-form]
+{Alias}
+match missing or (lambda: flag):  # error: [unresolved-reference]
+    # error: [redundant-condition] "always truthy"
+    case 1 if lambda *, flag: flag:
+        pass
+    case {0: {**captured}, **other} if flag := captured:
+        pass
+```
+
+## Cyclic guarded matches in a loop with invalid code
+
+Inference also terminates when a loop-carried match subject and its captures are involved in a
+cycle, even if the loop and patterns contain errors.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+values = []
+value = 0
+for _outer in 0:  # error: [not-iterable]
+    match (value for _inner in values):
+        case Color.VALUE as value if 0:  # error: [unresolved-reference]
+            pass
+        case Pattern() if value:  # error: [unresolved-reference]
+            type value = int
+        case _ if guard:  # error: [unresolved-reference]
+            break
+```
+
+A comprehension in the subject can also refer to a name bound by a later case, even when an earlier
+guard is always false.
+
+```py
+for _ in 0:  # error: [not-iterable]
+    # error: [possibly-unresolved-reference]
+    match [element for element in captured]:
+        # error: [possibly-unresolved-reference]
+        # error: [unresolved-attribute]
+        case captured.attribute if False:
+            pass
+        case b"" as captured:
+            pass
+```
+
+## Duplicate diagnostics in a cyclic match subject
+
+A cyclic match subject can cause the same invalid decorator call to be reported more than once.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+lambda: name_1
+type name_4 = 0 if 0 else name_0  # error: [invalid-type-form]
+try:
+    type name_2[name_3: unique_name_0] = name_4  # error: [unresolved-reference]
+except* Exception:
+    type name_2 = name_1  # error: [invalid-type-form]
+except* 0:  # error: [invalid-exception-caught]
+    @0  # error: [call-non-callable]
+    def name_2():
+        pass
+
+while [name_2]:
+    pass
+else:
+    match lambda *, name_1=unique_name_5: 0:  # error: [unresolved-reference]
+        case 0:
+            # error: [invalid-type-form]
+            # error: [invalid-type-form]
+            type name_0 = name_2
+        case []:
+            type name_1 = name_1
+match (lambda name_4, /: name_4) and {0: lambda: name_0}:
+    case unique_name_9():  # error: [unresolved-reference]
+        class name_1:
+            pass
+
+    case []:
+        match 0:
+            case unique_name_10.name_5:  # error: [unresolved-reference]
+                async def name_2(**name_3: name_4):
+                    pass
+
+            case object():
+                name_0: name_0  # error: [possibly-unresolved-reference]
+    case name_2:  # error: [conflicting-declarations]
+        pass
+
+# TODO: Report each `call-non-callable` diagnostic only once.
+# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
+# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | name_1]` is not callable"
+# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | name_1]` is not callable"
+# error: [too-many-positional-arguments]
+@name_2
+class name_1:
+    pass
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Apart from the optimistic treatment
