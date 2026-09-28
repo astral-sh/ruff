@@ -39,7 +39,7 @@ impl Uv {
         Self::parse_metadata_output(system, output)
     }
 
-    /// Executes `uv workspace metadata`, checking for an unsupported uv version on failure.
+    /// Executes `uv workspace metadata` without interpreting its output.
     ///
     /// This operation only requires a detached command executor, so it can run on a background
     /// worker.
@@ -88,7 +88,6 @@ impl Uv {
         let output = output.map_err(UvMetadataError::Invocation)?;
 
         // Before uv 0.12.3, `--quiet` suppresses the metadata JSON even on success.
-        // Only probe the version when metadata is unavailable, so successful calls stay cheap.
         if (!output.status.success() || output.stdout.is_empty())
             && let Some(version) = self.version(executor, directory)
             && version < Version::new(MINIMUM_UV_VERSION)
