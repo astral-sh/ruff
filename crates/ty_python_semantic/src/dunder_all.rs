@@ -7,7 +7,7 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
-use ty_python_core::dunder_all::{literal_dunder_all_assignment, static_dunder_all};
+use ty_python_core::dunder_all::static_dunder_all;
 use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
@@ -24,21 +24,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxH
     let module = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
-    // An unconditional literal assignment replaces any earlier value, including one from an
-    // import that could not be resolved. Start there so an unknown earlier value cannot prevent
-    // us from collecting the new value.
-    let body = module.suite();
-    let start = body
-        .iter()
-        .rposition(|stmt| {
-            literal_dunder_all_assignment(stmt).is_some_and(|elements| {
-                elements
-                    .iter()
-                    .all(|element| create_name(element).is_some())
-            })
-        })
-        .unwrap_or(0);
-    collector.visit_body(&body[start..]);
+    collector.visit_body(module.suite());
     collector.into_names()
 }
 
