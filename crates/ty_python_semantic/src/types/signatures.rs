@@ -5105,7 +5105,9 @@ impl<'db> Parameters<'db> {
         let index = semantic_index(db, definition.program_file(db));
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+                Box::new(ParameterDefault::Deferred(
+                    index.expect_single_definition(&param.parameter),
+                ))
             })
         };
 
@@ -5687,7 +5689,7 @@ impl<'db> Parameter<'db> {
             ParameterKind::PositionalOnly { default_type, .. }
             | ParameterKind::PositionalOrKeyword { default_type, .. }
             | ParameterKind::KeywordOnly { default_type, .. } => {
-                *default_type = Some(ParameterDefault::Inferred(default));
+                *default_type = Some(Box::new(ParameterDefault::Inferred(default)));
             }
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
                 panic!("cannot set default value for variadic parameter")
@@ -5806,7 +5808,7 @@ impl<'db> Parameter<'db> {
             ParameterKind::PositionalOnly { default_type, .. }
             | ParameterKind::PositionalOrKeyword { default_type, .. }
             | ParameterKind::KeywordOnly { default_type, .. } => {
-                if let Some(ParameterDefault::Inferred(ty)) = default_type {
+                if let Some(ParameterDefault::Inferred(ty)) = default_type.as_deref_mut() {
                     *ty = normalize_type(*ty)?;
                 }
             }
@@ -5984,10 +5986,10 @@ impl<'db> Parameter<'db> {
     }
 
     fn default(&self) -> Option<ParameterDefault<'db>> {
-        match self.kind {
+        match &self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
             | ParameterKind::PositionalOrKeyword { default_type, .. }
-            | ParameterKind::KeywordOnly { default_type, .. } => default_type,
+            | ParameterKind::KeywordOnly { default_type, .. } => default_type.as_deref().copied(),
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
     }
@@ -6011,7 +6013,7 @@ impl<'db> Parameter<'db> {
         if let ParameterKind::PositionalOrKeyword { name, default_type } = &self.kind {
             result.kind = ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: *default_type,
+                default_type: default_type.clone(),
             };
         }
         result
@@ -6085,6 +6087,8 @@ fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> T
         .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
 }
 
+// A default is boxed so that parameters without one do not reserve space for the largest default
+// type. The common no-default case also avoids allocating.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
@@ -6094,14 +6098,14 @@ pub enum ParameterKind<'db> {
         /// It is possible for signatures to be defined in ways that leave positional-only parameters
         /// nameless (e.g. via `Callable` annotations).
         name: Option<Name>,
-        default_type: Option<ParameterDefault<'db>>,
+        default_type: Option<Box<ParameterDefault<'db>>>,
     },
 
     /// Positional-or-keyword parameter, e.g. `def f(x): ...`
     PositionalOrKeyword {
         /// Parameter name.
         name: Name,
-        default_type: Option<ParameterDefault<'db>>,
+        default_type: Option<Box<ParameterDefault<'db>>>,
     },
 
     /// Variadic parameter, e.g. `def f(*args): ...`
@@ -6114,7 +6118,7 @@ pub enum ParameterKind<'db> {
     KeywordOnly {
         /// Parameter name.
         name: Name,
-        default_type: Option<ParameterDefault<'db>>,
+        default_type: Option<Box<ParameterDefault<'db>>>,
     },
 
     /// Variadic keywords parameter, e.g. `def f(**kwargs): ...`
@@ -6129,15 +6133,21 @@ impl<'db> ParameterKind<'db> {
     fn cycle_normalized_default(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        current: &Option<ParameterDefault<'db>>,
-        previous: &Option<ParameterDefault<'db>>,
+        current: &Option<Box<ParameterDefault<'db>>>,
+        previous: &Option<Box<ParameterDefault<'db>>>,
         cycle: &salsa::Cycle,
-    ) -> Option<ParameterDefault<'db>> {
-        current.map(|current| {
-            current.map_type(|ty| match previous.and_then(ParameterDefault::eager_type) {
-                Some(previous) => ty.cycle_normalized(db, env, previous, cycle),
-                None => ty.recursive_type_normalized(db, env, cycle),
-            })
+    ) -> Option<Box<ParameterDefault<'db>>> {
+        current.as_deref().copied().map(|current| {
+            Box::new(current.map_type(|ty| {
+                match previous
+                    .as_deref()
+                    .copied()
+                    .and_then(ParameterDefault::eager_type)
+                {
+                    Some(previous) => ty.cycle_normalized(db, env, previous, cycle),
+                    None => ty.recursive_type_normalized(db, env, cycle),
+                }
+            }))
         })
     }
 
@@ -6211,16 +6221,18 @@ impl<'db> ParameterKind<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        let apply_to_default_type = |default_type: &Option<ParameterDefault<'db>>| {
-            default_type.map(|default| match type_mapping {
-                TypeMapping::ReplaceParameterDefaults => {
-                    ParameterDefault::Inferred(Type::unknown())
-                }
-                // Defaults describe values, not the set of accepted arguments. Promoting the
-                // enclosing callable must not widen those values.
-                TypeMapping::Promote(..) => default,
-                _ => default
-                    .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+        let apply_to_default_type = |default_type: &Option<Box<ParameterDefault<'db>>>| {
+            default_type.as_deref().copied().map(|default| {
+                Box::new(match type_mapping {
+                    TypeMapping::ReplaceParameterDefaults => {
+                        ParameterDefault::Inferred(Type::unknown())
+                    }
+                    // Defaults describe values, not the set of accepted arguments. Promoting the
+                    // enclosing callable must not widen those values.
+                    TypeMapping::Promote(..) => default,
+                    _ => default
+                        .map_type(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                })
             })
         };
 
