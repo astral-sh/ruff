@@ -2234,6 +2234,8 @@ def check(child: Child[str]) -> None:
 
 ## Specialized declarations after a dynamic base
 
+An annotation from a generic base is specialized even when the subclass has an earlier dynamic base.
+
 ```py
 from typing import Any
 
@@ -2244,11 +2246,18 @@ class Integers(Any, Base[int]):
     items = []
 
 reveal_type(Integers.items)  # revealed: list[int]
-reveal_type(Integers().items)  # revealed: list[int]
+```
 
+An incompatible default is rejected:
+
+```py
 class Invalid(Any, Base[int]):
     items = ["wrong"]  # error: [invalid-assignment]
+```
 
+A generic subclass retains its type parameter in the inherited annotation:
+
+```py
 class Child[T](Any, Base[T]):
     items = []
 
