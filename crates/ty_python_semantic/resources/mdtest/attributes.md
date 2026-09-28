@@ -3140,6 +3140,91 @@ def as_protocol(child: Child) -> HasItems:
     return child
 ```
 
+### Annotations in unreachable methods
+
+An annotation in a method that is never defined does not affect instance attributes or subclass
+defaults. A later reachable annotation still provides context.
+
+```py
+class Base:
+    if False:
+        def unavailable(self) -> None:
+            self.value: int = 0
+            self.other: int = 0
+
+    def configure(self) -> None:
+        self.other: str = "base"
+
+class Child(Base):
+    value = "child"
+    other = "child"
+
+# error: [unresolved-attribute]
+reveal_type(Base().value)  # revealed: Unknown
+reveal_type(Base().other)  # revealed: str
+reveal_type(Child.value)  # revealed: str
+reveal_type(Child().value)  # revealed: str
+reveal_type(Child.other)  # revealed: str
+reveal_type(Child().other)  # revealed: str
+
+class Invalid(Base):
+    other = 1  # error: [invalid-assignment]
+```
+
+An annotation in a method that may be defined still provides context:
+
+```py
+def conditional(flag: bool):
+    class Base:
+        if flag:
+            def configure(self) -> None:
+                self.value: int = 0
+
+    class Child(Base):
+        value = "child"  # error: [invalid-assignment]
+```
+
+### Annotations in property getters with setters
+
+The getter can declare an instance attribute even when the property also has a setter.
+
+```py
+class Base:
+    @property
+    def prop(self) -> int:
+        self.value: int = 1
+        return self.value
+
+    @prop.setter
+    def prop(self, value: int) -> None:
+        pass
+
+reveal_type(Base().value)  # revealed: int
+
+class Child(Base):
+    value = "child"  # error: [invalid-assignment]
+```
+
+### Annotations in aliased methods
+
+A method can declare an instance attribute when it is preserved under an alias.
+
+```py
+class Base:
+    def configure(self) -> None:
+        self.value: int = 1
+
+    saved = configure
+
+    def configure(self) -> None:
+        pass
+
+reveal_type(Base().value)  # revealed: int
+
+class Child(Base):
+    value = "child"  # error: [invalid-assignment]
+```
+
 ### Descriptors for attributes declared in methods
 
 A descriptor can satisfy the inherited instance contract without being an instance of the annotated
