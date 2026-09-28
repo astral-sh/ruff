@@ -996,6 +996,63 @@ fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
 
 // Incremental inference tests
 #[test]
+fn recursive_alias_bound_after_dependency_edits() -> anyhow::Result<()> {
+    for (check_b_first, initial_cyclic) in
+        [(false, true), (true, true), (false, false), (true, false)]
+    {
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY313)
+            .build()?;
+        db.write_file(
+            "/src/a.py",
+            "from b import B, F\ntype A[T] = F[B[T]]\nfrom typing import reveal_type\ndef use(x: A[int]): reveal_type(x)",
+        )?;
+
+        for cyclic in [
+            initial_cyclic,
+            !initial_cyclic,
+            initial_cyclic,
+            !initial_cyclic,
+        ] {
+            let body = if cyclic { "A[list[T]]" } else { "list[T]" };
+            db.write_file(
+                "/src/b.py",
+                format!("from a import A\ntype F[T: A] = T | bytes\ntype B[T] = {body}"),
+            )?;
+
+            let files = if check_b_first {
+                ["/src/b.py", "/src/a.py"]
+            } else {
+                ["/src/a.py", "/src/b.py"]
+            };
+            for path in files {
+                let file = system_path_to_file(&db, path)?;
+                let diagnostics = check_types(&db, program_file(&db, file));
+                let cycles: Vec<_> = diagnostics
+                    .iter()
+                    .map(Diagnostic::headline_message)
+                    .filter(|message| message.contains("has a circular definition"))
+                    .collect();
+                let alias = if path == "/src/a.py" { "A" } else { "B" };
+                let expected_cycle = format!("Type alias `{alias}` has a circular definition");
+                let expected_cycles = if cyclic {
+                    vec![expected_cycle.as_str()]
+                } else {
+                    vec![]
+                };
+                assert_eq!(cycles, expected_cycles, "{diagnostics:#?}");
+                if !cyclic && path == "/src/a.py" {
+                    assert_revealed_type(&db, path, "list[int] | bytes");
+                } else if !cyclic {
+                    assert!(diagnostics.is_empty(), "{diagnostics:#?}");
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn alias_cycle_summary_updates_after_dependency_changes() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY313)
