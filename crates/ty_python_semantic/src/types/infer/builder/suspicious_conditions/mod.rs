@@ -1,5 +1,5 @@
 //! Logic for reporting boolean tests with fixed truthiness, or suspicious tests of values typed as
-//! `Callable` or `Iterable`.
+//! `Callable`, `Iterable`, or unions containing `None`.
 //!
 //! This module classifies tests and selects which expressions to report. [`exemptions`] handles
 //! assertions, defensive branches, and environment checks; [`diagnostic`] builds messages and fixes.
@@ -64,15 +64,15 @@ use ruff_text_size::Ranged;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
-    Db,
+    Db, ProgramEnvironment,
     lint::LintMetadata,
     reachability::{analyze_condition_expression, is_non_terminal_call},
     types::{
-        CallableTypes, KnownClass, KnownInstanceType, Type,
+        CallableTypes, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
-            TRUTHINESS_TEST_OF_ITERABLE,
+            TRUTHINESS_TEST_OF_ITERABLE, TRUTHINESS_TEST_OF_NONE_UNION,
         },
         infer::TypeInferenceBuilder,
         typevar::TypeVarSet,
@@ -128,7 +128,7 @@ enum ConditionKind<'db> {
 
     /// A value with fixed truthiness that does not require the strict rule.
     ///
-    /// Unlike the other three categories, these tests are reported by the enabled-by-default
+    /// Unlike the above three categories, these tests are reported by the enabled-by-default
     /// `redundant-condition` rule.
     ///
     /// ```python
@@ -149,6 +149,9 @@ enum ConditionKind<'db> {
     /// every member is either a `Callable` type or another callable type known to be
     /// always truthy, such as a function or bound method.
     Callable(CallableTypes<'db>),
+
+    /// A union whose `None` and non-`None` members can both be falsy.
+    NoneUnion(UnionType<'db>),
 }
 
 impl ConditionKind<'_> {
@@ -156,6 +159,7 @@ impl ConditionKind<'_> {
     const fn rule(&self) -> &'static LintMetadata {
         match self {
             Self::Value => &REDUNDANT_CONDITION,
+            Self::NoneUnion(_) => &TRUTHINESS_TEST_OF_NONE_UNION,
             Self::Iterable => &TRUTHINESS_TEST_OF_ITERABLE,
             Self::Callable(_) => &TRUTHINESS_TEST_OF_CALLABLE,
             Self::Boolean | Self::ShortCircuit | Self::ContainsWalrus => {
@@ -336,18 +340,20 @@ struct RedundantCondition<'ast, 'db> {
     kind: ConditionKind<'db>,
 }
 
-/// Determination of whether `redundant-condition-strict` diagnostics should be reported
-/// on subexpressions of a compound condition, or should instead be only reported on the
-/// outer expression.
+/// Determination of whether diagnostics for [`ConditionKind::Boolean`] and
+/// [`ConditionKind::ShortCircuit`] should be reported on subexpressions of a compound
+/// condition, or should instead be only reported on the outer expression.
 ///
-/// `redundant-condition` diagnostics are always reported, regardless of this preference.
+/// Other condition kinds are unaffected by this preference, including
+/// [`ConditionKind::ContainsWalrus`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BooleanDiagnosticPreference {
     /// No enclosing condition has fixed truthiness, so this test can be reported individually.
     CurrentCondition,
 
-    /// A condition containing this test has fixed truthiness. `redundant-condition-strict`
-    /// diagnostics should be suppressed for this subexpression.
+    /// A condition containing this test has fixed truthiness. Diagnostics for
+    /// [`ConditionKind::Boolean`] and [`ConditionKind::ShortCircuit`] should be suppressed
+    /// for this subexpression.
     EnclosingCondition,
 }
 
@@ -364,6 +370,9 @@ bitflags! {
 
         /// A suspicious `Iterable` operand suppresses only an enclosing iterable diagnostic.
         const SUPPRESS_ITERABLE = 1 << 2;
+
+        /// A suspicious `None` union operand suppresses only an enclosing `None` union diagnostic.
+        const SUPPRESS_NONE_UNION = 1 << 3;
     }
 }
 
@@ -389,6 +398,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             &REDUNDANT_CONDITION_STRICT,
             &TRUTHINESS_TEST_OF_CALLABLE,
             &TRUTHINESS_TEST_OF_ITERABLE,
+            &TRUTHINESS_TEST_OF_NONE_UNION,
         ];
 
         !self.in_string_annotation()
@@ -663,11 +673,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Classify a condition using its inferred type and truthiness.
     ///
     /// We return `Some` if the condition is always truthy, always falsy, or otherwise suspicious
-    /// in a boolean context due to it being a `Callable` or `Iterable` type. Exemptions are made
-    /// for literal boolean and integer expressions: although these can always be determined to be
-    /// either always truthy or always falsy, a condition written as `True`, `False`, `1`, or `0`
-    /// is almost certainly deliberate. A variable with an inferred literal type is still classified,
-    /// however, because its truthiness may be less obvious to the author:
+    /// in a boolean context due to it being a `Callable` or `Iterable` type, or a union containing
+    /// both `None` and other potentially falsy values. Exemptions are made for literal boolean,
+    /// integer, and `None` expressions: although these can always be determined to be either always
+    /// truthy or always falsy, a condition written as `True`, `False`, `1`, `0`, or `None` is almost
+    /// certainly deliberate. A variable with an inferred literal type is still classified, however,
+    /// because its truthiness may be less obvious to the author:
     ///
     /// ```python
     /// from typing import Literal, Callable, Iterable
@@ -676,7 +687,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///     flag: bool,
     ///     known: Literal[True],
     ///     callback: Callable[[], bool],
-    ///     items: Iterable[int]
+    ///     items: Iterable[int],
+    ///     limit: int | None,
     /// ):
     ///     if flag:      # No classification: ambiguous truthiness without a suspicious type.
     ///         pass
@@ -695,11 +707,187 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     ///     if items:     # `ConditionKind::Iterable`: ambiguous truthiness.
     ///         pass
+    ///
+    ///     if limit:     # `ConditionKind::NoneUnion`: `None` and `0` are both falsy.
+    ///         pass
     /// ```
     fn classify_redundant_condition<'expr>(
         &self,
         test: BooleanTest<'expr, 'db>,
     ) -> Option<RedundantCondition<'expr, 'db>> {
+        let BooleanTest {
+            expression,
+            value_type,
+            truthiness,
+            ..
+        } = test;
+
+        if matches!(
+            expression,
+            ast::Expr::BooleanLiteral(_)
+                | ast::Expr::NoneLiteral(_)
+                | ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(_),
+                    ..
+                })
+        ) {
+            // Literal flags such as `if False` and `while 1` are almost certainly deliberate.
+            // `assert None` also comes up a weird amount in certain ecosystem projects, too!
+            return None;
+        }
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        let kind = if truthiness.is_ambiguous() {
+            let expanded_type = ExpandedType::new(db, env, value_type);
+
+            if let Some(union) =
+                self.truthiness_test_of_none_union_candidate(expression, expanded_type)
+            {
+                ConditionKind::NoneUnion(union)
+            } else if let Some(callables) =
+                self.truthiness_test_of_callable_candidate(expanded_type)
+            {
+                ConditionKind::Callable(callables)
+            } else if self.is_truthiness_test_of_iterable_candidate(value_type) {
+                ConditionKind::Iterable
+            } else {
+                return None;
+            }
+        } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
+            ConditionKind::Boolean
+        } else if value_type.bool(db, env).is_ambiguous() {
+            ConditionKind::ShortCircuit
+        } else if any_over_expr(expression, ast::Expr::is_named_expr) {
+            // Include deferred bodies: a surrounding call may execute a lambda or generator.
+            ConditionKind::ContainsWalrus
+        } else {
+            ConditionKind::Value
+        };
+
+        Some(RedundantCondition {
+            expression,
+            value_type,
+            truthiness,
+            kind,
+        })
+    }
+
+    /// Return the union corresponding to `expanded_type` if this test is eligible
+    /// for `truthiness-test-of-none-union`.
+    fn truthiness_test_of_none_union_candidate(
+        &self,
+        expression: &ast::Expr,
+        expanded_type: ExpandedType<'db>,
+    ) -> Option<UnionType<'db>> {
+        // Only check types that are unions with `None`:
+        let union = expanded_type.as_union()?;
+
+        let db = self.db();
+        let env = self.program_environment();
+
+        let elements = union.elements(db);
+        if !elements.iter().any(|element| element.is_none(db)) {
+            return None;
+        }
+
+        // Check if one of the non-`None` elements of the union may be falsy.
+        // Dynamic types can materialize to always-truthy types. Excluding them respects
+        // the gradual guarantee: replacing an always-truthy union element with `Any`
+        // or `Unknown` should not introduce a diagnostic.
+        if !elements.iter().any(|element| {
+            if element.is_none(db)
+                || element.is_dynamic()
+                || !element
+                    .try_bool(db, env)
+                    .is_ok_and(Truthiness::may_be_false)
+            {
+                return false;
+            }
+
+            // Non-final classes without a `__bool__` or `__len__` method have ambiguous
+            // truthiness in the `try_bool` check above, since their truthiness *could* be
+            // affected by a subclass defining one of these methods.
+            // However, for this particular diagnostic, we want to assume that classes
+            // without these methods are always truthy. If we don't do that, we would flag
+            // all Boolean checks on types like `MyClass | None`, based on the assumption
+            // that there *might* be a subclass affecting truthiness. This would lead to
+            // too many false positives, so we make a conservative choice here.
+            ["__bool__", "__len__"].iter().any(|name| {
+                !element
+                    .member_lookup_with_policy(
+                        db,
+                        env,
+                        name,
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    )
+                    .place
+                    .is_undefined()
+            })
+        }) {
+            return None;
+        }
+
+        // A compound expression can combine `None` and other falsy values from unrelated
+        // operands, as in `enabled and match` with `match: Match[str] | None`. Require a
+        // value-producing operand to qualify independently, including through assignments.
+        // The shared condition traversal prefers operand diagnostics where possible.
+        let is_candidate = |operand: &ast::Expr| {
+            self.truthiness_test_of_none_union_candidate(
+                operand,
+                ExpandedType::new(db, env, self.expression_type(operand)),
+            )
+            .is_some()
+        };
+
+        let has_suspicious_operand = match expression {
+            ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().any(is_candidate),
+            ast::Expr::If(ast::ExprIf { body, orelse, .. }) => {
+                is_candidate(body) || is_candidate(orelse)
+            }
+            ast::Expr::Named(ast::ExprNamed { value, .. }) => is_candidate(value),
+            _ => true,
+        };
+        has_suspicious_operand.then_some(union)
+    }
+
+    fn truthiness_test_of_callable_candidate(
+        &self,
+        expanded_type: ExpandedType<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        let db = self.db();
+        let env = self.program_environment();
+
+        match *expanded_type {
+            Type::Callable(callable) => Some(CallableTypes::one(callable)),
+            Type::Union(union) => {
+                let mut emit_diagnostic = true;
+                let union_elements = union.elements(db);
+                let mut callable_elements = Vec::with_capacity(union_elements.len());
+                for element in union_elements {
+                    if let Type::Callable(callable) = element {
+                        callable_elements.push(*callable);
+                    } else if element.bool(db, env).is_always_true()
+                        && let Some(callables) = element.try_upcast_to_callable(db, env)
+                    {
+                        callable_elements.extend(&callables);
+                    } else {
+                        emit_diagnostic = false;
+                        break;
+                    }
+                }
+                if emit_diagnostic {
+                    Some(CallableTypes::from_elements(callable_elements))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn is_truthiness_test_of_iterable_candidate(&self, value_type: Type<'db>) -> bool {
         /// The bottom specialization for `GeneratorType`
         static BOTTOM_SPEC: &[Type] = &[Type::Never, Type::object(), Type::Never];
 
@@ -728,108 +916,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        let BooleanTest {
-            expression,
-            value_type,
-            truthiness,
-            ..
-        } = test;
-
-        if matches!(
-            expression,
-            ast::Expr::BooleanLiteral(_)
-                | ast::Expr::NoneLiteral(_)
-                | ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(_),
-                    ..
-                })
-        ) {
-            // Literal flags such as `if False` and `while 1` are almost certainly deliberate.
-            // `assert None` also comes up a weird amount in certain ecosystem projects, too!
-            return None;
-        }
-
         let db = self.db();
         let env = self.program_environment();
 
-        let kind = if truthiness.is_ambiguous() {
-            let expanded = match value_type.resolve_type_alias(db) {
-                Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-                ty => ty,
-            };
-            let callables = match expanded {
-                Type::Callable(callable) => Some(CallableTypes::one(callable)),
-                Type::Union(union) => {
-                    let mut emit_diagnostic = true;
-                    let union_elements = union.elements(db);
-                    let mut callable_elements = Vec::with_capacity(union_elements.len());
-                    for element in union_elements {
-                        if let Type::Callable(callable) = element {
-                            callable_elements.push(*callable);
-                        } else if element.bool(db, env).is_always_true()
-                            && let Some(callables) = element.try_upcast_to_callable(db, env)
-                        {
-                            callable_elements.extend(&callables);
-                        } else {
-                            emit_diagnostic = false;
-                            break;
-                        }
-                    }
-                    if emit_diagnostic {
-                        Some(CallableTypes::from_elements(callable_elements))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
+        if cannot_satisfy_iterable_check(db, value_type) {
+            return false;
+        }
 
-            if let Some(callables) = callables {
-                ConditionKind::Callable(callables)
-            } else {
-                if cannot_satisfy_iterable_check(db, value_type) {
-                    return None;
-                }
+        let builder = ConstraintSetBuilder::new();
 
-                let builder = ConstraintSetBuilder::new();
+        let generator = KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
 
-                let generator =
-                    KnownClass::GeneratorType.to_specialized_instance(db, env, BOTTOM_SPEC);
-
-                let check = |source: Type<'db>, target: Type<'db>| {
-                    source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
-                };
-
-                if check(generator, value_type)
-                    .and(db, &builder, || {
-                        let iterable =
-                            KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
-                        check(value_type, iterable)
-                    })
-                    .is_always_satisfied(db, env)
-                {
-                    ConditionKind::Iterable
-                } else {
-                    return None;
-                }
-            }
-        } else if value_type.is_assignable_to(db, env, KnownClass::Int.to_instance(db, env)) {
-            ConditionKind::Boolean
-        } else if value_type.bool(db, env).is_ambiguous() {
-            ConditionKind::ShortCircuit
-        } else if any_over_expr(expression, ast::Expr::is_named_expr) {
-            // Include deferred bodies: a surrounding call may execute a lambda or generator.
-            ConditionKind::ContainsWalrus
-        } else {
-            ConditionKind::Value
+        let check = |source: Type<'db>, target: Type<'db>| {
+            source.when_subtype_of(db, env, target, &builder, TypeVarSet::None)
         };
 
-        Some(RedundantCondition {
-            expression,
-            value_type,
-            truthiness,
-            kind,
-        })
+        check(generator, value_type)
+            .and(db, &builder, || {
+                let iterable = KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
+                check(value_type, iterable)
+            })
+            .is_always_satisfied(db, env)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested
@@ -1035,6 +1142,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let result = match &condition.kind {
             ConditionKind::Callable(_) => ConditionCheckResult::SUPPRESS_CALLABLE,
             ConditionKind::Iterable => ConditionCheckResult::SUPPRESS_ITERABLE,
+            ConditionKind::NoneUnion(_) => ConditionCheckResult::SUPPRESS_NONE_UNION,
             ConditionKind::Boolean
             | ConditionKind::ContainsWalrus
             | ConditionKind::ShortCircuit
@@ -1255,5 +1363,25 @@ fn is_trivial_statement(stmt: &ast::Stmt) -> bool {
             ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
         ),
         _ => false,
+    }
+}
+
+/// A type with outermost aliases resolved and aliases exposing top-level union elements expanded.
+///
+/// Aliases nested inside non-union types remain unexpanded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ExpandedType<'db>(Type<'db>);
+
+impl<'db> ExpandedType<'db> {
+    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Self {
+        Self(ty.expand_top_level_aliases(db, env))
+    }
+}
+
+impl<'db> std::ops::Deref for ExpandedType<'db> {
+    type Target = Type<'db>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

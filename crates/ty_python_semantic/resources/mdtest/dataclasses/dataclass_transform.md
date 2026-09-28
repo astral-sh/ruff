@@ -2402,5 +2402,104 @@ def _(m: ModelA | ModelB):
     m.x = b"1"  # error: [invalid-assignment]
 ```
 
+## Recursive field specifiers in a transform
+
+The recursive field specifier does not prevent the other specifiers or transform options from being
+used to synthesize a constructor.
+
+```py
+from typing import dataclass_transform
+
+def field(*, default: int) -> int:
+    return default
+
+transform = alias = dataclass_transform(field_specifiers=(lambda: transform, field), kw_only_default=True)
+
+@transform
+def model(cls):
+    return cls
+
+@model
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
+Example(name="ok", value="wrong")  # error: [invalid-argument-type]
+```
+
+## Recursive field specifiers in a loop
+
+```py
+from typing_extensions import dataclass_transform
+
+def repeat(flag: bool):
+    transform = None
+    while flag:
+        transform = dataclass_transform(field_specifiers=(lambda: transform,))
+    reveal_type(transform)  # revealed: None | <decorator produced by typing.dataclass_transform>
+```
+
+## Recursive field specifiers in a decorator factory
+
+```py
+from typing import dataclass_transform
+
+def field(*, default: int) -> int:
+    return default
+
+@dataclass_transform(field_specifiers=(lambda: decorator, field), kw_only_default=True)
+def factory(): ...
+
+decorator = alias = factory()
+
+@decorator
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
+Example(name="ok", value="wrong")  # error: [invalid-argument-type]
+```
+
+## Recursive field specifiers referring to the transformer
+
+```py
+from typing import dataclass_transform
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+@dataclass_transform(field_specifiers=(lambda: alias,))
+def factory() -> None: ...
+
+alias = other = factory
+static_assert(is_equivalent_to(TypeOf[factory], TypeOf[alias]))
+```
+
+## A recursive field specifier used in a dataclass
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(field_specifiers=(lambda: decorator,))
+def field(*, default: int) -> int:
+    return default
+
+@dataclass_transform(field_specifiers=(field,), kw_only_default=True)
+def factory(): ...
+
+decorator = alias = factory()
+
+@decorator
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

@@ -1,5 +1,13 @@
 # Narrowing For Truthiness Checks (`if x` or `if not x`)
 
+```toml
+[rules]
+# The tests in this file were written before the introduction
+# of this rule. Disable it for the entire file, since it would
+# otherwise just distract from the actual purpose of these tests.
+truthiness-test-of-none-union = "ignore"
+```
+
 ## Generator expressions
 
 A generator object is truthy even when it yields no values.

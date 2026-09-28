@@ -2235,11 +2235,10 @@ impl<'db> KnownClassLookupError<'db> {
 mod tests {
     use super::*;
     use crate::db::tests::{TestDbBuilder, setup_db};
-    use crate::{PythonVersionSource, PythonVersionWithSource};
     use strum::IntoEnumIterator;
     use ty_module_resolver::resolve_module_confident;
     use ty_python_core::TestProgramDb as _;
-    use ty_python_core::program::{Program, ProgramSettings};
+    use ty_python_core::program::Program;
 
     #[test]
     fn known_class_roundtrip_from_str() {
@@ -2335,22 +2334,12 @@ mod tests {
         classes.sort_unstable_by_key(|(_, version)| *version);
 
         let mut program = db.program();
-        let mut current_version = program.python_version(&db);
-        let python_platform = program.python_platform(&db).clone();
-        let search_paths = program.search_paths(&db).clone();
+        let mut settings = db.program_settings().clone();
 
         for (class, version_added) in classes {
-            if version_added != current_version {
-                let settings = ProgramSettings {
-                    python_version: PythonVersionWithSource {
-                        version: version_added,
-                        source: PythonVersionSource::default(),
-                    },
-                    python_platform: python_platform.clone(),
-                    search_paths: search_paths.clone(),
-                };
+            if version_added != settings.python_version.version {
+                settings.python_version.version = version_added;
                 program = Program::from_settings(&db, &settings);
-                current_version = version_added;
             }
 
             // Check the class can be looked up successfully

@@ -590,6 +590,12 @@ fn dynamic_content_impl<'db>(
             walk_specialization_types(db, alias.specialization(db), self);
         }
 
+        fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
+            if type_is.materialization_kind(db).is_none() {
+                walk_typeis_type(db, type_is, self);
+            }
+        }
+
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
             self.active_type_aliases.visit(
                 &alias.definition(db),

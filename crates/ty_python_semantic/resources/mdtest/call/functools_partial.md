@@ -1780,7 +1780,7 @@ def task(
     *,
     retries: Optional[int] = None,
 ):
-    if __fn:
+    if __fn is None:
         return 1
     return cast(
         Callable[[Callable[[], int]], int],

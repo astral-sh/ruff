@@ -220,7 +220,7 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
-    definition::DefinitionState,
+    definition::{DefinitionKind, DefinitionState},
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
@@ -2167,6 +2167,12 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
+    /// Returns whether every reachable declaration is an annotated assignment.
+    ///
+    /// Unbound entries and unreachable definitions do not affect the result. This distinguishes
+    /// attribute annotations from other declarations, such as methods, imports, and nested classes.
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool;
+
     fn any_reachable(
         self,
         db: &'db dyn Db,
@@ -2182,6 +2188,14 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool {
+        !self.any_reachable(db, |declaration| {
+            declaration.is_defined_and(|definition| {
+                !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+            })
+        })
+    }
+
     fn any_reachable(
         mut self,
         db: &'db dyn Db,

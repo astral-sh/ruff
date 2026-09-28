@@ -81,8 +81,8 @@ use salsa::Setter;
 
 use crate::script::script_tag;
 use crate::uv::{
-    ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataResult, UvMetadataService,
-    UvSyncTask,
+    ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError, UvMetadataResult,
+    UvMetadataService, UvSyncTask,
 };
 use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
 
@@ -710,7 +710,7 @@ fn apply_sync_result(
     db: &mut dyn Db,
     environment: ScriptEnvironment,
     request: &ScriptSyncRequest,
-    output: std::io::Result<std::process::Output>,
+    output: Result<std::process::Output, UvMetadataError>,
 ) {
     let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
         Ok(metadata) => (Some(metadata), None),

@@ -18,7 +18,7 @@ use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
-        self.infer_body(&class.body);
+        self.infer_scope_body(&class.body);
     }
 
     pub(super) fn infer_class_type_params(&mut self, class: &ast::StmtClassDef) {

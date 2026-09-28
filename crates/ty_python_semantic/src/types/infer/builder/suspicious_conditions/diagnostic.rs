@@ -35,20 +35,20 @@ use crate::{
     place_load::{PlaceLoadMode, PlaceLoadResolutionStep, resolve_place_load},
     reachability::is_range_reachable,
     types::{
-        KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, MemberLookupPolicy, Type,
-        TypeContext,
+        KnownClass, KnownUnion, LintDiagnosticGuard, LintDiagnosticGuardBuilder,
+        MemberLookupPolicy, Type, UnionType,
         call::bind::CallableDescription,
         context::InferContext,
+        definition_expression_type_in_scope,
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
         infer::{
             TypeInferenceBuilder,
-            builder::redundant_conditions::{
+            builder::suspicious_conditions::{
                 SuiteExitKind, is_trivial_statement, suite_ends_with_exit,
             },
         },
-        infer_definition_types, infer_scope_types,
         narrow::{NarrowingConstraint, infer_narrowing_constraints},
         signatures::CallableSignature,
         tuple::{Tuple, TupleLength},
@@ -731,6 +731,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 diagnostic
             }
+        } else if let ConditionKind::NoneUnion(union) = kind {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Boolean test on `{}` does not distinguish `None` from other falsy values",
+                test_type.display(db, env)
+            ));
+            let non_none = UnionType::from_elements(
+                db,
+                env,
+                union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter(|element| !element.is_none(db)),
+            );
+            let known_class = match non_none {
+                Type::NominalInstance(instance) => instance.known_class(db),
+                Type::Union(union) => union.known(db).map(KnownUnion::annotation_class),
+                _ => None,
+            };
+
+            // This list of builtin types does not need to be exhaustive. We just list the ones
+            // that were most commonly encountered in practice (ecosystem results):
+            diagnostic.set_primary_annotation_message(match known_class {
+                Some(KnownClass::Int | KnownClass::Float | KnownClass::Complex) => {
+                    "`None` and `0` are both falsy"
+                }
+                Some(KnownClass::Bool) => "`None` and `False` are both falsy",
+                Some(KnownClass::Str) => "`None` and the empty string are both falsy",
+                Some(KnownClass::Bytes) => "`None` and an empty bytestring are both falsy",
+                Some(KnownClass::List) => "`None` and an empty list are both falsy",
+                Some(KnownClass::Dict) => "`None` and an empty dictionary are both falsy",
+                _ => "Both `None` and non-`None` values can be falsy",
+            });
+            diagnostic.help("Use `is None` or `is not None` to check for presence of the value");
+            diagnostic.help("Use `bool(...)` if testing truthiness is intentional");
+            diagnostic
         } else {
             let add_always_falsy_concise_message = |diagnostic: &mut LintDiagnosticGuard| {
                 if should_quote_test_expression()
@@ -907,18 +943,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        match definition.kind(db) {
-            DefinitionKind::AnnotatedAssignment(_) => {
-                infer_definition_types(db, definition).try_expression_type(expression)
-            }
-            DefinitionKind::Parameter(_) => {
-                let scope = definition.scope(db).scope(db).parent()?;
-                let scope_id = scope.to_scope_id(db, definition.program_file(db));
-                infer_scope_types(db, scope_id, TypeContext::default())
-                    .try_expression_type(expression)
-            }
-            _ => None,
-        }
+        let file = definition.program_file(db);
+        let index = semantic_index(db, file);
+        let scope = index.try_expression_scope_id(expression).or_else(|| {
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            index.annotation_parent_scope_id(&module, expression)
+        })?;
+        Some(definition_expression_type_in_scope(
+            db,
+            definition,
+            expression,
+            scope.to_scope_id(db, file),
+        ))
     }
 
     /// Locate the iterable name and its element annotation so a fix can change only the name.
@@ -1069,8 +1105,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
-    /// Return a [`TextRange`] spanning from `branch_start` up to and including
-    /// the offset of the first newline character after the start of `first_statement`.
+    /// Return a [`TextRange`] spanning from `branch_start` up to
+    /// the offset of the first newline character after the start of
+    /// `first_statement`. The newline itself is excluded from this range.
     ///
     /// For example, given this code:
     ///
@@ -1479,7 +1516,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         candidates.into_iter().flatten().find_map(|candidate| {
             let name = candidate.as_name_expr()?;
             let ty = self.expression_type(candidate);
-            if ty.is_never() || !self.type_before_if_chain(name)?.is_union() {
+            if ty.is_never()
+                || !self
+                    .type_before_if_chain(name)?
+                    .expand_top_level_aliases(db, env)
+                    .is_union()
+            {
                 return None;
             }
             let place = places.symbol_id(&name.id)?;

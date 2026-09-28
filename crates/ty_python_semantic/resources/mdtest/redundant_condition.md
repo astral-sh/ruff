@@ -3955,6 +3955,40 @@ help: Add an `else` branch that calls `assert_never`
 note: This is an unsafe fix and may change runtime behavior
 ```
 
+## Exhaustiveness checks for union type aliases
+
+A type alias for a union receives the same exhaustiveness suggestion as the union itself.
+
+```py
+type Choice = int | str
+
+def exhaustive(value: Choice):
+    if isinstance(value, int):
+        print(value)
+    elif isinstance(value, str):  # snapshot: redundant-condition-strict
+        print(value)
+```
+
+```snapshot
+error[redundant-condition-strict]: Condition is always true
+ --> src/mdtest_snippet.py:6:10
+  |
+6 |     elif isinstance(value, str):  # snapshot: redundant-condition-strict
+  |          ^^^^^^^^^^^^^^^^^^^^^^ Inferred type is `Literal[True]`
+help: Add an `else` branch that calls `assert_never`
+   |
+1  + from typing import assert_never
+2  | type Choice = int | str
+--------------------------------------------------------------------------------
+7  |     elif isinstance(value, str):  # snapshot: redundant-condition-strict
+   -         print(value)
+8  +         print(value)
+9  +     else:
+10 +         assert_never(value)
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ## Exhaustiveness checks with an aliased condition
 
 A condition stored in a variable can narrow `value` before its first use in the chain. The fix is

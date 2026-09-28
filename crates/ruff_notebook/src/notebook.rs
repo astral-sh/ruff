@@ -474,7 +474,11 @@ impl Notebook {
 
 impl PartialEq for Notebook {
     fn eq(&self, other: &Self) -> bool {
-        self.trailing_newline == other.trailing_newline && self.raw == other.raw
+        self.trailing_newline == other.trailing_newline
+            && self.raw == other.raw
+            && self.source_code == other.source_code
+            && self.cell_offsets == other.cell_offsets
+            && self.valid_code_cells == other.valid_code_cells
     }
 }
 
@@ -528,6 +532,45 @@ mod tests {
         let notebook = Notebook::empty();
 
         assert_eq!(notebook.source_code(), "\n");
+    }
+
+    #[test]
+    fn equality_after_adding_cell_magic() -> Result<()> {
+        let mut notebook = Notebook::empty();
+        let transformed = "%%markdown\nSome text\n";
+        let mut source_map = SourceMap::default();
+        source_map.push_marker(0.into(), 0.into());
+        source_map.push_marker(
+            TextSize::of(notebook.source_code()),
+            TextSize::of(transformed),
+        );
+        notebook.update(&source_map, transformed.to_string());
+
+        let mut serialized = Vec::new();
+        notebook.write(&mut serialized)?;
+        let reloaded = Notebook::from_source_code(std::str::from_utf8(&serialized)?)?;
+
+        // Updating preserves the original Python cell selection, so the edited source still
+        // contains this cell. Reloading recognizes `%%markdown` and excludes it instead.
+        // The raw cells match, but the Python source returned to callers differs, so comparing
+        // only the raw notebook would incorrectly treat these notebooks as equal.
+        assert_eq!(notebook.cells(), reloaded.cells());
+        assert_eq!(notebook.source_code(), transformed);
+        assert_eq!(reloaded.source_code(), "\n");
+        assert_ne!(notebook, reloaded);
+
+        Ok(())
+    }
+
+    #[test]
+    fn equality_ignores_cached_index() {
+        let notebook = Notebook::empty();
+        let other = notebook.clone();
+
+        notebook.index();
+
+        assert_eq!(notebook, other);
+        assert_eq!(other, notebook);
     }
 
     #[test_case("markdown", false)]

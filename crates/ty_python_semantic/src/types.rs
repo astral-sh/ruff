@@ -396,7 +396,7 @@ pub(crate) fn inferred_declaration<'db>(
 /// Supports expressions that are evaluated within a type-params sub-scope.
 ///
 /// ## Panics
-/// If the given expression is not a sub-expression of the given [`Definition`].
+/// If the expression is absent from the semantic index for the definition's file.
 fn definition_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -406,6 +406,20 @@ fn definition_expression_type<'db>(
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
+    definition_expression_type_in_scope(db, definition, expression, scope)
+}
+
+/// Infer a definition's expression using an explicitly supplied evaluation scope.
+///
+/// [`definition_expression_type`] can look up the scope of a string literal used as an annotation,
+/// but not the scope of nodes parsed from its contents: those nodes are absent from the semantic
+/// index. This helper lets the caller supply the enclosing annotation's scope for such nodes.
+fn definition_expression_type_in_scope<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+    scope: ScopeId<'db>,
+) -> Type<'db> {
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
@@ -421,7 +435,8 @@ fn definition_expression_type<'db>(
             Type::unknown()
         }
     } else {
-        // expression is in a type-params sub-scope
+        // The expression is evaluated in another scope, such as a type-parameter scope
+        // or the scope containing a function's parameter annotations.
         infer_complete_scope_types(db, scope).expression_type(expression)
     }
 }
@@ -1933,17 +1948,27 @@ impl<'db> DataclassParams<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let field_specifiers = self
-            .field_specifiers(db)
-            .iter()
-            .map(|ty| {
-                let ty = ty.recursive_type_normalized_impl(db, env, div, true);
-                if nested { ty } else { Some(ty.unwrap_or(div)) }
-            })
-            .collect::<Option<Box<_>>>()?;
+        let field_specifiers =
+            normalize_field_specifiers(db, env, self.field_specifiers(db), div, nested)?;
 
         Some(Self::new(db, self.flags(db), field_specifiers))
     }
+}
+
+fn normalize_field_specifiers<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    field_specifiers: &[Type<'db>],
+    div: Type<'db>,
+    nested: bool,
+) -> Option<Box<[Type<'db>]>> {
+    field_specifiers
+        .iter()
+        .map(|ty| {
+            let ty = ty.recursive_type_normalized_impl(db, env, div, true);
+            if nested { ty } else { Some(ty.unwrap_or(div)) }
+        })
+        .collect()
 }
 
 /// Representation of a type: a set of possible values at runtime.
@@ -2890,6 +2915,16 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Resolve outermost aliases and expand aliases that expose top-level union elements.
+    ///
+    /// Aliases nested inside non-union types remain unexpanded.
+    fn expand_top_level_aliases(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        match self.resolve_type_alias(db) {
+            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
+            ty => ty,
+        }
+    }
+
     /// Selects the constructor used for a type variable's upper bound.
     ///
     /// The meta-type of `object` simplifies to permissive bare `type`, so retain the exact class
@@ -3186,7 +3221,6 @@ impl<'db> Type<'db> {
 
     /// Create a `LiteralString`.
     fn literal_string() -> Self {
-        // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
         Self::LiteralValue(LiteralValueType::unpromotable(
             LiteralValueTypeKind::LiteralString,
         ))
@@ -3711,7 +3745,7 @@ impl<'db> Type<'db> {
         if nested && (self.same_divergent_marker(div) || self.is_pending_narrowing()) {
             return None;
         }
-        // These types stay opaque, but pending values in their stored arguments, bounds, or
+        // Some of these types stay opaque, but pending values in their stored arguments, bounds, or
         // fields still invalidate the enclosing constructor's approximation.
         if nested
             && matches!(
@@ -3789,20 +3823,23 @@ impl<'db> Type<'db> {
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                Some(self)
-            }
+            Type::TypedDict(typed_dict) => typed_dict
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::TypedDict),
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
                 .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Type::NewTypeInstance),
+            Type::DataclassDecorator(params) => params
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::DataclassDecorator),
+            Type::DataclassTransformer(params) => params
+                .recursive_type_normalized_impl(db, env, div, nested)
+                .map(Type::DataclassTransformer),
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Never
             | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
@@ -5667,10 +5704,7 @@ impl<'db> Type<'db> {
         if member.is_class_var() {
             return false;
         }
-        let ty = match ty.resolve_type_alias(db) {
-            Type::Union(union) if union.has_aliases(db) => union.expand_aliases(db, env),
-            ty => ty,
-        };
+        let ty = ty.expand_top_level_aliases(db, env);
         let alternatives = match &ty {
             Type::Union(union) => union.elements(db),
             _ => std::slice::from_ref(&ty),
@@ -6702,14 +6736,24 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         recursion_guard: &ActiveRecursionDetector<Type<'db>>,
     ) -> Bindings<'db> {
+        self.bindings_with_receiver(db, env, recursion_guard, None)
+    }
+
+    fn bindings_with_receiver(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &ActiveRecursionDetector<Type<'db>>,
+        receiver: Option<Type<'db>>,
+    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings_impl(db, env, recursion_guard);
+            return fallback.bindings_with_receiver(db, env, recursion_guard, receiver);
         }
 
         match self {
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
-                .map(|unfolded| unfolded.bindings_impl(db, env, recursion_guard))
+                .map(|unfolded| unfolded.bindings_with_receiver(db, env, recursion_guard, receiver))
                 .unwrap_or_else(|| CallableBinding::not_callable(self).into()),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -6722,14 +6766,13 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        bound.bindings_impl(db, env, recursion_guard)
+                        bound.bindings_with_receiver(db, env, recursion_guard, receiver)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
                         self,
-                        constraints
-                            .elements(db)
-                            .iter()
-                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                        constraints.elements(db).iter().map(|ty| {
+                            ty.bindings_with_receiver(db, env, recursion_guard, receiver)
+                        }),
                     ),
                 }
             }
@@ -7074,12 +7117,15 @@ impl<'db> Type<'db> {
                 // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
                 // callable".
                 match self
-                    .member_lookup_with_policy(
+                    .member_lookup_with_policy_and_receiver(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        receiver,
                     )
+                    .unwrap_or_else(|error| error.fallback_member(db))
+                    .member(db)
                     .place
                 {
                     Place::Defined(DefinedPlace {
@@ -7107,10 +7153,9 @@ impl<'db> Type<'db> {
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
                 self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                union.elements(db).iter().map(|element| {
+                    element.bindings_with_receiver(db, env, recursion_guard, receiver)
+                }),
             ),
 
             // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
@@ -7145,9 +7190,16 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
-                intersection
-                    .positive_elements_or_object(db)
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                intersection.positive_elements_or_object(db).map(|element| {
+                    // Each callable candidate describes the same object, so bind its
+                    // `__call__` to the full intersection rather than just this element.
+                    element.bindings_with_receiver(
+                        db,
+                        env,
+                        recursion_guard,
+                        Some(receiver.unwrap_or(self)),
+                    )
+                }),
             ),
 
             Type::EnumComplement(complement) => {
@@ -7219,7 +7271,11 @@ impl<'db> Type<'db> {
                 .instance_fallback(db, env)
                 .bindings_impl(db, env, recursion_guard),
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings_impl(db, env, recursion_guard),
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(db)
+                    .bindings_with_receiver(db, env, recursion_guard, receiver)
+            }
 
             Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -7979,9 +8035,34 @@ impl<'db> Type<'db> {
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
-        // `NO_INSTANCE_FALLBACK` here in addition to other policies:
-        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
-        match self.member_lookup_with_policy(db, env, name, policy).place {
+        // `NO_INSTANCE_FALLBACK` here in addition to other policies.
+        Self::try_call_dunder_member_impl(
+            db,
+            env,
+            self.member_lookup_with_policy_and_receiver(
+                db,
+                env,
+                name,
+                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                None,
+            ),
+            argument_types,
+            tcx,
+        )
+    }
+
+    fn try_call_dunder_member_impl(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        member: MemberLookupResult<'db>,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        match member
+            .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
+            .place
+        {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
@@ -9585,15 +9666,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
-                type_is.with_type(
-                    db,
-                    type_is.type_argument(db).apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    ),
-                )
+                type_is.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
 
             Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
@@ -10523,7 +10596,19 @@ impl<'db> IntersectionType<'db> {
         let mut error_provenance = Provenance::Unknown;
 
         for element in positive {
-            match element.try_call_dunder_with_policy(db, env, name, argument_types, tcx, policy) {
+            match Type::try_call_dunder_member_impl(
+                db,
+                env,
+                element.member_lookup_with_policy_and_receiver(
+                    db,
+                    env,
+                    name,
+                    policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    Some(Type::Intersection(self)),
+                ),
+                argument_types,
+                tcx,
+            ) {
                 Ok(bindings) => successful_bindings.push(bindings),
                 Err(err) => {
                     error_provenance = error_provenance.or(err.provenance());
@@ -12039,6 +12124,10 @@ pub(super) struct MetaclassTransformInfo<'db> {
 pub struct TypeIsType<'db> {
     #[returns(copy)]
     type_argument: Type<'db>,
+
+    #[returns(copy)]
+    materialization_kind: Option<MaterializationKind>,
+
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     #[returns(copy)]
@@ -12073,7 +12162,7 @@ impl<'db> TypeIsType<'db> {
     ///     return isinstance(value, tuple)
     /// ```
     fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, None))
+        Type::TypeIs(Self::new(db, ty, None, None))
     }
 
     fn return_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -12082,12 +12171,81 @@ impl<'db> TypeIsType<'db> {
 
     #[must_use]
     fn bind(self, db: &'db dyn Db, scope: ScopeId<'db>, place: ScopedPlaceId) -> Type<'db> {
-        Type::TypeIs(Self::new(db, self.type_argument(db), Some((scope, place))))
+        Type::TypeIs(Self::new(
+            db,
+            self.type_argument(db),
+            self.materialization_kind(db),
+            Some((scope, place)),
+        ))
     }
 
     #[must_use]
     fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, self.place_info(db)))
+        Type::TypeIs(Self::new(
+            db,
+            ty,
+            self.materialization_kind(db),
+            self.place_info(db),
+        ))
+    }
+
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        let argument = self.type_argument(db);
+        let mut materialization = self.materialization_kind(db);
+        let argument = match type_mapping {
+            TypeMapping::Materialize(kind) => {
+                // The top and bottom materializations are already fully static types, so
+                // materializing them further does nothing.
+                if materialization.is_some() {
+                    return Type::TypeIs(self);
+                }
+
+                // `TypeIs` with a static argument is equivalent to its top and bottom materializations.
+                let top = argument.materialize(db, MaterializationKind::Top, visitor);
+                if visitor.is_equivalent_to_materialization(db, argument, top) {
+                    return Type::TypeIs(self);
+                }
+
+                materialization = Some(*kind);
+                argument
+            }
+            TypeMapping::ApplySpecializationWithMaterialization {
+                specialization,
+                materialization_kind,
+            } => {
+                let specialized = argument.apply_type_mapping_impl(
+                    db,
+                    &TypeMapping::ApplySpecialization(*specialization),
+                    tcx,
+                    visitor,
+                );
+
+                // Avoid materializing unrelated gradual types already present in the argument.
+                if materialization.is_none() {
+                    let materialized =
+                        argument.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if specialized != materialized {
+                        materialization = Some(*materialization_kind);
+                    }
+                }
+
+                specialized
+            }
+            _ => argument.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        };
+
+        Type::TypeIs(Self::new(
+            db,
+            argument,
+            materialization,
+            self.place_info(db),
+        ))
     }
 
     fn is_bound(self, db: &'db dyn Db) -> bool {

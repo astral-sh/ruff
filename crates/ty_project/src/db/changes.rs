@@ -10,12 +10,12 @@ use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use ty_python_core::program::FallibleStrategy;
+use ty_python_semantic::PythonEnvironment;
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
     project_changed: bool,
     project_sync_path: Option<SystemPathBuf>,
-    custom_stdlib_changed: bool,
     changed_files: ChangedFiles,
 }
 
@@ -30,11 +30,6 @@ impl ChangeResult {
     /// This may be an ancestor of the previous project root if that directory was deleted.
     pub fn project_sync_path(&self) -> Option<&SystemPath> {
         self.project_sync_path.as_deref()
-    }
-
-    /// Returns `true` if the custom stdlib's VERSIONS file has changed.
-    pub fn custom_stdlib_changed(&self) -> bool {
-        self.custom_stdlib_changed
     }
 
     /// Returns the scripts whose environments may need synchronization after these file events.
@@ -99,6 +94,14 @@ impl ProjectDatabase {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
         let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
+        let virtual_environment = project.program_settings(self).virtual_environment.clone();
+        let python_path = project
+            .metadata(self)
+            .configured_python_path(self.system())
+            .or_else(|| {
+                PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
+                    .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
+            });
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -107,7 +110,6 @@ impl ProjectDatabase {
         let mut result = ChangeResult {
             project_changed: false,
             project_sync_path: None,
-            custom_stdlib_changed: false,
             changed_files: if project.file_set(self).is_lazy() {
                 ChangedFiles::Unindexed
             } else {
@@ -125,6 +127,7 @@ impl ProjectDatabase {
         let mut removed_paths = BTreeSet::default();
         let mut reload_project = false;
         let mut reload_project_files = false;
+        let mut refresh_program_settings = false;
         // TODO: This should be removed once the incremental checker is ported
         // over to the `ignore` crate, since the `ignore` crate will respect
         // the settings provided in `create_walker`. ---AG
@@ -137,6 +140,12 @@ impl ProjectDatabase {
 
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
+
+            refresh_program_settings |= affects_python_environment(
+                change,
+                virtual_environment.as_deref(),
+                python_path.as_deref(),
+            );
 
             if let Some(path) = change.system_path() {
                 if configuration_paths.is_configuration(path, &project_root) {
@@ -190,7 +199,7 @@ impl ProjectDatabase {
                 }
 
                 if Some(path) == custom_stdlib_versions_path.as_deref() {
-                    result.custom_stdlib_changed = true;
+                    refresh_program_settings = true;
                 }
             }
 
@@ -300,7 +309,7 @@ impl ProjectDatabase {
                             .as_ref()
                             .is_some_and(|versions_path| versions_path.starts_with(path))
                         {
-                            result.custom_stdlib_changed = true;
+                            refresh_program_settings = true;
                         }
 
                         if configuration_paths.may_contain_configuration(path, &project_root) {
@@ -383,7 +392,7 @@ impl ProjectDatabase {
             removed_paths.clear();
         }
 
-        if result.custom_stdlib_changed {
+        if refresh_program_settings {
             let metadata = project.metadata(self);
             let merged_options = metadata.to_merged_options();
             match merged_options.to_program_settings(
@@ -487,4 +496,71 @@ impl ConfigurationPaths {
 
 fn is_ignore_file(path: &SystemPath) -> bool {
     matches!(path.file_name(), Some(".gitignore" | ".ignore"))
+}
+
+/// `pyvenv.cfg` records the environment's Python version and whether imports include system
+/// site-packages. Recreating an environment can change both without changing ty's configuration.
+///
+/// `python_path` is the configured environment or interpreter path,
+/// or a virtual environment path (e.g. `VIRTUAL_ENV` or the project's `.venv`).
+///
+/// uv writes `pyvenv.cfg` before creating `site-packages`. If these events arrive in separate
+/// batches, creating `site-packages` must retry resolution. A watcher may only report the creation
+/// of the `site-packages` parent `lib` or `lib/pythonX.Y` directory, so we also handle those
+/// directories (`lib64` on some Unix systems, `Lib` on Windows). We match `site-packages` by name;
+/// an unrelated directory only causes an extra refresh of the same settings.
+///
+/// Similar to `site-packages`, renaming a directory to `.venv` can change the inferred virtual
+/// environment without an event for `pyvenv.cfg`. That's why we need to rediscover the virtual
+/// environment when any ancestor path of a valid virtual environment location is created or deleted.
+fn affects_python_environment(
+    change: &ChangeEvent,
+    virtual_environment: Option<&SystemPath>,
+    python_path: Option<&SystemPath>,
+) -> bool {
+    let may_be_environment_root = |path: &SystemPath| {
+        virtual_environment == Some(path)
+            || python_path.is_some_and(|python_path| python_path.starts_with(path))
+    };
+
+    match change {
+        ChangeEvent::Created { path, .. }
+        | ChangeEvent::Changed { path, .. }
+        | ChangeEvent::Deleted { path, .. }
+            if path.file_name() == Some("pyvenv.cfg") =>
+        {
+            path.parent().is_some_and(may_be_environment_root)
+        }
+        // The configured path can be an interpreter file as well as an environment directory.
+        ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. }
+            if python_path.is_some_and(|python_path| python_path.starts_with(path))
+                || virtual_environment.is_some_and(|environment| environment.starts_with(path)) =>
+        {
+            true
+        }
+        ChangeEvent::Created {
+            path,
+            kind: CreatedKind::Directory,
+        }
+        | ChangeEvent::Deleted {
+            path,
+            kind: DeletedKind::Directory | DeletedKind::Any,
+        } => {
+            if path.file_name() == Some("site-packages") {
+                return true;
+            }
+
+            let is_library =
+                |path: &SystemPath| matches!(path.file_name(), Some("lib" | "lib64" | "Lib"));
+            let library = if is_library(path) {
+                Some(path.as_path())
+            } else {
+                path.parent().filter(|parent| is_library(parent))
+            };
+            library
+                .and_then(SystemPath::parent)
+                .is_some_and(may_be_environment_root)
+        }
+        _ => false,
+    }
 }

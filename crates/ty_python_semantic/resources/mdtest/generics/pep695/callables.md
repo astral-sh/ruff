@@ -1075,6 +1075,161 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
     return wrapper
 ```
 
+## Inference from a bounded callable type variable
+
+The upper bound of a bounded type variable is used to infer the signature of a callable type:
+
+```py
+from typing import Callable
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _[F: Callable[[int], str]](callback: F):
+    reveal_type(apply(callback))  # revealed: str
+```
+
+If the upper bound is a class type, the signature of the class's `__call__` method is used:
+
+```py
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+def _[F: Printer](callback: F):
+    reveal_type(apply(callback))  # revealed: str
+
+    x1: Callable[[str], str] = callback  # error: [invalid-assignment]
+    x2: Callable[[int], int] = callback  # error: [invalid-assignment]
+```
+
+If `__call__` returns `Self`, the type variable is preserved as the inferred return type:
+
+```py
+from typing import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+def _[F: Clone](callback: F) -> F:
+    reveal_type(apply(callback))  # revealed: F@_
+    return apply(callback)
+```
+
+The type variable is also preserved for class methods that return `Self`:
+
+```py
+class ClassClone:
+    @classmethod
+    def __call__(cls, value: int) -> Self:
+        return cls()
+
+def _[F: ClassClone](callback: F) -> F:
+    reveal_type(apply(callback))  # revealed: F@_
+    return apply(callback)
+```
+
+## Explicit receivers in callable bounds
+
+An explicit receiver annotation restricts which specializations are callable:
+
+```py
+from typing import Callable
+
+class Restricted[T]:
+    def __call__(self: "Restricted[int]", value: int) -> str:
+        return str(value)
+
+def consume(callback: Callable[[int], str]) -> None: ...
+def _(callback: Restricted[str]):
+    consume(callback)  # error: [invalid-argument-type]
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+def _[F: Restricted[str]](callback: F):
+    consume(callback)  # TODO: This should error.
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+The upper bound of a type variable satisfies an explicit receiver annotation with the same type:
+
+```py
+def _(callback: Restricted[int]):
+    consume(callback)
+    x: Callable[[int], str] = callback
+
+def _[F: Restricted[int]](callback: F):
+    consume(callback)
+    # TODO: This should not error.
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+Note that a compatible receiver bound does not satisfy an incompatible return type:
+
+```py
+def _[F: Restricted[int]](callback: F):
+    wrong: Callable[[int], bytes] = callback  # error: [invalid-assignment]
+```
+
+## Constructor bounds in callable inference
+
+The signature of a class constructor can be inferred from a type variable with an upper bound of
+`type[C]` during callable inference:
+
+```py
+from typing import Callable
+
+class C:
+    def __init__(self, value: int) -> None: ...
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _[F: type[C]](callback: F):
+    reveal_type(apply(callback))  # revealed: C
+
+    x1: Callable[[int], C] = callback
+    x2: Callable[[str], C] = callback  # error: [invalid-assignment]
+    x3: Callable[[int], str] = callback  # error: [invalid-assignment]
+```
+
+## Recursive callable types
+
+Callable inference falls back to an error when a `__call__` signature involves unbounded recursion:
+
+```py
+from typing import Callable
+from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf
+
+class Recursive:
+    __call__: "Recursive"
+
+def _(callback: Recursive):
+    x: Callable[[int], str] = callback  # error: [invalid-assignment]
+
+def _[F: Recursive](callback: F):
+    x1: CallableTypeOf[callback]  # error: [invalid-type-form]
+    x2: RegularCallableTypeOf[callback]  # error: [invalid-type-form]
+```
+
+Concrete nested specializations of the same generic class do not trigger the fallback:
+
+```py
+class Wrapper[T]:
+    @property
+    def __call__(self) -> T:
+        raise NotImplementedError
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+def _(callback: Wrapper[Wrapper[Callable[[int], str]]]):
+    reveal_type(apply(callback))  # revealed: str
+
+def _[F: Wrapper[Wrapper[Callable[[int], str]]]](callback: F):
+    reveal_type(apply(callback))  # revealed: str
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

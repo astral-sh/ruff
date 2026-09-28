@@ -302,14 +302,26 @@ reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ### Gradual specializations
 
 A type variable tuple remains assignable to an explicitly gradual specialization of its generic
-class.
+class, or its top materialization.
 
 ```py
 from typing import Any
+from ty_extensions import Bottom, Top
 
 class Array[*Ts]:
+    values: tuple[*Ts]
+
     def erase_shape(self) -> "Array[*tuple[Any, ...]]":
         return self
+
+    def erase_shape_top(self) -> "Top[Array[*tuple[Any, ...]]]":
+        return self
+
+    def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
+        return self  # error: [invalid-return-type]
+
+    def fixed_shape(self) -> "Top[Array[Any]]":
+        return self  # error: [invalid-return-type]
 ```
 
 ### Constrained inference from synthetic `Self`
@@ -1268,6 +1280,20 @@ def forward_mixed[*Ts](
     *args: *tuple[int, *Ts, str],
 ) -> None:
     accept_mixed_forwarded(callback, args)
+```
+
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+
+def accept[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward[*Ts](callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
 ```
 
 ### Callable inference through nested callable parameters

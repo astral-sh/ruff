@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.16.8"
+version = "0.16.9"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -314,6 +314,8 @@ version_files = [
     { target = "crates/ruff_linter/src/rules/**/*.rs", replace = "NEXT_RUFF_VERSION" },
     "crates/ruff_wasm/Cargo.toml",
     "scripts/benchmarks/pyproject.toml",
+    { target = ".github/ISSUE_TEMPLATE/1_bug_report.yaml" },
+    { target = ".github/ISSUE_TEMPLATE/3_question.yaml" },
 ]
 
 [tool.rooster.section-labels]

@@ -334,6 +334,57 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+The nominal specialization of a generic class can be inferred from the upper bound of `Self`:
+
+```py
+class Box[T = None]:
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read[T = None](box: Box[T]) -> T:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+```
+
+The same applies to a type variable with an explicit upper bound:
+
+```py
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@_
+```
+
+The specialization inferred from the bound cannot violate the bounds of a constrained type variable:
+
+```py
+def combine[T: (int, str)](box: Box[T], value: T) -> T:
+    return value
+
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    # error: [invalid-argument-type] "does not satisfy constraints"
+    combine(box, "")
+```
+
+A type variable cannot be substituted for its bound in non-covariant position:
+
+```py
+class Consumer[T]:
+    def consume(self, value: T) -> None: ...
+
+def accept_list[T](boxes: list[Box[T]]) -> None: ...
+def accept_consumer[T](consumer: Consumer[Box[T]]) -> None: ...
+def _[S: Box[int]](boxes: list[S], consumer: Consumer[S]) -> None:
+    accept_list(boxes)  # error: [invalid-argument-type]
+    accept_consumer(consumer)  # error: [invalid-argument-type]
+```
+
 ## Calls within the generic class
 
 A call to a generic class from one of its own methods creates an independent generic occurrence. The
@@ -1657,6 +1708,38 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Materialized `TypeIs` return types
+
+A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
+
+```py
+from typing import Any, TypeIs
+from ty_extensions import Bottom, Top
+
+class Predicate[T]:
+    def matches(self, value: object) -> TypeIs[T]:
+        return True
+
+    def unrelated(self, value: object) -> TypeIs[Any]:
+        return True
+
+def _(concrete: Predicate[int], gradual: Predicate[Any], value: object) -> None:
+    reveal_type(concrete.matches(value))  # revealed: TypeIs[int @ value]
+    reveal_type(gradual.matches(value))  # revealed: TypeIs[Any @ value]
+
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.matches(value))  # revealed: Top[TypeIs[Any @ value]]
+    reveal_type(bottom.matches(value))  # revealed: Bottom[TypeIs[Any @ value]]
+```
+
+An explicit `TypeIs[Any]` return type remains unmaterialized:
+
+```py
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.unrelated(value))  # revealed: TypeIs[Any @ value]
+    reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an
@@ -2105,6 +2188,48 @@ def probe(value: Tree[int, str]):
     child = FirstChild(value)
     reveal_type(child)  # revealed: FirstChild[str]
     reveal_type(child.value)  # revealed: str
+```
+
+## Aliased `Self` in explicit receivers
+
+Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Box[T]:
+    def mutate(self: Identity[Self], value: T) -> None: ...
+
+def check(box: Box[int]) -> None:
+    box.mutate(1)
+```
+
+## Unannotated subclass defaults inherit specialized declarations
+
+An inherited annotation is specialized using the subclass's base arguments before it provides
+context for an initializer. A further generic subclass retains its own type variables.
+
+```py
+class Base[T]:
+    items: list[T]
+
+class Integers(Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+reveal_type(Integers().items)  # revealed: list[int]
+
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+class Child[U](Base[U]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

@@ -1789,11 +1789,7 @@ class C[T: (str | None, int | None)]:
         raise NotImplementedError
 
 reveal_type(C("a"))  # revealed: C[str | None]
-
-# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
-# `C[int | None]` without an error.
-# error: [invalid-argument-type]
-reveal_type(C(1))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
 ```
 
 ## Union `self` annotations with variadic constructor parameters

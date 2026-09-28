@@ -479,14 +479,6 @@ impl Session {
         &self.project_state(path).db
     }
 
-    /// Returns an iterator, in arbitrary order, over all project databases
-    /// in this session.
-    pub(crate) fn project_dbs(&self) -> impl Iterator<Item = &ProjectDatabase> {
-        self.projects
-            .values()
-            .map(|project_state| &project_state.db)
-    }
-
     /// Returns a mutable reference to the project's [`ProjectDatabase`] in which the given `path`
     /// belongs.
     ///

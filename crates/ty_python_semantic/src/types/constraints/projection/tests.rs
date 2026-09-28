@@ -9,8 +9,8 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    CandidateSolution, CandidateSolutions, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution, SolutionPaths,
+    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
+    ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths,
     SolutionValidity, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
@@ -91,7 +91,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, inferable, bound),
+        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -136,7 +136,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
+                CandidateSolutions::default_solve(db, &env, &builder, bound)
             },
             0,
             |count, _, _| {
@@ -320,8 +320,9 @@ fn incomplete_solution_discards_the_projection() {
 
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
-        let choose = |_, bound: &PathBound<'_>| {
-            if bound.evidence_lower == Some(str) {
+        let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
+            let lower = candidate.inference_lower(db, &env);
+            if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
                 }
@@ -386,10 +387,11 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     fallback: Some(str),
                 },
             ] {
-                let choose = |_, bound: &PathBound<'_>| {
-                    if bound.bound_typevar == u {
+                let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
+                    let lower = candidate.inference_lower(db, &env);
+                    if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
-                    } else if bound.evidence_lower == Some(str) {
+                    } else if lower == Some(str) {
                         rejected_binding
                     } else {
                         PathBoundSolution::Solved(int)
@@ -501,7 +503,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, inferable, bound)
+            CandidateSolutions::default_solve(db, &env, &builder, bound)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -513,7 +515,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
+            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -622,7 +624,6 @@ class E: ...
     let right =
         UnionType::from_elements(db, &env, [instance("C")?, instance("D")?, instance("E")?]);
     let t = create_typevar(db, "T");
-    let inferable = TypeVarSet::from_typevars(db, [t]);
     let builder = ConstraintSetBuilder::new();
 
     // These classes can overlap, so distributing the intersection requires six DNF terms.
@@ -632,7 +633,8 @@ class E: ...
         let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| CandidateSolution {
-                    typevars: Box::new([PathBound::exact(t, ty)]) as Box<[_]>,
+                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
+                        as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),
@@ -640,9 +642,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                db,
-                &env,
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, inferable, bound),
+                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {

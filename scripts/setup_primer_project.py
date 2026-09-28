@@ -5,6 +5,7 @@
 # dependencies = ["mypy-primer"]
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -88,10 +89,45 @@ class _FormatMap:
 def get_ty_command(project: Project, *, ty_binary: str, venv_dir: Path) -> str:
     ty_cmd = project.ty_cmd
     if ty_cmd is None:
-        ty_cmd = "{ty} check {paths}" if project.paths else "{ty} check"
+        ty_cmd = "{ty} check {paths}" if project.paths is not None else "{ty} check"
     assert "{ty}" in ty_cmd
     ty_cmd = ty_cmd.format_map(_FormatMap(ty=ty_binary, paths=project.paths))
     return f"{ty_cmd} --python {shlex.quote(str(venv_dir))} --output-format concise"
+
+
+def run(*args: str, cwd: Path | None = None) -> None:
+    subprocess.run(args, cwd=cwd, check=True)
+
+
+def clone_project(
+    location: str, target_dir: Path, revision: str | None, *, full_history: bool
+) -> None:
+    depth = [] if full_history else ["--depth", "1"]
+    if revision is not None and not full_history:
+        # Fetch the requested commit without first downloading the default branch.
+        run("git", "init", str(target_dir))
+        run("git", "remote", "add", "origin", location, cwd=target_dir)
+        run("git", "fetch", *depth, "origin", revision, cwd=target_dir)
+        checkout = "FETCH_HEAD"
+    else:
+        run("git", "clone", *depth, location, str(target_dir))
+        checkout = revision
+
+    if checkout is not None:
+        run("git", "checkout", checkout, "--", cwd=target_dir)
+
+    # Initialize only the selected revision's submodules. Force checkout so that
+    # configured merge/rebase strategies cannot override the recorded gitlinks.
+    run(
+        "git",
+        "submodule",
+        "update",
+        "--init",
+        "--recursive",
+        "--checkout",
+        *(depth or ["--no-recommend-shallow"]),
+        cwd=target_dir,
+    )
 
 
 def main() -> None:
@@ -105,6 +141,11 @@ def main() -> None:
     parser.add_argument(
         "--revision",
         help="Git revision to check out before installing dependencies",
+    )
+    parser.add_argument(
+        "--full-history",
+        action="store_true",
+        help="Clone full history and tags if setup requires them or shallow fetches fail",
     )
     parser.add_argument(
         "--exclude-newer",
@@ -125,27 +166,21 @@ def main() -> None:
         print(get_ty_command(project, ty_binary="{ty}", venv_dir=target_dir / ".venv"))
         return
 
-    # Use a full clone only when a historical ecosystem report revision must be checked out.
-    clone_cmd = [
-        "git",
-        "clone",
-        "--recurse-submodules",
-        project.location,
-        str(target_dir),
-    ]
-    if not revision:
-        clone_cmd += ["--depth", "1"]
-    print(f"Cloning {project.location} into {target_dir}...")
-    subprocess.run(clone_cmd, check=True)
-
-    if revision:
-        print(f"Checking out revision {revision}...")
-        subprocess.run(["git", "checkout", revision], cwd=target_dir, check=True)
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--recursive"],
-            cwd=target_dir,
-            check=True,
+    if target_dir.exists() and (not target_dir.is_dir() or any(target_dir.iterdir())):
+        parser.error(
+            f"destination {target_dir} already exists and is not an empty directory"
         )
+
+    print(f"Cloning {project.location} into {target_dir}...")
+    try:
+        clone_project(
+            project.location, target_dir, revision, full_history=args.full_history
+        )
+    except subprocess.CalledProcessError as error:
+        message = f"Git checkout failed: {error}.\n"
+        if not args.full_history:
+            message += "If the server rejects shallow fetches, retry in a fresh directory with --full-history.\n"
+        parser.exit(1, message)
 
     # Create venv (matching primer's Venv.make_venv())
     venv_dir = target_dir / ".venv"
@@ -161,7 +196,7 @@ def main() -> None:
         install_base += f" --exclude-newer {shlex.quote(args.exclude_newer)}"
 
     # Run custom install command if the project defines one (matching primer's setup())
-    if project.install_cmd:
+    if project.install_cmd is not None:
         assert "{install}" in project.install_cmd
         install_cmd = project.install_cmd.format(install=install_base)
         print(f"Running install command: {install_cmd}")
@@ -169,7 +204,7 @@ def main() -> None:
         subprocess.run(install_cmd, cwd=target_dir, shell=True, check=True)  # ruff: ignore[subprocess-popen-with-shell-equals-true]
 
     # Install listed dependencies (matching primer's setup())
-    if project.deps:
+    if project.deps is not None:
         deps_cmd_parts = shlex.split(install_base) + project.deps
         print(f"Installing dependencies: {', '.join(project.deps)}")
         subprocess.run(deps_cmd_parts, cwd=target_dir, check=True)

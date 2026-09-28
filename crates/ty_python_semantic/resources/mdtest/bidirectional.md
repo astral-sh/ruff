@@ -1925,7 +1925,7 @@ class SortParams[F]:
 def build_sort_spec[T](
     sort_params: SortParams[T] | None,
 ) -> dict[T, Literal[1, -1]] | None:
-    if not sort_params:
+    if sort_params is None:
         return None
     return {sort_params.field: 1}
 
