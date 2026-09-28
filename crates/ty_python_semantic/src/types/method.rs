@@ -36,8 +36,6 @@ pub struct BoundMethodType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for BoundMethodType<'_> {}
 
-/// The uncommon constrained receiver is interned separately, so that every ordinary bound method
-/// does not have to reserve space for two full types.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ConstrainedBoundMethodReceiver<'db> {
     #[returns(copy)]
