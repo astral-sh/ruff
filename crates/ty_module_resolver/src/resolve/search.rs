@@ -1,34 +1,84 @@
-//! This module exposes a [`ModuleSearchCursor`] abstraction, which encapsulates reusable
-//! search state for namespace-aware module enumeration, and is equally usable for
-//! ordinary, single module resolution.
+//! This module exposes a [`ModuleSearchCursor`] abstraction, which encapsulates
+//! logic for efficient module resolution and (namespace-aware) module enumeration.
 //!
-//! [`ModuleSearchCursor`] provides an interface that describes traversal of the components
-//! of a module name
+//! It provides the following interfaces:
 //!
-//! - [`ModuleSearchCursor::advance`] returns a search object that can be used to resolve
-//!   the descendants of a module prefix. For example `ModuleSearchCursor::advance("acme")`
-//!   initializes a search that can be used to resolve any submodules of `acme` (e.g., `acme.tools`,
-//!   `acme.reports`, etc.).
-//! - [`ModuleSearchCursor::resolve_child`] selects the module candidates for a particular terminal
-//!   component of a module name (e.g. `ModuleSearchCursor::resolve_child("tools")`, to resolve
-//!   `acme.tools` given a prior call to `ModuleSearchCursor::advance("acme")`), while leaving the
-//!   search object reusable for resolving a different child with the same module name prefix.
+//! - [`ModuleSearchCursor::resolve_name`] which resolves a module relative to the current
+//!   position of the cursor (i.e., at some point along the individual components of a dotted
+//!   module name like `acme.tools.power`).
+//! - [`ModuleSearchCursor::list_modules`] which list modules immediately available (i.e., the
+//!   direct sub-modules) at the current position of the cursor.
+//!
+//! The latter operation is also accessible via the free functions
+//! [`list_root_modules`] and [`list_submodules`].
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
+use compact_str::CompactString;
 use itertools::Either;
+use ruff_db::system::FileType;
+use ruff_python_stdlib::identifiers::is_identifier;
 
+use crate::db::Db;
+use crate::module::Module;
 use crate::module_name::ModuleName;
-use crate::path::{ModuleDirectory, SearchPath};
+use crate::path::{ModuleDirectory, ModuleDirectoryEntry, ModulePath, SearchPath};
 
 use super::{
-    ComponentFileFilter, ModuleResolutionCandidate, ResolvedNames, ResolverContext,
-    StubPackageIndex, StubPackagePaths, normalize_candidates, resolve_component,
-    resolve_stub_package_in_search_path, search_paths, stub_package_index,
+    CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
+    PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex, StubPackagePaths,
+    normalize_candidates, resolve_component, resolve_stub_package_in_search_path, search_paths,
+    stub_package_index,
 };
 
+/// Lists top-level modules across the configured search paths.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Module listing is consumed by the next change's cached queries"
+    )
+)]
+pub(crate) fn list_root_modules<'db>(context: &ResolverContext<'db>) -> ModuleListing<'db> {
+    ModuleSearchCursor::with_configured_search_paths(context).list_modules()
+}
+
+/// Lists immediate submodules of a resolved module across the configured search paths.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Module listing is consumed by the next change's cached queries"
+    )
+)]
+pub(crate) fn list_submodules<'db>(
+    context: &ResolverContext<'db>,
+    module: Module<'db>,
+) -> ModuleListing<'db> {
+    list_submodules_by_name(context, module.name(context.db))
+}
+
+/// Lists immediate submodules of the given name without requiring that name to be resolvable.
+/// This allows module enumeration to reach local stub overrides beneath unresolved names.
+fn list_submodules_by_name<'db>(
+    context: &ResolverContext<'db>,
+    name: &ModuleName,
+) -> ModuleListing<'db> {
+    let Some(search) =
+        ModuleSearchCursor::at_module_name_prefix(context, name, &RootSearchPaths::Configured)
+    else {
+        return ModuleListing::default();
+    };
+
+    search.list_modules()
+}
+
+/// Manages state and logic for advancing through the components of a dotted
+/// module name (i.e., `acme`, `tools`, and `power` in the name `acme.tools.power`)
+/// during module resolution or enumeration.
 pub(super) struct ModuleSearchCursor<'a, 'db> {
     context: &'a ResolverContext<'db>,
     position: Position<'db>,
@@ -48,10 +98,34 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         Self::with_paths(context, RootSearchPaths::Supplied(search_paths))
     }
 
-    fn with_paths(context: &'a ResolverContext<'db>, search_paths: RootSearchPaths<'db>) -> Self {
-        Self {
-            context,
-            position: Position::Root(search_paths),
+    /// Positions a search that uses the given search roots at the given (absolute)
+    /// module name prefix, such that the search can be resumed from that point.
+    fn at_module_name_prefix(
+        context: &'a ResolverContext<'db>,
+        module_name_prefix: &ModuleName,
+        paths: &RootSearchPaths<'db>,
+    ) -> Option<Self> {
+        match paths {
+            RootSearchPaths::Configured => {
+                // For a search under a configured root path, we can reload search
+                // state from Salsa.
+                let key = ModuleNameIngredient::new(
+                    context.db,
+                    module_name_prefix,
+                    context.mode,
+                    context.resolver_environment,
+                );
+                Self::restore(context, key)
+            }
+            RootSearchPaths::Supplied(paths) => {
+                // Searches under supplied paths are not cached, so we have to
+                // start from the root and advance the cursor to the right position.
+                let mut cursor = Self::with_supplied_search_paths(context, paths);
+                for component in module_name_prefix.components() {
+                    cursor = cursor.advance(component)?;
+                }
+                Some(cursor)
+            }
         }
     }
 
@@ -63,6 +137,83 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
             self = self.advance(component)?;
         }
         self.resolve_child(last)
+    }
+
+    /// Lists the modules immediately available at the cursor's current position.
+    ///
+    /// In order to prevent cycles that might occur during recursive enumeration
+    /// (i.e., when calling this method in a loop) this method enforces the
+    /// following directory symlink policy:
+    ///
+    /// - We allow symlinks for search roots, so listing a symlinked search root
+    ///   always returns the modules available immediately beneath it.
+    /// - Below a search root, we do list the contents of a directory whose
+    ///   relative path from the search root contains a symlink.
+    ///
+    /// For example, consider the following layout in which `loop` is a symlink
+    /// back to `/src/pkg`:
+    ///
+    /// ```text
+    /// src
+    /// └── pkg
+    ///     ├── __init__.py
+    ///     ├── child.py
+    ///     └── loop -> .
+    /// ```
+    ///
+    /// Listing `pkg` will return `pkg.child` and `pkg.loop`, but listing
+    /// `pkg.loop` will not return any children because its relative path from
+    /// `/src` (i.e., `pkg/loop`) crosses a directory symlink. Recursive
+    /// enumeration would therefore stop instead of discovering
+    /// `pkg.loop.child`, `pkg.loop.loop`, and so on.
+    ///
+    /// This policy is applied independently to each portion of a namespace
+    /// package (so a directory excluded in one portion might still be included
+    /// through another).
+    ///
+    /// File symlinks are always allowed because they cannot create cycles.
+    ///
+    /// The symlink policy does not affect ordinary module resolution
+    /// (which will always traverse a finite set of directories regardless of symlinks).
+    fn list_modules(&self) -> ModuleListing<'db> {
+        let context = self.context;
+        let db = context.db;
+        let mut names = BTreeSet::new();
+
+        for directory in self.directories_allowed_for_enumeration() {
+            for entry in directory.entries(db) {
+                if let Some(name) = self.enumerable_module_name(&entry) {
+                    names.insert(CompactString::new(name));
+                }
+            }
+        }
+
+        let mut modules = Vec::new();
+        let mut unresolved_names = Vec::new();
+        for component_name in names {
+            let Some(name) = self.full_module_name(&component_name) else {
+                continue;
+            };
+
+            if let Some(candidates) = self.resolve_child(&component_name) {
+                if let Some(candidate) = candidates.into_iter().next() {
+                    let module = candidate.into_module(db, context.resolver_environment, &name);
+                    modules.push(module);
+                }
+
+                // A resolved module takes precedence over unresolved stub override names.
+                continue;
+            }
+
+            // The full search found no module, so any remaining candidates belong
+            // to the stub override search (see [`ModuleListing::unresolved_names`]).
+            unresolved_names.push(name);
+        }
+
+        ModuleListing {
+            modules: modules.into_boxed_slice(),
+            unresolved_names: unresolved_names.into_boxed_slice(),
+        }
     }
 
     /// Returns a new search which has been advanced by one component of a
@@ -99,13 +250,212 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         }
     }
 
-    #[cfg(test)]
+    fn with_paths(context: &'a ResolverContext<'db>, search_paths: RootSearchPaths<'db>) -> Self {
+        Self {
+            context,
+            position: Position::Root(search_paths),
+        }
+    }
+
+    /// Returns a representation of this cursor that can be cached with Salsa.
+    fn snapshot(&self) -> Option<ModuleSearchSnapshot> {
+        match &self.position {
+            Position::Root(_) => None,
+            Position::Prefix(resolver) => Some(resolver.snapshot(self.context)),
+        }
+    }
+
+    /// Restores a cursor from the snapshot for the given key.
+    fn restore(context: &'a ResolverContext<'db>, key: ModuleNameIngredient<'db>) -> Option<Self> {
+        Some(Self {
+            context,
+            position: Position::Prefix(PrefixResolver::restore(context, key)?),
+        })
+    }
+
+    /// Returns the directories to scan for child module names at the cursor's current position.
+    fn directories_allowed_for_enumeration(
+        &self,
+    ) -> impl Iterator<Item = Cow<'_, ModuleDirectory<'db>>> {
+        match &self.position {
+            Position::Root(paths) => Either::Left(paths.iter(self.context).map(|path| {
+                Cow::Owned(ModuleDirectory::new(
+                    self.context,
+                    path.to_module_path(),
+                    Some(true),
+                ))
+            })),
+            Position::Prefix(resolver) => Either::Right(
+                resolver
+                    .candidates(self.context)
+                    .filter(move |candidate| {
+                        !matches!(candidate.module, ResolvedModule::Module(_))
+                            && candidate.directory.enumeration_allowed(self.context.db)
+                    })
+                    .map(|candidate| Cow::Borrowed(&candidate.directory)),
+            ),
+        }
+    }
+
+    /// Returns the candidate module name supplied by the given directory entry
+    /// (if the entry does indeed supply a valid module name).
+    ///
+    /// `Some(name)` does not guarantee that the name resolves to an importable module.
+    fn enumerable_module_name<'entry>(
+        &self,
+        entry: &'entry ModuleDirectoryEntry<'db>,
+    ) -> Option<&'entry str> {
+        let name = entry.file_name()?;
+        let at_search_root = self.prefix().is_none();
+
+        // Below search roots, initializers define the parent package.
+        if !at_search_root && matches!(name, "__init__.py" | "__init__.pyi") {
+            return None;
+        }
+
+        let python_stem = || {
+            name.strip_suffix(".py")
+                .or_else(|| name.strip_suffix(".pyi"))
+        };
+        let name = match entry.file_type() {
+            FileType::Directory => name,
+            // A symlink may name either a Python file or a directory.
+            FileType::Symlink => python_stem().unwrap_or(name),
+            // Reject files without a Python source or stub extension.
+            FileType::File => python_stem()?,
+        };
+        let name = if at_search_root {
+            // Strip the suffix that identifies a top-level stub package.
+            name.strip_suffix("-stubs").unwrap_or(name)
+        } else {
+            name
+        };
+
+        // Reject invalid Python identifiers and keywords.
+        is_identifier(name).then_some(name)
+    }
+
+    /// Appends a component name to this search's module name prefix.
     fn full_module_name(&self, component_name: &str) -> Option<ModuleName> {
-        let prefix = match &self.position {
+        full_module_name(self.prefix(), component_name)
+    }
+
+    /// Returns the module name prefix, or `None` before the first component.
+    fn prefix(&self) -> Option<&ModuleName> {
+        match &self.position {
             Position::Root(_) => None,
             Position::Prefix(resolver) => Some(resolver.prefix()),
-        };
-        full_module_name(prefix, component_name)
+        }
+    }
+}
+
+/// Represents the result of enumerating the immediate submodules of a module
+/// name (or the modules immediately available at search roots).
+#[derive(Default)]
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "Module listing is consumed by the next change's cached queries"
+    )
+)]
+pub(crate) struct ModuleListing<'db> {
+    /// The list of fully resolved modules at this stage of enumeration.
+    modules: Box<[Module<'db>]>,
+    /// Unresolved module names that are nonetheless eligible for enumeration
+    /// because they may have eligible stub override candidates.
+    ///
+    /// For instance, a stub override (from a configured extra path) can supply
+    /// the module `acme.nested.tools` even if the source does not supply the
+    /// module `acme.nested`. Hence `acme.nested` must be preserved here as
+    /// an unresolved name so that we can still discover `acme.nested.tools`
+    /// underneath it at a later point in the recursive enumeration process.
+    unresolved_names: Box<[ModuleName]>,
+}
+
+/// Caches data used when searching beneath the given module name.
+///
+/// For example, enumerating either `acme.tools` or `acme.reports` requires
+/// finding the portions of `acme` across search paths and applying package and
+/// stub precedence to whittle down the set of possible module candidates that
+/// should actually be produced by the enumeration operation. As such, both
+/// enumerations can reuse a snapshot saved for `acme` before advancing through
+/// their respective final components.
+#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+fn module_search_snapshot<'db>(
+    db: &'db dyn Db,
+    name: ModuleNameIngredient<'db>,
+) -> Option<ModuleSearchSnapshot> {
+    let context = ResolverContext::new(db, name.resolver_environment(db), name.mode(db));
+    let module_name = name.name(db);
+
+    // Retrieve a cursor positioned just before the leaf of the given module name.
+    let cursor = match module_name.parent() {
+        Some(parent_name) => ModuleSearchCursor::at_module_name_prefix(
+            &context,
+            &parent_name,
+            &RootSearchPaths::Configured,
+        )?,
+        None => ModuleSearchCursor::with_configured_search_paths(&context),
+    };
+
+    // Advance the cursor through the leaf.
+    let cursor = cursor.advance(module_name.last_component())?;
+
+    cursor.snapshot()
+}
+
+/// Cached state that we use to rehydrate a [`ModuleSearchCursor`].
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+enum ModuleSearchSnapshot {
+    Typing {
+        stub_override_candidates: Box<[CachedCandidate]>,
+        full_search_candidates: Box<[CachedCandidate]>,
+    },
+    Runtime(Box<[CachedCandidate]>),
+}
+
+/// A module resolution candidate saved as part of a [`ModuleSearchSnapshot`].
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct CachedCandidate {
+    path: ModulePath,
+    module: ResolvedModule,
+    py_typed: PyTyped,
+    precedence: CandidatePrecedence,
+
+    /// Stores the result of the symlink policy for enumeration. This prevents
+    /// unnecessary cache invalidation of a `ModuleListing`, since the symlink
+    /// policy makes that result depend on the directory listing of an ancestor.
+    ///
+    /// For example, enforcing the symlink policy for `/src/acme` requires
+    /// reading `/src`. By storing this value, we make it so that we don't need
+    /// to invalidate the cached value of `acme`'s submodules if an unrelated
+    /// file is added to `/src`.
+    enumeration_allowed: bool,
+}
+
+impl CachedCandidate {
+    fn new(db: &dyn Db, candidate: &ModuleResolutionCandidate<'_>) -> Self {
+        Self {
+            path: candidate.directory.path().clone(),
+            enumeration_allowed: candidate.directory.enumeration_allowed(db),
+            module: candidate.module,
+            py_typed: candidate.py_typed,
+            precedence: candidate.precedence,
+        }
+    }
+
+    fn restore<'db>(&self, context: &ResolverContext<'db>) -> ModuleResolutionCandidate<'db> {
+        ModuleResolutionCandidate {
+            directory: ModuleDirectory::new(
+                context,
+                self.path.clone(),
+                Some(self.enumeration_allowed),
+            ),
+            module: self.module,
+            py_typed: self.py_typed,
+            precedence: self.precedence,
+        }
     }
 }
 
@@ -143,6 +493,35 @@ impl<'db> PrefixResolver<'db> {
         }
     }
 
+    /// Saves the candidates for this module name prefix.
+    fn snapshot(&self, context: &ResolverContext<'db>) -> ModuleSearchSnapshot {
+        match self {
+            Self::Typing(resolver) => resolver.snapshot(context),
+            Self::Runtime(resolver) => resolver.snapshot(context.db),
+        }
+    }
+
+    /// Restores a prefix resolver from the snapshot for the given key.
+    fn restore(context: &ResolverContext<'db>, key: ModuleNameIngredient<'db>) -> Option<Self> {
+        let snapshot = module_search_snapshot(context.db, key)?;
+        let prefix = key.name(context.db);
+
+        Some(match snapshot {
+            ModuleSearchSnapshot::Typing {
+                stub_override_candidates,
+                full_search_candidates,
+            } => Self::Typing(TypingModeResolver::restore(
+                context,
+                prefix,
+                stub_override_candidates,
+                full_search_candidates,
+            )),
+            ModuleSearchSnapshot::Runtime(candidates) => {
+                Self::Runtime(RuntimeModeResolver::restore(context, prefix, candidates))
+            }
+        })
+    }
+
     /// Returns a resolver advanced by one prefix component, retaining the candidates
     /// needed to resolve its descendants. This resolver remains reusable for siblings.
     fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
@@ -164,7 +543,16 @@ impl<'db> PrefixResolver<'db> {
         }
     }
 
-    #[cfg(test)]
+    fn candidates(
+        &self,
+        context: &ResolverContext<'db>,
+    ) -> impl Iterator<Item = &ModuleResolutionCandidate<'db>> {
+        match self {
+            Self::Typing(resolver) => Either::Left(resolver.candidates(context)),
+            Self::Runtime(resolver) => Either::Right(resolver.candidates.iter()),
+        }
+    }
+
     fn prefix(&self) -> &ModuleName {
         match self {
             Self::Typing(resolver) => &resolver.prefix,
@@ -249,7 +637,7 @@ impl<'db> TypingModeResolver<'db> {
                     extra_stub_package_paths,
                 );
                 let stub_override_candidates =
-                    normalize_candidates(context.db, root_candidates.clone(), true);
+                    normalize_candidates(context, root_candidates.clone(), true);
                 Self {
                     prefix,
                     root_candidates_from_extra_paths: (!root_candidates.is_empty())
@@ -274,6 +662,45 @@ impl<'db> TypingModeResolver<'db> {
         }
 
         Some(resolver)
+    }
+
+    /// Saves the candidates for both phases of the search.
+    fn snapshot(&self, context: &ResolverContext<'db>) -> ModuleSearchSnapshot {
+        let db = context.db;
+        ModuleSearchSnapshot::Typing {
+            stub_override_candidates: self
+                .stub_override_candidates
+                .iter()
+                .map(|candidate| CachedCandidate::new(db, candidate))
+                .collect(),
+            full_search_candidates: self
+                .full_search_candidates(context)
+                .iter()
+                .map(|candidate| CachedCandidate::new(db, candidate))
+                .collect(),
+        }
+    }
+
+    /// Restores both search phases from their cached candidates.
+    fn restore(
+        context: &ResolverContext<'db>,
+        prefix: &ModuleName,
+        stub_override_candidates: &[CachedCandidate],
+        full_search_candidates: &[CachedCandidate],
+    ) -> Self {
+        let restore = |candidates: &[CachedCandidate]| {
+            candidates
+                .iter()
+                .map(|candidate| candidate.restore(context))
+                .collect()
+        };
+
+        Self {
+            prefix: prefix.clone(),
+            root_candidates_from_extra_paths: None,
+            stub_override_candidates: restore(stub_override_candidates),
+            full_search_candidates: OnceCell::from(restore(full_search_candidates)),
+        }
     }
 
     fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
@@ -352,6 +779,15 @@ impl<'db> TypingModeResolver<'db> {
         (!candidates.is_empty()).then_some(candidates)
     }
 
+    fn candidates(
+        &self,
+        context: &ResolverContext<'db>,
+    ) -> impl Iterator<Item = &ModuleResolutionCandidate<'db>> {
+        self.stub_override_candidates
+            .iter()
+            .chain(self.full_search_candidates(context))
+    }
+
     /// Returns module candidates for the full search, initializing the candidates
     /// on first access if needed.
     fn full_search_candidates(&self, context: &ResolverContext<'db>) -> &ResolvedNames<'db> {
@@ -375,7 +811,7 @@ impl<'db> TypingModeResolver<'db> {
                     .skip_while(|path| path.is_extra()),
                 remaining_stub_package_paths,
             ));
-            candidates = normalize_candidates(context.db, candidates, true);
+            candidates = normalize_candidates(context, candidates, true);
 
             for component_name in self.prefix.components().skip(1) {
                 candidates = advance_candidates(
@@ -410,6 +846,31 @@ impl<'db> RuntimeModeResolver<'db> {
     ) -> Option<Self> {
         let candidates = paths.resolve_root(context, &prefix, true);
         (!candidates.is_empty()).then_some(Self { prefix, candidates })
+    }
+
+    /// Saves the runtime search candidates.
+    fn snapshot(&self, db: &dyn Db) -> ModuleSearchSnapshot {
+        ModuleSearchSnapshot::Runtime(
+            self.candidates
+                .iter()
+                .map(|candidate| CachedCandidate::new(db, candidate))
+                .collect(),
+        )
+    }
+
+    /// Restores the runtime search from its cached candidates.
+    fn restore(
+        context: &ResolverContext<'db>,
+        prefix: &ModuleName,
+        candidates: &[CachedCandidate],
+    ) -> Self {
+        Self {
+            prefix: prefix.clone(),
+            candidates: candidates
+                .iter()
+                .map(|candidate| candidate.restore(context))
+                .collect(),
+        }
     }
 
     fn advance(&self, context: &ResolverContext<'db>, component_name: &str) -> Option<Self> {
@@ -489,7 +950,7 @@ impl<'db> RootSearchPaths<'db> {
             stub_paths,
         );
 
-        normalize_candidates(context.db, candidates, for_module_name_prefix)
+        normalize_candidates(context, candidates, for_module_name_prefix)
     }
 
     fn iter(&self, context: &ResolverContext<'db>) -> impl Iterator<Item = &'db SearchPath> {
@@ -539,7 +1000,8 @@ fn discover_roots<'db, 'a>(
         }));
         // Defer file probes after stdlib until we know that stdlib does not win.
         pending_stub_paths.extend(stub_paths.after_stdlib.iter().filter(|search_path| {
-            ModuleDirectory::new(context, search_path.to_module_path()).may_contain_name(stub_name)
+            ModuleDirectory::new(context, search_path.to_module_path(), Some(true))
+                .may_contain_name(stub_name)
         }));
     }
 
@@ -565,7 +1027,7 @@ fn discover_roots<'db, 'a>(
             ComponentFileFilter::ByMode,
         )
         .is_ok();
-        let terminal = candidate.missing_submodule_is_terminal();
+        let terminal = candidate.missing_submodule_is_terminal(context);
         if resolved {
             cur_candidates.push(candidate);
         }
@@ -609,7 +1071,9 @@ fn advance_candidates<'db>(
     component_name_is_prefix: bool,
 ) -> ResolvedNames<'db> {
     let mut remaining_are_shadowed = false;
+    let mut remaining = candidates.len();
     candidates.retain_mut(|candidate| {
+        remaining -= 1;
         if remaining_are_shadowed {
             return false;
         }
@@ -618,11 +1082,11 @@ fn advance_candidates<'db>(
 
         // A terminal candidate shadows every lower-priority candidate, even if resolving
         // this component fails. Higher-priority candidates remain in play.
-        remaining_are_shadowed = candidate.missing_submodule_is_terminal();
+        remaining_are_shadowed = remaining > 0 && candidate.missing_submodule_is_terminal(context);
 
         resolved
     });
-    normalize_candidates(context.db, candidates, component_name_is_prefix)
+    normalize_candidates(context, candidates, component_name_is_prefix)
 }
 
 fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option<ModuleName> {
@@ -639,13 +1103,24 @@ fn full_module_name(prefix: Option<&ModuleName>, component_name: &str) -> Option
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_debug_snapshot;
+
+    #[cfg(target_family = "unix")]
+    use ruff_db::Db as _;
     use ruff_db::system::SystemPath;
+    #[cfg(target_family = "unix")]
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, OsSystem};
 
+    use crate::ModuleName;
     use crate::db::tests::TestDb;
-    use crate::resolve::ModuleResolveMode;
-    use crate::testing::TestCaseBuilder;
+    use crate::resolve::{ModuleResolveMode, ResolverContext};
+    #[cfg(target_family = "unix")]
+    use crate::settings::SearchPathSettings;
+    #[cfg(target_family = "unix")]
+    use crate::strategy::FallibleStrategy;
+    use crate::testing::{ModuleDebugSnapshot, TestCaseBuilder};
 
-    use super::{ModuleSearchCursor, ResolverContext};
+    use super::{ModuleListing, ModuleSearchCursor, list_root_modules, list_submodules};
 
     #[test]
     fn module_search_can_be_reused_across_sibling_module_resolutions() {
@@ -726,6 +1201,223 @@ mod tests {
         }
     }
 
+    #[test]
+    fn module_enumeration_excludes_local_files_with_protected_standard_library_names() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("leaf.py", ""), ("sys.py", "")])
+            .build()
+            .db;
+        // A local file cannot supply a protected name, even when typeshed omits it.
+        ListingCase::root().expect_module("leaf").assert(&db);
+    }
+
+    #[test]
+    fn module_enumeration_includes_namespaces_inside_regular_packages() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("regular/__init__.py", ""),
+                ("regular/namespace/child.py", ""),
+            ])
+            .build()
+            .db;
+        ListingCase::for_name("regular")
+            .expect_module("regular.namespace")
+            .assert(&db);
+        ListingCase::for_name("regular.namespace")
+            .expect_module("regular.namespace.child")
+            .assert(&db);
+    }
+
+    #[test]
+    fn module_enumeration_uses_resolution_precedence_for_namespace_children() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("acme/package/__init__.py", ""),
+                // The regular package excludes children from the other namespace portion.
+                ("acme/package/local.py", ""),
+                // A file module blocks descendants from a competing namespace directory.
+                ("acme/module.py", ""),
+            ])
+            .with_site_packages_files(&[
+                ("acme/package/hidden.py", ""),
+                ("acme/module/hidden.py", ""),
+            ])
+            .build()
+            .db;
+        assert_debug_snapshot!(ListingCase::for_name("acme").snapshot(&db), @r#"
+        [
+            Module::File("acme.module", "first-party", "/src/acme/module.py", Module, None),
+            Module::File("acme.package", "first-party", "/src/acme/package/__init__.py", Package, None),
+        ]
+        "#);
+        assert_debug_snapshot!(ListingCase::for_name("acme.package").snapshot(&db), @r#"
+        [
+            Module::File("acme.package.local", "first-party", "/src/acme/package/local.py", Module, None),
+        ]
+        "#);
+        ListingCase::for_name("acme.module").assert(&db);
+    }
+
+    #[test]
+    fn module_enumeration_combines_partial_stub_namespaces_with_source_packages() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/__init__.py", ""), ("acme/runtime.py", "")])
+            .with_site_packages_files(&[
+                ("acme-stubs/stubbed.pyi", ""),
+                ("acme-stubs/py.typed", "partial\n"),
+            ])
+            .build()
+            .db;
+        assert_debug_snapshot!(ListingCase::for_name("acme").snapshot(&db), @r#"
+        [
+            Module::File("acme.runtime", "first-party", "/src/acme/runtime.py", Module, None),
+            Module::File("acme.stubbed", "site-packages", "/site-packages/acme-stubs/stubbed.pyi", Module, None),
+        ]
+        "#);
+    }
+
+    #[test]
+    fn module_enumeration_includes_partial_stub_descendants_of_source_modules() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme.py", "")])
+            .with_site_packages_files(&[
+                ("acme-stubs/child.pyi", ""),
+                ("acme-stubs/py.typed", "partial\n"),
+            ])
+            .build()
+            .db;
+        ListingCase::for_name("acme")
+            .expect_module("acme.child")
+            .assert(&db);
+    }
+
+    #[test]
+    fn module_enumeration_combines_stub_overrides_with_source_siblings() {
+        let db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/__init__.py", ""), ("acme/runtime.py", "")])
+            .with_extra_path("/extra", &[("acme/stubbed.pyi", "")])
+            .build()
+            .db;
+        assert_debug_snapshot!(ListingCase::for_name("acme").snapshot(&db), @r#"
+        [
+            Module::File("acme.runtime", "first-party", "/src/acme/runtime.py", Module, None),
+            Module::File("acme.stubbed", "extra", "/extra/acme/stubbed.pyi", Module, None),
+        ]
+        "#);
+    }
+
+    #[test]
+    #[cfg(target_family = "unix")]
+    fn module_enumeration_of_aliases_does_not_traverse_directory_symlinks() -> anyhow::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        let root = temp.path().canonicalize()?;
+        let root = SystemPath::from_std_path(&root).expect("UTF-8 workspace path");
+        let mut db = TestDb::new();
+        db.use_system(OsSystem::new(root));
+        for path in [
+            "site-packages/acme/shared.py",
+            "site-packages/acme/visible.py",
+            "other_ns/shared.py",
+            "other_ns/hidden.py",
+            "src/regular/__init__.py",
+            "src/regular/nested/child.py",
+        ] {
+            db.write_file(root.join(path), "")?;
+        }
+        for (source, link) in [
+            ("other_ns", "src/acme"),
+            ("src/regular", "src/alias"),
+            ("src/regular/__init__.py", "src/regular/nested/__init__.py"),
+        ] {
+            std::os::unix::fs::symlink(root.join(source), root.join(link))?;
+        }
+
+        let settings = SearchPathSettings {
+            src_roots: vec![root.join("src")],
+            site_packages_paths: vec![root.join("site-packages")],
+            ..SearchPathSettings::empty()
+        };
+        db.set_search_paths(settings.to_search_paths(
+            db.system(),
+            db.vendored(),
+            &FallibleStrategy,
+        )?);
+
+        // The ordinary namespace portion supplies names, but resolution can select an alias.
+        ListingCase::for_name("acme")
+            .expect_modules(&["acme.shared", "acme.visible"])
+            .assert(&db);
+        // An initializer symlink does not prevent traversal of its containing directory.
+        ListingCase::for_name("regular.nested")
+            .expect_module("regular.nested.child")
+            .assert(&db);
+        ListingCase::for_name("alias").assert(&db);
+        ListingCase::for_name("alias.nested").assert(&db);
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(target_family = "unix")]
+    fn module_enumeration_supports_symlinked_search_roots() -> anyhow::Result<()> {
+        let temp = tempfile::TempDir::new()?;
+        let root = temp.path().canonicalize()?;
+        let root = SystemPath::from_std_path(&root).expect("UTF-8 workspace path");
+        let mut db = TestDb::new();
+        db.use_system(OsSystem::new(root));
+        db.write_file(root.join("source/pkg/__init__.py"), "")?;
+        db.write_file(root.join("source/pkg/child.py"), "")?;
+        db.write_file(root.join("typeshed/stdlib/VERSIONS"), "")?;
+        std::os::unix::fs::symlink(root.join("source"), root.join("src"))?;
+
+        let settings = SearchPathSettings {
+            src_roots: vec![root.join("src")],
+            custom_typeshed: Some(root.join("typeshed")),
+            ..SearchPathSettings::empty()
+        };
+        db.set_search_paths(settings.to_search_paths(
+            db.system(),
+            db.vendored(),
+            &FallibleStrategy,
+        )?);
+
+        ListingCase::root().expect_module("pkg").assert(&db);
+        ListingCase::for_name("pkg")
+            .expect_module("pkg.child")
+            .assert(&db);
+
+        Ok(())
+    }
+
+    #[test]
+    fn module_enumeration_excludes_stub_files_in_runtime_mode() {
+        let db = TestCaseBuilder::new()
+            .with_site_packages_files(&[
+                ("acme/__init__.py", ""),
+                ("acme/child.py", ""),
+                ("acme/stub_only.pyi", ""),
+            ])
+            .build()
+            .db;
+        let context =
+            ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Runtime);
+        let name = ModuleName::new_static("acme").expect("valid name");
+        let module = crate::resolve_real_module_confident(&db, db.resolver_environment(), &name)
+            .expect("runtime package");
+        let listing = list_submodules(&context, module);
+        assert_eq!(listing.modules.len(), 1);
+        let child = listing.modules[0];
+        assert_eq!(child.name(&db).as_str(), "acme.child");
+        assert_eq!(
+            child
+                .file(&db)
+                .expect("source file")
+                .path(&db)
+                .as_system_path(),
+            Some(SystemPath::new("/site-packages/acme/child.py"))
+        );
+    }
+
     fn assert_resolves_to(
         db: &TestDb,
         search: &ModuleSearchCursor,
@@ -745,5 +1437,91 @@ mod tests {
             file.path(db).as_system_path(),
             Some(SystemPath::new(expected))
         );
+    }
+
+    /// An enumeration target and the modules expected beneath it.
+    struct ListingCase<'a> {
+        parent_module_name: Option<&'a str>,
+        expected_module_names: Vec<&'a str>,
+    }
+
+    impl<'a> ListingCase<'a> {
+        fn root() -> Self {
+            Self {
+                parent_module_name: None,
+                expected_module_names: Vec::new(),
+            }
+        }
+
+        fn for_name(name: &'a str) -> Self {
+            Self {
+                parent_module_name: Some(name),
+                ..Self::root()
+            }
+        }
+
+        fn expect_module(mut self, name: &'a str) -> Self {
+            self.expected_module_names.push(name);
+            self
+        }
+
+        fn expect_modules(mut self, names: &[&'a str]) -> Self {
+            self.expected_module_names.extend_from_slice(names);
+            self
+        }
+
+        /// Formats listed modules after checking that they agree with ordinary resolution.
+        #[track_caller]
+        fn snapshot<'db>(&self, db: &'db TestDb) -> Vec<ModuleDebugSnapshot<'db>> {
+            let listing = self.list_modules(db);
+            listing
+                .modules
+                .into_iter()
+                .map(|module| ModuleDebugSnapshot { db, module })
+                .collect()
+        }
+
+        #[track_caller]
+        fn assert(&self, db: &TestDb) {
+            let listing = self.list_modules(db);
+            let module_names: Vec<_> = listing
+                .modules
+                .iter()
+                .map(|module| module.name(db).as_str())
+                .collect();
+            assert_eq!(module_names, self.expected_module_names);
+        }
+
+        /// Lists modules and checks that enumeration agrees with ordinary resolution.
+        #[track_caller]
+        fn list_modules<'db>(&self, db: &'db TestDb) -> ModuleListing<'db> {
+            let context =
+                ResolverContext::new(db, db.resolver_environment(), ModuleResolveMode::Typing);
+            let listing = match self.parent_module_name {
+                None => list_root_modules(&context),
+                Some(name) => {
+                    let name = ModuleName::new(name).expect("valid module name");
+                    let module =
+                        crate::resolve_module_confident(db, db.resolver_environment(), &name)
+                            .expect("parent module resolves");
+                    list_submodules(&context, module)
+                }
+            };
+            for module in &listing.modules {
+                let name = module.name(db);
+                assert_eq!(
+                    Some(*module),
+                    crate::resolve_module_confident(db, db.resolver_environment(), name),
+                    "enumeration must agree with resolution for {name}"
+                );
+            }
+            for name in &listing.unresolved_names {
+                assert!(
+                    crate::resolve_module_confident(db, db.resolver_environment(), name).is_none(),
+                    "unresolved name {name} must not resolve"
+                );
+            }
+            listing
+        }
     }
 }
