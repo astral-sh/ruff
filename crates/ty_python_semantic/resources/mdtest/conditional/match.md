@@ -657,6 +657,93 @@ def _(target: int, flag: NotBoolable):
     reveal_type(y)  # revealed: Literal[1, 2, 3]
 ```
 
+## Reachability after guarded patterns
+
+In these examples, an always-true guard makes the later case with the same pattern unreachable. A
+false or ambiguous guard can let the later case match.
+
+```py
+def always_true_guard(value: int | str) -> None:
+    match value:
+        # The guard is statically known to be true, so the second case is unreachable.
+        case str() if True:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 3]
+
+def always_false_guard(value: int | str) -> None:
+    match value:
+        # The guard is always false, so strings can reach the second case.
+        case str() if False:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[2, 3]
+
+def ambiguous_guard(value: int | str, flag: bool) -> None:
+    match value:
+        # The guard may be false, so strings can reach the second case.
+        case str() if flag:
+            result = 1
+        case str():
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 2, 3]
+```
+
+## Reachability after guarded enum patterns
+
+An enum member matched by an always-true guarded case cannot reach the same pattern in a later case.
+A false or ambiguous guard can leave that pattern reachable.
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+def enum_with_always_true_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # The guard is statically known to be true, so the second case is unreachable.
+        case Color.RED if True:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 3]
+
+def enum_with_always_false_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # The guard is always false, so `Color.RED` can reach the second case.
+        case Color.RED if False:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[2, 3]
+
+def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool) -> None:
+    match value:
+        # The guard may be false, so `Color.RED` can reach the second case.
+        case Color.RED if flag:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 2, 3]
+```
+
 ## Matching on enum | None without covering None
 
 When matching on a union of an enum and None, code after the match should still be reachable if None

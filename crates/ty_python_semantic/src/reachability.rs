@@ -234,7 +234,7 @@ use ty_python_core::{
     use_def_map,
 };
 
-/// Narrow `subject_ty` by all preceding unguarded match patterns.
+/// Narrow `subject_ty` by preceding match patterns with no guard or an always-true guard.
 ///
 /// Caching each prefix lets the next case reuse the already-normalized subject instead of
 /// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
@@ -260,16 +260,24 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     let narrowed_by_previous_patterns =
         type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
-    if previous.guard(db).is_some() {
-        narrowed_by_previous_patterns
-    } else {
+    if pattern_guard_allows_all_matches(db, previous) {
         type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
+    } else {
+        narrowed_by_previous_patterns
     }
+}
+
+/// Whether the guard cannot reject a value matched by the pattern.
+fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
+    // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
+    predicate
+        .guard(db)
+        .is_none_or(|guard| analyze_condition(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
 ///
-/// This result is also the preceding-pattern prefix for the next unguarded case.
+/// This result is also the preceding-pattern prefix when the guard allows every match.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
@@ -412,9 +420,9 @@ fn enum_member_pattern_coverage<'db>(
 
 /// Determine the static truthiness of a `match` case over a union of enum literals.
 ///
-/// The analysis removes enum members already matched by earlier unguarded cases, then decides
-/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
-/// ambiguous because the guard can reject an otherwise matching enum member.
+/// The analysis removes enum members already matched by earlier cases whose guards cannot reject
+/// them, then decides whether the current case is impossible, exhaustive, or still ambiguous.
+/// Guarded cases remain ambiguous because the guard can reject an otherwise matching enum member.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -432,7 +440,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     while let Some(previous) = previous_predicate.previous_predicate(db) {
         previous_predicate = *previous;
 
-        if previous_predicate.guard(db).is_some() {
+        if !pattern_guard_allows_all_matches(db, previous_predicate) {
             continue;
         }
 

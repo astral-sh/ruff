@@ -454,7 +454,8 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
 /// Infer the types of all names bound when `pattern` succeeds.
 ///
 /// The subject starts with its inferred type after removing values definitely matched by earlier
-/// unguarded cases. The analysis then checks the complete pattern before recording any bindings:
+/// cases with no guard or an always-true guard. The analysis then checks the complete pattern
+/// before recording any bindings:
 ///
 /// ```python
 /// def f(value: int | str) -> None:

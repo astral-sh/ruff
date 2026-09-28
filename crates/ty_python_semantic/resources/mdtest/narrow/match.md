@@ -107,6 +107,94 @@ def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
             reveal_type(x)  # revealed: A
 ```
 
+## Previous patterns with guards
+
+A pattern with an always-true guard excludes the same values from later captures as an unguarded
+pattern. A false or ambiguous guard can let the matched value reach a later case.
+
+```py
+def always_true_guard(value: int | str) -> None:
+    match value:
+        # The guard is statically known to be true, so strings cannot reach the next case.
+        case str() if True:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+            reveal_type(value)  # revealed: int
+
+def always_false_guard(value: int | str) -> None:
+    match value:
+        # The guard is always false, so strings can reach the next case.
+        case str() if False:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+            reveal_type(value)  # revealed: int | str
+
+def ambiguous_guard(value: int | str, flag: bool) -> None:
+    match value:
+        # The guard may be false, so strings can reach the next case.
+        case str() if flag:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+            reveal_type(value)  # revealed: int | str
+```
+
+## Previous guards using pattern captures
+
+The guard can be proven always true from the type of a captured value. In each example, the later
+capture excludes the values matched by the guarded pattern.
+
+```py
+from typing import Literal
+
+def guard_using_capture(value: int | str) -> None:
+    match value:
+        # `captured` is a string, so the guard is always true and strings cannot reach the next case.
+        case str() as captured if captured is not None:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+
+def guard_using_sequence_capture(value: tuple[int] | str) -> None:
+    match value:
+        # `captured` is an int, so the guard is always true and the tuple cannot reach the next case.
+        case [captured] if captured is not None:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: str
+
+def guard_using_comparison(value: Literal[1, 2]) -> None:
+    match value:
+        # `captured` is `Literal[1]`, so the guard is always true and `1` cannot reach the next case.
+        case 1 as captured if captured == 1:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: Literal[2]
+```
+
+## Multiple previous guarded patterns
+
+With multiple preceding guarded cases, only a pattern whose guard is always true excludes values
+from a later capture.
+
+```py
+def mixed_guards(value: int | str | bytes, flag: bool) -> None:
+    match value:
+        # The guard is false, so bytes can reach the last case.
+        case bytes() if False:
+            pass
+        # The guard is ambiguous, so strings can reach the last case.
+        case str() if flag:
+            pass
+        # The guard is always true, so ints cannot reach the last case.
+        case int() if True:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: str | bytes
+```
+
 ## Class patterns with generic classes
 
 ### Gradual mode
@@ -3468,6 +3556,35 @@ def capture_from_later_global() -> int:
 match capture_from_later_global():
     case captured:
         reveal_type(captured)  # revealed: int
+```
+
+Guard inference can also depend on a loop-carried match subject and its pattern captures. In these
+examples, an always-true guard excludes strings from a later capture, while a guard that can be
+false allows strings to reach it.
+
+```py
+def loop_carried_guard(value: int | str, again: bool) -> None:
+    while again:
+        match value:
+            # `captured` is a string, so the guard is always true and strings cannot reach the next case.
+            case str() as captured if captured is not None:
+                value = 1
+            case remaining:
+                reveal_type(remaining)  # revealed: int
+                value = remaining
+
+def loop_carried_ambiguous_guard(value: int | str, again: bool) -> None:
+    guard = False
+    while again:
+        match value:
+            # The guard can be false on the first iteration and true on a later one.
+            case str() if guard:
+                value = 1
+            case remaining:
+                # Because the guard can be false, strings can reach this case.
+                reveal_type(remaining)  # revealed: int | str
+                value = remaining
+                guard = True
 ```
 
 ## Value patterns
