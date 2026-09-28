@@ -3104,9 +3104,28 @@ class Invalid(Base):
     values = ("wrong",)  # error: [invalid-assignment]
 
 class Redeclared(Base):
+    # TODO: Report a Liskov violation for the incompatible redeclaration.
     value: str = "child"
 
 reveal_type(Redeclared.value)  # revealed: str
+```
+
+### Defaults for attributes declared in methods
+
+Annotations on instance attributes declared in methods do not yet provide context for subclass
+defaults.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.items: list[int] = [42]
+
+class Child(Base):
+    items = []
+
+# TODO: The inherited annotation should provide context for the default.
+reveal_type(Child.items)  # revealed: list[Unknown]
+reveal_type(Child().items)  # revealed: list[Unknown] | list[int]
 ```
 
 ### Gradual types and class-variable qualifiers are inherited
@@ -3129,8 +3148,10 @@ def check(child: Child) -> None:
     reveal_type(child.dynamic)  # revealed: Any
     reveal_type(child.class_only)  # revealed: int | str
     child.dynamic = 1
-    child.class_only = 1  # error: [invalid-attribute-access]
+    # error: [invalid-attribute-access] "Cannot assign to ClassVar `class_only` from an instance of type `Child`"
+    child.class_only = 1
 
+# no diagnostic: attribute writes are still allowed on the class itself
 Child.class_only = 1
 ```
 
@@ -3190,23 +3211,21 @@ An annotation can have several source locations. Identical annotations on both b
 provide a single declared type for subclass defaults.
 
 ```py
-def flag() -> bool:
-    return True
+def _(condition: bool):
+    class Base:
+        if condition:
+            value: int | str = 0
+        else:
+            value: int | str = "base"
 
-class Base:
-    if flag():
-        value: int | str = 0
-    else:
-        value: int | str = "base"
+    class Child(Base):
+        value = "child"
 
-class Child(Base):
-    value = "child"
+    class Grandchild(Child):
+        value = 1
 
-class Grandchild(Child):
-    value = 1
-
-reveal_type(Child.value)  # revealed: int | str
-reveal_type(Grandchild.value)  # revealed: int | str
+    reveal_type(Child.value)  # revealed: int | str
+    reveal_type(Grandchild.value)  # revealed: int | str
 ```
 
 ### Unreachable declarations do not hide inherited annotations
@@ -3219,7 +3238,7 @@ class Base:
     value: int = 0
 
     if 1 == 2:
-        def value(self) -> str:
+        def value(self) -> str:  # unreachable
             return "unreachable"
 
 class Child(Base):
@@ -3235,12 +3254,15 @@ reveal_type(Invalid.value)  # revealed: int
 ### Unreachable bindings do not mask inherited declarations
 
 A base with no reachable binding or declaration does not supply an attribute. Lookup continues to
-the next base in the MRO.
+the next base in the MRO. A reachable unannotated binding, by contrast, masks the later declaration.
 
 ```py
 class Left:
     if 1 == 2:
-        value = 0
+        value = 0  # unreachable
+
+class ReachableLeft:
+    value = 0
 
 class Right:
     value: int = 0
@@ -3249,6 +3271,11 @@ class Child(Left, Right):
     value = "wrong"  # error: [invalid-assignment]
 
 reveal_type(Child.value)  # revealed: int
+
+class WithReachableBinding(ReachableLeft, Right):
+    value = "child"
+
+reveal_type(WithReachableBinding.value)  # revealed: str
 ```
 
 ### Unannotated defaults retain their owner's declaration

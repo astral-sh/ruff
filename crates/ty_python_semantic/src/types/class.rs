@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_attribute_declaration};
+use crate::types::member::{Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -2927,13 +2927,18 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
     /// prevent us from determining which declaration applies. Final declarations are handled by
     /// override diagnostics instead of supplying initializer context.
-    pub(super) fn class_attribute_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
                 ClassBase::Generic | ClassBase::Protocol => continue,
                 ClassBase::Class(base) => base,
-                _ => return None,
+                // A dynamic base may supply the member, a divergent base is not yet known,
+                // and TypedDict has a special member lookup.
+                ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_)
+                | ClassBase::TypedDict(_) => return None,
             };
             let (base, specialization) = base.static_class_literal(db)?;
             let scope = base.body_scope(db);
@@ -2956,7 +2961,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_attribute_declaration(db, scope, symbol)
+                inherited_class_body_declaration(db, scope, symbol)
             } else {
                 (!declared.qualifiers.contains(TypeQualifiers::FINAL)
                     && declarations.contains_only_annotated_assignments(db))

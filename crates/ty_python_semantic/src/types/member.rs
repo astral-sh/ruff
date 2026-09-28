@@ -69,7 +69,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
             if let Place::Defined(ref mut place) = place_and_quals.place
                 && place.origin == TypeOrigin::Inferred
-                && let Some(inherited) = inherited_class_attribute_declaration(db, scope, symbol_id)
+                && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
                 && let Place::Defined(declared) = inherited.place
             {
                 // The annotation determines the public type, but the value is still supplied
@@ -126,13 +126,13 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
         .unwrap_or_default()
 }
 
-/// Returns the inherited annotation governing an unannotated class attribute.
+/// Returns the inherited class-body annotation governing an unannotated class attribute.
 ///
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
 /// while an explicit annotation or a new method definition supplies its own public type.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn inherited_class_attribute_declaration<'db>(
+pub(super) fn inherited_class_body_declaration<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
@@ -155,5 +155,5 @@ pub(super) fn inherited_class_attribute_declaration<'db>(
         &env,
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
-    .class_attribute_declaration(name)
+    .class_body_declaration(name)
 }
