@@ -15,7 +15,7 @@
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 use compact_str::CompactString;
@@ -25,15 +25,15 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::ResolverEnvironment;
 use crate::db::Db;
-use crate::module::Module;
+use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::{ModuleDirectory, ModuleDirectoryEntry, ModulePath, SearchPath};
 
 use super::{
     CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
-    ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
-    StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
-    search_paths, stub_package_index,
+    ModuleResolveMode, ModuleResolveModeIngredient, PyTyped, ResolvedModule, ResolvedNames,
+    ResolverContext, StubPackageIndex, StubPackagePaths, normalize_candidates, resolve_component,
+    resolve_stub_package_in_search_path, stub_package_index,
 };
 
 /// Recursively lists all available modules and submodules.
@@ -81,16 +81,22 @@ pub(crate) fn list_submodules<'db>(db: &'db dyn Db, module: Module<'db>) -> Modu
     // Desperate resolution can use a search path absent from the configuration.
     // Preserve that path when listing the module's submodules.
     let paths = match module.search_path(db) {
-        Some(path)
-            if !search_paths(db, resolver_environment, ModuleResolveMode::Typing)
-                .any(|configured| configured == path) =>
-        {
+        Some(path) if !context.search_paths().any(|configured| configured == path) => {
             RootSearchPaths::Supplied(std::slice::from_ref(path))
         }
         _ => RootSearchPaths::Configured,
     };
 
-    ModuleSearchCursor::at_module_name_prefix(&context, module.name(db), &paths)
+    let name = module.name(db);
+    // Directory summaries cover only configured search paths.
+    if matches!(paths, RootSearchPaths::Configured)
+        && module.kind(db) == ModuleKind::Module
+        && !may_have_children(&context, name)
+    {
+        return ModuleListing::default();
+    }
+
+    ModuleSearchCursor::at_module_name_prefix(&context, name, &paths)
         .map(|search| search.list_modules())
         .unwrap_or_default()
 }
@@ -150,8 +156,8 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
                 let key = ModuleNameIngredient::new(
                     context.db,
                     module_name_prefix,
-                    context.mode,
-                    context.resolver_environment,
+                    context.mode(),
+                    context.resolver_environment(),
                 );
                 Self::restore(context, key)
             }
@@ -238,7 +244,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 
             if let Some(candidates) = self.resolve_child(&component_name) {
                 if let Some(candidate) = candidates.into_iter().next() {
-                    let module = candidate.into_module(db, context.resolver_environment, &name);
+                    let module = candidate.into_module(db, context.resolver_environment(), &name);
                     modules.push(module);
                     if has_directory {
                         modules_with_possible_children.push(module);
@@ -461,6 +467,80 @@ impl<'db> ModuleListing<'db> {
     }
 }
 
+/// Uses conservative checks to rule out descendants of a file module before reconstructing
+/// its module search and resolving child names. Returning `true` means the full search
+/// is still needed; it does not guarantee that a child resolves.
+fn may_have_children(context: &ResolverContext, name: &ModuleName) -> bool {
+    // With `acme.py` and a partial `acme-stubs/child.pyi`, `acme` resolves to a file
+    // but `acme.child` still resolves to the stub. The directory-name check below looks
+    // for `acme`, not `acme-stubs`, so environments containing stub packages need the full search.
+    if context.mode().is_typing()
+        && !stub_package_index(context.db, context.resolver_environment())
+            .all()
+            .is_empty()
+    {
+        return true;
+    }
+
+    let parent = match name.parent() {
+        Some(parent) => DirectoryParent::Prefix(ModuleNameIngredient::new(
+            context.db,
+            parent,
+            context.mode(),
+            context.resolver_environment(),
+        )),
+        None => DirectoryParent::Root(context.mode),
+    };
+    let last_component = name.last_component();
+    child_directory_names(context.db, parent)
+        .binary_search_by(|child| child.as_str().cmp(last_component))
+        .is_ok()
+}
+
+/// Non-symlink directory names beneath this prefix across the configured search paths.
+///
+/// Sibling modules share this result. Adding a regular file to an existing directory
+/// leaves the summary unchanged because the summary contains only directory names.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn child_directory_names<'db>(db: &'db dyn Db, parent: DirectoryParent<'db>) -> Box<[String]> {
+    let (context, parent) = match parent {
+        DirectoryParent::Root(mode) => (ResolverContext::from_mode(db, mode), None),
+        DirectoryParent::Prefix(parent) => (
+            ResolverContext::new(db, parent.resolver_environment(db), parent.mode(db)),
+            Some(parent.name(db)),
+        ),
+    };
+    let mut names = BTreeSet::new();
+
+    for search_path in context.search_paths() {
+        let mut path = search_path.to_module_path();
+        if let Some(parent) = parent {
+            for component_name in parent.components() {
+                path.push(component_name);
+            }
+        }
+
+        let directory = ModuleDirectory::new(&context, path, None);
+        for entry in directory.entries(db) {
+            if entry.file_type() == FileType::Directory
+                && let Some(name) = entry.file_name()
+                && is_identifier(name)
+            {
+                names.insert(name.to_owned());
+            }
+        }
+    }
+
+    names.into_iter().collect()
+}
+
+/// Reuses the root or prefix ingredient without interning another combined query key.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype)]
+enum DirectoryParent<'db> {
+    Root(ModuleResolveModeIngredient<'db>),
+    Prefix(ModuleNameIngredient<'db>),
+}
+
 /// Caches data used when searching beneath the given module name.
 ///
 /// For example, enumerating either `acme.tools` or `acme.reports` requires
@@ -574,7 +654,7 @@ impl<'db> PrefixResolver<'db> {
         component_name: &str,
     ) -> Option<Self> {
         let prefix = ModuleName::new(component_name)?;
-        if context.mode.is_typing() {
+        if context.mode().is_typing() {
             TypingModeResolver::new(context, paths, prefix).map(Self::Typing)
         } else {
             RuntimeModeResolver::new(context, paths, prefix).map(Self::Runtime)
@@ -714,14 +794,13 @@ impl<'db> TypingModeResolver<'db> {
         let resolver = match paths {
             RootSearchPaths::Configured => {
                 let (extra_stub_package_paths, _) =
-                    stub_package_index(context.db, context.resolver_environment)
+                    stub_package_index(context.db, context.resolver_environment())
                         .split_by_extra_paths();
                 let root_candidates = discover_roots(
                     context,
                     prefix.as_str(),
                     false,
-                    search_paths(context.db, context.resolver_environment, context.mode)
-                        .take_while(|path| path.is_extra()),
+                    context.search_paths().take_while(|path| path.is_extra()),
                     extra_stub_package_paths,
                 );
                 let stub_override_candidates =
@@ -881,7 +960,8 @@ impl<'db> TypingModeResolver<'db> {
     fn full_search_candidates(&self, context: &ResolverContext<'db>) -> &ResolvedNames<'db> {
         self.full_search_candidates.get_or_init(|| {
             let (_, remaining_stub_package_paths) =
-                stub_package_index(context.db, context.resolver_environment).split_by_extra_paths();
+                stub_package_index(context.db, context.resolver_environment())
+                    .split_by_extra_paths();
 
             // Combine candidates across all search paths before traversing the
             // module name prefix, so that an ordinary package in one search path
@@ -895,8 +975,7 @@ impl<'db> TypingModeResolver<'db> {
                 context,
                 self.prefix.first_component(),
                 false,
-                search_paths(context.db, context.resolver_environment, context.mode)
-                    .skip_while(|path| path.is_extra()),
+                context.search_paths().skip_while(|path| path.is_extra()),
                 remaining_stub_package_paths,
             ));
             candidates = normalize_candidates(context, candidates, true);
@@ -1003,9 +1082,9 @@ impl<'db> RootSearchPaths<'db> {
         for_module_name_prefix: bool,
     ) -> ResolvedNames<'db> {
         let is_non_shadowable = !for_module_name_prefix
-            && context.mode.is_non_shadowable(
+            && context.mode().is_non_shadowable(
                 context
-                    .resolver_environment
+                    .resolver_environment()
                     .python_version(context.db)
                     .minor,
                 name.as_str(),
@@ -1014,10 +1093,11 @@ impl<'db> RootSearchPaths<'db> {
         // Typing mode requires us to consider stub-only packages (such as the package named
         // `acme-stubs`, which only contains `.pyi` files) when resolving a module name
         // (e.g., the name `acme`), so we must select all stub package paths here.
-        let stub_packages = context.mode.is_typing().then(|| match self {
-            Self::Configured => {
-                Cow::Borrowed(stub_package_index(context.db, context.resolver_environment))
-            }
+        let stub_packages = context.mode().is_typing().then(|| match self {
+            Self::Configured => Cow::Borrowed(stub_package_index(
+                context.db,
+                context.resolver_environment(),
+            )),
             Self::Supplied(paths) => Cow::Owned(StubPackageIndex::from_search_paths(
                 context.db,
                 paths.iter(),
@@ -1043,11 +1123,7 @@ impl<'db> RootSearchPaths<'db> {
 
     fn iter(&self, context: &ResolverContext<'db>) -> impl Iterator<Item = &'db SearchPath> {
         match self {
-            Self::Configured => Either::Left(search_paths(
-                context.db,
-                context.resolver_environment,
-                context.mode,
-            )),
+            Self::Configured => Either::Left(context.search_paths()),
             Self::Supplied(paths) => Either::Right(paths.iter()),
         }
     }
@@ -1195,9 +1271,9 @@ mod tests {
 
     #[cfg(target_family = "unix")]
     use ruff_db::Db as _;
-    use ruff_db::system::SystemPath;
     #[cfg(target_family = "unix")]
-    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, OsSystem};
+    use ruff_db::system::{DbWithTestSystem, OsSystem};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath};
 
     use crate::ModuleName;
     use crate::db::tests::TestDb;
@@ -1392,6 +1468,41 @@ mod tests {
             Module::File("acme.stubbed", "extra", "/extra/acme/stubbed.pyi", Module, None),
         ]
         "#);
+    }
+
+    #[test]
+    fn updates_stub_override_descendants_when_file_becomes_directory() -> anyhow::Result<()> {
+        let mut db = TestCaseBuilder::new()
+            .with_src_files(&[("api.py", "")])
+            .with_extra_path("/extra", &[("api", "")])
+            .build()
+            .db;
+        ListingCase::for_name("api").assert(&db);
+
+        db.remove_file("/extra/api")?;
+        db.write_file("/extra/api/stubbed.pyi", "")?;
+        ListingCase::for_name("api")
+            .expect_module("api.stubbed")
+            .assert(&db);
+
+        Ok(())
+    }
+
+    #[test]
+    fn updates_nested_stub_override_descendants_when_parent_is_created() -> anyhow::Result<()> {
+        let mut db = TestCaseBuilder::new()
+            .with_src_files(&[("acme/api.py", "")])
+            .with_extra_path("/extra", &[])
+            .build()
+            .db;
+        ListingCase::for_name("acme.api").assert(&db);
+
+        db.write_file("/extra/acme/api/stubbed.pyi", "")?;
+        ListingCase::for_name("acme.api")
+            .expect_module("acme.api.stubbed")
+            .assert(&db);
+
+        Ok(())
     }
 
     #[test]

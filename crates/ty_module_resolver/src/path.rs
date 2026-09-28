@@ -42,7 +42,7 @@ impl ModulePath {
         )
     }
 
-    fn push(&mut self, component: &str) {
+    pub(crate) fn push(&mut self, component: &str) {
         if let Some(component_extension) = camino::Utf8Path::new(component).extension() {
             assert!(
                 self.relative_path.extension().is_none(),
@@ -532,12 +532,12 @@ fn query_stdlib_version(
         return TypeshedVersionsQueryResult::DoesNotExist;
     };
     context
-        .resolver_environment
+        .resolver_environment()
         .search_paths(context.db)
         .typeshed_versions()
         .query_module(
             &module_name,
-            context.resolver_environment.python_version(context.db),
+            context.resolver_environment().python_version(context.db),
         )
 }
 
