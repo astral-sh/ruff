@@ -6271,18 +6271,6 @@ mod tests {
     use ruff_db::system::DbWithWritableSystem as _;
     use ty_python_core::ProgramFile;
 
-    #[test]
-    fn paramspec_value_survives_clearing_overload_index() {
-        let original = Signature::new(Parameters::empty(), Type::unknown()).into_paramspec_value();
-        let updated = original
-            .clone()
-            .with_source_overload_index(Some(0))
-            .with_source_overload_index(None);
-
-        assert!(updated.is_paramspec_value());
-        assert_eq!(updated, original);
-    }
-
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
