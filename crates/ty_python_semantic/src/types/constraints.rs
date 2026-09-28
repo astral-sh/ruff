@@ -2487,9 +2487,11 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
+                    let source_orders = storage.calculate_source_orders(source_order);
+                    let mut walker =
+                        SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
                     let mut path = interior.path_assignments(db, env, storage, source_order);
-                    path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                        .is_continue()
+                    walker.is_never_satisfied(db, env, storage, &mut path, self)
                 };
                 storage.never_satisfied_cache.insert(self, result);
                 result
