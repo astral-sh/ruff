@@ -476,6 +476,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 AtomicConstraintId(constraint_id),
                 process_node,
             ),
+            Constraint::Existential(_) => {
+                // XXX
+                ControlFlow::Continue(())
+            }
         }
     }
 
