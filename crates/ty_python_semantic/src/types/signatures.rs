@@ -673,7 +673,7 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Type<'db>,
 }
 
-/// Signature data needed only for overload diagnostics, receiver binding, or ParamSpec values.
+/// Signature data needed only for overload diagnostics, receiver binding, or `ParamSpec` values.
 #[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
 struct SignatureExtras<'db> {
     /// Position of this overload in the original function definition.
