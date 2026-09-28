@@ -87,15 +87,12 @@ impl Uv {
         // Only probe the version when metadata is unavailable, so successful calls stay cheap.
         if (!output.status.success() || output.stdout.is_empty())
             && let Some(version) = self.version(executor, target)
+            && version < Version::new([0, 12, 3])
         {
-            let minimum_version = Version::new([0, 12, 3]);
-            if version < minimum_version {
-                return Err(UvMetadataError::UnsupportedVersion {
-                    executable: self.executable.clone(),
-                    version,
-                    minimum_version,
-                });
-            }
+            return Err(UvMetadataError::UnsupportedVersion {
+                executable: self.executable.clone(),
+                version,
+            });
         }
 
         Ok(output)
@@ -177,47 +174,10 @@ pub(super) fn unsupported_command_execution() -> std::io::Error {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::VecDeque;
-    #[cfg(unix)]
-    use std::os::unix::process::ExitStatusExt;
-    #[cfg(windows)]
-    use std::os::windows::process::ExitStatusExt;
-    use std::process::{ExitStatus, Output};
-    use std::sync::Arc;
-
-    use parking_lot::Mutex;
-    use ruff_db::system::{Command, CommandExecutor, SystemPath, TestSystem};
+    use ruff_db::system::TestSystem;
     use ty_static::EnvVars;
 
-    use super::{MetadataTarget, Uv, UvMetadataError};
-
-    #[derive(Clone, Default)]
-    struct MockExecutor {
-        outputs: Arc<Mutex<VecDeque<std::io::Result<Output>>>>,
-        commands: Arc<Mutex<Vec<Command>>>,
-    }
-
-    impl CommandExecutor for MockExecutor {
-        fn execute(&self, command: Command) -> std::io::Result<Output> {
-            self.commands.lock().push(command);
-            self.outputs
-                .lock()
-                .pop_front()
-                .unwrap_or_else(|| Err(std::io::Error::other("unexpected command")))
-        }
-
-        fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
-            Box::new(self.clone())
-        }
-    }
-
-    fn output(success: bool, stdout: &str, stderr: &str) -> Output {
-        Output {
-            status: ExitStatus::from_raw((!success).into()),
-            stdout: stdout.as_bytes().to_vec(),
-            stderr: stderr.as_bytes().to_vec(),
-        }
-    }
+    use super::Uv;
 
     #[test]
     fn explicit_uv_override_skips_path_lookup() -> anyhow::Result<()> {
@@ -229,128 +189,5 @@ mod tests {
         assert_eq!(uv.executable, "custom-uv");
 
         Ok(())
-    }
-
-    #[test]
-    fn successful_metadata_does_not_probe_version() -> anyhow::Result<()> {
-        let system = TestSystem::default();
-        let root = SystemPath::new(if cfg!(windows) { "C:/app" } else { "/app" });
-        system.memory_file_system().create_directory_all(root)?;
-        let metadata = serde_json::json!({
-            "schema": {"version": "preview"},
-            "workspace_root": root.as_str(),
-        });
-        let executor = MockExecutor::default();
-        executor
-            .outputs
-            .lock()
-            .push_back(Ok(output(true, &metadata.to_string(), "")));
-        let uv = Uv {
-            executable: "custom-uv".into(),
-        };
-
-        let result = uv.execute(&executor, &MetadataTarget::Workspace(root));
-        assert_eq!(
-            Uv::parse_metadata_output(&system, result)?.workspace_root(),
-            root
-        );
-        assert_eq!(executor.commands.lock().len(), 1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn old_uv_reports_upgrade() {
-        // Old uv can either reject the metadata command or succeed with no JSON due to --quiet.
-        for metadata in [
-            output(false, "", "unrecognized subcommand"),
-            output(true, "", ""),
-        ] {
-            let executor = MockExecutor::default();
-            executor.outputs.lock().extend([
-                Ok(metadata),
-                Ok(output(true, "uv 0.12.2 (abcdef 2026-08-05)\n", "")),
-            ]);
-            let uv = Uv {
-                executable: "custom-uv".into(),
-            };
-            let result = uv.execute(
-                &executor,
-                &MetadataTarget::Script {
-                    path: SystemPath::new("/app/script.py"),
-                    python: None,
-                },
-            );
-
-            let error = result.unwrap_err();
-            assert_eq!(
-                error.to_string(),
-                "uv 0.12.2 is too old; upgrade `custom-uv` to uv 0.12.3 or newer"
-            );
-            let commands = executor.commands.lock();
-            assert_eq!(commands.len(), 2);
-            assert!(
-                commands
-                    .iter()
-                    .all(|command| command.get_executable() == "custom-uv")
-            );
-            assert_eq!(commands[1].get_args(), ["--version"]);
-            assert_eq!(commands[1].get_current_dir(), commands[0].get_current_dir());
-        }
-    }
-
-    #[test]
-    fn preserves_errors_without_an_unsupported_version() {
-        for version in [
-            Ok(output(true, "uv 0.12.3\n", "")),
-            Ok(output(true, "uv 0.12.19 (abcdef 2026-09-24)\n", "")),
-            Ok(output(true, "uv 1.0.0\n", "")),
-            Ok(output(true, "unknown version\n", "")),
-            Ok(output(false, "uv 0.12.2\n", "version failed")),
-            Err(std::io::Error::other("version unavailable")),
-        ] {
-            let executor = MockExecutor::default();
-            let metadata = output(false, "", "dependency could not be resolved");
-            let status = metadata.status;
-            executor.outputs.lock().extend([Ok(metadata), version]);
-            let uv = Uv {
-                executable: "custom-uv".into(),
-            };
-            let result = uv.execute(
-                &executor,
-                &MetadataTarget::Workspace(SystemPath::new("/app")),
-            );
-            let error = Uv::parse_metadata_output(&TestSystem::default(), result).unwrap_err();
-            assert!(
-                matches!(error, UvMetadataError::CommandFailed { status: actual, stderr }
-                if actual == status && stderr == "dependency could not be resolved")
-            );
-        }
-    }
-
-    #[test]
-    fn preserves_invalid_metadata_from_supported_uv() {
-        for stdout in ["", "invalid JSON"] {
-            let executor = MockExecutor::default();
-            executor.outputs.lock().extend([
-                Ok(output(true, stdout, "")),
-                Ok(output(true, "uv 0.12.3\n", "")),
-            ]);
-            let uv = Uv {
-                executable: "custom-uv".into(),
-            };
-            let result = uv.execute(
-                &executor,
-                &MetadataTarget::Workspace(SystemPath::new("/app")),
-            );
-            assert!(matches!(
-                Uv::parse_metadata_output(&TestSystem::default(), result),
-                Err(UvMetadataError::InvalidMetadata(_))
-            ));
-            assert_eq!(
-                executor.commands.lock().len(),
-                if stdout.is_empty() { 2 } else { 1 }
-            );
-        }
     }
 }

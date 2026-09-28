@@ -83,11 +83,10 @@ pub(crate) struct WorkspaceMember {
 
 #[derive(Debug, Error)]
 pub(crate) enum UvMetadataError {
-    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer")]
+    #[error("uv {version} is too old; upgrade `{executable}` to uv 0.12.3 or newer")]
     UnsupportedVersion {
         executable: String,
         version: Version,
-        minimum_version: Version,
     },
 
     #[error("Failed to invoke `uv workspace metadata`: {0}")]
