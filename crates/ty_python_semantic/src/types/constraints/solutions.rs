@@ -13,7 +13,7 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
     CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
     ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
-    SolutionViolationKind,
+    SolutionViolationKind, UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
@@ -207,6 +207,20 @@ impl<'db> SolutionWalker<'db> {
                     .overlaps_with(support)
                     .then_some((*assignment, *source_constraint))
             })
+    }
+
+    pub(super) fn is_never_satisfied(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        node: NodeId,
+    ) -> bool {
+        let mut limits = UnboundedSolutionLimits;
+        let ControlFlow::Continue(satisfiable) =
+            self.node_is_satisfiable_on_path(db, env, storage, &mut limits, path, node, None);
+        !satisfiable
     }
 
     /// Visit a BDD node and all of its descendants. We will add pending candidate solutions for
