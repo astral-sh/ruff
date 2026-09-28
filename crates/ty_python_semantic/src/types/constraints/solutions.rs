@@ -18,8 +18,21 @@ use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_ty
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
-/// whether we've already processed a node. Returns whether the node is new and should be
-/// processed.
+/// whether we've already processed a node in an equivalent situation. If so, we don't need to
+/// reproduce whatever results we calculated previously, and can return early.
+///
+/// If you are performing a BDD walk where you always want to process every node, use the
+/// [`never_cache`] callback.
+///
+/// The "in an equivalent situation" part is important. We will often encounter the same BDD node
+/// multiple times when walking a BDD, and how we interpret that node will depend on which other
+/// nodes we've already processed on this path, and what partial solution we've calculated so far
+/// for those other nodes. When constructing a cache key, you should take into account both `path`
+/// and `node`.
+///
+/// Returns `true` if this is the first time we've seen this node in this situation, and should
+/// process it. Returns `false` if this is _not_ the first time we've seen them, and can reuse any
+/// cached results.
 type CheckCache<'a, 'db, L, B> = dyn FnMut(
         &mut SolutionWalker<'db>,
         &mut ConstraintSetStorage<'db>,
@@ -42,10 +55,28 @@ fn never_cache<'db, L, B>(
 }
 
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
-/// whether we must walk its outgoing edges to determine its satisfiability. (We keep track of the
-/// node's support — the typevars mentioned in any constraints reachable from it. If none of those
-/// constraints can affect the solution we've already discovered for the path, there is no need to
-/// walk further in the BDD.)
+/// whether the current node can affect the partial solution that we've calculated so far for the
+/// current path. If not, we don't need to descend into the node's subtree, and can return early.
+///
+/// If you are performing a BDD walk where you always want to process every node, use the
+/// [`never_prune`] callback.
+///
+/// The current node and its descendents have a fixed set of constraints and typevars that they
+/// check. (We track this in the node's _support_, so that we don't have to calculate it on the
+/// fly.) If those typevars are not inferable, and there are no cross-typevar relationships between
+/// them and any other inferable typevars, then this node's subtree cannot possibly affect the
+/// current solution. There is one exception: if there is no possible way to satisfy the current
+/// node, that contradiction does "carry through" and invalidate the current solution.
+///
+/// Together, this gives three possible outcomes:
+///
+/// - We can skip this node's subtree, because the current solution is valid, and the subtree
+///   cannot affect that solution. ([`PathIs::Satisfied`])
+/// - We can skip this node's subtree, because the subtree is unsatisfiable, and the so the overall
+///   solution is invalid. ([`PathIs::Unsatisfied`])
+/// - The node's subtree can affect the current solution, and so we have to descend into the
+///   subtree to determine which extensions of the current solution are valid.
+///   ([`PathIs::Uncertain`])
 type PrunePath<'a, 'db, L, B> = dyn FnMut(
         &mut SolutionWalker<'db>,
         &mut ConstraintSetStorage<'db>,
