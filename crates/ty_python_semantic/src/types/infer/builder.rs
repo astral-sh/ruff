@@ -2163,7 +2163,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
     }
 
-    /// Record a type for the docstring without retaining its contents in the type database.
+    /// Infer the body of a module, class, or function scope.
+    ///
+    /// As a memory optimization, store `LiteralString` for a leading docstring instead of
+    /// interning its exact contents. Type inference does not currently use the docstring's type;
+    /// if it needs the exact type in the future, infer the docstring normally instead.
     fn infer_scope_body(&mut self, suite: &[ast::Stmt]) {
         if let Some((ast::Stmt::Expr(statement), body)) = suite.split_first()
             && statement.value.is_string_literal_expr()
