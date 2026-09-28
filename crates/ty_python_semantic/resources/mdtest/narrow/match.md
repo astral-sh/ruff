@@ -141,6 +141,46 @@ def ambiguous_guard(value: int | str, flag: bool) -> None:
             reveal_type(value)  # revealed: int | str
 ```
 
+## Previous patterns with short-circuit guards
+
+When a guard is evaluated directly as a condition, short-circuiting can determine its outcome even
+if an operand's truthiness can change. Saving the result first can test the same object again, so
+its truthiness remains ambiguous.
+
+```py
+class MutableTruthiness:
+    truthy: bool = False
+
+    def __bool__(self) -> bool:
+        self.truthy = not self.truthy
+        return self.truthy
+
+def or_guard(value: int | str, guard: MutableTruthiness) -> None:
+    match value:
+        # The guard is always true, so strings cannot reach the next case.
+        case str() if guard or True:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+
+def and_guard(value: int | str, guard: MutableTruthiness) -> None:
+    match value:
+        # The guard is always false, so strings can reach the next case.
+        case str() if guard and False:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+
+def saved_guard(value: int | str, guard: MutableTruthiness) -> None:
+    saved = guard or True
+    match value:
+        # `saved` can be the original object, whose truthiness may have changed.
+        case str() if saved:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+```
+
 ## Previous guards using pattern captures
 
 The guard can be proven always true from the type of a captured value. In each example, the later
