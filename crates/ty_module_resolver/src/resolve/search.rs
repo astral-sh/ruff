@@ -10,7 +10,8 @@
 //!   direct sub-modules) at the current position of the cursor.
 //!
 //! The latter operation is also accessible via the free functions
-//! [`list_root_modules`] and [`list_submodules`].
+//! [`list_root_modules`] and [`list_submodules`]. [`list_all_modules`] recursively
+//! lists all available modules.
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
@@ -22,6 +23,7 @@ use itertools::Either;
 use ruff_db::system::FileType;
 use ruff_python_stdlib::identifiers::is_identifier;
 
+use crate::ResolverEnvironment;
 use crate::db::Db;
 use crate::module::Module;
 use crate::module_name::ModuleName;
@@ -29,47 +31,83 @@ use crate::path::{ModuleDirectory, ModuleDirectoryEntry, ModulePath, SearchPath}
 
 use super::{
     CandidatePrecedence, ComponentFileFilter, ModuleNameIngredient, ModuleResolutionCandidate,
-    PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex, StubPackagePaths,
-    normalize_candidates, resolve_component, resolve_stub_package_in_search_path, search_paths,
-    stub_package_index,
+    ModuleResolveMode, PyTyped, ResolvedModule, ResolvedNames, ResolverContext, StubPackageIndex,
+    StubPackagePaths, normalize_candidates, resolve_component, resolve_stub_package_in_search_path,
+    search_paths, stub_package_index,
 };
 
-/// Lists top-level modules across the configured search paths.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
-pub(crate) fn list_root_modules<'db>(context: &ResolverContext<'db>) -> ModuleListing<'db> {
-    ModuleSearchCursor::with_configured_search_paths(context).list_modules()
+/// Recursively lists all available modules and submodules.
+///
+/// Returns a collection sorted in lexicographic order.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn list_all_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
+) -> Box<[Module<'db>]> {
+    let mut modules = Vec::new();
+    let mut stack = vec![list_root_modules(db, resolver_environment)];
+    while let Some(listing) = stack.pop() {
+        modules.extend_from_slice(&listing.modules);
+        for module in &listing.modules {
+            let children = list_submodules(db, *module);
+            if !children.is_empty() {
+                stack.push(children);
+            }
+        }
+        // Reach local stub overrides through unresolved names;
+        // see the example on `ModuleListing::stub_override_listings`.
+        stack.extend(listing.stub_override_listings(db, resolver_environment));
+    }
+    modules.sort_by_cached_key(|module| module.name(db));
+    modules.into_boxed_slice()
 }
 
-/// Lists immediate submodules of a resolved module across the configured search paths.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
-pub(crate) fn list_submodules<'db>(
-    context: &ResolverContext<'db>,
-    module: Module<'db>,
+/// Lists top-level modules across the configured search paths.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn list_root_modules<'db>(
+    db: &'db dyn Db,
+    resolver_environment: ResolverEnvironment<'db>,
 ) -> ModuleListing<'db> {
-    list_submodules_by_name(context, module.name(context.db))
+    let context = ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing);
+    ModuleSearchCursor::with_configured_search_paths(&context).list_modules()
+}
+
+/// Lists immediate submodules of a resolved module.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn list_submodules<'db>(db: &'db dyn Db, module: Module<'db>) -> ModuleListing<'db> {
+    let resolver_environment = module.resolver_environment(db);
+    let context = ResolverContext::new(db, resolver_environment, ModuleResolveMode::Typing);
+
+    // Desperate resolution can use a search path absent from the configuration.
+    // Preserve that path when listing the module's submodules.
+    let paths = match module.search_path(db) {
+        Some(path)
+            if !search_paths(db, resolver_environment, ModuleResolveMode::Typing)
+                .any(|configured| configured == path) =>
+        {
+            RootSearchPaths::Supplied(std::slice::from_ref(path))
+        }
+        _ => RootSearchPaths::Configured,
+    };
+
+    ModuleSearchCursor::at_module_name_prefix(&context, module.name(db), &paths)
+        .map(|search| search.list_modules())
+        .unwrap_or_default()
 }
 
 /// Lists immediate submodules of the given name without requiring that name to be resolvable.
 /// This allows module enumeration to reach local stub overrides beneath unresolved names.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn list_submodules_by_name<'db>(
-    context: &ResolverContext<'db>,
-    name: &ModuleName,
+    db: &'db dyn Db,
+    name: ModuleNameIngredient<'db>,
 ) -> ModuleListing<'db> {
-    let Some(search) =
-        ModuleSearchCursor::at_module_name_prefix(context, name, &RootSearchPaths::Configured)
-    else {
+    let context = ResolverContext::new(db, name.resolver_environment(db), name.mode(db));
+    let Some(search) = ModuleSearchCursor::at_module_name_prefix(
+        &context,
+        name.name(db),
+        &RootSearchPaths::Configured,
+    ) else {
         return ModuleListing::default();
     };
 
@@ -351,17 +389,10 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 
 /// Represents the result of enumerating the immediate submodules of a module
 /// name (or the modules immediately available at search roots).
-#[derive(Default)]
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "Module listing is consumed by the next change's cached queries"
-    )
-)]
+#[derive(Debug, Default, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ModuleListing<'db> {
     /// The list of fully resolved modules at this stage of enumeration.
-    modules: Box<[Module<'db>]>,
+    pub(crate) modules: Box<[Module<'db>]>,
     /// Unresolved module names that are nonetheless eligible for enumeration
     /// because they may have eligible stub override candidates.
     ///
@@ -371,6 +402,54 @@ pub(crate) struct ModuleListing<'db> {
     /// an unresolved name so that we can still discover `acme.nested.tools`
     /// underneath it at a later point in the recursive enumeration process.
     unresolved_names: Box<[ModuleName]>,
+}
+
+impl<'db> ModuleListing<'db> {
+    /// Returns non-empty module listings for unresolved stub override names.
+    ///
+    /// For example, suppose `/extra` is configured as an extra path and
+    /// `acme-stubs` is a complete stub package (i.e. not marked as partial):
+    ///
+    /// ```text
+    /// /extra/acme/nested/tools.pyi
+    ///
+    /// /site-packages/acme-stubs/__init__.pyi
+    ///
+    /// /site-packages/acme/__init__.py
+    /// /site-packages/acme/nested/__init__.py
+    /// /site-packages/acme/nested/tools.py
+    /// ```
+    ///
+    /// Typing-mode resolution selects the installed stubs for `acme`. Those
+    /// stubs do not supply `acme.nested`, and because the stub package is
+    /// "complete" it prevents falling back to the source package. Nonetheless,
+    /// the extra-path stub still supplies `acme.nested.tools`.
+    ///
+    /// Module enumeration must therefore visit the name `acme.nested` to reach
+    /// `tools`, even though the name itself does not resolve to a module. This
+    /// method returns listings beneath that name without including the name
+    /// among the resolved modules.
+    fn stub_override_listings(
+        &self,
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+    ) -> impl Iterator<Item = &'db ModuleListing<'db>> {
+        self.unresolved_names.iter().filter_map(move |name| {
+            let name_key = ModuleNameIngredient::new(
+                db,
+                name,
+                ModuleResolveMode::Typing,
+                resolver_environment,
+            );
+            let listing = list_submodules_by_name(db, name_key);
+            (!listing.is_empty()).then_some(listing)
+        })
+    }
+
+    /// Whether there are no modules or stub override names to visit during recursive enumeration.
+    fn is_empty(&self) -> bool {
+        self.modules.is_empty() && self.unresolved_names.is_empty()
+    }
 }
 
 /// Caches data used when searching beneath the given module name.
@@ -1402,9 +1481,13 @@ mod tests {
         let context =
             ResolverContext::new(&db, db.resolver_environment(), ModuleResolveMode::Runtime);
         let name = ModuleName::new_static("acme").expect("valid name");
-        let module = crate::resolve_real_module_confident(&db, db.resolver_environment(), &name)
-            .expect("runtime package");
-        let listing = list_submodules(&context, module);
+        let listing = ModuleSearchCursor::at_module_name_prefix(
+            &context,
+            &name,
+            &super::RootSearchPaths::Configured,
+        )
+        .expect("runtime package")
+        .list_modules();
         assert_eq!(listing.modules.len(), 1);
         let child = listing.modules[0];
         assert_eq!(child.name(&db).as_str(), "acme.child");
@@ -1476,7 +1559,8 @@ mod tests {
             let listing = self.list_modules(db);
             listing
                 .modules
-                .into_iter()
+                .iter()
+                .copied()
                 .map(|module| ModuleDebugSnapshot { db, module })
                 .collect()
         }
@@ -1494,17 +1578,15 @@ mod tests {
 
         /// Lists modules and checks that enumeration agrees with ordinary resolution.
         #[track_caller]
-        fn list_modules<'db>(&self, db: &'db TestDb) -> ModuleListing<'db> {
-            let context =
-                ResolverContext::new(db, db.resolver_environment(), ModuleResolveMode::Typing);
+        fn list_modules<'db>(&self, db: &'db TestDb) -> &'db ModuleListing<'db> {
             let listing = match self.parent_module_name {
-                None => list_root_modules(&context),
+                None => list_root_modules(db, db.resolver_environment()),
                 Some(name) => {
                     let name = ModuleName::new(name).expect("valid module name");
                     let module =
                         crate::resolve_module_confident(db, db.resolver_environment(), &name)
                             .expect("parent module resolves");
-                    list_submodules(&context, module)
+                    list_submodules(db, module)
                 }
             };
             for module in &listing.modules {

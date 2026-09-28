@@ -237,6 +237,10 @@ impl WritableSystem for TestSystem {
         self.system().write_file_bytes(path, content)
     }
 
+    fn remove_file(&self, path: &SystemPath) -> Result<()> {
+        self.system().remove_file(path)
+    }
+
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         self.system().create_directory_all(path)
     }
@@ -246,9 +250,9 @@ impl WritableSystem for TestSystem {
     }
 }
 
-/// File-writing helpers for databases, intended for tests.
+/// File mutation helpers for databases, intended for tests.
 ///
-/// Writes return an error when the database's system does not support writing.
+/// Operations return an error when the database's system does not support writing.
 pub trait DbWithWritableSystem: Db + Sized {
     /// Returns the writable system, or an error if writing is unsupported.
     fn writable_system(&self) -> Result<&dyn WritableSystem>;
@@ -298,6 +302,14 @@ pub trait DbWithWritableSystem: Db + Sized {
             self.write_file(path, content)?;
         }
 
+        Ok(())
+    }
+
+    /// Removes the file at the given path and notifies the Db about the change.
+    fn remove_file(&mut self, path: impl AsRef<SystemPath>) -> Result<()> {
+        let path = path.as_ref();
+        self.writable_system()?.remove_file(path)?;
+        File::sync_path(self, path);
         Ok(())
     }
 }
@@ -466,6 +478,10 @@ impl WritableSystem for InMemorySystem {
 
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
+    }
+
+    fn remove_file(&self, path: &SystemPath) -> Result<()> {
+        self.memory_fs.remove_file(path)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
