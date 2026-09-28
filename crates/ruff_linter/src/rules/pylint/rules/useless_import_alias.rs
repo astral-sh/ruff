@@ -9,7 +9,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
-/// This rule does not apply in `__init__.py` files.
+///
+/// This rule does not apply in `__init__.py` files or stub files (`.pyi`),
+/// where redundant aliases like `from foo import bar as bar` are used to
+/// intentionally re-export symbols (PEP 484).
 ///
 /// ## Why is this bad?
 /// The import alias is redundant and should be removed to avoid confusion.
