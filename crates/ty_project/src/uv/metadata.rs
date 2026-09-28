@@ -2,9 +2,12 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use char_str::CharStr;
+use pep440_rs::Version;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use thiserror::Error;
+
+use super::command::MINIMUM_UV_VERSION;
 
 mod dependencies;
 mod string_interner;
@@ -82,6 +85,12 @@ pub(crate) struct WorkspaceMember {
 
 #[derive(Debug, Error)]
 pub(crate) enum UvMetadataError {
+    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
+    UnsupportedVersion {
+        executable: String,
+        version: Version,
+    },
+
     #[error("Failed to invoke `uv workspace metadata`: {0}")]
     Invocation(#[source] std::io::Error),
 
