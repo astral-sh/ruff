@@ -551,11 +551,11 @@ impl<'db> SyntacticDunderAllCollector<'db> {
 
     fn add_names(&mut self, elts: &[ast::Expr]) {
         for elt in elts {
-            let Some(literal) = elt.as_string_literal_expr() else {
+            let Some(name) = dunder_all_element_name(elt) else {
                 self.unknown = true;
                 return;
             };
-            self.names.insert(Name::new(literal.value.to_str()));
+            self.names.insert(name);
         }
     }
 
@@ -698,6 +698,14 @@ fn is_dunder_all_definition(stmt: &ast::Stmt) -> bool {
     is_dunder_all(target) && matches!(value, ast::Expr::List(_) | ast::Expr::Tuple(_))
 }
 
-fn is_dunder_all(expr: &ast::Expr) -> bool {
+/// Returns `true` if `expr` is a reference to the name `__all__`.
+pub fn is_dunder_all(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+}
+
+/// Returns the name that `expr` adds to `__all__`, or `None` if it isn't a valid `__all__` element.
+///
+/// Only string literals are recognized as elements of `__all__`.
+pub fn dunder_all_element_name(expr: &ast::Expr) -> Option<Name> {
+    Some(Name::new(expr.as_string_literal_expr()?.value.to_str()))
 }

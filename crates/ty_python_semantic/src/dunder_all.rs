@@ -7,7 +7,9 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
-use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
+use ty_python_core::{
+    ProgramFile, SemanticIndex, Truthiness, dunder_all_element_name, is_dunder_all, semantic_index,
+};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
@@ -137,7 +139,7 @@ impl<'db> DunderAllNamesCollector<'db> {
 
             // `__all__.append(...)`
             "append" => {
-                let Some(name) = create_name(argument) else {
+                let Some(name) = dunder_all_element_name(argument) else {
                     return false;
                 };
                 self.names.insert(name);
@@ -145,7 +147,7 @@ impl<'db> DunderAllNamesCollector<'db> {
 
             // `__all__.remove(...)`
             "remove" => {
-                let Some(name) = create_name(argument) else {
+                let Some(name) = dunder_all_element_name(argument) else {
                     return false;
                 };
                 self.names.remove(&name);
@@ -202,7 +204,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Returns `false` if any of the names are invalid.
     fn add_names(&mut self, exprs: &[ast::Expr]) -> bool {
         for expr in exprs {
-            let Some(name) = create_name(expr) else {
+            let Some(name) = dunder_all_element_name(expr) else {
                 return false;
             };
             self.names.insert(name);
@@ -449,15 +451,4 @@ enum DunderAllOrigin {
 
     /// The `__all__` variable is imported from a module via a `*`-import.
     StarImport,
-}
-
-/// Checks if the given expression is a name expression for `__all__`.
-fn is_dunder_all(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
-}
-
-/// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid expression
-/// for a `__all__` element.
-fn create_name(expr: &ast::Expr) -> Option<Name> {
-    Some(Name::new(expr.as_string_literal_expr()?.value.to_str()))
 }
