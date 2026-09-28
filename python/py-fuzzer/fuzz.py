@@ -33,7 +33,7 @@ from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
-from typing import Final, NewType, NoReturn, assert_never
+from typing import Final, NewType, NoReturn, assert_never, cast
 
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
@@ -436,7 +436,8 @@ def parse_args() -> ResolvedCliArgs:
         args.test_executable = Path("target", "profiling", executable)
         assert args.test_executable.is_file()
 
-    seed_arguments: list[range | int] = args.seeds
+    # `args.seeds` is verified by `parse_seed_argument()`
+    seed_arguments = cast(list[range | int], args.seeds)
     seen_seeds: set[int] = set()
     for arg in seed_arguments:
         if isinstance(arg, int):
