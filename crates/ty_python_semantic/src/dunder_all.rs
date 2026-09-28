@@ -7,19 +7,38 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::dunder_all::{literal_dunder_all_assignment, static_dunder_all};
 use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxHashSet<Name>> {
+    if let Some(names) = static_dunder_all(db, file) {
+        return Some(names.iter().cloned().collect());
+    }
+
     let source_file = file.file(db);
     let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
     let module = parsed_module(db, file.python_file(db)).load(db);
     let index = semantic_index(db, file);
     let mut collector = DunderAllNamesCollector::new(db, file, index);
-    collector.visit_body(module.suite());
+    // An unconditional literal assignment replaces any earlier value, including one from an
+    // import that could not be resolved. Start there so an unknown earlier value cannot prevent
+    // us from collecting the new value.
+    let body = module.suite();
+    let start = body
+        .iter()
+        .rposition(|stmt| {
+            literal_dunder_all_assignment(stmt).is_some_and(|elements| {
+                elements
+                    .iter()
+                    .all(|element| create_name(element).is_some())
+            })
+        })
+        .unwrap_or(0);
+    collector.visit_body(&body[start..]);
     collector.into_names()
 }
 
@@ -259,18 +278,6 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                             continue;
                         }
 
-                        // We could do the `__all__` lookup lazily in case it's not needed. This would
-                        // happen if a `__all__` is imported from another module but then the module
-                        // redefines it. For example:
-                        //
-                        // ```python
-                        // from module import __all__ as __all__
-                        //
-                        // __all__ = ["a", "b"]
-                        // ```
-                        //
-                        // I'm avoiding this for now because it doesn't seem likely to happen in
-                        // practice.
                         let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
                         else {
                             self.invalid = true;

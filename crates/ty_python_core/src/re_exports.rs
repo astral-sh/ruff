@@ -30,6 +30,7 @@ use ruff_python_ast::{
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
+use crate::dunder_all::static_dunder_all;
 use crate::{Db, ProgramFile};
 
 #[salsa::tracked(
@@ -38,6 +39,10 @@ use crate::{Db, ProgramFile};
     heap_size=ruff_memory_usage::heap_size)
 ]
 pub(super) fn exported_names(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Name]> {
+    if let Some(names) = static_dunder_all(db, file) {
+        return names.into();
+    }
+
     let module = parsed_module(db, file.python_file(db)).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
@@ -438,4 +443,100 @@ enum PossibleExportKind {
 enum DunderAll {
     NotPresent,
     Present,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fmt::Write;
+
+    use ruff_db::files::system_path_to_file;
+
+    use crate::db::tests::TestDbBuilder;
+    use crate::{TestProgramDb, global_scope, place_table};
+
+    #[test]
+    fn static_dunder_all_falls_back_for_unrecognized_changes() -> anyhow::Result<()> {
+        let cases = [
+            (
+                "/src/append.py",
+                "__all__ = ['first']\n__all__.append('second')\n",
+            ),
+            (
+                "/src/extend.py",
+                "__all__ = ['first']\n__all__.extend(['second'])\n",
+            ),
+            (
+                "/src/add.py",
+                "__all__ = ['first']\n__all__ += ['second']\n",
+            ),
+            (
+                "/src/remove.py",
+                "__all__ = ['first']\n__all__.remove('first')\n",
+            ),
+            (
+                "/src/conditional.py",
+                "__all__ = ['first']\nif flag:\n    __all__.append('second')\n",
+            ),
+            (
+                "/src/alias.py",
+                "__all__ = ['first']\nexports = __all__\nexports.append('second')\n",
+            ),
+            (
+                "/src/function.py",
+                "def update():\n    __all__.append('second')\n__all__ = ['first']\nupdate()\n",
+            ),
+            (
+                "/src/import.py",
+                "__all__ = ['first']\nfrom other import *\n",
+            ),
+            (
+                "/src/annotation.py",
+                "__all__: __all__.append('second') = ['first']\n",
+            ),
+            (
+                "/src/unicode.py",
+                "__all__ = ['first']\nif flag:\n    __aℓℓ__.append('second')\n",
+            ),
+        ];
+        let mut builder = TestDbBuilder::new();
+        for (path, source) in &cases {
+            builder = builder.with_file(path, source);
+        }
+        let db = builder.build()?;
+        for (path, _) in cases {
+            let file = system_path_to_file(&db, path)?;
+            let program_file = db.program().program_file(&db, file);
+            assert!(
+                crate::dunder_all::static_dunder_all(&db, program_file).is_none(),
+                "{path}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn wildcard_import_respects_literal_dunder_all() -> anyhow::Result<()> {
+        let mut source = String::new();
+        for index in 0..1_000 {
+            writeln!(source, "name_{index} = {index}")?;
+        }
+        let db = TestDbBuilder::new()
+            .with_file("/src/source.py", &source)
+            .with_file(
+                "/src/generated_resource.py",
+                "from source import *\n\
+                 # The __all__ list is documented here.\n\
+                 __all__: list[str] = ['name_1', 'name_2']\n",
+            )
+            .with_file("/src/consumer.py", "from generated_resource import *\n")
+            .build()?;
+        let consumer = system_path_to_file(&db, "/src/consumer.py")?;
+        let file = db.program().program_file(&db, consumer);
+        let symbols = place_table(&db, global_scope(&db, file));
+
+        assert!(symbols.symbol_id("name_1").is_some());
+        assert!(symbols.symbol_id("name_2").is_some());
+        assert!(symbols.symbol_id("name_999").is_none());
+        Ok(())
+    }
 }
