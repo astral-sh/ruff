@@ -8,12 +8,15 @@ use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
-use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
+use crate::types::constraints::variables::{
+    AtomicConstraint, Constraint, ConstraintProvenance, UnsatisfiableBound,
+};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, CandidateSolution, CandidateSolutions,
-    CandidateTypeVarSolution, CandidateTypeVarSolver, ConstraintFailureEvidence, ConstraintId,
-    ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
-    SolutionViolationKind, UnboundedSolutionLimits,
+    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, AtomicConstraintId, CandidateSolution,
+    CandidateSolutions, CandidateTypeVarSolution, CandidateTypeVarSolver,
+    ConstraintFailureEvidence, ConstraintSetStorage, InteriorNodeData, Node, NodeId,
+    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
@@ -134,7 +137,7 @@ pub(super) enum Polarity {
 type ExploredNodeKey = (
     Polarity,
     NodeId,
-    Box<[(Assignment<ConstraintId>, ConstraintId)]>,
+    Box<[(Assignment<AtomicConstraintId>, AtomicConstraintId)]>,
 );
 
 enum Break<B> {
@@ -153,7 +156,7 @@ impl<B> Break<B> {
 }
 
 pub(super) struct SolutionWalker<'db, L> {
-    source_orders: FxIndexSet<ConstraintId>,
+    source_orders: FxIndexSet<AtomicConstraintId>,
     /// The relation before non-inferable variables are projected away. Used to recover the
     /// original upper bounds for diagnostics, since projected paths can contain derived bounds
     /// that obscure the original evidence.
@@ -195,7 +198,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     pub(super) fn new(
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
-        source_orders: FxIndexSet<ConstraintId>,
+        source_orders: FxIndexSet<AtomicConstraintId>,
         inferable: TypeVarSet<'db>,
         limits: L,
         original_node: NodeId,
@@ -217,7 +220,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     /// Returns an iterator of the positive and negative constraints on the current path
     fn constrained_assignments(
         path: &PathAssignments,
-    ) -> impl Iterator<Item = ConstraintId> + Clone {
+    ) -> impl Iterator<Item = AtomicConstraintId> + Clone {
         path.assignments
             .iter()
             .filter_map(|(assignment, _)| assignment.as_constrained())
@@ -229,12 +232,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
         support: &Support,
-    ) -> impl Iterator<Item = (Assignment<ConstraintId>, ConstraintId)> {
+    ) -> impl Iterator<Item = (Assignment<AtomicConstraintId>, AtomicConstraintId)> {
         path.assignments
             .iter()
             .filter_map(|(assignment, (source_constraint, _))| {
                 let constraint = assignment.as_constrained()?;
-                let constraint_support = storage.constraint_support(constraint);
+                let constraint_support = storage.constraint_support(constraint.into_inner());
                 constraint_support
                     .overlaps_with(support)
                     .then_some((*assignment, *source_constraint))
@@ -300,13 +303,16 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 if let Some(node_support) = node_support {
                     relevant_typevars |= node_support;
                 }
-                relevant_typevars
-                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                relevant_typevars.close_over_constraints(
+                    storage,
+                    Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
+                );
                 let mut relevant_path: Box<[_]> =
                     Self::constrained_assignments_mentioning(storage, path, &relevant_typevars)
                         .collect();
-                relevant_path
-                    .sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
+                relevant_path.sort_unstable_by_key(|(assignment, _)| {
+                    assignment.constraint().into_inner().ordering()
+                });
                 let key = (polarity, node, relevant_path);
                 ControlFlow::Continue(this.explored_nodes.insert(key))
             },
@@ -314,8 +320,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 // Next see if anything in this node can affect the solution we've already
                 // calculated on the current path.
                 let mut visible_typevars = this.inferable_support.clone();
-                visible_typevars
-                    .close_over_constraints(storage, Self::constrained_assignments(path));
+                visible_typevars.close_over_constraints(
+                    storage,
+                    Self::constrained_assignments(path).map(AtomicConstraintId::into_inner),
+                );
                 if let Some(node_support) = storage.node_support(node)
                     && visible_typevars.overlaps_with(node_support)
                 {
@@ -421,19 +429,49 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             PathIs::Uncertain => {}
         }
 
-        // At this point we actually have to walk the outgoing edges of this node. The repetitive
-        // nature of the visit_edge calls is intentional; in the negative polarity case, it's
-        // important that we not construct the `if_false` edge sink unless we actually need to
-        // visit it.
+        // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
-        let constraint = interior.constraint;
+        let constraint_id = interior.constraint;
+        let constraint = storage.constraint_data(constraint_id);
+        match constraint {
+            Constraint::Atomic(_) => self.visit_atomic_constraint(
+                db,
+                env,
+                storage,
+                path,
+                polarity,
+                interior,
+                AtomicConstraintId(constraint_id),
+                check_cache,
+                prune_path,
+                process_satisfied,
+            ),
+        }
+    }
 
+    #[expect(clippy::too_many_arguments)]
+    fn visit_atomic_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        interior: InteriorNodeData,
+        constraint: AtomicConstraintId,
+        check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
+        prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
+    ) -> ControlFlow<Break<L::Break>> {
+        // The repetitive nature of the visit_atomic_edge calls is intentional; in the negative
+        // polarity case, it's important that we not construct the `if_false` edge sink unless we
+        // actually need to visit it.
         let if_true = if polarity == Polarity::Positive {
             interior.if_true
         } else {
             interior.if_true.or(storage, interior.if_uncertain)
         };
-        self.visit_edge(
+        self.visit_atomic_edge(
             db,
             env,
             storage,
@@ -447,7 +485,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         )?;
 
         if polarity == Polarity::Positive {
-            self.visit_edge(
+            self.visit_atomic_edge(
                 db,
                 env,
                 storage,
@@ -466,7 +504,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         } else {
             interior.if_false.or(storage, interior.if_uncertain)
         };
-        self.visit_edge(
+        self.visit_atomic_edge(
             db,
             env,
             storage,
@@ -538,14 +576,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     /// (This is a helper method used by [`visit_node_and_then`][Self::visit_node_and_then]. You
     /// will probably not need to call this directly.)
     #[expect(clippy::too_many_arguments)]
-    fn visit_edge(
+    fn visit_atomic_edge(
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         polarity: Polarity,
-        assignment: Assignment<ConstraintId>,
+        assignment: Assignment<AtomicConstraintId>,
         child: NodeId,
         check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
         prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
@@ -604,7 +642,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
-        constraints: &[ConstraintId],
+        constraints: &[AtomicConstraintId],
         process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
     ) -> ControlFlow<Break<L::Break>> {
         let Some((constraint, constraints)) = constraints.split_first() else {
@@ -636,12 +674,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        constraints: impl Iterator<Item = ConstraintId>,
+        constraints: impl Iterator<Item = AtomicConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let mut evidence = CandidateTypeVarSolver::default();
         for constraint in constraints {
-            let constraint = storage.constraint_data(constraint);
+            let constraint = storage.atomic_constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
                 && constraint.provenance() == ConstraintProvenance::Evidence
             {
@@ -745,8 +783,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 continue;
             }
             current = interior.if_true;
-            let constraint_id = interior.constraint;
-            let constraint = storage.constraint_data(constraint_id);
+            let Some(constraint_id) = interior.constraint.as_atomic(storage) else {
+                continue;
+            };
+            let constraint = storage.atomic_constraint_data(constraint_id);
             if constraint.provenance() != ConstraintProvenance::Evidence {
                 continue;
             }
@@ -1109,7 +1149,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // constraints can be used in the solution.
         let previously_pending = self.pending.len();
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
-            let constraint = storage.constraint_data(constraint);
+            let constraint = storage.atomic_constraint_data(constraint);
             constraint.lower_bound_for(db, bound_typevar).is_some()
         });
 
@@ -1308,27 +1348,27 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             FxIndexMap::default();
 
         for (constraint, _) in typevars {
-            let constraint = storage.constraint_data(constraint);
+            let constraint = storage.atomic_constraint_data(constraint);
             match constraint {
-                Constraint::ConcreteLower(lower) => {
+                AtomicConstraint::ConcreteLower(lower) => {
                     if lower.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(lower.typevar).or_default();
                         solver.add_constraint(db, lower.typevar, constraint);
                     }
                 }
-                Constraint::ConcreteUpper(upper) => {
+                AtomicConstraint::ConcreteUpper(upper) => {
                     if upper.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(upper.typevar).or_default();
                         solver.add_constraint(db, upper.typevar, constraint);
                     }
                 }
-                Constraint::ConcreteEquivalence(equivalence) => {
+                AtomicConstraint::ConcreteEquivalence(equivalence) => {
                     if equivalence.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(equivalence.typevar).or_default();
                         solver.add_constraint(db, equivalence.typevar, constraint);
                     }
                 }
-                Constraint::TypeVarRange(bound) => {
+                AtomicConstraint::TypeVarRange(bound) => {
                     // A direct relationship between an inferable and non-inferable typevar must
                     // contribute bounds for both endpoints. Contextual inference relies on the
                     // reverse, non-inferable binding to preserve relationships to outer typevars.
@@ -1341,7 +1381,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                         solver.add_constraint(db, bound.right, constraint);
                     }
                 }
-                Constraint::TypeVarEquivalence(bound) => {
+                AtomicConstraint::TypeVarEquivalence(bound) => {
                     // A direct relationship between an inferable and non-inferable typevar must
                     // contribute bounds for both endpoints. Contextual inference relies on the
                     // reverse, non-inferable binding to preserve relationships to outer typevars.
@@ -1574,7 +1614,7 @@ struct Validations<'db> {
     constrained: FxIndexMap<BoundTypeVarInstance<'db>, Constrained<'db>>,
 }
 
-type ValidationConstraints = Option<SmallVec<[ConstraintId; 4]>>;
+type ValidationConstraints = Option<SmallVec<[AtomicConstraintId; 4]>>;
 
 struct UpperBound {
     constraints: ValidationConstraints,
@@ -1658,12 +1698,12 @@ impl<'db> Validations<'db> {
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
         support: &mut Support,
-        constraints: impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>>,
+        constraints: impl Iterator<Item = Result<AtomicConstraint<'db>, UnsatisfiableBound>>,
     ) -> ValidationConstraints {
         let constraints: ValidationConstraints = constraints
             .map(Result::ok)
             .map(|constraint| {
-                constraint.map(|constraint| storage.intern_constraint(db, env, constraint))
+                constraint.map(|constraint| storage.intern_atomic_constraint(db, env, constraint))
             })
             .collect();
 
@@ -1671,7 +1711,7 @@ impl<'db> Validations<'db> {
         // TODO: Consider calculating this at construction time, so that here we have a fixed
         // set of typevars to check.
         for constraint in constraints.iter().flatten() {
-            let constraint_support = storage.constraint_support(*constraint);
+            let constraint_support = storage.constraint_support(constraint.into_inner());
             *support |= constraint_support;
             let new_typevars = constraint_support - &*seen_typevars;
             *typevar_queue |= &new_typevars;
@@ -1692,7 +1732,7 @@ impl<'db> Validations<'db> {
         bound: Type<'db>,
     ) {
         self.upper_bounds.entry(bound_typevar).or_insert_with(|| {
-            let constraints = Constraint::new_upper_bound(
+            let constraints = AtomicConstraint::new_upper_bound(
                 db,
                 env,
                 ConstraintProvenance::Validity,
@@ -1728,7 +1768,7 @@ impl<'db> Validations<'db> {
                 .elements(db)
                 .iter()
                 .map(|&constrained_ty| {
-                    let constraints = Constraint::new_equivalence_bound(
+                    let constraints = AtomicConstraint::new_equivalence_bound(
                         db,
                         env,
                         ConstraintProvenance::Validity,
