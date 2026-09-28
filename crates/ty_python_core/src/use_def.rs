@@ -248,6 +248,7 @@
 
 use std::collections::hash_map::Entry;
 use std::hash::{Hash as _, Hasher as _};
+use std::marker::PhantomData;
 use std::ops::Index;
 use std::rc::Rc;
 use std::sync::{Arc, LazyLock};
@@ -256,6 +257,7 @@ use ruff_index::{FrozenIndexVec, Idx, IndexVec, newtype_index};
 use ruff_python_ast::NodeIndex;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
+use salsa::plumbing::{AsId, FromId, Id};
 use smallvec::SmallVec;
 use thin_vec::ThinVec;
 
@@ -615,13 +617,148 @@ impl Index<InternedDeclarationsId> for RetainedDeclarations {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
 struct RetainedPlaceStates {
     end_of_scope: InternedPlaceStateId,
     /// The reachable histories exclude their implicit initial unbound/undeclared entries.
     reachable: InternedPlaceStateId,
-    /// Both initial entries have this reachability constraint and are reconstructed by iterators.
+    /// Both initial entries have this reachability constraint.
     initial_reachability: ScopedReachabilityConstraintId,
+}
+
+/// Place-state IDs and their initial reachability constraints, indexed by symbol or member.
+///
+/// The common case stores four ID words per place and an implicit `ALWAYS_TRUE` constraint. If
+/// there are exceptions, the array begins with a marker and count, followed by the same ID words,
+/// then a bitmap and cumulative exception count for each group of 32 places, and finally the
+/// non-default constraints. The marker cannot be an `InternedBindingsId`, whose maximum is
+/// `u32::MAX - 1`. This keeps one allocation and permits constant-time lookup in either form.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct RetainedPlaceTable<I> {
+    words: Box<[u32]>,
+    _index: PhantomData<I>,
+}
+
+impl<I: Idx> RetainedPlaceTable<I> {
+    const EXCEPTIONS_MARKER: u32 = u32::MAX;
+    const WORDS_PER_STATE: usize = 4;
+    const GROUP_SIZE: usize = u32::BITS as usize;
+
+    fn new(states: Vec<RetainedPlaceStates>) -> Self {
+        let count = states.len();
+        let exceptions = states
+            .iter()
+            .filter(|state| {
+                state.initial_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            })
+            .count();
+        let has_exceptions = exceptions != 0;
+        let groups = if has_exceptions {
+            count.div_ceil(Self::GROUP_SIZE)
+        } else {
+            0
+        };
+        let mut words = Vec::with_capacity(
+            count * Self::WORDS_PER_STATE
+                + usize::from(has_exceptions) * 2
+                + groups * 2
+                + exceptions,
+        );
+        if has_exceptions {
+            words.push(Self::EXCEPTIONS_MARKER);
+            words.push(u32::try_from(count).expect("too many place states"));
+        }
+        for state in &states {
+            words.extend_from_slice(&[
+                state.end_of_scope.0.as_u32(),
+                state.end_of_scope.1.as_u32(),
+                state.reachable.0.as_u32(),
+                state.reachable.1.as_u32(),
+            ]);
+        }
+        if has_exceptions {
+            let mut preceding = 0u32;
+            for group in states.chunks(Self::GROUP_SIZE) {
+                let mut bitmap = 0u32;
+                for (index, state) in group.iter().enumerate() {
+                    if state.initial_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                        bitmap |= 1 << index;
+                    }
+                }
+                words.extend_from_slice(&[bitmap, preceding]);
+                preceding += bitmap.count_ones();
+            }
+            words.extend(states.into_iter().filter_map(|state| {
+                (state.initial_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE)
+                    .then_some(state.initial_reachability.as_u32())
+            }));
+        }
+        Self {
+            words: words.into_boxed_slice(),
+            _index: PhantomData,
+        }
+    }
+
+    fn has_exceptions(&self) -> bool {
+        self.words.first() == Some(&Self::EXCEPTIONS_MARKER)
+    }
+
+    fn len(&self) -> usize {
+        if self.has_exceptions() {
+            self.words[1] as usize
+        } else {
+            self.words.len() / Self::WORDS_PER_STATE
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.words.is_empty()
+    }
+
+    fn indices(&self) -> impl Iterator<Item = I> + '_ {
+        (0..self.len()).map(I::new)
+    }
+
+    fn get(&self, id: I) -> RetainedPlaceStates {
+        let index = id.index();
+        let count = self.len();
+        assert!(index < count);
+        let has_exceptions = self.has_exceptions();
+        let offset = usize::from(has_exceptions) * 2 + index * Self::WORDS_PER_STATE;
+        let end_of_scope = InternedPlaceStateId(
+            InternedBindingsId::from_u32(self.words[offset]),
+            InternedDeclarationsId::from_u32(self.words[offset + 1]),
+        );
+        let reachable = InternedPlaceStateId(
+            InternedBindingsId::from_u32(self.words[offset + 2]),
+            InternedDeclarationsId::from_u32(self.words[offset + 3]),
+        );
+        let initial_reachability = if has_exceptions {
+            let group = index / Self::GROUP_SIZE;
+            let bit = index % Self::GROUP_SIZE;
+            let bitmap_offset = 2 + count * Self::WORDS_PER_STATE + group * 2;
+            let bitmap = self.words[bitmap_offset];
+            if bitmap & (1 << bit) == 0 {
+                ScopedReachabilityConstraintId::ALWAYS_TRUE
+            } else {
+                let before = bitmap & ((1 << bit) - 1);
+                let exception_index =
+                    self.words[bitmap_offset + 1] as usize + before.count_ones() as usize;
+                let exceptions_offset =
+                    2 + count * Self::WORDS_PER_STATE + count.div_ceil(Self::GROUP_SIZE) * 2;
+                ScopedReachabilityConstraintId::from_raw(
+                    self.words[exceptions_offset + exception_index],
+                )
+            }
+        } else {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        };
+        RetainedPlaceStates {
+            end_of_scope,
+            reachable,
+            initial_reachability,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -697,7 +834,7 @@ struct UseDefMapExtra {
     multi_bindings_by_use: MultiBindingsByUse,
 
     /// Retained [`PlaceState`] values for each member.
-    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>,
+    member_states: RetainedPlaceTable<ScopedMemberId>,
 
     /// Snapshots of bindings used to resolve references from nested scopes.
     enclosing_snapshots: FrozenIndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
@@ -758,20 +895,42 @@ impl<'db> DefinitionEntry<'db> {
 static_assertions::assert_eq_size!(DefinitionEntry<'static>, DefinitionState<'static>);
 
 /// Retained definition states, excluding the implicit unbound definition at index zero.
+///
+/// Each group contains a byte of two-bit tags followed by up to four Salsa IDs. A deleted or
+/// undefined entry has an unused ID slot. This avoids the padding in an enum for every entry
+/// without requiring a separate allocation for the tags.
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 struct RetainedDefinitions<'db> {
-    states: Box<[DefinitionEntry<'db>]>,
+    states: Box<[u8]>,
+    _lifetime: PhantomData<Definition<'db>>,
 }
 
 impl<'db> RetainedDefinitions<'db> {
     fn new(states: IndexVec<ScopedDefinitionId, DefinitionEntry<'db>>) -> Self {
-        let mut states = states.into_iter();
+        let mut entries = states.into_iter();
 
-        let unbound_state = states.next();
+        let unbound_state = entries.next();
         debug_assert_eq!(unbound_state, Some(DefinitionEntry::Undefined));
 
+        let count = entries.len();
+        let mut states = Vec::with_capacity(count * 8 + count.div_ceil(4));
+        for (index, entry) in entries.enumerate() {
+            if index % 4 == 0 {
+                states.push(0);
+            }
+            let (tag, bits) = match entry {
+                DefinitionEntry::DeclarationPart(definition) => (0, definition.as_id().as_bits()),
+                DefinitionEntry::Unused(definition) => (1, definition.as_id().as_bits()),
+                DefinitionEntry::Used(definition) => (2, definition.as_id().as_bits()),
+                DefinitionEntry::Undefined => (3, 0),
+                DefinitionEntry::Deleted => (3, 1),
+            };
+            states[(index / 4) * 33] |= tag << ((index % 4) * 2);
+            states.extend_from_slice(&bits.to_ne_bytes());
+        }
         Self {
-            states: states.collect(),
+            states: states.into_boxed_slice(),
+            _lifetime: PhantomData,
         }
     }
 
@@ -781,18 +940,139 @@ impl<'db> RetainedDefinitions<'db> {
         if index == 0 {
             DefinitionEntry::Undefined
         } else {
-            self.states[index - 1]
+            let index = index - 1;
+            let group = (index / 4) * 33;
+            let tag = (self.states[group] >> ((index % 4) * 2)) & 3;
+            let offset = group + 1 + (index % 4) * 8;
+            let mut bytes = [0; 8];
+            bytes.copy_from_slice(&self.states[offset..offset + 8]);
+            let bits = u64::from_ne_bytes(bytes);
+            match tag {
+                0 => DefinitionEntry::DeclarationPart(Definition::from_id(Id::from_bits(bits))),
+                1 => DefinitionEntry::Unused(Definition::from_id(Id::from_bits(bits))),
+                2 => DefinitionEntry::Used(Definition::from_id(Id::from_bits(bits))),
+                3 if bits == 0 => DefinitionEntry::Undefined,
+                3 => DefinitionEntry::Deleted,
+                _ => unreachable!(),
+            }
         }
     }
 
     fn iter_enumerated(
         &self,
     ) -> impl Iterator<Item = (ScopedDefinitionId, DefinitionEntry<'db>)> + '_ {
-        self.states
-            .iter()
-            .copied()
-            .enumerate()
-            .map(|(index, entry)| (ScopedDefinitionId::new(index + 1), entry))
+        let count = (self.states.len() / 33) * 4 + (self.states.len() % 33).saturating_sub(1) / 8;
+        (1..=count).map(|index| {
+            let id = ScopedDefinitionId::new(index);
+            (id, self.get(id))
+        })
+    }
+}
+
+#[cfg(test)]
+mod retained_definitions_tests {
+    use super::*;
+
+    #[test]
+    fn packed_entries_round_trip_across_groups() {
+        let definition = Definition::from_id(Id::from_bits(0x1_0000_0001));
+        let variants = [
+            DefinitionEntry::DeclarationPart(definition),
+            DefinitionEntry::Unused(definition),
+            DefinitionEntry::Used(definition),
+            DefinitionEntry::Undefined,
+            DefinitionEntry::Deleted,
+        ];
+
+        for count in 0..=13 {
+            let expected: Vec<_> = (0..count)
+                .map(|index| variants[index % variants.len()])
+                .collect();
+            let entries = std::iter::once(DefinitionEntry::Undefined)
+                .chain(expected.iter().copied())
+                .collect();
+            let retained = RetainedDefinitions::new(entries);
+
+            assert_eq!(
+                retained.get(ScopedDefinitionId::new(0)),
+                DefinitionEntry::Undefined
+            );
+            assert_eq!(
+                retained.iter_enumerated().collect::<Vec<_>>(),
+                expected
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, entry)| (ScopedDefinitionId::new(index + 1), entry))
+                    .collect::<Vec<_>>()
+            );
+        }
+    }
+
+    #[test]
+    fn initial_reachability_defaults_and_exceptions() {
+        let symbol0 = ScopedSymbolId::new(0);
+        let symbol1 = ScopedSymbolId::new(1);
+        let member0 = ScopedMemberId::new(0);
+        let member1 = ScopedMemberId::new(1);
+        let mut builder = Box::new(UseDefMapBuilder::new(ScopeKind::Module));
+        builder.add_place(symbol0.into());
+        builder.add_place(member0.into());
+        builder.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+        builder.add_place(symbol1.into());
+        builder.add_place(member1.into());
+        let map = builder.finish();
+
+        for place in [symbol0.into(), member0.into()] {
+            assert_eq!(
+                map.reachable_bindings(place).initial_unbound,
+                Some(ScopedReachabilityConstraintId::ALWAYS_TRUE)
+            );
+        }
+        for place in [symbol1.into(), member1.into()] {
+            assert_eq!(
+                map.reachable_bindings(place).initial_unbound,
+                Some(ScopedReachabilityConstraintId::ALWAYS_FALSE)
+            );
+            assert_eq!(
+                map.reachable_declarations(place).initial_undeclared,
+                Some(ScopedReachabilityConstraintId::ALWAYS_FALSE)
+            );
+        }
+    }
+
+    #[test]
+    fn packed_place_states_round_trip_across_bitmap_groups() {
+        for count in [0, 1, 31, 32, 33, 64, 65, 100] {
+            for with_exceptions in [false, true] {
+                let expected: Vec<_> = (0..count)
+                    .map(|index| RetainedPlaceStates {
+                        end_of_scope: InternedPlaceStateId(
+                            InternedBindingsId::new(index),
+                            InternedDeclarationsId::new(index + 1),
+                        ),
+                        reachable: InternedPlaceStateId(
+                            InternedBindingsId::new(index + 2),
+                            InternedDeclarationsId::new(index + 3),
+                        ),
+                        initial_reachability: if with_exceptions
+                            && (index % 3 == 0 || matches!(index, 31 | 32 | 63 | 64))
+                        {
+                            ScopedReachabilityConstraintId::from_raw(
+                                u32::try_from(index).expect("small test index"),
+                            )
+                        } else {
+                            ScopedReachabilityConstraintId::ALWAYS_TRUE
+                        },
+                    })
+                    .collect();
+                let table = RetainedPlaceTable::<ScopedSymbolId>::new(expected.clone());
+                assert_eq!(table.len(), count);
+                assert_eq!(table.is_empty(), count == 0);
+                for (index, state) in table.indices().zip(expected) {
+                    assert_eq!(table.get(index), state);
+                }
+            }
+        }
     }
 }
 
@@ -841,7 +1121,7 @@ pub struct UseDefMap<'db> {
     >,
 
     /// Retained [`PlaceState`] values for each symbol.
-    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates>,
+    symbol_states: RetainedPlaceTable<ScopedSymbolId>,
 
     /// Collection fields omitted when they would all be empty.
     extra: Option<Box<UseDefMapExtra>>,
@@ -1128,7 +1408,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
+        let place_state_id = self.symbol_states.get(symbol).end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1139,7 +1419,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
+        let place_state_id = self.extra().member_states.get(member).end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -1151,8 +1431,8 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let state = match place {
-            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
-            ScopedPlaceId::Member(member) => &self.extra().member_states[member],
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states.get(symbol),
+            ScopedPlaceId::Member(member) => self.extra().member_states.get(member),
         };
         let bindings = &self.interned_bindings[state.reachable.bindings_id()];
         BindingWithConstraintsIterator {
@@ -1264,7 +1544,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
+        let place_state_id = self.symbol_states.get(symbol).end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -1273,7 +1553,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.extra().member_states[member].end_of_scope;
+        let place_state_id = self.extra().member_states.get(member).end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -1294,8 +1574,8 @@ impl<'db> UseDefMap<'db> {
 
     pub fn reachable_declarations(&self, place: ScopedPlaceId) -> DeclarationsIterator<'_, 'db> {
         let state = match place {
-            ScopedPlaceId::Symbol(symbol) => &self.symbol_states[symbol],
-            ScopedPlaceId::Member(member) => &self.extra().member_states[member],
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states.get(symbol),
+            ScopedPlaceId::Member(member) => self.extra().member_states.get(member),
         };
         let declarations = &self.interned_declarations[state.reachable.declarations_id()];
         DeclarationsIterator {
@@ -1310,8 +1590,8 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> ImportedFinalCandidatesIterator<'_, 'db> {
         let place_state_id = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].end_of_scope,
-            ScopedPlaceId::Member(member) => self.extra().member_states[member].end_of_scope,
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states.get(symbol).end_of_scope,
+            ScopedPlaceId::Member(member) => self.extra().member_states.get(member).end_of_scope,
         };
         self.imported_final_candidates_iterator(
             &self.interned_declarations[place_state_id.declarations_id()],
@@ -1324,8 +1604,8 @@ impl<'db> UseDefMap<'db> {
         place: ScopedPlaceId,
     ) -> ImportedFinalCandidatesIterator<'_, 'db> {
         let place_state_id = match place {
-            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].reachable,
-            ScopedPlaceId::Member(member) => self.extra().member_states[member].reachable,
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states.get(symbol).reachable,
+            ScopedPlaceId::Member(member) => self.extra().member_states.get(member).reachable,
         };
         self.imported_final_candidates_iterator(
             &self.interned_declarations[place_state_id.declarations_id()],
@@ -3321,10 +3601,10 @@ impl<'db> UseDefMapBuilder<'db> {
         reachable: IndexVec<I, ReachableDefinitions>,
         place_state_interner: &mut PlaceStateInterner,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
-    ) -> FrozenIndexVec<I, RetainedPlaceStates> {
+    ) -> RetainedPlaceTable<I> {
         assert_eq!(end_of_scope.len(), reachable.len());
 
-        end_of_scope
+        let states = end_of_scope
             .into_iter()
             .zip(reachable)
             .map(|(end_of_scope, definitions)| {
@@ -3358,7 +3638,8 @@ impl<'db> UseDefMapBuilder<'db> {
                     initial_reachability,
                 }
             })
-            .collect()
+            .collect();
+        RetainedPlaceTable::new(states)
     }
 
     fn intern_definitions_by_definition(

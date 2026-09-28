@@ -106,8 +106,13 @@ impl ScopedReachabilityConstraintId {
         self.0 >= SMALLEST_TERMINAL.0
     }
 
-    fn as_u32(self) -> u32 {
+    pub(crate) const fn as_u32(self) -> u32 {
         self.0
+    }
+
+    /// Reconstruct an ID previously returned by `as_u32`, including terminal IDs.
+    pub(crate) const fn from_raw(value: u32) -> Self {
+        Self(value)
     }
 }
 
