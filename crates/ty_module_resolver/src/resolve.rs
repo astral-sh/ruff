@@ -56,7 +56,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module::{Module, ModuleKind};
 use crate::module_name::{ImportingFile, ModuleName};
-use crate::path::{ModuleDirectory, ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::path::{ModuleDirectory, SearchPath, SystemOrVendoredPathRef};
 use crate::strategy::MisconfigurationStrategy;
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
@@ -1299,7 +1299,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
+            directory: ModuleDirectory::new(context, search_path.clone()),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1311,7 +1311,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => true,
             ResolvedModule::Package(init) => {
-                is_legacy_namespace_package(self.directory.path(), context, init)
+                is_legacy_namespace_package(context, self.directory.search_path(), init)
             }
             ResolvedModule::Module(_) => false,
         }
@@ -1374,7 +1374,6 @@ impl<'db> ModuleResolutionCandidate<'db> {
         match self.module {
             ResolvedModule::NamespacePackage => Cow::Owned(
                 self.directory
-                    .path()
                     .to_system_path()
                     .unwrap_or_default()
                     .to_string(),
@@ -1532,7 +1531,7 @@ fn resolve_component<'db>(
         // A namespace package is not backed by a file, so it cannot satisfy a stub-only lookup.
         if file_filter != ComponentFileFilter::StubOnly
             && let Some(subdirectory) = &subdirectory
-            && !subdirectory.path().search_path().is_standard_library()
+            && !subdirectory.search_path().is_standard_library()
         {
             candidate.module = ResolvedModule::NamespacePackage;
             candidate.py_typed = subdirectory
@@ -1599,14 +1598,14 @@ fn resolve_file_module_with_filter(
 /// contents, they all "need" to have the legacy namespace idiom (we do nothing to enforce that,
 /// we will just get confused if you mess it up).
 fn is_legacy_namespace_package(
-    package_path: &ModulePath,
     context: &ResolverContext,
+    search_path: &SearchPath,
     init: File,
 ) -> bool {
     static PKG_FINDER: LazyLock<Finder<'static>> = LazyLock::new(|| Finder::new("pkg"));
 
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
-    if package_path.search_path().is_standard_library() {
+    if search_path.is_standard_library() {
         return false;
     }
 
