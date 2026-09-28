@@ -239,7 +239,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
         self.validate_unpacked_typed_dict_kwargs(&function.parameters);
 
-        self.infer_body(&function.body);
+        self.infer_scope_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()

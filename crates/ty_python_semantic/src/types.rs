@@ -3221,7 +3221,6 @@ impl<'db> Type<'db> {
 
     /// Create a `LiteralString`.
     fn literal_string() -> Self {
-        // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
         Self::LiteralValue(LiteralValueType::unpromotable(
             LiteralValueTypeKind::LiteralString,
         ))

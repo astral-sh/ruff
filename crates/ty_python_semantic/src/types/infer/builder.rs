@@ -1994,7 +1994,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_module(&mut self, module: &ast::ModModule) {
-        self.infer_body(&module.body);
+        self.infer_scope_body(&module.body);
     }
 
     fn infer_type_alias_type_params(&mut self, type_alias: &ast::StmtTypeAlias) {
@@ -2161,6 +2161,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     _ => false,
                 }
             })
+    }
+
+    /// Infer the body of a module, class, or function scope.
+    ///
+    /// As a memory optimization, store `LiteralString` for a leading docstring instead of
+    /// interning its exact contents. Type inference does not currently use the docstring's type;
+    /// if it needs the exact type in the future, infer the docstring normally instead.
+    fn infer_scope_body(&mut self, suite: &[ast::Stmt]) {
+        if let Some((ast::Stmt::Expr(statement), body)) = suite.split_first()
+            && statement.value.is_string_literal_expr()
+        {
+            self.store_expression_type(&statement.value, Type::literal_string());
+            self.infer_body(body);
+        } else {
+            self.infer_body(suite);
+        }
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
