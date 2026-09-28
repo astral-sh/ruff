@@ -6,7 +6,7 @@ use crate::{
     place::{Place, PlaceAndQualifiers, Provenance},
     reachability::binding_reachability,
     types::{
-        KnownClass, Truthiness, Type, TypeContext, UnionBuilder, definition_expression_type,
+        KnownClass, Type, TypeContext, UnionBuilder, definition_expression_type,
         function::{is_implicit_classmethod, is_implicit_staticmethod},
         infer::infer_unpack_types,
         infer_expression_type, inferred_declaration,
@@ -17,7 +17,9 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ty_python_core::{
     SemanticIndex, attribute_scopes,
-    definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
+    definition::{
+        AnnotatedAssignmentDefinitionKind, Definition, DefinitionKind, DefinitionState, TargetKind,
+    },
     place_table,
     scope::{Scope, ScopeId},
     semantic_index, use_def_map,
@@ -47,43 +49,14 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         attribute: ImplicitAttributeName<'db>,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        let scope = attribute.class_body_scope(db);
-        let file = scope.program_file(db);
-        let module = parsed_module(db, file.python_file(db)).load(db);
-        let index = semantic_index(db, file);
-
-        for (declarations, method_scope_id) in attribute_declarations(db, scope, attribute.name(db))
-        {
-            if !is_valid_scope(
-                db,
-                index,
-                &module,
-                index.scope(method_scope_id),
-                MethodDecorator::None,
-            ) {
-                continue;
-            }
-
-            for declaration in declarations {
-                let DefinitionState::Defined(declaration) = declaration.declaration else {
-                    continue;
-                };
-                if !matches!(declaration.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
-                    continue;
-                }
-                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
-                    continue;
-                };
-                return Some(
-                    Place::declared(annotation.inner)
-                        .with_definition(declaration)
-                        .with_qualifiers(
-                            annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
-                        ),
-                );
-            }
-        }
-        None
+        implicit_attribute_declarations(
+            db,
+            attribute.class_body_scope(db),
+            attribute.name(db),
+            MethodDecorator::None,
+        )
+        .next()
+        .map(|(_, _, annotation)| annotation)
     }
 
     /// Tries to find declarations/bindings of an attribute named `name` that are only
@@ -180,117 +153,46 @@ impl<'db> StaticClassLiteral<'db> {
 
         let module = parsed_module(db, python_file).load(db);
         let index = semantic_index(db, program_file);
-        let class_map = use_def_map(db, class_body_scope);
-        let class_table = place_table(db, class_body_scope);
         // First check declarations
-        for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
+        for (declaration, assignment, annotation) in
+            implicit_attribute_declarations(db, class_body_scope, name, target_method_decorator)
         {
-            let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(db, index, &module, method_scope, target_method_decorator) {
+            if let Some(all_qualifiers) = annotation.is_bare_final() {
+                if let Some(value) = assignment.value(&module) {
+                    // If we see an annotated assignment with a bare `Final` as in
+                    // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
+                    // on the right-hand side.
+
+                    let inferred_ty =
+                        infer_expression_type(db, index.expression(value), TypeContext::default());
+                    return ImplicitAttribute {
+                        member: Member {
+                            inner: Place::bound(inferred_ty)
+                                .with_definition(declaration)
+                                .with_qualifiers(all_qualifiers),
+                        },
+                        augmented_bindings: None,
+                    };
+                }
+
+                // If there is no right-hand side, just record that we saw a `Final` qualifier
+                qualifiers |= all_qualifiers;
                 continue;
             }
 
-            for attribute_declaration in attribute_declarations {
-                let DefinitionState::Defined(declaration) = attribute_declaration.declaration
-                else {
-                    continue;
-                };
-
-                let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
-                    continue;
-                };
-
-                // We found an annotated assignment of one of the following forms (using 'self' in these
-                // examples, but we support arbitrary names for the first parameters of methods):
-                //
-                //     self.name: <annotation>
-                //     self.name: <annotation> = …
-
-                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
-                    continue;
-                };
-                let annotation = Place::declared(annotation.inner)
-                    .with_definition(declaration)
-                    .with_qualifiers(
-                        annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
-                    );
-
-                if let Some(all_qualifiers) = annotation.is_bare_final() {
-                    if let Some(value) = assignment.value(&module) {
-                        // If we see an annotated assignment with a bare `Final` as in
-                        // `self.SOME_CONSTANT: Final = 1`, infer the type from the value
-                        // on the right-hand side.
-
-                        let inferred_ty = infer_expression_type(
-                            db,
-                            index.expression(value),
-                            TypeContext::default(),
-                        );
-                        return ImplicitAttribute {
-                            member: Member {
-                                inner: Place::bound(inferred_ty)
-                                    .with_definition(declaration)
-                                    .with_qualifiers(all_qualifiers),
-                            },
-                            augmented_bindings: None,
-                        };
-                    }
-
-                    // If there is no right-hand side, just record that we saw a `Final` qualifier
-                    qualifiers |= all_qualifiers;
-                    continue;
-                }
-
-                return ImplicitAttribute {
-                    member: Member { inner: annotation },
-                    augmented_bindings: None,
-                };
-            }
+            return ImplicitAttribute {
+                member: Member { inner: annotation },
+                augmented_bindings: None,
+            };
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
             attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
-            if !is_valid_scope(db, index, &module, binding_scope, target_method_decorator) {
-                continue;
-            }
-
-            let scope_for_reachability_analysis = {
-                if binding_scope.node().as_function().is_some() {
-                    binding_scope
-                } else if binding_scope.is_eager() {
-                    let mut eager_scope_parent = binding_scope;
-                    while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
-                    {
-                        eager_scope_parent = index.scope(parent);
-                    }
-                    eager_scope_parent
-                } else {
-                    binding_scope
-                }
-            };
-
-            // The attribute assignment inherits the reachability of the method which contains it
-            let is_method_reachable =
-                if let Some(method_def) = scope_for_reachability_analysis.node().as_function() {
-                    let method = index.expect_single_definition(method_def);
-                    let method_place = class_table
-                        .symbol_id(&method_def.node(&module).name)
-                        .unwrap();
-                    class_map
-                        .reachable_symbol_bindings(method_place)
-                        .find_map(|bind| {
-                            (bind.binding.is_defined_and(|def| def == method))
-                                .then(|| binding_reachability(db, class_map, &bind))
-                        })
-                        .unwrap_or(Truthiness::AlwaysFalse)
-                } else {
-                    Truthiness::AlwaysFalse
-                };
-            if is_method_reachable.is_always_false() {
+            if !is_valid_scope(db, index, &module, binding_scope, target_method_decorator)
+                || !is_reachable_method(db, index, &module, class_body_scope, binding_scope)
+            {
                 continue;
             }
 
@@ -308,9 +210,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 }
 
-                if !is_method_reachable.is_always_false() {
-                    is_attribute_bound = true;
-                }
+                is_attribute_bound = true;
 
                 let inferred_ty = implicit_attribute_binding_type(db, binding);
 
@@ -342,6 +242,87 @@ impl<'db> StaticClassLiteral<'db> {
                 .then(|| AugmentedBindings::new(db, augmented_bindings.into_boxed_slice())),
         }
     }
+}
+
+/// Find annotations on attributes of the receiver in reachable methods.
+///
+/// This includes both `self.name: T` and `self.name: T = value`. The receiver can use any name
+/// chosen for the method's first parameter.
+fn implicit_attribute_declarations<'db, 'name>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'name str,
+    target_method_decorator: MethodDecorator,
+) -> impl Iterator<
+    Item = (
+        Definition<'db>,
+        &'db AnnotatedAssignmentDefinitionKind,
+        PlaceAndQualifiers<'db>,
+    ),
+> + use<'db, 'name> {
+    let file = class_body_scope.program_file(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let index = semantic_index(db, file);
+
+    attribute_declarations(db, class_body_scope, name)
+        .filter(move |(_, method_scope_id)| {
+            let method_scope = index.scope(*method_scope_id);
+            is_valid_scope(db, index, &module, method_scope, target_method_decorator)
+                && is_reachable_method(db, index, &module, class_body_scope, method_scope)
+        })
+        .flat_map(|(declarations, _)| declarations)
+        .filter_map(move |declaration| {
+            let DefinitionState::Defined(declaration) = declaration.declaration else {
+                return None;
+            };
+            let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
+                return None;
+            };
+            let annotation = inferred_declaration(db, declaration).declared()?;
+            Some((
+                declaration,
+                assignment,
+                Place::declared(annotation.inner)
+                    .with_definition(declaration)
+                    .with_qualifiers(
+                        annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
+                    ),
+            ))
+        })
+}
+
+/// An attribute in a method can contribute only if the method can be defined.
+fn is_reachable_method<'db>(
+    db: &'db dyn Db,
+    index: &'db SemanticIndex<'db>,
+    module: &ParsedModuleRef,
+    class_body_scope: ScopeId<'db>,
+    mut scope: &'db Scope,
+) -> bool {
+    while scope.is_eager()
+        && let Some(parent) = scope.parent()
+    {
+        scope = index.scope(parent);
+    }
+
+    let Some(method_def) = scope.node().as_function() else {
+        return false;
+    };
+    let method = index.expect_single_definition(method_def);
+    let Some(method_symbol) =
+        place_table(db, class_body_scope).symbol_id(&method_def.node(module).name)
+    else {
+        return false;
+    };
+    let class_map = use_def_map(db, class_body_scope);
+    class_map
+        .reachable_symbol_bindings(method_symbol)
+        .any(|binding| {
+            binding
+                .binding
+                .is_defined_and(|definition| definition == method)
+                && !binding_reachability(db, class_map, &binding).is_always_false()
+        })
 }
 
 fn is_valid_scope<'db>(

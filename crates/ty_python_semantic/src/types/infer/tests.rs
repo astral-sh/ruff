@@ -493,6 +493,42 @@ fn inherited_instance_annotation_updates_across_modules() -> anyhow::Result<()> 
 }
 
 #[test]
+fn inherited_instance_annotation_reachability_updates_across_modules() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_files([
+        (
+            "/src/base.py",
+            "class Base:\n    if False:\n        def configure(self):\n            self.value: int = 0",
+        ),
+        (
+            "/src/main.py",
+            "from base import Base\nclass Child(Base):\n    value = 'child'\nresult = Child().value",
+        ),
+    ])?;
+
+    let main = system_path_to_file(&db, "/src/main.py")?;
+    let result_type = |db: &TestDb| {
+        global_symbol(db, main, "result")
+            .place
+            .expect_type()
+            .display(db, &db.program_environment())
+            .to_string()
+    };
+    assert_eq!(result_type(&db), "str");
+    db.write_file(
+        "/src/base.py",
+        "class Base:\n    if True:\n        def configure(self):\n            self.value: int = 0",
+    )?;
+    assert_eq!(result_type(&db), "int");
+    db.write_file(
+        "/src/base.py",
+        "class Base:\n    if False:\n        def configure(self):\n            self.value: int = 0",
+    )?;
+    assert_eq!(result_type(&db), "str");
+    Ok(())
+}
+
+#[test]
 fn simple_assignment_does_not_enter_salsa_cycle() {
     let mut db = setup_db();
     db.write_dedented("src/a.py", "x = 1; y = x + 1").unwrap();
