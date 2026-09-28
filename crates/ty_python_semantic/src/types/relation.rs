@@ -721,6 +721,36 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // These checks depend only on the literal identities, so retaining a Salsa query for
+        // each pair is unnecessary. The general relation checker handles all other cases.
+        match (self, other) {
+            (Type::ClassLiteral(_), Type::ClassLiteral(_)) => return false,
+            (Type::FunctionLiteral(source), Type::FunctionLiteral(target))
+                if source.literal(db) != target.literal(db) =>
+            {
+                return false;
+            }
+            // A bound method can only be redundant when its captured receiver is redundant.
+            // Different literal values cannot satisfy that relation, except that a string
+            // literal can be redundant with LiteralString.
+            (Type::BoundMethod(source), Type::BoundMethod(target))
+                if let (Type::LiteralValue(source), Type::LiteralValue(target)) =
+                    (source.self_instance(db), target.self_instance(db))
+                    && source.kind() != target.kind()
+                    && !(source.is_string() && target.is_literal_string()) =>
+            {
+                return false;
+            }
+            (Type::BoundMethod(source), Type::BoundMethod(target))
+                if let (Some(source), Some(target)) =
+                    (source.function(db), target.function(db))
+                    && source.literal(db) != target.literal(db) =>
+            {
+                return false;
+            }
+            _ => {}
+        }
+
         let program = env.program(db);
         is_redundant_with_impl(db, TypePair::new(db, program, self, other))
     }

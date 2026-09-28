@@ -623,6 +623,63 @@ type X = TypeOf[A.method]
 static_assert(is_equivalent_to(X, X))
 ```
 
+### Literal receivers
+
+Bound methods retain their captured literal receivers when building a union. A `LiteralString`
+receiver can still cover a string literal receiver.
+
+```py
+from typing import Literal
+from typing_extensions import LiteralString
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+def check(flag: bool, text: LiteralString, alpha: Literal["alpha"], beta: Literal["beta"]):
+    first = alpha.title
+    second = beta.title
+    either = first if flag else second
+    reversed_either = second if flag else first
+    same = first if flag else first
+    general = first if flag else text.title
+
+    static_assert(not is_equivalent_to(TypeOf[first], TypeOf[second]))
+    static_assert(not is_equivalent_to(TypeOf[either], TypeOf[first]))
+    static_assert(is_equivalent_to(TypeOf[either], TypeOf[first] | TypeOf[second]))
+    static_assert(is_equivalent_to(TypeOf[either], TypeOf[reversed_either]))
+    static_assert(is_equivalent_to(TypeOf[same], TypeOf[first]))
+    static_assert(is_equivalent_to(TypeOf[general], TypeOf[text.title]))
+```
+
+### Distinct classes and functions
+
+Distinct class objects, function objects, and methods also remain separate in unions.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+class FirstClass: ...
+class SecondClass: ...
+
+def first() -> None: ...
+def second() -> None: ...
+
+class Example:
+    def first_method(self) -> None: ...
+    def second_method(self) -> None: ...
+
+def check(flag: bool, example: Example):
+    selected_class = FirstClass if flag else SecondClass
+    selected_function = first if flag else second
+    selected_method = example.first_method if flag else example.second_method
+    static_assert(not is_equivalent_to(TypeOf[selected_class], TypeOf[FirstClass]))
+    static_assert(is_equivalent_to(TypeOf[selected_class], TypeOf[FirstClass] | TypeOf[SecondClass]))
+    static_assert(not is_equivalent_to(TypeOf[selected_function], TypeOf[first]))
+    static_assert(is_equivalent_to(TypeOf[selected_function], TypeOf[first] | TypeOf[second]))
+    static_assert(not is_equivalent_to(TypeOf[selected_method], TypeOf[example.first_method]))
+    static_assert(is_equivalent_to(TypeOf[selected_method], TypeOf[example.first_method] | TypeOf[example.second_method]))
+```
+
 ### Non-fully-static callable types
 
 The examples provided below are only a subset of the possible cases and only include the ones with
