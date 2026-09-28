@@ -2924,21 +2924,20 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
     /// before continuing the MRO prevents a later sibling base from supplying a different contract.
-    /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
-    /// prevent us from determining which declaration applies. Final declarations are handled by
-    /// override diagnostics instead of supplying initializer context.
+    /// Methods and other non-annotation declarations mask older annotations. A dynamic base
+    /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
+    /// Final declarations are handled by override diagnostics instead of supplying context.
     pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
-                ClassBase::Generic | ClassBase::Protocol => continue,
+                ClassBase::Generic
+                | ClassBase::Protocol
+                | ClassBase::Any
+                | ClassBase::Dynamic(_) => continue,
                 ClassBase::Class(base) => base,
-                // A dynamic base may supply the member, a divergent base is not yet known,
-                // and TypedDict has a special member lookup.
-                ClassBase::Any
-                | ClassBase::Dynamic(_)
-                | ClassBase::Divergent(_)
-                | ClassBase::TypedDict(_) => return None,
+                // A divergent base is not yet known, and TypedDict has a special member lookup.
+                ClassBase::Divergent(_) | ClassBase::TypedDict(_) => return None,
             };
             let (base, specialization) = base.static_class_literal(db)?;
             let scope = base.body_scope(db);

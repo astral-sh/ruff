@@ -2232,5 +2232,30 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Specialized declarations after a dynamic base
+
+```py
+from typing import Any
+
+class Base[T]:
+    items: list[T]
+
+class Integers(Any, Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+reveal_type(Integers().items)  # revealed: list[int]
+
+class Invalid(Any, Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+class Child[T](Any, Base[T]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
