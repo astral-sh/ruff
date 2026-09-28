@@ -1328,6 +1328,77 @@ reveal_type(Z)  # revealed: bool
 reveal_type(Nope)  # revealed: Unknown
 ```
 
+### `__all__` also filters names from the module's own `*` imports
+
+Names that a module obtains through its own `*` import are only re-exported if they are listed in
+its `__all__`:
+
+`helpers.py`:
+
+```py
+__all__ = ["Helper", "Unlisted"]
+
+Helper: bool = True
+Unlisted: bool = True
+```
+
+`exporter.py`:
+
+```py
+from helpers import *
+
+__all__ = ["Helper", "X"]
+
+X: bool = True
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(Helper)  # revealed: bool
+reveal_type(X)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Unlisted)  # revealed: Unknown
+```
+
+### A `*` import does not import `__all__` itself
+
+`from a import *` does not bind `__all__` unless `a.__all__` includes `"__all__"`. A module that
+only `*`-imports from a module with `__all__` therefore has no `__all__` of its own, and a `*`
+import from it skips its private names:
+
+`a.py`:
+
+```py
+__all__ = ["A"]
+
+A: bool = True
+```
+
+`b.py`:
+
+```py
+from a import *
+
+_private: bool = True
+B: bool = True
+```
+
+`c.py`:
+
+```py
+from b import *
+
+reveal_type(A)  # revealed: bool
+reveal_type(B)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(_private)  # revealed: Unknown
+```
+
 ## `global` statements in non-global scopes
 
 Python allows `global` statements in function bodies to add new variables to the global scope, but
