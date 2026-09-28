@@ -446,10 +446,18 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 prune_path,
                 process_satisfied,
             ),
-            Constraint::Existential(_) => {
-                // XXX
-                ControlFlow::Continue(())
-            }
+            Constraint::Existential(existential) => self.visit_existential_constraint(
+                db,
+                env,
+                storage,
+                path,
+                polarity,
+                interior,
+                existential.body,
+                check_cache,
+                prune_path,
+                process_satisfied,
+            ),
         }
     }
 
@@ -621,6 +629,109 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     )?;
                 }
                 ControlFlow::Continue(())
+            },
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn visit_existential_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        path: &mut PathAssignments,
+        polarity: Polarity,
+        interior: InteriorNodeData,
+        existential_body: NodeId,
+        check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
+        prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
+        process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
+    ) -> ControlFlow<Break<L::Break>> {
+        let (if_holds, if_not_holds) = match polarity {
+            Polarity::Positive => (interior.if_true, interior.if_false),
+            Polarity::Negative => (
+                interior.if_true.or(storage, interior.if_uncertain),
+                interior.if_false.or(storage, interior.if_uncertain),
+            ),
+        };
+
+        // Walk the outgoing edge that depends on the existential holding. If we find any candidate
+        // solutions, walk the existential's body to make sure there are valid existential
+        // solutions that are compatible with that candidate solution.
+        self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            path,
+            polarity,
+            if_holds,
+            check_cache,
+            prune_path,
+            &|this, storage, path| {
+                // Note that we never negate existential's body, even when we are walking the
+                // negation of the existential _node_.
+                this.visit_node_and_then(
+                    db,
+                    env,
+                    storage,
+                    path,
+                    Polarity::Positive,
+                    existential_body,
+                    &never_cache,
+                    prune_path,
+                    process_satisfied,
+                )
+            },
+        )?;
+
+        // Under positive polarity, the existential's `if_uncertain` edge holds regardless of
+        // whether the quantifier itself holds, so we don't need to check the body.
+        if polarity == Polarity::Positive {
+            self.visit_node_and_then(
+                db,
+                env,
+                storage,
+                path,
+                polarity,
+                interior.if_uncertain,
+                check_cache,
+                prune_path,
+                process_satisfied,
+            )?;
+        }
+
+        // Last, walk the outgoing edge that depends on the existential _not_ holding. For each
+        // candidate solution, we check whether the existential's body has any solutions _given
+        // that candidate solution_.
+        self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            path,
+            polarity,
+            if_not_holds,
+            check_cache,
+            prune_path,
+            &|this, storage, path| {
+                // Note that we never negate existential's body, even when we are walking the
+                // negation of the existential _node_.
+                let has_any_solutions = this
+                    .node_is_satisfiable_on_path(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        Polarity::Positive,
+                        existential_body,
+                        None,
+                    )
+                    .map_break(Break::Limits)?;
+                if has_any_solutions {
+                    // Conservatively reject this candidate solution if the existential has at
+                    // least one solution.
+                    return ControlFlow::Continue(());
+                }
+                process_satisfied(this, storage, path)
             },
         )
     }

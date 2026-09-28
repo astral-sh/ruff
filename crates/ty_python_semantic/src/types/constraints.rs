@@ -4459,13 +4459,18 @@ impl InteriorNode {
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
         let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
+        let mut seen = FxHashSet::from_iter([self.node()]);
         let mut queue = VecDeque::from(vec![self.node()]);
         while let Some(node) = queue.pop_front() {
             node.for_each_unique_constraint(storage, &mut |constraint_id| {
                 let constraint = storage.constraint_data(constraint_id);
                 match constraint {
                     Constraint::Atomic(_) => constraints.push(AtomicConstraintId(constraint_id)),
-                    Constraint::Existential(existential) => queue.push_back(existential.body),
+                    Constraint::Existential(existential) => {
+                        if seen.insert(existential.body) {
+                            queue.push_back(existential.body);
+                        }
+                    }
                 }
             });
         }
