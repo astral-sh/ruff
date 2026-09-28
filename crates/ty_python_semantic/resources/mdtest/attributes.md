@@ -3449,6 +3449,25 @@ class DynamicLast(Base, Any):
 reveal_type(DynamicLast.value)  # revealed: int | str
 ```
 
+### Inherited instance annotations after a dynamic base
+
+```py
+from typing import Any
+
+class Base:
+    def __init__(self) -> None:
+        self.items: list[int] = []
+
+class Child(Any, Base):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child().items)  # revealed: list[int]
+
+class Invalid(Any, Base):
+    items = ["wrong"]  # error: [invalid-assignment]
+```
+
 ### Dynamically typed base expressions
 
 A base expression with type `Any` also leaves a concrete base's annotation available.
