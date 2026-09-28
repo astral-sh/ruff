@@ -141,14 +141,14 @@ class FuzzResult:
         progress = f"[{index}/{num_seeds}]"
         msg = (
             colored(f"Ran fuzzer on seed {self.seed}", "red")
-            if self.maybe_bug
+            if self.maybe_bug is not None
             else colored(f"Ran fuzzer successfully on seed {self.seed}", "green")
         )
         print(f"{msg:<60} {progress:>15}", flush=True)
 
         new = "new " if self.only_new_bugs else ""
 
-        if self.maybe_bug:
+        if self.maybe_bug is not None:
             match self.executable:
                 case Executable.RUFF:
                     panic_message = f"The following code triggers a {new}parser bug:"
@@ -239,7 +239,7 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
                 fuzz_result = future.result()
                 if not args.quiet:
                     fuzz_result.print_description(i, num_seeds)
-                if fuzz_result.maybe_bug:
+                if fuzz_result.maybe_bug is not None:
                     bugs.append(fuzz_result)
         except KeyboardInterrupt:
             print("\nShutting down the ProcessPoolExecutor due to KeyboardInterrupt...")
@@ -261,7 +261,7 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
         fuzz_result = fuzz_code(seed, args)
         if not args.quiet:
             fuzz_result.print_description(i, num_seeds)
-        if fuzz_result.maybe_bug:
+        if fuzz_result.maybe_bug is not None:
             bugs.append(fuzz_result)
     return bugs
 
