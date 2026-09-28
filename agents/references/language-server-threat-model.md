@@ -20,7 +20,8 @@ symlinks that point outside it.
 
 ## Security invariants
 
-- **Code Execution:** In untrusted workspaces, the editor extension and server may launch executables
+- **Code Execution:** Unexpected code execution during analysis is a security issue even in trusted
+    workspaces. In untrusted workspaces, the editor extension and server may launch executables
     bundled with the extension or trusted programs already installed on the host. They must not
     execute workspace or dependency code, including code run during installation.
 - **Edits:** Only editing operations may change source files, and they must not change unrelated
