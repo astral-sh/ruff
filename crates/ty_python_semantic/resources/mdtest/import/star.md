@@ -947,10 +947,10 @@ reveal_type(included)  # revealed: int
 reveal_type(excluded)  # revealed: Unknown
 ```
 
-### An `__all__` assignment followed by conditional changes
+### An `__all__` assignment followed by a conditional mutation
 
-The later assignment replaces the names from the wildcard import, and recognized changes apply to
-its new value.
+The source module has no `__all__`, so ty conservatively treats its public names as potential
+exports when it cannot determine the effect of a conditional mutation.
 
 `source.py`:
 
@@ -963,10 +963,11 @@ excluded: bool = True
 `exporter.py`:
 
 ```py
+import os
 from source import *
 
 __all__ = ["first"]
-if True:
+if os.getenv("EXTRA") is not None:
     __all__.append("second")
 ```
 
@@ -977,8 +978,33 @@ from exporter import *
 
 reveal_type(first)  # revealed: int
 reveal_type(second)  # revealed: str
-# error: [unresolved-reference]
-reveal_type(excluded)  # revealed: Unknown
+reveal_type(excluded)  # revealed: bool
+```
+
+### An `__all__` assignment followed by a slice assignment
+
+`source.py`:
+
+```py
+first: int = 1
+second: str = ""
+```
+
+`exporter.py`:
+
+```py
+from source import *
+
+__all__ = ["first"]
+__all__[:] = ["second"]
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(second)  # revealed: str
 ```
 
 ### Unicode identifiers can modify `__all__`

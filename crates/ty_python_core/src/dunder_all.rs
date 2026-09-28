@@ -13,7 +13,7 @@ use ruff_python_ast::{
 use crate::{Db, ProgramFile};
 
 /// Returns the elements of a list or tuple directly assigned to `__all__`.
-pub fn literal_dunder_all_assignment(stmt: &ast::Stmt) -> Option<&[ast::Expr]> {
+fn literal_dunder_all_assignment(stmt: &ast::Stmt) -> Option<&[ast::Expr]> {
     let (target, value) = match stmt {
         ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
             let [target] = targets.as_slice() else {
