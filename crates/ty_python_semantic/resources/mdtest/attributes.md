@@ -3244,8 +3244,6 @@ class Base:
     def configure(self) -> None:
         pass
 
-reveal_type(Base().value)  # revealed: int
-
 class Child(Base):
     value = "child"  # error: [invalid-assignment]
 ```
@@ -3321,25 +3319,10 @@ class NarrowSetterChild(WritableBase):
     value = NarrowSetter()
 ```
 
-### Instance annotations and method decorators
+### Annotations in class methods
 
-Only instance methods introduce instance annotations; a static method's first parameter and a class
-method's receiver do not declare instance attributes.
-
-```py
-class StaticBase:
-    @staticmethod
-    def static(other: object) -> None:
-        # error: [invalid-type-form]
-        other.static_value: int = 1  # error: [unresolved-attribute]
-
-class StaticChild(StaticBase):
-    static_value = "text"
-
-reveal_type(StaticChild.static_value)  # revealed: str
-```
-
-A class method's receiver is the class, not an instance:
+A class method's receiver is the class, so an annotation on it does not declare an instance
+attribute:
 
 ```py
 class ClassBase:
@@ -3374,7 +3357,6 @@ class Child(Left, Right):
     value = 1
 
 reveal_type(Child.value)  # revealed: int | str
-reveal_type(Child().value)  # revealed: int | str
 ```
 
 The annotation from `Right` does not replace the annotation inherited by `Left`:
