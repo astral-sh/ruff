@@ -1,6 +1,21 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = []
+#
+# [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 # ///
 
 """Add sidecar SHA-256 checksums to a cargo-dist local manifest.
