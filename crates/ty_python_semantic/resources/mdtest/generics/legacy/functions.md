@@ -2503,3 +2503,104 @@ def grandchild_value(value: Levels[object, object, U]) -> U:
 def probe(value: Levels[int, str, bytes]):
     reveal_type(grandchild_value(value))  # revealed: bytes
 ```
+
+## Generic property setters implementing protocols
+
+These deliberately contrived setters could use `object` and `int` directly instead of method-scoped
+type variables. They check that protocol compatibility agrees with ordinary assignment even when a
+setter uses an unnecessary type variable. A class-scoped type variable would test a different
+contract: it would be fixed by the instance's specialization.
+
+A setter's method-scoped type variable is inferred separately for each assignment. An unconstrained
+setter accepts every value of `object`, including writes through a protocol. A bounded setter still
+rejects values outside its bound.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+I = TypeVar("I", bound=int)
+
+class GenericSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class BoundedSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: I) -> None: ...
+
+class HasValue(Protocol):
+    value: object
+
+def check(generic: GenericSetter, bounded: BoundedSetter, value: object) -> None:
+    generic.value = value
+    writable: HasValue = generic
+    bounded.value = 1
+    bounded.value = value  # error: [invalid-assignment]
+    writable = bounded  # error: [invalid-assignment]
+```
+
+## Generic list property setters implementing protocols
+
+A setter accepting `list[T]` can infer a new element type for each assignment, but it still rejects
+non-list values. It therefore cannot implement a protocol that permits writing any `object`.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class ListSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: list[T]) -> None: ...
+
+class HasValue(Protocol):
+    value: object
+
+def check(setter: ListSetter) -> None:
+    setter.value = [1]
+    setter.value = ["a"]
+    setter.value = 1  # error: [invalid-assignment]
+    writable: HasValue = setter  # error: [invalid-assignment]
+```
+
+## Constrained property setters implementing protocols
+
+A setter with a method-scoped type variable constrained to `int` and `str` accepts either type, but
+rejects values such as `bytes`. It therefore cannot implement a protocol that permits writing any
+`object`.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T", int, str)
+
+class ConstrainedSetter:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class HasValue(Protocol):
+    value: object
+
+def check(setter: ConstrainedSetter) -> None:
+    setter.value = 1
+    setter.value = "a"
+    setter.value = b"wrong"  # error: [invalid-assignment]
+    writable: HasValue = setter  # error: [invalid-assignment]
+```
