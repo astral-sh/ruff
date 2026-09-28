@@ -3181,6 +3181,164 @@ class Independent(Inferred):
 reveal_type(Independent.value)  # revealed: str
 ```
 
+### Inherited declarations after a dynamic base
+
+A dynamic base does not erase the annotation of a concrete base when a subclass supplies its own
+default. The annotation governs both the initializer and subsequent access, in either base order.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+    items: list[int] = []
+
+class DynamicFirst(Any, Base):
+    value = "child"
+    items = []
+
+class DynamicLast(Base, Any):
+    value = "child"
+    items = []
+
+reveal_type(DynamicFirst.value)  # revealed: int | str
+reveal_type(DynamicFirst.items)  # revealed: list[int]
+reveal_type(DynamicLast.value)  # revealed: int | str
+reveal_type(DynamicLast.items)  # revealed: list[int]
+
+def check(first: DynamicFirst, last: DynamicLast) -> None:
+    reveal_type(first.value)  # revealed: int | str
+    reveal_type(last.value)  # revealed: int | str
+    first.value = 1
+    last.value = 1
+    first.value.upper()  # error: [unresolved-attribute]
+    last.value.upper()  # error: [unresolved-attribute]
+
+class InvalidFirst(Any, Base):
+    value = []  # error: [invalid-assignment]
+
+class InvalidLast(Base, Any):
+    value = []  # error: [invalid-assignment]
+```
+
+### Dynamically typed base expressions
+
+A base expression with type `Any` or `Unknown` also leaves a concrete base's annotation available.
+
+```py
+from typing import Any
+
+DynamicBase: Any = object
+
+class Base:
+    value: int | str = 0
+
+class Child(DynamicBase, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Child().value)  # revealed: int | str
+
+class Invalid(DynamicBase, Base):
+    value = []  # error: [invalid-assignment]
+
+def check(child: Child) -> None:
+    child.value = 1
+    child.value.upper()  # error: [unresolved-attribute]
+
+def unknown_base(base):
+    class Child(base, Base):
+        value = "child"
+
+    reveal_type(Child.value)  # revealed: int | str
+    reveal_type(Child().value)  # revealed: int | str
+```
+
+### Dynamic bases without a subclass default
+
+A dynamic base can still affect ordinary attribute lookup when the subclass does not supply a
+default.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Child(Any, Base): ...
+
+reveal_type(Child.value)  # revealed: (int & Any) | (str & Any)
+reveal_type(Child().value)  # revealed: (int & Any) | (str & Any)
+```
+
+### Dynamic bases and unannotated members
+
+An earlier concrete base with an unannotated member still masks a later annotation. A dynamic base
+on its own does not introduce an annotation for a subclass default.
+
+```py
+from typing import Any
+
+class Inferred:
+    value = 0
+
+class Annotated:
+    value: int | str = 0
+
+class Child(Any, Inferred, Annotated):
+    value = "child"
+
+class NoAnnotation(Any):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: str
+reveal_type(NoAnnotation.value)  # revealed: str
+```
+
+### Dynamic bases and inherited class variables
+
+The inherited `ClassVar` qualifier still prevents writes through instances.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    value: ClassVar[int | str] = 0
+
+class Child(Any, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+Child.value = 1
+Child().value = 1  # error: [invalid-attribute-access]
+```
+
+### Dynamic bases and inherited defaults
+
+A default inherits its annotation through an intermediate class, even when the intermediate class
+has a dynamic base before the class that declares the annotation.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Intermediate(Any, Base):
+    value = "intermediate"
+
+class Other:
+    value: bytes = b""
+
+class Child(Intermediate, Other):
+    value = 1
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Intermediate, Other):
+    value = b"wrong"  # error: [invalid-assignment]
+```
+
 ### Augmented assignments retain inherited declarations
 
 Updating a subclass default with augmented assignment preserves its inherited annotation, just like
