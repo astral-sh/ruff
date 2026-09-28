@@ -15,7 +15,7 @@
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use compact_str::CompactString;
@@ -48,7 +48,7 @@ pub(crate) fn list_all_modules<'db>(
     let mut stack = vec![list_root_modules(db, resolver_environment)];
     while let Some(listing) = stack.pop() {
         modules.extend_from_slice(&listing.modules);
-        for module in &listing.modules {
+        for module in &listing.modules_with_possible_children {
             let children = list_submodules(db, *module);
             if !children.is_empty() {
                 stack.push(children);
@@ -216,19 +216,22 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
     fn list_modules(&self) -> ModuleListing<'db> {
         let context = self.context;
         let db = context.db;
-        let mut names = BTreeSet::new();
+        let mut has_directory_by_name = BTreeMap::<_, bool>::new();
 
         for directory in self.directories_allowed_for_enumeration() {
             for entry in directory.entries(db) {
                 if let Some(name) = self.enumerable_module_name(&entry) {
-                    names.insert(CompactString::new(name));
+                    *has_directory_by_name
+                        .entry(CompactString::new(name))
+                        .or_default() |= entry.file_type() == FileType::Directory;
                 }
             }
         }
 
         let mut modules = Vec::new();
         let mut unresolved_names = Vec::new();
-        for component_name in names {
+        let mut modules_with_possible_children = Vec::new();
+        for (component_name, has_directory) in has_directory_by_name {
             let Some(name) = self.full_module_name(&component_name) else {
                 continue;
             };
@@ -237,6 +240,9 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
                 if let Some(candidate) = candidates.into_iter().next() {
                     let module = candidate.into_module(db, context.resolver_environment, &name);
                     modules.push(module);
+                    if has_directory {
+                        modules_with_possible_children.push(module);
+                    }
                 }
 
                 // A resolved module takes precedence over unresolved stub override names.
@@ -251,6 +257,7 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
         ModuleListing {
             modules: modules.into_boxed_slice(),
             unresolved_names: unresolved_names.into_boxed_slice(),
+            modules_with_possible_children: modules_with_possible_children.into_boxed_slice(),
         }
     }
 
@@ -393,6 +400,8 @@ impl<'a, 'db> ModuleSearchCursor<'a, 'db> {
 pub(crate) struct ModuleListing<'db> {
     /// The list of fully resolved modules at this stage of enumeration.
     pub(crate) modules: Box<[Module<'db>]>,
+    /// The subset of resolved modules that may have enumerable descendants.
+    modules_with_possible_children: Box<[Module<'db>]>,
     /// Unresolved module names that are nonetheless eligible for enumeration
     /// because they may have eligible stub override candidates.
     ///
