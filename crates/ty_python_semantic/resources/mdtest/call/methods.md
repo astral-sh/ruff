@@ -608,6 +608,37 @@ missing: Callable[[], int] = FixedTuple().method  # error: [invalid-assignment]
 empty: Callable[[], int] = FixedTuple().empty  # error: [invalid-assignment]
 ```
 
+## `Self` in unpacked bound-method parameters
+
+Binding a receiver consumes the first element of a fixed unpacked tuple. `Self` in the remaining
+elements still refers to the receiver's type, including when the method is inherited or overridden.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Self
+
+class Base:
+    def method(*args: *tuple[object, Self]) -> None: ...
+    @classmethod
+    def class_method(*args: *tuple[type[object], Self]) -> None: ...
+
+class Derived(Base):
+    def method(*args: *tuple[object, Self]) -> None: ...
+
+base: Callable[[Base], None] = Base().method
+derived: Callable[[Derived], None] = Derived().method
+too_broad: Callable[[Base], None] = Derived().method  # error: [invalid-assignment]
+
+class_base: Callable[[Base], None] = Base.class_method
+class_derived: Callable[[Derived], None] = Derived.class_method
+class_too_broad: Callable[[Base], None] = Derived.class_method  # error: [invalid-assignment]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml

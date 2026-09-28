@@ -1334,7 +1334,7 @@ impl<'db> Signature<'db> {
             receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
-            && self.needs_self_mapping(db, env, removed_receiver)
+            && self.needs_self_mapping(db, env, parameters.as_slice())
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
@@ -1631,11 +1631,11 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
-        let receiver = self.parameters.get(0)?;
+        let (receiver, parameters) = self.parameters.as_slice().split_first()?;
 
         // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
         // would be unsound.
-        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, parameters) {
             return None;
         }
 
@@ -1731,7 +1731,7 @@ impl<'db> Signature<'db> {
             .filter(|constraints| {
                 !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db, env))
             });
-        if !self.needs_self_mapping(db, env, false) {
+        if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
                     self.source_overload_index_raw(),
@@ -1973,15 +1973,12 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        receiver_is_removed: bool,
+        parameters: &[Parameter<'db>],
     ) -> bool {
         self.return_ty.contains_self(db, env)
-            || self
-                .parameters
+            || parameters
                 .iter()
-                .enumerate()
-                .skip(usize::from(receiver_is_removed))
-                .any(|(_, parameter)| parameter.annotated_type().contains_self(db, env))
+                .any(|parameter| parameter.annotated_type().contains_self(db, env))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {
