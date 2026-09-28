@@ -8,6 +8,17 @@ Before starting work on an issue and again before opening a pull request, follow
 [guidance on avoiding duplicate work](CONTRIBUTING.md#avoiding-duplicate-work). If an open pull
 request already addresses the issue, do not submit a competing one without maintainer agreement.
 
+## PR conventions
+
+Add appropriate GitHub labels to pull requests if you have permission to do so; if you don't,
+there's no need to worry about it. Labels can affect whether and how a pull request appears in the
+Ruff or ty changelog. The `[tool.rooster]` and `[tool.rooster.section-labels]` sections in
+[Ruff's `pyproject.toml`](pyproject.toml) and
+[ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml) specify which
+labels affect each changelog.
+
+When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label.
+
 ## Code Review Rules
 
 For security reviews of Ruff and ty runtime changes, use the
@@ -158,12 +169,6 @@ To inspect one evaluation task, run `cargo run --package ty_completion_eval -- s
 ### Ad hoc reproductions
 
 When running ty against a temporary Python reproduction file, create it outside the Ruff checkout (for example, under `/tmp`). A file inside the checkout discovers Ruff's root `pyproject.toml`, whose `requires-python = ">=3.7"` causes ty to infer Python 3.7 as the default Python version.
-
-### PR conventions
-
-When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label if you have permission to do so;
-if you don't, however, automation should add it anyway, so there's no need to worry about it. Similarly, add the `server`
-label if your change only affects the LSP server and you have permission to add that label.
 
 ### The `db` parameter
 
