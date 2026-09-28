@@ -1094,6 +1094,12 @@ class Derived(Base):
     # TODO: This should be an error, but instance attribute override checking is not yet supported
     def __init__(self):
         self.x = 2
+
+class ClassDefault(Base):
+    # TODO: This should be an override-of-final-variable error.
+    x = "value"
+
+reveal_type(ClassDefault.x)  # revealed: str
 ```
 
 ### Private (name-mangled) members are not checked

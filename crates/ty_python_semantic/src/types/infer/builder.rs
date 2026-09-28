@@ -108,7 +108,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
-use crate::types::member::inherited_class_body_declaration;
+use crate::types::member::{has_concrete_dunder_get, inherited_default_declaration};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
@@ -1608,7 +1608,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && self.index.scope(file_scope_id).kind() == ScopeKind::Class
             && let Some(symbol) = place_id.as_symbol()
             && let Some(inherited) =
-                inherited_class_body_declaration(db, binding.scope(db), symbol)
+                inherited_default_declaration(db, binding.scope(db), symbol)
         {
             place_and_quals = inherited;
         }
@@ -13215,17 +13215,41 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         }
 
+        // An inherited instance annotation describes the result of descriptor access, not
+        // the descriptor object stored in the subclass's namespace.
+        let descriptor_receiver = if self
+            .qualifiers
+            .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+            && matches!(self.node, AnyNodeRef::ExprName(_))
+            && builder.index.scope(file_scope_id).kind() == ScopeKind::Class
+            && has_concrete_dunder_get(db, env, bound_ty)
+        {
+            nearest_enclosing_class(db, builder.index, self.binding.scope(db))
+                .map(|class| Type::instance(db, env, class.identity_specialization(db)))
+        } else {
+            None
+        };
+        let assignment_ty = descriptor_receiver
+            .and_then(|receiver| {
+                bound_ty
+                    .try_call_dunder_get(db, env, Some(receiver), receiver.to_meta_type(db, env))
+                    .unwrap_or_else(|error| Some(error.fallback()))
+                    .map(|result| result.return_type)
+            })
+            .unwrap_or(bound_ty);
         if !builder.validate_assignment_type(
             self.node,
             self.binding,
             self.declaration,
             declared_ty,
-            bound_ty,
+            assignment_ty,
         ) {
             builder.discard_dict_key_assignments_for(self.binding);
 
             // Allow declarations to override inference in case of invalid assignment.
-            bound_ty = declared_ty;
+            if descriptor_receiver.is_none() {
+                bound_ty = declared_ty;
+            }
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {

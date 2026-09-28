@@ -3,7 +3,10 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
     TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
 };
-use crate::types::{ProgramEnvironment, Type, class::MroLookup, infer::nearest_enclosing_class};
+use crate::types::{
+    MemberLookupPolicy, ProgramEnvironment, Type, TypeQualifiers, class::MroLookup,
+    infer::nearest_enclosing_class,
+};
 use ty_python_core::{
     place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
 };
@@ -69,8 +72,16 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
             if let Place::Defined(ref mut place) = place_and_quals.place
                 && place.origin == TypeOrigin::Inferred
-                && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
+                && let Some(inherited) = inherited_default_declaration(db, scope, symbol_id)
                 && let Place::Defined(declared) = inherited.place
+                && !(inherited
+                    .qualifiers
+                    .contains(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE)
+                    && has_concrete_dunder_get(
+                        db,
+                        &ProgramEnvironment::from_scope(scope),
+                        place.ty,
+                    ))
             {
                 // The annotation determines the public type, but the value is still supplied
                 // by this class. Consumers such as Pydantic inspect that value's definition.
@@ -81,6 +92,11 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                     ..*place
                 };
                 place_and_quals.qualifiers = inherited.qualifiers;
+                // The declaration can come from instance storage, but this value is present in
+                // the class namespace and must participate in lookup as a class binding.
+                place_and_quals
+                    .qualifiers
+                    .remove(TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE);
             }
 
             if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
@@ -126,13 +142,24 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
         .unwrap_or_default()
 }
 
-/// Returns the inherited class-body annotation governing an unannotated class attribute.
+/// Returns whether the type has a concrete `__get__` method.
+pub(super) fn has_concrete_dunder_get<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    !ty.class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+        .is_undefined()
+}
+
+/// Returns the inherited annotation governing an unannotated class attribute.
 ///
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
-/// declaration. Both initializer inference and public member lookup use that declaration,
-/// while an explicit annotation or a new method definition supplies its own public type.
+/// declaration, including an instance annotation from a method. Both initializer inference
+/// and public member lookup use that declaration, while an explicit annotation or a new
+/// method definition supplies its own public type.
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn inherited_class_body_declaration<'db>(
+pub(super) fn inherited_default_declaration<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
@@ -155,5 +182,5 @@ pub(super) fn inherited_class_body_declaration<'db>(
         &env,
         class.identity_specialization(db).iter_mro(db).skip(1),
     )
-    .class_body_declaration(name)
+    .default_declaration(name)
 }
