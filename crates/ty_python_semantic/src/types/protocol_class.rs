@@ -18,8 +18,7 @@ use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, place_from_bindings,
-        place_from_declarations,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, place_from_declarations,
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -32,6 +31,7 @@ use crate::{
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
+        member::class_member,
         signatures::{CallableSignature, walk_signature},
         variance::infer_protocol_variance,
     },
@@ -164,15 +164,17 @@ impl<'db> ProtocolClass<'db> {
             // Bindings that are not declared in the class body are invalid protocol members, but
             // runtime-checkable protocols still consider them members for `isinstance()` and
             // `issubclass()`.
-            for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let place_and_definition = place_from_bindings(db, env, bindings);
-                if let Some(ty) = place_and_definition.place.ignore_possibly_undefined() {
+            for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_bindings() {
+                let name = place_table.symbol(symbol_id).name();
+                // Defaults retain inherited annotations, just as they do for ordinary classes.
+                let member = class_member(db, parent_scope, name).inner;
+                if let Place::Defined(place) = member.place {
                     direct_members.insert(
                         symbol_id,
                         ProtocolMemberCandidate {
-                            ty,
-                            qualifiers: TypeQualifiers::default(),
-                            definition: place_and_definition.first_definition,
+                            ty: place.ty,
+                            qualifiers: member.qualifiers,
+                            definition: place.provenance.definition(),
                             bound_on_class: BoundOnClass::Yes,
                         },
                     );
