@@ -496,6 +496,118 @@ def check_variadic(value: Variadic) -> None:
     value.method()  # error: [invalid-argument-type]
 ```
 
+## Bound methods without a positional receiver
+
+A method can be retrieved from an instance even when its function cannot accept the implicit
+receiver. Such a bound method cannot fulfill a callable contract.
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Method(Protocol):
+    def method(self) -> int: ...
+
+class NoReceiver:
+    def method() -> int:
+        return 1
+
+static_assert(not is_assignable_to(NoReceiver, Method))
+
+bound_method = NoReceiver().method  # no diagnostic
+protocol_value: Method = NoReceiver()  # error: [invalid-assignment]
+bound_callback: Callable[[], int] = NoReceiver().method  # error: [invalid-assignment]
+unbound_callback: Callable[[], int] = NoReceiver.method  # no diagnostic
+
+class PositionalReceivers:
+    def named(self) -> int:
+        return 1
+
+    def differently_named(receiver) -> int:
+        return 1
+
+    def positional_only(self, /) -> int:
+        return 1
+
+named: Callable[[], int] = PositionalReceivers().named  # no diagnostic
+different: Callable[[], int] = PositionalReceivers().differently_named  # no diagnostic
+positional_only: Callable[[], int] = PositionalReceivers().positional_only  # no diagnostic
+
+class Decorated:
+    @staticmethod
+    def static() -> int:
+        return 1
+
+    @classmethod
+    def class_method(cls) -> int:
+        return 1
+
+    @classmethod
+    def invalid_class_method() -> int:
+        return 1
+
+static: Callable[[], int] = Decorated().static  # no diagnostic
+class_method: Callable[[], int] = Decorated().class_method  # no diagnostic
+invalid_class_method: Callable[[], int] = Decorated().invalid_class_method  # error: [invalid-assignment]
+```
+
+Keyword-only and keyword-variadic parameters cannot receive a positional argument. A homogeneous
+variadic positional parameter can receive the instance and remains available for explicit arguments.
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+
+class KeywordOnlyCallable(Protocol):
+    def __call__(self, *, value: int) -> int: ...
+
+class KeywordVariadicCallable(Protocol):
+    def __call__(self, **kwargs: int) -> int: ...
+
+class OtherShapes:
+    def keyword_only(*, value: int) -> int:
+        return value
+
+    def keyword_variadic(**kwargs: int) -> int:
+        return 1
+
+    def variadic(*args: object) -> int:
+        return 1
+
+    def incompatible_variadic(*args: int) -> int:
+        return 1
+
+keyword_only: KeywordOnlyCallable = OtherShapes().keyword_only  # error: [invalid-assignment]
+keyword_variadic: KeywordVariadicCallable = OtherShapes().keyword_variadic  # error: [invalid-assignment]
+variadic_zero: Callable[[], int] = OtherShapes().variadic  # no diagnostic
+variadic_one: Callable[[str], int] = OtherShapes().variadic  # no diagnostic
+incompatible_variadic: Callable[[], int] = OtherShapes().incompatible_variadic  # error: [invalid-assignment]
+```
+
+A fixed unpacked tuple contributes positional parameters. Binding consumes its first element.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+
+class FixedTuple:
+    def method(*args: *tuple[object, int]) -> int:
+        return 1
+
+    def empty(*args: *tuple[()]) -> int:
+        return 1
+
+remaining: Callable[[int], int] = FixedTuple().method  # no diagnostic
+missing: Callable[[], int] = FixedTuple().method  # error: [invalid-assignment]
+empty: Callable[[], int] = FixedTuple().empty  # error: [invalid-assignment]
+```
+
 ## Method calls on `KnownInstance` types
 
 ```toml

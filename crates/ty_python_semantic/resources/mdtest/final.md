@@ -325,8 +325,9 @@ class C(B):
 
 ## Overriding a `@final` method by assigning a function to a class variable
 
-When a subclass overrides a `@final` method by assigning a function to a class variable, we emit a
-diagnostic but do not provide an autofix (since the function may be defined in a different file).
+When a subclass overrides a `@final` method by assigning a function to a class variable, we report
+the final override without an autofix (since the function may be defined in a different file). We
+also report an incompatible method signature when the function cannot accept the receiver.
 
 <!-- snapshot-diagnostics -->
 
@@ -353,6 +354,7 @@ from base import Base
 from other import replacement_method
 
 class Derived(Base):
+    # error: [invalid-method-override]
     method = replacement_method  # error: [override-of-final-method]
 ```
 

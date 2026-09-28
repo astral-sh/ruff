@@ -247,6 +247,38 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
     accepts_bytes_callback(base.g)  # error: [invalid-argument-type]
 ```
 
+## Overloads without a positional receiver
+
+Binding a method preserves overloads that can receive the instance. An overload without a positional
+parameter cannot fulfill a bound callable contract.
+
+```py
+from collections.abc import Callable
+from typing import overload
+
+class Mixed:
+    @overload
+    def method() -> str: ...
+    @overload
+    def method(self) -> int: ...
+    def method(self: object = None) -> int | str:
+        return 1
+
+valid: Callable[[], int] = Mixed().method  # no diagnostic
+invalid: Callable[[], str] = Mixed().method  # error: [invalid-assignment]
+unbound: Callable[[], str] = Mixed.method  # no diagnostic
+
+class AllInvalid:
+    @overload
+    def method() -> int: ...
+    @overload
+    def method(*, value: int) -> str: ...
+    def method(*args: object, **kwargs: object) -> int | str:
+        return 1
+
+all_invalid: Callable[[], int] = AllInvalid().method  # error: [invalid-assignment]
+```
+
 ## No matching explicit receiver
 
 When none of the explicitly annotated receivers accept the bound object, no overload is exposed.

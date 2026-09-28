@@ -33,16 +33,37 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 2 | from other import replacement_method
 3 | 
 4 | class Derived(Base):
-5 |     method = replacement_method  # error: [override-of-final-method]
+5 |     # error: [invalid-method-override]
+6 |     method = replacement_method  # error: [override-of-final-method]
 ```
 
 # Diagnostics
 
 ```
-error[override-of-final-method]: Cannot override `Base.method`
- --> src/derived.py:5:5
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/derived.py:6:5
   |
-5 |     method = replacement_method  # error: [override-of-final-method]
+6 |     method = replacement_method  # error: [override-of-final-method]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Base.method`
+  |
+ ::: src/base.py:5:9
+  |
+5 |     def method(self) -> None: ...
+  |         -------------------- `Base.method` defined here
+  |
+ ::: src/other.py:1:5
+  |
+1 | def replacement_method() -> None: ...
+  |     ---------------------------- Signature of `Derived.method`
+info: This violates the Liskov Substitution Principle
+
+```
+
+```
+error[override-of-final-method]: Cannot override `Base.method`
+ --> src/derived.py:6:5
+  |
+6 |     method = replacement_method  # error: [override-of-final-method]
   |     ^^^^^^ Overrides a definition from superclass `Base`
 info: `Base.method` is decorated with `@final`, forbidding overrides
  --> src/base.py:4:5
