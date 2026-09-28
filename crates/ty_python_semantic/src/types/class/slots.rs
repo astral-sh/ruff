@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::{self as ast, PythonVersion, name::Name};
+use ruff_python_ast::{self as ast, name::Name};
 use ty_python_core::{place_table, use_def_map};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
@@ -257,11 +257,11 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns whether this class synthesizes slots through a dataclass or named tuple.
+    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| false)]
     pub(super) fn has_generated_slots(self, db: &'db dyn Db) -> bool {
-        self.dataclass_params(db).is_some_and(|parameters| {
-            parameters.flags(db).contains(DataclassFlags::SLOTS)
-                && ProgramEnvironment::from_scope(self.body_scope(db)).python_version(db)
-                    >= PythonVersion::PY310
+        CodeGeneratorKind::from_class(db, self.into()).is_some_and(|field_policy| {
+            matches!(field_policy, CodeGeneratorKind::DataclassLike(_))
+                && self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
         }) || self.has_named_tuple_slots(db)
     }
 
@@ -311,7 +311,11 @@ impl<'db> StaticClassLiteral<'db> {
             //         value: int
             //
             // Here, `Child.__slots__` contains only `value` and `__weakref__`.
-            let field_policy = CodeGeneratorKind::DataclassLike(None);
+            let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
+                CodeGeneratorKind::from_class(db, self.into())
+            else {
+                return SlotDefinition::DynamicOrNone;
+            };
             let inherited_slots: FxIndexSet<_> = self
                 .iter_mro(db, None)
                 .skip(1)
