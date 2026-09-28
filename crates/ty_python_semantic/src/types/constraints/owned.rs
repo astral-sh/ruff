@@ -1,10 +1,11 @@
 use std::sync::Arc;
 
 use ruff_index::{Idx, IndexVec};
+use rustc_hash::FxHashMap;
 use ty_python_core::rank::{RankBitBox, RankBitBoxVec};
 
 use crate::types::constraints::support::Support;
-use crate::types::constraints::variables::Constraint;
+use crate::types::constraints::variables::{Constraint, ExistentialBound};
 use crate::types::constraints::{
     ConstraintId, ConstraintSetStorage, InteriorNode, NodeId, OwnedConstraintSet,
     OwnedConstraintSetInner, SourceOrder, SourceOrderId, SupportId,
@@ -16,6 +17,7 @@ pub(super) struct OwnedConstraintSetBuilder {
     used_supports: RankBitBoxVec,
     live_support: Option<Support>,
     source_orders: IndexVec<SourceOrderId, SourceOrder>,
+    mapped_source_orders: FxHashMap<SourceOrderId, Option<SourceOrderId>>,
 }
 
 impl OwnedConstraintSetBuilder {
@@ -30,6 +32,7 @@ impl OwnedConstraintSetBuilder {
             used_supports: RankBitBox::bits_with_capacity(storage.supports.len()),
             live_support: storage.node_support(root.node()).cloned(),
             source_orders: IndexVec::default(),
+            mapped_source_orders: FxHashMap::default(),
         };
         builder.mark_node_used(&mut storage, root.node());
         let mapped_source_order = builder
@@ -72,6 +75,17 @@ impl OwnedConstraintSetBuilder {
         let constraint_data = storage.constraint_data(constraint);
         match constraint_data {
             Constraint::Atomic(_) => {}
+            Constraint::Existential(existential) => {
+                let ExistentialBound {
+                    body, source_order, ..
+                } = *existential;
+                self.mark_node_used(storage, body);
+                if let Some(source_order) = source_order {
+                    let mapped_source_order = self.mark_source_order_used(storage, source_order);
+                    self.mapped_source_orders
+                        .insert(source_order, mapped_source_order);
+                }
+            }
         }
     }
 
@@ -154,7 +168,17 @@ impl OwnedConstraintSetBuilder {
             .constraints
             .into_iter()
             .zip(&self.used_constraints)
-            .filter_map(|(constraint, used)| used.then_some(constraint))
+            .filter_map(|(mut constraint, used)| {
+                if !used {
+                    return None;
+                }
+                if let Constraint::Existential(existential) = &mut constraint
+                    && let Some(source_order) = existential.source_order
+                {
+                    existential.source_order = self.mapped_source_orders[&source_order];
+                }
+                Some(constraint)
+            })
             .collect();
         let constraint_supports = storage
             .constraint_supports
