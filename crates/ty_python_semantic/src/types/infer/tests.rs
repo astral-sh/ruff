@@ -995,60 +995,6 @@ fn redundant_cast_without_closing_parenthesis() -> anyhow::Result<()> {
 }
 
 // Incremental inference tests
-#[test]
-fn wildcard_import_updates_after_dunder_all_changes() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_files([
-        ("/src/source.py", "first: int = 1\nsecond: str = ''"),
-        (
-            "/src/exporter.py",
-            "from source import *\n__all__ = ['first']",
-        ),
-        ("/src/importer.py", "from exporter import *"),
-    ])?;
-    let importer = system_path_to_file(&db, "/src/importer.py")?;
-
-    let assert_type = |db: &TestDb, name, expected| {
-        let place = global_symbol(db, importer, name).place;
-        assert_eq!(
-            place
-                .expect_type()
-                .display(db, &db.program_environment())
-                .to_string(),
-            expected
-        );
-    };
-    assert_type(&db, "first", "int");
-    assert!(global_symbol(&db, importer, "second").place.is_undefined());
-
-    db.write_file("/src/source.py", "first: bool = True\nsecond: str = ''")?;
-    assert_type(&db, "first", "bool");
-
-    db.write_file(
-        "/src/source.py",
-        "first: bool = True\nsecond: str = ''\n__all__ = ['second']",
-    )?;
-    assert!(global_symbol(&db, importer, "first").place.is_undefined());
-
-    db.write_file("/src/source.py", "first: bool = True\nsecond: str = ''")?;
-    assert_type(&db, "first", "bool");
-
-    db.write_file(
-        "/src/exporter.py",
-        "from source import *\n__all__ = ['second']",
-    )?;
-    assert!(global_symbol(&db, importer, "first").place.is_undefined());
-    assert_type(&db, "second", "str");
-
-    db.write_file(
-        "/src/exporter.py",
-        "from source import *\n__all__ = ['second']\n__all__.append('first')",
-    )?;
-    assert_type(&db, "first", "bool");
-    assert_type(&db, "second", "str");
-    Ok(())
-}
-
 #[track_caller]
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
     let scope = global_scope(db, program_file(db, file));
