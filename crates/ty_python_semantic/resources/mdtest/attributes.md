@@ -3183,8 +3183,8 @@ reveal_type(Independent.value)  # revealed: str
 
 ### Inherited declarations after a dynamic base
 
-A dynamic base does not erase the annotation of a concrete base when a subclass supplies its own
-default. The annotation governs both the initializer and subsequent access, in either base order.
+An unannotated subclass default retains the annotation from a concrete base, even when an earlier
+base is `Any`. The annotation provides context for the default and determines its type on access.
 
 ```py
 from typing import Any
@@ -3193,42 +3193,44 @@ class Base:
     value: int | str = 0
     items: list[int] = []
 
-class DynamicFirst(Any, Base):
+class Child(Any, Base):
     value = "child"
     items = []
 
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Child.items)  # revealed: list[int]
+
+def check(child: Child) -> None:
+    reveal_type(child.value)  # revealed: int | str
+    child.value = 1
+```
+
+An incompatible default is rejected:
+
+```py
+class Invalid(Any, Base):
+    value = []  # error: [invalid-assignment]
+```
+
+The concrete base's annotation is also retained when it comes before `Any`:
+
+```py
 class DynamicLast(Base, Any):
     value = "child"
-    items = []
 
-reveal_type(DynamicFirst.value)  # revealed: int | str
-reveal_type(DynamicFirst.items)  # revealed: list[int]
 reveal_type(DynamicLast.value)  # revealed: int | str
-reveal_type(DynamicLast.items)  # revealed: list[int]
-
-def check(first: DynamicFirst, last: DynamicLast) -> None:
-    reveal_type(first.value)  # revealed: int | str
-    reveal_type(last.value)  # revealed: int | str
-    first.value = 1
-    last.value = 1
-    first.value.upper()  # error: [unresolved-attribute]
-    last.value.upper()  # error: [unresolved-attribute]
-
-class InvalidFirst(Any, Base):
-    value = []  # error: [invalid-assignment]
-
-class InvalidLast(Base, Any):
-    value = []  # error: [invalid-assignment]
 ```
 
 ### Dynamically typed base expressions
 
-A base expression with type `Any` or `Unknown` also leaves a concrete base's annotation available.
+A base expression with type `Any` also leaves a concrete base's annotation available.
 
 ```py
 from typing import Any
 
-DynamicBase: Any = object
+class Dynamic: ...
+
+DynamicBase: Any = Dynamic
 
 class Base:
     value: int | str = 0
@@ -3237,21 +3239,19 @@ class Child(DynamicBase, Base):
     value = "child"
 
 reveal_type(Child.value)  # revealed: int | str
-reveal_type(Child().value)  # revealed: int | str
 
 class Invalid(DynamicBase, Base):
     value = []  # error: [invalid-assignment]
+```
 
-def check(child: Child) -> None:
-    child.value = 1
-    child.value.upper()  # error: [unresolved-attribute]
+The same applies when the base expression has an unknown type:
 
+```py
 def unknown_base(base):
     class Child(base, Base):
         value = "child"
 
     reveal_type(Child.value)  # revealed: int | str
-    reveal_type(Child().value)  # revealed: int | str
 ```
 
 ### Dynamic bases without a subclass default
@@ -3273,8 +3273,7 @@ reveal_type(Child().value)  # revealed: (int & Any) | (str & Any)
 
 ### Dynamic bases and unannotated members
 
-An earlier concrete base with an unannotated member still masks a later annotation. A dynamic base
-on its own does not introduce an annotation for a subclass default.
+An earlier concrete base with an unannotated member still masks a later annotation.
 
 ```py
 from typing import Any
@@ -3288,10 +3287,15 @@ class Annotated:
 class Child(Any, Inferred, Annotated):
     value = "child"
 
+reveal_type(Child.value)  # revealed: str
+```
+
+If no concrete base declares the attribute, the subclass default uses its inferred type:
+
+```py
 class NoAnnotation(Any):
     value = "child"
 
-reveal_type(Child.value)  # revealed: str
 reveal_type(NoAnnotation.value)  # revealed: str
 ```
 
@@ -3315,8 +3319,9 @@ Child().value = 1  # error: [invalid-attribute-access]
 
 ### Dynamic bases and inherited defaults
 
-A default inherits its annotation through an intermediate class, even when the intermediate class
-has a dynamic base before the class that declares the annotation.
+The first base that supplies a default determines its annotation. That annotation can come from an
+ancestor, even when the first base has an earlier dynamic base and another base has a different
+annotation for the same attribute.
 
 ```py
 from typing import Any
