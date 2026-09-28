@@ -11,6 +11,10 @@ use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
+///
+/// `syntactic_dunder_all_names` in `ty_python_core` mirrors this query without type inference, and
+/// must always return a superset of its names (or `None`). When recognizing a new way of changing
+/// `__all__` here, update that query too; otherwise `*` imports will skip the names it adds.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxHashSet<Name>> {
     let source_file = file.file(db);

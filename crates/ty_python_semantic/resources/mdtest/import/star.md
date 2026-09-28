@@ -1102,6 +1102,66 @@ reveal_type(f)  # revealed: def f() -> str
 reveal_type(g)  # revealed: def g() -> int
 ```
 
+### `__all__` reassigned to a dynamic value
+
+The same applies if `__all__` is first defined with string literals and later reassigned to a value
+we can't evaluate:
+
+`exporter.py`:
+
+```py
+__all__ = ["X"]
+__all__ = sorted(__all__)
+
+X: bool = True
+Y: bool = True
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
+```
+
+### `*` import from a module with a dynamic `__all__`
+
+A dynamically computed `__all__` could include `"__all__"`, in which case a `*` import from that
+module replaces the `__all__` of the importing module. We therefore also treat the importing module
+as though it does not have `__all__`:
+
+`a.py`:
+
+```py
+def names() -> list[str]:
+    return ["__all__", "X"]
+
+__all__ = names()
+
+X: bool = True
+```
+
+`b.py`:
+
+```py
+__all__ = ["Y"]
+
+from a import *
+
+Y: bool = True
+```
+
+`c.py`:
+
+```py
+from b import *
+
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
+```
+
 ### `__all__` conditionally defined in a statically known branch
 
 ```toml
@@ -1246,6 +1306,33 @@ reveal_type(X)  # revealed: Unknown
 reveal_type(Y)  # revealed: Unknown
 
 reveal_type(Z)  # revealed: bool
+```
+
+### `__all__` conditionally defined in a branch that is not statically known
+
+If `__all__` is only defined in a branch that we can't prove is taken, we treat the module as though
+it does not have `__all__`:
+
+`exporter.py`:
+
+```py
+def flag() -> bool:
+    return True
+
+if flag():
+    __all__ = ["X"]
+
+X: bool = True
+Y: bool = True
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+reveal_type(X)  # revealed: bool
+reveal_type(Y)  # revealed: bool
 ```
 
 ### Empty `__all__`
@@ -1397,6 +1484,40 @@ reveal_type(B)  # revealed: bool
 
 # error: [unresolved-reference]
 reveal_type(_private)  # revealed: Unknown
+```
+
+### A `*` import can replace `__all__`
+
+If `a.__all__` does include `"__all__"`, `from a import *` replaces the `__all__` of the importing
+module:
+
+`a.py`:
+
+```py
+__all__ = ["__all__", "X"]
+
+X: bool = True
+```
+
+`b.py`:
+
+```py
+__all__ = ["Y"]
+
+from a import *
+
+Y: bool = True
+```
+
+`c.py`:
+
+```py
+from b import *
+
+reveal_type(X)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ## `global` statements in non-global scopes
