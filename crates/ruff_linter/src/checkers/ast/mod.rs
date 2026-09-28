@@ -2871,7 +2871,11 @@ impl<'a> Checker<'a> {
         let Expr::Name(expr) = expr else {
             return;
         };
-        self.semantic.resolve_load(expr);
+        if self.semantic.in_class_generator_body() {
+            self.semantic.resolve_class_generator_load(expr);
+        } else {
+            self.semantic.resolve_load(expr);
+        }
     }
 
     fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
@@ -3552,6 +3556,7 @@ pub(crate) fn check_ast(
     // new deferred nodes after visiting nodes of that kind. For example, visiting a deferred
     // function can add a deferred lambda, but the opposite is not true.
     checker.visit_deferred();
+    checker.semantic.resolve_class_generator_loads();
     checker.visit_exports();
 
     // Check docstrings, bindings, and unresolved references.

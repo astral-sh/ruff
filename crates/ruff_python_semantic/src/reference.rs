@@ -220,6 +220,16 @@ impl UnresolvedReferences {
             flags,
         });
     }
+
+    /// Pushes an existing [`UnresolvedReference`].
+    pub(crate) fn push_reference(&mut self, reference: UnresolvedReference) {
+        self.0.push(reference);
+    }
+
+    /// Removes the most recently pushed [`UnresolvedReference`].
+    pub(crate) fn pop(&mut self) -> Option<UnresolvedReference> {
+        self.0.pop()
+    }
 }
 
 impl Deref for UnresolvedReferences {
