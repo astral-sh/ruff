@@ -8,6 +8,8 @@ use ty_static::EnvVars;
 
 use super::{UvMetadata, UvMetadataError};
 
+pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 12, 3];
+
 #[derive(Clone)]
 pub(crate) struct Uv {
     executable: String,
@@ -50,21 +52,23 @@ impl Uv {
         let mut command = Command::new(self.executable.as_str());
         command.args(["workspace", "metadata", "--quiet"]);
 
-        match target {
+        let directory = match target {
             MetadataTarget::Workspace(path) => {
                 // Use the environment selected by `uv check` without synchronizing it.
                 // Let uv apply its configured lockfile policy.
-                command.arg("--active").current_dir(path);
+                command.arg("--active");
+                Some(*path)
             }
             MetadataTarget::Script { path, python } => {
                 command.args(["--sync", "--script", path.as_str()]);
                 if let Some(python) = python {
                     command.args(["--python", python.as_str()]);
                 }
-                if let Some(parent) = path.parent() {
-                    command.current_dir(parent);
-                }
+                path.parent()
             }
+        };
+        if let Some(directory) = directory {
+            command.current_dir(directory);
         }
 
         tracing::debug!(
@@ -86,8 +90,8 @@ impl Uv {
         // Before uv 0.12.3, `--quiet` suppresses the metadata JSON even on success.
         // Only probe the version when metadata is unavailable, so successful calls stay cheap.
         if (!output.status.success() || output.stdout.is_empty())
-            && let Some(version) = self.version(executor, target)
-            && version < Version::new([0, 12, 3])
+            && let Some(version) = self.version(executor, directory)
+            && version < Version::new(MINIMUM_UV_VERSION)
         {
             return Err(UvMetadataError::UnsupportedVersion {
                 executable: self.executable.clone(),
@@ -101,14 +105,10 @@ impl Uv {
     fn version(
         &self,
         executor: &dyn CommandExecutor,
-        target: &MetadataTarget<'_>,
+        directory: Option<&SystemPath>,
     ) -> Option<Version> {
         let mut command = Command::new(self.executable.as_str());
         command.arg("--version");
-        let directory = match target {
-            MetadataTarget::Workspace(path) => Some(*path),
-            MetadataTarget::Script { path, .. } => path.parent(),
-        };
         if let Some(directory) = directory {
             command.current_dir(directory);
         }

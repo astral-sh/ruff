@@ -7,6 +7,8 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use thiserror::Error;
 
+use super::command::MINIMUM_UV_VERSION;
+
 mod dependencies;
 mod string_interner;
 
@@ -83,7 +85,7 @@ pub(crate) struct WorkspaceMember {
 
 #[derive(Debug, Error)]
 pub(crate) enum UvMetadataError {
-    #[error("uv {version} is too old; upgrade `{executable}` to uv 0.12.3 or newer")]
+    #[error("uv {version} is too old; upgrade `{executable}` to uv {minimum_version} or newer", minimum_version = Version::new(MINIMUM_UV_VERSION))]
     UnsupportedVersion {
         executable: String,
         version: Version,
