@@ -3687,7 +3687,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 seen.contains(&typevar.identity(self.db)) && when.mentions_typevar(*typevar)
             }),
         );
+        if seen == TypeVarSet::None {
+            return when;
+        }
+
+        // Earlier arguments still constrain these ParamSpecs in `pending`. Give the quantified
+        // occurrences fresh identities so they cannot capture those earlier bindings.
         when.reduce_inferable(self.db, self.env, self.constraints, seen)
+            .freshen_quantified_typevars(self.db, self.env)
     }
 
     /// Records a relation and projects its solutions into the legacy type mapping.
