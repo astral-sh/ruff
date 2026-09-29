@@ -1246,60 +1246,87 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
-        let removed_receiver = self.parameters.get(0).is_some_and(Parameter::is_positional);
-        let explicit_receiver = self
-            .parameters
-            .get(0)
-            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation);
-
-        // TODO: Theoretically, for a signature like `f(*args: *tuple[MyClass, int, *tuple[str, ...]])` with
-        // a variadic first parameter, we should also "skip the first parameter" by modifying the tuple type.
-        let mut parameters = if removed_receiver {
-            self.parameters.without_first()
+        // A fixed unpacked tuple has a known first positional argument, even though it is
+        // declared with `*args`. Expand it before consuming the receiver.
+        let binding_parameters = if self.parameters.get(0).is_some_and(|parameter| {
+            parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && parameter
+                    .annotated_type()
+                    .exact_tuple_instance_spec(db)
+                    .is_some_and(|tuple| matches!(tuple.as_ref(), Tuple::Fixed(_)))
+        }) {
+            self.parameters.expand_starred_variadic_annotations(db)
         } else {
             self.parameters.clone()
         };
+        let removed_receiver = binding_parameters
+            .get(0)
+            .is_some_and(Parameter::is_positional);
+        let first_parameter = binding_parameters.get(0);
+        let explicit_receiver = first_parameter.filter(|parameter| {
+            (parameter.is_positional()
+                || (parameter.is_variadic() && !parameter.has_starred_annotation()))
+                && !parameter.inferred_annotation
+        });
+        let impossible_receiver = binding_parameters.is_standard()
+            && !removed_receiver
+            && !first_parameter.is_some_and(Parameter::is_variadic);
+
+        // TODO: Binding a receiver through a variable-length unpacked tuple needs to account for
+        // its possible positional prefixes and suffixes.
+        let mut parameters = if removed_receiver {
+            binding_parameters.without_first()
+        } else {
+            binding_parameters.clone()
+        };
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
-        let receiver_constraint = explicit_receiver.map(|parameter| {
-            let receiver = receiver_type.unwrap_or_else(|| {
-                Type::TypeVar(BoundTypeVarInstance::synthetic_self(
-                    db,
-                    Type::object(),
-                    BindingContext::Synthetic(env.program(db)),
-                ))
-            });
-            let annotation = if let Some(typing_self_type) = typing_self_type {
-                let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                    db,
-                    env,
-                    typing_self_type,
-                    binding_context,
-                ));
-                parameter.annotated_type().apply_type_mapping(
-                    db,
-                    env,
-                    &mapping,
-                    TypeContext::default(),
-                )
-            } else {
-                parameter.annotated_type()
-            };
-            // TODO: Also intersect nested receiver type variables, such as the `T` in
-            // `self: list[T]`, with their valid specializations when constructing or solving the
-            // receiver constraint set.
-            let receiver_typevar = match annotation {
-                Type::TypeVar(typevar) => Some(typevar),
-                Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
-                _ => None,
-            };
-            if receiver_typevar.is_some_and(|typevar| {
-                Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
-            }) {
-                return std::borrow::Cow::Owned(OwnedConstraintSet::default());
-            }
-            receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
-        });
+        let receiver_constraint = if impossible_receiver {
+            // Keep the signature for bound-method diagnostics, but make it incompatible with
+            // callable contracts: no parameter can receive the implicit positional argument.
+            Some(std::borrow::Cow::Owned(OwnedConstraintSet::default()))
+        } else {
+            explicit_receiver.map(|parameter| {
+                let receiver = receiver_type.unwrap_or_else(|| {
+                    Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                        db,
+                        Type::object(),
+                        BindingContext::Synthetic(env.program(db)),
+                    ))
+                });
+                let annotation = if let Some(typing_self_type) = typing_self_type {
+                    let mapping = TypeMapping::BindSelf(SelfBinding::new(
+                        db,
+                        env,
+                        typing_self_type,
+                        binding_context,
+                    ));
+                    parameter.annotated_type().apply_type_mapping(
+                        db,
+                        env,
+                        &mapping,
+                        TypeContext::default(),
+                    )
+                } else {
+                    parameter.annotated_type()
+                };
+                // TODO: Also intersect nested receiver type variables, such as the `T` in
+                // `self: list[T]`, with their valid specializations when constructing or solving the
+                // receiver constraint set.
+                let receiver_typevar = match annotation {
+                    Type::TypeVar(typevar) => Some(typevar),
+                    Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
+                    _ => None,
+                };
+                if receiver_typevar.is_some_and(|typevar| {
+                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
+                }) {
+                    return std::borrow::Cow::Owned(OwnedConstraintSet::default());
+                }
+                receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+            })
+        };
         let receiver_constraints = merge_receiver_constraints(
             db,
             env,
@@ -1307,7 +1334,7 @@ impl<'db> Signature<'db> {
             receiver_constraint.as_deref(),
         );
         if let Some(self_type) = typing_self_type
-            && self.needs_self_mapping(db, env, removed_receiver)
+            && self.needs_self_mapping(db, env, parameters.as_slice())
         {
             let self_mapping =
                 TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
@@ -1604,11 +1631,11 @@ impl<'db> Signature<'db> {
         self_type: Type<'db>,
     ) -> Option<Self> {
         let context = self.generic_context?;
-        let receiver = self.parameters.get(0)?;
+        let (receiver, parameters) = self.parameters.as_slice().split_first()?;
 
         // Ensure `Self` is not used elsewhere in the signature, in which case eagerly binding it
         // would be unsound.
-        if !receiver.is_positional() || self.needs_self_mapping(db, env, true) {
+        if !receiver.is_positional() || self.needs_self_mapping(db, env, parameters) {
             return None;
         }
 
@@ -1704,7 +1731,7 @@ impl<'db> Signature<'db> {
             .filter(|constraints| {
                 !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db, env))
             });
-        if !self.needs_self_mapping(db, env, false) {
+        if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
                     self.source_overload_index_raw(),
@@ -1946,15 +1973,12 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        receiver_is_removed: bool,
+        parameters: &[Parameter<'db>],
     ) -> bool {
         self.return_ty.contains_self(db, env)
-            || self
-                .parameters
+            || parameters
                 .iter()
-                .enumerate()
-                .skip(usize::from(receiver_is_removed))
-                .any(|(_, parameter)| parameter.annotated_type().contains_self(db, env))
+                .any(|parameter| parameter.annotated_type().contains_self(db, env))
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> TypeVarSet<'db> {

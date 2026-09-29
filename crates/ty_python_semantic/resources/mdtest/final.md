@@ -343,7 +343,7 @@ class Base:
 `other.py`:
 
 ```py
-def replacement_method() -> None: ...
+def replacement_method(self) -> None: ...
 ```
 
 `derived.py`:
