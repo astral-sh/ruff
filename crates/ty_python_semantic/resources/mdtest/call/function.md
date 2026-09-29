@@ -200,9 +200,7 @@ def convert(value: Result[T]) -> Result[T]: ...
 def convert(value: T | Result[T]) -> Result[T]:
     raise NotImplementedError
 
-# TODO: Preserve correlated overloaded-callback solutions (astral-sh/ty#2799) to infer
-# `map[Result[str]]`.
-reveal_type(map(convert, ["a"]))  # revealed: map[Unknown]
+reveal_type(map(convert, ["a"]))  # revealed: map[Result[str]]
 ```
 
 ## Decorated
