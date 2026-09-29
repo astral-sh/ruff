@@ -402,6 +402,51 @@ def f[T](value: T, callback=lambda: f) -> T:
 reveal_type(f)  # revealed: property
 ```
 
+## Recursive lambda used as a class decorator
+
+The lambda returns a name that can refer back to the lambda itself. Inferring the decorated class
+converges even when another binding of that name has an unknown type.
+
+```py
+make = lambda cls: result
+try:
+    raise Exception
+except Exception:
+    @make
+    class result: ...
+
+    result = make
+finally:
+    from unknown_module import member as result  # error: [unresolved-import]
+```
+
+## Recursive lambda decorator in exception groups
+
+Regression test for <https://github.com/astral-sh/ty/issues/4616>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+(make := lambda: result)
+(alias := make)
+try:
+    first  # error: [unresolved-reference]
+except* 0:  # error: [invalid-exception-caught]
+    @make or fallback  # error: [too-many-positional-arguments]
+    class result:
+        pass
+
+try:
+    second  # error: [unresolved-reference]
+except* 0:  # error: [invalid-exception-caught]
+    (result := alias)
+finally:
+    from unknown_module import member as result  # error: [unresolved-import]
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.

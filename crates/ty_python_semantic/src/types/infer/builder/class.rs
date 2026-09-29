@@ -479,7 +479,9 @@ fn class_decorator_preserves_class_binding<'db>(
             .subclass_of()
             .into_class(db, env)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
-        Type::Divergent(_) => true,
+        // A provisional decorator result does not establish that the class is preserved.
+        // Keep its cycle marker so recursive return types can be normalized.
+        Type::Divergent(_) => false,
         Type::Union(union) => union.elements(db).iter().all(|element| {
             class_decorator_preserves_class_binding(db, env, original_class, *element)
         }),
