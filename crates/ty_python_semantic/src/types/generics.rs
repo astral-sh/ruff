@@ -28,7 +28,9 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -3567,7 +3569,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             |_variance, path_bound| {
                 validate(
                     path_bound.bound_typevar,
-                    CandidateSolutions::preliminary_solve(db, self.env, self.constraints, path_bound),
+                    CandidateSolutions::preliminary_solve(
+                        db,
+                        self.env,
+                        self.constraints,
+                        path_bound,
+                    ),
                 )
             },
         );
@@ -4473,6 +4480,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     evidence: ConstraintFailureEvidence::Upper(bounds),
                                     ..
                                 } => bounds.iter().copied().any(is_gradual),
+                                SpecializationError::MismatchedConstraint {
+                                    evidence: ConstraintFailureEvidence::UpperUnknown,
+                                    ..
+                                } => false,
                             })
                         }
                         // Do not bypass exhausted budgets by retrying recursive inference.
