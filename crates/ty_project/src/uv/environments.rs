@@ -75,6 +75,7 @@ use parking_lot::Mutex;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
 use ruff_db::cancellation::CancellationTokenSource;
+use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::File;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use salsa::Setter;
@@ -363,7 +364,7 @@ impl UvEnvironments {
                         // Keep the last working uv metadata so a failed refresh does not change
                         // the environment used for checking. Report the new error instead.
                         Err(error) => ProjectEnvironment {
-                            error: Some(error.to_string().into_boxed_str()),
+                            error: Some(error.to_diagnostic(Severity::Warning)),
                             ..project.metadata(db).environment().clone()
                         },
                     };
@@ -528,7 +529,7 @@ impl UvSyncChanges {
 #[derive(Debug, Default, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) struct ProjectEnvironment {
     pub(crate) metadata: Option<UvMetadata>,
-    pub(crate) error: Option<Box<str>>,
+    pub(crate) error: Option<Diagnostic>,
 }
 
 /// Whether a script environment is suitable for operations that depend on its dependencies.
@@ -586,8 +587,8 @@ pub(crate) struct ScriptEnvironment {
     /// The error from the most recent synchronization.
     ///
     /// `None` if synchronization has not completed or completed successfully.
-    #[returns(as_deref)]
-    pub(crate) initialization_error: Option<Box<str>>,
+    #[returns(as_ref)]
+    pub(crate) initialization_error: Option<Diagnostic>,
 }
 
 struct UvEnvironmentsInner {
@@ -714,14 +715,14 @@ fn apply_sync_result(
 ) {
     let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
         Ok(metadata) => (Some(metadata), None),
-        Err(error) => (None, Some(error.to_string().into_boxed_str())),
+        Err(error) => (None, Some(error.to_diagnostic(Severity::Error))),
     };
 
     if environment.uv_metadata(db) != uv_metadata.as_ref() {
         environment.set_uv_metadata(db).to(uv_metadata);
     }
 
-    if environment.initialization_error(db) != initialization_error.as_deref() {
+    if environment.initialization_error(db) != initialization_error.as_ref() {
         environment
             .set_initialization_error(db)
             .to(initialization_error);

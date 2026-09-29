@@ -3339,14 +3339,10 @@ mod uv_metadata {
             "#,
         )?;
         let diagnostics = case.db().check();
-        assert_snapshot!(case.render_diagnostics(&diagnostics), @r#"
-        pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 2: error: Failed to parse: `pyproject.toml`
-          cause: TOML parse error at line 8, column 11
-                   |
-                 8 | package = "invalid"
-                   |           ^^^^^^^^^
-                 invalid type: string "invalid", expected a boolean
-        "#);
+        assert_snapshot!(
+            case.render_diagnostics(&diagnostics),
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: `pyproject.toml`"
+        );
         assert_eq!(project.program_settings(case.db()), &program_settings);
 
         // If ordinary discovery also fails, keep the last applied settings and warning.
@@ -3530,15 +3526,10 @@ mod uv_metadata {
             )],
         )?;
 
-        assert_snapshot!(case.render_diagnostics(&case.db().check()), @r#"
-        script.py:2:1: error[uv-metadata] `uv workspace metadata` failed with status exit status: 2: error: TOML parse error at line 2, column 17
-          |
-        2 | dependencies = ["not a valid requirement ???"]
-          |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        Expected one of `@`, `(`, `<`, `=`, `>`, `~`, `!`, `;`, found `a`
-        not a valid requirement ???
-            ^
-        "#);
+        assert_snapshot!(
+            case.render_diagnostics(&case.db().check()),
+            @"script.py:2:1: error[uv-metadata] Failed to load uv metadata: TOML parse error at line 2, column 17"
+        );
 
         update_and_synchronize_script(
             &mut case,

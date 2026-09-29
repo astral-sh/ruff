@@ -1924,11 +1924,12 @@ mod uv_metadata {
         success: false
         exit_code: 1
         ----- stdout -----
-        error[uv-metadata]: `uv workspace metadata` failed with status exit status: 1: error: No solution found when resolving dependencies
+        error[uv-metadata]: `uv workspace metadata` failed with `exit status: 1`
+        --> script.py:2:1
+        info: No solution found when resolving dependencies
           cause: Because missing-script-dependency was not found in the cache and you require missing-script-dependency==99.0.0, we can conclude that your requirements are unsatisfiable.
 
         hint: Packages were unavailable because the network was disabled. When the network is disabled, registry packages may only be read from the cache.
-        --> script.py:2:1
 
         Found 1 diagnostic
 
