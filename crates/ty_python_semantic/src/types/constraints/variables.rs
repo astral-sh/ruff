@@ -112,7 +112,7 @@ impl<'db> Constraint<'db> {
         (node, source_order)
     }
 
-    pub(super) fn as_atomic(&self) -> Option<AtomicConstraint<'db>> {
+    fn as_atomic(&self) -> Option<AtomicConstraint<'db>> {
         #[expect(clippy::match_wildcard_for_single_variants)]
         match self {
             Constraint::Atomic(atomic) => Some(*atomic),
