@@ -278,17 +278,16 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
         }
     }
 
-    // The project and virtual environment watches cover search paths inside their roots.
-    // Deduplicate the remaining paths so shared or nested search paths are registered once.
-    let unique_module_paths =
-        ruff_db::system::deduplicate_nested_paths(search_paths.into_iter().filter(|path| {
-            !path.starts_with(project_path)
-                && virtual_environment.is_none_or(|environment| !path.starts_with(environment))
-        }));
+    // Register module search paths after their parents even when a recursive watch already
+    // covers them. On Linux, a parent watch can report changes through another symlink,
+    // such as `.venv/lib64` instead of `.venv/lib`, leaving import resolution stale.
+    let module_paths = search_paths
+        .into_iter()
+        .filter(|path| *path != project_path);
 
     let paths: Vec<_> = included_paths
         .chain(virtual_environment)
-        .chain(unique_module_paths)
+        .chain(module_paths)
         .chain(project.metadata(db).extra_configuration_paths())
         .map(SystemPath::to_path_buf)
         .collect();
