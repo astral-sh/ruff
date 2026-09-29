@@ -10,8 +10,8 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
-    CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
+    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, CandidateSolution, CandidateSolutions,
+    CandidateTypeVarSolution, CandidateTypeVarSolver, ConstraintFailureEvidence, ConstraintId,
     ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
     SolutionViolationKind, UnboundedSolutionLimits,
 };
@@ -134,7 +134,7 @@ pub(super) enum Polarity {
 type ExploredNodeKey = (
     Polarity,
     NodeId,
-    Box<[(ConstraintAssignment, ConstraintId)]>,
+    Box<[(Assignment<ConstraintId>, ConstraintId)]>,
 );
 
 enum Break<B> {
@@ -229,7 +229,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
         support: &Support,
-    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+    ) -> impl Iterator<Item = (Assignment<ConstraintId>, ConstraintId)> {
         path.assignments
             .iter()
             .filter_map(|(assignment, (source_constraint, _))| {
@@ -545,7 +545,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         polarity: Polarity,
-        assignment: ConstraintAssignment,
+        assignment: Assignment<ConstraintId>,
         child: NodeId,
         check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
         prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,

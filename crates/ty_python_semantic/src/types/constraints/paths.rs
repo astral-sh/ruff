@@ -19,8 +19,8 @@ use crate::types::constraints::variables::Constraint::{
     ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
 };
 use crate::types::constraints::{
-    ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
-    SourceOrderId, TypeVarId,
+    Assignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor, SourceOrderId,
+    TypeVarId,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -59,9 +59,9 @@ pub(crate) struct PathAssignments {
     /// All of the rules that we know for inferring derived constraints on the current path.
     sequents: Vec<Sequent<ConstraintId, u16>>,
     /// The sequents that can fire when a particular assignment is added to the path.
-    sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
+    sequent_antecedents: FxHashMap<Assignment<ConstraintId>, Vec<usize>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
-    pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
+    pub(super) assignments: FxIndexMap<Assignment<ConstraintId>, (ConstraintId, u16)>,
     /// Constraints that have been _replaced_ with other constraints on this path, because a
     /// sequent substituted an exact type for some typevar.
     substituted_constraints: FxIndexSet<ConstraintId>,
@@ -92,13 +92,13 @@ pub(crate) struct PathAssignments {
     independent_typevars: FxHashSet<TypeVarId>,
 
     /// Derived assignments that have been queued up to be added to the current path.
-    assignment_queue: VecDeque<(ConstraintAssignment, AssignmentFuel)>,
+    assignment_queue: VecDeque<(Assignment<ConstraintId>, AssignmentFuel)>,
 
     /// The next chunk of derived assignments that have been queued up to add to the current path.
     /// If we derive the same assignment multiple times, we keep the derivation that lets us make
     /// the most additional progress (more remaining fuel for this derivation chain, less overall
     /// fuel consumed).
-    new_assignments: FxIndexMap<ConstraintAssignment, AssignmentFuel>,
+    new_assignments: FxIndexMap<Assignment<ConstraintId>, AssignmentFuel>,
 }
 
 /// The total amount of fuel that we are willing to spend for this path traversal. This was
@@ -429,7 +429,7 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        assignment: ConstraintAssignment,
+        assignment: Assignment<ConstraintId>,
         f: impl FnOnce(&mut ConstraintSetStorage<'db>, &mut Self, Range<usize>, bool) -> R,
     ) -> R {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -490,13 +490,13 @@ impl PathAssignments {
         }
         for assignment in self.assignments[start..].keys() {
             match *assignment {
-                ConstraintAssignment::Positive(constraint) => {
+                Assignment::Positive(constraint) => {
                     self.positive_assignment_indices[constraint] = None;
                 }
-                ConstraintAssignment::Negative(constraint) => {
+                Assignment::Negative(constraint) => {
                     self.negative_assignment_indices[constraint] = None;
                 }
-                ConstraintAssignment::Unconstrained(_) => {}
+                Assignment::Unconstrained(_) => {}
             }
         }
         self.assignments.truncate(start);
@@ -511,10 +511,8 @@ impl PathAssignments {
     ) -> impl Iterator<Item = (ConstraintId, ConstraintId)> + '_ {
         self.assignments.iter().filter_map(
             |(assignment, (source_constraint, _))| match assignment {
-                ConstraintAssignment::Positive(constraint) => {
-                    Some((*constraint, *source_constraint))
-                }
-                ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
+                Assignment::Positive(constraint) => Some((*constraint, *source_constraint)),
+                Assignment::Negative(_) | Assignment::Unconstrained(_) => None,
             },
         )
     }
@@ -523,15 +521,15 @@ impl PathAssignments {
         self.substituted_constraints.contains(&constraint)
     }
 
-    fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
+    fn assignment_holds(&self, assignment: Assignment<ConstraintId>) -> bool {
         self.assignment_index(assignment).is_some()
     }
 
-    fn assignment_index(&self, assignment: ConstraintAssignment) -> Option<usize> {
+    fn assignment_index(&self, assignment: Assignment<ConstraintId>) -> Option<usize> {
         let indices = match assignment {
-            ConstraintAssignment::Positive(_) => &self.positive_assignment_indices,
-            ConstraintAssignment::Negative(_) => &self.negative_assignment_indices,
-            ConstraintAssignment::Unconstrained(_) => {
+            Assignment::Positive(_) => &self.positive_assignment_indices,
+            Assignment::Negative(_) => &self.negative_assignment_indices,
+            Assignment::Unconstrained(_) => {
                 return self.assignments.get_index_of(&assignment);
             }
         };
@@ -542,11 +540,11 @@ impl PathAssignments {
             .map(AssignmentIndex::as_usize)
     }
 
-    fn record_assignment_index(&mut self, assignment: ConstraintAssignment, index: usize) {
+    fn record_assignment_index(&mut self, assignment: Assignment<ConstraintId>, index: usize) {
         let indices = match assignment {
-            ConstraintAssignment::Positive(_) => &mut self.positive_assignment_indices,
-            ConstraintAssignment::Negative(_) => &mut self.negative_assignment_indices,
-            ConstraintAssignment::Unconstrained(_) => return,
+            Assignment::Positive(_) => &mut self.positive_assignment_indices,
+            Assignment::Negative(_) => &mut self.negative_assignment_indices,
+            Assignment::Unconstrained(_) => return,
         };
         let constraint = assignment.constraint();
         if indices.len() <= constraint.as_usize() {
@@ -562,7 +560,7 @@ impl PathAssignments {
     }
 
     /// Returns the greatest remaining fuel for any derivation of `assignment` on this path.
-    fn max_remaining_fuel_for(&self, assignment: ConstraintAssignment) -> Option<u16> {
+    fn max_remaining_fuel_for(&self, assignment: Assignment<ConstraintId>) -> Option<u16> {
         self.assignment_index(assignment)
             .map(|index| self.assignments[index].1)
     }
@@ -580,7 +578,7 @@ impl PathAssignments {
             storage: &mut ConstraintSetStorage<'db>,
             sequents: &[Sequent<InternedSequentConstraint<'db>>],
             dest: &mut Vec<Sequent<ConstraintId, u16>>,
-            antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
+            antecedents: &mut FxHashMap<Assignment<ConstraintId>, Vec<usize>>,
         ) {
             for sequent in sequents {
                 let sequent_index = dest.len();
@@ -852,11 +850,11 @@ impl PathAssignments {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        assignment: ConstraintAssignment,
+        assignment: Assignment<ConstraintId>,
         source_constraint: ConstraintId,
         fuel: AssignmentFuel,
     ) -> Result<(), PathAssignmentConflict> {
-        if matches!(assignment, ConstraintAssignment::Unconstrained(_)) {
+        if matches!(assignment, Assignment::Unconstrained(_)) {
             // An `Unconstrained` assignment means "this constraint can go either way". If there is
             // already any assignment for this constraint (positive, negative, or unconstrained),
             // the existing assignment is at least as informative, and we skip.
@@ -973,7 +971,11 @@ impl PathAssignments {
         Ok(())
     }
 
-    fn enqueue_assignment(&mut self, assignment: ConstraintAssignment, new_fuel: AssignmentFuel) {
+    fn enqueue_assignment(
+        &mut self,
+        assignment: Assignment<ConstraintId>,
+        new_fuel: AssignmentFuel,
+    ) {
         self.new_assignments
             .entry(assignment)
             .and_modify(|existing_fuel| {
