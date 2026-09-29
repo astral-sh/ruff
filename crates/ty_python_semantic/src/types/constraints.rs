@@ -2422,8 +2422,14 @@ impl NodeId {
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
                 let source_orders = storage.calculate_source_orders(source_order);
-                let mut walker =
-                    SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
+                let mut walker = SolutionWalker::new(
+                    db,
+                    storage,
+                    source_orders,
+                    TypeVarSet::None,
+                    UnboundedSolutionLimits,
+                    self,
+                );
                 let mut path = interior.path_assignments(db, env, storage, source_order);
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
@@ -2490,8 +2496,14 @@ impl NodeId {
                     false
                 } else {
                     let source_orders = storage.calculate_source_orders(source_order);
-                    let mut walker =
-                        SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
+                    let mut walker = SolutionWalker::new(
+                        db,
+                        storage,
+                        source_orders,
+                        TypeVarSet::None,
+                        UnboundedSolutionLimits,
+                        self,
+                    );
                     let mut path = interior.path_assignments(db, env, storage, source_order);
                     walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
                 };
@@ -3532,7 +3544,7 @@ impl<'db> CandidateSolutions<'db> {
             node,
             inferable,
             source_order,
-            &mut UnboundedSolutionLimits,
+            UnboundedSolutionLimits,
         );
         result
     }
@@ -3551,19 +3563,11 @@ impl<'db> CandidateSolutions<'db> {
         source_order: Option<SourceOrderId>,
         budget: SolutionBudget,
     ) -> Result<Self, ProjectionError> {
-        let mut limits = BoundedSolutionLimits {
+        let limits = BoundedSolutionLimits {
             remaining_paths: budget.paths,
             remaining_visits: budget.visits,
         };
-        match Self::compute_with_limits(
-            db,
-            env,
-            storage,
-            node,
-            inferable,
-            source_order,
-            &mut limits,
-        ) {
+        match Self::compute_with_limits(db, env, storage, node, inferable, source_order, limits) {
             ControlFlow::Continue(result) => Ok(result),
             ControlFlow::Break(error) => Err(error),
         }
@@ -3576,7 +3580,7 @@ impl<'db> CandidateSolutions<'db> {
         node: NodeId,
         inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-        limits: &mut L,
+        mut limits: L,
     ) -> ControlFlow<L::Break, Self> {
         let source_orders = storage.calculate_source_orders(source_order);
         if let Some(path_bounds) = Self::compute_simple_bound_conjunction(
@@ -3586,12 +3590,12 @@ impl<'db> CandidateSolutions<'db> {
             &source_orders,
             node,
             inferable,
-            limits,
+            &mut limits,
         )? {
             return ControlFlow::Continue(path_bounds);
         }
 
-        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, node);
+        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -3601,7 +3605,6 @@ impl<'db> CandidateSolutions<'db> {
             db,
             env,
             storage,
-            limits,
             &mut path,
             node_support.as_ref(),
             Polarity::Positive,

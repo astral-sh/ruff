@@ -1296,18 +1296,23 @@ mod tests {
             let mut path = set
                 .node
                 .path_assignments(db, &env, &mut storage, set.source_order);
-            let mut limits = BoundedSolutionLimits {
+            let limits = BoundedSolutionLimits {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker =
-                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
+            let mut walker = SolutionWalker::new(
+                db,
+                &mut storage,
+                source_orders.clone(),
+                inferable,
+                limits,
+                set.node,
+            );
             assert_eq!(
                 walker.visit_node(
                     db,
                     &env,
                     &mut storage,
-                    &mut limits,
                     &mut path,
                     None,
                     Polarity::Positive,
@@ -1317,14 +1322,19 @@ mod tests {
             );
             drop(walker);
 
-            let mut limits = UnboundedSolutionLimits;
-            let mut walker =
-                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
+            let limits = UnboundedSolutionLimits;
+            let mut walker = SolutionWalker::new(
+                db,
+                &mut storage,
+                source_orders.clone(),
+                inferable,
+                limits,
+                set.node,
+            );
             let ControlFlow::Continue(()) = walker.visit_node(
                 db,
                 &env,
                 &mut storage,
-                &mut limits,
                 &mut path,
                 None,
                 Polarity::Positive,
