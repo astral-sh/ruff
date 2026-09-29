@@ -22,6 +22,61 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Recursive lambda referring to a loop target
+
+Regression test for <https://github.com/astral-sh/ty/issues/4611>.
+
+```py
+value = lambda: value
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+## Recursive lambda in nested assignment expressions
+
+Recursive lambda inference also converges through nested assignment expressions.
+
+```py
+(value := (alias := lambda: value))
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+## Recursive lambda assignment expression and decorator
+
+The decorator's return type depends on the recursive lambda assigned in the `try` block. This cycle
+also converges when the lambda is accessed through its alias in `finally`.
+
+```py
+try:
+    f = (alias := lambda: f)
+finally:
+    alias[0]  # error: [not-subscriptable]
+
+@lambda value: f and value  # error: [dynamic-function-decorator-return]
+def f():
+    pass
+```
+
+## Recursive lambda with an exception target annotation
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+async def f(*, value: lambda: caught):  # error: [invalid-type-form]
+    pass
+
+try:
+    value = lambda: value
+    for value in f:  # error: [not-iterable]
+        pass
+except* lambda: value as caught:  # error: [invalid-exception-caught]
+    pass
+```
+
 ## Recursive lambdas nested in expressions
 
 Recursive return-type inference converges when a lambda is nested inside another expression. Here,
