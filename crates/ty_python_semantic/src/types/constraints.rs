@@ -128,7 +128,7 @@ mod support;
 mod variables;
 
 use paths::PathAssignments;
-use solutions::SolutionWalker;
+use solutions::{Polarity, SolutionWalker};
 use variables::{Constraint, ConstraintProvenance};
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -2421,9 +2421,17 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
+                let source_orders = storage.calculate_source_orders(source_order);
+                let mut walker = SolutionWalker::new(
+                    db,
+                    storage,
+                    source_orders,
+                    TypeVarSet::None,
+                    Polarity::Negative,
+                    self,
+                );
                 let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
+                walker.is_never_satisfied(db, env, storage, &mut path, self)
             }
         }
     }
@@ -2488,8 +2496,14 @@ impl NodeId {
                     false
                 } else {
                     let source_orders = storage.calculate_source_orders(source_order);
-                    let mut walker =
-                        SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
+                    let mut walker = SolutionWalker::new(
+                        db,
+                        storage,
+                        source_orders,
+                        TypeVarSet::None,
+                        Polarity::Positive,
+                        self,
+                    );
                     let mut path = interior.path_assignments(db, env, storage, source_order);
                     walker.is_never_satisfied(db, env, storage, &mut path, self)
                 };
@@ -3589,7 +3603,14 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
-        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, node);
+        let mut walker = SolutionWalker::new(
+            db,
+            storage,
+            source_orders,
+            inferable,
+            Polarity::Positive,
+            node,
+        );
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -4814,6 +4835,7 @@ where
 /// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
 /// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
 /// unsatisfiable. A `Break` result indicates the opposite.
+#[expect(dead_code, reason = "XXX to be removed")]
 struct IsNeverSatisfiedVisitor;
 
 impl PathFold for IsNeverSatisfiedVisitor {
