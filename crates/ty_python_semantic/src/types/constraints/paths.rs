@@ -308,6 +308,7 @@ impl PathAssignments {
     }
 
     /// Visits the paths of the negation of `node`, without constructing that negation eagerly.
+    #[expect(dead_code, reason = "XXX to be removed")]
     pub(super) fn visit_negated<'db, V>(
         &mut self,
         db: &'db dyn Db,
@@ -1238,7 +1239,7 @@ struct PathAssignmentConflict;
 
 #[cfg(test)]
 mod tests {
-    use super::super::solutions::SolutionWalker;
+    use super::super::solutions::{Polarity, SolutionWalker};
     use super::super::*;
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1579,8 +1580,14 @@ mod tests {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker =
-                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
+            let mut walker = SolutionWalker::new(
+                db,
+                &mut storage,
+                source_orders.clone(),
+                inferable,
+                Polarity::Positive,
+                set.node,
+            );
             assert_eq!(
                 walker.visit_node(
                     db,
@@ -1596,8 +1603,14 @@ mod tests {
             drop(walker);
 
             let mut limits = UnboundedSolutionLimits;
-            let mut walker =
-                SolutionWalker::new(db, &mut storage, source_orders.clone(), inferable, set.node);
+            let mut walker = SolutionWalker::new(
+                db,
+                &mut storage,
+                source_orders.clone(),
+                inferable,
+                Polarity::Positive,
+                set.node,
+            );
             let ControlFlow::Continue(()) = walker.visit_node(
                 db,
                 &env,
