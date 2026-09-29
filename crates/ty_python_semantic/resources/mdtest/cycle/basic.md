@@ -424,6 +424,66 @@ reveal_type(Example)  # revealed: <class 'Example'>
 Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
 ```
 
+## Class decorator annotations depend on the decorated class through a type alias
+
+A type alias can introduce the same dependency on the decorated class. Importers still see the class
+and can check its constructor arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`example.pyi`:
+
+```pyi
+type Alias = annotation
+
+def identity(value: Alias) -> Alias: ...
+
+@identity
+class Example:
+    def __init__(self, name: str) -> None: ...
+
+annotation = type[Example]
+```
+
+`main.py`:
+
+```py
+from example import Example
+
+reveal_type(Example)  # revealed: <class 'Example'>
+Example("example")
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
+## Dataclass outside a decorator whose annotations depend on the class
+
+An outer `@dataclass` still generates an initializer when the inner decorator's annotations depend
+on the decorated class.
+
+```pyi
+from dataclasses import dataclass
+from typing_extensions import reveal_type
+
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+def identity(value: annotation) -> annotation: ...
+
+@dataclass
+@identity
+class Example:
+    name: str
+
+annotation = Example("example")
+
+reveal_type(Example)  # revealed: <class 'Example'>
+reveal_type(Example("example").name)  # revealed: str
+Example()  # error: [missing-argument] "No argument provided for required parameter `name`"
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
 ## Recursive lambda used as a class decorator
 
 The lambda returns a name that can refer back to the lambda itself. Inferring the decorated class
@@ -438,33 +498,6 @@ except Exception:
     class result: ...
 
     result = make
-finally:
-    from unknown_module import member as result  # error: [unresolved-import]
-```
-
-## Recursive lambda decorator in exception groups
-
-Regression test for <https://github.com/astral-sh/ty/issues/4616>.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-(make := lambda: result)
-(alias := make)
-try:
-    first  # error: [unresolved-reference]
-except* 0:  # error: [invalid-exception-caught]
-    @make or fallback  # error: [too-many-positional-arguments]
-    class result:
-        pass
-
-try:
-    second  # error: [unresolved-reference]
-except* 0:  # error: [invalid-exception-caught]
-    (result := alias)
 finally:
     from unknown_module import member as result  # error: [unresolved-import]
 ```

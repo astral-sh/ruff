@@ -327,11 +327,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
                 inferred_ty
-            } else if decorated_ty.is_divergent() {
+            } else if let divergent_ty @ Type::Divergent(_) = decorated_ty.resolve_type_alias(db) {
                 // Keep the current binding to bootstrap decorators whose return annotations
                 // depend on the decorated class. Retain the cycle marker too: replacing it with
                 // only the class lets inferred lambda return types grow on every iteration.
-                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, decorated_ty])
+                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, divergent_ty])
             } else if class_decorator_preserves_class_binding(
                 db,
                 env,
