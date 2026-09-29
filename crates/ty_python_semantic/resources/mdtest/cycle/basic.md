@@ -402,6 +402,28 @@ def f[T](value: T, callback=lambda: f) -> T:
 reveal_type(f)  # revealed: property
 ```
 
+## Class decorator annotations depend on the decorated class
+
+A decorator's annotations can refer to an instance of the decorated class. We report the invalid
+annotations and preserve the class binding, so constructor calls can still be checked.
+
+```pyi
+from typing_extensions import reveal_type
+
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+def identity(value: annotation) -> annotation: ...
+
+@identity
+class Example:
+    def __init__(self, name: str) -> None: ...
+
+annotation = Example("example")
+
+reveal_type(Example)  # revealed: <class 'Example'>
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
 ## Recursive lambda used as a class decorator
 
 The lambda returns a name that can refer back to the lambda itself. Inferring the decorated class

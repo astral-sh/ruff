@@ -2,7 +2,7 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
+    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule, UnionType,
     call::CallError,
     function::KnownFunction,
     infer::{
@@ -327,6 +327,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
                 inferred_ty
+            } else if decorated_ty.is_divergent() {
+                // Keep the current binding to bootstrap decorators whose return annotations
+                // depend on the decorated class. Retain the cycle marker too: replacing it with
+                // only the class lets inferred lambda return types grow on every iteration.
+                UnionType::from_elements_cycle_recovery(db, env, [inferred_ty, decorated_ty])
             } else if class_decorator_preserves_class_binding(
                 db,
                 env,
