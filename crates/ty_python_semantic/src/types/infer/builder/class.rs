@@ -347,9 +347,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ..
                     } = apply_class_decorator(db, env, decorator_ty, inferred_ty)
                     {
-                        self.report_deprecated_call(
+                        self.report_deprecated_functions(
                             &decorator_node.expression,
-                            decorator_ty,
                             deprecated_functions,
                         );
                     }
@@ -371,9 +370,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return_type,
                     deprecated_functions,
                 } => {
-                    self.report_deprecated_call(
+                    self.report_deprecated_functions(
                         &decorator_node.expression,
-                        decorator_ty,
                         deprecated_functions,
                     );
                     return_type
@@ -510,10 +508,7 @@ fn apply_class_decorator<'db>(
     match decorator_ty.try_call(db, env, &call_arguments) {
         Ok(bindings) => ClassDecoratorResult::Success {
             return_type: bindings.return_type(db, env),
-            deprecated_functions: bindings
-                .deprecated_functions(db)
-                .map(|(_, function)| function)
-                .collect(),
+            deprecated_functions: bindings.deprecated_decorator_functions(db).collect(),
         },
         Err(error) => ClassDecoratorResult::Failure {
             return_type: error.return_type(db, env),

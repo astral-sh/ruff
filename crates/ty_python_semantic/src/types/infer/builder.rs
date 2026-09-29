@@ -5633,12 +5633,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let (return_ty, decorator_bindings) = match decorator_ty.try_call(db, env, &call_arguments)
         {
             Ok(bindings) => {
-                self.report_deprecated_call(
+                self.report_deprecated_functions(
                     &decorator_node.expression,
-                    decorator_ty,
-                    bindings
-                        .deprecated_functions(db)
-                        .map(|(_, function)| function),
+                    bindings.deprecated_decorator_functions(db),
                 );
                 (bindings.return_type(db, env), Some(bindings))
             }

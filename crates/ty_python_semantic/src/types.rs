@@ -7139,6 +7139,7 @@ impl<'db> Type<'db> {
                     }) => {
                         let mut bindings = dunder_callable.bindings_impl(db, env, recursion_guard);
                         bindings.replace_callable_type(dunder_callable, self);
+                        bindings.set_implicitly_invoked();
                         if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
                         }
