@@ -138,7 +138,11 @@ impl ProjectDatabase {
             Some(create_walker_builder(self, walk_roots)?.incremental_matcher())
         });
 
-        for change in changes {
+        // Classify the whole batch before syncing files. An earlier event for a deleted file
+        // can mark it as missing in the cache, preventing us from recognizing its deletion.
+        let changes: Vec<_> = changes.iter().map(|change| change.resolve(self)).collect();
+        for change in &changes {
+            let change = change.as_ref();
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
             refresh_program_settings |= affects_python_environment(
@@ -284,16 +288,7 @@ impl ProjectDatabase {
                 }
 
                 ChangeEvent::Deleted { kind, path } => {
-                    let is_file = match kind {
-                        DeletedKind::File => true,
-                        DeletedKind::Directory => false,
-                        DeletedKind::Any => self
-                            .files
-                            .try_system(self, path)
-                            .is_some_and(|file| file.exists(self)),
-                    };
-
-                    if is_file {
+                    if *kind == DeletedKind::File {
                         if synced_files.insert(path.to_path_buf()) {
                             File::sync_path(self, path);
                         }
