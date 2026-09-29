@@ -2058,16 +2058,16 @@ fn max_constructor_and_typevar_depth<'db>(
 }
 
 impl ConstraintId {
-    fn when_true(self) -> ConstraintAssignment {
-        ConstraintAssignment::Positive(self)
+    fn when_true(self) -> Assignment<Self> {
+        Assignment::Positive(self)
     }
 
-    fn when_false(self) -> ConstraintAssignment {
-        ConstraintAssignment::Negative(self)
+    fn when_false(self) -> Assignment<Self> {
+        Assignment::Negative(self)
     }
 
-    fn when_unconstrained(self) -> ConstraintAssignment {
-        ConstraintAssignment::Unconstrained(self)
+    fn when_unconstrained(self) -> Assignment<Self> {
+        Assignment::Unconstrained(self)
     }
 
     /// Defines the ordering of the variables in a constraint set BDD.
@@ -2311,21 +2311,21 @@ impl Node {
     /// of the constraint's truth value.)
     fn new_satisfied_constraint(
         storage: &mut ConstraintSetStorage<'_>,
-        constraint: ConstraintAssignment,
+        constraint: Assignment<ConstraintId>,
     ) -> (NodeId, Option<SourceOrderId>) {
         let constraint_id = constraint.constraint();
         let node = match constraint {
-            ConstraintAssignment::Positive(constraint) => {
+            Assignment::Positive(constraint) => {
                 NodeId::with_uncertain(storage, constraint, ALWAYS_TRUE, ALWAYS_FALSE, ALWAYS_FALSE)
             }
-            ConstraintAssignment::Negative(constraint) => {
+            Assignment::Negative(constraint) => {
                 NodeId::with_uncertain(storage, constraint, ALWAYS_FALSE, ALWAYS_FALSE, ALWAYS_TRUE)
             }
             // The result holds regardless of the constraint's truth value, so only
             // `if_uncertain` needs to be `ALWAYS_TRUE` — `n? 0: 1: 0`. It would also be
             // correct to use `n? 1: 1: 1` (i.e., `ALWAYS_TRUE` for all outgoing edges), but
             // that would throw away some of the efficiency gains this representation gives us.
-            ConstraintAssignment::Unconstrained(constraint) => {
+            Assignment::Unconstrained(constraint) => {
                 NodeId::with_uncertain(storage, constraint, ALWAYS_FALSE, ALWAYS_TRUE, ALWAYS_FALSE)
             }
         };
@@ -4534,44 +4534,40 @@ pub struct TypeVarSolution<'db> {
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) enum ConstraintAssignment {
-    Positive(ConstraintId),
-    Negative(ConstraintId),
-    Unconstrained(ConstraintId),
+pub(crate) enum Assignment<T> {
+    Positive(T),
+    Negative(T),
+    Unconstrained(T),
 }
 
-impl ConstraintAssignment {
-    fn constraint(self) -> ConstraintId {
+impl<T> Assignment<T> {
+    fn constraint(self) -> T {
         match self {
-            ConstraintAssignment::Positive(constraint) => constraint,
-            ConstraintAssignment::Negative(constraint) => constraint,
-            ConstraintAssignment::Unconstrained(constraint) => constraint,
+            Assignment::Positive(constraint) => constraint,
+            Assignment::Negative(constraint) => constraint,
+            Assignment::Unconstrained(constraint) => constraint,
         }
     }
 
-    fn as_constrained(self) -> Option<ConstraintId> {
+    #[expect(clippy::wrong_self_convention)]
+    fn as_constrained(self) -> Option<T> {
         match self {
-            ConstraintAssignment::Positive(constraint)
-            | ConstraintAssignment::Negative(constraint) => Some(constraint),
-            ConstraintAssignment::Unconstrained(_) => None,
+            Assignment::Positive(constraint) | Assignment::Negative(constraint) => Some(constraint),
+            Assignment::Unconstrained(_) => None,
         }
     }
 
     fn negated(self) -> Self {
         match self {
-            ConstraintAssignment::Positive(constraint) => {
-                ConstraintAssignment::Negative(constraint)
-            }
-            ConstraintAssignment::Negative(constraint) => {
-                ConstraintAssignment::Positive(constraint)
-            }
+            Assignment::Positive(constraint) => Assignment::Negative(constraint),
+            Assignment::Negative(constraint) => Assignment::Positive(constraint),
             // "This constraint can go either way" is symmetric under negation.
-            ConstraintAssignment::Unconstrained(constraint) => {
-                ConstraintAssignment::Unconstrained(constraint)
-            }
+            Assignment::Unconstrained(constraint) => Assignment::Unconstrained(constraint),
         }
     }
+}
 
+impl Assignment<ConstraintId> {
     fn display<'db, 'a>(
         self,
         db: &'db dyn Db,
@@ -4579,9 +4575,9 @@ impl ConstraintAssignment {
         storage: &'a ConstraintSetStorage<'db>,
     ) -> impl Display + 'a {
         let holds = match self {
-            ConstraintAssignment::Positive(_) => Some(true),
-            ConstraintAssignment::Negative(_) => Some(false),
-            ConstraintAssignment::Unconstrained(_) => None,
+            Assignment::Positive(_) => Some(true),
+            Assignment::Negative(_) => Some(false),
+            Assignment::Unconstrained(_) => None,
         };
 
         std::fmt::from_fn(move |f| {
@@ -4701,11 +4697,11 @@ trait PathVisitor {
 /// A single clause in the DNF representation of a BDD
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 struct SatisfiedClause {
-    constraints: Vec<ConstraintAssignment>,
+    constraints: Vec<Assignment<ConstraintId>>,
 }
 
 impl SatisfiedClause {
-    fn push(&mut self, constraint: ConstraintAssignment) {
+    fn push(&mut self, constraint: Assignment<ConstraintId>) {
         self.constraints.push(constraint);
     }
 

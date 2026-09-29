@@ -11,8 +11,8 @@ use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
-    CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
+    ALWAYS_FALSE, ALWAYS_TRUE, Assignment, CandidateSolution, CandidateSolutions,
+    CandidateTypeVarSolution, CandidateTypeVarSolver, ConstraintFailureEvidence, ConstraintId,
     ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
     SolutionViolationKind, UnboundedSolutionLimits,
 };
@@ -135,7 +135,7 @@ pub(super) enum Polarity {
 type ExploredNodeKey = (
     Polarity,
     NodeId,
-    Box<[(ConstraintAssignment, ConstraintId)]>,
+    Box<[(Assignment<ConstraintId>, ConstraintId)]>,
 );
 
 enum Break<B> {
@@ -230,7 +230,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &ConstraintSetStorage<'db>,
         path: &PathAssignments,
         support: &Support,
-    ) -> impl Iterator<Item = (ConstraintAssignment, ConstraintId)> {
+    ) -> impl Iterator<Item = (Assignment<ConstraintId>, ConstraintId)> {
         path.assignments
             .iter()
             .filter_map(|(assignment, (source_constraint, _))| {
@@ -419,24 +419,25 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
         let constraint = interior.constraint;
-        let edges: ArrayVec<(ConstraintAssignment, NodeId), 3> = if polarity == Polarity::Positive {
-            ArrayVec::from_iter([
-                (constraint.when_true(), interior.if_true),
-                (constraint.when_unconstrained(), interior.if_uncertain),
-                (constraint.when_false(), interior.if_false),
-            ])
-        } else {
-            ArrayVec::from_iter([
-                (
-                    constraint.when_true(),
-                    interior.if_true.or(storage, interior.if_uncertain),
-                ),
-                (
-                    constraint.when_false(),
-                    interior.if_false.or(storage, interior.if_uncertain),
-                ),
-            ])
-        };
+        let edges: ArrayVec<(Assignment<ConstraintId>, NodeId), 3> =
+            if polarity == Polarity::Positive {
+                ArrayVec::from_iter([
+                    (constraint.when_true(), interior.if_true),
+                    (constraint.when_unconstrained(), interior.if_uncertain),
+                    (constraint.when_false(), interior.if_false),
+                ])
+            } else {
+                ArrayVec::from_iter([
+                    (
+                        constraint.when_true(),
+                        interior.if_true.or(storage, interior.if_uncertain),
+                    ),
+                    (
+                        constraint.when_false(),
+                        interior.if_false.or(storage, interior.if_uncertain),
+                    ),
+                ])
+            };
         for (assignment, child) in edges {
             self.visit_edge(
                 db,
@@ -517,7 +518,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
         polarity: Polarity,
-        assignment: ConstraintAssignment,
+        assignment: Assignment<ConstraintId>,
         child: NodeId,
         check_cache: &CheckCache<'_, 'db, L, Break<L::Break>>,
         prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
