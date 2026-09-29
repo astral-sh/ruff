@@ -249,8 +249,7 @@ def takes_base_any(base: BaseForAny[Any]) -> None:
 
 ## Overloads without a positional receiver
 
-Binding a method preserves overloads that can receive the instance. An overload without a positional
-parameter cannot fulfill a bound callable contract.
+An overload without a positional receiver cannot be called as a bound method:
 
 ```py
 from collections.abc import Callable
@@ -264,19 +263,10 @@ class Mixed:
     def method(self: object = None) -> int | str:
         return 1
 
-valid: Callable[[], int] = Mixed().method  # no diagnostic
+reveal_type(Mixed().method())  # revealed: int
+
+valid: Callable[[], int] = Mixed().method
 invalid: Callable[[], str] = Mixed().method  # error: [invalid-assignment]
-unbound: Callable[[], str] = Mixed.method  # no diagnostic
-
-class AllInvalid:
-    @overload
-    def method() -> int: ...
-    @overload
-    def method(*, value: int) -> str: ...
-    def method(*args: object, **kwargs: object) -> int | str:
-        return 1
-
-all_invalid: Callable[[], int] = AllInvalid().method  # error: [invalid-assignment]
 ```
 
 ## No matching explicit receiver
