@@ -3137,21 +3137,20 @@ def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], S
     reveal_type(constrained(mixed))  # revealed: A
 ```
 
-If no covariant source alternative satisfies the declaration, the diagnostic intersects their
-rejected lower bounds:
+If no covariant source alternative satisfies an upper bound, the diagnostic intersects their
+rejected lower bounds. For declared constraints, it reports the first rejected alternative:
 
 ```py
 def _(source: Intersection[Source[C], Source[D]]) -> None:
     # error: [invalid-argument-type] "Argument type `C & D` does not satisfy upper bound `Base`"
     reveal_type(bounded(source))  # revealed: Unknown
-    # error: [invalid-argument-type] "Argument type `C & D` does not satisfy constraints (`A`, `B`)"
+    # error: [invalid-argument-type] "Inferred lower bound `C` does not satisfy constraints (`A`, `B`)"
     reveal_type(constrained(source))  # revealed: Unknown
 ```
 
 For a contravariant sink, the declared constraint must be a subtype of the sink's element type. A
 sink accepting only a strict subclass of `A` cannot select `A`; neither unrelated sink can select
-any declared constraint. When both alternatives fail, the diagnostic reports the upper bound from
-the first rejected alternative:
+any declared constraint:
 
 ```py
 class Sink(Generic[T_contra]):
@@ -3166,7 +3165,7 @@ def constrained_sink(sink: Sink[ConstrainedT]) -> ConstrainedT:
 def _(narrow: Intersection[Sink[SubA], Marker], unrelated: Intersection[Sink[C], Sink[D]]) -> None:
     # error: [invalid-argument-type] "No allowed specialization of `ConstrainedT` satisfies the inferred upper bound `SubA`"
     reveal_type(constrained_sink(narrow))  # revealed: Unknown
-    # error: [invalid-argument-type] "No allowed specialization of `ConstrainedT` satisfies the inferred upper bound `C`"
+    # error: [invalid-argument-type] "No allowed specialization of `ConstrainedT` satisfies the inferred upper bounds"
     reveal_type(constrained_sink(unrelated))  # revealed: Unknown
 ```
 
