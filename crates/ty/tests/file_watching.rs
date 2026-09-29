@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
 use insta::assert_snapshot;
+#[cfg(feature = "test-uv")]
+use insta::internals::SettingsBindDropGuard;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
 };
@@ -33,6 +35,8 @@ struct TestCase {
     watcher: Option<ProjectWatcher>,
     changes_receiver: crossbeam::channel::Receiver<Vec<ChangeEvent>>,
     _user_config_directory_override: UserConfigDirectoryOverrideGuard,
+    #[cfg(feature = "test-uv")]
+    snapshot_settings: Option<SettingsBindDropGuard>,
     /// The temporary directory that contains the test files.
     /// We need to hold on to it in the test case or the temp files get deleted.
     _temp_dir: tempfile::TempDir,
@@ -553,6 +557,8 @@ where
         changes_receiver: receiver,
         watcher: Some(watcher),
         _user_config_directory_override: user_config_directory_override,
+        #[cfg(feature = "test-uv")]
+        snapshot_settings: None,
         _temp_dir: temp_dir,
         root_dir: root_path,
     };
@@ -3282,7 +3288,6 @@ mod uv_metadata {
 
     use anyhow::Context;
     use insta::assert_snapshot;
-    use ruff_db::diagnostic::DiagnosticId;
     use ruff_db::files::File;
     use ruff_db::system::{Command, System, SystemPath};
     use ty_module_resolver::system_module_search_paths;
@@ -3334,8 +3339,14 @@ mod uv_metadata {
             "#,
         )?;
         let diagnostics = case.db().check();
-        assert_eq!(diagnostics.len(), 1);
-        assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
+        assert_snapshot!(case.render_diagnostics(&diagnostics), @r#"
+        pyproject.toml: warning[uv-metadata] `uv workspace metadata` failed with status exit status: 2: error: Failed to parse: `pyproject.toml`
+          cause: TOML parse error at line 8, column 11
+                   |
+                 8 | package = "invalid"
+                   |           ^^^^^^^^^
+                 invalid type: string "invalid", expected a boolean
+        "#);
         assert_eq!(project.program_settings(case.db()), &program_settings);
 
         // If ordinary discovery also fails, keep the last applied settings and warning.
@@ -3519,12 +3530,15 @@ mod uv_metadata {
             )],
         )?;
 
-        let initial = case.db().check();
-        assert!(
-            initial
-                .iter()
-                .any(|diagnostic| diagnostic.id() == DiagnosticId::UvMetadata)
-        );
+        assert_snapshot!(case.render_diagnostics(&case.db().check()), @r#"
+        script.py:2:1: error[uv-metadata] `uv workspace metadata` failed with status exit status: 2: error: TOML parse error at line 2, column 17
+          |
+        2 | dependencies = ["not a valid requirement ???"]
+          |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        Expected one of `@`, `(`, `<`, `=`, `>`, `~`, `!`, `;`, found `a`
+        not a valid requirement ???
+            ^
+        "#);
 
         update_and_synchronize_script(
             &mut case,
@@ -3643,8 +3657,9 @@ mod uv_metadata {
 
     /// Creates a watched project with the selected uv mode and test command environment.
     /// Lets the test control Python environment creation and synchronization.
+    /// Installs snapshot filters for temporary paths and platform-specific uv output.
     fn setup_uv_with_system(use_uv: UseUv, setup_files: impl Setup) -> anyhow::Result<TestCase> {
-        setup_with_system(setup_files, |system| {
+        let mut case = setup_with_system(setup_files, |system| {
             // TestSystem disables executable lookup so tests don't discover the host's Python.
             // These tests require uv, so resolve it using the wrapped OS system.
             let uv = system
@@ -3661,7 +3676,14 @@ mod uv_metadata {
                 },
             );
             system.set_env_var(EnvVars::UV, uv.as_str());
-        })
+        })?;
+
+        let mut settings = insta::Settings::clone_current();
+        settings.add_filter(&regex::escape(case.root_path().as_str()), "<temp_dir>");
+        settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        settings.add_filter(r"exit code: (\d+)", "exit status: $1");
+        case.snapshot_settings = Some(settings.bind_to_scope());
+        Ok(case)
     }
 
     /// Updates `pyproject.toml` and processes its watcher events through project synchronization.
