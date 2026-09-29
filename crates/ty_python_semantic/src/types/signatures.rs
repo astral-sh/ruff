@@ -131,10 +131,10 @@ fn receiver_violates_typevar_domain<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
     receiver: Type<'db>,
-    typevar: BoundTypeVarInstance<'db>,
+    typevar: TypeVarInstance<'db>,
 ) -> bool {
     let env = &ProgramEnvironment::from_program(program);
-    let Some(domain) = typevar.typevar(db).bound_or_constraints(db, env) else {
+    let Some(domain) = typevar.bound_or_constraints(db, env) else {
         return false;
     };
     if receiver.has_typevar(db, env) {
@@ -1346,12 +1346,12 @@ impl<'db> Signature<'db> {
                 .iter()
                 .cloned()
                 .enumerate()
-                .map(|(index, mut parameter)| {
+                .map(|(index, parameter)| {
                     if index == 0 {
-                        parameter.annotated_type = receiver_type;
-                        parameter.inferred_annotation = false;
+                        parameter.with_annotated_type(receiver_type)
+                    } else {
+                        parameter
                     }
-                    parameter
                 }),
         );
         self.clone().with_parameters(parameters)
@@ -1442,7 +1442,12 @@ impl<'db> Signature<'db> {
                     _ => None,
                 };
                 if receiver_typevar.is_some_and(|typevar| {
-                    receiver_violates_typevar_domain(db, env.program(db), receiver, typevar)
+                    receiver_violates_typevar_domain(
+                        db,
+                        env.program(db),
+                        receiver,
+                        typevar.typevar(db),
+                    )
                 }) {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
