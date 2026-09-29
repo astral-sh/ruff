@@ -735,24 +735,25 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.constraint_data(constraint);
-        let map = SequentMap::for_constraint(db, env, constraint_data);
-        let added = self.add_sequents(db, env, storage, map);
+        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
+            let added = self.add_sequents(db, env, storage, map);
 
-        // `projection_source_order` depends on knowing the order that sequents were discovered for
-        // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
-        // access to that in ConstraintSetStorage, so we need to maintain a local view of that
-        // information here.
-        self.single_replay_consequents.insert(
-            constraint,
-            self.sequents[added]
-                .iter()
-                .filter_map(|sequent| match sequent {
-                    Sequent::SingleImplication { post, .. }
-                    | Sequent::PairImplication { post, .. } => Some(*post),
-                    _ => None,
-                })
-                .collect(),
-        );
+            // `projection_source_order` depends on knowing the order that sequents were discovered for
+            // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
+            // access to that in ConstraintSetStorage, so we need to maintain a local view of that
+            // information here.
+            self.single_replay_consequents.insert(
+                constraint,
+                self.sequents[added]
+                    .iter()
+                    .filter_map(|sequent| match sequent {
+                        Sequent::SingleImplication { post, .. }
+                        | Sequent::PairImplication { post, .. } => Some(*post),
+                        _ => None,
+                    })
+                    .collect(),
+            );
+        }
 
         for existing_index in 0..self.discovered.len() {
             let (existing, _) = self
@@ -780,21 +781,20 @@ impl PathAssignments {
                 continue;
             }
 
-            if SequentMap::pair_cannot_produce_sequents(db, env, existing_data, constraint_data) {
-                continue;
-            }
-
             let (a, a_data, b, b_data) = if existing_index < constraint_index {
                 (*existing, existing_data, constraint, constraint_data)
             } else {
                 (constraint, constraint_data, *existing, existing_data)
             };
-            if !self.elaborated_pairs.insert((a, b)) {
+            if self.elaborated_pairs.contains(&(a, b)) {
                 // We've already elaborated this pair of constraints.
                 continue;
             }
 
-            let map = SequentMap::for_constraint_pair(db, env, a_data, b_data);
+            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+                continue;
+            };
+            self.elaborated_pairs.insert((a, b));
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
