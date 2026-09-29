@@ -2,9 +2,10 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
+use arrayvec::ArrayVec;
 use indexmap::map::Slice;
 use rustc_hash::{FxHashMap, FxHashSet};
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
@@ -395,24 +396,24 @@ impl<'db> SolutionWalker<'db> {
         // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
         let constraint = interior.constraint;
-        let edges: SmallVec<[(ConstraintAssignment, NodeId); 3]> =
+        let edges: ArrayVec<(ConstraintAssignment, NodeId), 3> =
             if self.polarity == Polarity::Positive {
-                smallvec![
+                ArrayVec::from_iter([
                     (constraint.when_true(), interior.if_true),
                     (constraint.when_unconstrained(), interior.if_uncertain),
                     (constraint.when_false(), interior.if_false),
-                ]
+                ])
             } else {
-                smallvec![
+                ArrayVec::from_iter([
                     (
                         constraint.when_true(),
-                        interior.if_true.or(storage, interior.if_uncertain)
+                        interior.if_true.or(storage, interior.if_uncertain),
                     ),
                     (
                         constraint.when_false(),
-                        interior.if_false.or(storage, interior.if_uncertain)
+                        interior.if_false.or(storage, interior.if_uncertain),
                     ),
-                ]
+                ])
             };
         for (assignment, child) in edges {
             self.visit_edge(
