@@ -23,7 +23,7 @@ use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::ChangeEvent;
+use ty_project::watch::{ChangeEvent, DeletedKind};
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
     ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
@@ -2084,21 +2084,29 @@ impl OpenDocumentHandle {
     }
 
     fn update_in_databases(&self, session: &mut Session, client: &Client) {
-        let path = self.notebook_or_file_path();
-        let (containing_workspace, is_virtual, changes) = match path {
-            AnySystemPath::System(system_path) => (
-                session.workspaces().for_path(system_path),
-                false,
-                [ChangeEvent::file_content_changed(system_path.clone())],
-            ),
-            AnySystemPath::SystemVirtual(virtual_path) => (
-                None,
-                true,
-                [ChangeEvent::ChangedVirtual(virtual_path.clone())],
-            ),
+        let change = match self.notebook_or_file_path() {
+            AnySystemPath::System(system_path) => {
+                ChangeEvent::file_content_changed(system_path.clone())
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                ChangeEvent::ChangedVirtual(virtual_path.clone())
+            }
         };
+        self.apply_change_in_databases(session, client, change);
+    }
 
-        if containing_workspace.is_some() || is_virtual {
+    fn apply_change_in_databases(
+        &self,
+        session: &mut Session,
+        client: &Client,
+        change: ChangeEvent,
+    ) {
+        let path = self.notebook_or_file_path();
+        let changes = [change];
+        let is_external = matches!(path, AnySystemPath::System(system_path)
+            if session.workspaces().for_path(system_path).is_none());
+
+        if !is_external {
             // A containing workspace determines the project for a system file, while virtual
             // documents select a single, arbitrary project. Neither selection depends on import
             // search paths, so update only the selected database.
@@ -2159,28 +2167,37 @@ impl OpenDocumentHandle {
                     if let Some(file) = db.files().try_system(db, system_path) {
                         db.project().close_file(db, file);
 
-                        // Remove deleted files before the watcher reports them so workspace
-                        // diagnostics don't try to read them.
-                        //
                         // In case we preferred the language given by the Client
                         // over the one detected by the file extension, remove the file
                         // from the project to handle cases where a user changes the language
                         // of a file (which results in a didClose and didOpen for the same path but with different languages).
-                        if is_deleted
-                            || (removed_document.language_id().is_some()
-                                && system_path
-                                    .extension()
-                                    .and_then(PySourceType::try_from_extension)
-                                    .is_none())
+                        if removed_document.language_id().is_some()
+                            && system_path
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_none()
                         {
                             db.project().remove_file(db, file);
                         }
 
-                        // Restore file and script membership from the saved contents. Discarding
-                        // unsaved script metadata can bring a file back into the project when
-                        // `exclude-scripts` is enabled. Also request synchronization for saved
-                        // metadata changes that were skipped while the editor overlay was present.
-                        self.update_in_databases(session, client);
+                        if is_deleted {
+                            // A content change leaves missing files in the project index, allowing
+                            // workspace diagnostics to report an I/O error until the watcher fires.
+                            self.apply_change_in_databases(
+                                session,
+                                client,
+                                ChangeEvent::Deleted {
+                                    path: system_path.clone(),
+                                    kind: DeletedKind::File,
+                                },
+                            );
+                        } else {
+                            // Restore file and script membership from the saved contents. Discarding
+                            // unsaved script metadata can bring a file back into the project when
+                            // `exclude-scripts` is enabled. Also request synchronization for saved
+                            // metadata changes that were skipped while the editor overlay was present.
+                            self.update_in_databases(session, client);
+                        }
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
