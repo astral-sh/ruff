@@ -1434,15 +1434,15 @@ class C:
     def method(self, value: int | str) -> "C":
         return self
 
-# TODO: Accept the callback without error.
-# error: [invalid-argument-type]
 method = identity(C.method)
-reveal_type(method)  # revealed: (C, int | str, /) -> C
+# revealed: ((C, int, /) -> C) & ((C, str, /) -> C)
+reveal_type(method)
 
 class Sub(C): ...
 
 # TODO: revealed: Sub (preserve the generic `Self` overload)
-reveal_type(method(Sub(), ""))  # revealed: C
+# revealed: C
+reveal_type(method(Sub(), ""))
 ```
 
 ## Dependent return types from generic callbacks
