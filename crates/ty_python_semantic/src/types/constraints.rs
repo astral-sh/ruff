@@ -752,8 +752,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    #[expect(dead_code)]
-    pub(crate) fn exists(
+    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
+    /// were inferable when this constraint set was created, and which should be abstracted away.
+    /// Those typevars will be removed from the constraint set, and the constraint set will return
+    /// true whenever there was _any_ specialization of those typevars that returned true before.
+    pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -780,11 +783,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    /// Reduces the set of inferable typevars for this constraint set. You provide the typevars that
-    /// were inferable when this constraint set was created, and which should be abstracted away.
-    /// Those typevars will be removed from the constraint set, and the constraint set will return
-    /// true whenever there was _any_ specialization of those typevars that returned true before.
-    pub(crate) fn reduce_inferable(
+    #[expect(dead_code, reason = "XXX: to be removed")]
+    pub(crate) fn old_reduce_inferable(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
