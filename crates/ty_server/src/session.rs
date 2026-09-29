@@ -2149,18 +2149,29 @@ impl OpenDocumentHandle {
 
             match path {
                 AnySystemPath::System(system_path) => {
+                    // The editor can delete the file before closing it and before its watcher
+                    // reports the deletion. Check disk state after removing the editor overlay.
+                    let is_deleted = db
+                        .system()
+                        .path_metadata(system_path)
+                        .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound);
+
                     if let Some(file) = db.files().try_system(db, system_path) {
                         db.project().close_file(db, file);
 
+                        // Remove deleted files before the watcher reports them so workspace
+                        // diagnostics don't try to read them.
+                        //
                         // In case we preferred the language given by the Client
                         // over the one detected by the file extension, remove the file
                         // from the project to handle cases where a user changes the language
                         // of a file (which results in a didClose and didOpen for the same path but with different languages).
-                        if removed_document.language_id().is_some()
-                            && system_path
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_none()
+                        if is_deleted
+                            || (removed_document.language_id().is_some()
+                                && system_path
+                                    .extension()
+                                    .and_then(PySourceType::try_from_extension)
+                                    .is_none())
                         {
                             db.project().remove_file(db, file);
                         }
@@ -2183,7 +2194,9 @@ impl OpenDocumentHandle {
                     // 1. The file does not belong to any workspace e.g., opening a random file from
                     //    outside the workspace because closing it acts like the file doesn't exists
                     // 2. The diagnostic mode is set to open-files only
-                    session.workspaces().for_path(system_path).is_none()
+                    // 3. The file was deleted before it was closed
+                    is_deleted
+                        || session.workspaces().for_path(system_path).is_none()
                         || session
                             .global_settings()
                             .diagnostic_mode()
