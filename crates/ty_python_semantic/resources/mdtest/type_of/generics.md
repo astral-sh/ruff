@@ -112,7 +112,7 @@ def constrained[T: (int, str)](x: type[T]) -> T:
 reveal_type(constrained(int))  # revealed: int
 reveal_type(constrained(str))  # revealed: str
 
-# error: [invalid-argument-type] "Argument to function `constrained` is incorrect: Argument type `A` does not satisfy constraints (`int`, `str`) of type variable `T`"
+# error: [invalid-argument-type] "Expected `type[T@constrained]`, found `<class 'A'>`: Inferred lower bound `A` does not satisfy constraints (`int`, `str`) of type variable `T`"
 constrained(A)
 ```
 

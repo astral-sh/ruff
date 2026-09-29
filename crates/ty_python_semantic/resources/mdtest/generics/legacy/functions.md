@@ -447,12 +447,53 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:12:15
    |
 12 | reveal_type(f("string"))  # revealed: Unknown
-   |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+   |               ^^^^^^^^ Expected `T@f`, found `Literal["string"]`
+info: Inferred lower bound `Literal["string"]` does not satisfy constraints (`int`, `None`) of type variable `T`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:7
+  |
+5 | def f(x: T) -> T:
+  |       ^^^^
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
 3 | T = TypeVar("T", int, None)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Inferring a constrained typevar from a covariant container
+
+The element type of a covariant container contributes to the inferred type variable. Here, `bytes`
+does not fit either constraint, so the `Sequence[bytes]` argument is rejected.
+
+```py
+from typing import Sequence, TypeVar
+
+T = TypeVar("T", int, str)
+
+def constrained(values: Sequence[T]) -> None: ...
+def f(values: Sequence[bytes]) -> None:
+    # snapshot: invalid-argument-type
+    constrained(values)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+ --> src/mdtest_snippet.py:8:17
+  |
+8 |     constrained(values)
+  |                 ^^^^^^ Expected `Sequence[T@constrained]`, found `Sequence[bytes]`
+info: Inferred lower bound `bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(values: Sequence[T]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ## Inferring a constrained typevar from a callback parameter
@@ -541,6 +582,54 @@ T = TypeVar("T", int, str)
 
 class Handler:
     def constrained(self, consumer: Callable[[T], None]) -> None: ...
+```
+
+## Constraint diagnostics with identically named classes
+
+The inferred type and a declared constraint have the same name but refer to different classes. The
+diagnostic distinguishes them by module.
+
+```py
+from definitions import constrained
+
+class Value: ...
+
+def produce() -> Value:
+    return Value()
+
+# snapshot: invalid-argument-type
+constrained(produce)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+ --> src/mdtest_snippet.py:9:13
+  |
+9 | constrained(produce)
+  |             ^^^^^^^ Expected `() -> T@constrained`, found `def produce() -> mdtest_snippet.Value`
+info: Inferred lower bound `mdtest_snippet.Value` does not satisfy constraints (`definitions.Value`, `int`) of type variable `T`
+info: Parameter declared here
+ --> src/definitions.py:7:17
+  |
+7 | def constrained(producer: Callable[[], T]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/definitions.py:5:1
+  |
+5 | T = TypeVar("T", Value, int)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+`definitions.py`:
+
+```py
+from typing import Callable, TypeVar
+
+class Value: ...
+
+T = TypeVar("T", Value, int)
+
+def constrained(producer: Callable[[], T]) -> None: ...
 ```
 
 ## Inferring a constrained typevar from a union of protocols
@@ -682,7 +771,78 @@ error[invalid-argument-type]: Argument to function `constrained` is incorrect
   --> src/mdtest_snippet.py:17:25
    |
 17 | reveal_type(constrained(bytes_identity))  # revealed: Unknown
-   |                         ^^^^^^^^^^^^^^ Argument type `bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+   |                         ^^^^^^^^^^^^^^ Expected `(T@constrained, /) -> T@constrained`, found `def bytes_identity(value: bytes) -> bytes`
+info: Inferred lower bound `bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(callback: Callable[[T], T]) -> T:
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+## Inferring a constrained typevar through alternative callback types
+
+The callback accepts a consumer of either `bytes` or `float`. Neither alternative matches the
+declared constraints of `T`, so the call is rejected.
+
+```py
+from typing import Callable, TypeVar
+
+T = TypeVar("T", int, str)
+
+def constrained(callback: Callable[[Callable[[T], None]], None]) -> None: ...
+def accepts_both(consumer: Callable[[bytes], None] | Callable[[float], None]) -> None: ...
+
+# snapshot: invalid-argument-type
+constrained(accepts_both)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+ --> src/mdtest_snippet.py:9:13
+  |
+9 | constrained(accepts_both)
+  |             ^^^^^^^^^^^^ Expected `((T@constrained, /) -> None, /) -> None`, found `def accepts_both(consumer: ((bytes, /) -> None) | ((float, /) -> None)) -> None`
+info: Inferred lower bound `bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(callback: Callable[[Callable[[T], None]], None]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+info: Type variable defined here
+ --> src/mdtest_snippet.py:3:1
+  |
+3 | T = TypeVar("T", int, str)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+Even when the alternatives overlap on `int`, neither is compatible with a consumer of an allowed
+specialization of `T`.
+
+```py
+def accepts_overlapping(consumer: Callable[[int | bytes], None] | Callable[[int | float], None]) -> None: ...
+
+# snapshot: invalid-argument-type
+constrained(accepts_overlapping)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `constrained` is incorrect
+  --> src/mdtest_snippet.py:13:13
+   |
+13 | constrained(accepts_overlapping)
+   |             ^^^^^^^^^^^^^^^^^^^ Expected `((T@constrained, /) -> None, /) -> None`, found `def accepts_overlapping(consumer: ((int | bytes, /) -> None) | ((float, /) -> None)) -> None`
+info: Inferred lower bound `int | bytes` does not satisfy constraints (`int`, `str`) of type variable `T`
+info: Parameter declared here
+ --> src/mdtest_snippet.py:5:17
+  |
+5 | def constrained(callback: Callable[[Callable[[T], None]], None]) -> None: ...
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
@@ -739,7 +899,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:12:17
    |
 12 |     reveal_type(f(x, y))  # revealed: int | str
-   |                 ^^^^^^^ Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`
+   |                 ^^^^^^^ Inferred lower bound `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`
 info: Type variable defined here
  --> src/mdtest_snippet.py:3:1
   |
@@ -789,8 +949,8 @@ def g(a: T, b: T, c: U, d: U) -> None:
     pass
 
 def _(x: int, y: str, z: bytes, w: float) -> None:
-    # error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
-    # error: [invalid-argument-type] "Argument type `bytes | float` does not satisfy constraints (`bytes`, `float`) of type variable `U`"
+    # error: [invalid-argument-type] "Inferred lower bound `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # error: [invalid-argument-type] "Inferred lower bound `bytes | float` does not satisfy constraints (`bytes`, `float`) of type variable `U`"
     g(x, y, z, w)
 ```
 
@@ -818,7 +978,7 @@ def f(x: list[T], y: list[T]) -> T:
     return x[0]
 
 def _(x: list[int], y: list[str]) -> None:
-    # TODO: error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # TODO: error: [invalid-argument-type] "Inferred lower bound `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
     reveal_type(f(x, y))  # revealed: int | str
@@ -834,7 +994,7 @@ def g(x: T, y: T, a: list[U], b: list[U]) -> T:
     return x
 
 def _(x: int, y: str, a: list[int], b: list[str]) -> None:
-    # TODO: error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
+    # TODO: error: [invalid-argument-type] "Inferred lower bound `int | str` does not satisfy constraints (`int`, `str`) of type variable `T`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[int]`"
     # error: [invalid-argument-type] "Expected `list[int | str]`, found `list[str]`"
     reveal_type(g(x, y, a, b))  # revealed: int | str
@@ -908,7 +1068,7 @@ def _(value: str) -> None:
     reveal_type(f(source, 1))  # revealed: int
     reveal_type(f(source, b"a"))  # revealed: bytes
 
-    # error: [invalid-argument-type] "Argument type `int | str` does not satisfy constraints (`int`, `str`, `bytes`)"
+    # error: [invalid-argument-type] "Inferred lower bound `int | str` does not satisfy constraints (`int`, `str`, `bytes`)"
     f(source, value)
 ```
 

@@ -6406,7 +6406,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     error,
                     argument_index: argument_indices
                         .and_then(|(first, last)| (first == last).then_some(first)),
-                    argument: Some(SpecializationArgument {
+                    argument: Some(SpecializationErrorContext {
                         parameter_definition: parameter.definition(),
                         expected_ty: formal,
                         provided_ty: None,
@@ -6630,7 +6630,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
                     argument_index: relation.adjusted_argument_index,
-                    argument: Some(SpecializationArgument {
+                    argument: Some(SpecializationErrorContext {
                         parameter_definition: self.signature.parameters()
                             [relation.matched_parameter.index]
                             .definition(),
@@ -8966,8 +8966,12 @@ pub(crate) enum InvalidDataclassArgument {
     WeakrefSlotRequiresSlots,
 }
 
+/// Argument and parameter context for a specialization error.
+///
+/// This preserves the expected type, the provided type when available, and the parameter
+/// definition so diagnostics can explain the failed inference in terms of the original call.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SpecializationArgument<'db> {
+pub(crate) struct SpecializationErrorContext<'db> {
     parameter_definition: Option<Definition<'db>>,
     expected_ty: Type<'db>,
     /// Absent when inference combines multiple arguments into a variadic tuple.
@@ -9031,7 +9035,7 @@ pub(crate) enum BindingError<'db> {
     SpecializationError {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
-        argument: Option<SpecializationArgument<'db>>,
+        argument: Option<SpecializationErrorContext<'db>>,
     },
     PropertyHasNoGetter(PropertyInstanceType<'db>),
     PropertyHasNoSetter(PropertyInstanceType<'db>),
@@ -9653,16 +9657,20 @@ impl<'db> BindingError<'db> {
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let upper_bounds = match error {
+                let (constraint_evidence, constraints) = match error {
                     SpecializationError::MismatchedConstraint {
-                        evidence: ConstraintFailureEvidence::Upper(bounds),
+                        constraints,
+                        evidence,
                         ..
-                    } => Some(bounds.as_ref()),
-                    SpecializationError::MismatchedConstraint {
-                        evidence: ConstraintFailureEvidence::UpperUnknown,
-                        ..
-                    } => Some(&[][..]),
-                    _ => None,
+                    } => {
+                        let types = match evidence {
+                            ConstraintFailureEvidence::Lower(bound) => std::slice::from_ref(bound),
+                            ConstraintFailureEvidence::Upper(bounds) => bounds.as_ref(),
+                            ConstraintFailureEvidence::UpperUnknown => &[],
+                        };
+                        (Some(types), Some(constraints.elements(db)))
+                    }
+                    SpecializationError::MismatchedBound { .. } => (None, None),
                 };
                 let defining_class =
                     CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
@@ -9670,11 +9678,12 @@ impl<'db> BindingError<'db> {
                     .iter()
                     .flat_map(|argument| [Some(argument.expected_ty), argument.provided_ty])
                     .flatten()
-                    .chain(upper_bounds.into_iter().flatten().copied())
+                    .chain(constraint_evidence.into_iter().flatten().copied())
+                    .chain(constraints.into_iter().flatten().copied())
                     .chain(defining_class);
                 let display_settings =
                     DisplaySettings::from_possibly_ambiguous_types(db, env, types);
-                let qualified_callable_description = upper_bounds.and_then(|_| {
+                let qualified_callable_description = constraint_evidence.and_then(|_| {
                     CallableDescription::new_with_settings(db, callable_ty, Some(&display_settings))
                 });
                 let mut diag = builder.into_diagnostic(format_args!(
@@ -9707,56 +9716,48 @@ impl<'db> BindingError<'db> {
                     }
                     SpecializationError::MismatchedConstraint {
                         bound_typevar,
-                        evidence: ConstraintFailureEvidence::Lower(argument),
-                    } => {
-                        let argument_ty_display = argument.display(db, env);
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
-                        diag.set_primary_annotation_message(format_args!(
-                            "Argument type `{argument_ty_display}` does not \
-                                satisfy constraints ({}) of type variable `{typevar_name}`",
-                            typevar
-                                .constraints(db, env)
-                                .expect(
-                                    "type variable should have constraints if this error occurs"
-                                )
-                                .iter()
-                                .format_with(", ", |ty, f| f(&format_args!(
-                                    "`{}`",
-                                    ty.display(db, env)
-                                )))
-                        ));
-                    }
-                    SpecializationError::MismatchedConstraint {
-                        bound_typevar,
-                        evidence:
-                            evidence @ (ConstraintFailureEvidence::Upper(_)
-                            | ConstraintFailureEvidence::UpperUnknown),
+                        constraints,
+                        evidence,
                     } => {
                         let typevar_name = bound_typevar.typevar(db).name(db);
-                        let explanation = if let ConstraintFailureEvidence::Upper(bounds) = evidence
-                        {
-                            if let [bound] = bounds.as_ref() {
+                        let explanation = match evidence {
+                            ConstraintFailureEvidence::Lower(bound) => {
+                                let bound = bound.display_with(db, env, display_settings.clone());
                                 format!(
-                                    "No allowed specialization of `{typevar_name}` satisfies \
-                                     the inferred upper bound `{}`",
-                                    bound.display_with(db, env, display_settings.clone())
-                                )
-                            } else {
-                                format!(
-                                    "No allowed specialization of `{typevar_name}` satisfies \
-                                     all inferred upper bounds: {}",
-                                    bounds.iter().format_with(", ", |ty, f| f(&format_args!(
-                                        "`{}`",
-                                        ty.display_with(db, env, display_settings.clone())
-                                    )))
+                                    "Inferred lower bound `{bound}` does not satisfy \
+                                     constraints ({}) of type variable `{typevar_name}`",
+                                    constraints.elements(db).iter().format_with(", ", |ty, f| f(
+                                        &format_args!(
+                                            "`{}`",
+                                            ty.display_with(db, env, display_settings.clone())
+                                        )
+                                    ))
                                 )
                             }
-                        } else {
-                            format!(
-                                "No allowed specialization of `{typevar_name}` satisfies \
-                                 the inferred upper bounds"
-                            )
+                            ConstraintFailureEvidence::Upper(bounds) => {
+                                if let [bound] = bounds.as_ref() {
+                                    format!(
+                                        "No allowed specialization of `{typevar_name}` satisfies \
+                                         the inferred upper bound `{}`",
+                                        bound.display_with(db, env, display_settings.clone())
+                                    )
+                                } else {
+                                    format!(
+                                        "No allowed specialization of `{typevar_name}` satisfies \
+                                         all inferred upper bounds: {}",
+                                        bounds.iter().format_with(", ", |ty, f| f(&format_args!(
+                                            "`{}`",
+                                            ty.display_with(db, env, display_settings.clone())
+                                        )))
+                                    )
+                                }
+                            }
+                            ConstraintFailureEvidence::UpperUnknown => {
+                                format!(
+                                    "No allowed specialization of `{typevar_name}` satisfies \
+                                     the inferred upper bounds"
+                                )
+                            }
                         };
 
                         if let Some(argument) = argument

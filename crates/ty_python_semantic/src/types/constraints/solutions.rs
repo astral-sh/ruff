@@ -124,7 +124,9 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
-    /// The relation before non-inferable variables are projected away.
+    /// The relation before non-inferable variables are projected away. Used to recover the
+    /// original upper bounds for diagnostics, since projected paths can contain derived bounds
+    /// that obscure the original evidence.
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
@@ -1307,7 +1309,7 @@ impl<'db> SolutionWalker<'db> {
                             SolutionViolationKind::UpperBound(_) => {
                                 SolutionViolationKind::UpperBound(argument)
                             }
-                            kind @ SolutionViolationKind::Constraints(_) => kind.clone(),
+                            kind @ SolutionViolationKind::Constraints { .. } => kind.clone(),
                         },
                     });
                 }
@@ -1444,7 +1446,13 @@ impl<'db> SolutionWalker<'db> {
                     constrained_typevar,
                 )?
             {
-                violations.insert(*bound_typevar, SolutionViolationKind::Constraints(evidence));
+                violations.insert(
+                    *bound_typevar,
+                    SolutionViolationKind::Constraints {
+                        constraints: constrained_typevar.typevar_constraints,
+                        evidence,
+                    },
+                );
             }
         }
 
@@ -1502,6 +1510,7 @@ struct UpperBound {
 }
 
 struct Constrained<'db> {
+    typevar_constraints: TypeVarConstraints<'db>,
     declared_constraints: SmallVec<[DeclaredConstraint<'db>; 4]>,
 }
 
@@ -1639,7 +1648,7 @@ impl<'db> Validations<'db> {
         declared_constraints: TypeVarConstraints<'db>,
     ) {
         self.constrained.entry(bound_typevar).or_insert_with(|| {
-            let declared_constraints = declared_constraints
+            let validations = declared_constraints
                 .elements(db)
                 .iter()
                 .map(|&constrained_ty| {
@@ -1665,7 +1674,8 @@ impl<'db> Validations<'db> {
                 })
                 .collect();
             Constrained {
-                declared_constraints,
+                typevar_constraints: declared_constraints,
+                declared_constraints: validations,
             }
         });
     }

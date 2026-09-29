@@ -106,7 +106,9 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
+};
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
     walk_non_atomic_type, walk_type_with_recursion_guard,
@@ -4519,7 +4521,10 @@ pub(crate) enum ConstraintFailureEvidence<'db> {
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum SolutionViolationKind<'db> {
     UpperBound(Option<Type<'db>>),
-    Constraints(ConstraintFailureEvidence<'db>),
+    Constraints {
+        constraints: TypeVarConstraints<'db>,
+        evidence: ConstraintFailureEvidence<'db>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -4533,11 +4538,11 @@ impl<'db> SolutionViolation<'db> {
     fn evidence_types(&self) -> &[Type<'db>] {
         match &self.kind {
             SolutionViolationKind::UpperBound(argument) => argument.as_slice(),
-            SolutionViolationKind::Constraints(ConstraintFailureEvidence::Lower(lower)) => {
-                std::slice::from_ref(lower)
-            }
-            SolutionViolationKind::Constraints(ConstraintFailureEvidence::Upper(upper)) => upper,
-            SolutionViolationKind::Constraints(ConstraintFailureEvidence::UpperUnknown) => &[],
+            SolutionViolationKind::Constraints { evidence, .. } => match evidence {
+                ConstraintFailureEvidence::Lower(lower) => std::slice::from_ref(lower),
+                ConstraintFailureEvidence::Upper(upper) => upper,
+                ConstraintFailureEvidence::UpperUnknown => &[],
+            },
         }
     }
 }

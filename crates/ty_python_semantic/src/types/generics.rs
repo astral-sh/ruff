@@ -28,7 +28,9 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
+};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
@@ -2664,13 +2666,14 @@ enum ConstraintSetAnalysis<'db> {
 impl<'db> ConstraintSetAnalysis<'db> {
     /// Reports why a type variable's declared bound or constraints cannot be satisfied.
     ///
-    /// Paths whose lower bounds violate the same declaration in a contravariant position are
-    /// combined into an intersection. For example, paths rejecting `int` and `bool` for
+    /// Paths whose lower bounds violate the same declared upper bound in a contravariant position
+    /// are combined into an intersection. For example, paths rejecting `int` and `bool` for
     /// `T: bytes` report `bool`, their intersection.
     ///
     /// The inference API returns at most one declaration error per relation. Failures involving
-    /// upper bounds describe alternatives across paths, so only the first path's bounds are
-    /// reported. Invariant paths and failures involving different declarations or type variables
+    /// declared constraints describe alternatives across paths, so only the first path's evidence
+    /// is reported. Intersecting rejected lower bounds could produce a type that satisfies the
+    /// constraints. Invariant paths and failures involving different declarations or type variables
     /// also report only the first failure.
     fn specialization_error(
         &self,
@@ -2689,12 +2692,7 @@ impl<'db> ConstraintSetAnalysis<'db> {
             return Some(error);
         }
 
-        let (SpecializationError::MismatchedBound { argument, .. }
-        | SpecializationError::MismatchedConstraint {
-            evidence: ConstraintFailureEvidence::Lower(argument),
-            ..
-        }) = &mut error
-        else {
+        let SpecializationError::MismatchedBound { argument, .. } = &mut error else {
             return Some(error);
         };
 
@@ -2704,22 +2702,9 @@ impl<'db> ConstraintSetAnalysis<'db> {
             {
                 return None;
             }
-            match (&first.error, &failure.error) {
-                (
-                    SpecializationError::MismatchedBound { .. },
-                    SpecializationError::MismatchedBound { argument, .. },
-                )
-                | (
-                    SpecializationError::MismatchedConstraint {
-                        evidence: ConstraintFailureEvidence::Lower(_),
-                        ..
-                    },
-                    SpecializationError::MismatchedConstraint {
-                        evidence: ConstraintFailureEvidence::Lower(argument),
-                        ..
-                    },
-                ) => Some(*argument),
-                _ => None,
+            match &failure.error {
+                SpecializationError::MismatchedBound { argument, .. } => Some(*argument),
+                SpecializationError::MismatchedConstraint { .. } => None,
             }
         });
         if lower_bounds.clone().all(|bound| bound.is_some()) {
@@ -3615,12 +3600,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 bound_typevar,
                 argument: (*argument)?,
             },
-            SolutionViolationKind::Constraints(evidence) => {
-                SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    evidence: evidence.clone(),
-                }
-            }
+            SolutionViolationKind::Constraints {
+                constraints,
+                evidence,
+            } => SpecializationError::MismatchedConstraint {
+                bound_typevar,
+                constraints: *constraints,
+                evidence: evidence.clone(),
+            },
         };
         Some(ConstraintFailure {
             error,
@@ -4387,6 +4374,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
+                            constraints: typevar_constraints,
                             evidence: if polarity.is_contravariant() {
                                 ConstraintFailureEvidence::Upper(Box::new([ty]))
                             } else {
@@ -4818,6 +4806,7 @@ pub(crate) enum SpecializationError<'db> {
     },
     MismatchedConstraint {
         bound_typevar: BoundTypeVarInstance<'db>,
+        constraints: TypeVarConstraints<'db>,
         evidence: ConstraintFailureEvidence<'db>,
     },
 }
@@ -5706,12 +5695,15 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let bytes = KnownClass::Bytes.to_instance(db, &env);
+        let constraints = TypeVarConstraints::new(db, [int, str].as_slice());
         let first = SpecializationError::MismatchedConstraint {
             bound_typevar: typevar,
+            constraints,
             evidence: ConstraintFailureEvidence::Upper(Box::new([str, bytes])),
         };
         let second = SpecializationError::MismatchedConstraint {
             bound_typevar: typevar,
+            constraints,
             evidence: ConstraintFailureEvidence::Upper(Box::new([int])),
         };
         let analysis = ConstraintSetAnalysis::Unsatisfiable(

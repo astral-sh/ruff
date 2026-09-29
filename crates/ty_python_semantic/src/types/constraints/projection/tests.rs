@@ -231,10 +231,9 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
     let str = known_instance(db, KnownClass::Str);
     let bool = known_instance(db, KnownClass::Bool);
     let bytes = known_instance(db, KnownClass::Bytes);
+    let declared_constraints = TypeVarConstraints::new(db, [int, str].as_slice());
     let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
-        Some(TypeVarBoundOrConstraints::Constraints(
-            TypeVarConstraints::new(db, [int, str].as_slice()),
-        ))
+        Some(TypeVarBoundOrConstraints::Constraints(declared_constraints))
     });
     let builder = ConstraintSetBuilder::new();
     let upper = |ty| ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, ty);
@@ -252,18 +251,25 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
         for path in paths {
             assert!(!path.violations().is_empty());
             for violation in path.violations() {
-                match &violation.kind {
-                    SolutionViolationKind::Constraints(ConstraintFailureEvidence::Upper(
-                        bounds,
-                    )) => {
+                let SolutionViolationKind::Constraints {
+                    constraints,
+                    evidence,
+                } = &violation.kind
+                else {
+                    panic!("expected constraint violation, got {:?}", violation.kind);
+                };
+                assert_eq!(*constraints, declared_constraints);
+                match evidence {
+                    ConstraintFailureEvidence::Upper(bounds) => {
                         assert!(
                             bounds.len() == 1 && [bool, bytes].contains(&bounds[0]),
                             "alternative bounds were combined: {bounds:?}"
                         );
                     }
-                    SolutionViolationKind::Constraints(ConstraintFailureEvidence::UpperUnknown) => {
+                    ConstraintFailureEvidence::UpperUnknown => {}
+                    other @ ConstraintFailureEvidence::Lower(_) => {
+                        panic!("expected upper-bound evidence, got {other:?}");
                     }
-                    other => panic!("expected upper-bound evidence, got {other:?}"),
                 }
             }
         }
