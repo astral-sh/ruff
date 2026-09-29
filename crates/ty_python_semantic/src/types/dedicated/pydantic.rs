@@ -1023,9 +1023,10 @@ fn lax_input_type_impl<'db>(
         if !expanding_types.insert(constructor) {
             return Type::any();
         }
-        let result = recursive.map_or(db, env, Type::any(), |unfolded| {
-            lax_input_type_impl(db, env, unfolded, expanding_types)
-        });
+        let result = recursive
+            .unfold(db, env)
+            .map(|unfolded| lax_input_type_impl(db, env, unfolded, expanding_types))
+            .unwrap_or(Type::any());
         expanding_types.remove(&constructor);
         return result;
     }

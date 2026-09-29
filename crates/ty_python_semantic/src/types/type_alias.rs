@@ -5,8 +5,8 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type, TypeContext,
-        TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
+        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -26,8 +26,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 
 impl<'db> Type<'db> {
-    /// Returns whether expanding aliases and unions can return to the same alias without entering
-    /// another type. For example, `type A = int | A` is invalid, but
+    /// Returns whether expanding aliases, unions, and intersections can return to the same alias
+    /// without entering another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
     pub(super) fn has_unguarded_alias_cycle(self, db: &'db dyn Db) -> bool {
         AliasCycleSummary::from_type(db, self).cycle.is_some()
@@ -92,7 +92,17 @@ impl<'db> AliasCycleSummary<'db> {
                 .elements(db)
                 .iter()
                 .find_map(|&element| Self::collect(db, element, typevars)),
-            _ => ty.is_divergent().then_some(ty),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
+                .find_map(|&element| Self::collect(db, element, typevars)),
+            Type::Divergent(divergent)
+                if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
+            {
+                Some(ty)
+            }
+            _ => None,
         }
     }
 
@@ -142,7 +152,7 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
                 self.recover(db, value)
             }),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
-                recursive.map_or(db, self.env, None, |unfolded| self.recover(db, unfolded))
+                self.recover(db, recursive.unfold(db, self.env).into_unfolded()?)
             }),
             Type::Union(union) => {
                 let elements: Vec<_> = union
@@ -202,7 +212,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_scope(alias.rhs_scope(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -314,7 +324,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
             let env = ProgramEnvironment::from_definition(alias.definition(db));
             value.cycle_normalized(db, &env, *previous, cycle)
@@ -461,7 +471,7 @@ impl<'db> TypeAliasType<'db> {
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -719,7 +729,12 @@ impl<'db> TypeAliasType<'db> {
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
-                        .apply_specialization_impl(db, current_specialization, visitor)
+                        .apply_specialization_impl(
+                            db,
+                            current_specialization,
+                            specialization.specialize_self_domain(),
+                            visitor,
+                        )
                 }))
             }
             _ => {

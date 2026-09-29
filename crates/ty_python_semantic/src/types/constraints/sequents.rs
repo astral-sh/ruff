@@ -304,11 +304,33 @@ impl<'db> SequentMap<'db> {
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
     /// isolation. This method is cached so that we only perform this work once per
     /// constraint.
+    ///
+    /// Returns `None` without caching if we can quickly determine that there are no sequents.
     pub(super) fn for_constraint(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         constraint: Constraint<'db>,
-    ) -> &'db Self {
+    ) -> Option<&'db Self> {
+        // Most individual constraints produce no sequents. Avoid interning the query arguments
+        // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
+        // single-constraint `add_sequents` methods below.
+        let may_produce_sequents = match constraint {
+            Constraint::ConcreteLower(bound) => {
+                bound.bound == bound.typevar.domain(db).bottom(db)
+                    || bound.bound == bound.typevar.domain(db).top(db)
+            }
+            Constraint::ConcreteUpper(bound) => {
+                bound.bound == bound.typevar.domain(db).top(db)
+                    || bound.bound == bound.typevar.domain(db).bottom(db)
+            }
+            Constraint::ConcreteEquivalence(_) => false,
+            Constraint::TypeVarRange(bound) => bound.left.is_same_typevar_as(db, bound.right),
+            Constraint::TypeVarEquivalence(bound) => bound.left.is_same_typevar_as(db, bound.right),
+        };
+        if !may_produce_sequents {
+            return None;
+        }
+
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _| SequentMap::default(),
@@ -331,11 +353,13 @@ impl<'db> SequentMap<'db> {
             map
         }
 
-        for_constraint_inner(db, env.program(db), constraint)
+        Some(for_constraint_inner(db, env.program(db), constraint))
     }
 
     /// Returns a sequent map containing the sequents that we can infer from a pair of constraints.
     /// This method is cached so that we only perform this work once per constraint pair.
+    ///
+    /// Returns `None` without caching if we can quickly determine that there are no sequents.
     ///
     /// (Note that this method is _not_ commutative; you should provide `left` and `right` in the
     /// order that they appear in the source code, so that we can construct derived constraints
@@ -345,7 +369,28 @@ impl<'db> SequentMap<'db> {
         env: &ProgramEnvironment<'db>,
         left: Constraint<'db>,
         right: Constraint<'db>,
-    ) -> &'db Self {
+    ) -> Option<&'db Self> {
+        // Currently, the only pattern we look for is when two concrete lower-bound constraints
+        // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
+        // produce is `(l₁ | l₂) ≤ T`. But we don't store that as a single constraint; we always
+        // break that apart into the two smaller constraints that we started with.
+        if let Constraint::ConcreteLower(left) = left
+            && let Constraint::ConcreteLower(right) = right
+            && left.typevar.is_same_typevar_as(db, right.typevar)
+            && left
+                .bound
+                .when_trivially_disjoint_from(
+                    db,
+                    env,
+                    right.bound,
+                    &ConstraintSetBuilder::new(),
+                    TypeVarSet::None,
+                )
+                .is_trivially_always_satisfied()
+        {
+            return None;
+        }
+
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _, _| SequentMap::default(),
@@ -370,37 +415,7 @@ impl<'db> SequentMap<'db> {
             map
         }
 
-        for_constraint_pair_inner(db, env.program(db), left, right)
-    }
-
-    /// Quickly determines whether two constraints cannot possibly produce any sequents when passed
-    /// to [`for_constraint_pair`][Self::for_constraint_pair]. If this returns `true`, it is safe
-    /// to skip calling `for_constraint_pair` for this pair of constraints.
-    pub(super) fn pair_cannot_produce_sequents(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        left: Constraint<'db>,
-        right: Constraint<'db>,
-    ) -> bool {
-        // Currently, the only pattern we look for is when two concrete lower-bound constraints
-        // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
-        // produce is `(l₁ | l₂) ≤ T`. But we don't store that as a single constraint; we always
-        // break that apart into the two smaller constraints that we started with.
-
-        let Constraint::ConcreteLower(left) = left else {
-            return false;
-        };
-        let Constraint::ConcreteLower(right) = right else {
-            return false;
-        };
-        if !left.typevar.is_same_typevar_as(db, right.typevar) {
-            return false;
-        }
-
-        let builder = ConstraintSetBuilder::new();
-        left.bound
-            .when_trivially_disjoint_from(db, env, right.bound, &builder, TypeVarSet::None)
-            .is_trivially_always_satisfied()
+        Some(for_constraint_pair_inner(db, env.program(db), left, right))
     }
 }
 
@@ -580,7 +595,14 @@ impl<'db> Constraint<'db> {
         let when = lower
             .bound()
             .when_constraint_set_assignable_to_owned(db, env, upper.bound());
-        Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
+        let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+        Self::add_constraint_set_implication(
+            map,
+            provenance,
+            lower.into(),
+            upper.into(),
+            when.as_ref(),
+        );
     }
 
     fn add_sequents_for_equivalence(
@@ -599,12 +621,20 @@ impl<'db> Constraint<'db> {
                 lower
                     .bound()
                     .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
-            Self::add_constraint_set_implication(map, lower.into(), upper.into(), when.as_ref());
+            let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+            Self::add_constraint_set_implication(
+                map,
+                provenance,
+                lower.into(),
+                upper.into(),
+                when.as_ref(),
+            );
         }
     }
 
     fn add_constraint_set_implication(
         map: &mut SequentMap<'db>,
+        provenance: ConstraintProvenance,
         lower_constraint: Self,
         upper_constraint: Self,
         when: &OwnedConstraintSet<'db>,
@@ -668,7 +698,9 @@ impl<'db> Constraint<'db> {
                     Node::AlwaysTrue | Node::AlwaysFalse => break,
                     Node::Interior(interior) => {
                         let interior = storage.interior_node_data(interior.node());
-                        let derived = storage.constraint_data(interior.constraint);
+                        let derived = storage
+                            .constraint_data(interior.constraint)
+                            .with_provenance(provenance);
                         if interior.if_true != ALWAYS_FALSE {
                             map.add_pair_implication(lower_constraint, upper_constraint, derived);
                             node = interior.if_true;
@@ -1255,19 +1287,18 @@ impl<'db> ConcreteLowerBound<'db> {
         // elements. (For instance, when processing `τ₁ & τ₂ ≤ T` and `τ₂ & τ₁ ≤ T`, these clauses
         // would add sequents for `(τ₁ & τ₂ ≤ T) → (τ₂ & τ₁ ≤ T)` and vice versa.)
 
+        // We use subtyping here, as a gradual range `Any <= T` permits materializations not implied
+        // by `int <= T`, despite `Any` and `int` being mutually assignable.
+        let lower = self.bound.bottom_materialization(db, env);
+        let other_lower = other.bound.bottom_materialization(db, env);
+
         // (β ≤ α) ⇒ ((α ≤ T) ⇒ (β ≤ T))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
-        {
+        if other_lower.is_constraint_set_subtype_of(db, env, lower) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (α ≤ β) ⇒ ((β ≤ T) ⇒ (α ≤ T))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
-        {
+        if lower.is_constraint_set_subtype_of(db, env, other_lower) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1321,6 +1352,14 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
+        // Gradual assignability is not transitive, so only fully static bounds can contribute
+        // additional range sequents.
+        if !self.bound.is_static_sequent_eligible(db, env)
+            || !other.bound.is_static_sequent_eligible(db, env)
+        {
+            return;
+        }
+
         // `(α ≤ T) ∧ (T ≤ β)` simplifies to `T = α` when `α = β`. For ordinary typevars, only
         // simplify when the materialized bounds are the same `Type`; checking semantic equivalence
         // can recursively expand protocol members. ParamSpec bounds still need the semantic check
@@ -1339,13 +1378,7 @@ impl<'db> ConcreteLowerBound<'db> {
             return;
         }
 
-        // Gradual assignability is not transitive, so only fully static bounds can contribute
-        // additional range sequents.
-        if self.bound.is_static_sequent_eligible(db, env)
-            && other.bound.is_static_sequent_eligible(db, env)
-        {
-            Constraint::add_sequents_for_range(db, env, map, self, other);
-        }
+        Constraint::add_sequents_for_range(db, env, map, self, other);
     }
 
     fn add_sequents_with_concrete_equivalence(
@@ -1484,19 +1517,18 @@ impl<'db> ConcreteUpperBound<'db> {
         // `T ≤ τ₂ | τ₁`, these clauses would add sequents for `(T ≤ τ₁ | τ₂) → (T ≤ τ₂ | τ₁)` and
         // vice versa.)
 
+        // We use subtyping here, as a gradual range `T <= Any` permits materializations not implied
+        // by `T <= int`, despite `Any` and `int` being mutually assignable.
+        let upper = self.bound.top_materialization(db, env);
+        let other_upper = other.bound.top_materialization(db, env);
+
         // (α ≤ β) ⇒ ((T ≤ α) ⇒ (T ≤ β))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
-        {
+        if upper.is_constraint_set_subtype_of(db, env, other_upper) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (β ≤ α) ⇒ ((T ≤ β) ⇒ (T ≤ α))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
-        {
+        if other_upper.is_constraint_set_subtype_of(db, env, upper) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1968,6 +2000,30 @@ mod tests {
     }
 
     #[test]
+    fn disjoint_lower_bounds_skip_empty_sequent_maps() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = create_typevar(db, "T");
+        let left = Constraint::from(ConcreteLowerBound::new(
+            ConstraintProvenance::Evidence,
+            t,
+            Type::int_literal(0),
+        ));
+        let right = Constraint::from(ConcreteLowerBound::new(
+            ConstraintProvenance::Evidence,
+            t,
+            Type::int_literal(1),
+        ));
+
+        assert!(SequentMap::for_constraint(db, &env, left).is_none());
+        assert!(SequentMap::for_constraint(db, &env, right).is_none());
+        for (left, right) in [(left, right), (right, left)] {
+            assert!(SequentMap::for_constraint_pair(db, &env, left, right).is_none());
+        }
+    }
+
+    #[test]
     fn overlapping_lower_bounds_do_not_skip_nonempty_sequent_map() {
         let db = setup_db();
         let db = &db;
@@ -1992,14 +2048,11 @@ mod tests {
         for (left, right) in [(left, right), (right, left)] {
             let sequents = SequentMap::for_constraint_pair(db, &env, left, right);
 
-            assert!(
+            assert!(sequents.is_some_and(|sequents| {
                 sequents
                     .all_sequents()
                     .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
-            );
-            assert!(!SequentMap::pair_cannot_produce_sequents(
-                db, &env, left, right
-            ));
+            }));
         }
     }
 }

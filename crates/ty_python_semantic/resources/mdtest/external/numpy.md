@@ -51,9 +51,8 @@ reveal_type(interpolated)  # revealed: ndarray[tuple[Any, ...], dtype[float64]]
 
 ## Iterating over an array union
 
-A callback that only accepts pairs is not valid for a possibly nonempty multidimensional array:
-iteration yields subarrays, not tuples. Inferring the iterator element type requires substituting
-the array's dtype into the nested `ndarray` result.
+An array can satisfy `map`'s iterable parameter through its gradual iterator overload, even when
+another overload yields multidimensional subarrays, not tuples.
 
 ```py
 from typing import Any
@@ -66,7 +65,6 @@ def process(padding):
     if len(padding) == 0:
         padding = np.zeros((0, 2), dtype=np.int64)
 
-    # error: [invalid-argument-type]
     return list(map(prepare, padding))
 ```
 

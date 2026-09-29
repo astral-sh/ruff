@@ -1452,10 +1452,15 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        let inherited_generic_context = if policy.no_inherited_generic_context() {
+            None
+        } else {
+            self.inherited_generic_context(db)
+        };
         let result = MroLookup::new(db, env, mro_iter).class_member(
             name,
             policy,
-            self.inherited_generic_context(db),
+            inherited_generic_context,
             self.is_known(db, KnownClass::Object),
         );
 
@@ -1590,16 +1595,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         });
 
-        // The inherited `object.__dict__` annotation already describes dictionary access. A
-        // synthesized slot descriptor would incorrectly replace the class's own namespace.
-        if name != "__dict__"
-            && self
-                .slot_names(db)
-                .is_some_and(|slots| slots.iter().any(|slot| slot == name))
-            && (self.has_generated_slots(db)
-                || !self.has_own_class_binding(db, name)
-                || self.file(db).is_stub(db) && self.has_instance_slot(db, name))
-        {
+        if self.has_own_slot_descriptor(db, name) {
             return Member::definitely_declared(self.own_slot_descriptor(
                 db,
                 env,
@@ -1716,7 +1712,7 @@ impl<'db> StaticClassLiteral<'db> {
                 CallableType::new(db, signatures, CallableTypeKind::FunctionLike)
             });
 
-            return Some(synthesized_callables.into_type(db, env));
+            return Some(synthesized_callables.to_type(db, env));
         }
 
         // An ordinary subclass of a frozen dataclass is not itself dataclass-like, so the
@@ -2156,24 +2152,21 @@ impl<'db> StaticClassLiteral<'db> {
 
                 Some(Type::function_like_callable(db, signature))
             }
-            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__")
-                if env.python_version(db) >= PythonVersion::PY310 =>
-            {
-                self.has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
-                    .then(|| {
-                        if let Some(slots) = self.slot_names(db) {
-                            return Type::heterogeneous_tuple(
-                                db,
-                                env,
-                                slots.iter().map(|name| Type::string_literal(db, name)),
-                            );
-                        }
+            (field_policy @ CodeGeneratorKind::DataclassLike(_), "__slots__") => self
+                .has_dataclass_param(db, field_policy, DataclassFlags::SLOTS)
+                .then(|| {
+                    if let Some(slots) = self.slot_names(db) {
+                        return Type::heterogeneous_tuple(
+                            db,
+                            env,
+                            slots.iter().map(|name| Type::string_literal(db, name)),
+                        );
+                    }
 
-                        let fields = self.fields(db, specialization, field_policy);
-                        let slots = fields.keys().map(|name| Type::string_literal(db, name));
-                        Type::heterogeneous_tuple(db, env, slots)
-                    })
-            }
+                    let fields = self.fields(db, specialization, field_policy);
+                    let slots = fields.keys().map(|name| Type::string_literal(db, name));
+                    Type::heterogeneous_tuple(db, env, slots)
+                }),
             (CodeGeneratorKind::TypedDict, name) => synthesize_typed_dict_method(
                 db,
                 env,
@@ -2649,14 +2642,7 @@ impl<'db> StaticClassLiteral<'db> {
             // want to improve this, we could instead pass a definition-kind filter to the use-def map
             // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
             // us to generate a union of `__init__` methods.
-            if declarations.clone().any_reachable(db, |declaration| {
-                declaration.is_defined_and(|declaration| {
-                    !matches!(
-                        declaration.kind(db),
-                        DefinitionKind::AnnotatedAssignment(..)
-                    )
-                })
-            }) {
+            if !declarations.clone().contains_only_annotated_assignments(db) {
                 continue;
             }
 

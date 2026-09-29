@@ -1436,6 +1436,33 @@ def needs_something_hashable(x: Hashable):
 needs_something_hashable([])  # error: [invalid-argument-type]
 ```
 
+## Unannotated protocol defaults retain inherited declarations
+
+A default in a protocol subclass preserves the inherited member type. Both protocol writes and
+structural implementations use the annotation, so a narrower default does not narrow the interface.
+
+```py
+from typing import ClassVar, Protocol
+
+class Base(Protocol):
+    value: int | str
+    shared: ClassVar[int | str]
+
+class WithDefaults(Base, Protocol):
+    value = "default"
+    shared = "default"
+
+class Implementation:
+    value: int | str = 1
+    shared: ClassVar[int | str] = 1
+
+def check(protocol: WithDefaults, implementation: Implementation) -> None:
+    reveal_type(protocol.value)  # revealed: int | str
+    protocol.value = 1
+    protocol.shared = 1  # error: [invalid-attribute-access]
+    result: WithDefaults = implementation
+```
+
 ## Diagnostics for protocols with invalid attribute members
 
 This is a short appendix to the previous section with the `snapshot-diagnostics` directive enabled

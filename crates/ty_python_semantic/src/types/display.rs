@@ -981,7 +981,7 @@ impl<'db> Type<'db> {
                     definition,
                     name,
                     constructor.parameters(db),
-                    constructor.unfold(db, env),
+                    constructor.unfold(db, env).into_type(),
                 )
             }
             _ => return None,
@@ -1363,7 +1363,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                 .display_with(db, self.env, self.settings.clone())
                 .fmt_detailed(f),
             Type::BoundMethod(bound_method) => {
-                let Some(function) = bound_method.function(db) else {
+                let Some(callable) = bound_method.into_callable_type(db) else {
                     f.set_invalid_type_annotation();
                     write!(
                         f,
@@ -1374,10 +1374,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     )?;
                     return Ok(());
                 };
+                let Some(function) = bound_method.function(db) else {
+                    return callable
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f);
+                };
                 let self_ty = bound_method.self_instance(db);
                 let receiver_ty = bound_method.signature_receiver(db);
-                let bound_signatures =
-                    function.bound_signatures(db, receiver_ty, bound_method.typing_self_type(db));
+                let bound_signatures = callable.signatures(db);
 
                 match bound_signatures.overloads.as_slice() {
                     [signature] => {
@@ -1446,15 +1450,45 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         KnownClass::FunctionType.to_class_literal(db, self.env),
                         "__get__",
                         "function",
-                        Type::FunctionLiteral(function),
-                        Some(&**function.name(db)),
+                        function.inner(db),
+                        function
+                            .inner(db)
+                            .as_function_literal()
+                            .map(|function| &**function.name(db)),
                     ),
-                    KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                        KnownClass::FunctionType.to_class_literal(db, self.env),
-                        "__call__",
-                        "function",
-                        Type::FunctionLiteral(function),
-                        Some(&**function.name(db)),
+                    KnownBoundMethodType::DunderCall(callable) => {
+                        let callable = callable.inner(db);
+                        let (class_name, name) = match callable {
+                            Type::BoundMethod(method) => (
+                                "method",
+                                method.function(db).map(|function| &**function.name(db)),
+                            ),
+                            _ => (
+                                match callable.function_like_kind(db) {
+                                    Some(CallableTypeKind::StaticMethodLike) => "staticmethod",
+                                    Some(CallableTypeKind::ClassMethodLike) => "classmethod",
+                                    Some(CallableTypeKind::FunctionLike) => "function",
+                                    _ => "callable",
+                                },
+                                callable
+                                    .as_function_literal()
+                                    .map(|function| &**function.name(db)),
+                            ),
+                        };
+                        (
+                            callable.to_meta_type(db, self.env),
+                            "__call__",
+                            class_name,
+                            callable,
+                            name,
+                        )
+                    }
+                    KnownBoundMethodType::MethodTypeDunderGet(method) => (
+                        KnownClass::MethodType.to_class_literal(db, self.env),
+                        "__get__",
+                        "method",
+                        Type::BoundMethod(method),
+                        method.function(db).map(|function| &**function.name(db)),
                     ),
                     KnownBoundMethodType::PropertyDunderGet(property) => (
                         property.instance_class(db).to_class_literal(db, self.env),
@@ -1679,7 +1713,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => fmt_type_guard_like(db, self.env, type_is, &self.settings, f),
+            Type::TypeIs(type_is) => {
+                let materialization = match type_is.materialization_kind(db) {
+                    Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
+                    Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+                    None => None,
+                };
+
+                if let Some((name, form)) = materialization {
+                    f.with_type(Type::SpecialForm(form)).write_str(name)?;
+                    f.write_char('[')?;
+                }
+
+                fmt_type_guard_like(db, self.env, type_is, &self.settings, f)?;
+
+                if materialization.is_some() {
+                    f.write_char(']')?;
+                }
+
+                Ok(())
+            }
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(db, self.env, type_guard, &self.settings, f)
             }

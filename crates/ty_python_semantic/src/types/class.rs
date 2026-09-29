@@ -25,7 +25,8 @@ use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType,
     SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
-use crate::place::{DefinedPlace, Provenance, TypeOrigin};
+use crate::place::{DefinedPlace, Provenance, TypeOrigin, place_from_declarations};
+use crate::reachability::{DeclarationsIteratorExtension, ReachabilityConstraintsExtension};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -35,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::Member;
+use crate::types::member::{Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -67,6 +68,7 @@ use rustc_hash::FxHashSet;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
+use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
 mod enum_literal;
@@ -2410,22 +2412,24 @@ impl<'db> ClassType<'db> {
             .to_instance_approximation(db, env)
             .unwrap_or_else(Type::unknown);
 
-        let metaclass_dunder_call_function_symbol = lookup_type
-            .member_lookup_with_policy(
+        let metaclass_dunder_call = lookup_type
+            .member_lookup_with_policy_and_receiver(
                 db,
                 env,
                 "__call__",
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                if receiver == lookup_type {
+                    None
+                } else {
+                    Some(receiver)
+                },
             )
+            .unwrap_or_else(|error| error.fallback_member(db))
+            .member(db)
             .place;
 
-        if let Place::Defined(DefinedPlace {
-            ty: Type::BoundMethod(metaclass_dunder_call_function),
-            ..
-        }) = metaclass_dunder_call_function_symbol
-            && let Some(function) = metaclass_dunder_call_function.function(db)
-        {
+        if let Place::Defined(DefinedPlace { ty, .. }) = metaclass_dunder_call {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
@@ -2437,52 +2441,34 @@ impl<'db> ClassType<'db> {
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum {
-                let callable = if receiver == lookup_type {
-                    function.into_bound_callable(
-                        db,
-                        metaclass_dunder_call_function.signature_receiver(db),
-                        metaclass_dunder_call_function.typing_self_type(db),
-                    )
-                } else {
-                    function.into_bound_callable_with_receiver(db, env, receiver, receiver)
-                };
-                return CallableTypes::one(callable);
+            if !is_actual_enum && let Some(callables) = ty.try_upcast_to_callable(db, env) {
+                return callables;
             }
         }
 
-        let dunder_new_function_symbol = lookup_type.lookup_dunder_new(db, env);
+        let dunder_new_callables = lookup_type
+            .lookup_dunder_new(db, env, MemberLookupPolicy::default())
+            .and_then(|place_and_quals| {
+                receiver
+                    .resolve_dunder_new_callable(db, env, place_and_quals.place)
+                    .ignore_possibly_undefined()
+            })
+            .and_then(|ty| ty.try_upcast_to_callable(db, env));
 
-        let dunder_new_signature = dunder_new_function_symbol
-            .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
-            .and_then(|ty| match ty {
-                Type::FunctionLiteral(function) => Some(function.signature(db)),
-                Type::Callable(callable) => Some(callable.signatures(db)),
-                _ => None,
-            });
-
-        let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
-            let bound_signature = dunder_new_signature.bind_self_with_receiver(
-                db,
-                env,
-                Some(receiver),
-                Some(instance_type),
-            );
+        let dunder_new_callables = if let Some(callables) = dunder_new_callables {
+            let bound_callables =
+                callables.map(|callable| callable.bind_self(db, env, receiver, instance_type));
 
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = bound_signature
-                .overloads
-                .iter()
+            let returns_non_subclass = bound_callables
+                .signatures(db)
                 .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
 
-            let dunder_new_bound_method =
-                CallableType::new(db, bound_signature, CallableTypeKind::Regular);
-
             if returns_non_subclass {
-                return CallableTypes::one(dunder_new_bound_method);
+                return bound_callables;
             }
-            Some(dunder_new_bound_method)
+            Some(bound_callables)
         } else {
             None
         };
@@ -2559,16 +2545,17 @@ impl<'db> ClassType<'db> {
             None
         };
 
-        match (dunder_new_function, synthesized_dunder_init_callable) {
-            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
-                CallableTypes::from_elements([
-                    dunder_new_function,
-                    synthesized_dunder_init_callable,
-                ])
+        match (dunder_new_callables, synthesized_dunder_init_callable) {
+            (Some(dunder_new_callables), Some(synthesized_dunder_init_callable)) => {
+                CallableTypes::from_elements(
+                    dunder_new_callables
+                        .iter()
+                        .copied()
+                        .chain([synthesized_dunder_init_callable]),
+                )
             }
-            (Some(constructor), None) | (None, Some(constructor)) => {
-                CallableTypes::one(constructor)
-            }
+            (Some(constructors), None) => constructors,
+            (None, Some(constructor)) => CallableTypes::one(constructor),
             (None, None) => {
                 // If no `__new__` or `__init__` method is found, then we fall back to looking for
                 // an `object.__new__` method.
@@ -2590,22 +2577,23 @@ impl<'db> ClassType<'db> {
                         new_function =
                             new_function.with_inherited_generic_context(db, class_generic_context);
                     }
-                    CallableTypes::one(new_function.into_bound_callable(
-                        db,
-                        instance_type,
-                        instance_type,
-                    ))
-                } else {
-                    // Fallback if no `object.__new__` is found.
-                    CallableTypes::one(CallableType::single(
-                        db,
-                        Signature::new_generic(
-                            class_generic_context,
-                            Parameters::empty(),
-                            instance_type,
-                        ),
-                    ))
+                    if let Some(callable) = new_function
+                        .into_bound_method_type(db, instance_type)
+                        .into_callable_type(db)
+                    {
+                        return CallableTypes::one(callable);
+                    }
                 }
+
+                // Fallback if no `object.__new__` is found.
+                CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new_generic(
+                        class_generic_context,
+                        Parameters::empty(),
+                        instance_type,
+                    ),
+                ))
             }
         }
     }
@@ -2924,12 +2912,66 @@ pub(super) struct MroLookup<'db, I> {
 
 impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Create a new MRO lookup from a database and an MRO iterator.
-    fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, mro_iter: I) -> Self {
+    pub(super) fn new(db: &'db dyn Db, env: &ProgramEnvironment<'db>, mro_iter: I) -> Self {
         Self {
             db,
             env: env.clone(),
             mro_iter,
         }
+    }
+
+    /// Finds the annotation governing a new class-body default, without inferring existing defaults.
+    ///
+    /// An unannotated binding retains its owner's inherited declaration. Resolving that owner
+    /// before continuing the MRO prevents a later sibling base from supplying a different contract.
+    /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
+    /// prevent us from determining which declaration applies. Final declarations are handled by
+    /// override diagnostics instead of supplying initializer context.
+    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+        let db = self.db;
+        for base in self.mro_iter {
+            let base = match base {
+                ClassBase::Generic | ClassBase::Protocol => continue,
+                ClassBase::Class(base) => base,
+                // A dynamic base may supply the member, a divergent base is not yet known,
+                // and TypedDict has a special member lookup.
+                ClassBase::Any
+                | ClassBase::Dynamic(_)
+                | ClassBase::Divergent(_)
+                | ClassBase::TypedDict(_) => return None,
+            };
+            let (base, specialization) = base.static_class_literal(db)?;
+            let scope = base.body_scope(db);
+            let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+                continue;
+            };
+            let use_def = use_def_map(db, scope);
+            let declarations = use_def.end_of_scope_symbol_declarations(symbol);
+            let declared = place_from_declarations(db, &self.env, declarations.clone())
+                .ignore_conflicting_declarations();
+            let declaration = if declared.is_undefined() {
+                let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
+                let predicates = bindings.predicates();
+                let constraints = bindings.reachability_constraints();
+                if !bindings.any(|binding| {
+                    binding.binding.definition().is_some()
+                        && !constraints
+                            .evaluate(db, predicates, binding.reachability_constraint)
+                            .is_always_false()
+                }) {
+                    continue;
+                }
+                inherited_class_body_declaration(db, scope, symbol)
+            } else {
+                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
+                    && declarations.contains_only_annotated_assignments(db))
+                .then_some(declared)
+            };
+            return declaration.map(|declaration| {
+                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+            });
+        }
+        None
     }
 
     /// Infer augmented-assignment results after finding the existing attribute they read.

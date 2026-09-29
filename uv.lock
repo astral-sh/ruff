@@ -487,7 +487,7 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#a31ef389f3cc304b59623df7fe4b068419a323a4" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#6e2b17067e73f9fa1d929d10512f4c66ba46f552" }
 dependencies = [
     { name = "click" },
     { name = "jinja2" },
@@ -1596,7 +1596,7 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.16.8"
+version = "0.16.9"
 source = { editable = "." }
 
 [package.dev-dependencies]

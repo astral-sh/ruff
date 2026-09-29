@@ -666,6 +666,33 @@ class WithBackportedDefault(Generic[Unpack[Ts]]):
 reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```
 
+### Gradual specializations
+
+A type variable tuple remains assignable to an explicitly gradual specialization of its generic
+class, or its top materialization.
+
+```py
+from typing import Any, Generic, TypeVarTuple
+from ty_extensions import Bottom, Top
+
+Ts = TypeVarTuple("Ts")
+
+class Array(Generic[*Ts]):
+    values: tuple[*Ts]
+
+    def erase_shape(self) -> "Array[*tuple[Any, ...]]":
+        return self
+
+    def erase_shape_top(self) -> "Top[Array[*tuple[Any, ...]]]":
+        return self
+
+    def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
+        return self  # error: [invalid-return-type]
+
+    def fixed_shape(self) -> "Top[Array[Any]]":
+        return self  # error: [invalid-return-type]
+```
+
 ## Functions
 
 ### Partials with bound variadic arguments
@@ -715,6 +742,23 @@ def check(i: int, s: str) -> None:
     two = partial(repeat, (i, s), kw=1)
     reveal_type(two(i, s))  # revealed: tuple[int, str]
     two(i, i)  # error: [invalid-argument-type]
+```
+
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def accept(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
 ```
 
 ## Tuple concatenation with type variables

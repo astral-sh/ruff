@@ -890,6 +890,36 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn unresolved_namespace_descendant() {
+        let mut test = CodeActionTest::with_source("<START>NamespaceReport<END>()");
+        test.db
+            .write_file("acme/reports.py", "class NamespaceReport: ...")
+            .expect("write unopened namespace descendant");
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @"
+        info[code-action]: import acme.reports.NamespaceReport
+         --> main.py:1:1
+          |
+        1 | NamespaceReport()
+          | ^^^^^^^^^^^^^^^
+        help: This is a preferred code action
+          |
+        1 + from acme.reports import NamespaceReport
+        2 | NamespaceReport()
+          |
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:1:1
+          |
+        1 | NamespaceReport()
+          | ^^^^^^^^^^^^^^^
+          |
+          - NamespaceReport()
+        1 + NamespaceReport()  # ty: ignore[unresolved-reference]
+          |
+        ");
+    }
+
     struct CodeActionTest {
         db: ty_project::TestDb,
         file: File,

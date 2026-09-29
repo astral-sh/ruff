@@ -2280,6 +2280,7 @@ if sys.version_info >= (3, 11):
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
+        slots_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behavior.

@@ -457,14 +457,6 @@ reason = "the public semantic model retains node navigation for downstream analy
 [[override]]
 lint = "hawk::dead_public"
 crate = "ruff_python_semantic"
-item = "model::SemanticModel::<'a>::in_runtime_required_annotation"
-kind = "inherent_method"
-level = "expect"
-reason = "semantic model predicates intentionally expose each annotation context"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ruff_python_semantic"
 item = "model::SemanticModel::<'a>::in_simple_string_type_definition"
 kind = "inherent_method"
 level = "expect"
@@ -581,14 +573,6 @@ item = "size::TextSize::saturating_sub"
 kind = "inherent_method"
 level = "expect"
 reason = "TextSize intentionally provides both checked and saturating arithmetic"
-
-[[override]]
-lint = "hawk::dead_public"
-crate = "ty_project"
-item = "db::changes::ChangeResult::custom_stdlib_changed"
-kind = "inherent_method"
-level = "expect"
-reason = "change results expose both project and custom-stdlib invalidation state"
 
 [[override]]
 lint = "hawk::dead_public"

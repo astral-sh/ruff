@@ -15,12 +15,11 @@ use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
-use ty_python_core::program::{Program, ProgramSettings};
+use ty_python_core::program::Program;
 use ty_python_core::scope::FileScopeId;
 use ty_python_core::{
     ProgramFile, TestProgramDb as _, global_scope, place_table, semantic_index, use_def_map,
 };
-use ty_site_packages::{PythonVersionSource, PythonVersionWithSource};
 
 use super::*;
 
@@ -119,39 +118,10 @@ fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     db.write_dedented("src/py312_dependency.py", "value: int = 312")?;
 
     let file = system_path_to_file(&db, "src/main.py").expect("file to exist");
-    let default_program = db.program();
-    let search_paths = default_program.search_paths(&db).clone();
-    let python_platform = default_program.python_platform(&db).clone();
-    let py311 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY311,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform: python_platform.clone(),
-                search_paths: search_paths.clone(),
-            },
-        ),
-    );
-    let py312 = ProgramFile::new(
-        &db,
-        file,
-        Program::from_settings(
-            &db,
-            &ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY312,
-                    source: PythonVersionSource::Default,
-                },
-                python_platform,
-                search_paths,
-            },
-        ),
-    );
+    let py311 = db.program().program_file(&db, file);
+    let mut settings = db.program_settings().clone();
+    settings.python_version.version = PythonVersion::PY312;
+    let py312 = Program::from_settings(&db, &settings).program_file(&db, file);
 
     let check = |file, expected_type, expect_invalid_syntax, expect_unresolved_import| {
         let diagnostics = crate::check_file_unwrap(&db, file);
@@ -204,31 +174,16 @@ fn program_file_changes_with_python_version() -> anyhow::Result<()> {
         (program_file.as_id(), program_file.python_file(&db).as_id())
     };
 
-    let equivalent_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: db.program_settings().python_version.clone(),
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    let mut settings = db.program_settings().clone();
+    let equivalent_program = Program::from_settings(&db, &settings);
     assert_eq!(program, equivalent_program);
     assert_eq!(
         program_file_id,
         equivalent_program.program_file(&db, file).as_id()
     );
 
-    let py312_program = Program::from_settings(
-        &db,
-        &ProgramSettings {
-            python_version: PythonVersionWithSource {
-                version: PythonVersion::PY312,
-                source: PythonVersionSource::Default,
-            },
-            python_platform: program.python_platform(&db).clone(),
-            search_paths: program.search_paths(&db).clone(),
-        },
-    );
+    settings.python_version.version = PythonVersion::PY312;
+    let py312_program = Program::from_settings(&db, &settings);
 
     let program_file = py312_program.program_file(&db, file);
     assert_ne!(program_file_id, program_file.as_id());
@@ -699,16 +654,22 @@ fn redundant_condition_lookup_does_not_reenter_scope_inference() -> anyhow::Resu
     Ok(())
 }
 
-/// Repeated conditions on the same name or attribute share one cached definition summary.
-/// The first two fixtures combine many assignments to one place with many conditions that test it.
-/// Each lookup can inspect every assignment, so repeating it for every condition would make
-/// these examples quadratic even if their diagnostics were unchanged.
+/// Repeated conditions share cached definition and reachability summaries. Reassigned names need
+/// different definitions at each read, but share the index of their original assignment guards.
+/// Rebuilding that index for every condition would make these examples quadratic even if their
+/// diagnostics were unchanged. Attribute fallback lookup also shares its definition summary.
+/// Lazy closure reads share both the summary and boundness analysis of their outer bindings.
 /// Conditions on distinct names also share the reachability summaries for preceding calls,
 /// rather than traversing an increasingly long call prefix for each name.
 #[test]
 fn repeated_tuple_conditions_share_provenance() -> anyhow::Result<()> {
     let repetitions = 100;
     let names = "value = (1,)\nif value:\n    pass\n".repeat(repetitions);
+    let lazy_closure = format!(
+        "def outer():\n    def inner():\n{}{}",
+        "        if value:\n            pass\n".repeat(repetitions),
+        "    value = (1,)\n".repeat(repetitions),
+    );
     let attributes = format!(
         "class C:\n{}\n{}",
         "    value = (1,)\n".repeat(repetitions),
@@ -729,7 +690,8 @@ if value_{index}:
     }
 
     for (source, query_name, max_queries) in [
-        (names, "name_condition_definition_info", 1),
+        (names, "definition_reachability", 1),
+        (lazy_closure, "owning_scope_condition_definition_info", 1),
         (attributes, "attribute_condition_definition_info", 1),
         (
             calls,
@@ -1330,6 +1292,40 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 
     db.write_file("/src/defaults.py", with_default)?;
     assert_file_diagnostics(&db, "/src/main.py", &[]);
+    Ok(())
+}
+
+#[test]
+fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+class Meta1(type): ...
+class Meta2(type): ...
+class Base(metaclass=Meta1): ...
+";
+    db.write_files([
+        ("/src/base.py", base),
+        (
+            "/src/main.py",
+            "\
+from typing_extensions import reveal_type
+from base import Base
+
+C = type('C', (Base,), {})
+reveal_type(type(C))
+",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
+
+    db.write_file(
+        "/src/base.py",
+        base.replace("metaclass=Meta1", "metaclass=Meta2"),
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta2'>");
+
+    db.write_file("/src/base.py", base)?;
+    assert_revealed_type(&db, "/src/main.py", "<class 'Meta1'>");
     Ok(())
 }
 

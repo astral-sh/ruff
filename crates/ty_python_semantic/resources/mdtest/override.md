@@ -147,15 +147,14 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     def my_property1(self) -> int: ...
 
-    # TODO: This maybe shouldn't be a Liskov violation? Whether called on the type or
-    # on an instance, it will behave the same from the caller's perspective. The only difference
-    # is whether the method body gets access to `cls`, which is not a concern of Liskov.
+    # Class and static methods can override each other when "bound" signatures match,
+    # but here, we deliberately add a new parameter to introduce a Liskov violation
     @staticmethod
     @override
-    def class_method1() -> int: ...  # error: [invalid-method-override]
+    def class_method1(x: int) -> int: ...  # error: [invalid-method-override]
     @classmethod
     @override
-    def static_method1(cls) -> int: ...
+    def static_method1(cls, x: int) -> int: ...  # error: [invalid-method-override]
 
 # Diagnostic edge case: `override` is very far away from the method definition in the source code:
 
@@ -635,6 +634,31 @@ class Parent(Grandparent):
 class Child(Parent):
     @override
     def __new__(cls) -> Parent: ...  # error: [invalid-method-override]
+```
+
+## Wrapped classmethods with inherited `Self` incompatibilities
+
+In the below example, `Parent.make` already violates `Grandparent.make`'s return contract: `Self`
+means `Parent` when accessed on `Parent`, but the wrapped factory returns `Grandparent`.
+`Child.make` preserves the parent's return type, so we do not report the inherited incompatibility
+on `Child`.
+
+```pyi
+from typing_extensions import Self
+
+class Grandparent:
+    @classmethod
+    def make(cls) -> Self: ...
+
+class Factory:
+    def __call__(self, cls: type[Grandparent]) -> Grandparent: ...
+
+class Parent(Grandparent):
+    make = classmethod(Factory())
+
+class Child(Parent):
+    @classmethod
+    def make(cls) -> Grandparent: ...
 ```
 
 ## Missing `@override` decorator

@@ -201,8 +201,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableType, CallableTypes, ComparisonSoundnessPolicy, EnumClassLiteral,
-        KnownInstanceType, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        CallableType, ComparisonSoundnessPolicy, EnumClassLiteral, KnownInstanceType,
+        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
@@ -220,7 +220,7 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, EvaluationMode,
     FileScopeId, NarrowingEvaluator, PredicateNarrowingTargets, ScopedDefinitionId, SemanticIndex,
     Truthiness, UseDefMap,
-    definition::DefinitionState,
+    definition::{DefinitionKind, DefinitionState},
     expression::Expression,
     narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
@@ -1780,12 +1780,7 @@ pub(crate) fn is_non_terminal_call<'db>(
         return Truthiness::AlwaysTrue;
     }
 
-    let overloads_iterator = if let Some(callable) = ty
-        .try_upcast_to_callable(db, env)
-        .and_then(CallableTypes::exactly_one)
-    {
-        callable.signatures(db).overloads.iter()
-    } else {
+    let Some(callables) = ty.try_upcast_to_callable(db, env) else {
         return Truthiness::AlwaysTrue;
     };
 
@@ -1793,7 +1788,7 @@ pub(crate) fn is_non_terminal_call<'db>(
     let mut all_overloads_return_never = true;
     let mut any_overload_is_generic = false;
 
-    for overload in overloads_iterator {
+    for overload in callables.signatures(db) {
         let returns_never = overload.return_ty.is_equivalent_to(db, env, Type::Never);
         no_overloads_return_never &= !returns_never;
         all_overloads_return_never &= returns_never;
@@ -2172,6 +2167,12 @@ pub(crate) fn evaluate_reachability_with_cache<'db>(
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
+    /// Returns whether every reachable declaration is an annotated assignment.
+    ///
+    /// Unbound entries and unreachable definitions do not affect the result. This distinguishes
+    /// attribute annotations from other declarations, such as methods, imports, and nested classes.
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool;
+
     fn any_reachable(
         self,
         db: &'db dyn Db,
@@ -2187,6 +2188,14 @@ pub(crate) trait DeclarationsIteratorExtension<'db> {
 }
 
 impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
+    fn contains_only_annotated_assignments(self, db: &'db dyn Db) -> bool {
+        !self.any_reachable(db, |declaration| {
+            declaration.is_defined_and(|definition| {
+                !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_))
+            })
+        })
+    }
+
     fn any_reachable(
         mut self,
         db: &'db dyn Db,

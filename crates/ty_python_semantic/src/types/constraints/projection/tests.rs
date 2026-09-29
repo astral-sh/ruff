@@ -9,8 +9,8 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    CandidateSolution, CandidateSolutions, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, PathBound, PathBoundSolution, Solution, SolutionPaths,
+    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
+    ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths,
     SolutionValidity, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
@@ -85,10 +85,11 @@ fn collect_paths<'db, 'c>(
     budget: SolutionBudget,
 ) -> Result<SolutionProjection<Paths<'db>>, ProjectionError> {
     let env = db.program_environment();
+    let inferable = TypeVarSet::from_typevars(db, typevars.iter().copied());
     set.try_fold_solutions(
         db,
         &env,
-        TypeVarSet::from_typevars(db, typevars.iter().copied()),
+        inferable,
         budget,
         |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
@@ -319,8 +320,9 @@ fn incomplete_solution_discards_the_projection() {
 
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
-        let choose = |_, bound: &PathBound<'_>| {
-            if bound.evidence_lower == Some(str) {
+        let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
+            let lower = candidate.inference_lower(db, &env);
+            if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
                 }
@@ -385,10 +387,11 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                     fallback: Some(str),
                 },
             ] {
-                let choose = |_, bound: &PathBound<'_>| {
-                    if bound.bound_typevar == u {
+                let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
+                    let lower = candidate.inference_lower(db, &env);
+                    if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
-                    } else if bound.evidence_lower == Some(str) {
+                    } else if lower == Some(str) {
                         rejected_binding
                     } else {
                         PathBoundSolution::Solved(int)
@@ -630,7 +633,9 @@ class E: ...
         let paths = CandidateSolutions::Constrained(
             alternatives
                 .map(|ty| CandidateSolution {
-                    typevars: Box::new([PathBound::exact(t, ty)]) as Box<[_]>,
+                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
+                        as Box<[_]>,
+                    validity: SolutionValidity::Valid,
                 })
                 .into(),
         );

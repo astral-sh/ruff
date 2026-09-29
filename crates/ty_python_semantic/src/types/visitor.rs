@@ -149,7 +149,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
         if self.should_visit_lazy_type_attributes() {
-            self.visit_type(db, recursive.unfold(db, self.program_environment()));
+            self.visit_type(
+                db,
+                recursive.unfold(db, self.program_environment()).into_type(),
+            );
         } else {
             self.notify_skipped_lazy_type_attributes();
         }
@@ -587,6 +590,12 @@ fn dynamic_content_impl<'db>(
             walk_specialization_types(db, alias.specialization(db), self);
         }
 
+        fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
+            if type_is.materialization_kind(db).is_none() {
+                walk_typeis_type(db, type_is, self);
+            }
+        }
+
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
             self.active_type_aliases.visit(
                 &alias.definition(db),
@@ -599,7 +608,7 @@ fn dynamic_content_impl<'db>(
             self.active_recursive_types.visit(
                 &recursive.constructor(db),
                 || self.record(DynamicContent::Indeterminate),
-                || self.visit_type(db, recursive.unfold(db, self.env)),
+                || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
             );
         }
 
@@ -931,7 +940,15 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                     Type::Recursive(recursive) => active_aliases.visit(
                         &nested.to_type_identity(db),
                         || true,
-                        || search(db, env, recursive.unfold(db, env), query, active_aliases),
+                        || {
+                            search(
+                                db,
+                                env,
+                                recursive.unfold(db, env).into_type(),
+                                query,
+                                active_aliases,
+                            )
+                        },
                     ),
                     _ => false,
                 }

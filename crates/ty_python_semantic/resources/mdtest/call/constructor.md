@@ -628,6 +628,30 @@ class Bar:
 reveal_type(Bar())  # revealed: Bar
 ```
 
+## `__new__` borrowed from another class
+
+A borrowed `__new__` method retains the upper bound on its `Self` receiver. The class being
+constructed must be a subclass of the class that defined the method.
+
+```py
+from typing_extensions import Self
+
+class A:
+    value: int = 1
+
+    def __new__(cls: type[Self]) -> int:
+        return cls.value
+
+class B:
+    __new__ = A.__new__
+
+class C(A):
+    __new__ = A.__new__
+
+B()  # error: [invalid-argument-type] "Argument type `B` does not satisfy upper bound `A` of type variable `Self`"
+reveal_type(C())  # revealed: int
+```
+
 ## A callable instance in place of `__new__`
 
 ### Bound
@@ -1765,11 +1789,7 @@ class C[T: (str | None, int | None)]:
         raise NotImplementedError
 
 reveal_type(C("a"))  # revealed: C[str | None]
-
-# TODO: Resolve `U` before selecting a constraint for `T`. This should infer
-# `C[int | None]` without an error.
-# error: [invalid-argument-type]
-reveal_type(C(1))  # revealed: C[str | None]
+reveal_type(C(1))  # revealed: C[int | None]
 ```
 
 ## Union `self` annotations with variadic constructor parameters
@@ -2125,6 +2145,34 @@ class Foo:
 reveal_type(Foo(1))  # revealed: Foo
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `Callable.__call__`"
 reveal_type(Foo())  # revealed: Foo
+```
+
+An explicit `Self` annotation on the callable's receiver refers to the callable instance, not the
+class being constructed:
+
+```py
+from typing_extensions import Self
+
+class SelfCallable:
+    def __call__(self: Self, x: int) -> None: ...
+
+class WithSelfCallable:
+    __init__ = SelfCallable()
+
+reveal_type(WithSelfCallable(1))  # revealed: WithSelfCallable
+```
+
+For a classmethod `__call__`, the `cls: type[Self]` receiver refers to the callable's class:
+
+```py
+class ClassmethodCallable:
+    @classmethod
+    def __call__(cls: type[Self], x: int) -> None: ...
+
+class WithClassmethodCallable:
+    __init__ = ClassmethodCallable()
+
+reveal_type(WithClassmethodCallable(1))  # revealed: WithClassmethodCallable
 ```
 
 ### Possibly Unbound

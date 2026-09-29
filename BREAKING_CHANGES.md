@@ -247,7 +247,7 @@ This is a follow-up to release 0.10.0. Because of a mistake in the release proce
 
 ## 0.9.0
 
-Ruff now formats your code according to the 2025 style guide. As a result, your code might now get formatted differently. See the [changelog](./CHANGELOG.md#090) for a detailed list of changes.
+Ruff now formats your code according to the 2025 style guide. As a result, your code might now get formatted differently. See the [changelog](./changelogs/0.9.x.md#090) for a detailed list of changes.
 
 ## 0.8.0
 
@@ -336,7 +336,7 @@ Ruff now formats your code according to the 2025 style guide. As a result, your 
 
 ### Ruff 2024.2 style
 
-The formatter now formats code according to the Ruff 2024.2 style guide. Read the [changelog](./CHANGELOG.md#030) for a detailed list of stabilized style changes.
+The formatter now formats code according to the Ruff 2024.2 style guide. Read the [changelog](./changelogs/0.3.x.md#030) for a detailed list of stabilized style changes.
 
 ### `isort`: Use one blank line after imports in typing stub files ([#9971](https://github.com/astral-sh/ruff/pull/9971))
 

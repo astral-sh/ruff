@@ -2035,6 +2035,19 @@ def _(
     reveal_type(callable_style_to_style)  # revealed: (Style, /) -> Style
 ```
 
+## Ordinary assignments remain values
+
+An assignment that is never used in a type expression is not checked as a type alias. In particular,
+`Self` can be stored as a value, and a list of classes is an ordinary list.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    marker = Self
+    classes = [int, str]
+```
+
 ## Recursive
 
 ### Old union syntax
@@ -2324,6 +2337,130 @@ def inspect(
     reveal_type(plain)  # revealed: Unknown
     reveal_type(recursive)  # revealed: Unknown
     reveal_type(explicit)  # revealed: Explicit
+```
+
+### Invalid cycles
+
+An implicit alias cannot include itself as a union member without a containing type. The error is
+reported once at the definition, even when the alias is used in multiple annotations.
+
+```py
+from typing import Union
+
+# snapshot: cyclic-type-alias-definition
+IntOr = Union[int, "IntOr"]
+
+def first(value: IntOr): ...
+def second(value: IntOr): ...
+```
+
+```snapshot
+error[cyclic-type-alias-definition]: Type alias `IntOr` has a circular definition
+ --> src/mdtest_snippet.py:4:9
+  |
+4 | IntOr = Union[int, "IntOr"]
+  |         ^^^^^^^^^^^^^^^^^^^
+```
+
+The same restriction applies to mutually recursive aliases.
+
+```py
+First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alias `First` has a circular definition"
+Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
+
+def inspect(first: First, second: Second): ...
+```
+
+### Invalid generic cycles
+
+Specializing a recursive reference does not guard its cycle. A generic implicit alias cannot include
+a specialization of itself as a union member.
+
+```py
+from typing import TypeVar, Union
+
+T = TypeVar("T")
+Alias = Union[T, "Alias[T]"]  # error: [cyclic-type-alias-definition]
+Growing = Union[T, "Growing[list[T]]"]  # error: [cyclic-type-alias-definition]
+
+def inspect(bare: Alias, specialized: Alias[int], growing: Growing[int]): ...
+```
+
+### Invalid recursive alias bodies
+
+`Self` cannot appear in a type alias. Repeated uses of a recursive alias report the error once, at
+its definition.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Tree = tuple[Self, "Node.Tree"]
+
+def first(value: Node.Tree): ...
+def second(value: Node.Tree): ...
+```
+
+Errors that are also detected while inferring the assignment's runtime value are reported once.
+
+```py
+Tree = tuple["Tree", 1]  # error: [invalid-type-form]
+
+def first(value: Tree): ...
+def second(value: Tree): ...
+```
+
+### Suppressing invalid recursive alias bodies
+
+A suppression on an alias definition applies to errors in its type expression. The suppression is
+used even when the assignment is valid as a runtime expression.
+
+```toml
+[rules]
+unused-ignore-comment = "error"
+```
+
+```py
+from typing_extensions import Self
+
+class Node:
+    Tree = tuple[Self, "Node.Tree"]  # ty: ignore[invalid-type-form]
+
+def inspect(value: Node.Tree): ...
+```
+
+### Invalid bodies in mutually recursive aliases
+
+Using an alias also checks the bodies of aliases it references. An error in a mutually recursive
+alias is reported once at its definition.
+
+```py
+from typing_extensions import Self
+
+class Node:
+    First = tuple["Node.Second"]
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Second = tuple[Self, "Node.First"]
+
+def inspect(value: Node.First): ...
+```
+
+### Recursive aliases inside unchecked functions
+
+`no_type_check` suppresses errors in nested class bodies, including errors in recursive aliases used
+by a nested function.
+
+```py
+from typing import no_type_check
+from typing_extensions import Self
+
+@no_type_check
+def unchecked():
+    class Node:
+        Tree = tuple[Self, "Node.Tree"]
+
+    def inspect(value: Node.Tree): ...
 ```
 
 ### Mutually recursive aliases
@@ -2664,14 +2801,14 @@ def inspect(direct: Direct, repeated: Repeated):
     repeated[0]
 ```
 
-A union retains its non-recursive alternative after recovery.
+A union member does not make an unguarded cycle valid.
 
 ```py
-WithLeaf = int | Identity["WithLeaf"]
+WithLeaf = int | Identity["WithLeaf"]  # error: [cyclic-type-alias-definition]
 
 def inspect_union(value: WithLeaf):
-    reveal_type(value)  # revealed: int
-    value[0]  # error: [not-subscriptable]
+    reveal_type(value)  # revealed: Divergent
+    value[0]
 ```
 
 ### Generic recursive aliases

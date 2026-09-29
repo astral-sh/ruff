@@ -171,13 +171,7 @@ fn check_method_typevar_variance<'db>(
     let last_definition = function.literal(db).last_definition;
     let signatures = match member.read_ty {
         Type::FunctionLiteral(function) => Some(function.signature(db)),
-        Type::BoundMethod(method) => method.function(db).map(|function| {
-            function.bound_signatures(
-                db,
-                method.signature_receiver(db),
-                method.typing_self_type(db),
-            )
-        }),
+        Type::BoundMethod(method) => method.bound_signatures(db),
         Type::Callable(callable) => Some(callable.signatures(db)),
         _ => None,
     }

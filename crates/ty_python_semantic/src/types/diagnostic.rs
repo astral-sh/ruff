@@ -108,6 +108,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_ENUM_MEMBER_ANNOTATION);
     registry.register_lint(&INVALID_GENERIC_ENUM);
     registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_INIT_TYPE_VARIABLE);
     registry.register_lint(&INVALID_MODULE_GETATTR_CALL);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_PARAMSPEC);
@@ -192,8 +193,11 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
+    registry.register_lint(&TRUTHINESS_TEST_OF_NONE_UNION);
     registry.register_lint(&REDUNDANT_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
+    registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
+    registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
 
     // String annotations
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
@@ -722,6 +726,15 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_CHECKING_CONSTANT = {
         summary: "detects invalid `TYPE_CHECKING` constant assignments",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invalid-init-type-variable.md")]
+    pub(crate) static INVALID_INIT_TYPE_VARIABLE = {
+        summary: "detects type variables from outer scopes in `__init__` receiver annotations",
+        status: LintStatus::stable("0.0.83"),
         default_level: Level::Error,
     }
 }
@@ -1373,7 +1386,16 @@ declare_lint! {
     pub(crate) static INVALID_LEGACY_POSITIONAL_PARAMETER = {
         summary: "detects incorrect usage of the legacy convention for specifying positional-only parameters",
         status: LintStatus::stable("0.0.15"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-none-union.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_NONE_UNION = {
+        summary: "detects truthiness checks that conflate `None` with other falsy values",
+        status: LintStatus::stable("0.0.84"),
+        default_level: Level::Ignore,
     }
 }
 
@@ -1392,6 +1414,24 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey (strict)",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-callable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_CALLABLE = {
+        summary: "detects truthiness tests of `Callable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/truthiness-test-of-iterable.md")]
+    pub(crate) static TRUTHINESS_TEST_OF_ITERABLE = {
+        summary: "detects truthiness tests of `Iterable`-typed objects",
+        status: LintStatus::stable("0.0.83"),
+        default_level: Level::Warn,
     }
 }
 
@@ -1436,6 +1476,21 @@ impl TypeCheckDiagnostics {
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    /// Extend with selected diagnostics while retaining all used suppressions.
+    pub(super) fn extend_filtered(
+        &mut self,
+        other: &TypeCheckDiagnostics,
+        mut include: impl FnMut(&Diagnostic) -> bool,
+    ) {
+        self.diagnostics.extend(
+            other
+                .iter()
+                .filter(|diagnostic| include(diagnostic))
+                .cloned(),
+        );
         self.used_suppressions.extend(&other.used_suppressions);
     }
 

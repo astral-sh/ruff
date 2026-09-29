@@ -365,6 +365,14 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Returns the recorded use of an expression, if it loads a tracked place.
+    pub fn try_expression_use_id(
+        &self,
+        expression: ast::ExprRef<'_>,
+    ) -> Option<ast_ids::ScopedUseId> {
+        self.ast_ids.try_use_id(expression)
+    }
+
     /// Returns the place table for a specific scope.
     ///
     /// Use the Salsa cached [`place_table()`] query if you only need the

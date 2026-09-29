@@ -154,12 +154,10 @@ impl<'db> ClassBase<'db> {
             }
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::Recursive(recursive) => recursive.map_or_else(
-                db,
-                env,
-                || None,
-                |unfolded| Self::try_from_type(db, env, unfolded, subclass),
-            ),
+            Type::Recursive(recursive) => {
+                let unfolded = recursive.unfold(db, env).into_unfolded()?;
+                Self::try_from_type(db, env, unfolded, subclass)
+            }
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)

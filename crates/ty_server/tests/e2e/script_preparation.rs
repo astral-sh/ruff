@@ -9,7 +9,7 @@ use ty_project::UseUv;
 use ty_server::{ClientOptions, DiagnosticMode};
 
 use crate::TestServerBuilder;
-use crate::workspace_folders::condensed_workspace_diagnostic_snapshot;
+use crate::diagnostic_snapshots::condensed_workspace_diagnostic_snapshot;
 
 #[test]
 #[cfg(feature = "test-uv")]

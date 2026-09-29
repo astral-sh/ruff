@@ -11,8 +11,10 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
 use crate::types::equality::{
-    ComparisonSoundnessPolicy, TupleEqualityEvaluator, equality_truthiness, inequality_truthiness,
+    ComparisonSoundnessPolicy, ContainerElementEqualityEvaluator, equality_truthiness,
+    inequality_truthiness,
 };
+use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::known_instance::{FunctoolsPartialInstance, InternedType, MethodWrapper};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::{
@@ -244,7 +246,22 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> FunctionType<'db> {
-            FunctionType::new(db, function.literal(db), None)
+            function.without_updated_signatures(db)
+        }
+
+        fn upcast_bound_method<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            method: BoundMethodType<'db>,
+            visitor: &UpcastingVisitor<'db>,
+        ) -> BoundMethodType<'db> {
+            method
+                .with_func(db, upcast(db, env, method.func(db), visitor).ty)
+                .with_constrained_receiver(
+                    db,
+                    upcast(db, env, method.self_instance(db), visitor).ty,
+                    method.signature_receiver(db),
+                )
         }
 
         fn upcast_property<'db>(
@@ -296,9 +313,10 @@ impl<'db> Type<'db> {
         ) -> UpcastResult<'db> {
             match ty {
                 Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
-                    recursive.map_or(db, env, UpcastResult::unstable(ty), |unfolded| {
-                        upcast(db, env, unfolded, visitor)
-                    })
+                    recursive
+                        .unfold(db, env)
+                        .map(|unfolded| upcast(db, env, unfolded, visitor))
+                        .unwrap_or(UpcastResult::unstable(ty))
                 }),
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
@@ -315,24 +333,29 @@ impl<'db> Type<'db> {
                     unspecialized_function(db, function),
                 )),
                 Type::BoundMethod(method) => visit_type(db, ty, visitor, || {
-                    UpcastResult::unstable(Type::BoundMethod(BoundMethodType::from_callable(
-                        db,
-                        upcast(db, env, method.func(db), visitor).ty,
-                        upcast(db, env, method.self_instance(db), visitor).ty,
-                        method.signature_receiver(db),
+                    UpcastResult::unstable(Type::BoundMethod(upcast_bound_method(
+                        db, env, method, visitor,
                     )))
                 }),
                 Type::KnownBoundMethod(method) => visit_type(db, ty, visitor, || {
                     let (method, retention) = match method {
                         KnownBoundMethodType::FunctionTypeDunderGet(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderGet(unspecialized_function(
-                                db, function,
+                            KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(
+                                db,
+                                upcast(db, env, function.inner(db), visitor).ty,
                             )),
                             NegativeRetention::Unstable,
                         ),
-                        KnownBoundMethodType::FunctionTypeDunderCall(function) => (
-                            KnownBoundMethodType::FunctionTypeDunderCall(unspecialized_function(
-                                db, function,
+                        KnownBoundMethodType::DunderCall(callable) => (
+                            KnownBoundMethodType::DunderCall(InternedType::new(
+                                db,
+                                upcast(db, env, callable.inner(db), visitor).ty,
+                            )),
+                            NegativeRetention::Unstable,
+                        ),
+                        KnownBoundMethodType::MethodTypeDunderGet(method) => (
+                            KnownBoundMethodType::MethodTypeDunderGet(upcast_bound_method(
+                                db, env, method, visitor,
                             )),
                             NegativeRetention::Unstable,
                         ),
@@ -646,10 +669,6 @@ enum MembershipOperator {
 }
 
 impl MembershipOperator {
-    const fn is_in(self) -> bool {
-        matches!(self, MembershipOperator::In)
-    }
-
     const fn is_not_in(self) -> bool {
         matches!(self, MembershipOperator::NotIn)
     }
@@ -695,6 +714,54 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) op: ast::CmpOp,
     pub(crate) left_ty: Type<'db>,
     pub(crate) right_ty: Type<'db>,
+}
+
+/// Refine membership using the contents of an immediately consumed container display.
+/// For sets, assume equality is an equivalence relation and equal objects have equal hashes.
+pub(super) fn infer_literal_membership_comparison<'db>(
+    context: &InferContext<'db, '_>,
+    left: Type<'db>,
+    op: ast::CmpOp,
+    right: &ast::Expr,
+    expression_type: impl FnMut(&ast::Expr) -> Type<'db>,
+) -> Option<Type<'db>> {
+    let negate = match op {
+        ast::CmpOp::In => false,
+        ast::CmpOp::NotIn => true,
+        _ => return None,
+    };
+    let db = context.db();
+    let env = context.program_environment();
+    let elements = extract_literal_container_element_types(db, env, right, expression_type)?;
+    let truthiness = fixed_membership_truthiness(context, left, &elements).negate_if(negate);
+    Some(Type::from_truthiness(db, env, truthiness))
+}
+
+/// Evaluate membership using the supplied element types and identity-or-equality semantics.
+/// An ambiguous comparison does not prevent a later element from proving membership.
+fn fixed_membership_truthiness<'db>(
+    context: &InferContext<'db, '_>,
+    needle: Type<'db>,
+    elements: &[Type<'db>],
+) -> Truthiness {
+    let db = context.db();
+    let env = context.program_environment();
+    let soundness_policy =
+        ComparisonSoundnessPolicy::from_analysis_settings(db.analysis_settings(context.file()));
+    let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
+    let mut truthiness = Truthiness::AlwaysFalse;
+    for &element in elements {
+        // It's okay to ignore errors here because Python doesn't call `__bool__`
+        // for different union variants. Instead, this is just for us to
+        // evaluate a possibly truthy value to `false` or `true`.
+        truthiness = truthiness.or(equality
+            .element_truthiness(element, needle)
+            .unwrap_or_else(|error| error.fallback_truthiness()));
+        if truthiness.is_always_true() {
+            break;
+        }
+    }
+    truthiness
 }
 
 /// Infers the type of a binary comparison (e.g. 'left == right'). See
@@ -781,31 +848,9 @@ fn infer_binary_type_comparison_inner<'db>(
         && let Some(right_tuple) = right.tuple_instance_spec(db, env)
         && let Tuple::Fixed(right_tuple) = &*right_tuple
     {
-        let mut any_eq = false;
-        let mut any_ambiguous = false;
-        let mut equality = TupleEqualityEvaluator::new(db, env, soundness_policy);
-
-        for &element_ty in right_tuple.elements_slice() {
-            // It's okay to ignore errors here because Python doesn't call `__bool__`
-            // for different union variants. Instead, this is just for us to
-            // evaluate a possibly truthy value to `false` or `true`.
-            match equality
-                .element_truthiness(element_ty, left)
-                .unwrap_or_else(|error| error.fallback_truthiness())
-            {
-                Truthiness::AlwaysTrue => any_eq = true,
-                Truthiness::AlwaysFalse => (),
-                Truthiness::Ambiguous => any_ambiguous = true,
-            }
-        }
-
-        return Ok(if any_eq {
-            Type::bool_literal(op.is_in())
-        } else if !any_ambiguous {
-            Type::bool_literal(op.is_not_in())
-        } else {
-            KnownClass::Bool.to_instance(db, env)
-        });
+        let truthiness = fixed_membership_truthiness(context, left, right_tuple.elements_slice())
+            .negate_if(op.is_not_in());
+        return Ok(Type::from_truthiness(db, env, truthiness));
     }
 
     let comparison_truthiness = match op {
@@ -1552,7 +1597,7 @@ fn infer_tuple_rich_comparison<'db>(
             let soundness_policy = ComparisonSoundnessPolicy::from_analysis_settings(
                 db.analysis_settings(context.file()),
             );
-            let mut equality = TupleEqualityEvaluator::new(db, env, soundness_policy);
+            let mut equality = ContainerElementEqualityEvaluator::new(db, env, soundness_policy);
 
             for (l_ty, r_ty) in left_iter.zip(right_iter) {
                 let eq_truthiness = equality

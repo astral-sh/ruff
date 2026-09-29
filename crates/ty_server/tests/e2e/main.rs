@@ -28,10 +28,12 @@
 //! [`await_notification`]: TestServer::await_notification
 
 mod call_hierarchy;
+mod closed_documents;
 mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod diagnostic_snapshots;
 mod file_watching;
 mod folding_range;
 mod goto_definition;
@@ -71,16 +73,16 @@ use lsp_types::{
     DidCloseTextDocumentNotification, DidCloseTextDocumentParams, DidOpenTextDocumentNotification,
     DidOpenTextDocumentParams, DidSaveTextDocumentNotification, DidSaveTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReport, DocumentDiagnosticRequest,
-    ExitNotification, FileEvent, FileSystemWatcher, FoldingRange, FoldingRangeParams, Hover,
-    HoverParams, HoverRequest, InitializeParams, InitializeRequest, InitializeResult,
-    InitializedNotification, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, InlayHintRequest, LanguageKind, Notification, PartialResultParams, Position,
-    PrepareRenameRequest, PreviousResultId, PublishDiagnosticsClientCapabilities, Range,
-    RegistrationRequest, Request, SemanticTokens, ShutdownRequest, SignatureHelp,
-    SignatureHelpParams, SignatureHelpRequest, SignatureHelpTriggerKind,
-    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
-    TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest, Uri,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    ExitNotification, FileChangeType, FileEvent, FileSystemWatcher, FoldingRange,
+    FoldingRangeParams, Hover, HoverParams, HoverRequest, InitializeParams, InitializeRequest,
+    InitializeResult, InitializedNotification, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, InlayHintRequest, LanguageKind, Notification,
+    PartialResultParams, Position, PrepareRenameRequest, PreviousResultId,
+    PublishDiagnosticsClientCapabilities, Range, RegistrationRequest, Request, SemanticTokens,
+    ShutdownRequest, SignatureHelp, SignatureHelpParams, SignatureHelpRequest,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, UnregistrationRequest,
+    Uri, VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
     WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticRequest,
     WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent, WorkspaceFoldersInitializeParams,
 };
@@ -947,6 +949,18 @@ impl TestServer {
         self.send_notification::<DidChangeWatchedFilesNotification>(params);
     }
 
+    /// Sends a `workspace/didChangeWatchedFiles` notification for one path.
+    pub(crate) fn did_change_watched_file(
+        &mut self,
+        path: impl AsRef<SystemPath>,
+        kind: FileChangeType,
+    ) {
+        self.did_change_watched_files(vec![FileEvent {
+            uri: self.file_uri(path),
+            kind,
+        }]);
+    }
+
     /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
     /// workspace folders. The paths provided should be paths to the root of the workspace folder.
     pub(crate) fn change_workspace_folders<P: AsRef<SystemPath>>(
@@ -1615,7 +1629,6 @@ impl TestServerBuilder {
     }
 
     /// Write multiple files to the test directory
-    #[expect(dead_code)]
     pub(crate) fn with_files<P, C, I>(mut self, files: I) -> Result<Self>
     where
         I: IntoIterator<Item = (P, C)>,
@@ -1681,6 +1694,11 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to uri"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_uri.path()), "<temp_dir>/");
+        // Absolute globs use forward slashes on every platform.
+        settings.add_filter(
+            &tempdir_filter(project_dir.as_str().replace('\\', "/")),
+            "<temp_dir>/",
+        );
         settings.add_filter(r#"\\\\"#, "/");
         settings.add_filter(
             r#"The system cannot find the file specified."#,

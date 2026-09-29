@@ -1,12 +1,13 @@
 use memchr::memmem::Finder;
+use unicode_normalization::is_nfkc;
 
 /// A reusable text prefilter for an identifier or keyword.
 ///
 /// A match only indicates that a source may contain the name: matches in
 /// comments and strings are included. Matchers created with [`Self::new`] accept
-/// all non-ASCII sources because Python normalizes identifiers with NFKC. Matchers
-/// created with [`Self::keyword`] search their literal spelling instead. Callers should
-/// validate candidates using the AST or semantic analysis.
+/// sources that change under NFKC normalization because Python normalizes
+/// identifiers this way. Matchers created with [`Self::keyword`] search their literal
+/// spelling instead. Callers should validate candidates using the AST or semantic analysis.
 ///
 /// Construct a matcher once and reuse it across sources to avoid preprocessing
 /// the name for each source. Cache matchers for fixed names in a [`std::sync::LazyLock`].
@@ -18,6 +19,8 @@ pub struct NameMatcher<'a> {
 
 impl<'a> NameMatcher<'a> {
     /// Creates an identifier matcher that borrows `name` without allocating.
+    ///
+    /// The identifier `name` is expected to be NFKC-normalized.
     pub fn new(name: &'a str) -> Self {
         Self {
             finder: Finder::new(name),
@@ -28,7 +31,7 @@ impl<'a> NameMatcher<'a> {
     /// Creates a keyword matcher that borrows `keyword` without allocating.
     ///
     /// Python recognizes keywords by their literal spelling, without NFKC normalization,
-    /// so keyword matchers skip the ASCII check.
+    /// so keyword matchers skip the normalization check.
     pub fn keyword(keyword: &'a str) -> Self {
         Self {
             finder: Finder::new(keyword),
@@ -38,11 +41,12 @@ impl<'a> NameMatcher<'a> {
 
     /// Returns whether `source` may contain the configured identifier or keyword.
     ///
-    /// Identifier matchers return `true` immediately for non-ASCII source. Otherwise,
-    /// searches for the literal spelling bounded by bytes other than ASCII letters,
-    /// digits or `_`. Matches may occur in comments, strings, or Unicode identifiers.
+    /// Identifier matchers conservatively return `true` if the source changes under
+    /// NFKC normalization. Otherwise, searches for the literal spelling bounded by bytes
+    /// other than ASCII letters, digits or `_`. Matches may occur in comments, strings,
+    /// or Unicode identifiers.
     pub fn may_match(&self, source: &str) -> bool {
-        if !self.is_keyword && !source.is_ascii() {
+        if !self.is_keyword && !source.is_ascii() && !is_nfkc(source) {
             return true;
         }
 
@@ -96,10 +100,26 @@ mod tests {
     }
 
     #[test]
-    fn non_ascii_source_is_a_candidate() {
+    fn normalized_unicode_uses_literal_spelling() {
+        let matcher = NameMatcher::new("C");
+        assert!(!matcher.may_match("# note — a comment"));
+        assert!(!matcher.may_match("# café"));
+        assert!(!matcher.may_match("# 中文"));
+        assert!(!matcher.may_match("# שלום"));
+        assert!(!matcher.may_match("# 🦀"));
+        // There is no precomposed character for 'q' with an acute accent.
+        assert!(!matcher.may_match("# q\u{301}"));
+        assert!(matcher.may_match("# café\nC = 1"));
+        assert!(NameMatcher::new("café").may_match("café = 1"));
+    }
+
+    #[test]
+    fn normalization_can_change_identifiers() {
         let matcher = NameMatcher::new("C");
         assert!(matcher.may_match("𝒞 = 1"));
-        assert!(matcher.may_match("# café"));
+        assert!(matcher.may_match("Ｃ = 1"));
+        assert!(NameMatcher::new("ffi").may_match("ﬃ = 1"));
+        assert!(NameMatcher::new("café").may_match("cafe\u{301} = 1"));
     }
 
     #[test]

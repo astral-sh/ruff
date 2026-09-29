@@ -105,6 +105,7 @@ reveal_type(y)  # revealed: Unknown
 
 ```py
 def one(x: int | None):
+    # error: [truthiness-test-of-none-union]
     assert (y := x), reveal_type(y)  # revealed: (int & ~AlwaysTruthy) | None
     reveal_type(y)  # revealed: int & ~AlwaysFalsy
 

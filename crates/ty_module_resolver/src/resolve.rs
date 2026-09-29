@@ -62,6 +62,7 @@ use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 use crate::{ResolverEnvironment, ResolverFile, SearchPathSettings, SearchPathSettingsError};
 
 use self::search::ModuleSearchCursor;
+pub(crate) use self::search::{list_all_modules, list_root_modules, list_submodules};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -229,7 +230,7 @@ impl ModuleResolveMode {
     /// places due to being unable to resolve builtin symbols. This is similar
     /// behaviour to other type checkers such as mypy:
     /// <https://github.com/python/mypy/blob/3807423e9d98e678bf16b13ec8b4f909fe181908/mypy/build.py#L104-L117>
-    pub(super) fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
+    fn is_non_shadowable(self, minor_version: u8, module_name: &str) -> bool {
         // Builtin modules are never shadowable, no matter what.
         if ruff_python_stdlib::sys::is_builtin_module(minor_version, module_name) {
             return true;
@@ -834,10 +835,12 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
+            // Resolve symlinks so site-packages outside the environment keeps its own file watch,
+            // and imports use the same path as the reported changes.
+            let path = canonicalize(path, system);
             tracing::debug!("Adding site-packages search path `{path}`");
             let path = strategy.fallback_opt(
-                SearchPath::site_packages(system, path.clone())
-                    .map_err(SearchPathSettingsError::from),
+                SearchPath::site_packages(system, path).map_err(SearchPathSettingsError::from),
                 |err| {
                     tracing::debug!("Skipping invalid site-packages search-path: {err}");
                 },
@@ -1138,8 +1141,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             // (Most importantly, don't register a root for editable installations from the project
             // directory as that would change the durability of files within those folders).
             // Not having an exact file root for editable installs just means that
-            // some queries (like `list_modules_in`) will run slightly more frequently
-            // than they would otherwise.
+            // some queries will run slightly more frequently than they would otherwise.
             if files.root(db, path).is_none() {
                 files.try_add_root(db, path, FileRootKind::SearchPath);
             }
@@ -1233,11 +1235,10 @@ fn desperately_resolve_name<'db>(
     ModuleSearchCursor::with_supplied_search_paths(&context, search_paths).resolve_name(name)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 enum ResolvedModule {
     NamespacePackage,
-    LegacyNamespacePackage(File),
-    RegularPackage(File),
+    Package(File),
     Module(File),
 }
 
@@ -1255,7 +1256,7 @@ enum ComponentFileFilter {
 /// Variants are declared from highest to lowest precedence so that derived ordering can be used
 /// when traversing candidates. This is a precedence tier rather than a total ordering: the stable
 /// sorts used by the resolver preserve search-path order between candidates in the same tier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, get_size2::GetSize)]
 enum CandidatePrecedence {
     /// A PEP 561 stub-only package named `<package>-stubs`.
     ///
@@ -1297,7 +1298,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         precedence: CandidatePrecedence,
     ) -> Self {
         Self {
-            directory: ModuleDirectory::new(context, search_path.to_module_path()),
+            directory: ModuleDirectory::new(context, search_path.to_module_path(), Some(true)),
             module: ResolvedModule::NamespacePackage,
             py_typed: PyTyped::Untyped,
             precedence,
@@ -1305,11 +1306,12 @@ impl<'db> ModuleResolutionCandidate<'db> {
     }
 
     // Is this some kind of namespace package?
-    fn is_any_namespace_package(&self) -> bool {
+    fn is_any_namespace_package(&self, context: &ResolverContext) -> bool {
         match self.module {
             ResolvedModule::NamespacePackage => true,
-            ResolvedModule::LegacyNamespacePackage(_) => true,
-            ResolvedModule::RegularPackage(_) => false,
+            ResolvedModule::Package(init) => {
+                is_legacy_namespace_package(self.directory.path(), context, init)
+            }
             ResolvedModule::Module(_) => false,
         }
     }
@@ -1326,23 +1328,8 @@ impl<'db> ModuleResolutionCandidate<'db> {
                 tracing::trace!("Resolve namespace package `{name}`");
                 Module::namespace_package(db, resolver_environment, Cow::Borrowed(name))
             }
-            ResolvedModule::LegacyNamespacePackage(file) => {
-                // legacy namespace packages behave like regular packages
-                // when they're the target of the resolution
-                tracing::trace!(
-                    "Resolved legacy namespace package `{name}` to `{path}`",
-                    path = file.path(db)
-                );
-                Module::file_module(
-                    db,
-                    file,
-                    resolver_environment,
-                    Cow::Borrowed(name),
-                    ModuleKind::Package,
-                    self.directory.into_search_path(),
-                )
-            }
-            ResolvedModule::RegularPackage(file) => {
+            ResolvedModule::Package(file) => {
+                // Legacy namespace packages also use their defining file when resolved directly.
                 tracing::trace!(
                     "Resolved package `{name}` to `{path}`",
                     path = file.path(db)
@@ -1370,7 +1357,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         }
     }
 
-    fn missing_submodule_is_terminal(&self) -> bool {
+    fn missing_submodule_is_terminal(&self, context: &ResolverContext) -> bool {
         if matches!(self.py_typed, PyTyped::Partial) {
             return false;
         }
@@ -1379,10 +1366,7 @@ impl<'db> ModuleResolutionCandidate<'db> {
         // in a higher-priority search path is not shadowed by
         // `foo/__init__.py` in a lower-priority one. Note that both
         // shadow namespace packages.
-        matches!(
-            self.module,
-            ResolvedModule::RegularPackage(_) | ResolvedModule::Module(_)
-        )
+        !self.is_any_namespace_package(context)
     }
 
     fn to_str<'a>(&self, db: &'a dyn Db) -> Cow<'a, str> {
@@ -1394,9 +1378,9 @@ impl<'db> ModuleResolutionCandidate<'db> {
                     .unwrap_or_default()
                     .to_string(),
             ),
-            ResolvedModule::LegacyNamespacePackage(file) => Cow::Borrowed(file.path(db).as_str()),
-            ResolvedModule::RegularPackage(file) => Cow::Borrowed(file.path(db).as_str()),
-            ResolvedModule::Module(file) => Cow::Borrowed(file.path(db).as_str()),
+            ResolvedModule::Package(file) | ResolvedModule::Module(file) => {
+                Cow::Borrowed(file.path(db).as_str())
+            }
         }
     }
 }
@@ -1427,14 +1411,25 @@ fn resolve_stub_package_in_search_path<'db>(
     }
 }
 
+/// Orders candidates for the same module name by precedence and removes shadowed namespace packages.
+///
+/// Regular packages and file modules shadow namespace packages, including legacy namespaces.
+/// When `for_module_name_prefix` is true, partial namespaces with higher precedence than every
+/// competing regular package or file module remain available to supply descendants. Candidates
+/// within the same precedence tier retain their search-path order.
 fn normalize_candidates<'db>(
-    db: &dyn Db,
+    context: &ResolverContext,
     mut candidates: ResolvedNames<'db>,
     for_module_name_prefix: bool,
 ) -> ResolvedNames<'db> {
+    // Namespace classification cannot affect precedence without competing candidates.
+    if candidates.len() < 2 {
+        return candidates;
+    }
+
     let best_concrete_precedence = candidates
         .iter()
-        .filter(|candidate| !candidate.is_any_namespace_package())
+        .filter(|candidate| !candidate.is_any_namespace_package(context))
         .map(|candidate| candidate.precedence)
         .min();
 
@@ -1446,7 +1441,7 @@ fn normalize_candidates<'db>(
     // partial. The stub-package candidate is ordered first so it takes priority. Other candidates
     // are only used when the stub package fails to find a submodule in a partial sub-package.
     candidates.retain(|candidate| {
-        if !candidate.is_any_namespace_package() {
+        if !candidate.is_any_namespace_package(context) {
             return true;
         }
 
@@ -1469,7 +1464,7 @@ fn normalize_candidates<'db>(
         tracing::trace!(
             "Discarding namespace package `{}` because a non-namespace entry of the same name \
              was found",
-            candidate.to_str(db),
+            candidate.to_str(context.db),
         );
         false
     });
@@ -1503,12 +1498,8 @@ fn resolve_component<'db>(
         && let Some(init) =
             resolve_file_module_with_filter(subdirectory, context, "__init__", file_filter)
     {
-        // Check for a regular package first (highest priority).
-        candidate.module = if is_legacy_namespace_package(subdirectory.path(), context, init) {
-            ResolvedModule::LegacyNamespacePackage(init)
-        } else {
-            ResolvedModule::RegularPackage(init)
-        };
+        // Packages with an initializer take precedence over file modules.
+        candidate.module = ResolvedModule::Package(init);
         candidate.py_typed = subdirectory
             .path()
             .py_typed(context)
@@ -1523,12 +1514,12 @@ fn resolve_component<'db>(
     } else {
         // Last resort, check if a folder with the given name exists. If so,
         // then this is a namespace package. We need to skip this check for
-        // typeshed because the `resolve_file_module` can also return `None` if the
+        // typeshed because `resolve_file_module_with_filter` can also return `None` if the
         // `__init__.py` exists but isn't available for the current Python version.
         // Let's assume that the `xml` module is only available on Python 3.11+ and
         // we're resolving for Python 3.10:
         //
-        // * `resolve_file_module("xml/__init__.pyi")` returns `None` even though
+        // * Looking up `xml/__init__.pyi` returns `None` even though
         //   the file exists but the module isn't available for the current Python
         //   version.
         // * The check here would now return `true` because the `xml` directory
@@ -1561,25 +1552,6 @@ fn resolve_component<'db>(
 }
 
 type ResolvedNames<'db> = Vec<ModuleResolutionCandidate<'db>>;
-
-/// If `module` exists on disk with an extension permitted by the resolver's mode, return its
-/// [`File`].
-///
-/// Typing resolution prefers `.pyi` over `.py`; runtime resolution only considers `.py`.
-pub(super) fn resolve_file_module(
-    module: &ModulePath,
-    resolver_state: &ResolverContext,
-) -> Option<File> {
-    let mut parent = module.clone();
-    parent.pop();
-
-    resolve_file_module_with_filter(
-        &ModuleDirectory::new(resolver_state, parent),
-        resolver_state,
-        module.file_stem()?,
-        ComponentFileFilter::ByMode,
-    )
-}
 
 fn resolve_file_module_with_filter(
     directory: &ModuleDirectory,
@@ -1647,6 +1619,18 @@ fn is_legacy_namespace_package(
         return false;
     }
 
+    has_legacy_namespace_declaration(
+        context.db,
+        PythonFile::new(
+            context.db,
+            init,
+            context.resolver_environment.python_version(context.db),
+        ),
+    )
+}
+
+#[salsa::tracked(returns(copy))]
+fn has_legacy_namespace_declaration(db: &dyn Db, init: PythonFile<'_>) -> bool {
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
     //
     // The benefit of being syntax-only is speed and avoiding circular dependencies
@@ -1654,22 +1638,15 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(
-        context.db,
-        PythonFile::new(
-            context.db,
-            init,
-            context.resolver_environment.python_version(context.db),
-        ),
-    );
+    let parsed = ruff_db::parsed::parsed_module(db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(context.db).suite());
+    visitor.visit_body(parsed.load(db).suite());
 
     visitor.is_legacy_namespace_package
 }
 
 /// Info about the `py.typed` file for this package
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
 pub(crate) enum PyTyped {
     /// No `py.typed` was found
     Untyped,

@@ -56,7 +56,7 @@ impl<'db> Type<'db> {
                 }
                 // Recursive bodies can contain type forms; unfold them under the same guard.
                 Type::Recursive(recursive) => visitor.visit(db, ty, || {
-                    project(db, env, recursive.unfold(db, env), visitor)
+                    project(db, env, recursive.unfold(db, env).into_type(), visitor)
                 }),
                 Type::Union(union) => {
                     let mut elements = union

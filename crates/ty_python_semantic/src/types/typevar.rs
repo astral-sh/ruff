@@ -574,7 +574,7 @@ impl<'db> TypeVarInstance<'db> {
                     }
                     type_is_self_referential_impl(
                         state,
-                        recursive.unfold(db, state.env),
+                        recursive.unfold(db, state.env).into_type(),
                         self_identity,
                     )
                 }
@@ -1260,13 +1260,20 @@ impl<'db> BoundTypeVarInstance<'db> {
         specialization: Specialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
+        let mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        self.apply_type_mapping_to_bound_or_constraints(db, &mapping, &visitor)
+    }
+
+    fn apply_type_mapping_to_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         self.map_bound_or_constraints(db, |original| {
-            let original = original?;
-            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
-                specialization,
-            ));
-            let visitor = ApplyTypeMappingVisitor::new(env);
-            Some(original.apply_type_mapping_impl(db, &mapping, &visitor))
+            original.map(|original| original.apply_type_mapping_impl(db, type_mapping, visitor))
         })
     }
 
@@ -1434,7 +1441,11 @@ impl<'db> BoundTypeVarInstance<'db> {
                         visitor,
                     ))
                 } else {
-                    Type::TypeVar(self)
+                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
+                        db,
+                        type_mapping,
+                        visitor,
+                    ))
                 }
             }
             TypeMapping::Promote(..)
@@ -1658,6 +1669,17 @@ pub enum TypeVarKind {
 }
 
 impl TypeVarKind {
+    pub(super) const fn is_pep695(self) -> bool {
+        match self {
+            Self::Pep695TypeVar | Self::Pep695ParamSpec | Self::Pep695TypeVarTuple => true,
+            Self::LegacyTypeVar
+            | Self::TypingSelf
+            | Self::LegacyParamSpec
+            | Self::LegacyTypeVarTuple
+            | Self::Pep613Alias => false,
+        }
+    }
+
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }

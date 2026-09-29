@@ -738,10 +738,10 @@ def lower_bound[T, U]():
     static_assert(constraints.implies_subtype_of(Outer[Inner[int]], U))
 ```
 
-### Gradual equivalence substitutions preserve correlation
+### Substituting gradual equivalences into nested bounds
 
-A gradual equivalence uses the same materialization on both sides. We can therefore substitute it
-into a nested bound without relying on transitivity through gradual assignability.
+Substituting a gradual equivalence into a lower bound preserves assignability, but does not
+establish subtyping.
 
 ```py
 from typing import Any
@@ -754,7 +754,8 @@ class Covariant[T]:
 
 def equivalence_into_lower[T, U]():
     constraints = ConstraintSet.equality(T, Any) & ConstraintSet.lower_bound(Covariant[T], U)
-    static_assert(constraints.implies_subtype_of(Covariant[Any], U))
+    static_assert(constraints.satisfies(ConstraintSet.lower_bound(Covariant[Any], U)))
+    static_assert(not constraints.implies_subtype_of(Covariant[Any], U))
 
 def equivalence_into_equality[T, U]():
     constraints = ConstraintSet.equality(T, Any) & ConstraintSet.equality(U, Covariant[T])

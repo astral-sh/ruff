@@ -2,10 +2,13 @@
 
 use std::process::Output;
 
+use pep440_rs::Version;
 use ruff_db::system::{Command, CommandExecutor, System, SystemPath, WhichError};
 use ty_static::EnvVars;
 
 use super::{UvMetadata, UvMetadataError};
+
+pub(super) const MINIMUM_UV_VERSION: [u64; 3] = [0, 12, 3];
 
 #[derive(Clone)]
 pub(crate) struct Uv {
@@ -31,6 +34,7 @@ impl Uv {
         let output = system
             .command_executor()
             .ok_or_else(unsupported_command_execution)
+            .map_err(UvMetadataError::Invocation)
             .and_then(|executor| self.execute(executor, target));
         Self::parse_metadata_output(system, output)
     }
@@ -44,25 +48,27 @@ impl Uv {
         &self,
         executor: &dyn CommandExecutor,
         target: &MetadataTarget<'_>,
-    ) -> std::io::Result<Output> {
+    ) -> Result<Output, UvMetadataError> {
         let mut command = Command::new(self.executable.as_str());
         command.args(["workspace", "metadata", "--quiet"]);
 
-        match target {
+        let directory = match target {
             MetadataTarget::Workspace(path) => {
                 // Use the environment selected by `uv check` without synchronizing it.
                 // Let uv apply its configured lockfile policy.
-                command.arg("--active").current_dir(path);
+                command.arg("--active");
+                Some(*path)
             }
             MetadataTarget::Script { path, python } => {
                 command.args(["--sync", "--script", path.as_str()]);
                 if let Some(python) = python {
                     command.args(["--python", python.as_str()]);
                 }
-                if let Some(parent) = path.parent() {
-                    command.current_dir(parent);
-                }
+                path.parent()
             }
+        };
+        if let Some(directory) = directory {
+            command.current_dir(directory);
         }
 
         tracing::debug!(
@@ -79,15 +85,52 @@ impl Uv {
             start.elapsed().as_secs_f64()
         );
 
-        output
+        let output = output.map_err(UvMetadataError::Invocation)?;
+
+        // Before uv 0.12.3, `--quiet` suppresses the metadata JSON even on success.
+        if (!output.status.success() || output.stdout.is_empty())
+            && let Some(version) = self.version(executor, directory)
+            && version < Version::new(MINIMUM_UV_VERSION)
+        {
+            return Err(UvMetadataError::UnsupportedVersion {
+                executable: self.executable.clone(),
+                version,
+            });
+        }
+
+        Ok(output)
+    }
+
+    fn version(
+        &self,
+        executor: &dyn CommandExecutor,
+        directory: Option<&SystemPath>,
+    ) -> Option<Version> {
+        let mut command = Command::new(self.executable.as_str());
+        command.arg("--version");
+        if let Some(directory) = directory {
+            command.current_dir(directory);
+        }
+        let output = executor.execute(command).ok()?;
+        if !output.status.success() {
+            return None;
+        }
+
+        std::str::from_utf8(&output.stdout)
+            .ok()?
+            .strip_prefix("uv ")?
+            .split_whitespace()
+            .next()?
+            .parse()
+            .ok()
     }
 
     /// Parses and validates the output returned by [`Self::execute`].
     pub(crate) fn parse_metadata_output(
         system: &dyn System,
-        output: std::io::Result<Output>,
+        output: Result<Output, UvMetadataError>,
     ) -> Result<UvMetadata, UvMetadataError> {
-        let output = output.map_err(UvMetadataError::Invocation)?;
+        let output = output?;
 
         if !output.status.success() {
             return Err(UvMetadataError::CommandFailed {

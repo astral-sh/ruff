@@ -47,18 +47,37 @@ help: Import from `unittest.mock` instead
 
 ## Explicit lazy imports
 
-An explicit lazy import is diagnosed, but the fixer does not support the `lazy` keyword, so no fix
-is offered.
+The replacement imports retain `lazy`, including when a `from` import is split.
 
 ```py
-lazy from mock import patch  # snapshot: deprecated-mock-import
+lazy from mock import mock, patch  # snapshot: deprecated-mock-import
+lazy import mock  # snapshot: deprecated-mock-import
 ```
 
 ```snapshot
 error[UP026]: `mock` is deprecated, use `unittest.mock`
  --> src/mdtest_snippet.py:1:1
   |
-1 | lazy from mock import patch  # snapshot: deprecated-mock-import
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1 | lazy from mock import mock, patch  # snapshot: deprecated-mock-import
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Import from `unittest.mock` instead
+  |
+  - lazy from mock import mock, patch  # snapshot: deprecated-mock-import
+1 + lazy from unittest.mock import patch
+2 + lazy from unittest import mock  # snapshot: deprecated-mock-import
+3 | lazy import mock  # snapshot: deprecated-mock-import
+  |
+
+
+error[UP026]: `mock` is deprecated, use `unittest.mock`
+ --> src/mdtest_snippet.py:2:13
+  |
+2 | lazy import mock  # snapshot: deprecated-mock-import
+  |             ^^^^
+help: Import from `unittest.mock` instead
+  |
+1 | lazy from mock import mock, patch  # snapshot: deprecated-mock-import
+  - lazy import mock  # snapshot: deprecated-mock-import
+2 + lazy from unittest import mock  # snapshot: deprecated-mock-import
+  |
 ```

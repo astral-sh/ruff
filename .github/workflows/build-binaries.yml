@@ -24,7 +24,8 @@ concurrency:
   group: build-binaries-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-permissions: {}
+permissions:
+  contents: read
 
 env:
   UV_LOCKED: 1

@@ -334,6 +334,57 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from bounded receivers
+
+The nominal specialization of a generic class can be inferred from the upper bound of `Self`:
+
+```py
+class Box[T = None]:
+    def get(self) -> T:
+        reveal_type(read(self))  # revealed: T@Box
+        reveal_type(identity(self))  # revealed: Self@get
+        return read(self)
+
+def read[T = None](box: Box[T]) -> T:
+    raise NotImplementedError
+
+def identity[T](value: T) -> T:
+    return value
+```
+
+The same applies to a type variable with an explicit upper bound:
+
+```py
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(read(box))  # revealed: int
+    reveal_type(identity(box))  # revealed: S@_
+```
+
+The specialization inferred from the bound cannot violate the bounds of a constrained type variable:
+
+```py
+def combine[T: (int, str)](box: Box[T], value: T) -> T:
+    return value
+
+def _[S: Box[int]](box: S) -> None:
+    reveal_type(combine(box, 1))  # revealed: int
+    # error: [invalid-argument-type] "does not satisfy constraints"
+    combine(box, "")
+```
+
+A type variable cannot be substituted for its bound in non-covariant position:
+
+```py
+class Consumer[T]:
+    def consume(self, value: T) -> None: ...
+
+def accept_list[T](boxes: list[Box[T]]) -> None: ...
+def accept_consumer[T](consumer: Consumer[Box[T]]) -> None: ...
+def _[S: Box[int]](boxes: list[S], consumer: Consumer[S]) -> None:
+    accept_list(boxes)  # error: [invalid-argument-type]
+    accept_consumer(consumer)  # error: [invalid-argument-type]
+```
+
 ## Calls within the generic class
 
 A call to a generic class from one of its own methods creates an independent generic occurrence. The
@@ -389,6 +440,18 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
+An explicit `cls: type[Self]` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __new__(cls: type[Self], x: T) -> "Explicit[T]":
+        return object.__new__(cls)
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
+```
+
 ### `__init__` only
 
 ```py
@@ -406,6 +469,17 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 
 # error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
+```
+
+An explicit `self: Self` annotation does not affect the inferred type:
+
+```py
+from typing import Self
+
+class Explicit[T]:
+    def __init__(self: Self, x: T) -> None: ...
+
+reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 ```
 
 ### Failed constructor inference
@@ -426,6 +500,23 @@ class Consumer[T]:
 def accepts_dog(value: Dog) -> None: ...
 
 consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+```
+
+### Constrained constructor inference uses argument evidence
+
+Constructor arguments should select the narrowest compatible declared constraint. A string argument
+therefore specializes `NameAttribute` to `str`, not the broader `object` constraint.
+
+```py
+class NameAttribute[T: (object, str)]:
+    def __init__(self, value: T) -> None:
+        self._value = value
+
+    @property
+    def value(self) -> T:
+        return self._value
+
+attribute: NameAttribute[str] = NameAttribute("Alice")
 ```
 
 ### Constructing the class from its own type variable
@@ -510,6 +601,46 @@ class Box[T: NamedTuple]:
     def __init__(self, value: T, other: Self | None = None) -> None:
         if other is None:
             reveal_type(Box(value, self))  # revealed: Box[T@Box]
+```
+
+### Inferring through a `Self`-annotated constructor parameter
+
+When ty accepts arguments that require different specializations of an invariant class, it should
+infer a specialization covering both. The `Self`-annotated template contributes `int` alongside the
+direct argument, whether that argument is gradual or static.
+
+```py
+from typing import Any, Self
+
+class Box[T]:
+    def __init__(self, value: T, template: Self | None = None) -> None:
+        self.value = value
+
+def construct_from_any(value: Any) -> None:
+    # revealed: Box[Any | int]
+    reveal_type(Box(value, Box(1)))
+
+def construct_from_str(value: str) -> None:
+    # revealed: Box[str | int]
+    reveal_type(Box(value, Box(1)))
+```
+
+### Constructing through `type(self)`
+
+Calling a constructor through `type(self)` preserves the current `Self` specialization. The class's
+type variable is fixed by that specialization and cannot be inferred from a different constructor
+argument.
+
+```py
+from typing import Self
+
+class Box[T]:
+    def __init__(self, value: T) -> None:
+        self.value = value
+
+    def reset(self) -> Self:
+        # error: [invalid-argument-type]
+        return type(self)("hello")
 ```
 
 ### Constructing with an enclosing Self type
@@ -753,7 +884,158 @@ reveal_type(C(1, True))  # revealed: C[int]
 wrong_innards: C[int] = C("five", 1)
 ```
 
+### Class-scoped type variables in `__init__` receiver annotations
+
+The `invalid-init-type-variable` rule rejects class-scoped type variables in explicit `__init__`
+receiver annotations, including when the variables occur inside another type. Ordinary methods can
+use those variables in their receiver annotations.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+class Swapped[T, U]:
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use type variable `U` from an outer scope"
+    # error: [invalid-init-type-variable] "First parameter of `__init__` cannot use type variable `T` from an outer scope"
+    def __init__(self: Swapped[U, T]) -> None: ...
+
+class Identity[T]:
+    def __init__(self: Identity[T], value: T) -> None: ...  # error: [invalid-init-type-variable]
+    def method(self: Identity[T]) -> None: ...
+
+class Nested[T]:
+    # snapshot: invalid-init-type-variable
+    def __init__(self: Nested[list[T]]) -> None: ...
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
+  --> src/mdtest_snippet.py:14:36
+   |
+12 | class Nested[T]:
+   |       ------ `T` is bound to this enclosing scope
+13 |     # snapshot: invalid-init-type-variable
+14 |     def __init__(self: Nested[list[T]]) -> None: ...
+   |                                    ^ `T` used in the first parameter's annotation here
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+The same restriction applies through a type alias.
+
+```py
+type Alias[T] = T
+
+class Aliased[T]:
+    def __init__(self: Alias[Aliased[T]]) -> None: ...  # error: [invalid-init-type-variable]
+```
+
+Reporting the diagnostic does not change the inferred type.
+
+```py
+reveal_type(Identity(1))  # revealed: Identity[Literal[1]]
+```
+
+The restriction also applies to `ParamSpec` and `TypeVarTuple` parameters.
+
+```py
+class WithParamSpec[**P]:
+    def __init__(self: WithParamSpec[P]) -> None: ...  # error: [invalid-init-type-variable]
+
+class WithTuple[*Ts]:
+    def __init__(self: WithTuple[*Ts]) -> None: ...  # error: [invalid-init-type-variable]
+```
+
+Type variables scoped to `__init__` can determine the constructed type without referencing the
+class's own type variables.
+
+```py
+class Remapped[T]:
+    def __init__[V](self: "Remapped[list[V]]", value: V) -> None: ...
+
+reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+```
+
+### Type variables from enclosing scopes in `__init__` receiver annotations
+
+A nested class can reference an enclosing class's type parameters, but cannot use them in an
+explicit `__init__` receiver annotation. Type variables in that annotation must be scoped to
+`__init__`.
+
+```py
+class Outer[T]:
+    class Inner[S]:
+        # snapshot: invalid-init-type-variable
+        def __init__(self: "Outer.Inner[T]") -> None: ...
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
+ --> src/mdtest_snippet.py:4:41
+  |
+1 | class Outer[T]:
+  |       ----- `T` is bound to this enclosing scope
+2 |     class Inner[S]:
+3 |         # snapshot: invalid-init-type-variable
+4 |         def __init__(self: "Outer.Inner[T]") -> None: ...
+  |                                         ^ `T` used in the first parameter's annotation here
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+The same restriction applies to type variables bound to an enclosing function.
+
+```py
+def outer[T](value: T) -> T:
+    class Inner[S]:
+        # snapshot: invalid-init-type-variable
+        def __init__(self: "Inner[T]") -> None: ...
+
+    return value
+```
+
+```snapshot
+error[invalid-init-type-variable]: First parameter of `__init__` cannot use type variable `T` from an outer scope
+ --> src/mdtest_snippet.py:8:35
+  |
+5 | def outer[T](value: T) -> T:
+  |     ----------------------- `T` is bound to this enclosing scope
+6 |     class Inner[S]:
+7 |         # snapshot: invalid-init-type-variable
+8 |         def __init__(self: "Inner[T]") -> None: ...
+  |                                   ^ `T` used in the first parameter's annotation here
+info: Using type variables from an outer scope can make the constructed type ambiguous
+help: Use a type variable scoped to `__init__`, or omit the first parameter's annotation
+info: See https://typing.python.org/en/latest/spec/constructors.html#init-method
+```
+
+This includes `ParamSpec` and `TypeVarTuple` parameters from enclosing scopes.
+
+```py
+def with_paramspec[**P]():
+    class Inner[**Q]:
+        def __init__(self: "Inner[P]") -> None: ...  # error: [invalid-init-type-variable]
+
+def with_tuple[*Ts]():
+    class Inner[*Us]:
+        def __init__(self: "Inner[*Ts]") -> None: ...  # error: [invalid-init-type-variable]
+```
+
 ### Some `__init__` overloads only apply to certain specializations
+
+An overload can specialize the receiver. Retaining other class-scoped type variables is rejected,
+but the receiver annotation still participates in overload resolution.
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 ```py
 from __future__ import annotations
@@ -798,6 +1080,7 @@ C[None](12)
 
 class D[T, U]:
     @overload
+    # error: [invalid-init-type-variable]
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
     def __init__(self, t: T, u: U) -> None: ...
@@ -1425,6 +1708,38 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Materialized `TypeIs` return types
+
+A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
+
+```py
+from typing import Any, TypeIs
+from ty_extensions import Bottom, Top
+
+class Predicate[T]:
+    def matches(self, value: object) -> TypeIs[T]:
+        return True
+
+    def unrelated(self, value: object) -> TypeIs[Any]:
+        return True
+
+def _(concrete: Predicate[int], gradual: Predicate[Any], value: object) -> None:
+    reveal_type(concrete.matches(value))  # revealed: TypeIs[int @ value]
+    reveal_type(gradual.matches(value))  # revealed: TypeIs[Any @ value]
+
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.matches(value))  # revealed: Top[TypeIs[Any @ value]]
+    reveal_type(bottom.matches(value))  # revealed: Bottom[TypeIs[Any @ value]]
+```
+
+An explicit `TypeIs[Any]` return type remains unmaterialized:
+
+```py
+def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -> None:
+    reveal_type(top.unrelated(value))  # revealed: TypeIs[Any @ value]
+    reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an
@@ -1873,6 +2188,48 @@ def probe(value: Tree[int, str]):
     child = FirstChild(value)
     reveal_type(child)  # revealed: FirstChild[str]
     reveal_type(child.value)  # revealed: str
+```
+
+## Aliased `Self` in explicit receivers
+
+Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Box[T]:
+    def mutate(self: Identity[Self], value: T) -> None: ...
+
+def check(box: Box[int]) -> None:
+    box.mutate(1)
+```
+
+## Unannotated subclass defaults inherit specialized declarations
+
+An inherited annotation is specialized using the subclass's base arguments before it provides
+context for an initializer. A further generic subclass retains its own type variables.
+
+```py
+class Base[T]:
+    items: list[T]
+
+class Integers(Base[int]):
+    items = []
+
+reveal_type(Integers.items)  # revealed: list[int]
+reveal_type(Integers().items)  # revealed: list[int]
+
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+
+class Child[U](Base[U]):
+    items = []
+
+def check(child: Child[str]) -> None:
+    reveal_type(child.items)  # revealed: list[str]
+    child.items.append(1)  # error: [invalid-argument-type]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

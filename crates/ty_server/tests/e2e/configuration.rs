@@ -7,8 +7,8 @@ use serde_json::{Map, json};
 use ty_server::{ClientOptions, WorkspaceOptions};
 
 use crate::TestServerBuilder;
+use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
 use crate::pull_diagnostics::filter_result_id;
-use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 
 #[test]
 fn configuration_file() -> Result<()> {

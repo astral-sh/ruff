@@ -1,7 +1,7 @@
 use crate::{Db, platform::PythonPlatform};
 
 use ruff_db::files::File;
-use ruff_db::system::SystemPath;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{ResolverEnvironment, SearchPaths};
@@ -30,6 +30,7 @@ impl<'db> Program<'db> {
             python_version,
             python_platform,
             search_paths,
+            virtual_environment: _,
         } = settings;
 
         let resolver_environment =
@@ -59,6 +60,11 @@ pub struct ProgramSettings {
     pub python_version: PythonVersionWithSource,
     pub python_platform: PythonPlatform,
     pub search_paths: SearchPaths,
+    /// The root of the resolved virtual environment, if any. File watchers use this to observe
+    /// `pyvenv.cfg` and directory changes without resolving the environment again. System Python
+    /// installations are very unlikely to be deleted and recreated, so we exclude them to avoid
+    /// recursively watching a system prefix such as `/usr`.
+    pub virtual_environment: Option<SystemPathBuf>,
 }
 
 impl ProgramSettings {
@@ -67,6 +73,7 @@ impl ProgramSettings {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPaths::empty(vendored),
+            virtual_environment: None,
         }
     }
 }

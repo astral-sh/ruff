@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.16.8"
+version = "0.16.9"
 description = "An extremely fast Python linter and code formatter"
 authors = { workspace = true }
 edition = { workspace = true }
@@ -21,6 +21,7 @@ dist = true
 
 [dependencies]
 ruff_cache = { workspace = true }
+ruff_command_line = { workspace = true }
 ruff_db = { workspace = true, default-features = false, features = ["os"] }
 ruff_diagnostics = { workspace = true }
 ruff_graph = { workspace = true, features = ["serde", "clap"] }
@@ -39,7 +40,6 @@ ruff_text_size = { workspace = true }
 ruff_workspace = { workspace = true }
 
 anyhow = { workspace = true }
-argfile = { workspace = true }
 rkyv = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }

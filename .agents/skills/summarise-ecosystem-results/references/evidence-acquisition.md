@@ -42,7 +42,7 @@ download_validated_artifact <validated-shard-id> \
   "$snapshot_dir/shards/diagnostics-shard-<number>"
 ```
 
-When the selected deployed HTML report was available, compare it byte-for-byte with the downloaded artifact's `diff.html` before trusting the adjacent JSON. Record the selected Actions attempt and pass it to `scripts/collect_ty_ecosystem_run_metadata.py` with `--attempt <actions-attempt>` once for all projects requiring reproduction. Verify that the frozen HTML report's Ruff base and PR revisions agree with the resulting immutable manifest, then use the saved report, shards, run, attempt, and matching comment when available throughout the investigation.
+When the selected deployed HTML report was available, compare it byte-for-byte with the downloaded artifact's `diff.html` before trusting the adjacent JSON. Record the selected Actions attempt and pass it to `scripts/collect_ty_ecosystem_run_metadata.py` with `--attempt <actions-attempt>` once for all projects requiring reproduction. Verify that the frozen HTML report's Ruff base and PR revisions agree with the collected manifest, and complete the minimizing skill's runtime review before publishing it as immutable. Use the saved report, shards, run, attempt, and matching comment when available throughout the investigation.
 
 ## Prefer the Exact Attempt's Structured Diff
 

@@ -109,9 +109,9 @@ impl serde::Serialize for NoqaCode {
 /// ALL < category < linter group < linter prefix < rule
 /// ```
 ///
-/// The ordering of variants isn't currently used anywhere, but they should be kept in descending
-/// order of severity, with error categories first, followed by warning, and then by off-by-default
-/// categories.
+/// Variants are ordered by descending severity, with error categories first, followed by warning,
+/// and then by off-by-default categories. The rule documentation lists category filter options
+/// in this order.
 ///
 /// See our [rule categorization guidelines] for more information on assigning categories.
 ///
@@ -221,6 +221,17 @@ pub enum RuleStatus {
     Deprecated { since: &'static str },
     /// The rule was removed in the provided Ruff version, and errors will be displayed on use.
     Removed { since: &'static str },
+}
+
+impl std::fmt::Display for RuleStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            RuleStatus::Stable { .. } => "stable",
+            RuleStatus::Preview { .. } => "preview",
+            RuleStatus::Deprecated { .. } => "deprecated",
+            RuleStatus::Removed { .. } => "removed",
+        })
+    }
 }
 
 #[ruff_macros::map_codes]

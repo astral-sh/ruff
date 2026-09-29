@@ -5,9 +5,23 @@
       "name": "astral-sh/ruff",
       "id": 523043277,
       "oidc_subject": "legacy"
+    },
+    "ruff-security": {
+      "name": "astral-sh/ruff-security",
+      "id": 1373465128,
+      "oidc_subject": "immutable",
+      "owner_id": 115962839
     }
   },
   "rules": [
+    {
+      "caller": "ruff",
+      "environment": "automations",
+      "caller_workflow": "sync-ruff-security.yml",
+      "on": ["push", "workflow_dispatch"],
+      "permissions": { "contents": "write", "workflows": "write" },
+      "target": "ruff-security"
+    },
     {
       "caller": "ruff",
       "environment": "automations",

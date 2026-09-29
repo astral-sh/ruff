@@ -1177,6 +1177,39 @@ def constrained[T: (int, str)](x: T):
     reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
+## Static method assignments through type variables
+
+An instance assignment shadows a static method with its underlying function. This also works when
+the instance has a bounded or constrained type variable as its type:
+
+```py
+class C:
+    @staticmethod
+    def f(x: int) -> int:
+        return x
+
+class D(C): ...
+
+def bounded[T: C](obj: T):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+
+def constrained[T: (C, D)](obj: T):
+    obj.f = obj.f
+    obj.f = 1  # error: [invalid-assignment]
+```
+
+A class assignment replaces the static method descriptor itself. We reject assigning the unwrapped
+function through a generic class object:
+
+```py
+def bounded_class[T: C](cls: type[T]):
+    cls.f = cls.f  # error: [invalid-assignment]
+
+def constrained_class[T: (C, D)](cls: type[T]):
+    cls.f = cls.f  # error: [invalid-assignment]
+```
+
 ## Enum members on generic class objects
 
 An enum member cannot be reassigned through a generic class receiver. The restriction applies to

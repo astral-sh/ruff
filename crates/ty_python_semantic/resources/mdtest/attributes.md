@@ -1305,8 +1305,8 @@ reveal_type(c_instance.variable_with_class_default1)  # revealed: Literal["value
 
 #### Augmented assignments to overriding class-level defaults
 
-An unannotated class-level default supplies the initial value for an augmented assignment, even when
-another branch of a diamond declares a wider instance attribute.
+An unannotated class-level default retains the inherited declaration, including through a diamond.
+An augmented assignment must accept every value permitted by that declaration.
 
 ```py
 class Base:
@@ -1321,9 +1321,10 @@ class Child(First, Second):
     value = 1
 
     def update(self) -> None:
+        # error: [unsupported-operator] "Operator `|=` is not supported between objects of type `None` and `Literal[2]`"
         self.value |= 2
 
-reveal_type(Child().value)  # revealed: int
+reveal_type(Child().value)  # revealed: int | None
 ```
 
 #### Descriptor attributes as class variables
@@ -1400,8 +1401,7 @@ class Intermediate(Base):
     # TODO: This should be an error
     redeclared_with_wider_type: str | int | None
 
-    # TODO: This should be an `invalid-assignment` error
-    overwritten_in_subclass_body = 1
+    overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
     # TODO: This should be an `invalid-assignment` error
     pure_overwritten_in_subclass_body = 1
@@ -1441,9 +1441,8 @@ reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
 reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
 reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
 
-# TODO: Both of these should be `str`
-reveal_type(Derived.overwritten_in_subclass_body)  # revealed: int
-reveal_type(Derived().overwritten_in_subclass_body)  # revealed: int | str
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: str
 
 reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
 reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
@@ -1535,6 +1534,130 @@ def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
 
 DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
+```
+
+## Shadowing static methods on instances
+
+### Nominal instances
+
+Assigning a static method's underlying function to an instance shadows the descriptor without
+changing how the function is called.
+
+```py
+class Decoder:
+    @staticmethod
+    def decode(data: bytes) -> str:
+        return data.decode("utf-8")
+
+def reset(decoder: Decoder) -> None:
+    decoder.decode = decoder.decode
+    reveal_type(decoder.decode(b"hello"))  # revealed: str
+    decoder.decode = None  # error: [invalid-assignment]
+```
+
+Assigning the unwrapped function to the class would change binding on subsequent instance access, so
+class writes still require the `staticmethod` wrapper.
+
+```py
+Decoder.decode = Decoder.decode  # error: [invalid-assignment]
+Decoder.decode = staticmethod(Decoder.decode)
+```
+
+### Implicit `self`
+
+An unannotated `self` parameter can also shadow a static method with its underlying function.
+
+```py
+class Decoder:
+    @staticmethod
+    def decode(data: bytes) -> str:
+        return data.decode("utf-8")
+
+    def reset(self) -> None:
+        self.decode = Decoder.decode
+        reveal_type(self.decode(b"hello"))  # revealed: str
+        self.decode = None  # error: [invalid-assignment]
+```
+
+### Conditional static methods
+
+When a class conditionally defines a static method, the instance can shadow either descriptor with
+the function returned by attribute access.
+
+```py
+def example(flag: bool) -> None:
+    class C:
+        if flag:
+            @staticmethod
+            def f(x: int) -> int:
+                return x
+
+        else:
+            @staticmethod
+            def f(x: int) -> int:
+                return x + 1
+
+    c = C()
+    c.f = c.f
+    reveal_type(c.f(1))  # revealed: int
+    c.f = None  # error: [invalid-assignment]
+    C.f = C.f  # error: [invalid-assignment]
+```
+
+### Static methods mixed with other attributes
+
+Only staticmethod alternatives are unwrapped when an attribute can also hold another type.
+
+```py
+def example(flag: bool) -> None:
+    class C:
+        if flag:
+            @staticmethod
+            def f(x: int) -> int:
+                return x
+
+        else:
+            f = 1
+
+    c = C()
+    c.f = c.f
+    c.f = 1
+    c.f = None  # error: [invalid-assignment]
+```
+
+### Static methods on metaclasses
+
+A class object can shadow a static method inherited from its metaclass. Replacing the descriptor on
+the metaclass itself still requires the wrapper.
+
+```py
+class Meta(type):
+    @staticmethod
+    def f(x: int) -> int:
+        return x
+
+class C(metaclass=Meta): ...
+
+C.f = C.f
+Meta.f = Meta.f  # error: [invalid-assignment]
+```
+
+### Static methods stored on instances
+
+A staticmethod stored directly on an instance does not invoke the descriptor protocol. Its write
+type therefore retains the wrapper.
+
+```py
+def f(x: int) -> int:
+    return x
+
+class C:
+    def __init__(self) -> None:
+        self.f = staticmethod(f)
+
+def replace(c: C) -> None:
+    c.f = staticmethod(f)
+    c.f = f  # error: [invalid-assignment]
 ```
 
 ## Accessing attributes on class objects
@@ -2926,6 +3049,268 @@ reveal_type(A.X)  # revealed: int
 A.X = 100
 ```
 
+### Unannotated assignments retain inherited declarations
+
+Assigning a new default in a subclass does not redeclare an annotated attribute. The inherited type
+provides context for the initializer and remains the public type for class and instance access.
+Inside the class body, the assigned value can still narrow the type of a bare name.
+
+```py
+from typing import Protocol
+
+class Base:
+    items: list[int] = []
+    values: tuple[int, ...] = ()
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    values = ()
+    value = "child"
+    reveal_type(items)  # revealed: list[int]
+    reveal_type(values)  # revealed: tuple[()]
+    reveal_type(value)  # revealed: Literal["child"]
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.values)  # revealed: tuple[int, ...]
+reveal_type(Child.value)  # revealed: int | str
+
+class HasItems(Protocol):
+    items: list[int]
+    values: tuple[int, ...]
+    value: int | str
+
+def check(child: Child) -> None:
+    reveal_type(child.items)  # revealed: list[int]
+    reveal_type(child.values)  # revealed: tuple[int, ...]
+    reveal_type(child.value)  # revealed: int | str
+    child.items.append("wrong")  # error: [invalid-argument-type]
+    child.values = (1, 2)
+    child.value = 1
+    protocol: HasItems = child
+
+class Grandchild(Child):
+    value = 1
+
+reveal_type(Grandchild.value)  # revealed: int | str
+```
+
+The initializer must be assignable to the inherited declaration. An explicit subclass annotation
+instead supplies a new declared type.
+
+```py
+class Invalid(Base):
+    items = ["wrong"]  # error: [invalid-assignment]
+    values = ("wrong",)  # error: [invalid-assignment]
+
+class Redeclared(Base):
+    # TODO: Report a Liskov violation for the incompatible redeclaration.
+    value: str = "child"
+
+reveal_type(Redeclared.value)  # revealed: str
+```
+
+### Defaults for attributes declared in methods
+
+Annotations on instance attributes declared in methods do not yet provide context for subclass
+defaults.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.items: list[int] = [42]
+
+class Child(Base):
+    items = []
+
+# TODO: The inherited annotation should provide context for the default.
+reveal_type(Child.items)  # revealed: list[Unknown]
+reveal_type(Child().items)  # revealed: list[Unknown] | list[int]
+```
+
+### Gradual types and class-variable qualifiers are inherited
+
+An inherited `Any` annotation remains gradual. A `ClassVar` annotation still prevents instance
+writes after a subclass supplies a new default.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    dynamic: Any
+    class_only: ClassVar[int | str] = 0
+
+class Child(Base):
+    dynamic = "child"
+    class_only = "child"
+
+def check(child: Child) -> None:
+    reveal_type(child.dynamic)  # revealed: Any
+    reveal_type(child.class_only)  # revealed: int | str
+    child.dynamic = 1
+    # error: [invalid-attribute-access] "Cannot assign to ClassVar `class_only` from an instance of type `Child`"
+    child.class_only = 1
+
+# no diagnostic: attribute writes are still allowed on the class itself
+Child.class_only = 1
+```
+
+### Inherited declarations follow the MRO
+
+The first member in the MRO supplies the declaration. An unannotated member with no inherited
+declaration still uses its inferred type.
+
+```py
+class Left:
+    value: int | str = 0
+
+class Right:
+    value: bytes = b""
+
+class Child(Left, Right):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Inferred:
+    value = 0
+
+class Independent(Inferred):
+    value = "child"
+
+reveal_type(Independent.value)  # revealed: str
+```
+
+### Augmented assignments retain inherited declarations
+
+Updating a subclass default with augmented assignment preserves its inherited annotation, just like
+an ordinary assignment. The result must still be assignable to that annotation.
+
+```py
+class Base:
+    items: list[int] = []
+    value: int | str = 0
+
+class Child(Base):
+    items = []
+    items += [1]
+    value = "child"
+    value += "!"
+
+reveal_type(Child.items)  # revealed: list[int]
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Base):
+    value = 1
+    value /= 2  # error: [invalid-assignment]
+```
+
+### Inheriting conditional declarations
+
+An annotation can have several source locations. Identical annotations on both branches still
+provide a single declared type for subclass defaults.
+
+```py
+def _(condition: bool):
+    class Base:
+        if condition:
+            value: int | str = 0
+        else:
+            value: int | str = "base"
+
+    class Child(Base):
+        value = "child"
+
+    class Grandchild(Child):
+        value = 1
+
+    reveal_type(Child.value)  # revealed: int | str
+    reveal_type(Grandchild.value)  # revealed: int | str
+```
+
+### Unreachable declarations do not hide inherited annotations
+
+A method in an unreachable branch does not replace an attribute annotation. Subclass defaults still
+use that annotation for both assignment checks and public reads.
+
+```py
+class Base:
+    value: int = 0
+
+    if 1 == 2:
+        def value(self) -> str:  # unreachable
+            return "unreachable"
+
+class Child(Base):
+    value = 1
+
+class Invalid(Base):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+reveal_type(Invalid.value)  # revealed: int
+```
+
+### Unreachable bindings do not mask inherited declarations
+
+A base with no reachable binding or declaration does not supply an attribute. Lookup continues to
+the next base in the MRO. A reachable unannotated binding, by contrast, masks the later declaration.
+
+```py
+class Left:
+    if 1 == 2:
+        value = 0  # unreachable
+
+class ReachableLeft:
+    value = 0
+
+class Right:
+    value: int = 0
+
+class Child(Left, Right):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+
+class WithReachableBinding(ReachableLeft, Right):
+    value = "child"
+
+reveal_type(WithReachableBinding.value)  # revealed: str
+```
+
+### Unannotated defaults retain their owner's declaration
+
+The first base that supplies a default determines the inherited declaration. Its own ancestors can
+provide that annotation; a later sibling in the subclass's MRO does not replace it.
+
+```py
+class Root:
+    value: int = 0
+
+class Left(Root):
+    value = 1
+
+class Right(Root):
+    value: str = "right"
+
+class Child(Left, Right):
+    value = "wrong"  # error: [invalid-assignment]
+
+reveal_type(Child.value)  # revealed: int
+```
+
+If the first base's default has no governing annotation, a later sibling does not supply one.
+
+```py
+class Inferred:
+    value = 0
+
+class Unannotated(Inferred, Right):
+    value = 1
+
+reveal_type(Unannotated.value)  # revealed: int
+```
+
 ## Intersections of attributes
 
 ### Attribute only available on one element
@@ -2975,29 +3360,10 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-### Method binding uses the full intersection type
-
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
-found, however, `Self` must be bound using the full `A & B` receiver.
-
-```py
-from typing_extensions import Self
-from ty_extensions import Intersection
-
-class A:
-    def method(self) -> Self:
-        return self
-
-class B: ...
-
-def _(a_and_b: Intersection[A, B]):
-    reveal_type(a_and_b.method())  # revealed: A & B
-```
-
 ### Descriptor binding uses the full intersection type
 
-Descriptors found while searching the individual elements of an intersection must also be bound
-using the full intersection as the receiver.
+Descriptors found while searching the individual elements of an intersection use the full
+intersection as the receiver.
 
 ```py
 from typing import TypeVar
@@ -3014,8 +3380,9 @@ class A:
 
 class B: ...
 
-def _(a_and_b: Intersection[A, B]):
+def _(a_and_b: Intersection[A, B], b_and_a: Intersection[B, A]):
     reveal_type(a_and_b.desc)  # revealed: A & B
+    reveal_type(b_and_a.desc)  # revealed: B & A
 ```
 
 ### Negation types
