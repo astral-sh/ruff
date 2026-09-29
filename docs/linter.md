@@ -203,11 +203,11 @@ The first five categories compose the default rule set:
     ```
 
 while the remaining four (`security`, `formatting`, `pedantic`, and `restriction`) are off by
-default. For certain projects, you may want to enable either `security` or `formatting` as entire
-categories, but `pedantic` and `restriction` contain a wider variety of opinionated lints, and you
+default. For certain projects, you may want to enable `security` as an entire category, but
+`formatting`, `pedantic`, and `restriction` contain a wider variety of opinionated lints, and you
 will typically only want to select individual rules from these categories directly.
 
-See [Migrating to categories](#migrating-to-categories) for a migration guide.
+See [Trying out categories](#trying-out-categories) for more detailed steps on getting started.
 
 ### Interaction with other selectors
 
@@ -265,16 +265,10 @@ will select all `E` and `F` rules, with the exception of `F401`. Analogously, a 
 
 would select all `suspicious` rules, except for the `UP` rules in that category.
 
-Note that we plan to deprecate and eventually remove the linter groups in the future. If you give
-the new categories a try and run into situations where you need to fall back on linter groups,
-please let us know on the [tracking issue](https://github.com/astral-sh/ruff/issues/27959).
-
-### Migrating to categories
+### Trying out categories
 
 This section is intended to help you choose which categories you want to enable, based on the rules
 and linter groups you have selected and on the types of issues you want to catch.
-
-#### Rules of thumb
 
 We expect virtually all projects to want the `correctness` rules enabled. The lints in this category
 include syntax errors that are not yet mapped to `invalid-syntax` diagnostics and other problems
@@ -300,79 +294,30 @@ enable this entire category.
 
 The `formatting` category contains rules that overlap with code formatters like the Ruff formatter
 or Black. If you use a code formatter, you will likely want to leave this category off. On the other
-hand, if you don't use a code formatter and rely on lint rules to format your code, this category is
-for you. In the future, this category should allow us to stabilize the formatting-related
-`pycodestyle` (`E`) rules that otherwise didn't fit well into the `E` linter group.
+hand, if you don't use a code formatter and rely on lint rules to format your code, you can select
+those rules from this category. Note that it contains rules beyond those related to PEP 8, however,
+so you may still want to select a subset of the `formatting` rules rather than the whole category.
 
 `pedantic` rules, as you may guess, are pedantic, which can mean either "noisy," leading to many
 diagnostics, or overly opinionated, suggesting changes that many Python users disagree with. Unlike
-the `security` and `formatting` categories, you probably will not want to enable this category as a
-whole. Instead, we intend for rules from the `pedantic` category to be selected individually. This
-also goes for `restriction`, which contains even more restrictive rules.
+the `security` category, you probably will not want to enable this category as a whole. Instead, we
+intend for rules from the `pedantic` category to be selected individually.
 
-#### Trying the categories and sharing feedback
+The `restriction` category goes beyond being pedantic to arbitrarily restrict even common code
+patterns, such as `print` (`T201`) or `assert` (`S101`). Like the `pedantic` category, we do not
+recommend enabling `restriction` as a whole. If you enable any `restriction` lints, they should be
+chosen narrowly for your project's needs.
 
-If you'd like to try out the new categories without replacing your current configuration, the
+If you're already using `extend-select` to extend the default rule set, you'll inherit the
+category-based defaults automatically and won't need to modify your configuration. Similarly, if
+you'd like to try out the new categories without replacing your current configuration wholesale, the
 defaults, or a smaller subset like `correctness` and `suspicious`, are a great place to start. You
-can append them to an existing `select` configuration, or add them with `extend-select`.
+can append them to an existing `select` configuration, or add them with `extend-select`. In either
+case, you shouldn't feel obligated to enable all of the new categories and can freely `ignore` the
+ones that don't suit your needs.
 
-However, if you'd like to get the full category experience, you can try out our simple migration
-script with the following command:
-
-```console
-uv run https://raw.githubusercontent.com/astral-sh/ruff/main/scripts/migrate-categories.py
-```
-
-The script expects to be run within a Ruff project and will read your current config and generate a
-new `select` list including the default categories, as well as any additional rules you've selected
-from non-default categories. It can produce output grouped by linter, such as:
-
-```toml
-select = [
-    # Default categories
-    "correctness",
-    "suspicious",
-    "complexity",
-    "performance",
-    "style",
-
-    # B
-    "batched-without-explicit-strict",  # pedantic
-    "class-as-data-structure",  # pedantic
-
-    # C4
-    "unnecessary-comprehension",  # pedantic
-]
-```
-
-or grouped by category, with the `--by-category` flag:
-
-```toml
-select = [
-    # Default categories
-    "correctness",
-    "suspicious",
-    "complexity",
-    "performance",
-    "style",
-
-    # security
-    "ambiguous-unicode-character-comment",
-    "ambiguous-unicode-character-docstring",
-
-    # pedantic
-    "ambiguous-class-name",
-]
-```
-
-With the `--exact` flag, the script will additionally print an `ignore` list disabling any default
-rules that you don't currently enable.
-
-We eventually hope to deprecate and remove the legacy linter groups, so trying to reach a comparable
-rule selection without using any linter groups is the best way to preview that. We're open to
-iterating on the specific rules in each of the new categories, to adding new top-level categories,
-and to introducing non-linter secondary groups to make this selection process easier, so please
-share any feedback in the [tracking issue](https://github.com/astral-sh/ruff/issues/27959).
+If you run into any issues or have any suggestions about the new categories, please share any
+feedback in the [tracking issue](https://github.com/astral-sh/ruff/issues/27959)!
 
 ## Fixes
 
