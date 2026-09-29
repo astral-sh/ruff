@@ -3323,8 +3323,9 @@ mod uv_metadata {
         );
 
         // uv rejects this setting, but ty must still apply its rule configuration.
-        update_and_synchronize_project(
+        update_file_and_wait_for_uv_sync(
             &mut case,
+            "pyproject.toml",
             r#"
             [project]
             name = "example"
@@ -3346,11 +3347,12 @@ mod uv_metadata {
         assert_eq!(project.program_settings(case.db()), &program_settings);
 
         // If ordinary discovery also fails, keep the last applied settings and warning.
-        update_and_synchronize_project(&mut case, "[project\n")?;
+        update_file_and_wait_for_uv_sync(&mut case, "pyproject.toml", "[project\n")?;
         assert_eq!(case.db().check(), diagnostics);
 
-        update_and_synchronize_project(
+        update_file_and_wait_for_uv_sync(
             &mut case,
+            "pyproject.toml",
             r#"
             [project]
             name = "example"
@@ -3397,7 +3399,7 @@ mod uv_metadata {
         );
 
         // Without its own ty configuration, the member belongs to the enclosing workspace.
-        update_and_synchronize_project(&mut case, MANIFEST)?;
+        update_file_and_wait_for_uv_sync(&mut case, "pyproject.toml", MANIFEST)?;
         assert_eq!(case.db().project(), project);
         assert_eq!(project.root(case.db()), case.root_path());
         Ok(())
@@ -3677,13 +3679,18 @@ mod uv_metadata {
         Ok(case)
     }
 
-    /// Updates `pyproject.toml` and processes its watcher events through project synchronization.
-    fn update_and_synchronize_project(
+    /// Updates an existing file, waits for its watcher event, and completes any resulting
+    /// uv project synchronization.
+    /// Relative paths are resolved against the current project root.
+    fn update_file_and_wait_for_uv_sync(
         case: &mut TestCase,
+        path: impl AsRef<SystemPath>,
         source: &str,
     ) -> anyhow::Result<UvSyncChanges> {
-        update_file(case.project_path("pyproject.toml"), source)?;
-        let changes = case.take_watch_changes(event_for_file("pyproject.toml"));
+        let path = case.project_path(path);
+        update_file(&path, source)?;
+        let file_name = path.file_name().context("Expected a file name")?;
+        let changes = case.take_watch_changes(event_for_file(file_name));
         apply_changes_and_synchronize_project(case, &changes)
     }
 
