@@ -3654,10 +3654,19 @@ impl<'db> Type<'db> {
                     .head_ids()
                     .any(|id| ty.same_divergent_marker(Type::divergent(id)))
             });
-        cycle.head_ids().fold(normalized, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
-        })
+        // Other cycle heads initially return bare markers, before their queries have contributed
+        // any type constructors. For example, if F = Callable[[], P] and P = F | Unknown, removing
+        // F's marker while first inferring P leaves Callable[[], Unknown] for F. Each subsequent
+        // iteration then adds another callable layer, with no marker left to stop the growth.
+        // Preserve other heads' markers during the initial iteration so their constructors can
+        // propagate. Later iterations must normalize all heads to resolve mutual references.
+        cycle
+            .head_ids()
+            .filter(|&id| cycle.iteration() > 0 || id == cycle.id())
+            .fold(normalized, |ty, id| {
+                ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
+                    .unwrap_or(Type::divergent(id))
+            })
     }
 
     /// Discard unresolved narrowing while preserving recursive structure around it. A bare

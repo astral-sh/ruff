@@ -22,6 +22,88 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Recursive lambdas nested in expressions
+
+Recursive return-type inference converges when a lambda is nested inside another expression. Here,
+the loop target contributes `Unknown` to `value`, alongside the recursive callable. Inference must
+retain the recursive reference when combining these bindings.
+
+### Conditional expression
+
+```py
+value = (lambda: value) if True else None
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+### Short-circuit expression
+
+```py
+value = None or (lambda: value)
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+### Tuple subscript
+
+```py
+value = (lambda: value,)[0]
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+### Dictionary subscript
+
+```py
+value = {0: lambda: value}[0]
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+### Function call
+
+The function preserves the argument's type, including its recursive return type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def identity(value: T) -> T:
+    return value
+
+value = identity(lambda: value)
+for value in lambda: value:  # error: [not-iterable]
+    pass
+```
+
+## Recursive lambda with short-circuit assignments
+
+Regression test for <https://github.com/astral-sh/ty/issues/4618>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+# error: [invalid-type-form] "Variable of type `() -> Divergent`"
+# error: [invalid-type-form] "Variable of type `Literal[0]`"
+type Alias = value
+source = Alias
+value = lambda: source
+decorator = source
+
+# error: [not-subscriptable]
+# error: [dynamic-function-decorator-return]
+@decorator[0]
+def Alias():
+    pass
+
+Alias and ((source := value) or (lambda: source)) and 0
+value = 0
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:
