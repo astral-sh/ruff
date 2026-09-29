@@ -41,6 +41,7 @@ type CheckCache<'a, 'db, L, B> = dyn Fn(
         &mut ConstraintSetStorage<'db>,
         &mut L,
         &mut PathAssignments,
+        Polarity,
         NodeId,
     ) -> ControlFlow<B, bool>
     + 'a;
@@ -52,6 +53,7 @@ fn never_cache<'db, L, B>(
     _storage: &mut ConstraintSetStorage<'db>,
     _limits: &mut L,
     _path: &mut PathAssignments,
+    _polarity: Polarity,
     _node: NodeId,
 ) -> ControlFlow<B, bool> {
     ControlFlow::Continue(true)
@@ -85,6 +87,7 @@ type PrunePath<'a, 'db, L, B> = dyn Fn(
         &mut ConstraintSetStorage<'db>,
         &mut L,
         &mut PathAssignments,
+        Polarity,
         NodeId,
     ) -> ControlFlow<B, PathIs>
     + 'a;
@@ -109,6 +112,7 @@ fn never_prune<'db, L, B>(
     _storage: &mut ConstraintSetStorage<'db>,
     _limits: &mut L,
     _paths: &mut PathAssignments,
+    _polarity: Polarity,
     _node: NodeId,
 ) -> ControlFlow<B, PathIs> {
     ControlFlow::Continue(PathIs::Uncertain)
@@ -127,11 +131,13 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn Fn(
 /// Whether [`SolutionWalker`] walks a BDD or its negation. (We can walk the negation of a BDD
 /// lazily, which is more efficient than actually constructing the negation and then walking it
 /// normally.)
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(super) enum Polarity {
     Positive,
     Negative,
 }
+
+type ExploredNodeKey = (Polarity, NodeId, Vec<(ConstraintAssignment, ConstraintId)>);
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
@@ -141,7 +147,6 @@ pub(super) struct SolutionWalker<'db> {
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
-    polarity: Polarity,
 
     declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 
@@ -149,7 +154,7 @@ pub(super) struct SolutionWalker<'db> {
     /// constraints that are in scope when we encounter the node can affect how we interpret its
     /// downstream edges. But we also don't want to consider _all_ of the constraints on the path;
     /// we only want to consider the ones that are relevant to the node and its descendants.
-    explored_nodes: FxHashSet<(NodeId, Vec<(ConstraintAssignment, ConstraintId)>)>,
+    explored_nodes: FxHashSet<ExploredNodeKey>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -178,7 +183,6 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: FxIndexSet<ConstraintId>,
         inferable: TypeVarSet<'db>,
-        polarity: Polarity,
         original_node: NodeId,
     ) -> Self {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
@@ -187,7 +191,6 @@ impl<'db> SolutionWalker<'db> {
             original_node,
             inferable,
             inferable_support,
-            polarity,
             declared_constraint_solutions: FxHashMap::default(),
             explored_nodes: FxHashSet::default(),
             pending: Vec::default(),
@@ -228,11 +231,20 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &mut PathAssignments,
+        polarity: Polarity,
         node: NodeId,
     ) -> bool {
         let mut limits = UnboundedSolutionLimits;
-        let ControlFlow::Continue(satisfiable) =
-            self.node_is_satisfiable_on_path(db, env, storage, &mut limits, path, node, None);
+        let ControlFlow::Continue(satisfiable) = self.node_is_satisfiable_on_path(
+            db,
+            env,
+            storage,
+            &mut limits,
+            path,
+            polarity,
+            node,
+            None,
+        );
         !satisfiable
     }
 
@@ -247,6 +259,7 @@ impl<'db> SolutionWalker<'db> {
         limits: &mut L,
         path: &mut PathAssignments,
         all_typevars: Option<&Support>,
+        polarity: Polarity,
         node: NodeId,
     ) -> ControlFlow<L::Break> {
         let validations = all_typevars
@@ -258,8 +271,9 @@ impl<'db> SolutionWalker<'db> {
             storage,
             limits,
             path,
+            polarity,
             node,
-            &|this, storage, _limits, path, node| {
+            &|this, storage, _limits, path, polarity, node| {
                 // See if we've already visited this node on an "equivalent" path, where we only
                 // consider the typevars that can affect the solutions we'd find if we were to
                 // continue walking down the node.
@@ -281,10 +295,10 @@ impl<'db> SolutionWalker<'db> {
                         .collect();
                 relevant_path
                     .sort_unstable_by_key(|(assignment, _)| assignment.constraint().ordering());
-                let key = (node, relevant_path);
+                let key = (polarity, node, relevant_path);
                 ControlFlow::Continue(this.explored_nodes.insert(key))
             },
-            &|this, storage, limits, path, node| {
+            &|this, storage, limits, path, polarity, node| {
                 // Next see if anything in this node can affect the solution we've already
                 // calculated on the current path.
                 let mut visible_typevars = this.inferable_support.clone();
@@ -305,6 +319,7 @@ impl<'db> SolutionWalker<'db> {
                     storage,
                     limits,
                     path,
+                    polarity,
                     node,
                     validations,
                 )? {
@@ -364,6 +379,7 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        polarity: Polarity,
         node: NodeId,
         check_cache: &CheckCache<'_, 'db, L, L::Break>,
         prune_path: &PrunePath<'_, 'db, L, L::Break>,
@@ -371,23 +387,23 @@ impl<'db> SolutionWalker<'db> {
     ) -> ControlFlow<L::Break> {
         limits.visit_node()?;
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
-            (self.polarity, node)
+            (polarity, node)
         {
             return ControlFlow::Continue(());
         }
 
-        if !check_cache(self, storage, limits, path, node)? {
+        if !check_cache(self, storage, limits, path, polarity, node)? {
             return ControlFlow::Continue(());
         }
 
         // If the current node is ALWAYS_TRUE, we can immediately report the current solution.
         if let (Polarity::Positive, ALWAYS_TRUE) | (Polarity::Negative, ALWAYS_FALSE) =
-            (self.polarity, node)
+            (polarity, node)
         {
             return process_satisfied(self, storage, limits, path);
         }
 
-        match prune_path(self, storage, limits, path, node)? {
+        match prune_path(self, storage, limits, path, polarity, node)? {
             PathIs::Satisfied => return process_satisfied(self, storage, limits, path),
             PathIs::Unsatisfied => return ControlFlow::Continue(()),
             PathIs::Uncertain => {}
@@ -396,25 +412,24 @@ impl<'db> SolutionWalker<'db> {
         // At this point we actually have to walk the outgoing edges of this node.
         let interior = storage.interior_node_data(node);
         let constraint = interior.constraint;
-        let edges: ArrayVec<(ConstraintAssignment, NodeId), 3> =
-            if self.polarity == Polarity::Positive {
-                ArrayVec::from_iter([
-                    (constraint.when_true(), interior.if_true),
-                    (constraint.when_unconstrained(), interior.if_uncertain),
-                    (constraint.when_false(), interior.if_false),
-                ])
-            } else {
-                ArrayVec::from_iter([
-                    (
-                        constraint.when_true(),
-                        interior.if_true.or(storage, interior.if_uncertain),
-                    ),
-                    (
-                        constraint.when_false(),
-                        interior.if_false.or(storage, interior.if_uncertain),
-                    ),
-                ])
-            };
+        let edges: ArrayVec<(ConstraintAssignment, NodeId), 3> = if polarity == Polarity::Positive {
+            ArrayVec::from_iter([
+                (constraint.when_true(), interior.if_true),
+                (constraint.when_unconstrained(), interior.if_uncertain),
+                (constraint.when_false(), interior.if_false),
+            ])
+        } else {
+            ArrayVec::from_iter([
+                (
+                    constraint.when_true(),
+                    interior.if_true.or(storage, interior.if_uncertain),
+                ),
+                (
+                    constraint.when_false(),
+                    interior.if_false.or(storage, interior.if_uncertain),
+                ),
+            ])
+        };
         for (assignment, child) in edges {
             self.visit_edge(
                 db,
@@ -422,6 +437,7 @@ impl<'db> SolutionWalker<'db> {
                 storage,
                 limits,
                 path,
+                polarity,
                 assignment,
                 child,
                 check_cache,
@@ -443,6 +459,7 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        polarity: Polarity,
         node: NodeId,
         validations: Option<&Validations<'db>>,
     ) -> ControlFlow<L::Break, bool> {
@@ -476,6 +493,7 @@ impl<'db> SolutionWalker<'db> {
             storage,
             &mut AllowEarlyBreak(limits),
             path,
+            polarity,
             node,
             &never_cache,
             &never_prune,
@@ -520,6 +538,7 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
         path: &mut PathAssignments,
+        polarity: Polarity,
         assignment: ConstraintAssignment,
         child: NodeId,
         check_cache: &CheckCache<'_, 'db, L, L::Break>,
@@ -529,7 +548,7 @@ impl<'db> SolutionWalker<'db> {
         // Don't bother adding the assignment and checking the sequent map if the edge takes us to
         // the ALWAYS_FALSE terminal.
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
-            (self.polarity, child)
+            (polarity, child)
         {
             return ControlFlow::Continue(());
         }
@@ -547,6 +566,7 @@ impl<'db> SolutionWalker<'db> {
                         storage,
                         limits,
                         path,
+                        polarity,
                         child,
                         check_cache,
                         prune_path,
