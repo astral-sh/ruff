@@ -137,7 +137,11 @@ pub(super) enum Polarity {
     Negative,
 }
 
-type ExploredNodeKey = (Polarity, NodeId, Vec<(ConstraintAssignment, ConstraintId)>);
+type ExploredNodeKey = (
+    Polarity,
+    NodeId,
+    Box<[(ConstraintAssignment, ConstraintId)]>,
+);
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
@@ -290,7 +294,7 @@ impl<'db> SolutionWalker<'db> {
                 }
                 relevant_typevars
                     .close_over_constraints(storage, Self::constrained_assignments(path));
-                let mut relevant_path: Vec<_> =
+                let mut relevant_path: Box<[_]> =
                     Self::constrained_assignments_mentioning(storage, path, &relevant_typevars)
                         .collect();
                 relevant_path
