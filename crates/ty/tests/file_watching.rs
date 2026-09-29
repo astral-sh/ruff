@@ -6,6 +6,7 @@ use anyhow::{Context, anyhow};
 use insta::assert_snapshot;
 #[cfg(feature = "test-uv")]
 use insta::internals::SettingsBindDropGuard;
+use ruff_db::Db as _;
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics,
 };
@@ -75,6 +76,40 @@ impl TestCase {
         &self.db
     }
 
+    /// Starts file-watching and waits until the watcher is ready to deliver events.
+    /// Panics if the test is already watching.
+    fn start_watching(&mut self) -> anyhow::Result<()> {
+        assert!(self.watcher.is_none(), "File watcher is already running");
+
+        let (sender, receiver) = crossbeam::channel::unbounded();
+        let watcher = directory_watcher(move |events| sender.send(events).unwrap())
+            .with_context(|| "Failed to create directory watcher")?;
+        let watcher = ProjectWatcher::new(watcher, &mut self.db);
+        assert!(!watcher.has_errored_paths());
+        self.watcher = Some(watcher);
+        self.changes_receiver = receiver;
+
+        // Write a sentinel file to confirm the watcher is live and delivering events.
+        // This
+        // 1. ensures the watcher is working well, and not e.g. backed up with events unrelated to the current test
+        // 2. flushes events that are unrelated to the current test
+        let sentinel_path = self.db.system().current_directory().join(".watcher_ready");
+        std::fs::write(sentinel_path.as_std_path(), "ready")?;
+
+        self.try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_secs(30))
+            .expect(
+                "Watcher failed to deliver sentinel event within 30s \
+                 — file watching may not be operational",
+            );
+
+        // Clean up the sentinel file and drain its deletion event.
+        let _ = std::fs::remove_file(sentinel_path.as_std_path());
+        let _ = self
+            .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
+
+        Ok(())
+    }
+
     /// Stops file-watching and returns the collected change events.
     ///
     /// The caller must pass a `MatchEvent` filter that is applied to
@@ -118,7 +153,7 @@ impl TestCase {
         let watcher = self
             .watcher
             .take()
-            .expect("Cannot call `stop_watch` more than once");
+            .expect("Cannot call `stop_watch` without a running watcher");
 
         let start = Instant::now();
         let mut all_events = Vec::new();
@@ -170,7 +205,7 @@ impl TestCase {
         let watcher = self
             .watcher
             .as_ref()
-            .expect("Cannot call `try_take_watch_changes` after `stop_watch`");
+            .expect("Cannot call `try_take_watch_changes` without a running watcher");
 
         let start = Instant::now();
         let mut all_events = Vec::new();
@@ -322,6 +357,7 @@ struct SetupContext<'a> {
     fallback_options: Option<Options>,
     included_paths: Option<Vec<SystemPathBuf>>,
     allow_invalid_settings: bool,
+    watch: bool,
 }
 
 impl<'a> SetupContext<'a> {
@@ -404,6 +440,12 @@ impl<'a> SetupContext<'a> {
     fn set_included_paths(&mut self, paths: Vec<SystemPathBuf>) {
         self.included_paths = Some(paths);
     }
+
+    /// Controls whether setup starts watching. Defaults to true.
+    /// When false, call [`TestCase::start_watching`] after preparing the filesystem.
+    fn set_watch(&mut self, watch: bool) {
+        self.watch = watch;
+    }
 }
 
 impl<const N: usize, P> Setup for [(P, &'static str); N]
@@ -479,6 +521,7 @@ where
         fallback_options: None,
         included_paths: None,
         allow_invalid_settings: false,
+        watch: true,
     };
 
     setup_files
@@ -492,6 +535,7 @@ where
         fallback_options,
         included_paths,
         allow_invalid_settings,
+        watch,
         ..
     } = setup_context;
 
@@ -545,17 +589,10 @@ where
         db.project().set_included_paths(&mut db, included_paths);
     }
 
-    let (sender, receiver) = crossbeam::channel::unbounded();
-    let watcher = directory_watcher(move |events| sender.send(events).unwrap())
-        .with_context(|| "Failed to create directory watcher")?;
-
-    let watcher = ProjectWatcher::new(watcher, &mut db);
-    assert!(!watcher.has_errored_paths());
-
-    let test_case = TestCase {
+    let mut test_case = TestCase {
         db,
-        changes_receiver: receiver,
-        watcher: Some(watcher),
+        changes_receiver: crossbeam::channel::never(),
+        watcher: None,
         _user_config_directory_override: user_config_directory_override,
         #[cfg(feature = "test-uv")]
         snapshot_settings: None,
@@ -563,24 +600,9 @@ where
         root_dir: root_path,
     };
 
-    // Write a sentinel file to confirm the watcher is live and delivering events.
-    // This
-    // 1. ensures the watcher is working well, and not e.g. backed up with events unrelated to the current test
-    // 2. flushes events that are unrelated to the current test
-    let sentinel_path = project_path.join(".watcher_ready");
-    std::fs::write(sentinel_path.as_std_path(), "ready")?;
-
-    test_case
-        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_secs(30))
-        .expect(
-            "Watcher failed to deliver sentinel event within 30s \
-             — file watching may not be operational",
-        );
-
-    // Clean up the sentinel file and drain its deletion event.
-    let _ = std::fs::remove_file(sentinel_path.as_std_path());
-    let _ = test_case
-        .try_take_watch_changes(event_for_file(".watcher_ready"), Duration::from_millis(500));
+    if watch {
+        test_case.start_watching()?;
+    }
 
     Ok(test_case)
 }
@@ -3648,7 +3670,7 @@ mod uv_metadata {
         Ok(case)
     }
 
-    /// Creates a watched project with the selected uv mode and test command environment.
+    /// Creates a project with the selected uv mode and test command environment.
     /// Lets the test control Python environment creation and synchronization.
     /// Installs snapshot filters for temporary paths and platform-specific uv output.
     fn setup_uv_with_system(use_uv: UseUv, setup_files: impl Setup) -> anyhow::Result<TestCase> {
