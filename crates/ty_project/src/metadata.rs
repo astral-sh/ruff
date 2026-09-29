@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span};
 use ruff_db::files::FileRootKind;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -231,7 +231,7 @@ impl ProjectMetadata {
                 },
                 Err(error) => ProjectEnvironment {
                     metadata: None,
-                    error: Some(error.to_string().into_boxed_str()),
+                    error: Some(error.to_diagnostic(Severity::Warning)),
                 },
             }
         } else {
@@ -491,14 +491,13 @@ impl ProjectMetadata {
     }
 
     pub(crate) fn uv_diagnostic(&self, db: &dyn Db) -> Option<Diagnostic> {
-        let error = self.environment.error.as_deref()?;
+        let mut diagnostic = self.environment.error.clone()?;
         let path = self
             .environment
             .metadata
             .as_ref()
             .map_or(self.root(), uv::UvMetadata::workspace_root)
             .join("pyproject.toml");
-        let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Warning, error);
         if let Ok(file) = system_path_to_file(db, &path) {
             let mut annotation = Annotation::primary(Span::from(file));
             annotation.hide_snippet(true);
@@ -710,7 +709,7 @@ mod tests {
 
     use anyhow::{Context, anyhow};
     use insta::assert_ron_snapshot;
-    use ruff_db::diagnostic::{DiagnosticId, Severity};
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
     use ruff_db::system::{SystemPathBuf, TestSystem};
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
     use ruff_python_ast::PythonVersion;
@@ -1158,7 +1157,11 @@ unclosed table, expected `]`
         let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
         system.memory_file_system().create_directory_all(&root)?;
         let mut environment = uv_workspace(&root, &system)?;
-        environment.error = Some("uv metadata refresh failed".into());
+        environment.error = Some(Diagnostic::new(
+            DiagnosticId::UvMetadata,
+            Severity::Warning,
+            "uv metadata refresh failed",
+        ));
         let mut metadata = ProjectMetadata::new("app", root).with_environment(environment);
         metadata.set_override_options(Options::from_toml_str(
             "[rules]\nmissing-direct-dependency = 'warn'",

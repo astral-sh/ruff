@@ -105,8 +105,14 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let environment = script_environment(db, file);
     let uv_metadata = environment.and_then(|environment| environment.uv_metadata(db));
 
-    if let Some(error) = environment.and_then(|environment| environment.initialization_error(db)) {
-        diagnostics.report_invalid(uv_metadata_diagnostic(file, tag, error));
+    if let Some(diagnostic) =
+        environment.and_then(|environment| environment.initialization_error(db))
+    {
+        let mut diagnostic = diagnostic.clone();
+        let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
+        annotation.hide_snippet(true);
+        diagnostic.annotate(annotation);
+        diagnostics.report_invalid(diagnostic);
     }
 
     let configuration_root = file
@@ -366,14 +372,6 @@ impl ScriptConfigurationDiagnostics {
     fn extend(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
         self.diagnostics.extend(diagnostics);
     }
-}
-
-fn uv_metadata_diagnostic(file: File, tag: &ScriptTag, message: &str) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(DiagnosticId::UvMetadata, Severity::Error, message);
-    let mut annotation = Annotation::primary(Span::from(file).with_range(tag.range()));
-    annotation.hide_snippet(true);
-    diagnostic.annotate(annotation);
-    diagnostic
 }
 
 fn invalid_script_metadata_diagnostic(
