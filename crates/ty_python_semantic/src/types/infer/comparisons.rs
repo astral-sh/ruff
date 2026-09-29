@@ -1356,6 +1356,32 @@ fn infer_binary_intersection_type_comparison<'db>(
         IntersectionOn::Left => (Type::Intersection(intersection), other),
         IntersectionOn::Right => (other, Type::Intersection(intersection)),
     };
+    if matches!(
+        op,
+        NonIdentityOperator::Rich(RichCompareOperator::Eq | RichCompareOperator::Ne)
+    ) {
+        // `Unknown & None` still has only one possible runtime value. Use that fact for
+        // definite equality proofs, but keep the original operands for custom comparisons.
+        let [known_left, known_right] = [left, right].map(|ty| match ty {
+            Type::Intersection(intersection)
+                if intersection.positive(db).iter().any(|ty| ty.is_none(db)) =>
+            {
+                Type::none(db, env)
+            }
+            _ => ty,
+        });
+        if [known_left, known_right] != [left, right]
+            && let truthiness @ (Truthiness::AlwaysTrue | Truthiness::AlwaysFalse) = op.truthiness(
+                db,
+                env,
+                known_left,
+                known_right,
+                ComparisonSoundnessPolicy::CONSERVATIVE,
+            )
+        {
+            return Ok(Type::from_truthiness(db, env, truthiness));
+        }
+    }
     // Rich comparisons can return arbitrary objects. Use the full receiver to bind `Self`.
     // A failed call can still succeed via component-specific inference below, such as the
     // concrete-base fallback for NewTypes of `float`.

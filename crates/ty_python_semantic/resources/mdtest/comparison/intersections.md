@@ -236,6 +236,68 @@ def is_zero(value) -> bool:
     return reveal_type(value == 0)  # revealed: Unknown
 ```
 
+## Gradual operands narrowed to `None`
+
+Narrowing a gradual type to `None` fixes its runtime value. Comparisons with a string literal have
+definite boolean results, even though the narrowed type retains its gradual component.
+
+```py
+def compare(value):
+    assert value is None
+    reveal_type(value)  # revealed: Unknown & None
+    reveal_type(value == "ready")  # revealed: Literal[False]
+    reveal_type("ready" == value)  # revealed: Literal[False]
+    reveal_type(value != "ready")  # revealed: Literal[True]
+    reveal_type("ready" != value)  # revealed: Literal[True]
+
+    assert value == "ready"
+    "unreachable".missing  # no diagnostic (unreachable)
+```
+
+The same applies to `Any`, including when both operands have been narrowed to `None`.
+
+```py
+from typing import Any
+
+def compare_any(left: Any, right):
+    assert left is None
+    assert right is None
+    reveal_type(left == "ready")  # revealed: Literal[False]
+    reveal_type(left == right)  # revealed: Literal[True]
+    reveal_type(left != right)  # revealed: Literal[False]
+```
+
+An annotated `str` operand can be an instance of a subclass with custom comparison methods, so it
+does not establish a definite result.
+
+```py
+def compare_string(value, text: str):
+    assert value is None
+    reveal_type(value == text)  # revealed: Unknown
+    reveal_type(value != text)  # revealed: Unknown
+```
+
+Custom comparison methods can still supply a non-boolean result. A gradual comparison result is not
+narrowed to `bool`.
+
+```py
+class Custom:
+    def __eq__(self, other: object) -> str:  # error: [invalid-method-override]
+        return "equal"
+
+    def __ne__(self, other: object) -> bytes:  # error: [invalid-method-override]
+        return b"different"
+
+def compare_custom(value, custom: Custom):
+    assert value is None
+    reveal_type(custom == value)  # revealed: str
+    reveal_type(custom != value)  # revealed: bytes
+
+    # TODO: Retain the precise return types of the reflected comparisons.
+    reveal_type(value == custom)  # revealed: Unknown
+    reveal_type(value != custom)  # revealed: Unknown
+```
+
 ## Conditionally defined comparison methods
 
 A conditional comparison method can fall back to the inherited `object` method. Narrowing its
