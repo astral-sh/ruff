@@ -1,0 +1,53 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+ --> RUF079_cross_module.py:7:22
+  |
+6 | @contextmanager
+7 | def synchronous() -> Iterator[int]:
+  |                      ^^^^^^^^^^^^^
+8 |     yield 1
+  |
+help: Replace with `Generator`
+  |
+6 | @contextmanager
+  - def synchronous() -> Iterator[int]:
+7 + def synchronous() -> Generator[int, None, None]:
+8 |     yield 1
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079_cross_module.py:12:29
+   |
+11 | @asynccontextmanager
+12 | async def asynchronous() -> AsyncIterator[int]:
+   |                             ^^^^^^^^^^^^^^^^^^
+13 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+11 | @asynccontextmanager
+   - async def asynchronous() -> AsyncIterator[int]:
+12 + async def asynchronous() -> AsyncGenerator[int, None]:
+13 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079_cross_module.py:17:25
+   |
+16 | @contextmanager
+17 | def already_typing() -> TypingIterator[int]:
+   |                         ^^^^^^^^^^^^^^^^^^^
+18 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+16 | @contextmanager
+   - def already_typing() -> TypingIterator[int]:
+17 + def already_typing() -> Generator[int, None, None]:
+18 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior

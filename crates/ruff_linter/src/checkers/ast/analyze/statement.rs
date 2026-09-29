@@ -191,6 +191,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ReturnInGenerator) {
                 flake8_bugbear::rules::return_in_generator(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::ContextManagerGenerator) {
+                ruff::rules::context_manager_generator(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::FallibleContextManager) {
                 ruff::rules::fallible_context_manager(checker, function_def);
             }

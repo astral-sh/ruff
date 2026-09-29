@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+expression: transformed.source_code()
+---
+from contextlib import asynccontextmanager, contextmanager
+from typing import Iterator, Generator, AsyncGenerator
+import builtins
+
+object = 42
+
+
+@contextmanager
+def value_return() -> Generator[int, None, builtins.object]:
+    yield 1
+    return "done"
+
+
+@asynccontextmanager
+async def async_value() -> AsyncGenerator[int, None]:
+    yield 1
+
+
+def still_used() -> Iterator[int]:
+    return iter([1])
+
+
+def outer():
+    Generator = 1
+
+    @contextmanager
+    def shadowed() -> Iterator[int]:
+        yield 1
+
+    return Generator, shadowed

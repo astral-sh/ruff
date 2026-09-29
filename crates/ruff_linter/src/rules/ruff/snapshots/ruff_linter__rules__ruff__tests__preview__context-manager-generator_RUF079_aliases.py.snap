@@ -1,0 +1,40 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+ --> RUF079_aliases.py:7:23
+  |
+6 | @_contextmanager
+7 | def synchronous() -> "_Iterator[int]":
+  |                       ^^^^^^^^^^^^^^
+8 |     yield 1
+  |
+help: Replace with `Generator`
+  |
+6 | @_contextmanager
+  - def synchronous() -> "_Iterator[int]":
+7 + def synchronous() -> "_Generator[int, None, None]":
+8 |     yield 1
+  |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079_aliases.py:12:30
+   |
+11 | @_asynccontextmanager
+12 | async def asynchronous() -> "_AsyncIterator[str]":
+   |                              ^^^^^^^^^^^^^^^^^^^
+13 |     yield "value"
+   |
+help: Replace with `AsyncGenerator`
+   |
+   - from collections.abc import AsyncIterator as _AsyncIterator
+1  + from collections.abc import AsyncIterator as _AsyncIterator, AsyncGenerator
+2  | from contextlib import asynccontextmanager as _asynccontextmanager, contextmanager as _contextmanager
+--------------------------------------------------------------------------------
+11 | @_asynccontextmanager
+   - async def asynchronous() -> "_AsyncIterator[str]":
+12 + async def asynchronous() -> "AsyncGenerator[str, None]":
+13 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior

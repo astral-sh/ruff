@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF079 Use `Generator` instead of `Iterator` for a context manager
+ --> RUF079_version.py:7:18
+  |
+6 | @contextmanager
+7 | def context() -> Iterator[int]:
+  |                  ^^^^^^^^^^^^^
+8 |     yield 1
+  |
+help: Replace with `Generator`

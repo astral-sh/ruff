@@ -1061,6 +1061,7 @@ mod tests {
         	incorrect-decorator-order (RUF074),
         	fallible-context-manager (RUF075),
         	method-receiver-default (RUF077),
+        	context-manager-generator (RUF079),
         	invalid-rule-code (RUF102),
         	invalid-suppression-comment (RUF103),
         	unmatched-suppression-comment (RUF104),

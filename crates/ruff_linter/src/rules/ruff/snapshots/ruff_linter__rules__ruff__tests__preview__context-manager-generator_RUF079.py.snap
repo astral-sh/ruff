@@ -1,0 +1,272 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:10:17
+   |
+ 9 | @cm
+10 | def simple() -> Iterator[int]:
+   |                 ^^^^^^^^^^^^^
+11 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+9  | @cm
+   - def simple() -> Iterator[int]:
+10 + def simple() -> t.Generator[int, None, None]:
+11 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079.py:15:29
+   |
+14 | @acm
+15 | async def asynchronous() -> AsyncIterator[str]:
+   |                             ^^^^^^^^^^^^^^^^^^
+16 |     yield "value"
+   |
+help: Replace with `AsyncGenerator`
+   |
+14 | @acm
+   - async def asynchronous() -> AsyncIterator[str]:
+15 + async def asynchronous() -> t.AsyncGenerator[str, None]:
+16 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:20:18
+   |
+19 | @cl.contextmanager
+20 | def aliased() -> I[str]:
+   |                  ^^^^^^
+21 |     yield "value"
+   |
+help: Replace with `Generator`
+   |
+1  | from collections import abc
+   - from collections.abc import AsyncIterator as AI, Iterator as I
+2  + from collections.abc import AsyncIterator as AI, Iterator as I, Generator
+3  | from contextlib import asynccontextmanager as acm, contextmanager as cm
+--------------------------------------------------------------------------------
+19 | @cl.contextmanager
+   - def aliased() -> I[str]:
+20 + def aliased() -> Generator[str, None, None]:
+21 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079.py:25:30
+   |
+24 | @cl.asynccontextmanager
+25 | async def aliased_async() -> AI[int]:
+   |                              ^^^^^^^
+26 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+1  | from collections import abc
+   - from collections.abc import AsyncIterator as AI, Iterator as I
+2  + from collections.abc import AsyncIterator as AI, Iterator as I, AsyncGenerator
+3  | from contextlib import asynccontextmanager as acm, contextmanager as cm
+--------------------------------------------------------------------------------
+24 | @cl.asynccontextmanager
+   - async def aliased_async() -> AI[int]:
+25 + async def aliased_async() -> AsyncGenerator[int, None]:
+26 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:30:20
+   |
+29 | @cm
+30 | def qualified() -> abc.Iterator[tuple[int, str]]:
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |     yield (1, "value")
+   |
+help: Replace with `Generator`
+   |
+1  | from collections import abc
+   - from collections.abc import AsyncIterator as AI, Iterator as I
+2  + from collections.abc import AsyncIterator as AI, Iterator as I, Generator
+3  | from contextlib import asynccontextmanager as acm, contextmanager as cm
+--------------------------------------------------------------------------------
+29 | @cm
+   - def qualified() -> abc.Iterator[tuple[int, str]]:
+30 + def qualified() -> Generator[tuple[int, str], None, None]:
+31 |     yield (1, "value")
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:35:18
+   |
+34 | @cm
+35 | def quoted() -> "t.Iterator[str]":
+   |                  ^^^^^^^^^^^^^^^
+36 |     yield "value"
+   |
+help: Replace with `Generator`
+   |
+34 | @cm
+   - def quoted() -> "t.Iterator[str]":
+35 + def quoted() -> "t.Generator[str, None, None]":
+36 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079.py:40:30
+   |
+39 | @acm
+40 | async def quoted_async() -> 't.AsyncIterator[int]':
+   |                              ^^^^^^^^^^^^^^^^^^^^
+41 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+39 | @acm
+   - async def quoted_async() -> 't.AsyncIterator[int]':
+40 + async def quoted_async() -> 't.AsyncGenerator[int, None]':
+41 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:45:25
+   |
+44 | @cm
+45 | def complex_string() -> "Iter" "ator[int]":
+   |                         ^^^^^^^^^^^^^^^^^^
+46 |     yield 1
+   |
+help: Replace with `Generator`
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:50:25
+   |
+49 |   @cm
+50 |   def trailing_comma() -> Iterator[
+   |  _________________________^
+51 | |     int,  # yielded type
+52 | | ]:
+   | |_^
+53 |       yield 1
+   |
+help: Replace with `Generator`
+   |
+49 | @cm
+   - def trailing_comma() -> Iterator[
+   -     int,  # yielded type
+50 + def trailing_comma() -> t.Generator[
+51 +     int, None, None,  # yielded type
+52 | ]:
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:57:29
+   |
+56 | @cm
+57 | def parenthesized_item() -> Iterator[(int),]:
+   |                             ^^^^^^^^^^^^^^^^
+58 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+56 | @cm
+   - def parenthesized_item() -> Iterator[(int),]:
+57 + def parenthesized_item() -> t.Generator[(int), None, None,]:
+58 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:62:30
+   |
+61 | @cm
+62 | def parenthesized_tuple() -> Iterator[(int,)]:
+   |                              ^^^^^^^^^^^^^^^^
+63 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+61 | @cm
+   - def parenthesized_tuple() -> Iterator[(int,)]:
+62 + def parenthesized_tuple() -> t.Generator[(int, None, None,)]:
+63 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:67:37
+   |
+66 | @cm
+67 | def quoted_parenthesized_item() -> "Iterator[(int),]":
+   |                                     ^^^^^^^^^^^^^^^^
+68 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+66 | @cm
+   - def quoted_parenthesized_item() -> "Iterator[(int),]":
+67 + def quoted_parenthesized_item() -> "t.Generator[(int), None, None,]":
+68 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:72:24
+   |
+71 | @cm
+72 | def returns_value() -> Iterator[int]:
+   |                        ^^^^^^^^^^^^^
+73 |     yield 1
+74 |     return "done"
+   |
+help: Replace with `Generator`
+   |
+71 | @cm
+   - def returns_value() -> Iterator[int]:
+72 + def returns_value() -> t.Generator[int, None, object]:
+73 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:78:22
+   |
+77 | @cm
+78 | def yields_from() -> Iterator[int]:
+   |                      ^^^^^^^^^^^^^
+79 |     yield from (1, 2)
+   |
+help: Replace with `Generator`
+   |
+77 | @cm
+   - def yields_from() -> Iterator[int]:
+78 + def yields_from() -> t.Generator[int, None, None]:
+79 |     yield from (1, 2)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079.py:84:26
+   |
+82 | @other_decorator
+83 | @cm
+84 | def outer_decorator() -> Iterator[int]:
+   |                          ^^^^^^^^^^^^^
+85 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+83 | @cm
+   - def outer_decorator() -> Iterator[int]:
+84 + def outer_decorator() -> t.Generator[int, None, None]:
+85 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior

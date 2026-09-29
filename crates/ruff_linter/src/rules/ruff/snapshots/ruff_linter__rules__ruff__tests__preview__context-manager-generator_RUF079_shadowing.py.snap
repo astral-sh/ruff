@@ -1,0 +1,58 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079_shadowing.py:8:23
+   |
+ 7 | @contextmanager
+ 8 | def value_return() -> Iterator[int]:
+   |                       ^^^^^^^^^^^^^
+ 9 |     yield 1
+10 |     return "done"
+   |
+help: Replace with `Generator`
+   |
+1  | from contextlib import asynccontextmanager, contextmanager
+   - from typing import AsyncIterator, Iterator
+2  + from typing import AsyncIterator, Iterator, Generator
+3  + import builtins
+4  |
+--------------------------------------------------------------------------------
+8  | @contextmanager
+   - def value_return() -> Iterator[int]:
+9  + def value_return() -> Generator[int, None, builtins.object]:
+10 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> RUF079_shadowing.py:14:28
+   |
+13 | @asynccontextmanager
+14 | async def async_value() -> AsyncIterator[int]:
+   |                            ^^^^^^^^^^^^^^^^^^
+15 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+1  | from contextlib import asynccontextmanager, contextmanager
+   - from typing import AsyncIterator, Iterator
+2  + from typing import AsyncIterator, Iterator, AsyncGenerator
+3  |
+--------------------------------------------------------------------------------
+13 | @asynccontextmanager
+   - async def async_value() -> AsyncIterator[int]:
+14 + async def async_value() -> AsyncGenerator[int, None]:
+15 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+RUF079 Use `Generator` instead of `Iterator` for a context manager
+  --> RUF079_shadowing.py:26:23
+   |
+25 |     @contextmanager
+26 |     def shadowed() -> Iterator[int]:
+   |                       ^^^^^^^^^^^^^
+27 |         yield 1
+   |
+help: Replace with `Generator`
