@@ -981,13 +981,13 @@ on a derived class.
 
 ```py
 from contextlib import contextmanager
-from typing import Iterator
+from collections.abc import Generator
 from typing_extensions import Self
 
 class Base:
     @classmethod
     @contextmanager
-    def create(cls) -> Iterator[Self]:
+    def create(cls) -> Generator[Self, None, None]:
         yield cls()
 
 class Child(Base): ...
@@ -1525,12 +1525,12 @@ bind `self`:
 
 ```py
 from contextlib import contextmanager
-from collections.abc import Iterator
+from collections.abc import Generator
 
 class D:
     @staticmethod
     @contextmanager
-    def ctx(num: int) -> Iterator[int]:
+    def ctx(num: int) -> Generator[int, None, None]:
         yield num
 
     def use_ctx(self) -> None:
