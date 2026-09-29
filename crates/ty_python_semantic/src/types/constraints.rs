@@ -119,6 +119,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod owned;
 pub(crate) mod paths;
 pub(crate) mod projection;
 pub(crate) mod resolution;
@@ -127,6 +128,7 @@ mod solutions;
 mod support;
 mod variables;
 
+use owned::OwnedConstraintSetBuilder;
 use paths::PathAssignments;
 use solutions::{Polarity, SolutionWalker};
 use variables::{AtomicConstraint, Constraint, ConstraintProvenance};
@@ -1142,139 +1144,21 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
-        if node.is_terminal() {
-            return OwnedConstraintSet {
-                node,
-                source_order: None,
-                inner: None,
-            };
-        }
+        let root = match node.node() {
+            Node::Interior(interior) => interior,
+            Node::AlwaysTrue | Node::AlwaysFalse => {
+                return OwnedConstraintSet {
+                    node,
+                    source_order: None,
+                    inner: None,
+                };
+            }
+        };
         let source_order = constraint
             .source_order
             .expect("non-terminal BDD should have source_order");
-
-        // Combining constraint sets can allocate a new source-order tree even when the BDD is
-        // unchanged. Preserve each relevant constraint's first source position, but rebuild the
-        // persisted sidecar densely so redundant combinations cannot affect its IDs or owned-set
-        // equality. Unlike node and constraint IDs, source-order IDs are not embedded in the BDD,
-        // so the sidecar can be rebuilt without remapping the BDD.
-        let mut storage = self.storage.into_inner();
-        let source_constraints = storage.calculate_source_orders(Some(source_order));
-
-        let mut used_nodes = RankBitBox::bits_with_capacity(storage.nodes.len());
-        let mut used_constraints = RankBitBox::bits_with_capacity(storage.constraints.len());
-        let mut used_supports = RankBitBox::bits_with_capacity(storage.supports.len());
-
-        let mut stack = vec![node];
-        while let Some(node) = stack.pop() {
-            if node.is_terminal() || used_nodes[node.index()] {
-                continue;
-            }
-            let interior = storage.interior_node_data(node);
-            let node_support = storage
-                .node_support_id(node)
-                .expect("node should be non-terminal");
-            let constraint_support = storage.constraint_support_id(interior.constraint);
-            used_nodes.set(node.index(), true);
-            used_constraints.set(interior.constraint.index(), true);
-            used_supports.set(node_support.index(), true);
-            used_supports.set(constraint_support.index(), true);
-            stack.push(interior.if_true);
-            stack.push(interior.if_uncertain);
-            stack.push(interior.if_false);
-        }
-
-        let mut source_orders: IndexVec<SourceOrderId, SourceOrder> =
-            IndexVec::with_capacity(source_constraints.len().saturating_mul(2).saturating_sub(1));
-        let live_support = storage.node_support(node);
-        let source_order = source_constraints
-            .into_iter()
-            .fold(None, |left, source_constraint| {
-                // Preserve ordering history for absorbed constraints related to the live graph.
-                // Unrelated history can retain fresh typevars and prevent recursive Salsa queries
-                // from reaching a fixed point. Incomplete supports may hide a relationship, so
-                // preserve those entries.
-                let constraint_support_id =
-                    storage.constraint_support_id(source_constraint.into_inner());
-                let constraint_support = storage.support_data(constraint_support_id);
-                if !used_constraints[source_constraint.into_inner().index()]
-                    && let Some(live_support) = live_support
-                    && live_support.is_complete()
-                    && constraint_support.is_complete()
-                    && !constraint_support.overlaps_with(live_support)
-                {
-                    return left;
-                }
-                used_constraints.set(source_constraint.into_inner().index(), true);
-                // Source-order-only constraints are reloaded too, so retain their supports.
-                used_supports.set(constraint_support_id.index(), true);
-                let right = source_orders.push(SourceOrder::AtomicConstraint(source_constraint));
-
-                Some(match left {
-                    Some(left) => source_orders.push(SourceOrder::Ordered(left, right)),
-                    None => right,
-                })
-            })
-            .expect("non-terminal BDD should have source_order");
-
-        used_nodes.truncate(used_nodes.last_one().map_or(0, |last| last + 1));
-        used_constraints.truncate(used_constraints.last_one().map_or(0, |last| last + 1));
-        used_supports.truncate(used_supports.last_one().map_or(0, |last| last + 1));
-
-        let nodes = storage
-            .nodes
-            .into_iter()
-            .zip(&used_nodes)
-            .filter_map(|(node, used)| used.then_some(node))
-            .collect();
-        let node_supports = storage
-            .node_supports
-            .into_iter()
-            .zip(&used_nodes)
-            .filter_map(|(support, used)| used.then_some(support))
-            .collect();
-        let node_indices = RankBitBox::from_bits(used_nodes);
-
-        let constraints = storage
-            .constraints
-            .into_iter()
-            .zip(&used_constraints)
-            .filter_map(|(constraint, used)| used.then_some(constraint))
-            .collect();
-        let constraint_supports = storage
-            .constraint_supports
-            .into_iter()
-            .zip(&used_constraints)
-            .filter_map(|(support, used)| used.then_some(support))
-            .collect();
-        let constraint_indices = RankBitBox::from_bits(used_constraints);
-
-        let supports = storage
-            .supports
-            .into_iter()
-            .zip(&used_supports)
-            .filter_map(|(support, used)| used.then_some(support))
-            .collect();
-        let support_indices = RankBitBox::from_bits(used_supports);
-
-        storage.typevars.shrink_to_fit();
-
-        OwnedConstraintSet {
-            node,
-            source_order: Some(source_order),
-            inner: Some(Arc::new(OwnedConstraintSetInner {
-                constraints,
-                constraint_supports,
-                constraint_indices,
-                typevars: storage.typevars,
-                nodes,
-                node_supports,
-                node_indices,
-                supports,
-                support_indices,
-                source_orders: source_orders.raw.into_boxed_slice(),
-            })),
-        }
+        let storage = self.storage.into_inner();
+        OwnedConstraintSetBuilder::build(storage, root, source_order)
     }
 
     /// Loads an [`OwnedConstraintSet`] into this builder.
@@ -6891,36 +6775,6 @@ class E: ...
                 "allocation order {allocation_order:?}"
             );
         }
-    }
-
-    #[test]
-    fn owned_constraint_set_source_order_ignores_construction_history() {
-        let db = setup_db();
-        let db = &db;
-        let t = create_typevar(db, "T");
-        let u = create_typevar(db, "U");
-
-        let build = |include_redundant_combination| {
-            ConstraintSetBuilder::new().into_owned(|builder| {
-                let t_int = create_constraint(db, builder, t, KnownClass::Int);
-                let u_str = create_constraint(db, builder, u, KnownClass::Str);
-                let combined = t_int.and(db, builder, || u_str);
-
-                if include_redundant_combination {
-                    // Repeating one constraint leaves the BDD and first-occurrence source order
-                    // unchanged, but creates a distinct, reachable source-order tree. Both trees
-                    // must compact to the same owned set.
-                    let redundant = combined.and(db, builder, || t_int);
-                    assert_eq!(redundant.node, combined.node);
-                    assert_ne!(redundant.source_order, combined.source_order);
-                    redundant
-                } else {
-                    combined
-                }
-            })
-        };
-
-        assert_eq!(build(false), build(true));
     }
 
     #[test]
