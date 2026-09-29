@@ -29,7 +29,7 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 /// regex allows to check for prefix matches.
 ///
 /// ## Equality
-/// Equality is based on the patterns from which a filter was constructed.
+/// Equality is based on the original absolute globs.
 ///
 /// Because of that, two filters that include the exact same files but were
 /// constructed from different patterns (or even just order) compare unequal.
@@ -37,6 +37,7 @@ const DFA_SIZE_LIMIT: usize = 1_000_000;
 pub(crate) struct IncludeFilter {
     #[get_size(ignore)]
     glob_set: GlobSet,
+    /// The original absolute globs, before adding patterns for descendants.
     original_patterns: Box<[Box<str>]>,
     #[get_size(size_fn = bit_box_size)]
     literal_pattern_indices: BitBox,
@@ -216,7 +217,7 @@ impl IncludeFilterBuilder {
             .backslash_escape(true)
             .build()?;
 
-        self.original_patterns.push(input.relative().into());
+        self.original_patterns.push(input.absolute().into());
 
         // `lib` is the same as `lib/**`
         // Add a glob that matches `lib` exactly, change the glob to `lib/**`.
@@ -353,6 +354,28 @@ mod tests {
     #[track_caller]
     fn assert_not_match_directory(filter: &IncludeFilter, path: &str) {
         assert!(!filter.match_directory(path.replace('/', MAIN_SEPARATOR_STR)));
+    }
+
+    #[test]
+    fn equality_accounts_for_pattern_root() -> anyhow::Result<()> {
+        let build = |root| -> anyhow::Result<IncludeFilter> {
+            let mut builder = IncludeFilterBuilder::new();
+            builder.add(
+                &PortableGlobPattern::parse("src", PortableGlobKind::Include)?.into_absolute(root),
+            )?;
+            Ok(builder.build()?)
+        };
+        let member = build("/workspace/project")?;
+        let workspace = build("/workspace")?;
+
+        assert_eq!(member.match_file("/workspace/src/main.py"), MatchFile::No);
+        assert_eq!(
+            workspace.match_file("/workspace/src/main.py"),
+            MatchFile::Pattern
+        );
+        assert_ne!(member, workspace);
+        assert_eq!(workspace, build("/workspace")?);
+        Ok(())
     }
 
     #[test]
