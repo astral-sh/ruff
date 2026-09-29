@@ -560,8 +560,8 @@ class Writer(Protocol[T_contra]):
 
 def constrained(writer: Writer[T]) -> None: ...
 def f(text: Writer[str], binary: Writer[bytes], either: Writer[str] | Writer[bytes]):
-    constrained(text)
-    constrained(binary)
+    constrained(text)  # no diagnostic
+    constrained(binary)  # no diagnostic
     # snapshot: invalid-argument-type
     constrained(either)
 ```

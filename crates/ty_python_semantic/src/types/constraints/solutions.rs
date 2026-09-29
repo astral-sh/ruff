@@ -598,14 +598,12 @@ impl<'db> SolutionWalker<'db> {
     /// Finds evidence that excludes every declared constraint without relying on both sides of
     /// the inferred range together. A conflict between otherwise valid bounds is not itself a
     /// violation of the type variable's declaration.
-    #[expect(clippy::too_many_arguments)]
     fn constraint_failure_evidence<L: SolutionLimits>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         limits: &mut L,
-        bound_typevar: BoundTypeVarInstance<'db>,
         evidence: &CandidateTypeVarSolution<'db>,
         constrained: &Constrained<'db>,
     ) -> ControlFlow<L::Break, Option<ConstraintFailureEvidence<'db>>> {
@@ -630,6 +628,7 @@ impl<'db> SolutionWalker<'db> {
         // necessarily applies to the whole relation. As in `NodeId::is_single_conjunction`, both
         // a second live branch and an uncertain branch rule out that interpretation. Charge this
         // scan to the traversal budget because diagnostic collection can occur on many paths.
+        let bound_typevar = evidence.bound_typevar;
         let mut upper_bounds = Vec::new();
         let mut current = self.original_node;
         loop {
@@ -1441,7 +1440,6 @@ impl<'db> SolutionWalker<'db> {
                     env,
                     storage,
                     limits,
-                    *bound_typevar,
                     &evidence,
                     constrained_typevar,
                 )?
