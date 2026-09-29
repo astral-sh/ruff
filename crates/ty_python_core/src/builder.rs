@@ -2272,6 +2272,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    /// Build a suppression predicate without inferring expressions whose syntax rules out a
+    /// context manager. Inferring a lambda's return type or a collection's element types here
+    /// can create a cycle through bindings whose reachability depends on this predicate.
+    fn build_context_manager_suppression_predicate(
+        &mut self,
+        context_expr: &'ast ast::Expr,
+        is_async: bool,
+    ) -> PredicateOrLiteral<'db> {
+        if context_expr.is_literal_expr()
+            || matches!(
+                context_expr,
+                ast::Expr::Lambda(_)
+                    | ast::Expr::List(_)
+                    | ast::Expr::Set(_)
+                    | ast::Expr::Dict(_)
+                    | ast::Expr::Tuple(_)
+                    | ast::Expr::ListComp(_)
+                    | ast::Expr::SetComp(_)
+                    | ast::Expr::DictComp(_)
+                    | ast::Expr::Generator(_)
+                    | ast::Expr::FString(_)
+                    | ast::Expr::TString(_)
+            )
+        {
+            return PredicateOrLiteral::Literal(false);
+        }
+
+        let expression = self
+            .expressions_by_node
+            .get(&ExpressionNodeKey::from(context_expr))
+            .copied()
+            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
+        PredicateOrLiteral::Predicate(Predicate {
+            node: PredicateNode::ContextManagerSuppresses {
+                expression,
+                is_async,
+            },
+            is_positive: true,
+        })
+    }
+
     fn visit_condition(&mut self, test: &'ast ast::Expr) {
         self.visit_boolean_test(test, ExpressionContext::Condition);
     }
@@ -4720,19 +4761,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.exception_context_stack_manager
                                 .record_deferred_terminal_context_manager_exit();
                         }
-                        let context_expr = &item.context_expr;
-                        let expression = self
-                            .expressions_by_node
-                            .get(&ExpressionNodeKey::from(context_expr))
-                            .copied()
-                            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
-                        let predicate = PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::ContextManagerSuppresses {
-                                expression,
-                                is_async: *is_async,
-                            },
-                            is_positive: true,
-                        });
+                        let predicate = self.build_context_manager_suppression_predicate(
+                            &item.context_expr,
+                            *is_async,
+                        );
                         let predicate_id = self.add_predicate(predicate);
 
                         self.flow_restore(exceptional_entry);

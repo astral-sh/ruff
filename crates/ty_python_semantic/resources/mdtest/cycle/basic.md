@@ -617,3 +617,65 @@ value = 0
 while value:
     value = new_class("C", (value,))
 ```
+
+## Recursive lambda used as a context manager
+
+A lambda cannot suppress exceptions. Determining which bindings remain visible after the `with`
+statement does not require inferring its return type, which depends on those same bindings.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/4614>.
+
+```py
+match lambda: value:
+    case value:
+        pass
+
+with lambda: value:  # error: [invalid-context-manager]
+    match missing:  # error: [unresolved-reference]
+        case []:
+            del value
+        case 0:
+            for _ in 0:  # error: [not-iterable]
+                pass
+
+def value():
+    pass
+```
+
+## Recursive annotations in a context manager collection
+
+A set cannot suppress exceptions either. Inferring its element types to determine reachability can
+create a cycle through aliases, function annotations, and decorators.
+
+This is another regression test for <https://github.com/astral-sh/ty/issues/4614>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+(f := lambda: f)
+try:
+    missing  # error: [unresolved-reference]
+except:
+    type Alias = g  # error: [invalid-type-form]
+finally:
+    # error: [invalid-context-manager]
+    # error: [possibly-unresolved-reference]
+    # error: [unresolved-reference]
+    with {Alias}, (f := replacement):
+        pass
+
+def f():
+    pass
+
+@lambda: f  # error: [too-many-positional-arguments]
+def decorated():
+    pass
+
+# error: [invalid-type-form] "Function `f` is not valid in a parameter annotation"
+# error: [invalid-type-form] "Variable of type `() -> Divergent` is not allowed in a parameter annotation"
+def g(value: decorated):
+    pass
+```
