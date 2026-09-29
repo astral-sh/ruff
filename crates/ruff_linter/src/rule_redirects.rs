@@ -148,9 +148,11 @@ mod tests {
     #[test]
     fn overshadowing_redirects() {
         for rule in Rule::iter() {
-            let (code, status) = (rule.noqa_code(), rule.status());
+            let Some(code) = rule.noqa_code() else {
+                continue;
+            };
 
-            if matches!(status, RuleStatus::Removed { .. }) {
+            if matches!(rule.status(), RuleStatus::Removed { .. }) {
                 continue;
             }
 

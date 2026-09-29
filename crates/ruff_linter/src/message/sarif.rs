@@ -136,7 +136,7 @@ impl<'a> From<(&'a str, SarifLevel)> for SarifRule<'a> {
             Some((linter, suffix)) => {
                 let rule = linter
                     .all_rules()
-                    .find(|rule| rule.noqa_code().suffix() == suffix)
+                    .find(|rule| rule.noqa_code().is_some_and(|code| code.suffix() == suffix))
                     .expect("Expected a valid noqa code corresponding to a rule");
                 (Some(linter.name()), rule)
             }

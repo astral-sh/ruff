@@ -62,6 +62,8 @@ class LSPClient(LanguageClient):
 
         self.diagnostics = {}
 
+        # TODO: remove the suppression comment when https://github.com/openlawlibrary/pygls/pull/635 has been released
+        # ty: ignore[dynamic-function-decorator-return]
         @self.feature(lsp.TEXT_DOCUMENT_PUBLISH_DIAGNOSTICS)
         def publish_diagnostics(
             client: LSPClient, params: lsp.PublishDiagnosticsParams
@@ -72,11 +74,13 @@ class LSPClient(LanguageClient):
             future = self.diagnostics.get(params.uri, None)
 
             if future is None or future.done():
-                future = asyncio.Future()
+                future = asyncio.Future[lsp.PublishDiagnosticsParams]()
                 self.diagnostics[params.uri] = future
 
             future.set_result(params)
 
+        # TODO: remove the suppression comment when https://github.com/openlawlibrary/pygls/pull/635 has been released
+        # ty: ignore[dynamic-function-decorator-return]
         @self.feature(lsp.WINDOW_LOG_MESSAGE)
         def log_message(client: LSPClient, params: lsp.LogMessageParams):
             if params.type == lsp.MessageType.Error:
@@ -150,7 +154,7 @@ class LSPClient(LanguageClient):
         future = self.diagnostics.get(path.as_uri(), None)
 
         if future is None:
-            future = asyncio.Future()
+            future = asyncio.Future[lsp.PublishDiagnosticsParams]()
             self.diagnostics[path.as_uri()] = future
 
         try:

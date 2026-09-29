@@ -125,7 +125,9 @@ where
         diagnostic.set_noqa_offset(noqa_offset);
     }
 
-    diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+    if let Some(code) = rule.noqa_code() {
+        diagnostic.set_secondary_code(SecondaryCode::new(code.to_string()));
+    }
     diagnostic.set_documentation_url(rule.url());
 
     diagnostic

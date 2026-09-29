@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
@@ -67,7 +68,7 @@ use crate::rules::flake8_logging::helpers::is_logger_method_name;
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 /// - [PEP 8: Programming Recommendations on bare `except`](https://peps.python.org/pep-0008/#programming-recommendations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.127")]
+#[violation_metadata(stable_since = "v0.0.127", category = Category::Suspicious)]
 pub(crate) struct BlindExcept {
     name: String,
 }

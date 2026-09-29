@@ -3,7 +3,8 @@ use ruff_python_ast::{self as ast, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::{AlwaysFixableViolation, Edit, Fix};
+use crate::codes::Category;
+use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of the `xml.etree.cElementTree` module.
@@ -25,26 +26,31 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.199")]
+#[violation_metadata(stable_since = "v0.0.199", category = Category::Suspicious)]
 pub(crate) struct DeprecatedCElementTree;
 
-impl AlwaysFixableViolation for DeprecatedCElementTree {
+impl Violation for DeprecatedCElementTree {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "`cElementTree` is deprecated, use `ElementTree`".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Replace with `ElementTree`".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Replace with `ElementTree`".to_string())
     }
 }
 
-fn add_check_for_node<T>(checker: &Checker, node: &T)
+fn add_check_for_node<T>(checker: &Checker, node: &T, preserves_laziness: bool)
 where
     T: Ranged,
 {
     let mut diagnostic = checker.report_diagnostic(DeprecatedCElementTree, node.range());
     diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    if !preserves_laziness {
+        return;
+    }
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),
@@ -54,17 +60,19 @@ where
 
 /// UP023
 pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
+    let preserves_laziness = checker
+        .import_rewrite_preserves_laziness("xml.etree.cElementTree", "xml.etree.ElementTree");
     match stmt {
         Stmt::Import(ast::StmtImport {
             names,
-            is_lazy: _,
+            is_lazy,
             range: _,
             node_index: _,
         }) => {
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
                 if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
-                    add_check_for_node(checker, name);
+                    add_check_for_node(checker, name, *is_lazy || preserves_laziness);
                 }
             }
         }
@@ -72,7 +80,7 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             module,
             names,
             level,
-            is_lazy: _,
+            is_lazy,
             range: _,
             node_index: _,
         }) => {
@@ -81,12 +89,12 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
             } else if let Some(module) = module {
                 if module == "xml.etree.cElementTree" {
                     // Ex) `from xml.etree.cElementTree import XML`
-                    add_check_for_node(checker, stmt);
+                    add_check_for_node(checker, stmt, *is_lazy || preserves_laziness);
                 } else if module == "xml.etree" {
                     // Ex) `from xml.etree import cElementTree as ET`
                     for name in names {
                         if &name.name == "cElementTree" && name.asname.is_some() {
-                            add_check_for_node(checker, name);
+                            add_check_for_node(checker, name, true);
                         }
                     }
                 }

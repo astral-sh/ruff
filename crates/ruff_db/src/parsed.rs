@@ -413,6 +413,8 @@ mod indexed {
                         entry_count,
                         layout: IndexChunkLayout::Relative,
                     });
+                    let chunk_words = (node_chunk.len() * usize::from(relative_bits)).div_ceil(64);
+                    words.resize(words.len() + chunk_words, 0);
                     for (entry, node) in node_chunk.iter().enumerate() {
                         let (kind, pointer) = node.into_raw_parts();
                         let address = pointer.as_ptr().expose_provenance();
@@ -442,6 +444,8 @@ mod indexed {
                         u64::try_from(pointer.as_ptr().expose_provenance())
                             .expect("AST node addresses should fit in a bitstream word")
                     }));
+                    let kind_words = (node_chunk.len() * usize::from(Self::KIND_BITS)).div_ceil(64);
+                    words.resize(words.len() + kind_words, 0);
                     for (entry, node) in node_chunk.iter().enumerate() {
                         let (kind, _) = node.into_raw_parts();
                         Self::write_bits(
@@ -456,12 +460,11 @@ mod indexed {
             }
         }
 
-        fn write_bits(words: &mut Vec<u64>, bit: usize, value: u64, bits: u8) {
+        fn write_bits(words: &mut [u64], bit: usize, value: u64, bits: u8) {
             debug_assert!((1..=64).contains(&bits));
             let word = bit / 64;
             let shift = bit % 64;
             let end = bit + usize::from(bits);
-            words.resize(words.len().max(end.div_ceil(64)), 0);
             words[word] |= value << shift;
             if end > (word + 1) * 64 {
                 words[word + 1] |= value >> (64 - shift);

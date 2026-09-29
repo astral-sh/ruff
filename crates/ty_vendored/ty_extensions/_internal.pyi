@@ -1,4 +1,4 @@
-# ruff: noqa: PYI021
+# ruff: file-ignore[docstring-in-stub]
 """
 Internal-only symbols for special forms and type-system tests.
 
@@ -10,7 +10,8 @@ import types
 from enum import Enum
 from typing import Any, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self, TypeForm  # noqa: UP035
+# ruff: ignore[deprecated-import]
+from typing_extensions import LiteralString, Self, TypeForm
 
 # -------------
 # Special forms
@@ -230,6 +231,20 @@ def is_equivalent_to(
 
 def is_subtype_of(ty: TypeForm[object], of: TypeForm[object]) -> ConstraintSet:
     """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    """
+
+def is_constraint_set_subtype_of(
+    ty: TypeForm[object], of: TypeForm[object]
+) -> ConstraintSet:
+    """Returns a constraint set that is satisfied when `ty` is a `subtype`_ of `of`.
+
+    This differs from `is_subtype_of` in how it treats typevars.
+    `is_subtype_of` will assume that all typevars are non-inferable, and will
+    require all possible specializations of a typevar to satisfy the relation.
+    This method will instead return a constraint set describing which
+    specializations (possibly not all of them) satisfy the relation.
 
     .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     """

@@ -4,10 +4,10 @@ Checks for protocol classes with members that will lead to ambiguous interfaces.
 
 ## Why is this bad?
 
-Assigning to an undeclared variable in a protocol class, or to an undeclared attribute
-through a protocol method's `self` or `cls` receiver, leads to an ambiguous interface
-which may lead to the type checker inferring unexpected things. It's recommended to
-ensure that all members of a protocol class are explicitly declared.
+Assigning to an undeclared variable in a protocol class, or to an undeclared attribute through a
+protocol method's `self` or `cls` receiver, leads to an ambiguous interface which may lead to the
+type checker inferring unexpected things. It's recommended to ensure that all members of a protocol
+class are explicitly declared.
 
 ## Examples
 

@@ -1,11 +1,11 @@
-# ruff: noqa: PYI021
+# ruff: file-ignore[docstring-in-stub]
 """Experimental ty APIs intended to be exposed to end users."""
 
 import collections.abc
 import sys
 from typing import Any, ClassVar, Protocol, _SpecialForm
 
-from typing_extensions import LiteralString, Self  # noqa: UP035
+from typing_extensions import LiteralString, Self  # ruff: ignore[deprecated-import]
 
 from ._internal import TypeOf as _TypeOf
 

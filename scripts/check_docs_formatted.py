@@ -5,6 +5,7 @@
 # dependencies = ["ruff"]
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -12,6 +13,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -207,8 +213,8 @@ def format_contents(src: str) -> tuple[str, Sequence[CodeBlockError]]:
             code = format_str(code, extension)
         except InvalidInput as e:
             errors.append(CodeBlockError(e))
-        except NotImplementedError as e:
-            raise e
+        except NotImplementedError:
+            raise
 
         code = textwrap.indent(code, match["indent"])
         return f"{match['before']}{code}{match['after']}"

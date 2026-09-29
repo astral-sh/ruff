@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for the unintentional use of type annotations.
@@ -23,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// a["b"] = 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.250")]
+#[violation_metadata(stable_since = "v0.0.250", category = Category::Suspicious)]
 pub(crate) struct UnintentionalTypeAnnotation;
 
 impl Violation for UnintentionalTypeAnnotation {

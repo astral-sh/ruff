@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 
 /// ## What it does
@@ -64,7 +65,7 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 /// - [Python documentation: `re.escape`](https://docs.python.org/3/library/re.html#re.escape)
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.13.0")]
+#[violation_metadata(stable_since = "0.13.0", category = Category::Style)]
 pub(crate) struct PytestRaisesAmbiguousPattern;
 
 impl Violation for PytestRaisesAmbiguousPattern {
@@ -137,7 +138,7 @@ fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool 
 /// * `\d`, `\D`: Digit and non-digit
 /// * `\s`, `\S`: Whitespace and non-whitespace
 /// * `\w`, `\W`: Word and non-word character
-/// * `\z`: End of input
+/// * `\z`, `\Z`: End of input
 ///
 /// `\u`, `\U`, `\N`, `\x`, `\a`, `\f`, `\n`, `\r`, `\t`, `\v`
 /// are also valid in normal strings and thus do not count.
@@ -145,7 +146,10 @@ fn string_has_unescaped_metacharacters(value: &ast::StringLiteralValue) -> bool 
 /// while backreferences (e.g., `\1`) are not valid without groups,
 /// both of which should be caught in [`string_has_unescaped_metacharacters`].
 const fn escaped_char_is_regex_metasequence(c: char) -> bool {
-    matches!(c, 'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z')
+    matches!(
+        c,
+        'A' | 'b' | 'B' | 'd' | 'D' | 's' | 'S' | 'w' | 'W' | 'z' | 'Z'
+    )
 }
 
 const fn char_is_regex_metacharacter(c: char) -> bool {

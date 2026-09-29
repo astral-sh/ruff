@@ -6,6 +6,7 @@ use ruff_python_semantic::{Definition, Member, MemberKind};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `__iter__` methods in stubs that return `Iterable[T]` instead
@@ -69,7 +70,7 @@ use crate::checkers::ast::Checker;
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Correctness)]
 pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }

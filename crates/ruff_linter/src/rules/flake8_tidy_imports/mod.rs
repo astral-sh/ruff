@@ -11,6 +11,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use rustc_hash::FxHashMap;
+    use test_case::test_case;
 
     use crate::assert_diagnostics;
     use crate::registry::Rule;
@@ -221,6 +222,46 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    /// Test that `__lazy_modules__` properly handles relative imports.
+    ///
+    /// In this example, `.` resolves to `mypackage`, so both `helper` and `func` are imported from
+    /// modules that have been declared lazy. As with other lazy imports, the full module path has
+    /// to match, so `mypackage.sub` is _not_ lazy.
+    #[test_case("mymodule.py")]
+    #[test_case("__init__.py")]
+    fn declared_lazy_relative_imports(filename: &str) {
+        let source_kind = SourceKind::Python {
+            code: dedent(
+                r#"
+                __lazy_modules__ = ["mypackage", "mypackage.sub.utils"]
+                from . import helper
+                from .sub.utils import func
+                from .sub import eager
+
+                helper()
+                func()
+                eager()
+                "#,
+            )
+            .to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, _) = test_contents(
+            &source_kind,
+            &Path::new("mypackage").join(filename),
+            &LinterSettings {
+                namespace_packages: vec![Path::new("mypackage").to_path_buf()],
+                ..LinterSettings::for_rule(Rule::LazyImportImmediatelyResolved)
+                    .with_target_version(PythonVersion::PY315)
+            },
+        );
+        assert_diagnostics!(
+            format!("declared_lazy_relative_imports_{filename}"),
+            diagnostics
+        );
     }
 
     #[test]

@@ -1,7 +1,10 @@
+use std::hash::{Hash, Hasher};
+
 use crate::Db;
 use crate::ProgramEnvironment;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 use ty_python_core::Truthiness;
 use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicateKind,
@@ -9,7 +12,7 @@ use ty_python_core::predicate::{
 };
 
 use crate::place::{DefinedPlace, Place};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
@@ -22,6 +25,42 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypedDictType, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
+
+/// Identifies a pattern by its address and subject type without hashing the pattern subtree.
+#[derive(Clone, Copy)]
+pub(super) struct PatternCacheKey<'pattern, 'db> {
+    pub(super) pattern: &'pattern PatternPredicateKind<'db>,
+    pub(super) subject_ty: Type<'db>,
+}
+
+impl PatternCacheKey<'_, '_> {
+    pub(super) fn is_structural(self) -> bool {
+        matches!(
+            self.pattern,
+            PatternPredicateKind::Class(_)
+                | PatternPredicateKind::Mapping(_)
+                | PatternPredicateKind::Sequence(_)
+                | PatternPredicateKind::Or(_)
+        )
+    }
+}
+
+impl PartialEq for PatternCacheKey<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self.pattern, other.pattern) && self.subject_ty == other.subject_ty
+    }
+}
+
+impl Eq for PatternCacheKey<'_, '_> {}
+
+impl Hash for PatternCacheKey<'_, '_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::ptr::hash(self.pattern, state);
+        self.subject_ty.hash(state);
+    }
+}
+
+type PatternTypeCache<'pattern, 'db> = FxHashMap<PatternCacheKey<'pattern, 'db>, Type<'db>>;
 
 pub(crate) fn singleton_pattern_type<'db>(
     db: &'db dyn Db,
@@ -44,13 +83,6 @@ pub(crate) fn mapping_pattern_type<'db>(
     KnownClass::Mapping
         .to_instance(db, env)
         .top_materialization(db, env)
-}
-
-pub(crate) fn callable_pattern_type<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-) -> Type<'db> {
-    Type::Callable(CallableType::unknown(db)).top_materialization(db, env)
 }
 
 /// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
@@ -81,7 +113,7 @@ fn typed_dict_pattern_domain_satisfies<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-    predicate: &impl Fn(TypedDictType<'db>) -> bool,
+    predicate: &mut impl FnMut(TypedDictType<'db>) -> bool,
 ) -> bool {
     match ty.resolve_type_alias(db) {
         Type::TypedDict(typed_dict) => predicate(typed_dict),
@@ -114,7 +146,7 @@ pub(super) fn is_typed_dict_runtime_domain(
     env: &ProgramEnvironment<'_>,
     ty: Type<'_>,
 ) -> bool {
-    typed_dict_pattern_domain_satisfies(db, env, ty, &|_| true)
+    typed_dict_pattern_domain_satisfies(db, env, ty, &mut |_| true)
 }
 
 pub(crate) fn sequence_pattern_type_builder<'db>(
@@ -169,7 +201,6 @@ fn sequence_pattern_getitem_method<'db>(
         db,
         CallableSignature::from_overloads(overloads.chain(fallback_overload)),
         CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
     )
 }
 
@@ -269,12 +300,13 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
 /// # Exhaustive for a `Child` subject because `Child.x` is definitely bound.
 /// case Base(x=_): ...
 /// ```
-fn class_pattern_is_exhaustive(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    class: ClassLiteral<'_>,
-    subject_ty: Type<'_>,
-    kind: &ClassPatternPredicateKind<'_>,
+fn class_pattern_is_exhaustive<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassLiteral<'db>,
+    subject_ty: Type<'db>,
+    kind: &'pattern ClassPatternPredicateKind<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
     let class_instance_ty = Type::instance(db, env, class.top_materialization(db));
     let is_typed_dict_match = is_typed_dict_runtime_domain(db, env, subject_ty)
@@ -288,7 +320,14 @@ fn class_pattern_is_exhaustive(
     }
 
     if !kind.keywords.iter().all(|keyword| {
-        member_pattern_is_exhaustive(db, env, subject_ty, keyword.attr.as_str(), &keyword.pattern)
+        member_pattern_is_exhaustive(
+            db,
+            env,
+            subject_ty,
+            keyword.attr.as_str(),
+            &keyword.pattern,
+            cache,
+        )
     }) {
         return false;
     }
@@ -300,10 +339,10 @@ fn class_pattern_is_exhaustive(
         .zip(positional_sources)
         .all(|(pattern, source)| match source {
             ClassPatternPositionalSource::MatchSelf => {
-                pattern_is_exhaustive_for_subject(db, env, pattern, subject_ty)
+                pattern_is_exhaustive_for_subject(db, env, pattern, subject_ty, cache)
             }
             ClassPatternPositionalSource::Attribute(name) => {
-                member_pattern_is_exhaustive(db, env, subject_ty, name.as_str(), pattern)
+                member_pattern_is_exhaustive(db, env, subject_ty, name.as_str(), pattern, cache)
             }
             ClassPatternPositionalSource::Unknown => false,
         })
@@ -510,31 +549,33 @@ pub(crate) fn class_pattern_positional_sources(
 }
 
 /// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.
-fn member_pattern_is_exhaustive(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    instance_ty: Type<'_>,
+fn member_pattern_is_exhaustive<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    instance_ty: Type<'db>,
     name: &str,
-    pattern: &PatternPredicateKind<'_>,
+    pattern: &'pattern PatternPredicateKind<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
     let place = instance_ty.member(db, env, name).place;
     place.is_definitely_bound()
-        && place
-            .raw_type()
-            .is_some_and(|member_ty| pattern_is_exhaustive_for_subject(db, env, pattern, member_ty))
+        && place.raw_type().is_some_and(|member_ty| {
+            pattern_is_exhaustive_for_subject(db, env, pattern, member_ty, cache)
+        })
 }
 
 /// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
-fn pattern_is_exhaustive_for_subject(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    pattern: &PatternPredicateKind<'_>,
-    subject_ty: Type<'_>,
+fn pattern_is_exhaustive_for_subject<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    pattern: &'pattern PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
     subject_ty.is_subtype_of(
         db,
         env,
-        definite_match_pattern_type_for_subject(db, env, pattern, subject_ty),
+        definite_match_pattern_type_for_subject_cached(db, env, pattern, subject_ty, cache),
     )
 }
 
@@ -543,13 +584,14 @@ fn pattern_is_exhaustive_for_subject(
 /// A nonempty mapping pattern is exhaustive for a `TypedDict` only when every key names a required
 /// field and every nested pattern exhausts that field's declared type. Other mapping types do not
 /// guarantee that a particular key is present.
-fn mapping_pattern_is_exhaustive(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    kind: &MappingPatternPredicateKind<'_>,
-    subject_ty: Type<'_>,
+fn mapping_pattern_is_exhaustive<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &'pattern MappingPatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
-    typed_dict_pattern_domain_satisfies(db, env, subject_ty, &|typed_dict| {
+    typed_dict_pattern_domain_satisfies(db, env, subject_ty, &mut |typed_dict| {
         kind.entries.iter().all(|entry| {
             let key_ty = infer_same_file_expression_type(db, entry.key, TypeContext::default());
             let Some(key) = key_ty.as_string_literal() else {
@@ -557,7 +599,13 @@ fn mapping_pattern_is_exhaustive(
             };
             typed_dict.item(db, key.value(db)).is_some_and(|field| {
                 field.is_required()
-                    && pattern_is_exhaustive_for_subject(db, env, &entry.pattern, field.declared_ty)
+                    && pattern_is_exhaustive_for_subject(
+                        db,
+                        env,
+                        &entry.pattern,
+                        field.declared_ty,
+                        cache,
+                    )
             })
         })
     })
@@ -567,11 +615,12 @@ fn mapping_pattern_is_exhaustive(
 ///
 /// Each aligned element is checked with the subject-aware matcher so nested class patterns use the
 /// tuple element's actual static type.
-fn sequence_pattern_is_exhaustive_for_subject(
-    db: &dyn Db,
-    env: &ProgramEnvironment<'_>,
-    kind: &SequencePatternPredicateKind<'_>,
-    subject_ty: Type<'_>,
+fn sequence_pattern_is_exhaustive_for_subject<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &'pattern SequencePatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
 ) -> bool {
     if !subject_ty.is_subtype_of(db, env, sequence_pattern_type_builder(db, env).build()) {
         return false;
@@ -595,7 +644,7 @@ fn sequence_pattern_is_exhaustive_for_subject(
                 .iter()
                 .zip(kind.patterns.iter())
                 .all(|(element, pattern)| {
-                    pattern_is_exhaustive_for_subject(db, env, pattern, *element)
+                    pattern_is_exhaustive_for_subject(db, env, pattern, *element, cache)
                 });
     };
     if elements.len() < prefix.len() + suffix.len() {
@@ -606,7 +655,9 @@ fn sequence_pattern_is_exhaustive_for_subject(
         .iter()
         .zip(prefix)
         .chain(elements.iter().rev().zip(suffix.iter().rev()))
-        .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, env, pattern, *element))
+        .all(|(element, pattern)| {
+            pattern_is_exhaustive_for_subject(db, env, pattern, *element, cache)
+        })
 }
 
 /// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
@@ -644,6 +695,65 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    definite_match_pattern_type_for_subject_cached(
+        db,
+        env,
+        kind,
+        subject_ty,
+        &mut FxHashMap::default(),
+    )
+}
+
+/// Reuse definite-match types when different union arms reach the same nested pattern and type.
+///
+/// ```python
+/// from __future__ import annotations
+/// from typing import TypeAlias, TypedDict
+///
+/// class A(TypedDict):
+///     child: Node
+/// class B(TypedDict):
+///     child: Node
+/// Node: TypeAlias = A | B | None
+///
+/// def visit(node: Node) -> None:
+///     match node:
+///         case {"child": {"child": _}}: ...
+/// ```
+///
+/// Both `A` and `B` pass `Node` to the nested mapping pattern. Its definite-match type can be
+/// reused when deciding which values can reach a later case. The cache is local to one analysis,
+/// where the database and program environment remain the same.
+fn definite_match_pattern_type_for_subject_cached<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &'pattern PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
+) -> Type<'db> {
+    let key = PatternCacheKey {
+        pattern: kind,
+        subject_ty,
+    };
+    let cacheable = key.is_structural() || matches!(kind, PatternPredicateKind::As(Some(_), _));
+    if cacheable && let Some(result) = cache.get(&key) {
+        return *result;
+    }
+
+    let result = definite_match_pattern_type_for_subject_impl(db, env, kind, subject_ty, cache);
+    if cacheable {
+        cache.insert(key, result);
+    }
+    result
+}
+
+fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &'pattern PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
+) -> Type<'db> {
     if let Some(subject_independent_ty) =
         subject_independent_definite_match_pattern_type(db, env, kind)
     {
@@ -655,10 +765,9 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         return UnionType::from_elements(
             db,
             env,
-            union
-                .elements(db)
-                .iter()
-                .map(|element| definite_match_pattern_type_for_subject(db, env, kind, *element)),
+            union.elements(db).iter().map(|element| {
+                definite_match_pattern_type_for_subject_cached(db, env, kind, *element, cache)
+            }),
         );
     }
 
@@ -682,9 +791,11 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
-                    if class_pattern_is_exhaustive(db, env, class, resolved_subject_ty, kind) {
+                    if class_pattern_is_exhaustive(db, env, class, resolved_subject_ty, kind, cache)
+                    {
                         let top_subject_ty = resolved_subject_ty.top_materialization(db, env);
-                        if !class_pattern_is_exhaustive(db, env, class, top_subject_ty, kind) {
+                        if !class_pattern_is_exhaustive(db, env, class, top_subject_ty, kind, cache)
+                        {
                             return subject_ty;
                         }
                         return top_subject_ty;
@@ -692,7 +803,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_empty()
-                        && let callable_pattern_ty = callable_pattern_type(db, env)
+                        && let callable_pattern_ty = Type::Callable(CallableType::top(db))
                         && subject_ty.is_subtype_of(db, env, callable_pattern_ty) =>
                 {
                     return callable_pattern_ty;
@@ -701,25 +812,37 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            if !sequence_pattern_is_exhaustive_for_subject(db, env, kind, resolved_subject_ty) {
+            if !sequence_pattern_is_exhaustive_for_subject(
+                db,
+                env,
+                kind,
+                resolved_subject_ty,
+                cache,
+            ) {
                 // A nested subject-dependent pattern rejected the context-free approximation.
                 // Reusing that approximation for the surrounding sequence would reintroduce the
                 // values that the recursive analysis deliberately excluded.
                 return Type::Never;
             }
             let top_subject_ty = resolved_subject_ty.top_materialization(db, env);
-            return if sequence_pattern_is_exhaustive_for_subject(db, env, kind, top_subject_ty) {
+            return if sequence_pattern_is_exhaustive_for_subject(
+                db,
+                env,
+                kind,
+                top_subject_ty,
+                cache,
+            ) {
                 top_subject_ty
             } else {
                 subject_ty
             };
         }
         PatternPredicateKind::Mapping(kind) => {
-            if !mapping_pattern_is_exhaustive(db, env, kind, resolved_subject_ty) {
+            if !mapping_pattern_is_exhaustive(db, env, kind, resolved_subject_ty, cache) {
                 return Type::Never;
             }
             let top_subject_ty = resolved_subject_ty.top_materialization(db, env);
-            return if mapping_pattern_is_exhaustive(db, env, kind, top_subject_ty) {
+            return if mapping_pattern_is_exhaustive(db, env, kind, top_subject_ty, cache) {
                 top_subject_ty
             } else {
                 subject_ty
@@ -730,12 +853,16 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 db,
                 env,
                 patterns.iter().map(|pattern| {
-                    definite_match_pattern_type_for_subject(db, env, pattern, subject_ty)
+                    definite_match_pattern_type_for_subject_cached(
+                        db, env, pattern, subject_ty, cache,
+                    )
                 }),
             );
         }
         PatternPredicateKind::As(Some(pattern), _) => {
-            return definite_match_pattern_type_for_subject(db, env, pattern, subject_ty);
+            return definite_match_pattern_type_for_subject_cached(
+                db, env, pattern, subject_ty, cache,
+            );
         }
         _ => return Type::Never,
     }
@@ -1091,7 +1218,9 @@ fn subject_independent_definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    let class_instance_ty = Type::instance(db, env, class.top_materialization(db));
+                    let class_instance_ty =
+                        Type::instance(db, env, class.unknown_specialization(db))
+                            .top_materialization(db, env);
                     let typed_dict_adds_runtime_matches =
                         typed_dict_matches_class_pattern(db, env, class)
                             && !Type::object().is_subtype_of(db, env, class_instance_ty);
@@ -1099,7 +1228,7 @@ fn subject_independent_definite_match_pattern_type<'db>(
                 }
                 Type::ClassLiteral(_) => None,
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    Some(callable_pattern_type(db, env))
+                    Some(Type::Callable(CallableType::top(db)))
                 }
                 _ => Some(Type::Never),
             }
@@ -1155,10 +1284,11 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
                 Type::ClassLiteral(class) if kind.is_empty() => {
-                    Type::instance(db, env, class.top_materialization(db))
+                    Type::instance(db, env, class.unknown_specialization(db))
+                        .top_materialization(db, env)
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) if kind.is_empty() => {
-                    callable_pattern_type(db, env)
+                    Type::Callable(CallableType::top(db))
                 }
                 _ => Type::Never,
             }

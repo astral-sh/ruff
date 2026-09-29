@@ -10,6 +10,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -63,7 +64,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// [Python keywords]: https://docs.python.org/3/reference/lexical_analysis.html#keywords
 /// [Dunder names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Pedantic)]
 pub(crate) struct ConvertTypedDictFunctionalToClass {
     name: String,
 }
@@ -96,7 +97,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
         return;
     };
 
-    let Some((body, total_keyword)) = match_fields_and_total(arguments) else {
+    let Some((body, keywords)) = match_fields_and_keywords(arguments) else {
         return;
     };
 
@@ -112,7 +113,7 @@ pub(crate) fn convert_typed_dict_functional_to_class(
             stmt,
             class_name,
             body,
-            total_keyword,
+            keywords,
             base_class,
             checker.generator(),
             checker.comment_ranges(),
@@ -170,17 +171,14 @@ fn create_field_assignment_stmt(field: &str, annotation: &Expr) -> Stmt {
 fn create_class_def_stmt(
     class_name: &str,
     body: Suite,
-    total_keyword: Option<&Keyword>,
+    keywords: &[Keyword],
     base_class: &Expr,
 ) -> Stmt {
     ast::StmtClassDef {
         name: Identifier::new(class_name.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
-            args: Box::from([base_class.clone()]),
-            keywords: match total_keyword {
-                Some(keyword) => std::iter::once(keyword.clone()).collect(),
-                None => std::iter::empty().collect(),
-            },
+            args: [base_class.clone()].into(),
+            keywords: keywords.into(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),
@@ -260,37 +258,36 @@ fn fields_from_keywords(keywords: &[Keyword]) -> Option<Suite> {
         .collect()
 }
 
-/// Match the fields and `total` keyword from a `TypedDict` call.
-fn match_fields_and_total(arguments: &Arguments) -> Option<(Suite, Option<&Keyword>)> {
+/// Match the fields and class keywords from a `TypedDict` call.
+fn match_fields_and_keywords(arguments: &Arguments) -> Option<(Suite, &[Keyword])> {
     match (&*arguments.args, &*arguments.keywords) {
         // Ex) `TypedDict("MyType", {"a": int, "b": str})`
-        ([_typename, fields], [..]) => {
-            let total = arguments.find_keyword("total");
-            match fields {
-                Expr::Dict(ast::ExprDict {
-                    items,
-                    range: _,
-                    node_index: _,
-                }) => Some((fields_from_dict_literal(items)?, total)),
-                Expr::Call(ast::ExprCall {
-                    func,
-                    arguments: Arguments { keywords, .. },
-                    range_start: _,
-                    node_index: _,
-                }) => Some((fields_from_dict_call(func, keywords)?, total)),
-                _ => None,
-            }
-        }
+        ([_typename, fields], keywords) => match fields {
+            Expr::Dict(ast::ExprDict {
+                items,
+                range: _,
+                node_index: _,
+            }) => Some((fields_from_dict_literal(items)?, keywords)),
+            Expr::Call(ast::ExprCall {
+                func,
+                arguments: Arguments {
+                    keywords: fields, ..
+                },
+                range_start: _,
+                node_index: _,
+            }) => Some((fields_from_dict_call(func, fields)?, keywords)),
+            _ => None,
+        },
         // Ex) `TypedDict("MyType")`
         ([_typename], []) => {
             let node = Stmt::Pass(ast::StmtPass {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             });
-            Some((Suite::from([node]), None))
+            Some((Suite::from([node]), &[]))
         }
         // Ex) `TypedDict("MyType", a=int, b=str)`
-        ([_typename], fields) => Some((fields_from_keywords(fields)?, None)),
+        ([_typename], fields) => Some((fields_from_keywords(fields)?, &[])),
         // Ex) `TypedDict()`
         _ => None,
     }
@@ -301,7 +298,7 @@ fn convert_to_class(
     stmt: &Stmt,
     class_name: &str,
     body: Suite,
-    total_keyword: Option<&Keyword>,
+    keywords: &[Keyword],
     base_class: &Expr,
     generator: Generator,
     comment_ranges: &CommentRanges,
@@ -309,10 +306,7 @@ fn convert_to_class(
     Fix::applicable_edit(
         Edit::range_replacement(
             generator.stmt(&create_class_def_stmt(
-                class_name,
-                body,
-                total_keyword,
-                base_class,
+                class_name, body, keywords, base_class,
             )),
             stmt.range(),
         ),

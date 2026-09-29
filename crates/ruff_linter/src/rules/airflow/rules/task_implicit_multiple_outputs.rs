@@ -7,6 +7,7 @@ use ruff_python_semantic::{BindingKind, Modules, SemanticModel};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::add_argument;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -53,7 +54,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `XCom` layout, and a function with multiple return paths may not always
 /// return a dict.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.14")]
+#[violation_metadata(preview_since = "0.15.14", category = Category::Style)]
 pub(crate) struct AirflowTaskImplicitMultipleOutputs {
     annotation_is_mapping: bool,
 }

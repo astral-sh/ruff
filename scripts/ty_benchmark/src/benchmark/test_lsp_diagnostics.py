@@ -39,10 +39,11 @@ SEVERITY_LABELS: Final = {
 
 @pytest.fixture(scope="module", params=ALL_PROJECTS, ids=lambda p: p.name)
 def project_setup(
-    request,
+    request: pytest.FixtureRequest,
 ) -> Generator[tuple[Project, Venv]]:
     """Set up a project and its venv once per module (shared across all tests for this project)."""
-    project: Project = request.param
+    project = request.param
+    assert isinstance(project, Project)
 
     with tempfile.TemporaryDirectory() as tempdir:
         cwd = Path(tempdir)
@@ -61,9 +62,11 @@ def project_setup(
     params=TOOLS_TO_BENCHMARK,
     ids=lambda t: t.name(),
 )
-def tool(request) -> Tool:
+def tool(request: pytest.FixtureRequest) -> Tool:
     """Provide each tool to test."""
-    return request.param
+    value = request.param
+    assert isinstance(value, Tool)
+    return value
 
 
 def test_fetch_diagnostics(
@@ -416,7 +419,7 @@ def print_diagnostics(
 ):
     file = file.relative_to(cwd)
 
-    if label:
+    if label is not None:
         print(f"\n{file}: {len(diagnostics)} {label}")
     else:
         print(f"\n{file}: {len(diagnostics)} diagnostics")

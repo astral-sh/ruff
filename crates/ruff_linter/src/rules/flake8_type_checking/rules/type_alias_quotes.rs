@@ -7,6 +7,7 @@ use ruff_python_stdlib::typing::{is_pep_593_generic_type, is_standard_library_li
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
@@ -49,7 +50,7 @@ use ruff_python_ast::token::parenthesized_range;
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Correctness)]
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
@@ -134,7 +135,7 @@ impl Violation for UnquotedTypeAlias {
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.1")]
+#[violation_metadata(preview_since = "0.8.1", category = Category::Pedantic)]
 pub(crate) struct QuotedTypeAlias;
 
 impl AlwaysFixableViolation for QuotedTypeAlias {

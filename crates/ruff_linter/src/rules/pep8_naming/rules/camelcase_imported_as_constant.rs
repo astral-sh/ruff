@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::pep8_naming::helpers;
 use crate::rules::pep8_naming::settings::IgnoreNames;
 
@@ -51,7 +52,7 @@ use crate::rules::pep8_naming::settings::IgnoreNames;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.82")]
+#[violation_metadata(stable_since = "v0.0.82", category = Category::Pedantic)]
 pub(crate) struct CamelcaseImportedAsConstant {
     name: String,
     asname: String,

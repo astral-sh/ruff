@@ -32,7 +32,7 @@ pub(super) fn generate_method_call(name: Name, method: &str, generator: Generato
     let call = ast::ExprCall {
         func: Box::new(attr.into()),
         arguments: ast::Arguments {
-            args: Box::from([]),
+            args: [].into(),
             keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
@@ -66,9 +66,8 @@ pub(super) fn replace_with_identity_check(
     };
 
     let new_expr = Expr::Compare(ast::ExprCompare {
-        left: left.clone().into(),
         ops: [op].into(),
-        comparators: [ast::ExprNoneLiteral::default().into()].into(),
+        operands: [left.clone(), ast::ExprNoneLiteral::default().into()].into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });

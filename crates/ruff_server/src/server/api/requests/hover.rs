@@ -112,18 +112,22 @@ fn hover(
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    let _ = write!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
+    let _ = write!(&mut output, "# {}", rule.name_and_code());
     output.push('\n');
     output.push('\n');
 
-    let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    let _ = write!(
-        &mut output,
-        "Derived from the **{}** linter.",
-        linter.name()
-    );
-    output.push('\n');
-    output.push('\n');
+    if let Some(linter) = rule
+        .noqa_code()
+        .and_then(|code| Linter::parse_code(&code.to_string()).map(|(linter, _)| linter))
+    {
+        let _ = write!(
+            &mut output,
+            "Derived from the **{}** linter.",
+            linter.name()
+        );
+        output.push('\n');
+        output.push('\n');
+    }
 
     let fix_availability = rule.fixable();
     if matches!(
@@ -144,7 +148,7 @@ fn format_rule_text(rule: Rule) -> String {
     if let Some(explanation) = rule.explanation() {
         output.push_str(explanation.trim());
     } else {
-        tracing::warn!("Rule {} does not have an explanation", rule.noqa_code());
+        tracing::warn!("Rule {} does not have an explanation", rule.name_and_code());
         output.push_str("An issue occurred: an explanation for this rule was not found.");
     }
     output

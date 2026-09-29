@@ -804,6 +804,7 @@ else:
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,
+        slots_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
     ) -> IdentityFunction:
         """Decorator that marks a function, class, or metaclass as providing
@@ -1336,7 +1337,7 @@ else:
 
     For example::
 
-        def is_awaitable(val: object) -> TypeIs[Awaitable[object]]:
+        def is_awaitable(val: object) -> TypeIs[Awaitable[Any]]:
             return hasattr(val, '__await__')
 
         def f(val: Union[int, Awaitable[int]]) -> int:

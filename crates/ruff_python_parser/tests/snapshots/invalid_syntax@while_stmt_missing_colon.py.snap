@@ -18,18 +18,18 @@ Module(
                         ExprCompare {
                             node_index: NodeIndex(None),
                             range: 12..18,
-                            left: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 12..13,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
                             ops: [
                                 Lt,
                             ],
-                            comparators: [
+                            operands: [
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 12..13,
+                                        id: Name("a"),
+                                        ctx: Load,
+                                    },
+                                ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
                                         node_index: NodeIndex(None),

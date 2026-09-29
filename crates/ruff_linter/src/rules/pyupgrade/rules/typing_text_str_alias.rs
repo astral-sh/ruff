@@ -6,6 +6,7 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -31,7 +32,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Text`](https://docs.python.org/3/library/typing.html#typing.Text)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.195")]
+#[violation_metadata(stable_since = "v0.0.195", category = Category::Suspicious)]
 pub(crate) struct TypingTextStrAlias {
     module: TypingModule,
 }

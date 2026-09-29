@@ -146,7 +146,7 @@ def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
     defers .pth/.start processing until a single StartupState.process() call.
     """
 
-def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
+def addsitepackages(known_paths: set[str], prefixes: Iterable[str] | None = None) -> set[str]:  # undocumented
     """Add global site-packages directories, if they exist.
 
     Site-packages directories are computed from *prefixes*, or from the global
@@ -154,7 +154,7 @@ def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None
     paths added by addsitedir().
     """
 
-def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
+def addusersitepackages(known_paths: set[str]) -> set[str]:  # undocumented
     """Add the per-user site-packages directory, if enabled.
 
     The user site directory is added only when user site-packages are enabled

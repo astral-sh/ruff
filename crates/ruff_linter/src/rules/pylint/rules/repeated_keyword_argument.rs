@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for repeated keyword arguments in function calls.
@@ -23,7 +24,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: Argument](https://docs.python.org/3/glossary.html#term-argument)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Correctness)]
 pub(crate) struct RepeatedKeywordArgument {
     duplicate_keyword: String,
 }

@@ -6,6 +6,7 @@ use std::fmt;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for indexed access to lists, strings, tuples, bytes, and comprehensions
@@ -26,7 +27,7 @@ use crate::checkers::ast::Checker;
 /// var = [1, 2, 3][0]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.278")]
+#[violation_metadata(stable_since = "v0.0.278", category = Category::Correctness)]
 pub(crate) struct InvalidIndexType {
     value_type: String,
     index_type: String,

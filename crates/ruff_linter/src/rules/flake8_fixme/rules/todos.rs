@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::directives::{TodoComment, TodoDirectiveKind};
 
 /// ## What it does
@@ -23,7 +24,7 @@ use crate::directives::{TodoComment, TodoDirectiveKind};
 ///     return f"Hello, {name}!"  # TODO: Add support for custom greetings.
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Pedantic)]
 pub(crate) struct LineContainsTodo;
 impl Violation for LineContainsTodo {
     #[derive_message_formats]
@@ -50,7 +51,7 @@ impl Violation for LineContainsTodo {
 ///     return distance / time  # FIXME: Raises ZeroDivisionError for time = 0.
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Pedantic)]
 pub(crate) struct LineContainsFixme;
 impl Violation for LineContainsFixme {
     #[derive_message_formats]
@@ -74,7 +75,7 @@ impl Violation for LineContainsFixme {
 ///     return distance / time  # XXX: Raises ZeroDivisionError for time = 0.
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Pedantic)]
 pub(crate) struct LineContainsXxx;
 impl Violation for LineContainsXxx {
     #[derive_message_formats]
@@ -110,7 +111,7 @@ impl Violation for LineContainsXxx {
 ///         return False
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.272")]
+#[violation_metadata(stable_since = "v0.0.272", category = Category::Pedantic)]
 pub(crate) struct LineContainsHack;
 impl Violation for LineContainsHack {
     #[derive_message_formats]

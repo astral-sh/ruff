@@ -5,6 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -75,7 +76,7 @@ pub(crate) enum MinMax {
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.266")]
+#[violation_metadata(stable_since = "v0.0.266", category = Category::Pedantic)]
 pub(crate) struct NestedMinMax {
     func: MinMax,
 }
@@ -202,7 +203,7 @@ pub(crate) fn nested_min_max(
         let flattened_expr = Expr::Call(ast::ExprCall {
             func: Box::new(func.clone()),
             arguments: Arguments {
-                args: collect_nested_args(min_max, args, checker.semantic()).into_boxed_slice(),
+                args: collect_nested_args(min_max, args, checker.semantic()).into(),
                 keywords: keywords.iter().cloned().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,

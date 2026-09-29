@@ -1,17 +1,22 @@
 use crate::{
+    Db,
     diagnostic::format_enumeration,
     types::{
-        KnownInstanceType, Signature, Type, TypeVarKind,
+        BoundTypeVarIdentity, KnownInstanceType, Signature, StaticClassLiteral, Type, TypeVarKind,
+        TypeVarVariance,
         context::InferContext,
         diagnostic::{
-            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT,
-            UNBOUND_TYPE_VARIABLE,
+            INVALID_GENERIC_CLASS, INVALID_LEGACY_POSITIONAL_PARAMETER,
+            INVALID_TYPE_VARIABLE_DEFAULT, UNBOUND_TYPE_VARIABLE,
         },
-        function::{FunctionDecorators, OverloadLiteral},
+        function::{FunctionDecorators, FunctionType, OverloadLiteral},
         generics::GenericContext,
         infer_definition_types,
+        list_members::all_end_of_scope_members,
+        member::class_member,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
+        variance::{MemberVariance, VarianceInferable},
         visitor::find_over_type,
     },
 };
@@ -22,6 +27,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
 use ty_python_core::definition::Definition;
 
 pub(crate) fn check_function_definition<'db>(
@@ -47,6 +53,203 @@ pub(crate) fn check_function_definition<'db>(
     check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+}
+
+/// Check that a nominal class's exposed methods respect its declared type-parameter variance.
+/// Constructors are excluded because their parameters establish the class specialization.
+/// Recursively checks type variables nested in containers, unions, and callables as well as bare uses.
+pub(super) fn check_class_method_typevar_variance<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+) {
+    let db = context.db();
+    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+        return;
+    }
+
+    // Protocols require declared variance to match the inferred variance, including for explicitly
+    // invariant type variables. Nominal classes can be more conservative, so they only reject uses
+    // incompatible with a declared covariance or contravariance. Both checks share recursive
+    // variance inference, but only nominal classes currently skip overloads and independently
+    // generic methods to avoid false positives.
+    // TODO: Handle these cases in shared variance inference so both checks can account for them.
+    let Some(generic_context) = class.generic_context(db) else {
+        return;
+    };
+    if !generic_context.variables(db).any(|typevar| {
+        matches!(
+            typevar.typevar(db).explicit_variance(db),
+            Some(TypeVarVariance::Covariant | TypeVarVariance::Contravariant)
+        )
+    }) {
+        return;
+    }
+
+    let env = context.program_environment();
+    let instance = class.variance_receiver(db, env);
+    let mut reported = FxHashSet::default();
+    for member in all_end_of_scope_members(db, class.body_scope(db))
+        .unique_by(|member| member.member.name.clone())
+    {
+        let mut member = member.member;
+        if matches!(member.name.as_str(), "__init__" | "__new__") {
+            continue;
+        }
+        // The iterator lists declarations and bindings separately; lookup combines their types.
+        let Some(ty) =
+            class_member(db, class.body_scope(db), &member.name).ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        member.ty = ty.resolve_type_alias(db);
+        if let Type::PropertyInstance(property) = member.ty {
+            // Each retained accessor has its own exclusions. Checking bound accessor signatures
+            // includes the setter's input, which an ordinary property read would not expose.
+            for (accessor, function) in property.accessors_with_functions(db) {
+                if function.definition(db).scope(db) == class.body_scope(db)
+                    && !exclude_from_variance(db, function)
+                {
+                    check_method_typevar_variance(
+                        context,
+                        generic_context,
+                        function,
+                        MemberVariance::accessor(db, env, accessor, instance),
+                        &mut reported,
+                    );
+                }
+            }
+            continue;
+        }
+        for (function, ty) in member
+            .local_function_bindings(db, class.body_scope(db))
+            .filter(|(function, _)| !exclude_from_variance(db, *function))
+        {
+            check_method_typevar_variance(
+                context,
+                generic_context,
+                function,
+                MemberVariance::of(db, env, ty, instance),
+                &mut reported,
+            );
+        }
+    }
+}
+
+/// Whether a source method is exempt from declared-variance validation.
+fn exclude_from_variance<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> bool {
+    let last_definition = function.literal(db).last_definition;
+    // Variance depends on the complete overload set: a broader overload can cover an otherwise
+    // incompatible signature.
+    // TODO: Account for that coverage in shared variance inference before
+    // checking overloaded methods here.
+    if function.has_known_decorator(db, FunctionDecorators::OVERLOAD)
+        || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
+    {
+        return true;
+    }
+
+    // Independent method type parameters can make an occurrence of a class parameter redundant.
+    // TODO: Account for those relationships instead of just composing each occurrence's variance.
+    // Use the lexical context so that type parameters moved into a returned callable also count.
+    let lexical_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+    lexical_signature.generic_context.is_some_and(|context| {
+        context
+            .variables(db)
+            .any(|typevar| !typevar.typevar(db).is_self(db))
+    })
+}
+
+fn check_method_typevar_variance<'db>(
+    context: &InferContext<'db, '_>,
+    generic_context: GenericContext<'db>,
+    function: FunctionType<'db>,
+    member: MemberVariance<'db>,
+    reported: &mut FxHashSet<(Definition<'db>, BoundTypeVarIdentity<'db>)>,
+) {
+    let db = context.db();
+    let env = context.program_environment();
+    let last_definition = function.literal(db).last_definition;
+    let signatures = match member.read_ty {
+        Type::FunctionLiteral(function) => Some(function.signature(db)),
+        Type::BoundMethod(method) => method.bound_signatures(db),
+        Type::Callable(callable) => Some(callable.signatures(db)),
+        _ => None,
+    }
+    .map(|signatures| signatures.overloads.as_slice());
+    let signature = match signatures {
+        Some([signature]) => Some(signature),
+        Some(_) => return,
+        None => None,
+    }
+    .filter(|signature| signature.definition() == Some(function.definition(db)));
+
+    for typevar in generic_context.variables(db) {
+        let Some(declared_variance) = typevar.typevar(db).explicit_variance(db) else {
+            continue;
+        };
+        if declared_variance == TypeVarVariance::Invariant {
+            continue;
+        }
+        let required_variance = member
+            .variance_of(db, env, typevar.identity(db))
+            .evaluate(db);
+        if declared_variance.join(required_variance) == declared_variance
+            || !reported.insert((function.definition(db), typevar.identity(db)))
+        {
+            continue;
+        }
+        let node = last_definition.node(db, context.file(), context.module());
+        let range = signature
+            .and_then(|signature| {
+                let parameters = signature.parameters().iter().filter_map(|parameter| {
+                    let annotation = node
+                        .parameters
+                        .iter()
+                        .nth(parameter.source_parameter_index()?)?
+                        .annotation()?;
+                    // `P.args` and `P.kwargs` both consume `P`, despite having distinct identities.
+                    let parameter_type = match parameter.annotated_type() {
+                        Type::TypeVar(typevar) if typevar.paramspec_attr(db).is_some() => {
+                            Type::TypeVar(typevar.without_paramspec_attr(db))
+                        }
+                        ty => ty,
+                    };
+                    Some((
+                        annotation.range(),
+                        parameter_type
+                            .with_polarity(TypeVarVariance::Contravariant)
+                            .variance_of(db, env, typevar.identity(db))
+                            .evaluate(db),
+                    ))
+                });
+                let returns = node.returns.iter().map(|annotation| {
+                    (
+                        annotation.range(),
+                        signature
+                            .return_ty
+                            .variance_of(db, env, typevar.identity(db))
+                            .evaluate(db),
+                    )
+                });
+                parameters.chain(returns).find_map(|(range, variance)| {
+                    (declared_variance.join(variance) != declared_variance).then_some(range)
+                })
+            })
+            .unwrap_or_else(|| node.name.range());
+        if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, range) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Variance of type variable `{}` is incompatible with method `{}`",
+                typevar.name(db),
+                node.name,
+            ));
+            diagnostic.info(format_args!(
+                "Type variable `{}` is declared as {}, but this method requires it to be {}",
+                typevar.name(db),
+                declared_variance.as_str(),
+                required_variance.as_str(),
+            ));
+        }
+    }
 }
 
 /// Check that a function using PEP 695 syntax does not also introduce legacy type variables.

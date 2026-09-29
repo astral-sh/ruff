@@ -387,7 +387,7 @@ doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictCo
 fields = [
   { name = "key", type = "Expr?" },
   { name = "value", type = "Expr" },
-  { name = "generators", type = "Comprehension*" },
+  { name = "generators", type = "Box<[Comprehension]>" },
 ]
 
 [Expr.nodes.ExprGenerator]
@@ -411,11 +411,16 @@ doc = "See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.Yield
 fields = [{ name = "value", type = "Expr" }]
 
 [Expr.nodes.ExprCompare]
-doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
+doc = """A comparison or chain of comparisons.
+
+`operands` contains all operands in source order, including the leftmost operand.
+For example, `a < b <= c` has operands `[a, b, c]` and operators `[Lt, LtE]`.
+There is at least one operator, and `operands.len() == ops.len() + 1`.
+
+See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)."""
 fields = [
-  { name = "left", type = "Expr" },
   { name = "ops", type = "Box<[CmpOp]>" },
-  { name = "comparators", type = "Box<[Expr]>" },
+  { name = "operands", type = "Box<[Expr]>" },
 ]
 # The fields must be visited simultaneously
 custom_source_order = true

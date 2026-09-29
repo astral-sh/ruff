@@ -83,7 +83,9 @@ expression: initialization_result
           "number",
           "decorator",
           "builtinConstant",
-          "typeParameter"
+          "typeParameter",
+          "operator",
+          "regexp"
         ],
         "tokenModifiers": [
           "definition",

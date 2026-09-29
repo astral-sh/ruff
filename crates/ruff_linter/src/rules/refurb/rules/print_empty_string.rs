@@ -6,6 +6,7 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -38,7 +39,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Complexity)]
 pub(crate) struct PrintEmptyString {
     reason: Reason,
 }
@@ -243,8 +244,7 @@ impl EmptyStringFix {
             .iter()
             .filter(|arg| !is_empty_string(arg))
             .cloned()
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+            .collect();
 
         // Remove the `sep` keyword argument if it exists.
         if separator == Separator::Remove {

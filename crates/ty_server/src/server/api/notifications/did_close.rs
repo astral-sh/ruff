@@ -25,11 +25,11 @@ impl SyncNotificationHandler for DidCloseTextDocumentHandler {
         } = params;
 
         let document = session
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .with_failure_code(ErrorCode::InternalError)?;
 
         let should_clear_diagnostics = document
-            .close(session)
+            .close(session, client)
             .with_failure_code(ErrorCode::InternalError)?;
 
         if should_clear_diagnostics {

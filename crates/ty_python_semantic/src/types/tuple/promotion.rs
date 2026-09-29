@@ -6,7 +6,7 @@ use ruff_python_ast::{self as ast};
 
 use crate::types::tuple::TupleSpec;
 use crate::types::typevar::BoundTypeVarIdentity;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{any_over_type, contains_growing_type};
 use crate::types::{Type, UnionBuilder};
 
 /// Tracks the typevars of a collection to which tuple size promotion should **not** apply.
@@ -30,8 +30,8 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         expression: &ast::Expr,
         ty: Type<'db>,
     ) {
-        if !Self::is_promotable_tuple_literal(db, env, expression, ty) {
-            self.record_unpromotable_type(db, env, typevar_identity, ty);
+        if !Self::allows_expression(db, env, Some(expression), ty) {
+            self.blocked_typevars.insert(typevar_identity);
         }
     }
 
@@ -44,9 +44,7 @@ impl<'db> TupleSizePromotionConstraints<'db> {
         typevar_identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) {
-        if any_over_type(db, env, ty, true, |ty| {
-            ty.tuple_instance_spec(db, env).is_some()
-        }) {
+        if !Self::allows_expression(db, env, None, ty) {
             self.blocked_typevars.insert(typevar_identity);
         }
     }
@@ -55,6 +53,32 @@ impl<'db> TupleSizePromotionConstraints<'db> {
     /// of the constraints recorded on this object.
     pub(crate) fn allow(&self, typevar_identity: BoundTypeVarIdentity<'db>) -> bool {
         !self.blocked_typevars.contains(&typevar_identity)
+    }
+
+    /// Reports whether an inferred collection element allows tuple size promotion. Tuple types
+    /// from annotations or nonliteral expressions keep their shape.
+    ///
+    /// For `items = [(1,), (2, 3)]`, both tuple literals are eligible, so their differing lengths
+    /// may be widened to `tuple[int, ...]`. With `pair = (2, 3)` followed by
+    /// `items = [(1,), pair]`, the nonliteral `pair` blocks promotion for the collection.
+    ///
+    /// The supplied `ty` should already have undergone literal promotion, so `(2, 3)` has the
+    /// homogeneous type `tuple[int, int]` when checking its eligibility.
+    /// If no source expression is available, any tuple type blocks tuple-size promotion.
+    pub(crate) fn allows_expression(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        expression: Option<&ast::Expr>,
+        ty: Type<'db>,
+    ) -> bool {
+        expression
+            .is_some_and(|expression| Self::is_promotable_tuple_literal(db, env, expression, ty))
+            // An unbounded unfolding cannot establish the absence of annotated tuples.
+            // Preserve their lengths unless the complete finite scan permits promotion.
+            || (!contains_growing_type(db, env, ty)
+                && !any_over_type(db, env, ty, true, |ty| {
+                    ty.tuple_instance_spec(db, env).is_some()
+                }))
     }
 
     /// Returns true if the given expression is either a non-starred homogeneous tuple literal or the
@@ -204,7 +228,7 @@ impl<'db> Type<'db> {
 
         let mut builder = UnionBuilder::new(db, env)
             .unpack_aliases(false)
-            .recursively_defined(union.recursively_defined(db));
+            .or_recursively_defined(union.recursively_defined(db));
 
         for element in other_union_elements {
             builder = builder.add(element);

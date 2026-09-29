@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -51,7 +52,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: `abc.ABC`](https://docs.python.org/3/library/abc.html#abc.ABC)
 /// - [Python documentation: `abc.ABCMeta`](https://docs.python.org/3/library/abc.html#abc.ABCMeta)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.2.0")]
+#[violation_metadata(preview_since = "v0.2.0", category = Category::Complexity)]
 pub(crate) struct MetaClassABCMeta;
 
 impl AlwaysFixableViolation for MetaClassABCMeta {

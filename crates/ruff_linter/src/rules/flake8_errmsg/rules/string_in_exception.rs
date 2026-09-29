@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::fresh_binding_name;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
@@ -54,7 +55,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// - `lint.flake8-errmsg.max-string-length`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = Category::Pedantic)]
 pub(crate) struct RawStringInException;
 
 impl Violation for RawStringInException {
@@ -110,7 +111,7 @@ impl Violation for RawStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = Category::Pedantic)]
 pub(crate) struct FStringInException;
 
 impl Violation for FStringInException {
@@ -167,7 +168,7 @@ impl Violation for FStringInException {
 /// RuntimeError: 'Some value' is incorrect
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.183")]
+#[violation_metadata(stable_since = "v0.0.183", category = Category::Pedantic)]
 pub(crate) struct DotFormatInException;
 
 impl Violation for DotFormatInException {

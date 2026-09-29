@@ -77,8 +77,8 @@ pub fn lint_fix_toml<'a>(
             };
         }
 
-        for (rule, name, count) in fixes.iter() {
-            *fixed.entry(rule).or_default(name) += count;
+        for (id, code, count) in fixes.iter() {
+            *fixed.entry(id).or_default(code) += count;
         }
 
         transformed = Cow::Owned(code);

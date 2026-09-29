@@ -391,6 +391,8 @@ fn to_lsp_diagnostic(
     } else {
         (
             match diagnostic.severity() {
+                // Map lint diagnostics without codes to warning, like in `severity`.
+                _ if diagnostic.id().is_lint() => lsp_types::DiagnosticSeverity::Warning,
                 ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::Information,
                 ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::Warning,
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,

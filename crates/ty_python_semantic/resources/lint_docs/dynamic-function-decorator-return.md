@@ -30,9 +30,9 @@ stringify("not an integer")
 This rule identifies the point where a decorator erases useful type information, before that
 imprecision spreads to every use of the decorated function. It can be especially useful in cases
 where the decorator is defined in a third-party library. Whereas linter rules such as
-[`ANN201`][ann201] and [`ANN202`][ann202] can complain about missing annotations in your
-first-party code, they cannot identify instances where unsound types leak into your code due to
-missing type annotations in third-party code installed into `site-packages`.
+[`ANN201`][ann201] and [`ANN202`][ann202] can complain about missing annotations in your first-party
+code, they cannot identify instances where unsound types leak into your code due to missing type
+annotations in third-party code installed into `site-packages`.
 
 ## Examples
 

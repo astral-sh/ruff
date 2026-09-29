@@ -4,7 +4,7 @@ use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
 use ruff_db::files::File;
-use ruff_db::source::source_text;
+use ruff_db::source::{is_notebook, source_text};
 use ruff_python_ast::script::ScriptTag;
 use ruff_ranged_value::{RangedValue, ValueSource, ValueSourceGuard};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -12,19 +12,14 @@ use serde::Deserialize;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, UseDefaultStrategy};
 use ty_python_semantic::PythonVersionWithSource;
+use ty_python_semantic::dependency::DependencyMetadata;
 
 use crate::metadata::options::{EnvironmentOptions, Options, OptionsContext};
 use crate::metadata::pyproject::Tool;
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::UvMetadata;
+use crate::uv::{DependencyMetadataError, UvMetadata, script_environment};
 use crate::{Db, ProjectMetadata};
-
-mod environment;
-
-pub(crate) use environment::ScriptEnvironmentCacheKey;
-use environment::script_environment;
-pub use environment::{ScriptEnvironmentAvailability, ScriptEnvironments};
 
 /// A standalone PEP 723 script and its resolved settings.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -60,6 +55,7 @@ pub(crate) struct Script<'db> {
     pub(crate) settings_diagnostics: Box<[Diagnostic]>,
 }
 
+#[salsa::tracked]
 impl<'db> Script<'db> {
     /// Returns the script for `file` without creating a second Salsa memo for ordinary files.
     pub(crate) fn for_file(db: &'db dyn Db, file: File) -> Option<Self> {
@@ -67,6 +63,27 @@ impl<'db> Script<'db> {
         // do not also allocate a tracked `script` memo just to cache another `None`.
         script_tag(db, file)?;
         script(db, file)
+    }
+
+    /// Cache dependency declarations separately from settings, which can remain unchanged after
+    /// uv synchronizes an edit to the script's dependencies.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    pub(crate) fn dependency_metadata(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Option<Box<DependencyMetadata>>, DependencyMetadataError> {
+        if !self.has_valid_settings(db) {
+            return Ok(None);
+        }
+
+        let Some(metadata) = script_environment(db, self.file(db))
+            .and_then(|environment| environment.uv_metadata(db))
+        else {
+            return Ok(None);
+        };
+        metadata
+            .dependency_metadata()
+            .map(|metadata| Some(Box::new(metadata)))
     }
 }
 
@@ -79,7 +96,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     let tag = script_tag(db, file)?;
 
     // Never treat third-party files as scripts.
-    if !crate::should_check_file(db, file) {
+    if !crate::is_project_file(db, file) {
         return None;
     }
 
@@ -137,17 +154,18 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 ///
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
 #[salsa::tracked(returns(as_deref))]
-pub(crate) fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
+pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {
         return None;
     }
 
-    let source = source_text(db, file);
-    if source.is_notebook() {
+    // Notebook outputs can be large, so skip notebooks before reading their contents.
+    if is_notebook(db, file) {
         return None;
     }
 
+    let source = source_text(db, file);
     ScriptTag::parse(source.as_bytes()).map(Box::new)
 }
 
@@ -206,7 +224,6 @@ fn resolve_script_options(
 
     let uv_options = uv_metadata.map(|metadata| Options {
         environment: Some(EnvironmentOptions {
-            python_version: metadata.python_version().cloned(),
             python: metadata
                 .environment()
                 .map(|path| RelativePathBuf::new(path, ValueSource::UvMetadata)),
@@ -378,8 +395,9 @@ fn invalid_script_metadata_diagnostic(
 #[cfg(test)]
 mod tests {
     use ruff_db::files::system_path_to_file;
+    use ruff_db::source::source_text;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
@@ -414,6 +432,30 @@ mod tests {
         let events = db.take_salsa_events();
         assert_function_query_was_not_run(&db, crate::should_check_file, ordinary, &events);
         assert_function_query_was_not_run(&db, script, ordinary, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn script_tag_does_not_read_notebook_source() -> anyhow::Result<()> {
+        let mut db = TestDb::new(ProjectMetadata::new(
+            "test",
+            SystemPathBuf::from("/project"),
+        ));
+        db.write_file(
+            "/project/notebook.ipynb",
+            r#"{"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}"#,
+        )?;
+        let notebook = system_path_to_file(&db, SystemPath::new("/project/notebook.ipynb"))?;
+
+        assert_eq!(db.project().script_files(&db).iter().count(), 0);
+        assert!(db.project().files(&db).contains(notebook));
+
+        db.take_salsa_events();
+        source_text(&db, notebook);
+        let events = db.take_salsa_events();
+        // This assertion would fail if index already read the full text of notebook.
+        assert_function_query_was_run(&db, source_text, notebook, &events);
 
         Ok(())
     }

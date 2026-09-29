@@ -45,4 +45,5 @@ except ZeroDivisionError:
 
 ## Ruff rule
 
-This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
+This rule corresponds to Ruff's
+[`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)

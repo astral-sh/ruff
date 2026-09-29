@@ -8,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for explicit `raise StopIteration` in generator functions.
@@ -38,7 +39,7 @@ use crate::checkers::ast::Checker;
 /// - [PEP 479](https://peps.python.org/pep-0479/)
 /// - [Python documentation](https://docs.python.org/3/library/exceptions.html#StopIteration)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Correctness)]
 pub(crate) struct StopIterationReturn;
 
 impl Violation for StopIterationReturn {

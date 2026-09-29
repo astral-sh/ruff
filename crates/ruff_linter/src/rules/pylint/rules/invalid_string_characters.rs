@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -27,7 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// x = "\b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterBackspace;
 
 impl Violation for InvalidCharacterBackspace {
@@ -63,7 +64,7 @@ impl Violation for InvalidCharacterBackspace {
 /// x = "\x1a"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterSub;
 
 impl Violation for InvalidCharacterSub {
@@ -99,7 +100,7 @@ impl Violation for InvalidCharacterSub {
 /// x = "\x1b"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterEsc;
 
 impl Violation for InvalidCharacterEsc {
@@ -135,7 +136,7 @@ impl Violation for InvalidCharacterEsc {
 /// x = "\0"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterNul;
 
 impl Violation for InvalidCharacterNul {
@@ -170,7 +171,7 @@ impl Violation for InvalidCharacterNul {
 /// x = "Dear Sir\u200b/\u200bMadam"  # zero width space
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.257")]
+#[violation_metadata(stable_since = "v0.0.257", category = Category::Suspicious)]
 pub(crate) struct InvalidCharacterZeroWidthSpace;
 
 impl Violation for InvalidCharacterZeroWidthSpace {

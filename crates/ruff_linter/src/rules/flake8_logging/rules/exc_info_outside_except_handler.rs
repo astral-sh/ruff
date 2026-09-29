@@ -6,6 +6,7 @@ use ruff_python_stdlib::logging::LoggingLevel;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::rules::flake8_logging::helpers::outside_handlers;
 use crate::{Fix, FixAvailability, Violation};
@@ -69,7 +70,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///
 /// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", category = Category::Suspicious)]
 pub(crate) struct ExcInfoOutsideExceptHandler;
 
 impl Violation for ExcInfoOutsideExceptHandler {

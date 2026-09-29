@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for cases where files are opened (e.g., using the builtin `open()` function)
@@ -34,7 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `open`](https://docs.python.org/3/library/functions.html#open)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.219")]
+#[violation_metadata(stable_since = "v0.0.219", category = Category::Suspicious)]
 pub(crate) struct OpenFileWithContextHandler;
 
 impl Violation for OpenFileWithContextHandler {

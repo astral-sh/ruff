@@ -52,7 +52,7 @@ impl ExpandedStatistics<'_> {
     }
 }
 
-/// Accumulator type for grouping diagnostics by code.
+/// Accumulator type for grouping diagnostics by name.
 /// Format: (`code`, `representative_diagnostic`, `total_count`, `fixable_count`)
 type DiagnosticGroup<'a> = (Option<&'a SecondaryCode>, &'a Diagnostic, usize, usize);
 
@@ -280,15 +280,15 @@ impl Printer {
         let statistics: Vec<ExpandedStatistics> = diagnostics
             .inner
             .iter()
-            .sorted_by_key(|diagnostic| diagnostic.secondary_code())
+            .sorted_by_key(|diagnostic| diagnostic.name())
             .fold(vec![], |mut acc: Vec<DiagnosticGroup>, diagnostic| {
                 let is_fixable = diagnostic
                     .fix()
                     .is_some_and(|fix| fix.applies(required_applicability));
                 let code = diagnostic.secondary_code();
 
-                if let Some((prev_code, _prev_message, count, fixable_count)) = acc.last_mut() {
-                    if *prev_code == code {
+                if let Some((_prev_code, prev_message, count, fixable_count)) = acc.last_mut() {
+                    if prev_message.name() == diagnostic.name() {
                         *count += 1;
                         if is_fixable {
                             *fixable_count += 1;
@@ -500,19 +500,18 @@ fn print_fix_summary(
             relativize_path(filename).bold(),
             ":".cyan()
         )?;
-        for (code, name, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
-            if is_human_readable_names_enabled(preview) && !prefer_rule_codes {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {name} ({code})",
-                    name = name.to_string().red().bold(),
-                )?;
-            } else {
-                writeln!(
-                    writer,
-                    "    {count:>num_digits$} × {code} ({name})",
-                    code = code.to_string().red().bold(),
-                )?;
+        for (name, code, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
+            write!(writer, "    {count:>num_digits$} × ")?;
+            match code {
+                Some(code) if is_human_readable_names_enabled(preview) && !prefer_rule_codes => {
+                    writeln!(writer, "{name} ({code})", name = name.as_str().red().bold())?;
+                }
+                Some(code) => {
+                    writeln!(writer, "{code} ({name})", code = code.as_str().red().bold())?;
+                }
+                None => {
+                    writeln!(writer, "{name}", name = name.as_str().red().bold())?;
+                }
             }
         }
     }

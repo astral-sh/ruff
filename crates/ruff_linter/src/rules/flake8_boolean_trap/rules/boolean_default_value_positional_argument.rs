@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_boolean_trap::helpers::{
     add_liskov_substitution_principle_help, is_allowed_func_def,
 };
@@ -99,7 +100,7 @@ use crate::rules::flake8_boolean_trap::helpers::{
 ///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.127")]
+#[violation_metadata(stable_since = "v0.0.127", category = Category::Pedantic)]
 pub(crate) struct BooleanDefaultValuePositionalArgument;
 
 impl Violation for BooleanDefaultValuePositionalArgument {

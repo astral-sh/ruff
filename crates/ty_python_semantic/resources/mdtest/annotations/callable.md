@@ -596,6 +596,89 @@ class A(Base):
 reveal_type(into_regular_callable(A))
 ```
 
+### Callable objects used as `__new__`
+
+In the example below, a callable object creates instances of `Product`. Passing the class as a
+callback accepts the same arguments as constructing it directly: the constructor supplies `cls`,
+leaving the integer argument for the caller.
+
+```py
+from typing import Callable
+
+class Factory:
+    def __call__(self, cls: "type[Product]", value: int) -> "Product":
+        return object.__new__(cls)
+
+class Product:
+    __new__ = Factory()
+
+def create(factory: Callable[[int], Product]) -> Product:
+    return factory(1)
+
+reveal_type(create(Product))  # revealed: Product
+```
+
+### Unions of callable objects used as `__new__`
+
+In the example below, the selected constructor either returns its string argument or its length.
+Both alternatives accept a string, and converting the class to a callback preserves both possible
+return types.
+
+```py
+from typing import Callable
+
+class Text:
+    def __call__(self, cls: type, value: str) -> str:
+        return value
+
+class Length:
+    def __call__(self, cls: type, value: str) -> int:
+        return len(value)
+
+def check(use_text: bool):
+    class Convert:
+        __new__ = Text() if use_text else Length()
+
+    converter: Callable[[str], str | int] = Convert
+    reveal_type(converter("abc"))  # revealed: str | int
+```
+
+### Callable objects used as metaclass `__call__`
+
+In the example below, the metaclass delegates construction to a callable object that returns a
+string. Converting the class to a callback uses this object's signature. Since the object is not a
+descriptor, the class is not passed as an additional argument.
+
+```py
+from typing import Callable
+
+class Convert:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+class Meta(type):
+    __call__ = Convert()
+
+class Product(metaclass=Meta): ...
+
+def convert(callback: Callable[[int], str]) -> str:
+    return callback(1)
+
+reveal_type(convert(Product))  # revealed: str
+```
+
+### Classes with unknown bases
+
+In the example below, the unknown base class may provide a constructor that accepts an argument. We
+therefore allow the subclass to be passed to `map` as a callback.
+
+```py
+def example(base):
+    class ImportItem(base): ...
+
+    map(ImportItem, [])
+```
+
 ## Nested callable relations still reach the leaf mismatch
 
 ```py

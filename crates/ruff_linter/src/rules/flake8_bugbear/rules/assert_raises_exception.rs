@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `assertRaises` and `pytest.raises` context managers that catch
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.83")]
+#[violation_metadata(stable_since = "v0.0.83", category = Category::Suspicious)]
 pub(crate) struct AssertRaisesException {
     exception: ExceptionKind,
 }

@@ -4,9 +4,9 @@ Use this reference whenever the summary skill delegates reproduction or minimiza
 
 ## Primary-Agent Responsibilities
 
-Freeze the exact report, Actions run, and attempt. Run `scripts/collect_ty_ecosystem_run_metadata.py` once for all projects with retained source-attributable diagnostics or new, fixed, or meaningfully changed reproducible failure outcomes, then build and copy both exact-revision profiling binaries before assigning any subagent work.
+Freeze the exact report, Actions run, and attempt. Run `scripts/collect_ty_ecosystem_run_metadata.py` once for all projects with retained source-attributable diagnostics or new, fixed, or meaningfully changed reproducible failure outcomes. Review the saved evidence and complete the [checker environment and platform settings](../../minimizing-ty-ecosystem-changes/SKILL.md#checker-environment-and-platforms) before publishing the manifest. Choose the execution environment, then build and copy both exact-revision profiling binaries before assigning any subagent work.
 
-Publish the immutable `TY_ECOSYSTEM_RUN_METADATA`, `TY_ECOSYSTEM_BASE_BINARY`, and `TY_ECOSYSTEM_PR_BINARY` absolute paths. Install the copied PR ecosystem config once at `$TY_ECOSYSTEM_CONFIG_HOME/ty/ty.toml` and publish the absolute `TY_ECOSYSTEM_CONFIG_HOME` path. Treat the snapshot, optional structured JSON, binaries, metadata, copied config, and installed configuration as read-only shared inputs.
+Publish the immutable `TY_ECOSYSTEM_RUN_METADATA`, `TY_ECOSYSTEM_BASE_BINARY`, and `TY_ECOSYSTEM_PR_BINARY` absolute paths. Prepare the reproduction config as described in the minimizing skill, install it once at `$TY_ECOSYSTEM_CONFIG_HOME/ty/ty.toml`, and publish the absolute `TY_ECOSYSTEM_CONFIG_HOME` path. Treat the snapshot, optional structured JSON, binaries, metadata, copied config, and installed configuration as read-only shared inputs.
 
 If a subagent requests an exact-revision debug binary, only the primary agent may build it. Pause every active worker and wait for acknowledgment, verify the shared checkout is clean, remember its original ref, then build and copy the requested binary. Always restore the original ref before resuming workers, even if the build fails; publish the binary's immutable path only after a successful build and restoration. The profiling binaries remain the behavioral oracle.
 
@@ -18,11 +18,11 @@ Give each subagent:
 
 - The PR and detailed report links, plus the ecosystem comment link when available.
 - The paths to the frozen HTML report, optional matching structured JSON, and available diagnostics shards, plus the frozen comment path when available and the selected Actions run and attempt; use these captured inputs instead of refetching live evidence.
-- The exact assigned entries from the structured JSON when available, or from the frozen HTML report otherwise; distinguish source-attributable changes from outcomes without recoverable source, and provide the reported merge-base and PR run counts for intermittent severe failures.
+- The exact retained entries assigned from the structured JSON when available, or from the frozen HTML report otherwise; distinguish source-attributable changes from outcomes without recoverable source, and provide the reported merge-base and PR run counts for intermittent severe failures.
 - The immutable `TY_ECOSYSTEM_RUN_METADATA`, `TY_ECOSYSTEM_BASE_BINARY`, `TY_ECOSYSTEM_PR_BINARY`, and `TY_ECOSYSTEM_CONFIG_HOME` absolute paths.
+- The primary agent's reviewed runtime settings and their supporting evidence in the shared manifest. Identify the execution environment in which the binaries and dependencies were prepared, and require workers to apply the minimizing skill's environment overrides and deadlines, use its reproduction runner for both binaries, and preserve each project's platform overrides.
 - The instruction to prefix every direct or indirect `gh` invocation with `GH_TELEMETRY=false`.
-- For assignments requiring reproduction, the instruction to use the `minimizing-ty-ecosystem-changes` skill with the shared manifest, copied profiling binaries, installed configuration, and a unique temporary directory; never generate another manifest.
-- For source-attributable assignments, the instruction to produce a fully minimized, provenance-preserving reproducer by exhausting the complete advanced-minimization workflow, including third-party dependency inlining, standard-library inlining, and an audit of every remaining import.
+- For source-attributable assignments, the instruction to complete reproduction and minimization using the [minimizing-ty-ecosystem-changes skill](../../minimizing-ty-ecosystem-changes/SKILL.md) with the shared manifest, copied profiling binaries, installed configuration, and a unique temporary directory; never generate another manifest.
 - The instruction to inspect vendored definitions and Rust implementations with `git -C <ruff-checkout> show <exact-revision>:<repository-relative-path>`, using the analyzed revisions from the immutable manifest rather than the restored working tree.
 - The instruction that an independently invented analogue does not satisfy a source-attributable assignment, and that a partially minimized example or an original source excerpt never satisfies any minimization assignment. If a genuine external blocker prevents minimization, return the blocker and mark the assignment as incomplete.
 - For outcomes without recoverable source evidence, the instruction to verify and report the captured outcomes, stderr, panic evidence, and run frequencies without requiring a source reproducer or minimized code.
@@ -34,7 +34,7 @@ Give each subagent:
 
 Request:
 
-- For source-attributable assignments, report-ready GitHub-flavored Markdown describing the exact base-versus-PR behavior and minimized code, plus separate working notes covering the original source permalink, reproduction, accepted reductions, both binaries' results, per-side run counts for intermittent severe failures, any necessary causal fingerprint, and the import audit.
+- For source-attributable assignments, report-ready sections following the [report template](../assets/report-template.md), plus separate working notes covering the original source permalink, reproduction, accepted reductions, both binaries' results, per-side run counts for intermittent severe failures, any necessary causal fingerprint, and the import audit. The primary agent deduplicates equivalent examples and synthesizes the final report across assignments.
 - For outcomes without recoverable source evidence, report-ready GitHub-flavored Markdown describing the verified project outcomes, relevant stderr, panic evidence, and run frequencies.
 
-If a later entry has exactly the same behavior change and cause as an already minimized entry, the subagent may classify it as a duplicate instead of repeating the full minimization, but it must explain the match.
+If a later entry has exactly the same behavior change and cause as an already minimized entry, the subagent may classify it as a duplicate instead of repeating the full minimization, but it must first reproduce the original entry and explain the match. Preserve that entry in the exhaustive inventory and hit counts.

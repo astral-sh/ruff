@@ -441,6 +441,131 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Recursive protocol variance
+
+A recursive protocol that only produces its type parameter is covariant. Returning that protocol
+from a nominal class preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+A recursive protocol that consumes its type parameter is contravariant, even when it also returns
+another instance of itself.
+
+```py
+class Writer[T](Protocol):
+    def write(self, value: T) -> None: ...
+    def next(self) -> "Writer[T]": ...
+
+class Sink[T]:
+    def writer(self) -> Writer[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Sink[object], Sink[int]))
+static_assert(not is_subtype_of(Sink[int], Sink[object]))
+```
+
+Writable attributes make recursive protocols invariant, including underscore-prefixed attributes.
+
+```py
+class Writable[T](Protocol):
+    _value: T
+
+    def next(self) -> "Writable[T]": ...
+
+class Wrapper[T]:
+    def value(self) -> Writable[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Recursive protocol variance with annotated receivers
+
+An explicit receiver annotation does not make a bound method consume its type parameter. `Reader`
+remains covariant when its interface also recurses through the return type of `next`, and returning
+that protocol from `Source` preserves covariance.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Reader[T](Protocol):
+    def read(self: "Reader[T]") -> T: ...
+    def next(self) -> "Reader[T]": ...
+
+class Source[T]:
+    def reader(self) -> Reader[T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Source[int], Source[object]))
+static_assert(not is_subtype_of(Source[object], Source[int]))
+```
+
+## Expanding recursive protocol variance
+
+Variance inference terminates when a recursive reference changes the specialization. The mutable
+list in `next` makes `Node` invariant, even though `read` produces `T` directly.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def read(self) -> T: ...
+    def next(self) -> "Node[list[T]]": ...
+
+class Wrapper[T]:
+    def node(self) -> Node[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
+## Mutually recursive protocol variance
+
+A writable attribute constrains every protocol in a recursive cycle. Here, `Left` is invariant
+because it returns a `Right` whose `_value` attribute can be mutated.
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Left[T](Protocol):
+    def right(self) -> "Right[T]": ...
+
+class Right[T](Protocol):
+    _value: T
+
+    def left(self) -> Left[T]: ...
+
+class Wrapper[T]:
+    def left(self) -> Left[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
+static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
+```
+
 ## Mutual Recursion
 
 This example due to Martin Huschenbett's PyCon 2025 talk,
@@ -566,6 +691,30 @@ static_assert(not is_subtype_of(DescriptorOwner[B], DescriptorOwner[A]))
 static_assert(not is_subtype_of(DescriptorOwner[A], DescriptorOwner[B]))
 ```
 
+### Mutable attributes on classmethod wrappers
+
+A classmethod exposes its wrapped callable through `__func__`, including any mutable attributes. In
+the below example, `Wrapper[T].value` therefore makes `C[T]` invariant even though `T` does not
+appear in the bound call signature. Accepting `C[int]` as `C[object]` would let `set_value` replace
+an `int` with a `str`.
+
+```py
+class Wrapper[T]:
+    value: T
+
+    def __call__(self, cls: object) -> None: ...
+
+class C[T]:
+    method = classmethod(Wrapper[T]())
+
+def set_value(c: C[object]) -> None:
+    c.method.__func__.value = "not an int"
+
+def corrupt(c: C[int]) -> int:
+    set_value(c)  # error: [invalid-argument-type]
+    return c.method.__func__.value
+```
+
 ### Mutable protocol attributes
 
 Underscore-prefixed protocol attributes remain writable through their structural interface, so their
@@ -636,6 +785,44 @@ class C[T]:
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
+```
+
+#### Final attributes in stubs
+
+Stub attributes declared as `Final` are read-only, whether their declarations omit an initializer or
+use an ellipsis placeholder. A type parameter used only in such an attribute is covariant, while one
+used in an ordinary writable attribute is invariant.
+
+`box.pyi`:
+
+```pyi
+from typing import Final
+
+class Box[T]:
+    value: Final[T]
+
+class BoxWithPlaceholder[T]:
+    value: Final[T] = ...
+
+class MutableBox[T]:
+    value: T
+```
+
+`main.py`:
+
+```py
+from box import Box, BoxWithPlaceholder, MutableBox
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+static_assert(is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+static_assert(is_subtype_of(BoxWithPlaceholder[int], BoxWithPlaceholder[object]))
+static_assert(not is_subtype_of(BoxWithPlaceholder[object], BoxWithPlaceholder[int]))
+
+static_assert(not is_subtype_of(MutableBox[int], MutableBox[object]))
+static_assert(not is_subtype_of(MutableBox[object], MutableBox[int]))
 ```
 
 #### Underscore-prefixed attributes
@@ -808,6 +995,153 @@ static_assert(not is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 ```
 
+### Replaced methods and retained aliases
+
+Only the final interface constrains variance. An overwritten method no longer consumes `T`, so the
+unused parameter falls back to covariance.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Overwritten[T]:
+    def method(self, value: T) -> None: ...
+    def method(self, value: object) -> None: ...
+
+static_assert(is_subtype_of(Overwritten[int], Overwritten[object]))
+static_assert(not is_subtype_of(Overwritten[object], Overwritten[int]))
+```
+
+An alias retains the original method's input, making the class contravariant.
+
+```py
+class Aliased[T]:
+    def method(self, value: T) -> None: ...
+    alias = method
+    def method(self, value: object) -> None: ...
+
+static_assert(is_subtype_of(Aliased[object], Aliased[int]))
+static_assert(not is_subtype_of(Aliased[int], Aliased[object]))
+```
+
+### Decorated methods
+
+A decorator that replaces a method with `int` removes the original signature's variance
+requirements, just as it does when validating declared variance.
+
+```py
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def replace(func: object) -> int:
+    return 1
+
+class Replaced[T]:
+    @replace
+    def method(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(Replaced[int], Replaced[object]))
+static_assert(not is_subtype_of(Replaced[object], Replaced[int]))
+```
+
+A public `Callable` attribute is writable. Unlike declared-method validation, inferred variance also
+accounts for replacing this attribute, making `Preserved` invariant even though calling the
+attribute only produces `T`.
+
+```py
+def preserve[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Preserved[T]:
+    @preserve
+    def method(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Preserved[int], Preserved[object]))
+static_assert(not is_subtype_of(Preserved[object], Preserved[int]))
+```
+
+A decorator returning a mutable `list[T]` also makes its owner invariant, independently of the
+original method's covariant return annotation.
+
+```py
+def mutable[R](func: Callable[..., R]) -> list[R]:
+    raise NotImplementedError
+
+class Mutable[T]:
+    @mutable
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Mutable[int], Mutable[object]))
+static_assert(not is_subtype_of(Mutable[object], Mutable[int]))
+```
+
+### Descriptor read and write types
+
+Descriptor access determines the member's variance. A getter returning `T` and a setter accepting
+any `object` permit covariance, even when the descriptor's own type parameter is declared invariant.
+
+```py
+from typing import Callable, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+R = TypeVar("R")
+
+class Permissive(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: object) -> None: ...
+
+class Covariant[T]:
+    @Permissive
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Covariant[int], Covariant[object]))
+static_assert(not is_subtype_of(Covariant[object], Covariant[int]))
+```
+
+If the setter accepts `T`, it adds a contravariant contribution and the owner is invariant.
+
+```py
+class Writable(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, instance: object, value: R) -> None: ...
+
+class Invariant[T]:
+    @Writable
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Invariant[int], Invariant[object]))
+static_assert(not is_subtype_of(Invariant[object], Invariant[int]))
+```
+
+An unresolved write domain retains the descriptor's ordinary variance contribution. Knowing the read
+type alone does not establish covariance when inferring variance.
+
+```py
+class Deferred(Generic[R]):
+    def __init__(self, func: Callable[..., R]) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> R:
+        raise NotImplementedError
+    def __set__(self, *args: object) -> None: ...
+
+class Unresolved[T]:
+    @Deferred
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Unresolved[int], Unresolved[object]))
+static_assert(not is_subtype_of(Unresolved[object], Unresolved[int]))
+```
+
 ### Properties
 
 Properties constrain to covariance if they are get-only and invariant if they are get-set:
@@ -836,6 +1170,38 @@ static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+### Decorated property accessors
+
+A property's exposed getter return type constrains variance even when a decorator returns a callable
+wrapper. The receiver does not constrain variance.
+
+```py
+from functools import cache
+from typing import Callable
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def preserve[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class Preserved[T]:
+    @property
+    @preserve
+    def value(self: "Preserved[T]") -> T:
+        raise NotImplementedError
+
+class Cached[T]:
+    @property
+    @cache
+    def value(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Preserved[int], Preserved[object]))
+static_assert(not is_subtype_of(Preserved[object], Preserved[int]))
+static_assert(is_subtype_of(Cached[int], Cached[object]))
+static_assert(not is_subtype_of(Cached[object], Cached[int]))
 ```
 
 ### Property subclasses
@@ -924,6 +1290,488 @@ class D[T]:
 
 static_assert(is_subtype_of(D[B], D[A]))
 static_assert(not is_subtype_of(D[A], D[B]))
+```
+
+## Variance in composed return types
+
+A mutable member makes a union or intersection return type invariant.
+
+```py
+from typing import Callable
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Marker: ...
+
+class UnionReturn[T]:
+    def value(self) -> list[T] | tuple[T, ...]:
+        raise NotImplementedError
+
+class IntersectionReturn[T]:
+    def value(self) -> Intersection[list[T], Marker]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(UnionReturn[int], UnionReturn[object]))
+static_assert(not is_subtype_of(UnionReturn[object], UnionReturn[int]))
+static_assert(not is_subtype_of(IntersectionReturn[int], IntersectionReturn[object]))
+static_assert(not is_subtype_of(IntersectionReturn[object], IntersectionReturn[int]))
+```
+
+Returning a tuple of consumers requires contravariance: tuples preserve the variance of their
+elements, and the callables consume `T`.
+
+```py
+class Callbacks[T]:
+    def callbacks(self) -> tuple[Callable[[T], None], ...]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(Callbacks[object], Callbacks[int]))
+static_assert(not is_subtype_of(Callbacks[int], Callbacks[object]))
+```
+
+## Tuple elements
+
+Tuples are covariant in each element type. A class that accepts `tuple[T, object]` is therefore
+contravariant in `T`.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Covariant[T]:
+    def produce(self) -> tuple[T, object]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Covariant[int], Covariant[bool]))
+static_assert(is_subtype_of(Covariant[bool], Covariant[int]))
+
+class Contravariant[T]:
+    def consume(self, value: tuple[T, object]) -> None: ...
+
+static_assert(is_subtype_of(Contravariant[int], Contravariant[bool]))
+static_assert(not is_subtype_of(Contravariant[bool], Contravariant[int]))
+
+class Invariant[T]:
+    def produce(self) -> tuple[list[T], object]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Invariant[int], Invariant[bool]))
+static_assert(not is_subtype_of(Invariant[bool], Invariant[int]))
+```
+
+A specialized tuple class can also appear in a `type[...]` annotation. A mutable element type makes
+a class that returns it invariant in that element's type parameter.
+
+```py
+class TupleClassProducer[T]:
+    def produce(self) -> type[tuple[list[T], object]]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(TupleClassProducer[bool], TupleClassProducer[int]))
+static_assert(not is_subtype_of(TupleClassProducer[int], TupleClassProducer[bool]))
+```
+
+The same applies to all elements of a variable-length tuple.
+
+```py
+class PrefixConsumer[T]:
+    def consume(self, value: tuple[T, *tuple[object, ...]]) -> None: ...
+
+static_assert(is_subtype_of(PrefixConsumer[int], PrefixConsumer[bool]))
+static_assert(not is_subtype_of(PrefixConsumer[bool], PrefixConsumer[int]))
+
+class SuffixConsumer[T]:
+    def consume(self, value: tuple[*tuple[object, ...], T]) -> None: ...
+
+static_assert(is_subtype_of(SuffixConsumer[int], SuffixConsumer[bool]))
+static_assert(not is_subtype_of(SuffixConsumer[bool], SuffixConsumer[int]))
+
+class RepeatedConsumer[T]:
+    def consume(self, value: tuple[object, *tuple[T, ...]]) -> None: ...
+
+static_assert(is_subtype_of(RepeatedConsumer[int], RepeatedConsumer[bool]))
+static_assert(not is_subtype_of(RepeatedConsumer[bool], RepeatedConsumer[int]))
+```
+
+An unpacked type variable tuple also contributes to variance.
+
+```py
+class VariadicConsumer[*Ts]:
+    def consume(self, value: tuple[object, *Ts]) -> None: ...
+
+static_assert(is_subtype_of(VariadicConsumer[int], VariadicConsumer[bool]))
+static_assert(not is_subtype_of(VariadicConsumer[bool], VariadicConsumer[int]))
+```
+
+## Tuple subclasses
+
+The same principle applies to classes that refer to tuple-subclass instances:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class TupleSubclass[T](tuple[T, object]): ...
+
+class Covariant[T]:
+    def produce(self) -> TupleSubclass[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Covariant[int], Covariant[bool]))
+static_assert(is_subtype_of(Covariant[bool], Covariant[int]))
+
+class Contravariant[T]:
+    def consume(self, value: TupleSubclass[T]) -> None: ...
+
+static_assert(is_subtype_of(Contravariant[int], Contravariant[bool]))
+static_assert(not is_subtype_of(Contravariant[bool], Contravariant[int]))
+
+class TupleSubclassWithListElement[T](tuple[list[T], object]): ...
+
+class Invariant[T]:
+    def produce(self) -> TupleSubclassWithListElement[T]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(Invariant[int], Invariant[bool]))
+static_assert(not is_subtype_of(Invariant[bool], Invariant[int]))
+```
+
+The same applies to all elements of a variable-length tuple.
+
+```py
+class MixedTupleSubclassGenericPrefix[T](tuple[T, *tuple[object, ...]]): ...
+
+class PrefixConsumer[T]:
+    def consume(self, value: MixedTupleSubclassGenericPrefix[T]) -> None: ...
+
+static_assert(is_subtype_of(PrefixConsumer[int], PrefixConsumer[bool]))
+static_assert(not is_subtype_of(PrefixConsumer[bool], PrefixConsumer[int]))
+
+class MixedTupleSubclassGenericSuffix[T](tuple[*tuple[object, ...], T]): ...
+
+class SuffixConsumer[T]:
+    def consume(self, value: MixedTupleSubclassGenericSuffix[T]) -> None: ...
+
+static_assert(is_subtype_of(SuffixConsumer[int], SuffixConsumer[bool]))
+static_assert(not is_subtype_of(SuffixConsumer[bool], SuffixConsumer[int]))
+
+class MixedTupleGenericVariadicElement[T](tuple[object, *tuple[T, ...]]): ...
+
+class RepeatedConsumer[T]:
+    def consume(self, value: MixedTupleGenericVariadicElement[T]) -> None: ...
+
+static_assert(is_subtype_of(RepeatedConsumer[int], RepeatedConsumer[bool]))
+static_assert(not is_subtype_of(RepeatedConsumer[bool], RepeatedConsumer[int]))
+```
+
+An unpacked type variable tuple also contributes to variance.
+
+```py
+class TupleSubclassWithTypeVarTuple[*Ts](tuple[object, *Ts]): ...
+
+class VariadicConsumer[*Ts]:
+    def consume(self, value: TupleSubclassWithTypeVarTuple[*Ts]) -> None: ...
+
+static_assert(is_subtype_of(VariadicConsumer[int], VariadicConsumer[bool]))
+static_assert(not is_subtype_of(VariadicConsumer[bool], VariadicConsumer[int]))
+```
+
+The type parameters of a tuple subclass can also describe members that are not tuple elements. A
+read-only property makes such a parameter covariant. The tuple element parameter remains covariant
+independently of the property parameter.
+
+```py
+class TupleWithExtra[A, B](tuple[A, object]):
+    @property
+    def extra(self) -> B:
+        raise NotImplementedError
+
+class ExtraProducer[T]:
+    def produce(self) -> TupleWithExtra[int, T]:
+        raise NotImplementedError
+
+class ExtraConsumer[T]:
+    def consume(self, value: TupleWithExtra[int, T]) -> None: ...
+
+static_assert(is_subtype_of(TupleWithExtra[bool, str], TupleWithExtra[int, str]))
+static_assert(not is_subtype_of(TupleWithExtra[int, str], TupleWithExtra[bool, str]))
+static_assert(is_subtype_of(ExtraProducer[bool], ExtraProducer[int]))
+static_assert(not is_subtype_of(ExtraProducer[int], ExtraProducer[bool]))
+static_assert(is_subtype_of(ExtraConsumer[int], ExtraConsumer[bool]))
+static_assert(not is_subtype_of(ExtraConsumer[bool], ExtraConsumer[int]))
+```
+
+A method that accepts an extra type parameter makes it contravariant, even though the tuple element
+parameter is still covariant. Returning this subclass preserves the extra parameter's
+contravariance; accepting it reverses that variance.
+
+```py
+class TupleWithSink[A, B](tuple[A, object]):
+    def accept(self, value: B) -> None: ...
+
+class SinkProducer[T]:
+    def produce(self) -> TupleWithSink[int, T]:
+        raise NotImplementedError
+
+class SinkConsumer[T]:
+    def consume(self, value: TupleWithSink[int, T]) -> None: ...
+
+static_assert(is_subtype_of(TupleWithSink[bool, str], TupleWithSink[int, str]))
+static_assert(not is_subtype_of(TupleWithSink[int, str], TupleWithSink[bool, str]))
+static_assert(is_subtype_of(SinkProducer[int], SinkProducer[bool]))
+static_assert(not is_subtype_of(SinkProducer[bool], SinkProducer[int]))
+static_assert(is_subtype_of(SinkConsumer[bool], SinkConsumer[int]))
+static_assert(not is_subtype_of(SinkConsumer[int], SinkConsumer[bool]))
+```
+
+An extra parameter in a writable attribute is invariant.
+
+```py
+class TupleWithMutableExtra[A, B](tuple[A, object]):
+    extra: B
+
+class MutableExtraProducer[T]:
+    def produce(self) -> TupleWithMutableExtra[int, T]:
+        raise NotImplementedError
+
+class MutableExtraConsumer[T]:
+    def consume(self, value: TupleWithMutableExtra[int, T]) -> None: ...
+
+static_assert(not is_subtype_of(TupleWithMutableExtra[int, bool], TupleWithMutableExtra[int, int]))
+static_assert(not is_subtype_of(TupleWithMutableExtra[int, int], TupleWithMutableExtra[int, bool]))
+static_assert(not is_subtype_of(MutableExtraProducer[bool], MutableExtraProducer[int]))
+static_assert(not is_subtype_of(MutableExtraProducer[int], MutableExtraProducer[bool]))
+static_assert(not is_subtype_of(MutableExtraConsumer[bool], MutableExtraConsumer[int]))
+static_assert(not is_subtype_of(MutableExtraConsumer[int], MutableExtraConsumer[bool]))
+```
+
+A read-only property containing a mutable `list` also makes its parameter invariant, since `list` is
+invariant in its element type.
+
+```py
+class TupleWithListExtra[A, B](tuple[A, object]):
+    @property
+    def extra(self) -> list[B]:
+        raise NotImplementedError
+
+static_assert(not is_subtype_of(TupleWithListExtra[int, bool], TupleWithListExtra[int, int]))
+static_assert(not is_subtype_of(TupleWithListExtra[int, int], TupleWithListExtra[int, bool]))
+```
+
+An extra parameter is also invariant when separate members both produce and consume it.
+
+```py
+class TupleWithReadWriteMethods[A, B](tuple[A, object]):
+    def get(self) -> B:
+        raise NotImplementedError
+
+    def accept(self, value: B) -> None: ...
+
+static_assert(not is_subtype_of(TupleWithReadWriteMethods[int, bool], TupleWithReadWriteMethods[int, int]))
+static_assert(not is_subtype_of(TupleWithReadWriteMethods[int, int], TupleWithReadWriteMethods[int, bool]))
+```
+
+An unused extra parameter falls back to covariance under PEP 695 variance inference. It must not be
+treated as bivariant merely because it does not occur in the tuple elements.
+
+```py
+class TupleWithUnusedExtra[A, B](tuple[A, object]): ...
+
+class UnusedExtraProducer[T]:
+    def produce(self) -> TupleWithUnusedExtra[int, T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(TupleWithUnusedExtra[int, bool], TupleWithUnusedExtra[int, int]))
+static_assert(not is_subtype_of(TupleWithUnusedExtra[int, int], TupleWithUnusedExtra[int, bool]))
+static_assert(is_subtype_of(UnusedExtraProducer[bool], UnusedExtraProducer[int]))
+static_assert(not is_subtype_of(UnusedExtraProducer[int], UnusedExtraProducer[bool]))
+```
+
+An extra parameter can also acquire its variance from another generic base.
+
+```py
+class ExtraSink[T]:
+    def accept(self, value: T) -> None: ...
+
+class TupleWithInheritedSink[A, B](tuple[A, object], ExtraSink[B]): ...
+
+static_assert(is_subtype_of(TupleWithInheritedSink[int, int], TupleWithInheritedSink[int, bool]))
+static_assert(not is_subtype_of(TupleWithInheritedSink[int, bool], TupleWithInheritedSink[int, int]))
+```
+
+A subclass of an already generic tuple subclass also keeps the variance of parameters used outside
+the inherited tuple elements.
+
+```py
+class FurtherTupleSubclass[A, B](TupleWithExtra[A, B]): ...
+
+class FurtherProducer[T]:
+    def produce(self) -> FurtherTupleSubclass[int, T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(FurtherProducer[bool], FurtherProducer[int]))
+static_assert(not is_subtype_of(FurtherProducer[int], FurtherProducer[bool]))
+```
+
+Multiple extra parameters retain their separate variances when only one appears in the tuple
+elements.
+
+```py
+class TupleWithTwoExtras[A, B, C](tuple[A, object]):
+    @property
+    def extra(self) -> B:
+        raise NotImplementedError
+
+    def accept(self, value: C) -> None: ...
+
+static_assert(is_subtype_of(TupleWithTwoExtras[int, bool, str], TupleWithTwoExtras[int, int, str]))
+static_assert(not is_subtype_of(TupleWithTwoExtras[int, int, str], TupleWithTwoExtras[int, bool, str]))
+static_assert(is_subtype_of(TupleWithTwoExtras[int, str, int], TupleWithTwoExtras[int, str, bool]))
+static_assert(not is_subtype_of(TupleWithTwoExtras[int, str, bool], TupleWithTwoExtras[int, str, int]))
+```
+
+The tuple spec need not contain a type parameter at all. An extra parameter still determines
+variance for an empty tuple subclass.
+
+```py
+class EmptyTupleWithSink[T](tuple[()]):
+    def accept(self, value: T) -> None: ...
+
+static_assert(is_subtype_of(EmptyTupleWithSink[int], EmptyTupleWithSink[bool]))
+static_assert(not is_subtype_of(EmptyTupleWithSink[bool], EmptyTupleWithSink[int]))
+```
+
+An extra parameter also remains independent of the element parameter in a homogeneous tuple
+subclass.
+
+```py
+class HomogeneousTupleWithExtra[A, B](tuple[A, ...]):
+    @property
+    def extra(self) -> B:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(HomogeneousTupleWithExtra[bool, str], HomogeneousTupleWithExtra[int, str]))
+static_assert(not is_subtype_of(HomogeneousTupleWithExtra[int, str], HomogeneousTupleWithExtra[bool, str]))
+static_assert(is_subtype_of(HomogeneousTupleWithExtra[int, bool], HomogeneousTupleWithExtra[int, int]))
+static_assert(not is_subtype_of(HomogeneousTupleWithExtra[int, int], HomogeneousTupleWithExtra[int, bool]))
+```
+
+A tuple with a fixed prefix and a variable-length tail also keeps member parameters separate from
+the types of its elements.
+
+```py
+class MixedTupleWithSink[A, B](tuple[A, *tuple[object, ...]]):
+    def accept(self, value: B) -> None: ...
+
+class MixedSinkProducer[T]:
+    def produce(self) -> MixedTupleWithSink[int, T]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(MixedTupleWithSink[bool, str], MixedTupleWithSink[int, str]))
+static_assert(not is_subtype_of(MixedTupleWithSink[int, str], MixedTupleWithSink[bool, str]))
+static_assert(is_subtype_of(MixedSinkProducer[int], MixedSinkProducer[bool]))
+static_assert(not is_subtype_of(MixedSinkProducer[bool], MixedSinkProducer[int]))
+```
+
+An unpacked type variable tuple may describe an extra member rather than the tuple elements.
+Returning that member makes the extra pack covariant.
+
+```py
+class TupleWithExtraPack[A, *Ts](tuple[A, object]):
+    def extra(self) -> tuple[*Ts]:
+        raise NotImplementedError
+
+class ExtraPackProducer[*Us]:
+    def produce(self) -> TupleWithExtraPack[int, *Us]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(TupleWithExtraPack[int, bool], TupleWithExtraPack[int, int]))
+static_assert(not is_subtype_of(TupleWithExtraPack[int, int], TupleWithExtraPack[int, bool]))
+static_assert(is_subtype_of(ExtraPackProducer[bool], ExtraPackProducer[int]))
+static_assert(not is_subtype_of(ExtraPackProducer[int], ExtraPackProducer[bool]))
+```
+
+When the extra pack precedes the tuple element parameter, accepting its values makes the pack
+contravariant.
+
+```py
+class TupleWithPackSink[*Ts, A](tuple[A, object]):
+    def accept(self, values: tuple[*Ts]) -> None: ...
+
+static_assert(is_subtype_of(TupleWithPackSink[int, int], TupleWithPackSink[bool, int]))
+static_assert(not is_subtype_of(TupleWithPackSink[bool, int], TupleWithPackSink[int, int]))
+```
+
+A writable attribute typed with the extra pack makes it invariant.
+
+```py
+class TupleWithMutablePack[A, *Ts](tuple[A, object]):
+    values: tuple[*Ts]
+
+static_assert(not is_subtype_of(TupleWithMutablePack[int, bool], TupleWithMutablePack[int, int]))
+static_assert(not is_subtype_of(TupleWithMutablePack[int, int], TupleWithMutablePack[int, bool]))
+```
+
+An extra type parameter can also appear before or after the unpacked pack that supplies the tuple
+elements. Varying one parameter at a time shows that each contributes its own variance.
+
+```py
+class LeadingExtra[B, *Ts](tuple[*Ts]):
+    def accept(self, value: B) -> None: ...
+
+static_assert(is_subtype_of(LeadingExtra[int, str], LeadingExtra[bool, str]))
+static_assert(not is_subtype_of(LeadingExtra[bool, str], LeadingExtra[int, str]))
+static_assert(is_subtype_of(LeadingExtra[str, bool], LeadingExtra[str, int]))
+static_assert(not is_subtype_of(LeadingExtra[str, int], LeadingExtra[str, bool]))
+
+class TrailingExtra[*Ts, B](tuple[*Ts]):
+    @property
+    def extra(self) -> B:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(TrailingExtra[str, bool], TrailingExtra[str, int]))
+static_assert(not is_subtype_of(TrailingExtra[str, int], TrailingExtra[str, bool]))
+static_assert(is_subtype_of(TrailingExtra[bool, str], TrailingExtra[int, str]))
+static_assert(not is_subtype_of(TrailingExtra[int, str], TrailingExtra[bool, str]))
+```
+
+A `ParamSpec` can likewise describe a subclass method without appearing in its tuple spec. A method
+that accepts those arguments makes the `ParamSpec` contravariant.
+
+```py
+from collections.abc import Callable
+
+class TupleWithCall[A, **P](tuple[A, object]):
+    def call(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
+
+class CallProducer[**Q]:
+    def produce(self) -> TupleWithCall[int, Q]:
+        raise NotImplementedError
+
+static_assert(is_subtype_of(TupleWithCall[int, [int]], TupleWithCall[int, [bool]]))
+static_assert(not is_subtype_of(TupleWithCall[int, [bool]], TupleWithCall[int, [int]]))
+static_assert(is_subtype_of(CallProducer[[int]], CallProducer[[bool]]))
+static_assert(not is_subtype_of(CallProducer[[bool]], CallProducer[[int]]))
+```
+
+Accepting a callback with the `ParamSpec` arguments makes it covariant.
+
+```py
+class TupleWithCallbackSink[A, **P](tuple[A, object]):
+    def accept(self, callback: Callable[P, None]) -> None: ...
+
+static_assert(is_subtype_of(TupleWithCallbackSink[int, [bool]], TupleWithCallbackSink[int, [int]]))
+static_assert(not is_subtype_of(TupleWithCallbackSink[int, [int]], TupleWithCallbackSink[int, [bool]]))
+```
+
+A writable callback makes the `ParamSpec` invariant.
+
+```py
+class TupleWithMutableCallback[A, **P](tuple[A, object]):
+    callback: Callable[P, None]
+
+static_assert(not is_subtype_of(TupleWithMutableCallback[int, [bool]], TupleWithMutableCallback[int, [int]]))
+static_assert(not is_subtype_of(TupleWithMutableCallback[int, [int]], TupleWithMutableCallback[int, [bool]]))
 ```
 
 ## Union Types
@@ -1481,14 +2329,14 @@ class B(A):
     pass
 
 class C[T]:
-    def f() -> T | None:
+    def f(self) -> T | None:
         pass
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 
 class D[T](C[T]):
-    def g(x: T) -> None:
+    def g(self, x: T) -> None:
         pass
 
 static_assert(not is_subtype_of(D[B], D[A]))

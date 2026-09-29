@@ -7,6 +7,7 @@ use ruff_python_ast::{ExprBinOp, ExprRef, Operator};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -76,7 +77,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// The fix replaces the whole statement, so any comments inside it are lost.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.7")]
+#[violation_metadata(preview_since = "v0.3.7", category = Category::Pedantic)]
 pub(crate) struct NonAugmentedAssignment {
     operator: AugmentedOperator,
 }

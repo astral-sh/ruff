@@ -9,6 +9,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for unreachable code.
@@ -30,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///     return "reachable"
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.0.0")]
+#[violation_metadata(preview_since = "0.0.0", category = Category::Testing)]
 pub(crate) struct UnreachableCode {
     name: String,
 }

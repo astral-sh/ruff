@@ -5,6 +5,7 @@ use ruff_python_semantic::analyze::typing::is_list;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 use crate::rules::refurb::helpers::generate_method_call;
@@ -39,7 +40,7 @@ use crate::rules::refurb::helpers::generate_method_call;
 /// - [Python documentation: Mutable Sequence Types](https://docs.python.org/3/library/stdtypes.html#typesseq-mutable)
 /// - [Python documentation: `list.clear()`](https://docs.python.org/3/library/stdtypes.html#sequence.clear)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.0.287")]
+#[violation_metadata(preview_since = "v0.0.287", category = Category::Complexity)]
 pub(crate) struct DeleteFullSlice;
 
 impl Violation for DeleteFullSlice {

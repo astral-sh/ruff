@@ -5,11 +5,11 @@ or its bases, and no instance dictionary to store their values.
 
 ## Why is this bad?
 
-Most Python objects store their attributes in an "instance dictionary". Assigning to a new
-attribute adds an entry to this dictionary; deleting that attribute removes it again. Accordingly,
-most Python objects allow for **arbitrary attributes to be set and read**. The advantage of this is
-that it allows for many dynamic features; the disadvantage is that it can be costly in terms of
-memory, and can easily allow for typos to slip in accidentally, e.g.:
+Most Python objects store their attributes in an "instance dictionary". Assigning to a new attribute
+adds an entry to this dictionary; deleting that attribute removes it again. Accordingly, most Python
+objects allow for **arbitrary attributes to be set and read**. The advantage of this is that it
+allows for many dynamic features; the disadvantage is that it can be costly in terms of memory, and
+can easily allow for typos to slip in accidentally, e.g.:
 
 ```py
 class Foo:

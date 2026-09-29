@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for named assignment expressions (e.g., `x := 0`) in `assert`
@@ -48,7 +49,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `-O`](https://docs.python.org/3/using/cmdline.html#cmdoption-O)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.2.0")]
+#[violation_metadata(stable_since = "v0.2.0", category = Category::Suspicious)]
 pub(crate) struct AssignmentInAssert;
 
 impl Violation for AssignmentInAssert {

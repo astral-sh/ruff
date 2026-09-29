@@ -90,8 +90,8 @@ use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
 use ty_python_core::scope::{NodeWithScopeKind, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
-    AncestorsIter, BindingWithConstraintsIterator, EnclosingSnapshotResult, FileScopeId,
-    ProgramFile, SemanticIndex,
+    AncestorsIter, BindingWithConstraintsIterator, BindingsSnapshotId, EnclosingSnapshotResult,
+    FileScopeId, ProgramFile, SemanticIndex,
 };
 
 use crate::Db;
@@ -124,6 +124,9 @@ pub(crate) enum PlaceLoadMode<'ast> {
     /// For example, a caller resolving `value` in `print(value)` uses this mode so that only
     /// bindings that reach that occurrence are considered.
     AtExpression(ast::ExprRef<'ast>),
+    /// Resolve a plain name using bindings and constraints retained at an earlier point in
+    /// the same scope. Enclosing-scope resolution still follows the name's lexical scope.
+    AtNameSnapshot(BindingsSnapshotId),
     /// Resolve all bindings reachable in the scope.
     ///
     /// A caller uses this mode for an annotation in any of these contexts:
@@ -897,7 +900,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
     }
 
     fn uses_enclosing_snapshots(self) -> bool {
-        matches!(self.mode, PlaceLoadMode::AtExpression(_))
+        matches!(
+            self.mode,
+            PlaceLoadMode::AtExpression(_) | PlaceLoadMode::AtNameSnapshot(_)
+        )
     }
 
     fn is_lexical_enclosing_scope(self, enclosing_scope: FileScopeId) -> bool {
@@ -932,6 +938,10 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     Some((scope, ConstraintKey::UseId(use_id))),
                 ))
             }
+            PlaceLoadMode::AtNameSnapshot(snapshot) => Some((
+                PlaceLoadSourceKind::Bindings(use_def.bindings_at_snapshot(snapshot)),
+                Some((scope, ConstraintKey::Snapshot(snapshot))),
+            )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
                 let source = table
                     .place_id(place_expr)
@@ -957,6 +967,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
             table
                 .parents(place_expr)
                 .filter_map(|prefix_id| match self.mode {
+                    PlaceLoadMode::AtNameSnapshot(_) => None,
                     PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
                         Some(PlaceExprPrefixLoad::AllReachable(prefix_id))
                     }

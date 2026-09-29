@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use hashbrown::HashSet;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
@@ -11,7 +12,7 @@ use ruff_python_ast::{
 };
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashSet;
+use rustc_hash::FxBuildHasher;
 use thin_vec::ThinVec;
 use unicode_normalization::UnicodeNormalization;
 
@@ -40,7 +41,7 @@ mod tests;
 
 #[derive(Debug, Default)]
 struct NameInterner {
-    names: FxHashSet<Name>,
+    names: HashSet<Name, FxBuildHasher>,
 }
 
 impl NameInterner {
@@ -50,13 +51,9 @@ impl NameInterner {
             return name;
         }
 
-        if let Some(name) = self.names.get(text) {
-            return name.clone();
-        }
-
-        let name = Name::new_heap(text);
-        self.names.insert(name.clone());
-        name
+        self.names
+            .get_or_insert_with(text, |text| Name::new_heap(text))
+            .clone()
     }
 }
 
@@ -442,14 +439,14 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    fn bump_name(&mut self) -> Name {
+    fn bump_identifier(&mut self) -> Name {
         let text = self.current_token_text();
-        let name = if !self.tokens.current_flags().is_non_ascii_name() {
+        let name = if !self.tokens.current_flags().is_non_ascii_identifier() {
             self.intern_name(text)
         } else {
             self.intern_normalized_name(text)
         };
-        self.bump(TokenKind::Name);
+        self.bump(TokenKind::Identifier);
         name
     }
 
@@ -619,15 +616,15 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Bumps the soft keyword token as a `Name` token.
+    /// Bumps the soft keyword token as an `Identifier` token.
     ///
     /// # Panics
     ///
     /// If the current token is not a soft keyword.
-    fn bump_soft_keyword_as_name(&mut self) {
+    fn bump_soft_keyword_as_identifier(&mut self) {
         assert!(self.at_soft_keyword());
 
-        self.do_bump(TokenKind::Name);
+        self.do_bump(TokenKind::Identifier);
     }
 
     /// Consume the current token if it is of the given kind. Returns `true` if it matches, `false`
@@ -1457,19 +1454,16 @@ impl RecoveryContextKind {
             RecoveryContextKind::Except => p.at(TokenKind::Except),
             RecoveryContextKind::AssignmentTargets => p.at(TokenKind::Equal),
             RecoveryContextKind::TypeParams => p.at_type_param(),
-            RecoveryContextKind::ImportNames => p.at_name_or_soft_keyword(),
+            RecoveryContextKind::ImportNames => p.at_identifier_or_soft_keyword(),
             RecoveryContextKind::ImportFromAsNames(_) => {
-                p.at(TokenKind::Star) || p.at_name_or_soft_keyword()
+                p.at(TokenKind::Star) || p.at_identifier_or_soft_keyword()
             }
             RecoveryContextKind::Slices => p.at(TokenKind::Colon) || p.at_expr(),
             RecoveryContextKind::ListElements
             | RecoveryContextKind::SetElements
             | RecoveryContextKind::TupleElements(_) => p.at_expr(),
             RecoveryContextKind::DictElements => p.at(TokenKind::DoubleStar) || p.at_expr(),
-            RecoveryContextKind::SequenceMatchPattern(_) => {
-                // `+` doesn't start any pattern but is here for better error recovery.
-                p.at(TokenKind::Plus) || p.at_pattern_start()
-            }
+            RecoveryContextKind::SequenceMatchPattern(_) => p.at_pattern_start(),
             RecoveryContextKind::MatchPatternMapping => {
                 // A star pattern is invalid as a mapping key and is here only for
                 // better error recovery.
@@ -1478,12 +1472,12 @@ impl RecoveryContextKind {
             RecoveryContextKind::MatchPatternClassArguments => p.at_pattern_start(),
             RecoveryContextKind::Arguments => p.at_expr(),
             RecoveryContextKind::DeleteTargets => p.at_expr(),
-            RecoveryContextKind::Identifiers => p.at_name_or_soft_keyword(),
+            RecoveryContextKind::Identifiers => p.at_identifier_or_soft_keyword(),
             RecoveryContextKind::Parameters(_) => {
                 matches!(
                     p.current_token_kind(),
                     TokenKind::Star | TokenKind::DoubleStar | TokenKind::Slash
-                ) || p.at_name_or_soft_keyword()
+                ) || p.at_identifier_or_soft_keyword()
             }
             RecoveryContextKind::WithItems(_) => p.at_expr(),
             RecoveryContextKind::InterpolatedStringElements(elements_kind) => match elements_kind {

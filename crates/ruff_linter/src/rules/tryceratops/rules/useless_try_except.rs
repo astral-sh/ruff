@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for immediate uses of `raise` within exception handlers.
@@ -29,7 +30,7 @@ use crate::checkers::ast::Checker;
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.7.0")]
+#[violation_metadata(stable_since = "0.7.0", category = Category::Complexity)]
 pub(crate) struct UselessTryExcept;
 
 impl Violation for UselessTryExcept {

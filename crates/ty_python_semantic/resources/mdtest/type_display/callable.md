@@ -60,6 +60,9 @@ def f(x: Top[Callable[..., str]] | Callable[[int], int]):
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 We wrap the signature of a top ParamSpec with `Top[...]`:

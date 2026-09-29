@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use crate::document::{DocumentKey, LanguageId};
-use crate::session::DocumentHandle;
+use crate::session::OpenDocumentHandle;
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentVersion, NotebookDocument},
@@ -43,16 +43,19 @@ impl Index {
         })
     }
 
-    pub(crate) fn document_handle(
+    /// Returns a handle to the open document specified by its URI.
+    ///
+    /// Returns an error if the document is not open in the index.
+    pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
-    ) -> Result<DocumentHandle, DocumentError> {
+    ) -> Result<OpenDocumentHandle, DocumentError> {
         let key = DocumentKey::from_uri(uri);
         let Some(document) = self.documents.get(&key) else {
             return Err(DocumentError::NotFound(key));
         };
 
-        Ok(DocumentHandle::from_document(document))
+        Ok(OpenDocumentHandle::from_document(document))
     }
 
     #[expect(dead_code)]
@@ -183,18 +186,21 @@ impl Index {
         Ok(document)
     }
 
-    pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+    pub(super) fn open_text_document(&mut self, document: TextDocument) -> OpenDocumentHandle {
         let key = DocumentKey::from_uri(document.uri());
 
-        let handle = DocumentHandle::from_text_document(&document);
+        let handle = OpenDocumentHandle::from_text_document(&document);
 
         self.documents.insert(key, Document::new_text(document));
 
         handle
     }
 
-    pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
-        let handle = DocumentHandle::from_notebook_document(&document);
+    pub(super) fn open_notebook_document(
+        &mut self,
+        document: NotebookDocument,
+    ) -> OpenDocumentHandle {
+        let handle = OpenDocumentHandle::from_notebook_document(&document);
         let notebook_key = DocumentKey::from_uri(document.uri());
 
         self.documents

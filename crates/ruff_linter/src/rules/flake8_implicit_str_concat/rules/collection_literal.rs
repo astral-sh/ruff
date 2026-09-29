@@ -4,6 +4,7 @@ use ruff_python_ast::{Expr, StringLike};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -51,7 +52,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// However, the issue is that you may often want to change semantics
 /// by adding a missing comma. Thus, the fix is always marked as unsafe.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.16.0")]
+#[violation_metadata(stable_since = "0.16.0", category = Category::Suspicious)]
 pub(crate) struct ImplicitStringConcatenationInCollectionLiteral;
 
 impl Violation for ImplicitStringConcatenationInCollectionLiteral {

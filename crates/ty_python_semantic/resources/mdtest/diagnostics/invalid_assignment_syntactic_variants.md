@@ -511,13 +511,13 @@ first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `list[Literal["wrong"]]` is not assignable to `list[int]`
+error[invalid-assignment]: Object of type `list[str]` is not assignable to `list[int]`
  --> src/mdtest_snippet.py:2:28
   |
 1 | middle: list[int]
   |         --------- Declared type
 2 | first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
-  |         ------             ^^^^^^^ Incompatible iterable element of type `Literal["wrong"]` (expected `int`)
+  |         ------             ^^^^^^^ Incompatible iterable element of type `str` (expected `int`)
   |         |
   |         Assigned to this variable
 ```
@@ -533,15 +533,16 @@ first, *middle, last = 1, 2, 3, "wrong", 4  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `list[Literal[2, 3, "wrong"]]` is not assignable to `list[int]`
+error[invalid-assignment]: Object of type `list[int | str]` is not assignable to `list[int]`
  --> src/mdtest_snippet.py:2:27
   |
 1 | middle: list[int]
   |         --------- Declared type
 2 | first, *middle, last = 1, 2, 3, "wrong", 4  # snapshot: invalid-assignment
-  |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `Literal[2, 3, "wrong"]` (expected `int`)
+  |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `int | str` (expected `int`)
   |         |
   |         Assigned to this variable
+info: element `str` of union `int | str` is not assignable to `int`
 ```
 
 ## Opaque unpacking values

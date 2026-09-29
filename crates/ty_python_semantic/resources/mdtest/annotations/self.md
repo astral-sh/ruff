@@ -560,6 +560,20 @@ def _(c: MyClass):
     c.field = c
 ```
 
+A generic type alias preserves `Self` when it is used in an attribute annotation:
+
+```py
+type Identity[T] = T
+
+class AliasedNode:
+    parent: Identity[Self]
+
+    def __init__(self) -> None:
+        self.parent = self
+
+reveal_type(AliasedNode().parent)  # revealed: AliasedNode
+```
+
 Self from class body annotations and method signatures represent the same logical type variable.
 When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
 and the method's `Self` should be considered the same type, even though they have different binding
@@ -645,6 +659,40 @@ class Sub(Factory):
 
 def _(s: Sub):
     reveal_type(s.maker())  # revealed: Sub
+```
+
+## Passing `self` as a callable
+
+When `self` is passed to a generic function expecting a callable type, the parameter and return
+types of the callable are inferred from the class's `__call__` method:
+
+```py
+from typing import Callable
+
+def apply[T](callback: Callable[[int], T]) -> T:
+    return callback(1)
+
+class Printer:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+    def format(self, values: list[int]) -> str:
+        reveal_type(apply(self))  # revealed: str
+        return ", ".join(map(self, values))
+```
+
+If `__call__` returns `Self`, the class's `Self` type is preserved as the inferred return type:
+
+```py
+from typing import Self
+
+class Clone:
+    def __call__(self, value: int) -> Self:
+        return self
+
+    def clone(self) -> Self:
+        reveal_type(apply(self))  # revealed: Self@clone
+        return apply(self)
 ```
 
 ## Generic Classes
@@ -1422,6 +1470,48 @@ class D(C): ...
 reveal_type(D().instance_method)
 # revealed: bound method <class 'D'>.class_method() -> D
 reveal_type(D.class_method)
+```
+
+A generic type alias does not prevent binding `Self` in the method signature:
+
+```py
+from typing import Self
+
+type Identity[T] = T
+
+class Aliased:
+    def copy(self, other: Identity[Self]) -> Identity[Self]:
+        return other
+
+# revealed: bound method Aliased.copy(other: Aliased) -> Aliased
+reveal_type(Aliased().copy)
+```
+
+`Self` also binds in a parameter annotation when the return type does not contain `Self`:
+
+```py
+class ParameterOnly:
+    def consume(self, other: Identity[Self]) -> None: ...
+
+# revealed: bound method ParameterOnly.consume(other: ParameterOnly) -> None
+reveal_type(ParameterOnly().consume)
+
+ParameterOnly().consume(ParameterOnly())
+ParameterOnly().consume(object())  # error: [invalid-argument-type]
+```
+
+Nested uses of the same alias still bind `Self` to the concrete receiver, including when a subclass
+inherits the method:
+
+```py
+class NestedAlias:
+    def copy(self, other: Identity[Identity[Self]]) -> Identity[Identity[Self]]:
+        return other
+
+class NestedChild(NestedAlias): ...
+
+# revealed: bound method NestedChild.copy(other: NestedChild) -> NestedChild
+reveal_type(NestedChild().copy)
 ```
 
 In nested functions `self` binds to the method. So in the following example the `self` in `C.b` is

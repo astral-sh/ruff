@@ -19,7 +19,7 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, ErrorContext, IntersectionType, Type,
-    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable,
+    TypeMapping, TypeQualifiers, TypeVarVariance, UnionBuilder, VarianceInferable, VarianceTerm,
     definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::types::TypeContext;
@@ -27,6 +27,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
@@ -218,12 +219,41 @@ pub enum TypedDictType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SynthesizedTypedDictKind {
     Schema,
+    /// Constraints on operands of a non-mutating merge.
     Patch,
+    /// Constraints on sources of an in-place update, including their hidden items.
+    UpdatePatch,
 }
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
         Self::Class(defining_class)
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Class(class) => Some(Self::Class(
+                class.recursive_type_normalized_impl(db, env, div, nested)?,
+            )),
+            Self::Synthesized(typed_dict) => {
+                Some(Self::Synthesized(SynthesizedTypedDictType::new(
+                    db,
+                    typed_dict
+                        .items(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    typed_dict.kind(db),
+                    typed_dict
+                        .openness(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                )))
+            }
+        }
     }
 
     pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
@@ -557,8 +587,9 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
-        self.items(db)
+    ) -> VarianceTerm<'db> {
+        let variances = self
+            .items(db)
             .values()
             .map(|field| (field.declared_ty, field.is_read_only()))
             .chain(
@@ -572,8 +603,8 @@ impl<'db> TypedDictType<'db> {
                     TypeVarVariance::Invariant
                 };
                 ty.with_polarity(polarity).variance_of(db, env, typevar)
-            })
-            .collect()
+            });
+        VarianceTerm::join(db, variances)
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -656,7 +687,12 @@ impl<'db> TypedDictType<'db> {
             TypedDictOpenness::Closed | TypedDictOpenness::Extra(_) => TypedDictOpenness::Closed,
         };
 
-        Self::from_patch_items_with_openness(db, items, openness)
+        Self::Synthesized(SynthesizedTypedDictType::new(
+            db,
+            items,
+            SynthesizedTypedDictKind::UpdatePatch,
+            openness,
+        ))
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
@@ -689,6 +725,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let source_items = source.items(db);
             let target_items = synthesized_target.items(db);
             let target_openness = synthesized_target.openness(db);
+            let is_update_patch =
+                synthesized_target.kind(db) == SynthesizedTypedDictKind::UpdatePatch;
             let mut result = self.always();
 
             for (source_item_name, source_item_field) in source_items {
@@ -697,8 +735,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         target_item_field.declared_ty
                     } else {
                         match target_openness {
-                            TypedDictOpenness::ImplicitlyOpen => continue,
-                            TypedDictOpenness::Closed => return self.never(),
+                            TypedDictOpenness::ImplicitlyOpen
+                                if !is_update_patch || !source_item_field.may_be_present(db) =>
+                            {
+                                continue;
+                            }
+                            // A mutation cannot write an undeclared key: a subtype of the
+                            // destination may give that key an incompatible type.
+                            TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Closed => {
+                                return self.never();
+                            }
                             TypedDictOpenness::Extra(extra_items) => extra_items.declared_ty,
                         }
                     };
@@ -714,7 +760,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
-            let source_extra_items = if target_openness.is_implicitly_open() {
+            // An open source can hide items that overlap the destination's declared fields.
+            // For example, a source declaring only `name: str` may also contain `count: str`,
+            // so it cannot update a destination declaring `count: int`.
+            let source_extra_items = if !is_update_patch && target_openness.is_implicitly_open() {
                 source.explicit_extra_items(db)
             } else {
                 source.openness(db).effective_extra_items()
@@ -1108,9 +1157,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let left_items = left.items(db);
         let right_items = right.items(db);
-        let fields_in_common = btreemap_values_with_same_key(left_items, right_items);
+        let fields_in_common = btreemap_items_with_same_key(left_items, right_items);
         let common_fields_disjoint =
-            fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
+            fields_in_common.when_any(db, self.constraints, |(name, left_field, right_field)| {
+                if let Some(context) = self.report_context() {
+                    context.take();
+                }
                 // Condition 1 above.
                 if left_field.is_required() || right_field.is_required() {
                     if (!left_field.is_required() && !left_field.is_read_only())
@@ -1118,37 +1170,86 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     {
                         // One side demands a `Required` source field, while the other side demands a
                         // `NotRequired` one. They must be disjoint.
+                        if let Some(context) = self.report_context() {
+                            let (required, not_required) = if left_field.is_required() {
+                                (left, right)
+                            } else {
+                                (right, left)
+                            };
+                            context.push(ErrorContext::TypedDictRequirednessConflict {
+                                field_name: name.clone(),
+                                required,
+                                not_required,
+                            });
+                        }
                         return self.always();
                     }
                 }
-                if !left_field.is_read_only() && !right_field.is_read_only() {
+                let result = if !left_field.is_read_only() && !right_field.is_read_only() {
                     // Condition 2 above. This field is mutable on both sides, so the so the types must
                     // be compatible, i.e. mutually assignable.
-                    let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
-                    relation_checker
-                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                        .and(db, self.constraints, || {
-                            relation_checker.check_type_pair(
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |relation_checker| {
+                            relation_checker
+                                .check_type_pair(
+                                    db,
+                                    left_field.declared_ty,
+                                    right_field.declared_ty,
+                                )
+                                .and(db, self.constraints, || {
+                                    relation_checker.check_type_pair(
+                                        db,
+                                        right_field.declared_ty,
+                                        left_field.declared_ty,
+                                    )
+                                })
+                        },
+                    )
+                    .negate(db, self.constraints)
+                } else if !left_field.is_read_only() {
+                    // Half of condition 3 above.
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |checker| {
+                            checker.check_type_pair(
+                                db,
+                                left_field.declared_ty,
+                                right_field.declared_ty,
+                            )
+                        },
+                    )
+                    .negate(db, self.constraints)
+                } else if !right_field.is_read_only() {
+                    // The other half of condition 3 above.
+                    self.check_relation_with_context(
+                        db,
+                        self.as_relation_checker(TypeRelation::Assignability),
+                        |checker| {
+                            checker.check_type_pair(
                                 db,
                                 right_field.declared_ty,
                                 left_field.declared_ty,
                             )
-                        })
-                        .negate(db, self.constraints)
-                } else if !left_field.is_read_only() {
-                    // Half of condition 3 above.
-                    self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                        .negate(db, self.constraints)
-                } else if !right_field.is_read_only() {
-                    // The other half of condition 3 above.
-                    self.as_relation_checker(TypeRelation::Assignability)
-                        .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
-                        .negate(db, self.constraints)
+                        },
+                    )
+                    .negate(db, self.constraints)
                 } else {
                     // Condition 4 above.
                     self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                };
+                if let Some(context) = self.report_context()
+                    && result.is_always_satisfied(db, self.env)
+                {
+                    context.push(ErrorContext::TypedDictFieldTypeConflict {
+                        field_name: name.clone(),
+                        left: left_field.declared_ty,
+                        right: right_field.declared_ty,
+                    });
                 }
+                result
             });
 
         let required_fields_disjoint = common_fields_disjoint.or(db, self.constraints, || {
@@ -1321,7 +1422,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
-    ) -> TypeVarVariance {
+    ) -> VarianceTerm<'db> {
         match self {
             Self::Class(class) if class.static_class_literal(db).is_some() => {
                 // Compose each type parameter's variance with its type argument. Inferred variance
@@ -1330,22 +1431,7 @@ impl<'db> VarianceInferable<'db> for TypedDictType<'db> {
                 class.variance_of(db, env, typevar)
             }
             Self::Class(class) => {
-                #[salsa::tracked(
-                    returns(copy),
-                    cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
-                    heap_size=ruff_memory_usage::heap_size
-                )]
-                fn functional_variance<'db>(
-                    db: &'db dyn Db,
-                    class: ClassType<'db>,
-                    typevar: BoundTypeVarIdentity<'db>,
-                ) -> TypeVarVariance {
-                    let env =
-                        ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
-                    TypedDictType::new(class).variance_of_items(db, &env, typevar)
-                }
-
-                functional_variance(db, class, typevar)
+                VarianceTerm::variable(db, VarianceOrigin::TypedDict(class), typevar)
             }
             Self::Synthesized(_) => self.variance_of_items(db, env, typevar),
         }
@@ -1828,6 +1914,13 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
     match ty {
+        Type::Recursive(recursive) => {
+            let unfolded = recursive.unfold(db, env).into_unfolded()?;
+            extract_unpacked_typed_dict_from_value_type(db, env, unfolded)
+        }
+        Type::RecursiveVar(_) => {
+            unreachable!("semantic operation on an unbound recursive variable")
+        }
         Type::TypedDict(td) => {
             let keys = td
                 .items(db)
@@ -3041,7 +3134,10 @@ impl<'db> SynthesizedTypedDictType<'db> {
     }
 
     fn is_patch(self, db: &'db dyn Db) -> bool {
-        self.kind(db) == SynthesizedTypedDictKind::Patch
+        matches!(
+            self.kind(db),
+            SynthesizedTypedDictKind::Patch | SynthesizedTypedDictKind::UpdatePatch
+        )
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -3067,10 +3163,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
             .openness(db)
             .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
 
-        match self.kind(db) {
-            SynthesizedTypedDictKind::Schema => Self::schema(db, items, openness),
-            SynthesizedTypedDictKind::Patch => Self::patch(db, items, openness),
-        }
+        Self::new(db, items, self.kind(db), openness)
     }
 }
 
@@ -3237,14 +3330,14 @@ bitflags! {
 
 impl get_size2::GetSize for TypedDictFieldFlags {}
 
-/// Yield all the key/val pairs where the same key is present in both `BTreeMap`s. Take advantage
+/// Yield each shared key and its values from both `BTreeMap`s. Take advantage
 /// of the fact that keys are sorted to walk through each map once without doing any lookups. It
 /// would be nice if `BTreeMap` had something like `BTreeSet::intersection` that did this for us,
 /// but as far as I know we have to do it ourselves. Life is hard.
-fn btreemap_values_with_same_key<'a, K, V1, V2>(
+fn btreemap_items_with_same_key<'a, K, V1, V2>(
     left: &'a BTreeMap<K, V1>,
     right: &'a BTreeMap<K, V2>,
-) -> impl Iterator<Item = (&'a V1, &'a V2)>
+) -> impl Iterator<Item = (&'a K, &'a V1, &'a V2)>
 where
     K: Ord,
 {
@@ -3256,10 +3349,10 @@ where
         {
             match left_key.cmp(right_key) {
                 Ordering::Equal => {
-                    // Matching keys. Yield this pair of values and advance both iterators.
+                    // Matching keys. Yield the key and both values, then advance both iterators.
                     left_items.next();
                     right_items.next();
-                    return Some((left_val, right_val));
+                    return Some((left_key, left_val, right_val));
                 }
                 Ordering::Less => {
                     // `left_items` is behind `right_items` in key order. Advance `left_items`.
@@ -3277,30 +3370,22 @@ where
 }
 
 #[test]
-fn test_btreemap_overlapping_items() {
+fn btreemap_overlapping_items() {
     // A case with partial overlap and gaps.
     let left = BTreeMap::from_iter([("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5)]);
     let right = BTreeMap::from_iter([("b", 2.0), ("d", 4.0), ("f", 6.0)]);
     assert_eq!(
-        btreemap_values_with_same_key(&left, &right).collect::<Vec<_>>(),
-        vec![(&2, &2.0), (&4, &4.0)],
+        btreemap_items_with_same_key(&left, &right).collect::<Vec<_>>(),
+        vec![(&"b", &2, &2.0), (&"d", &4, &4.0)],
     );
     assert_eq!(
-        btreemap_values_with_same_key(&right, &left).collect::<Vec<_>>(),
-        vec![(&2.0, &2), (&4.0, &4)],
+        btreemap_items_with_same_key(&right, &left).collect::<Vec<_>>(),
+        vec![(&"b", &2.0, &2), (&"d", &4.0, &4)],
     );
 
     // A case where one side is empty.
     let left = BTreeMap::<i32, i32>::new();
     let right = BTreeMap::<i32, i32>::from_iter([(1, 1), (2, 2)]);
-    assert!(
-        btreemap_values_with_same_key(&left, &right)
-            .next()
-            .is_none()
-    );
-    assert!(
-        btreemap_values_with_same_key(&right, &left)
-            .next()
-            .is_none()
-    );
+    assert!(btreemap_items_with_same_key(&left, &right).next().is_none());
+    assert!(btreemap_items_with_same_key(&right, &left).next().is_none());
 }

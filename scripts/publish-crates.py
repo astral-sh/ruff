@@ -3,6 +3,7 @@
 # dependencies = []
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -10,6 +11,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -151,7 +157,7 @@ def publish_workspace(
         print(f"  {crate.pretty()}")
 
     command = build_cargo_publish_command(cargo, existing, cargo_publish_args)
-    return subprocess.run(command, cwd=REPO_ROOT).returncode
+    return subprocess.run(command, cwd=REPO_ROOT, check=False).returncode
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:

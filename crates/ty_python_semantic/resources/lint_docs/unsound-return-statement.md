@@ -31,14 +31,14 @@ returns_int() + 42
 ```
 
 This rule allows you to use ["fully static"][fully-static] return types as "typed boundaries" for
-your code. With this rule enabled, ty would emit an error on the `return returns_any()` statement
-in `returns_int`, since the `returns_any()` call is inferred as having type `Any`, and `Any` is not
-a subtype of `int`. This helps prevent the unsoundness from spreading far from its original source
-(in this case, the return type of the `returns_any` function).
+your code. With this rule enabled, ty would emit an error on the `return returns_any()` statement in
+`returns_int`, since the `returns_any()` call is inferred as having type `Any`, and `Any` is not a
+subtype of `int`. This helps prevent the unsoundness from spreading far from its original source (in
+this case, the return type of the `returns_any` function).
 
-Note that this rule is only applied to functions annotated as returning
-[fully static][fully-static] types. It will not trigger if `Any` or `Unknown` appear anywhere in
-your return type, either implicitly or explicitly:
+Note that this rule is only applied to functions annotated as returning [fully static][fully-static]
+types. It will not trigger if `Any` or `Unknown` appear anywhere in your return type, either
+implicitly or explicitly:
 
 ```py
 from typing import Any
@@ -61,11 +61,11 @@ def returns_list_of_any() -> list[Any]:
 ```
 
 This rule works especially well when combined with ty's `missing-type-argument` and
-`unsound-assignment` rules, as well as the Ruff rules [`ANN201`][ann201],
-[`ANN202`][ann202], [`ANN204`][ann204], [`ANN205`][ann205], and [`ANN206`][ann206]. Enabling all
-these rules at once effectively makes it much less likely that a `return` statement can lead to
-unsoundness "leaking" out of a function unless that function has been *explicitly* annotated with
-a dynamic type in some way (`-> Any` or `-> tuple[Any]`, for example).
+`unsound-assignment` rules, as well as the Ruff rules [`ANN201`][ann201], [`ANN202`][ann202],
+[`ANN204`][ann204], [`ANN205`][ann205], and [`ANN206`][ann206]. Enabling all these rules at once
+effectively makes it much less likely that a `return` statement can lead to unsoundness "leaking"
+out of a function unless that function has been *explicitly* annotated with a dynamic type in some
+way (`-> Any` or `-> tuple[Any]`, for example).
 
 This rule is analogous to mypy's [`no-any-return`][no-any-return] error code, which is enabled by
 mypy’s [`--strict`][mypy-strict] mode and can also be enabled on its own using mypy’s
@@ -112,7 +112,8 @@ Python code.
 
 ## See also
 
-- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound `return` statements
+- `unsound-yield` is a similar rule that triggers on unsound `yield` expressions rather than unsound
+    `return` statements
 - `unsound-assignment` is a similar rule that triggers on unsound assignments
 
 [ann201]: https://docs.astral.sh/ruff/rules/missing-return-type-undocumented-public-function/

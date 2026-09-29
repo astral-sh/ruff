@@ -1219,12 +1219,87 @@ python-version = "3.12"
 ```
 
 ```py
-type Recursive = int | Recursive
+type Recursive = int | Recursive  # error: [cyclic-type-alias-definition]
 
 class C:
     value: Recursive = 1
 
 C().value
+```
+
+### Recursive metaclass declarations containing dynamic types
+
+A recursive declaration containing `Any` can describe a data descriptor. Assignments to a class
+attribute must still satisfy the setter stored on its metaclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: int) -> None: ...
+
+Implicit = Any | list["Implicit"]
+type Explicit = Any | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+ExplicitOwner.value = "bad"  # error: [invalid-assignment] "Expected `int`"
+```
+
+### Recursive metaclass declarations containing non-descriptors
+
+A recursive union can contain both descriptors and ordinary values. A valid assignment is checked
+against the descriptor actually stored on the metaclass, even when the class has an attribute with
+the same name.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> str:
+        return "value"
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+Implicit = Descriptor | list["Implicit"]
+type Explicit = Descriptor | list[Explicit]
+
+class ImplicitMeta(type):
+    value: Implicit = Descriptor()
+
+class ExplicitMeta(type):
+    value: Explicit = Descriptor()
+
+class ImplicitOwner(metaclass=ImplicitMeta):
+    value: str = ""
+
+class ExplicitOwner(metaclass=ExplicitMeta):
+    value: str = ""
+
+ImplicitOwner.value = "accepted"
+ExplicitOwner.value = "accepted"
 ```
 
 ### Property getters do not infer fixed owner type variables
@@ -1942,6 +2017,31 @@ class Decorated:
 bound = Decorated().method
 reveal_type(bound)  # revealed: Decorator[(value: str)]
 bound(1)  # error: [invalid-argument-type]
+```
+
+### Static getters, setters and deleters
+
+```py
+class Descriptor:
+    @staticmethod
+    def __get__(descriptor: object, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    @staticmethod
+    def __set__(instance: object, value: int) -> None: ...
+    @staticmethod
+    def __delete__(instance: object) -> None: ...
+
+class Owner:
+    value = Descriptor()
+
+owner = Owner()
+reveal_type(owner.value)  # revealed: int
+reveal_type(Owner.value)  # revealed: int
+owner.value = 1
+del owner.value
+
+owner.value = "wrong"  # error: [invalid-assignment] "Expected `int`, found `Literal["wrong"]`"
 ```
 
 [descriptors]: https://docs.python.org/3/howto/descriptor.html

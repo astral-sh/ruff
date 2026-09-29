@@ -169,7 +169,7 @@ def use_existing_union(form: TypeForm[int] | TypeForm[str]) -> None:
 def use_existing_alias(form: FormUnion, value: int | str) -> None:
     assert_type(value, form)
 
-type RecursiveForm = RecursiveForm | TypeForm[int]
+type RecursiveForm = RecursiveForm | TypeForm[int]  # error: [cyclic-type-alias-definition]
 
 def use_recursive_alias(form: RecursiveForm) -> None:
     reveal_type(cast(form, object()))  # revealed: int
@@ -192,6 +192,69 @@ def use_bound[T: TypeForm[int]](form: T, value: int) -> None:
 def use_constraints[T: (TypeForm[int], TypeForm[str])](form: T, value: int | str) -> None:
     reveal_type(cast(form, object()))  # revealed: int | str
     assert_type(value, form)
+```
+
+## Loop-carried values in `TypeForm` contexts
+
+Passing a reassigned value to a `TypeForm` parameter does not make the assignment a type alias. Even
+when an attribute lookup fails during loop inference, we only report the missing attribute.
+
+```py
+from typing_extensions import TypeForm
+
+def unwrap(form: TypeForm):
+    while True:
+        # error: [unresolved-attribute]
+        form = form.__supertype__
+        unwrap(form)
+```
+
+The same applies when a loop returns a value from a function annotated with `TypeForm`. The
+placeholder class has no underlying type attribute, but the assignment does not define an alias.
+
+```py
+class Wrapper: ...
+
+def unwrap_alias(form: Wrapper) -> TypeForm:
+    while True:
+        # error: [unresolved-attribute]
+        form = form.__value__
+        if form:
+            return form
+```
+
+## Recursive aliases of `TypeForm`
+
+A value whose type is a recursive alias of `TypeForm` represents the type inside that `TypeForm`.
+Casting to it unwraps the `TypeForm` while preserving recursive references in its type argument. The
+same projection applies when the alias is one alternative in a union of type forms.
+
+```py
+from typing import cast
+from typing_extensions import TypeForm
+
+RecursiveForm = TypeForm[list["RecursiveForm"]]
+
+def cast_recursive_form(form: RecursiveForm) -> None:
+    reveal_type(cast(form, object()))  # revealed: list[RecursiveForm]
+
+def cast_union(form: RecursiveForm | TypeForm[int]) -> None:
+    reveal_type(cast(form, object()))  # revealed: list[RecursiveForm] | int
+```
+
+A recursive `TypeForm` alias also denotes an ordinary value during assignment. An incompatible
+assignment reports a type mismatch, since the value is already a valid type form.
+
+```py
+type ExplicitForm = TypeForm[list[ExplicitForm]]
+
+def assign_recursive_form(form: RecursiveForm) -> None:
+    valid: TypeForm[list[RecursiveForm]] = form
+    invalid: TypeForm[int] = form  # error: [invalid-assignment]
+
+def assign_explicit_form(form: ExplicitForm) -> None:
+    valid: TypeForm[list[ExplicitForm]] = form
+    invalid: TypeForm[int] = form  # error: [invalid-assignment]
 ```
 
 ## Runtime class objects and gradual values
