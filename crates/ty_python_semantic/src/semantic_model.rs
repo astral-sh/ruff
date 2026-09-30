@@ -35,7 +35,7 @@ use crate::types::{
     is_discarded_dict_key_assignment, reaching_definitions_from_inference,
 };
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::place::PlaceExpr;
+use ty_python_core::place::{PlaceExpr, PlaceExprRef, PlaceTable, ScopedPlaceId};
 use ty_python_core::place_table;
 use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
@@ -116,23 +116,57 @@ impl<'db> SemanticModel<'db> {
         name: &str,
         node: ast::AnyNodeRef<'_>,
     ) -> bool {
-        let index = semantic_index(self.db, self.program_file());
         let Some(scope) = self.scope(node) else {
             return false;
         };
 
-        if index.visible_ancestor_scopes(scope).any(|(scope, _)| {
-            index
-                .place_table(scope)
-                .symbol_by_name(name)
-                .is_some_and(|symbol| symbol.is_bound() || symbol.is_declared())
-        }) {
+        if self.has_visible_name_binding_or_declaration(scope, name) {
             return false;
         }
 
         let env = self.program_environment();
         implicit_builtins_symbol_scope(self.db, &env, name)
             .is_some_and(|scope| Some(scope) == builtins_module_scope(self.db, &env))
+    }
+
+    /// Returns whether `name` is bound or declared in `scope` or a visible ancestor.
+    ///
+    /// This ignores reachability: for example, `new: object` counts even before that statement.
+    /// The scope must belong to this model's file.
+    pub fn has_visible_name_binding_or_declaration(&self, scope: FileScopeId, name: &str) -> bool {
+        self.has_visible_binding_or_declaration_by(scope, |table| {
+            table.symbol_id(name).map(Into::into)
+        })
+    }
+
+    /// Returns whether `place` is bound or declared in `scope` or a visible ancestor.
+    ///
+    /// This ignores reachability, like [`Self::has_visible_name_binding_or_declaration`].
+    /// The scope must belong to this model's file.
+    pub fn has_visible_binding_or_declaration<'a>(
+        &self,
+        scope: FileScopeId,
+        place: impl Into<PlaceExprRef<'a>>,
+    ) -> bool {
+        let place = place.into();
+        self.has_visible_binding_or_declaration_by(scope, |table| table.place_id(place))
+    }
+
+    /// Checks visible scopes for a bound or declared place selected by `lookup`.
+    fn has_visible_binding_or_declaration_by(
+        &self,
+        scope: FileScopeId,
+        lookup: impl Fn(&PlaceTable) -> Option<ScopedPlaceId>,
+    ) -> bool {
+        let index = semantic_index(self.db, self.program_file());
+
+        index.visible_ancestor_scopes(scope).any(|(scope, _)| {
+            let table = index.place_table(scope);
+            lookup(table).is_some_and(|id| {
+                let place = table.place(id);
+                place.is_bound() || place.is_declared()
+            })
+        })
     }
 
     /// Returns a map from symbol name to that symbol's
