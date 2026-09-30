@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/binary.py
 ---
 ## Input
 ```python
@@ -484,7 +483,9 @@ aaaaaaaaaaa = t"hellooooooooooooooooooooooo \
 
 # Black breaks the right side first for the following expressions:
 aaaaaaaaaaaaaa + caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaal(
-    argument1, argument2, argument3
+    argument1,
+    argument2,
+    argument3,
 )
 aaaaaaaaaaaaaa + [
     bbbbbbbbbbbbbbbbbbbbbb,
