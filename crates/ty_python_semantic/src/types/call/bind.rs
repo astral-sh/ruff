@@ -867,6 +867,7 @@ impl<'db> Bindings<'db> {
         constructor_instance_type: Type<'db>,
         constructor_kind: ConstructorCallableKind,
     ) -> Self {
+        self.set_implicitly_invoked();
         for element in &mut self.elements {
             element.items = std::mem::take(&mut element.items)
                 .into_iter()
@@ -905,6 +906,13 @@ impl<'db> Bindings<'db> {
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
         for binding in self.iter_flat_mut() {
             binding.dunder_call_is_possibly_unbound = true;
+        }
+    }
+
+    /// Record that these bindings were reached through an implicit method lookup.
+    pub(crate) fn set_implicitly_invoked(&mut self) {
+        for binding in self.iter_flat_mut() {
+            binding.is_implicitly_invoked = true;
         }
     }
 
@@ -982,6 +990,20 @@ impl<'db> Bindings<'db> {
         let mut functions = SmallVec::new();
         collect(db, self, &mut functions);
         functions.into_iter()
+    }
+
+    /// Return deprecations that need to be reported when applying a decorator. Direct function
+    /// implementations are checked at references, while overloads and implicit methods are only
+    /// known after applying the decorator. Filter after collecting all deprecations so that
+    /// intersection members retain their usual role in suppressing a warning.
+    pub(crate) fn deprecated_decorator_functions(
+        &self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = OverloadLiteral<'db>> {
+        self.deprecated_functions(db)
+            .filter_map(move |(callable, function)| {
+                (function.is_overload(db) || callable.is_implicitly_invoked).then_some(function)
+            })
     }
 
     /// Returns an iterator over all `CallableBinding`s, flattening the two-level structure.
@@ -3345,6 +3367,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
         let callable_binding = CallableBinding {
             callable_type,
             signature_type,
+            is_implicitly_invoked: false,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_result: None,
@@ -3374,6 +3397,10 @@ pub(crate) struct CallableBinding<'db> {
     /// calls to functions this will be the same as `callable_type`; for other callable instances
     /// it may be a `__call__` method.
     pub(crate) signature_type: Type<'db>,
+
+    /// Whether the callable is reached through an implicit `__call__` or constructor lookup,
+    /// rather than being called directly. Its implementation cannot be checked at the reference.
+    is_implicitly_invoked: bool,
 
     /// If this is a callable object (i.e. called via a `__call__` method), the boundness of
     /// that call method.
@@ -3472,6 +3499,7 @@ impl<'db> CallableBinding<'db> {
         Self {
             callable_type: signature_type,
             signature_type,
+            is_implicitly_invoked: false,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_result: None,
@@ -3484,6 +3512,7 @@ impl<'db> CallableBinding<'db> {
         Self {
             callable_type: signature_type,
             signature_type,
+            is_implicitly_invoked: false,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
             overload_call_result: None,
