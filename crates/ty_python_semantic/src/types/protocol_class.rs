@@ -470,6 +470,20 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.member_count(db)
     }
 
+    pub(super) fn has_only_implicitly_bound_instance_methods(self, db: &'db dyn Db) -> bool {
+        self.members(db).all(|member| {
+            let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+                member.data.kind
+            else {
+                return false;
+            };
+            callable
+                .signatures(db)
+                .iter()
+                .all(Signature::has_implicit_positional_receiver_annotation)
+        })
+    }
+
     /// Returns whether structural comparison can avoid recursive member expansion.
     pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
         let env = ProgramEnvironment::from_program(self.interface.program(db));

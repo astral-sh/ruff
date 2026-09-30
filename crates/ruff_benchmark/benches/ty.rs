@@ -1054,6 +1054,48 @@ def _[T]():
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4629>.
+///
+/// Comparing a materialized recursive protocol to its original type can repeatedly expand
+/// the protocol's members when they contain the protocol inside a generic type.
+fn benchmark_recursive_protocol_materialization_scaling(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for num_methods in [24, 48, 96, 192] {
+        let mut code = "\
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node(Protocol):
+"
+        .to_string();
+
+        for i in 0..num_methods {
+            writeln!(
+                &mut code,
+                "    def edit_{i}(self, nodes: list[Node]) -> list[Node]: ..."
+            )
+            .ok();
+        }
+
+        code.push_str("\nstatic_assert(is_subtype_of(Top[Node], Node))\n");
+
+        criterion.bench_function(
+            &format!("ty_micro[recursive_protocol_materialization_{num_methods}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |case| assert_eq!(case.db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -2200,6 +2242,7 @@ criterion_group!(
     benchmark_nested_recursive_protocol_receiver,
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
+    benchmark_recursive_protocol_materialization_scaling,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,

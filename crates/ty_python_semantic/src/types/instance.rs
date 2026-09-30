@@ -31,7 +31,7 @@ use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type_expanding_aliases, materialization_is_noop,
-    walk_type_with_recursion_guard,
+    protocol_materialization_is_noop, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -508,6 +508,29 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// Prove that a protocol's requirements do not change under materialization.
+///
+/// The interface must be read inside this query. If a dependency is provisional during Salsa cycle
+/// recovery, `cycle_result` prevents an incomplete interface from being used as a proof; the
+/// structural comparison remains available as a fallback.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn protocol_materialization_is_provably_noop<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    class: ProtocolClass<'db>,
+) -> bool {
+    let env = ProgramEnvironment::from_program(program);
+    protocol_materialization_is_noop(
+        db,
+        &env,
+        Type::ProtocolInstance(ProtocolInstanceType::from_class(class)),
+    )
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -538,6 +561,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin == target_origin
+        {
+            return self.always();
+        }
+
+        // In the opposite direction, top materialization can add requirements. Avoid expanding
+        // recursive members only when a complete, conservative proof shows that it does not.
+        if let Some(source) = source_protocol
+            && source.materialization_kind(db) == Some(MaterializationKind::Top)
+            && protocol.materialization_kind(db).is_none()
+            && let (Some(source_origin), Some(target_origin)) =
+                (source.materialized_origin(db), protocol.class_origin(db))
+            && source_origin == target_origin
+            && protocol_materialization_is_provably_noop(db, self.env.program(db), source_origin)
         {
             return self.always();
         }

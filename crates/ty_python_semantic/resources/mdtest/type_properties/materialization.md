@@ -2979,6 +2979,179 @@ def recursive_nested_materialization(
     reveal_type(nested_bottom.marker)  # revealed: Never
 ```
 
+### Fully static recursive protocols
+
+Materializing a fully static recursive protocol does not change its requirements, even when the
+recursive reference occurs inside a generic type.
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+class Tree(Protocol):
+    def add(self, children: list[Tree]) -> int: ...
+    def parent(self) -> Tree: ...
+
+static_assert(is_equivalent_to(Tree, Top[Tree]))
+static_assert(is_equivalent_to(Tree, Bottom[Tree]))
+static_assert(is_equivalent_to(Top[Tree], Bottom[Tree]))
+static_assert(is_subtype_of(Top[Tree], Tree))
+static_assert(is_subtype_of(Tree, Bottom[Tree]))
+```
+
+The same holds for mutually recursive protocols, including a forward reference:
+
+```py
+class First(Protocol):
+    def add(self, children: list[Second]) -> None: ...
+
+class Second(Protocol):
+    def add(self, children: list[First]) -> None: ...
+
+static_assert(is_equivalent_to(First, Top[First]))
+static_assert(is_equivalent_to(First, Bottom[First]))
+static_assert(is_equivalent_to(Second, Top[Second]))
+static_assert(is_equivalent_to(Second, Bottom[Second]))
+```
+
+### Recursive protocols with gradual members
+
+A recursive protocol can still change under materialization when it contains gradual types, even
+when they occur inside a callable return type. Its bottom materialization is a subtype of the
+protocol, which is a subtype of its top materialization.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Callable, Protocol, overload
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to, is_subtype_of
+
+class AnyTree(Protocol):
+    def add(self, children: list[AnyTree]) -> int: ...
+    def value(self) -> Any: ...
+
+class UnknownTree(Protocol):
+    def add(self, children: list[UnknownTree]) -> int: ...
+    def callback(self) -> Callable[[], Unknown]: ...
+
+static_assert(not is_equivalent_to(AnyTree, Top[AnyTree]))
+static_assert(not is_equivalent_to(AnyTree, Bottom[AnyTree]))
+static_assert(is_subtype_of(Bottom[AnyTree], AnyTree))
+static_assert(is_subtype_of(AnyTree, Top[AnyTree]))
+static_assert(is_subtype_of(Bottom[AnyTree], Top[AnyTree]))
+static_assert(not is_subtype_of(Top[AnyTree], AnyTree))
+static_assert(not is_subtype_of(AnyTree, Bottom[AnyTree]))
+static_assert(not is_equivalent_to(UnknownTree, Top[UnknownTree]))
+static_assert(not is_equivalent_to(UnknownTree, Bottom[UnknownTree]))
+static_assert(is_subtype_of(Bottom[UnknownTree], UnknownTree))
+static_assert(is_subtype_of(UnknownTree, Top[UnknownTree]))
+static_assert(is_subtype_of(Bottom[UnknownTree], Top[UnknownTree]))
+```
+
+An overload retains its gradual requirements even when another overload is fully static:
+
+```py
+class OverloadedTree(Protocol):
+    @overload
+    def add(self, children: list[OverloadedTree], value: int) -> int: ...
+    @overload
+    def add(self, children: list[OverloadedTree], value: Any) -> Any: ...
+
+static_assert(not is_equivalent_to(OverloadedTree, Top[OverloadedTree]))
+static_assert(not is_equivalent_to(OverloadedTree, Bottom[OverloadedTree]))
+static_assert(not is_subtype_of(Top[OverloadedTree], OverloadedTree))
+```
+
+A recursive reference can itself be materialized:
+
+```py
+class MaterializedTree(Protocol):
+    def add(self, children: list[Top[MaterializedTree]]) -> None: ...
+    def value(self) -> Any: ...
+
+static_assert(not is_equivalent_to(MaterializedTree, Top[MaterializedTree]))
+static_assert(not is_equivalent_to(MaterializedTree, Bottom[MaterializedTree]))
+```
+
+### Materialization during protocol interface inference
+
+A comparison made while a protocol's interface is being inferred must account for its gradual
+members, including members that have not yet been inferred.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class P(Protocol):
+    check: None = static_assert(not is_subtype_of("Top[P]", "P"))
+    def value(self) -> Any: ...
+
+static_assert(not is_subtype_of(Top[P], P))
+```
+
+### Recursive protocols with gradual property setters
+
+Materializing a recursive protocol accounts for a gradual setter even when its getter is fully
+static.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Tree(Protocol):
+    def add(self, children: list[Tree]) -> None: ...
+    @property
+    def value(self) -> int: ...
+    @value.setter
+    def value(self, value: Any) -> None: ...
+
+static_assert(not is_equivalent_to(Tree, Top[Tree]))
+static_assert(not is_equivalent_to(Tree, Bottom[Tree]))
+
+def write(top: Top[Tree], bottom: Bottom[Tree]) -> None:
+    top.value = 1  # error: [invalid-assignment]
+    bottom.value = object()  # no diagnostic
+```
+
+### Recursive protocols with descriptors
+
+Descriptor read types are materialized in a recursive protocol as well.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Callable, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type[object] | None = None) -> Any: ...
+    def __set__(self, instance: object, value: Any) -> None: ...
+
+def descriptor(function: Callable[..., Any]) -> Descriptor:
+    raise NotImplementedError
+
+class Tree(Protocol):
+    def add(self, children: list[Tree]) -> None: ...
+    @descriptor
+    def value(self) -> Any: ...
+
+static_assert(not is_equivalent_to(Tree, Top[Tree]))
+static_assert(not is_equivalent_to(Tree, Bottom[Tree]))
+
+def read(top: Top[Tree], bottom: Bottom[Tree]) -> None:
+    reveal_type(top.value)  # revealed: object
+    reveal_type(bottom.value)  # revealed: Never
+```
+
 ### Recursive protocols with stable specializations
 
 These specializations have identical property types: both `value` properties return `str | int`, and
