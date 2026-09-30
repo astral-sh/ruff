@@ -1273,6 +1273,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         .is_always_satisfied(db, self.env)
     }
 
+    /// Computes a receiver constraint while preserving the active signature comparisons.
+    ///
+    /// The bound signature must own its constraints, so this uses a separate builder. A
+    /// recursive protocol can require the same receiver comparison while that builder is still
+    /// in use. Treat an exact active revisit coinductively, and don't cache its result: it may
+    /// depend on the signature comparisons currently being checked.
+    pub(super) fn receiver_constraint_to_owned(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> OwnedConstraintSet<'db> {
+        if source.is_trivially_constraint_set_assignable_to(db, target) {
+            return OwnedConstraintSet::always();
+        }
+        let types = TypePair::new(db, self.env.program(db), source, target);
+        self.signature_relation_visitor.receiver_constraints.visit(
+            &types,
+            OwnedConstraintSet::always,
+            || {
+                ConstraintSetBuilder::new().into_owned(|constraints| {
+                    let relation_visitor = HasRelationToVisitor::default(constraints);
+                    let disjointness_visitor = IsDisjointVisitor::default(constraints);
+                    TypeRelationChecker::constraint_set_assignability(
+                        self.env,
+                        constraints,
+                        &relation_visitor,
+                        &disjointness_visitor,
+                        self.signature_relation_visitor,
+                        self.materialization_visitor,
+                    )
+                    .check_type_pair(db, source, target)
+                })
+            },
+        )
+    }
+
     /// Checks class subtyping without discarding the active recursive relation state.
     pub(super) fn is_class_subtype(
         &self,

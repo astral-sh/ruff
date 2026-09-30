@@ -45,7 +45,7 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypePair,
     TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     VarianceTerm, infer_complete_scope_types, todo_type,
 };
@@ -582,11 +582,12 @@ impl<'db> CallableSignature<'db> {
         let specialized = match self.overloads.as_slice() {
             [signature] => {
                 if signature.has_receiver_determined_method_typevar(db, env) {
-                    signature.specialize_for_bound_receiver(
+                    signature.specialize_for_bound_receiver_impl(
                         db,
                         env,
                         receiver_type,
                         typing_self_type,
+                        Some(checker),
                     )
                 } else {
                     None
@@ -602,11 +603,12 @@ impl<'db> CallableSignature<'db> {
                         .iter()
                         .filter(|signature| signature.can_bind_self_to(db, checker, receiver_type))
                         .filter_map(|signature| {
-                            signature.specialize_for_bound_receiver(
+                            signature.specialize_for_bound_receiver_impl(
                                 db,
                                 env,
                                 receiver_type,
                                 typing_self_type,
+                                Some(checker),
                             )
                         })
                         .flat_map(|signature| signature.overloads),
@@ -615,10 +617,23 @@ impl<'db> CallableSignature<'db> {
             _ => None,
         };
 
-        specialized
-            .as_ref()
-            .unwrap_or(self)
-            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+        Self {
+            overloads: specialized
+                .as_ref()
+                .unwrap_or(self)
+                .overloads
+                .iter()
+                .map(|signature| {
+                    signature.bind_self_with_receiver_impl(
+                        db,
+                        env,
+                        Some(receiver_type),
+                        Some(typing_self_type),
+                        Some(checker),
+                    )
+                })
+                .collect(),
+        }
     }
 
     pub(crate) fn has_parameters(&self) -> bool {
@@ -828,7 +843,11 @@ impl<'db> SignatureRelationKey<'db> {
     }
 }
 
-pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+#[derive(Default)]
+pub(crate) struct SignatureRelationVisitor<'db> {
+    signatures: ActiveRecursionDetector<SignatureRelationKey<'db>>,
+    pub(super) receiver_constraints: ActiveRecursionDetector<TypePair<'db>>,
+}
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -1368,6 +1387,17 @@ impl<'db> Signature<'db> {
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
     ) -> Self {
+        self.bind_self_with_receiver_impl(db, env, receiver_type, typing_self_type, None)
+    }
+
+    fn bind_self_with_receiver_impl(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+        checker: Option<&TypeRelationChecker<'_, '_, 'db>>,
+    ) -> Self {
         // A fixed unpacked tuple has a known first positional argument, even though it is
         // declared with `*args`. Expand it before consuming the receiver.
         let binding_parameters = if self.parameters.get(0).is_some_and(|parameter| {
@@ -1451,7 +1481,14 @@ impl<'db> Signature<'db> {
                 }) {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
-                receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+                checker.map_or_else(
+                    || receiver.when_constraint_set_assignable_to_owned(db, env, annotation),
+                    |checker| {
+                        std::borrow::Cow::Owned(
+                            checker.receiver_constraint_to_owned(db, receiver, annotation),
+                        )
+                    },
+                )
             })
         };
         let receiver_constraints = merge_receiver_constraints(
@@ -1503,8 +1540,24 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableSignature<'db>> {
-        let bound_signature =
-            self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
+        self.specialize_for_bound_receiver_impl(db, env, receiver_type, typing_self_type, None)
+    }
+
+    fn specialize_for_bound_receiver_impl(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+        checker: Option<&TypeRelationChecker<'_, '_, 'db>>,
+    ) -> Option<CallableSignature<'db>> {
+        let bound_signature = self.bind_self_with_receiver_impl(
+            db,
+            env,
+            Some(receiver_type),
+            Some(typing_self_type),
+            checker,
+        );
         let Some(receiver_constraints) = bound_signature.receiver_constraints() else {
             return Some(CallableSignature::single(self.clone()));
         };
@@ -2748,6 +2801,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // the finite layer still bubbles out of `work`, because only exact active revisits take
         // this branch and the result is not memoized.
         self.signature_relation_visitor
+            .signatures
             .visit(&key, || self.always(), work)
     }
 
