@@ -659,35 +659,7 @@ impl<'db> SolutionWalker<'db> {
             if constraint.provenance() != ConstraintProvenance::Evidence {
                 continue;
             }
-            let upper = match constraint {
-                Constraint::ConcreteUpper(upper)
-                    if bound_typevar.is_same_typevar_as(db, upper.typevar) =>
-                {
-                    Some(upper.bound)
-                }
-                Constraint::ConcreteEquivalence(exact)
-                    if bound_typevar.is_same_typevar_as(db, exact.typevar) =>
-                {
-                    Some(exact.bound)
-                }
-                Constraint::TypeVarRange(range)
-                    if bound_typevar.is_same_typevar_as(db, range.left) =>
-                {
-                    Some(Type::TypeVar(range.right))
-                }
-                Constraint::TypeVarEquivalence(exact) => {
-                    let (left, right) = exact.in_builder(db, storage);
-                    if bound_typevar.is_same_typevar_as(db, left) {
-                        Some(Type::TypeVar(right))
-                    } else if bound_typevar.is_same_typevar_as(db, right) {
-                        Some(Type::TypeVar(left))
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
-            };
-            if let Some(upper) = upper {
+            if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
                 let order = self
                     .source_orders
                     .get_index_of(&constraint_id)
@@ -1053,7 +1025,7 @@ impl<'db> SolutionWalker<'db> {
         let previously_pending = self.pending.len();
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
             let constraint = storage.constraint_data(constraint);
-            constraint.provides_lower_bound_for(db, bound_typevar)
+            constraint.lower_bound_for(db, bound_typevar).is_some()
         });
 
         // A constraint preferred over every potentially valid alternative will also be preferred
