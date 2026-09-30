@@ -446,18 +446,24 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 prune_path,
                 process_satisfied,
             ),
-            Constraint::Existential(existential) => self.visit_existential_constraint(
-                db,
-                env,
-                storage,
-                path,
-                polarity,
-                interior,
-                existential.body,
-                check_cache,
-                prune_path,
-                process_satisfied,
-            ),
+            Constraint::Existential(existential) => {
+                let locals = existential.locals.clone();
+                let body = existential.body;
+                path.with_quantified_typevars(&locals, |path| {
+                    self.visit_existential_constraint(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        interior,
+                        body,
+                        check_cache,
+                        prune_path,
+                        process_satisfied,
+                    )
+                })
+            }
         }
     }
 
@@ -1444,6 +1450,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             // Ignore any constraints that were replaced with other constraints on this path due to
             // substituting an exact type for some typevar.
             .filter(|(constraint, _)| !path.constraint_is_substituted(*constraint))
+            // Ignore any constraints that reference a quantified-away typevar. Those are local to
+            // the existential's body, and should not leak outside. The sequent map should have
+            // propagated any information about how the quantified-away typevars related to the
+            // inferable typevars.
+            .filter(|(constraint, _)| {
+                let constraint_support = storage.constraint_support(constraint.into_inner());
+                !path.quantified_typevars.overlaps_with(constraint_support)
+            })
             .map(|(constraint, source_constraint)| {
                 let source_order = self
                     .source_orders
