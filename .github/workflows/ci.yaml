@@ -1002,6 +1002,23 @@ jobs:
       - name: "Run PGO pipeline"
         run: python scripts/build_ruff_pgo.py --debug
 
+  script-lockfiles:
+    name: "script lockfiles"
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
+    needs: determine_changes
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          # renovate: datasource=github-release-attachments depName=astral-sh/uv
+          version: "0.12.18"
+          checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
+      - name: "Check script lockfiles"
+        run: uv run --locked scripts/lock-scripts.py --check
+
   prek:
     name: "prek"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
@@ -1496,6 +1513,7 @@ jobs:
       - cargo-build-msrv
       - shellcheck
       - scripts
+      - script-lockfiles
       - prek
       - docs
       - python-package
