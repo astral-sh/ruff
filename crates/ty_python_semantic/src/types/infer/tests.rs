@@ -1380,8 +1380,8 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
         "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy";
 
     for (initial, changed, initial_diagnostics, changed_diagnostics) in [
-        (STATIC, GRADUAL, &[][..], &[FAILURE][..]),
-        (GRADUAL, STATIC, &[FAILURE][..], &[][..]),
+        (STATIC, GRADUAL, &[][..], &[FAILURE, FAILURE][..]),
+        (GRADUAL, STATIC, &[FAILURE, FAILURE][..], &[][..]),
     ] {
         let mut db = setup_db();
         db.write_file("/src/other.py", initial)?;
@@ -1389,22 +1389,30 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
             "/src/node.py",
             r#"
             from __future__ import annotations
-            from typing import Protocol
+            from typing import Protocol, TypeVar
             from other import Payload
 
             class Node(Protocol):
                 def payload(self) -> Payload: ...
                 def edit(self, nodes: list[Node]) -> list[Node]: ...
+
+            T = TypeVar("T", covariant=True)
+
+            class GenericNode(Protocol[T]):
+                def child(self) -> GenericNode[T]: ...
+                def read(self: GenericNode[int]) -> int: ...
+                def payload(self) -> Payload: ...
             "#,
         )?;
         db.write_dedented(
             "/src/main.py",
             r#"
-            from node import Node
+            from node import GenericNode, Node
             from ty_extensions import Top, static_assert
             from ty_extensions._internal import is_subtype_of
 
             static_assert(is_subtype_of(Top[Node], Node))
+            static_assert(is_subtype_of(Top[GenericNode[int]], GenericNode[int]))
             "#,
         )?;
 

@@ -3017,6 +3017,42 @@ static_assert(is_equivalent_to(Second, Top[Second]))
 static_assert(is_equivalent_to(Second, Bottom[Second]))
 ```
 
+### Fully static recursive protocols with growing specializations
+
+The recursive specialization can grow without changing the materialization of a fully static
+protocol, even when a method has an explicitly annotated receiver.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Node[T](Protocol):
+    def child(self) -> Node[tuple[T, T]]: ...
+    def value(self) -> T: ...
+    def read(self: Node[int]) -> int: ...
+
+static_assert(is_equivalent_to(Node[int], Top[Node[int]]))
+static_assert(is_equivalent_to(Node[int], Bottom[Node[int]]))
+
+T_co = TypeVar("T_co", covariant=True)
+
+class LegacyNode(Protocol[T_co]):
+    def child(self) -> LegacyNode[tuple[T_co, T_co]]: ...
+    def value(self) -> T_co: ...
+    def read(self: LegacyNode[int]) -> int: ...
+
+static_assert(is_equivalent_to(LegacyNode[int], Top[LegacyNode[int]]))
+static_assert(is_equivalent_to(LegacyNode[int], Bottom[LegacyNode[int]]))
+```
+
 ### Recursive protocols with gradual members
 
 A recursive protocol can still change under materialization when it contains gradual types, even
@@ -3075,6 +3111,165 @@ class MaterializedTree(Protocol):
 
 static_assert(not is_equivalent_to(MaterializedTree, Top[MaterializedTree]))
 static_assert(not is_equivalent_to(MaterializedTree, Bottom[MaterializedTree]))
+```
+
+### Recursive protocols with gradual growing specializations
+
+The initial specialization has a static `value`, but the child introduces `Any` or `Unknown`. An
+explicitly annotated receiver does not make the protocol's materialization a no-op.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_subtype_of
+
+class Node[T](Protocol):
+    def child(self) -> Node[tuple[T, Any]]: ...
+    def value(self) -> T: ...
+    def read(self: Node[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
+static_assert(not is_subtype_of(Node[int], Bottom[Node[int]]))
+
+T_co = TypeVar("T_co", covariant=True)
+
+class LegacyNode(Protocol[T_co]):
+    def child(self) -> LegacyNode[tuple[T_co, Any]]: ...
+    def value(self) -> T_co: ...
+    def read(self: LegacyNode[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[LegacyNode[int]], LegacyNode[int]))
+static_assert(not is_subtype_of(LegacyNode[int], Bottom[LegacyNode[int]]))
+
+class UnknownNode[T](Protocol):
+    def child(self) -> UnknownNode[tuple[T, Unknown]]: ...
+    def value(self) -> T: ...
+    def read(self: UnknownNode[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[UnknownNode[int]], UnknownNode[int]))
+static_assert(not is_subtype_of(UnknownNode[int], Bottom[UnknownNode[int]]))
+
+class LegacyUnknownNode(Protocol[T_co]):
+    def child(self) -> LegacyUnknownNode[tuple[T_co, Unknown]]: ...
+    def value(self) -> T_co: ...
+    def read(self: LegacyUnknownNode[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[LegacyUnknownNode[int]], LegacyUnknownNode[int]))
+static_assert(not is_subtype_of(LegacyUnknownNode[int], Bottom[LegacyUnknownNode[int]]))
+```
+
+Even when `object | Any` simplifies to `object`, a child can expose the gradual member in a
+different specialization.
+
+```py
+class Masked[T](Protocol):
+    def child(self) -> Masked[int]: ...
+    def value(self) -> T | Any: ...
+    def read(self: Masked[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[Masked[object]], Masked[object]))
+static_assert(not is_subtype_of(Masked[object], Bottom[Masked[object]]))
+
+class LegacyMasked(Protocol[T_co]):
+    def child(self) -> LegacyMasked[int]: ...
+    def value(self) -> T_co | Any: ...
+    def read(self: LegacyMasked[int]) -> int: ...
+
+static_assert(not is_subtype_of(Top[LegacyMasked[object]], LegacyMasked[object]))
+static_assert(not is_subtype_of(LegacyMasked[object], Bottom[LegacyMasked[object]]))
+```
+
+### Recursive protocols capturing a gradual type variable
+
+An enclosing type variable can introduce a gradual type in a recursive specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+def outer[U: Any]() -> None:
+    class Node[T](Protocol):
+        def child(self) -> Node[U]: ...
+        def value(self) -> T: ...
+        def read(self: Node[int]) -> int: ...
+
+    static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
+
+U = TypeVar("U", bound=Any)
+T_co = TypeVar("T_co", covariant=True)
+
+def legacy_outer(value: U) -> None:
+    class Node(Protocol[T_co]):
+        def child(self) -> Node[U]: ...
+        def value(self) -> T_co: ...
+        def read(self: Node[int]) -> int: ...
+
+    static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
+```
+
+### Recursive generic protocol interfaces during inference
+
+A materialization comparison can depend on the interface being inferred. The provisional interface
+does not prove that the gradual member is unchanged.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+if is_subtype_of("Top[Node[int]]", "Node[int]"):
+    Payload = Any
+else:
+    Payload = int
+
+class Node[T](Protocol):
+    def child(self) -> Node[T]: ...
+    def read(self: Node[int]) -> int: ...
+    def value(self) -> Payload: ...
+
+static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
+
+def inspect(node: Node[int]) -> None:
+    reveal_type(node.value())  # revealed: Any | int
+
+T_co = TypeVar("T_co", covariant=True)
+
+if is_subtype_of("Top[LegacyNode[int]]", "LegacyNode[int]"):
+    LegacyPayload = Any
+else:
+    LegacyPayload = int
+
+class LegacyNode(Protocol[T_co]):
+    def child(self) -> LegacyNode[T_co]: ...
+    def read(self: LegacyNode[int]) -> int: ...
+    def value(self) -> LegacyPayload: ...
+
+static_assert(not is_subtype_of(Top[LegacyNode[int]], LegacyNode[int]))
+
+def inspect_legacy(node: LegacyNode[int]) -> None:
+    reveal_type(node.value())  # revealed: Any | int
 ```
 
 ### Materialization during protocol interface inference
