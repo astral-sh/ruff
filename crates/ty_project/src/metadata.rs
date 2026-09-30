@@ -20,7 +20,7 @@ use crate::metadata::options::{
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::settings::Settings;
 use crate::metadata::value::RelativePathBuf;
-use crate::uv::{self, ProjectEnvironment, UseUv};
+use crate::uv::{self, UseUv, UvWorkspace};
 pub use options::Options;
 use options::TyTomlError;
 mod configuration_file;
@@ -72,7 +72,7 @@ pub struct ProjectMetadata {
     config_file_override: Option<SystemPathBuf>,
 
     #[cfg_attr(test, serde(skip))]
-    environment: ProjectEnvironment,
+    uv_workspace: UvWorkspace,
 
     #[cfg_attr(test, serde(skip))]
     use_uv: UseUv,
@@ -90,7 +90,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             config_file_override: None,
-            environment: ProjectEnvironment::default(),
+            uv_workspace: UvWorkspace::default(),
             use_uv: UseUv::Off,
         }
     }
@@ -103,7 +103,7 @@ impl ProjectMetadata {
         use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
         let metadata = Self::load_config_file(path, root, system, use_uv)?;
-        Ok(metadata.with_environment(Self::uv_workspace_environment(root, system, use_uv)))
+        Ok(metadata.with_workspace(Self::uv_workspace_environment(root, system, use_uv)))
     }
 
     fn load_config_file(
@@ -132,7 +132,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             config_file_override: Some(path),
-            environment: ProjectEnvironment::default(),
+            uv_workspace: UvWorkspace::default(),
             use_uv,
         })
     }
@@ -180,7 +180,7 @@ impl ProjectMetadata {
             user_configuration: None,
             fallback_options: None,
             config_file_override: None,
-            environment: ProjectEnvironment::default(),
+            uv_workspace: UvWorkspace::default(),
             use_uv: UseUv::Off,
         })
     }
@@ -207,9 +207,9 @@ impl ProjectMetadata {
         system: &dyn System,
         use_uv: UseUv,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let environment = Self::uv_workspace_environment(path, system, use_uv);
+        let workspace = Self::uv_workspace_environment(path, system, use_uv);
 
-        Self::discover_with_uv_workspace(path, system, environment)
+        Self::discover_with_uv_workspace(path, system, workspace)
             .map(|metadata| metadata.with_use_uv(use_uv))
     }
 
@@ -217,7 +217,7 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
         use_uv: UseUv,
-    ) -> ProjectEnvironment {
+    ) -> UvWorkspace {
         if use_uv.workspace_discovery_enabled() {
             let metadata = uv::Uv::new(system)
                 .map_err(uv::uv_executable_error)
@@ -225,24 +225,24 @@ impl ProjectMetadata {
                 .and_then(|uv| uv.metadata(system, &uv::MetadataTarget::Workspace(path)));
 
             match metadata {
-                Ok(metadata) => ProjectEnvironment {
+                Ok(metadata) => UvWorkspace {
                     metadata: Some(metadata),
                     error: None,
                 },
-                Err(error) => ProjectEnvironment {
+                Err(error) => UvWorkspace {
                     metadata: None,
                     error: Some(error.to_diagnostic(Severity::Warning)),
                 },
             }
         } else {
-            ProjectEnvironment::default()
+            UvWorkspace::default()
         }
     }
 
     fn discover_with_uv_workspace(
         path: &SystemPath,
         system: &dyn System,
-        environment: ProjectEnvironment,
+        workspace: UvWorkspace,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
         tracing::debug!("Searching for a project in '{path}'");
 
@@ -252,7 +252,7 @@ impl ProjectMetadata {
 
         let mut closest_project: Option<ProjectMetadata> = None;
         let mut uv_project: Option<ProjectMetadata> = None;
-        let uv_workspace_root = environment
+        let uv_workspace_root = workspace
             .metadata
             .as_ref()
             .map(uv::UvMetadata::workspace_root);
@@ -272,7 +272,7 @@ impl ProjectMetadata {
 
             if has_ty_configuration {
                 tracing::debug!("Found project at '{}'", project_root);
-                return Ok(metadata.with_environment(environment));
+                return Ok(metadata.with_workspace(workspace));
             }
 
             if is_uv_workspace_root {
@@ -318,7 +318,7 @@ impl ProjectMetadata {
             Self::new(path.file_name().unwrap_or("root"), path.to_path_buf())
         };
 
-        Ok(metadata.with_environment(environment))
+        Ok(metadata.with_workspace(workspace))
     }
 
     fn discover_in(
@@ -405,8 +405,8 @@ impl ProjectMetadata {
     }
 
     #[must_use]
-    fn with_environment(mut self, environment: ProjectEnvironment) -> Self {
-        self.environment = environment;
+    fn with_workspace(mut self, workspace: UvWorkspace) -> Self {
+        self.uv_workspace = workspace;
         self
     }
 
@@ -422,14 +422,14 @@ impl ProjectMetadata {
         &self,
         system: &dyn System,
         path: &SystemPath,
-        environment: ProjectEnvironment,
+        workspace: UvWorkspace,
     ) -> Result<Self, ProjectMetadataError> {
         let mut metadata = if let Some(config_file) = self.config_file_override() {
             // A background uv refresh has already run when the caller supplies updated metadata.
             Self::load_config_file(config_file.to_path_buf(), self.root(), system, self.use_uv)?
-                .with_environment(environment)
+                .with_workspace(workspace)
         } else {
-            Self::discover_with_uv_workspace(path, system, environment)?.with_use_uv(self.use_uv)
+            Self::discover_with_uv_workspace(path, system, workspace)?.with_use_uv(self.use_uv)
         };
 
         metadata.override_options.clone_from(&self.override_options);
@@ -486,14 +486,14 @@ impl ProjectMetadata {
         self.override_options = Some(Box::new(options));
     }
 
-    pub(crate) fn environment(&self) -> &ProjectEnvironment {
-        &self.environment
+    pub(crate) fn uv_workspace(&self) -> &UvWorkspace {
+        &self.uv_workspace
     }
 
     pub(crate) fn uv_diagnostic(&self, db: &dyn Db) -> Option<Diagnostic> {
-        let mut diagnostic = self.environment.error.clone()?;
+        let mut diagnostic = self.uv_workspace.error.clone()?;
         let path = self
-            .environment
+            .uv_workspace
             .metadata
             .as_ref()
             .map_or(self.root(), uv::UvMetadata::workspace_root)
@@ -506,8 +506,8 @@ impl ProjectMetadata {
         Some(diagnostic)
     }
 
-    pub(crate) fn uv_workspace(&self) -> Option<&uv::UvMetadata> {
-        self.environment.metadata.as_ref()
+    pub(crate) fn uv_workspace_metadata(&self) -> Option<&uv::UvMetadata> {
+        self.uv_workspace.metadata.as_ref()
     }
 
     /// Sets the lowest-precedence options for this project, replacing any previous fallbacks.
@@ -575,7 +575,7 @@ impl ProjectMetadata {
             self.user_configuration = Some(Box::new((user.path().to_owned(), user.into_options())));
         }
 
-        self.uv_workspace_options = self.environment.metadata.as_ref().map(|uv_workspace| {
+        self.uv_workspace_options = self.uv_workspace.metadata.as_ref().map(|uv_workspace| {
             Box::new(Options {
                 environment: Some(EnvironmentOptions {
                     python: uv_workspace
@@ -719,7 +719,7 @@ mod tests {
 
     use crate::db::{ProjectDatabase, testing::TestDb};
     use crate::metadata::{Options, uv::UvMetadata, value::RelativePathBuf};
-    use crate::uv::{DependencyMetadataError, ProjectEnvironment};
+    use crate::uv::{DependencyMetadataError, UvWorkspace};
     use crate::{Db as _, ProjectMetadata, ProjectMetadataError};
 
     #[test]
@@ -995,8 +995,8 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let environment = uv_workspace(&root, &system)?;
-        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, environment)?;
+        let workspace = uv_workspace(&root, &system)?;
+        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, workspace)?;
 
         assert_eq!(project.root(), &*root);
 
@@ -1029,8 +1029,8 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let environment = uv_workspace(&root, &system)?;
-        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, environment)?;
+        let workspace = uv_workspace(&root, &system)?;
+        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, workspace)?;
 
         assert_eq!(project.root(), &*root);
 
@@ -1076,9 +1076,8 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let environment = uv_workspace(&root, &system)?;
-        let mut project =
-            ProjectMetadata::discover_with_uv_workspace(&member, &system, environment)?;
+        let workspace = uv_workspace(&root, &system)?;
+        let mut project = ProjectMetadata::discover_with_uv_workspace(&member, &system, workspace)?;
         project.apply_configuration_files(&system)?;
 
         assert_eq!(project.root(), &*member);
@@ -1122,8 +1121,8 @@ unclosed table, expected `]`
             ),
         ])?;
 
-        let environment = uv_workspace(&workspace, &system)?;
-        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, environment)?;
+        let workspace = uv_workspace(&workspace, &system)?;
+        let project = ProjectMetadata::discover_with_uv_workspace(&member, &system, workspace)?;
 
         assert_eq!(project.root(), &*root);
 
@@ -1135,8 +1134,8 @@ unclosed table, expected `]`
         let system = TestSystem::default();
         let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
         system.memory_file_system().create_directory_all(&root)?;
-        let environment = uv_workspace(&root, &system)?;
-        let metadata = ProjectMetadata::new("app", root).with_environment(environment);
+        let workspace = uv_workspace(&root, &system)?;
+        let metadata = ProjectMetadata::new("app", root).with_workspace(workspace);
         let db = TestDb::new(metadata);
 
         let diagnostics = db.project().check_settings(&db);
@@ -1156,13 +1155,13 @@ unclosed table, expected `]`
         let system = TestSystem::default();
         let root = SystemPathBuf::from(if cfg!(windows) { "C:/app" } else { "/app" });
         system.memory_file_system().create_directory_all(&root)?;
-        let mut environment = uv_workspace(&root, &system)?;
-        environment.error = Some(Diagnostic::new(
+        let mut workspace = uv_workspace(&root, &system)?;
+        workspace.error = Some(Diagnostic::new(
             DiagnosticId::UvMetadata,
             Severity::Warning,
             "uv metadata refresh failed",
         ));
-        let mut metadata = ProjectMetadata::new("app", root).with_environment(environment);
+        let mut metadata = ProjectMetadata::new("app", root).with_workspace(workspace);
         metadata.set_override_options(Options::from_toml_str(
             "[rules]\nmissing-direct-dependency = 'warn'",
             ValueSource::Cli,
@@ -1170,7 +1169,7 @@ unclosed table, expected `]`
         let mut db = TestDb::new(metadata);
         let project = db.project();
 
-        assert!(project.metadata(&db).uv_workspace().is_some());
+        assert!(project.metadata(&db).uv_workspace_metadata().is_some());
         let diagnostics = project.check_settings(&db);
         assert_eq!(diagnostics.len(), 1);
         assert_eq!(diagnostics[0].id(), DiagnosticId::UvMetadata);
@@ -1228,15 +1227,14 @@ unclosed table, expected `]`
                 },
             },
         });
-        let uv_environment = ProjectEnvironment {
+        let workspace = UvWorkspace {
             metadata: Some(UvMetadata::from_metadata(
                 metadata.to_string().as_bytes(),
                 &system,
             )?),
             error: None,
         };
-        let mut project =
-            ProjectMetadata::discover_with_uv_workspace(&member, &system, uv_environment)?;
+        let mut project = ProjectMetadata::discover_with_uv_workspace(&member, &system, workspace)?;
         project.set_fallback_options(Options::from_toml_str(
             r#"
             [environment]
@@ -1350,15 +1348,14 @@ unclosed table, expected `]`
                 "python": {"version": "3.13.0"},
             },
         });
-        let uv_environment = ProjectEnvironment {
+        let workspace = UvWorkspace {
             metadata: Some(UvMetadata::from_metadata(
                 metadata.to_string().as_bytes(),
                 &system,
             )?),
             error: None,
         };
-        let mut project =
-            ProjectMetadata::discover_with_uv_workspace(&root, &system, uv_environment)?;
+        let mut project = ProjectMetadata::discover_with_uv_workspace(&root, &system, workspace)?;
         project.apply_configuration_files(&system)?;
 
         let db = ProjectDatabase::fallible(project, system)?;
@@ -1829,16 +1826,13 @@ unclosed table, expected `]`
         assert_eq!(format!("{error:#}").replace('\\', "/"), message);
     }
 
-    fn uv_workspace(
-        root: &SystemPathBuf,
-        system: &TestSystem,
-    ) -> anyhow::Result<ProjectEnvironment> {
+    fn uv_workspace(root: &SystemPathBuf, system: &TestSystem) -> anyhow::Result<UvWorkspace> {
         let metadata = serde_json::json!({
             "schema": {"version": "preview"},
             "workspace_root": root,
         });
 
-        Ok(ProjectEnvironment {
+        Ok(UvWorkspace {
             metadata: Some(UvMetadata::from_metadata(
                 metadata.to_string().as_bytes(),
                 system,

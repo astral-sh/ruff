@@ -5,8 +5,8 @@ use ty_combine::Combine;
 use ty_static::EnvVars;
 
 pub(crate) use command::{MetadataTarget, Uv, uv_executable_error};
-pub(crate) use environments::{ProjectEnvironment, ScriptEnvironmentCacheKey, script_environment};
 pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges};
+pub(crate) use environments::{ScriptEnvironmentCacheKey, UvWorkspace, script_environment};
 pub(crate) use metadata::{DependencyMetadataError, UvMetadata, UvMetadataError};
 pub(crate) use service::{
     ScriptSyncRequest, ScriptSyncTask, UvMetadataResult, UvMetadataService, UvSyncTask,

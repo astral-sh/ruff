@@ -356,19 +356,19 @@ impl UvEnvironments {
                     };
                     drop(project_sync);
                     let project = db.project();
-                    let environment = match Uv::parse_metadata_output(db.system(), output) {
-                        Ok(metadata) => ProjectEnvironment {
+                    let workspace = match Uv::parse_metadata_output(db.system(), output) {
+                        Ok(metadata) => UvWorkspace {
                             metadata: Some(metadata),
                             error: None,
                         },
                         // Keep the last working uv metadata so a failed refresh does not change
                         // the environment used for checking. Report the new error instead.
-                        Err(error) => ProjectEnvironment {
+                        Err(error) => UvWorkspace {
                             error: Some(error.to_diagnostic(Severity::Warning)),
-                            ..project.metadata(db).environment().clone()
+                            ..project.metadata(db).uv_workspace().clone()
                         },
                     };
-                    changes.project = Some(match project.rediscover(db, &path, environment) {
+                    changes.project = Some(match project.rediscover(db, &path, workspace) {
                         Ok(result) => result,
                         Err(error) => {
                             let error = anyhow::Error::new(error);
@@ -527,7 +527,7 @@ impl UvSyncChanges {
 /// Applied workspace metadata and the error from its latest request.
 /// Both fields are absent when no workspace metadata has been requested.
 #[derive(Debug, Default, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) struct ProjectEnvironment {
+pub(crate) struct UvWorkspace {
     pub(crate) metadata: Option<UvMetadata>,
     pub(crate) error: Option<Diagnostic>,
 }
@@ -992,10 +992,10 @@ mod tests {
             assert!(changes.project.is_some());
             assert!(!environments.has_pending_synchronizations());
 
-            let environment = case.db.project().metadata(&case.db).environment();
-            assert_eq!(environment.error, None);
+            let workspace = case.db.project().metadata(&case.db).uv_workspace();
+            assert_eq!(workspace.error, None);
             assert_eq!(
-                environment
+                workspace
                     .metadata
                     .as_ref()
                     .context("missing uv metadata")?
