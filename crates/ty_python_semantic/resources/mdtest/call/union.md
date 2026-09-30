@@ -153,10 +153,7 @@ def construct(use_fancy: bool):
     factory = FancyDict if use_fancy else dict
     result = factory({"answer": 42})
 
-    # TODO(#27337): `T@FancyDict` should not escape the `FancyDict` constructor arm.
-    # TODO: revealed: FancyDict[int] | dict[str, int]
-    # revealed: FancyDict[int] | dict[str, T@FancyDict | int]
-    reveal_type(result)
+    reveal_type(result)  # revealed: dict[str, int]
 ```
 
 ## Constructor checking through `type[]` in a union
