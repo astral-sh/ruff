@@ -1,10 +1,11 @@
 //! Bounded projections of correlated constraint solutions.
 
 use rustc_hash::FxHashSet;
+use std::ops::ControlFlow;
 
 use super::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution, Solutions,
-    TypeVarSolution,
+    BoundedSolutionLimits, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
+    PathBoundSolution, Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -15,7 +16,7 @@ use crate::{Db, ProgramEnvironment};
 pub(crate) struct SolutionBudget {
     /// Satisfied paths collected before per-variable solution selection can reject them.
     pub(crate) paths: usize,
-    /// Interior and terminal visits, shared by preprocessing and path collection.
+    /// Interior and terminal visits, shared by preprocessing, path collection, and validation.
     pub(crate) visits: usize,
     /// Set-theoretic terms contributed to the result, including terms exposed by aliases.
     /// Also bounds storage when retaining alternatives.
@@ -135,16 +136,24 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-    ) -> Result<CandidateSolutions<'db>, ProjectionError> {
-        CandidateSolutions::compute_bounded(
+    ) -> Result<(CandidateSolutions<'db>, BoundedSolutionLimits), ProjectionError> {
+        let mut limits = BoundedSolutionLimits {
+            remaining_paths: budget.paths,
+            remaining_visits: budget.visits,
+        };
+        let paths = CandidateSolutions::compute_with_limits(
             db,
             env,
             &mut self.builder.storage.borrow_mut(),
             self.node,
             inferable,
             self.source_order,
-            budget,
-        )
+            &mut limits,
+        );
+        match paths {
+            ControlFlow::Continue(paths) => Ok((paths, limits)),
+            ControlFlow::Break(error) => Err(error),
+        }
     }
 
     /// Computes solutions using a caller-provided selector within the given projection budget.
@@ -165,19 +174,28 @@ impl<'db> ConstraintSet<'db, '_> {
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
+        let (path_bounds, mut limits) = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
-        path_bounds.try_solve_with(choose, |solution| {
-            for violation in solution.violations() {
-                for evidence in violation.evidence_types() {
-                    type_budget.charge_type(db, *evidence)?;
+        match path_bounds.try_solve_with(db, env, &mut limits, choose, |solution| {
+            let mut charge = || {
+                for violation in solution.violations() {
+                    for evidence in violation.evidence_types() {
+                        type_budget.charge_type(db, *evidence)?;
+                    }
                 }
+                for binding in &solution.solved_typevars {
+                    type_budget.charge_type(db, binding.solution)?;
+                }
+                Ok(())
+            };
+            match charge() {
+                Ok(()) => ControlFlow::Continue(()),
+                Err(error) => ControlFlow::Break(error),
             }
-            for binding in &solution.solved_typevars {
-                type_budget.charge_type(db, binding.solution)?;
-            }
-            Ok(())
-        })
+        }) {
+            ControlFlow::Continue(solutions) => Ok(solutions),
+            ControlFlow::Break(error) => Err(error),
+        }
     }
 
     /// Folds complete, correlated solutions without first allocating every solved path.
@@ -208,9 +226,12 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
+        let (path_bounds, mut limits) = self.bounded_path_bounds(db, env, inferable, budget)?;
 
         path_bounds.try_fold_with(
+            db,
+            env,
+            &mut limits,
             choose,
             initial,
             &mut ProjectionTypeBudget::new(budget.type_terms),
@@ -220,8 +241,12 @@ impl<'db> ConstraintSet<'db, '_> {
 }
 
 impl<'db> CandidateSolutions<'db> {
+    #[expect(clippy::too_many_arguments)]
     fn try_fold_with<T>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        limits: &mut BoundedSolutionLimits,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
@@ -234,15 +259,20 @@ impl<'db> CandidateSolutions<'db> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let candidates = match self {
+        let (inferable, candidates) = match self {
             Self::Unsatisfiable => return Ok(SolutionProjection::Unsatisfiable),
             Self::Unconstrained => return Ok(SolutionProjection::Unconstrained),
-            Self::Constrained(candidates) => candidates,
+            Self::Constrained { inferable, paths } => (*inferable, paths),
         };
 
         let mut retained = false;
         for candidate in candidates {
-            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
+            let Some((solution, incomplete)) =
+                (match Self::solve_path_with(db, env, inferable, candidate, limits, &mut choose) {
+                    ControlFlow::Continue(solution) => solution,
+                    ControlFlow::Break(error) => return Err(error),
+                })
+            else {
                 continue;
             };
             if !solution.is_valid() {

@@ -1464,7 +1464,10 @@ impl<'db> SolutionWalker<'db> {
             .drain(..)
             .map(|pending| pending.candidate)
             .collect();
-        CandidateSolutions::Constrained(result)
+        CandidateSolutions::Constrained {
+            inferable: self.inferable,
+            paths: result,
+        }
     }
 }
 

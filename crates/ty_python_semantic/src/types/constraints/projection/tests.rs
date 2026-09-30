@@ -8,11 +8,13 @@ use ty_python_core::ProgramFile;
 use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProjection};
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
+use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
     SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions, TypeVarSolution,
 };
+use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
@@ -281,6 +283,118 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
         PathBoundSolution::Unsolved
     });
     assert!(matches!(result, Ok(Solutions::Constrained(_))));
+}
+
+#[test]
+fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S");
+    let u = create_typevar(db, "U");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    for fixed in [[s, u], [u, s]] {
+        let builder = ConstraintSetBuilder::new();
+        let lower = |ty| ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, ty);
+        let set =
+            lower(Type::TypeVar(fixed[0])).or(db, &builder, || lower(Type::TypeVar(fixed[1])));
+        let result = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            |_, candidate| CandidateSolutions::default_solve(db, &env, &builder, candidate),
+        );
+        let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+            panic!("expected invalid paths, got {result:?}");
+        };
+        let violations = paths
+            .iter()
+            .flat_map(Solution::violations)
+            .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            violations,
+            fixed.map(|variable| (
+                t,
+                SolutionViolationKind::UpperBound(Some(Type::TypeVar(variable)))
+            ))
+        );
+    }
+}
+
+#[test]
+fn caller_fixed_mixed_evidence_violates_declared_upper_bound() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = Type::TypeVar(create_typevar(db, "S"));
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+    let builder = ConstraintSetBuilder::new();
+    let (node, source_order) = Constraint::new_nodes(
+        db,
+        &env,
+        &mut builder.storage.borrow_mut(),
+        Constraint::new_lower_bound(db, ConstraintProvenance::Mixed, t, s),
+    );
+    let set = ConstraintSet::from_node(&builder, node, source_order);
+
+    let result = set.solutions_with(
+        db,
+        &env,
+        inferable,
+        SolutionBudget::default(),
+        |_, candidate| CandidateSolutions::default_solve(db, &env, &builder, candidate),
+    );
+    let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+        panic!("expected invalid path, got {result:?}");
+    };
+    let violations = paths
+        .iter()
+        .flat_map(Solution::violations)
+        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        violations,
+        [(t, SolutionViolationKind::UpperBound(Some(s)))]
+    );
+}
+
+#[test]
+fn custom_choice_must_satisfy_declared_upper_bound() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = Type::TypeVar(create_typevar(db, "S"));
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, Type::object());
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
+        PathBoundSolution::Solved(s)
+    });
+    let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+        panic!("expected invalid path, got {result:?}");
+    };
+    let violations = paths
+        .iter()
+        .flat_map(Solution::violations)
+        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        violations,
+        [(t, SolutionViolationKind::UpperBound(Some(s)))]
+    );
 }
 
 #[test]
@@ -757,18 +871,25 @@ class E: ...
     // Charging the input alone does not prevent that expansion; the fold also needs a bounded
     // intersection constructor.
     for alternatives in [[left, right], [right, left]] {
-        let paths = CandidateSolutions::Constrained(
-            alternatives
+        let paths = CandidateSolutions::Constrained {
+            inferable: TypeVarSet::from_typevars(db, [t]),
+            paths: alternatives
                 .map(|ty| CandidateSolution {
                     typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
                         as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),
-        );
+        };
 
         assert_eq!(
             paths.try_fold_with(
+                db,
+                &env,
+                &mut super::super::BoundedSolutionLimits {
+                    remaining_paths: usize::MAX,
+                    remaining_visits: usize::MAX,
+                },
                 |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
@@ -784,4 +905,88 @@ class E: ...
         );
     }
     Ok(())
+}
+
+#[test]
+fn validation_shares_the_projection_visit_budget() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let s = create_typevar(db, "S");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+
+    // Binding an explicitly annotated receiver retains the condition `int <= S` in the
+    // signature. The assignment to the declared callable bound therefore remains nonterminal.
+    let bound = Type::single_callable(db, Signature::new(Parameters::empty(), Type::object()));
+    let selected = Type::single_callable(
+        db,
+        Signature::new(
+            Parameters::from_annotation(
+                db,
+                [Parameter::positional_only(None).with_annotated_type(Type::TypeVar(s))],
+            ),
+            Type::TypeVar(s),
+        )
+        .bind_self_with_receiver(db, &env, Some(int), None),
+    );
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
+    let u = create_typevar(db, "U");
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+    let relation_builder = ConstraintSetBuilder::new();
+    let relation = selected.when_assignable_to(db, &env, bound, &relation_builder, inferable);
+    assert!(!relation.is_trivially_always_satisfied());
+    assert!(!relation.is_trivially_never_satisfied());
+
+    let builder = ConstraintSetBuilder::new();
+    let set = exact(db, &builder, t, bound)
+        .and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
+    let default_budget = SolutionBudget::default();
+    let (_, remaining) = set
+        .bounded_path_bounds(db, &env, inferable, default_budget)
+        .unwrap();
+    let budget = SolutionBudget {
+        visits: default_budget.visits - remaining.remaining_visits,
+        ..default_budget
+    };
+
+    // The first alternative is retained. The second requires validation, but collection has
+    // consumed the visit budget, so neither API may return the prefix as a complete result.
+    let mut selected_paths = 0;
+    let result = set.solutions_with(db, &env, inferable, budget, |_, candidate| {
+        if candidate.bound_typevar == t {
+            selected_paths += 1;
+            PathBoundSolution::Solved(if selected_paths == 1 { bound } else { selected })
+        } else {
+            CandidateSolutions::default_solve(db, &env, &builder, candidate)
+        }
+    });
+    assert_eq!(selected_paths, 2);
+    assert_eq!(result, Err(ProjectionError::TraversalBudgetExceeded));
+
+    let mut selected_paths = 0;
+    let mut folded_paths = 0;
+    let result = set.try_fold_solutions(
+        db,
+        &env,
+        inferable,
+        budget,
+        |_, candidate| {
+            if candidate.bound_typevar == t {
+                selected_paths += 1;
+                PathBoundSolution::Solved(if selected_paths == 1 { bound } else { selected })
+            } else {
+                CandidateSolutions::default_solve(db, &env, &builder, candidate)
+            }
+        },
+        0,
+        |count, _, _| {
+            folded_paths += 1;
+            Ok(count + 1)
+        },
+    );
+    assert_eq!(selected_paths, 2);
+    assert_eq!(folded_paths, 1);
+    assert_eq!(result, Err(ProjectionError::TraversalBudgetExceeded));
 }
