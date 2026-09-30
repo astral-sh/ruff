@@ -2657,6 +2657,32 @@ def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -
     reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
 ```
 
+## Materialized recursive generic protocols
+
+A fully static specialization is unchanged by materialization. Specializations with gradual type
+arguments still have their requirements materialized.
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
+
+T = TypeVar("T")
+
+class Tree(Protocol[T]):
+    def add(self, children: list[Tree[T]]) -> int: ...
+    def value(self) -> T: ...
+
+static_assert(is_equivalent_to(Tree[int], Top[Tree[int]]))
+static_assert(is_equivalent_to(Tree[int], Bottom[Tree[int]]))
+static_assert(not is_equivalent_to(Tree[Any], Top[Tree[Any]]))
+static_assert(not is_equivalent_to(Tree[Any], Bottom[Tree[Any]]))
+static_assert(not is_equivalent_to(Tree[Unknown], Top[Tree[Unknown]]))
+static_assert(not is_equivalent_to(Tree[Unknown], Bottom[Tree[Unknown]]))
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an

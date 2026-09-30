@@ -1371,6 +1371,54 @@ class Model(ModelBase):
 }
 
 #[test]
+fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
+    // Changing an imported type must invalidate the cached proof even when the protocol and its
+    // consumer are unchanged.
+    const STATIC: &str = "Payload = int\n";
+    const GRADUAL: &str = "from typing import Any\nPayload = Any\n";
+    const FAILURE: &str =
+        "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy";
+
+    for (initial, changed, initial_diagnostics, changed_diagnostics) in [
+        (STATIC, GRADUAL, &[][..], &[FAILURE][..]),
+        (GRADUAL, STATIC, &[FAILURE][..], &[][..]),
+    ] {
+        let mut db = setup_db();
+        db.write_file("/src/other.py", initial)?;
+        db.write_dedented(
+            "/src/node.py",
+            r#"
+            from __future__ import annotations
+            from typing import Protocol
+            from other import Payload
+
+            class Node(Protocol):
+                def payload(self) -> Payload: ...
+                def edit(self, nodes: list[Node]) -> list[Node]: ...
+            "#,
+        )?;
+        db.write_dedented(
+            "/src/main.py",
+            r#"
+            from node import Node
+            from ty_extensions import Top, static_assert
+            from ty_extensions._internal import is_subtype_of
+
+            static_assert(is_subtype_of(Top[Node], Node))
+            "#,
+        )?;
+
+        assert_file_diagnostics(&db, "/src/main.py", initial_diagnostics);
+        db.write_file("/src/other.py", changed)?;
+        assert_file_diagnostics(&db, "/src/main.py", changed_diagnostics);
+        db.write_file("/src/other.py", initial)?;
+        assert_file_diagnostics(&db, "/src/main.py", initial_diagnostics);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
