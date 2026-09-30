@@ -5954,7 +5954,7 @@ struct CallInference<'a, 'db, 'c> {
     inferable_typevars: TypeVarSet<'db>,
 }
 
-impl<'a, 'db, 'c> CallInference<'a, 'db, 'c> {
+impl<'a, 'db> CallInference<'a, 'db, '_> {
     /// Yields the effective formal and actual types for each matched argument-parameter pair.
     ///
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
@@ -6463,6 +6463,18 @@ impl<'db, 'c> CallInference<'_, 'db, 'c> {
     }
 
     /// Check a captured callback to collect its evidence before validating outer arguments.
+    ///
+    /// Forward the arguments matched to the `ParamSpec` components. Even when none were supplied,
+    /// the callback must be checked for missing arguments:
+    ///
+    /// ```py
+    /// from typing import Callable
+    ///
+    /// def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+    /// def f(x: int) -> None: ...
+    ///
+    /// foo(f)  # P specializes to `(x: int)`, so `f` is checked with no arguments.
+    /// ```
     fn infer_paramspec_sub_call(
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
@@ -6487,8 +6499,15 @@ impl<'db, 'c> CallInference<'_, 'db, 'c> {
         }
         let indices = self.paramspec_argument_indices(prefix.len());
         let forwards_arguments = indices.iter().any(|(index, _)| {
-            let [parameter] = self.argument_matches[*index].parameters.as_slice() else { return false; };
-            matches!(self.signature.parameters()[parameter.index].annotated_type(), Type::TypeVar(typevar) if typevar.is_paramspec(db))
+            let [parameter] = self.argument_matches[*index].parameters.as_slice() else {
+                return false;
+            };
+            let Type::TypeVar(typevar) =
+                self.signature.parameters()[parameter.index].annotated_type()
+            else {
+                return false;
+            };
+            typevar.is_paramspec(db)
         });
         let argument_indices = forwards_arguments.then_some(indices);
         let sub_arguments = if let Some(indices) = &argument_indices {
@@ -7261,7 +7280,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec_component_start = self.paramspec_call.take().and_then(|call| {
             let start = call.component_start;
-            self.check_paramspec_call(call);
+            self.check_paramspec_call(&call);
             start
         });
 
@@ -7324,7 +7343,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     /// Remap the completed callback's diagnostics into the outer argument list.
-    fn check_paramspec_call(&mut self, call: InferredParamSpecCall<'db>) {
+    fn check_paramspec_call(&mut self, call: &InferredParamSpecCall<'db>) {
         let db = self.db;
         let paramspec = call.paramspec;
         let paramspec_arguments = call.argument_indices.as_deref();
