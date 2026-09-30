@@ -1473,14 +1473,18 @@ def bad_return[T: int](x: T) -> T:
     return x + 1
 ```
 
-## Division with a float upper bound
+## Using float as an upper bound
 
-A `float` upper bound also accepts `int`, so implicit special method lookup must support both
-members of the union.
+An upper bound of `float` is internally treated as if the bound would be `float | int`. Normal
+arithmetic operations are available on that type:
 
 ```py
-def divide[T: float](value: T):
-    reveal_type(value / 1)  # revealed: float
+def f[T: float](value: T):
+    reveal_type(value + 1)  # revealed: float
+    reveal_type(value + 1.0)  # revealed: float
+    # TODO: Adding two values of the bounded type variable should be supported.
+    # error: [unsupported-operator]
+    reveal_type(value + value)  # revealed: Unknown
 ```
 
 ## All occurrences of the same typevar have the same type

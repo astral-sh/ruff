@@ -5914,9 +5914,32 @@ impl<'db> Type<'db> {
                     let mut error = None;
                     let mut properties = None;
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
-                        // For `T: A | B`, bind the method on `A` to `T & A` (and similarly
-                        // for `B`). Keeping `T` preserves subtypes in `Self` returns, while
-                        // narrowing to the selected member also checks `Self` arguments.
+                        // Consider a method call on an object of type `T: E1 | E2`:
+                        //
+                        // ```py
+                        // from typing import Self, reveal_type
+                        //
+                        // class E1:
+                        //     def f(self) -> list[Self]:
+                        //         return [self]
+                        //
+                        // class E2:
+                        //     def f(self) -> set[Self]:
+                        //         return {self}
+                        //
+                        // def _[T: E1 | E2](obj: T):
+                        //     reveal_type(obj.f())
+                        // ```
+                        //
+                        // For `T: E1 | E2`, we can't bind `E1.f` to the full receiver type `T`,
+                        // since that would invalidate the implicit `self: Self` annotation of
+                        // `E1.f`, with `Self: E1`. But we can observe that `T = T & (E1 | E2)`:
+                        // `T` is a subtype of `E1 | E2` due to its bound, so intersecting the two
+                        // just gives us `T`. Expanding this gives `T = (T & E1) | (T & E2)`.
+                        //
+                        // On the first union element, we can bind `E1.f` to a receiver of type
+                        // `T & E1`, which is accepted by `Self: E1`, and similarly for `E2.f`.
+                        // In this example, the result is `list[T & E1] | set[T & E2]`.
                         let receiver = receiver.map(|receiver| {
                             IntersectionType::from_two_elements(db, env, receiver, *elem)
                         });
@@ -6296,8 +6319,6 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
-                // Implicit special method lookup must distribute over bounds and constraints
-                // before applying `NO_INSTANCE_FALLBACK` to each member.
                 Type::TypeVar(typevar)
                     if let Some(bound_or_constraints) =
                         typevar.typevar(db).bound_or_constraints(db, env) =>

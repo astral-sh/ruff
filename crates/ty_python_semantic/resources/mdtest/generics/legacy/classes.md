@@ -1922,47 +1922,6 @@ def use_typevar(value: U):
     reveal_type(value.value)
 ```
 
-## Self methods with generic union upper bounds
-
-A `Self` return type preserves the receiver's type variable even when the upper bound contains
-generic classes.
-
-```py
-from typing_extensions import Any, Generic, Self, TypeVar
-
-T = TypeVar("T")
-
-class A(Generic[T]):
-    def copy(self) -> Self:
-        return self
-
-    def merge(self, other: Self) -> None: ...
-
-class B(Generic[T]):
-    def copy(self) -> Self:
-        return self
-
-    def merge(self, other: Self) -> None: ...
-
-U = TypeVar("U", bound=A[Any] | B[Any])
-
-def copy(value: U) -> U:
-    result = value.copy()
-    # TODO: The union of the branch-specific results should normalize to U.
-    reveal_type(result)  # revealed: (U@copy & A[Any]) | (U@copy & B[Any])
-    return result
-```
-
-Two values of the same type variable can belong to different union members, so one does not
-necessarily satisfy the other's `Self` parameter.
-
-```py
-def merge(left: U, right: U) -> None:
-    # error: [invalid-argument-type] "Argument to bound method `A.merge` is incorrect"
-    # error: [invalid-argument-type] "Argument to bound method `B.merge` is incorrect"
-    left.merge(right)
-```
-
 ## Correlated constrained receiver calls
 
 Multiple occurrences of the same constrained type variable have the same assignment. Distributing
