@@ -12,6 +12,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_index::{IndexVec, newtype_index};
 
 use crate::types::constraints::sequents::{Sequent, SequentGroup, SequentMap};
+use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::AtomicConstraint;
 use crate::types::constraints::variables::AtomicConstraint::{
     ConcreteEquivalence, ConcreteLower, ConcreteUpper, TypeVarEquivalence, TypeVarRange,
@@ -63,6 +64,8 @@ pub(crate) struct PathAssignments {
     /// Constraints that have been _replaced_ with other constraints on this path, because a
     /// sequent substituted an exact type for some typevar.
     substituted_constraints: FxIndexSet<AtomicConstraintId>,
+    /// The typevars that are bound by a quantifier on this path.
+    pub(super) quantified_typevars: Support,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
     /// replenishment and rollback do not need to update these indices.
     positive_assignment_indices: IndexVec<AtomicConstraintId, Option<AssignmentIndex>>,
@@ -186,6 +189,7 @@ impl Default for PathAssignments {
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             substituted_constraints: FxIndexSet::default(),
+            quantified_typevars: Support::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -279,6 +283,7 @@ impl PathAssignments {
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             substituted_constraints: FxIndexSet::default(),
+            quantified_typevars: Support::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -503,6 +508,18 @@ impl PathAssignments {
         self.substituted_constraints
             .truncate(substituted_constraints_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
+        result
+    }
+
+    pub(super) fn with_quantified_typevars<R>(
+        &mut self,
+        quantified_typevars: &Support,
+        f: impl FnOnce(&mut Self) -> R,
+    ) -> R {
+        let previous_quantified_typevars = self.quantified_typevars.clone();
+        self.quantified_typevars |= quantified_typevars;
+        let result = f(self);
+        self.quantified_typevars = previous_quantified_typevars;
         result
     }
 
