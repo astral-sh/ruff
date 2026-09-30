@@ -3754,7 +3754,8 @@ for _ in 0:  # error: [not-iterable]
 
 ## Duplicate diagnostics in a cyclic match subject
 
-A cyclic match subject can cause the same invalid decorator call to be reported more than once.
+In the example below, the subject of the second `match` refers to `NestedAlias`, which can depend on
+the `decorator` captured by that match. ty reports the same invalid decorator call twice.
 
 ```toml
 [environment]
@@ -3762,51 +3763,42 @@ python-version = "3.12"
 ```
 
 ```py
-lambda: name_1
-type name_4 = 0 if 0 else name_0  # error: [invalid-type-form]
-try:
-    type name_2[name_3: unique_name_0] = name_4  # error: [unresolved-reference]
-except* Exception:
-    type name_2 = name_1  # error: [invalid-type-form]
-except* 0:  # error: [invalid-exception-caught]
-    @0  # error: [call-non-callable]
-    def name_2():
+condition = object()
+lambda: Result
+type Alias = int if False else NestedAlias  # error: [invalid-type-form]
+if condition:
+    decorator = Alias
+else:
+    type decorator = Result  # error: [invalid-type-form]
+    @None  # error: [call-non-callable]
+    def decorator():
         pass
 
-while [name_2]:
-    pass
-else:
-    match lambda *, name_1=unique_name_5: 0:  # error: [unresolved-reference]
+if [decorator]:
+    match lambda Result=condition: 0:
         case 0:
             # error: [invalid-type-form]
             # error: [invalid-type-form]
-            type name_0 = name_2
+            type NestedAlias = decorator
         case []:
-            type name_1 = name_1
-match (lambda name_4, /: name_4) and {0: lambda: name_0}:
-    case unique_name_9():  # error: [unresolved-reference]
-        class name_1:
+            type Result = Result
+match (lambda x: x) and {0: lambda: NestedAlias}:
+    case []:
+        class Result:
             pass
 
-    case []:
-        match 0:
-            case unique_name_10.name_5:  # error: [unresolved-reference]
-                async def name_2(**name_3: name_4):
-                    pass
-
-            case object():
-                name_0: name_0  # error: [possibly-unresolved-reference]
-    case name_2:  # error: [conflicting-declarations]
+        async def decorator(**kwargs: Alias):
+            pass
+        NestedAlias: NestedAlias  # error: [possibly-unresolved-reference]
+    case decorator:
         pass
 
 # TODO: Report each `call-non-callable` diagnostic only once.
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
-# error: [call-non-callable] "Object of type `TypeAliasType` is not callable"
-# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | name_1]` is not callable"
-# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | name_1]` is not callable"
+# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | Result]` is not callable"
+# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | Result]` is not callable"
 # error: [too-many-positional-arguments]
-@name_2
-class name_1:
+@decorator
+class Result:
     pass
 ```
 
