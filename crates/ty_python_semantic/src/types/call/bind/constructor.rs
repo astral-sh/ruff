@@ -52,7 +52,10 @@ pub(super) struct ConstructorBinding<'db> {
     pub(super) entry: CallableBinding<'db>,
     /// Context for the constructor callable: the instance type being constructed and the kind of
     /// constructor method.
-    pub(super) constructor_context: ConstructorContext<'db>,
+    constructor_context: ConstructorContext<'db>,
+    /// Class type variables that can be inferred by this constructor call. Explicitly supplied
+    /// class arguments are fixed, even when they contain type variables from the caller.
+    inferable_class_context: Option<GenericContext<'db>>,
     /// The next downstream constructor method, if any, to be (conditionally) checked after this
     /// one.
     pub(super) downstream_constructor: Option<Box<Bindings<'db>>>,
@@ -66,6 +69,7 @@ impl<'db> ConstructorBinding<'db> {
         Self {
             entry,
             constructor_context,
+            inferable_class_context: None,
             downstream_constructor: None,
         }
     }
@@ -87,7 +91,16 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     pub(super) fn set_constructed_instance_type(&mut self, instance_type: Type<'db>) {
+        if self.constructed_instance_type() != instance_type {
+            // An override can replace an inferable class instance with a fixed type-variable or
+            // intersection receiver. The original class variables no longer describe the result.
+            self.inferable_class_context = None;
+        }
         self.constructor_context = self.constructor_context.with_instance_type(instance_type);
+    }
+
+    pub(super) fn set_inferable_class_context(&mut self, context: GenericContext<'db>) {
+        self.inferable_class_context = Some(context);
     }
 
     pub(super) fn set_downstream_constructor(&mut self, bindings: Bindings<'db>) {
@@ -350,6 +363,7 @@ impl<'db> ConstructorBinding<'db> {
         ConstructorBinding {
             entry: f(self.entry),
             constructor_context: self.constructor_context,
+            inferable_class_context: self.inferable_class_context,
             downstream_constructor: None,
         }
     }
@@ -404,17 +418,14 @@ impl<'db> ConstructorBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Specialization<'db>> {
+        let class_context = self.inferable_class_context?;
         let constructed_instance_type = self.constructed_instance_type();
-        // This will be `None` if we're constructing a non-generic class. If we're constructing a
-        // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
-        // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
-        // specialization of that alias.
+        // For a bare generic class (`C(...)`), this is the identity specialization. Explicitly
+        // specialized aliases do not have an inferable class context and return above.
         let (_, class_specialization) = constructed_instance_type.class_specialization(db, env)?;
         let static_class_literal = self
             .constructed_class_literal(db, env)
             .and_then(ClassLiteral::as_static);
-        let class_context = class_specialization.generic_context(db);
-
         let mut combined: Option<Specialization<'db>> = None;
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
             let Some(overload) = binding

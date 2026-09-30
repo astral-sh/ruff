@@ -17,9 +17,9 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        Parameter, Parameters, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         tuple::Tuple,
@@ -961,6 +961,10 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
                 .map(|typevar| {
                     let mut identity = typevar.identity(db);
                     identity.freshness = TypeVarNonce::NONE;
+                    // Freshening can also change the domain when it refers to another
+                    // freshened typevar. Conservatively match all domains of the same binder
+                    // so that a subsequent freshening cannot reuse an existing nonce.
+                    identity.canonical_domain = None;
                     identity
                 })
                 .collect();
@@ -989,6 +993,7 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
         ) {
             let mut identity = bound_typevar.identity(db);
             identity.freshness = TypeVarNonce::NONE;
+            identity.canonical_domain = None;
             if self.base_identities.contains(&identity) {
                 self.max_freshness.set(
                     self.max_freshness
@@ -1021,6 +1026,9 @@ pub(crate) fn max_typevar_freshness_matching_generic_context<'db>(
 pub struct BoundTypeVarInstance<'db> {
     #[returns(copy)]
     pub typevar: TypeVarInstance<'db>,
+    /// The declaration before specialization, materialization, or transposition of its domain.
+    #[returns(copy)]
+    original: TypeVarInstance<'db>,
     // This duplicates the source-level identity accessible through `typevar`, but keeps
     // `identity()` to a single interned-field read. Storing only the occurrence-specific fields
     // and reconstructing the full identity regresses hot-path project benchmarks.
@@ -1032,6 +1040,14 @@ pub struct BoundTypeVarInstance<'db> {
 impl get_size2::GetSize for BoundTypeVarInstance<'_> {}
 
 impl<'db> BoundTypeVarInstance<'db> {
+    fn canonical_domain_key(
+        db: &'db dyn Db,
+        typevar: TypeVarInstance<'db>,
+        domain: Option<TypeVarBoundOrConstraintsEvaluation<'db>>,
+    ) -> TypeVarInstance<'db> {
+        TypeVarInstance::new(db, typevar.identity(db), domain, None, None)
+    }
+
     pub(crate) fn new(
         db: &'db dyn Db,
         typevar: TypeVarInstance<'db>,
@@ -1044,8 +1060,11 @@ impl<'db> BoundTypeVarInstance<'db> {
             binding_context,
             paramspec_attr,
             freshness,
+            canonical_domain: typevar.is_self(db).then(|| {
+                Self::canonical_domain_key(db, typevar, typevar._bound_or_constraints(db))
+            }),
         };
-        Self::new_internal(db, typevar, identity)
+        Self::new_internal(db, typevar, typevar, identity)
     }
 
     pub(super) fn binding_context(self, db: &'db dyn Db) -> BindingContext<'db> {
@@ -1061,21 +1080,25 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 
     pub(crate) fn with_name_suffix(self, db: &'db dyn Db, suffix: &str) -> Self {
-        Self::new(
+        let typevar = self.typevar(db).with_name_suffix(db, suffix);
+        let mut identity = self.identity(db);
+        identity.identity = typevar.identity(db);
+        identity.canonical_domain = identity
+            .canonical_domain
+            .map(|domain| domain.with_name_suffix(db, suffix));
+        Self::new_internal(
             db,
-            self.typevar(db).with_name_suffix(db, suffix),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
+            typevar,
+            self.original(db).with_name_suffix(db, suffix),
+            identity,
         )
     }
 
     /// Get the identity of this bound typevar occurrence.
     ///
-    /// This includes the source-level typevar, binding context, `ParamSpec` attribute, and
-    /// freshness nonce. It is used for comparing whether two bound typevars represent the same
-    /// occurrence, regardless of e.g. differences in their bounds or constraints due to
-    /// materialization.
+    /// This includes the source-level typevar, binding context, `ParamSpec` attribute, freshness
+    /// nonce, and any specialized domain. Materialized views of the same occurrence retain the
+    /// same identity.
     pub(crate) fn identity(self, db: &'db dyn Db) -> BoundTypeVarIdentity<'db> {
         self.identity_inner(db)
     }
@@ -1156,13 +1179,9 @@ impl<'db> BoundTypeVarInstance<'db> {
             None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            Some(kind),
-            self.freshness(db),
-        )
+        let mut identity = self.identity(db);
+        identity.paramspec_attr = Some(kind);
+        Self::new_internal(db, typevar, typevar, identity)
     }
 
     /// Returns a new bound typevar instance without any `ParamSpec` attribute set.
@@ -1180,18 +1199,18 @@ impl<'db> BoundTypeVarInstance<'db> {
         );
 
         let typevar = self.typevar(db);
-        Self::new(
+        let typevar = TypeVarInstance::new(
             db,
-            TypeVarInstance::new(
-                db,
-                typevar.identity(db),
-                None, // Remove the upper bound set by `with_paramspec_attr`
-                typevar.explicit_variance(db),
-                None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
-            ),
-            self.binding_context(db),
-            None,
-            self.freshness(db),
+            typevar.identity(db),
+            None, // Remove the upper bound set by `with_paramspec_attr`
+            typevar.explicit_variance(db),
+            None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
+        );
+        Self::new_internal(
+            db,
+            typevar,
+            typevar,
+            self.identity(db).without_paramspec_attr(db),
         )
     }
 
@@ -1253,17 +1272,17 @@ impl<'db> BoundTypeVarInstance<'db> {
         Self::new(db, typevar, binding_context, None, TypeVarNonce::NONE)
     }
 
-    /// Applies a specialization to this occurrence's declared upper bound or constraints, if any.
-    fn apply_specialization_to_bound_or_constraints(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        let mapping =
-            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
-        let visitor = ApplyTypeMappingVisitor::new(env);
-        self.apply_type_mapping_to_bound_or_constraints(db, &mapping, &visitor)
+    /// Whether a specialization may affect a represented bound without forcing a lazy bound.
+    pub(super) fn specialization_may_change_domain(self, db: &'db dyn Db) -> bool {
+        self.identity(db).canonical_domain.is_some()
+            || [self.typevar(db), self.original(db)]
+                .into_iter()
+                .any(|typevar| {
+                    matches!(
+                        typevar._bound_or_constraints(db),
+                        Some(TypeVarBoundOrConstraintsEvaluation::Eager(_))
+                    )
+                })
     }
 
     fn apply_type_mapping_to_bound_or_constraints(
@@ -1275,6 +1294,63 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.map_bound_or_constraints(db, |original| {
             original.map(|original| original.apply_type_mapping_impl(db, type_mapping, visitor))
         })
+    }
+
+    /// Maps a binder's domain and updates its identity to represent the new specialization.
+    ///
+    /// The current bound may be a materialized or transposed view of the declared domain. Map
+    /// that view independently, and derive the new identity from the canonical domain stored in
+    /// the existing identity. The mapping must respect the scope of variables in the domain.
+    fn map_domain(
+        self,
+        db: &'db dyn Db,
+        view: Self,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let mapped = view.apply_type_mapping_to_bound_or_constraints(db, type_mapping, visitor);
+        self.update_domain_after_mapping(db, mapped, type_mapping, visitor)
+    }
+
+    fn update_domain_after_mapping(
+        self,
+        db: &'db dyn Db,
+        mapped: Self,
+        type_mapping: &TypeMapping<'_, 'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        if matches!(type_mapping, TypeMapping::Materialize(_)) {
+            return mapped;
+        }
+        let mut identity = mapped.identity(db);
+        let original = self.original(db);
+        let canonical = self.identity(db).canonical_domain.unwrap_or(original);
+        let previous = canonical.bound_or_constraints(db, visitor.env);
+        // A specialization can materialize the types it substitutes. Only the visible view uses
+        // that materialization; the identity tracks the specialization before materialization.
+        let canonical_mapping = match type_mapping {
+            TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
+                TypeMapping::ApplySpecialization(*specialization)
+            }
+            _ => type_mapping.clone(),
+        };
+        let current =
+            previous.map(|domain| domain.apply_type_mapping_impl(db, &canonical_mapping, visitor));
+        if current != previous {
+            identity.canonical_domain = if current == original.bound_or_constraints(db, visitor.env)
+            {
+                original.is_self(db).then(|| {
+                    Self::canonical_domain_key(db, original, original._bound_or_constraints(db))
+                })
+            } else {
+                Some(Self::canonical_domain_key(
+                    db,
+                    original,
+                    current.map(TypeVarBoundOrConstraintsEvaluation::Eager),
+                ))
+            };
+        }
+        Self::new_internal(db, mapped.typevar(db), original, identity)
     }
 
     /// Returns an identical type variable with its `TypeVarBoundOrConstraints` mapped by the
@@ -1295,13 +1371,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             typevar._default(db),
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
-        )
+        Self::new_internal(db, typevar, self.original(db), self.identity(db))
     }
 
     pub(crate) fn variance_with_polarity(
@@ -1358,59 +1428,71 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
             };
 
-        let possibly_apply_to_self = |specialization: &ApplySpecialization<'a, 'db>| {
-            if self.typevar(db).is_self(db)
-                && specialization.specialize_self_domain()
-                && let Some(specialization) = specialization.as_specialization(db)
+        let apply_retained_domain = |specialization: &ApplySpecialization<'a, 'db>,
+                                     mapped: Type<'db>| {
+            if let Type::TypeVar(view) = mapped
+                && view.is_same_typevar_as(db, self)
+                && specialization.specializes_typevar_domains()
+                && (self.specialization_may_change_domain(db)
+                    || view.specialization_may_change_domain(db))
             {
-                Type::TypeVar(self.apply_specialization_to_bound_or_constraints(
-                    db,
-                    specialization,
-                    visitor.env,
-                ))
+                let mapping = TypeMapping::ApplySpecialization(*specialization);
+                Type::TypeVar(self.map_domain(db, view, &mapping, visitor))
             } else {
-                Type::TypeVar(self)
+                mapped
             }
         };
 
         match type_mapping {
             TypeMapping::ApplySpecialization(specialization) => {
-                mapped_specialization_type(specialization)
-                    .unwrap_or_else(|| possibly_apply_to_self(specialization))
+                let mapped =
+                    mapped_specialization_type(specialization).unwrap_or(Type::TypeVar(self));
+                apply_retained_domain(specialization, mapped)
             }
             TypeMapping::ApplySpecializationWithMaterialization {
                 specialization,
                 materialization_kind,
-            } => mapped_specialization_type(specialization)
-                .map(|mapped| {
-                    // Only materialize if the specialization actually substituted this
-                    // typevar with a different type. A typevar that maps back to itself
-                    // hasn't been substituted and should not be materialized.
-                    if mapped == Type::TypeVar(self) {
-                        mapped
-                    } else {
-                        let env = visitor.env;
-                        // Materialization uses a different mapping mode. Reuse of the outer
-                        // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_materialization_root();
-                        let materialized =
-                            mapped.materialize(db, *materialization_kind, &materialization_visitor);
-
-                        if *materialization_kind == MaterializationKind::Top
-                            && !materialization_visitor.is_equivalent_to_materialization(
-                                db,
-                                mapped,
-                                materialized,
-                            )
-                            && let Some(upper_bound) = self.top_materialized_upper_bound(db)
-                        {
-                            IntersectionType::from_two_elements(db, env, materialized, upper_bound)
+            } => {
+                let mapped = mapped_specialization_type(specialization)
+                    .map(|mapped| {
+                        // Only materialize if the specialization actually substituted this
+                        // typevar with a different type. A typevar that maps back to itself
+                        // hasn't been substituted and should not be materialized.
+                        if mapped == Type::TypeVar(self) {
+                            mapped
                         } else {
-                            materialized
+                            let env = visitor.env;
+                            // Materialization uses a different mapping mode. Reuse of the outer
+                            // visitor can incorrectly hit a cache entry from specialization.
+                            let materialization_visitor = visitor.for_new_materialization_root();
+                            let materialized = mapped.materialize(
+                                db,
+                                *materialization_kind,
+                                &materialization_visitor,
+                            );
+
+                            if *materialization_kind == MaterializationKind::Top
+                                && !materialization_visitor.is_equivalent_to_materialization(
+                                    db,
+                                    mapped,
+                                    materialized,
+                                )
+                                && let Some(upper_bound) = self.top_materialized_upper_bound(db)
+                            {
+                                IntersectionType::from_two_elements(
+                                    db,
+                                    env,
+                                    materialized,
+                                    upper_bound,
+                                )
+                            } else {
+                                materialized
+                            }
                         }
-                    }
-                })
-                .unwrap_or_else(|| possibly_apply_to_self(specialization)),
+                    })
+                    .unwrap_or(Type::TypeVar(self));
+                apply_retained_domain(specialization, mapped)
+            }
             TypeMapping::BindSelf(binding) => {
                 if binding.should_bind(db, visitor.env, self) {
                     binding.self_type()
@@ -1434,18 +1516,22 @@ impl<'db> BoundTypeVarInstance<'db> {
                 delta,
             } => {
                 if generic_context.contains(db, self.identity(db)) && !self.is_paramspec(db) {
-                    Type::TypeVar(self.freshen_with_mapping(
+                    let freshened = self.freshen_with_mapping(
                         db,
                         self.freshness(db).add(*delta),
                         type_mapping,
                         visitor,
-                    ))
-                } else {
-                    Type::TypeVar(self.apply_type_mapping_to_bound_or_constraints(
+                    );
+                    Type::TypeVar(self.update_domain_after_mapping(
                         db,
+                        freshened,
                         type_mapping,
                         visitor,
                     ))
+                } else if self.specialization_may_change_domain(db) {
+                    Type::TypeVar(self.map_domain(db, self, type_mapping, visitor))
+                } else {
+                    Type::TypeVar(self)
                 }
             }
             TypeMapping::Promote(..)
@@ -1538,13 +1624,12 @@ impl<'db> BoundTypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        Self::new(
+        Self::new_internal(
             db,
             self.typevar(db)
                 .materialize_impl(db, materialization_kind, visitor),
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            self.freshness(db),
+            self.original(db),
+            self.identity(db),
         )
     }
 
@@ -1560,13 +1645,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         let default = self.default_type(db);
 
         if bound_or_constraints.is_none() && default.is_none() {
-            return Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                nonce,
-            );
+            let mut identity = self.identity(db);
+            identity.freshness = nonce;
+            return Self::new_internal(db, typevar, self.original(db), identity);
         }
 
         let typevar = TypeVarInstance::new(
@@ -1584,13 +1665,9 @@ impl<'db> BoundTypeVarInstance<'db> {
             }),
         );
 
-        Self::new(
-            db,
-            typevar,
-            self.binding_context(db),
-            self.paramspec_attr(db),
-            nonce,
-        )
+        let mut identity = self.identity(db);
+        identity.freshness = nonce;
+        Self::new_internal(db, typevar, self.original(db), identity)
     }
 
     pub(super) fn to_instance(
@@ -1599,13 +1676,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<InstanceProjection<Self>> {
         Some(self.typevar(db).to_instance(db, env)?.map(|typevar| {
-            Self::new(
-                db,
-                typevar,
-                self.binding_context(db),
-                self.paramspec_attr(db),
-                self.freshness(db),
-            )
+            let mut identity = self.identity(db);
+            identity.identity = typevar.identity(db);
+            Self::new_internal(db, typevar, self.original(db), identity)
         }))
     }
 }
@@ -1848,10 +1921,11 @@ impl std::fmt::Display for ParamSpecAttrKind {
 /// The identity of a bound type variable occurrence.
 ///
 /// This identifies a specific binding of a typevar to a context (e.g., `T@ClassC` vs `T@FunctionF`),
-/// plus a freshness nonce for fresh callable occurrences, independent of the typevar's
-/// bounds or constraints. Two bound typevars have the same identity if they represent the same
-/// occurrence, even if their bounds have been materialized differently. Two fresh occurrences of
-/// the same source-level typevar have different bound identities.
+/// plus a freshness nonce for fresh callable occurrences. Its specialized canonical domain
+/// distinguishes bindings with different specialized bounds or constraints. Two bound
+/// typevars have the same identity if they represent the same occurrence, even if their bounds
+/// have been materialized differently. Two fresh occurrences of the same source-level typevar
+/// have different bound identities.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
@@ -1861,6 +1935,9 @@ pub struct BoundTypeVarIdentity<'db> {
     pub(super) paramspec_attr: Option<ParamSpecAttrKind>,
     /// The freshness nonce for this bound typevar occurrence; `0` is the source-level occurrence.
     freshness: TypeVarNonce,
+    /// The specialized domain before identity-preserving transformations such as materialization
+    /// and transposition. `Self` also records its original domain to distinguish synthetic binders.
+    canonical_domain: Option<TypeVarInstance<'db>>,
 }
 
 impl<'db> BoundTypeVarIdentity<'db> {
@@ -2368,6 +2445,622 @@ mod tests {
         )
     }
 
+    fn map_self<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        type_mapping: &TypeMapping<'_, 'db>,
+    ) -> BoundTypeVarInstance<'db> {
+        typevar.map_domain(
+            db,
+            typevar,
+            type_mapping,
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
+    fn specialization_mapping<'db>(
+        db: &'db dyn Db,
+        context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> TypeMapping<'db, 'db> {
+        TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+            context.specialize(db, vec![ty]),
+        ))
+    }
+
+    fn specialize_typevar<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+        context: GenericContext<'db>,
+        ty: Type<'db>,
+    ) -> BoundTypeVarInstance<'db> {
+        typevar
+            .apply_type_mapping_impl(
+                db,
+                &specialization_mapping(db, context, ty),
+                &ApplyTypeMappingVisitor::new(env),
+            )
+            .as_typevar()
+            .expect("the retained typevar should remain a typevar")
+    }
+
+    #[test]
+    fn specialized_typevar_domains_distinguish_bindings() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let v = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("V"),
+            TypeVarVariance::Invariant,
+        );
+        let u_context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let v_context = GenericContext::from_typevar_instances(db, &env, [v]);
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let bounds = [
+            TypeVarBoundOrConstraints::UpperBound(KnownClass::List.to_specialized_instance(
+                db,
+                &env,
+                &[Type::TypeVar(u)],
+            )),
+            TypeVarBoundOrConstraints::Constraints(TypeVarConstraints::new(
+                db,
+                [Type::TypeVar(u), str].as_slice(),
+            )),
+        ];
+        for bound in bounds {
+            let t = bound_typevar(
+                db,
+                &env,
+                "T",
+                TypeVarKind::Pep695TypeVar,
+                Some(bound.into()),
+                TypeVarNonce::NONE,
+            );
+            let no_op = specialize_typevar(db, &env, t, u_context, Type::TypeVar(u));
+            assert_eq!(no_op.identity(db), t.identity(db));
+            let direct = specialize_typevar(db, &env, t, u_context, int);
+            assert_ne!(direct.identity(db), t.identity(db));
+            let through_v = specialize_typevar(db, &env, t, u_context, Type::TypeVar(v));
+            let staged = specialize_typevar(db, &env, through_v, v_context, int);
+            assert_eq!(staged.identity(db), direct.identity(db));
+            let restored = specialize_typevar(db, &env, through_v, v_context, Type::TypeVar(u));
+            assert_eq!(restored.identity(db), t.identity(db));
+        }
+    }
+
+    #[test]
+    fn freshening_updates_ordinary_typevar_domains() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let t = bound_typevar(
+            db,
+            &env,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound).into()),
+            TypeVarNonce::NONE,
+        );
+        let u_context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context: u_context,
+            delta: 1,
+        };
+        let visitor = ApplyTypeMappingVisitor::new(&env);
+        let fresh_u = u
+            .apply_type_mapping_impl(db, &mapping, &visitor)
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        let mapped_t = t
+            .apply_type_mapping_impl(db, &mapping, &visitor)
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        assert_ne!(mapped_t.identity(db), t.identity(db));
+        assert_eq!(
+            mapped_t.identity(db),
+            specialize_typevar(db, &env, t, u_context, Type::TypeVar(fresh_u)).identity(db)
+        );
+
+        let both_context = GenericContext::from_typevar_instances(db, &env, [t, u]);
+        let both_mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context: both_context,
+            delta: 1,
+        };
+        let fresh_t = t
+            .apply_type_mapping_impl(db, &both_mapping, &ApplyTypeMappingVisitor::new(&env))
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        // Freshening `U` changes `T`'s domain as well as its nonce. A later freshening of the
+        // original context still needs to see that nonce, or it could recreate `fresh_t`.
+        let max_freshness = max_typevar_freshness_matching_generic_context(
+            db,
+            [Type::TypeVar(fresh_t)],
+            both_context,
+        );
+        assert_eq!(max_freshness, Some(TypeVarNonce::FIRST));
+        let next_mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context: both_context,
+            delta: max_freshness.map_or(1, |nonce| nonce.increment().value()),
+        };
+        let next_t = t
+            .apply_type_mapping_impl(db, &next_mapping, &ApplyTypeMappingVisitor::new(&env))
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        assert_ne!(next_t.identity(db), fresh_t.identity(db));
+
+        let mapped_t_context = GenericContext::from_typevar_instances(db, &env, [mapped_t]);
+        let fresh_mapped_t = mapped_t
+            .apply_type_mapping_impl(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context: mapped_t_context,
+                    delta: 1,
+                },
+                &ApplyTypeMappingVisitor::new(&env),
+            )
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        assert_eq!(fresh_t.identity(db), fresh_mapped_t.identity(db));
+    }
+
+    #[test]
+    fn freshening_captured_typevars_preserves_lazy_domains() {
+        let mut db = setup_db();
+        db.clear_salsa_events();
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let context = GenericContext::from_typevar_instances(&db, &env, [u]);
+        let mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context: context,
+            delta: 1,
+        };
+        for domain in [
+            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound,
+            TypeVarBoundOrConstraintsEvaluation::LazyConstraints,
+        ] {
+            let captured = bound_typevar(
+                &db,
+                &env,
+                "T",
+                TypeVarKind::Pep695TypeVar,
+                Some(domain),
+                TypeVarNonce::NONE,
+            );
+            let freshened = captured.apply_type_mapping_impl(
+                &db,
+                &mapping,
+                &ApplyTypeMappingVisitor::new(&env),
+            );
+            assert_eq!(freshened, Type::TypeVar(captured));
+        }
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run_by_name(&db, "lazy_bound_unchecked", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "lazy_constraints_unchecked", None, &events);
+    }
+
+    #[test]
+    fn specialized_typevar_preserves_its_materialized_and_transposed_views() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let int = KnownClass::Int.to_instance(db, &env);
+        let gradual_bound =
+            KnownClass::Dict.to_specialized_instance(db, &env, &[Type::TypeVar(u), Type::any()]);
+        let t = bound_typevar(
+            db,
+            &env,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(gradual_bound).into()),
+            TypeVarNonce::NONE,
+        );
+        let view = t.materialize_impl(
+            db,
+            MaterializationKind::Top,
+            &ApplyTypeMappingVisitor::new(&env),
+        );
+        assert_eq!(view.identity(db), t.identity(db));
+        assert_ne!(view.typevar(db), t.typevar(db));
+        let projected = specialize_typevar(db, &env, t, context, int);
+        let projected_view = specialize_typevar(db, &env, view, context, int);
+        assert_eq!(projected.identity(db), projected_view.identity(db));
+        assert_ne!(projected.typevar(db), projected_view.typevar(db));
+
+        let class_bound: Type<'_> = KnownClass::List
+            .to_specialized_class_type(db, &env, &[Type::TypeVar(u)])
+            .expect("list should accept one type argument")
+            .into();
+        let class_typevar = bound_typevar(
+            db,
+            &env,
+            "ClassT",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(class_bound).into()),
+            TypeVarNonce::NONE,
+        );
+        let transposed = class_typevar
+            .to_instance(db, &env)
+            .map(InstanceProjection::into_inner)
+            .expect("a class bound should have an instance projection");
+        let specialized_then_transposed = specialize_typevar(db, &env, class_typevar, context, int)
+            .to_instance(db, &env)
+            .map(InstanceProjection::into_inner)
+            .expect("a specialized class bound should have an instance projection");
+        let transposed_then_specialized = specialize_typevar(db, &env, transposed, context, int);
+        assert_eq!(
+            specialized_then_transposed.identity(db),
+            transposed_then_specialized.identity(db)
+        );
+        assert_eq!(
+            specialized_then_transposed
+                .typevar(db)
+                .bound_or_constraints(db, &env),
+            transposed_then_specialized
+                .typevar(db)
+                .bound_or_constraints(db, &env)
+        );
+    }
+
+    #[test]
+    fn specialization_updates_the_domain_of_a_retained_bound_view() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let original_bound =
+            KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let view_bound = KnownClass::Set.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let t = bound_typevar(
+            db,
+            &env,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(original_bound).into()),
+            TypeVarNonce::NONE,
+        );
+        let view = t.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(view_bound))
+        });
+        assert_eq!(view.identity(db), t.identity(db));
+        let int = KnownClass::Int.to_instance(db, &env);
+        let context = GenericContext::from_typevar_instances(db, &env, [t, u]);
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+            context.specialize(db, vec![Type::TypeVar(view), int]),
+        ));
+        let result = t
+            .apply_type_mapping_impl(db, &mapping, &ApplyTypeMappingVisitor::new(&env))
+            .as_typevar()
+            .expect("the retained typevar should remain a typevar");
+        let u_context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let expected = specialize_typevar(db, &env, t, u_context, int);
+        assert_eq!(result.identity(db), expected.identity(db));
+        assert_eq!(
+            result.typevar(db).bound_or_constraints(db, &env),
+            Some(TypeVarBoundOrConstraints::UpperBound(
+                KnownClass::Set.to_specialized_instance(db, &env, &[int])
+            )),
+        );
+    }
+
+    #[test]
+    fn specialization_with_materialization_updates_a_retained_bound_view() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let bound =
+            KnownClass::Dict.to_specialized_instance(db, &env, &[Type::TypeVar(u), Type::any()]);
+        let t = bound_typevar(
+            db,
+            &env,
+            "T",
+            TypeVarKind::Pep695TypeVar,
+            Some(TypeVarBoundOrConstraints::UpperBound(bound).into()),
+            TypeVarNonce::NONE,
+        );
+        let view = t.materialize_impl(
+            db,
+            MaterializationKind::Top,
+            &ApplyTypeMappingVisitor::new(&env),
+        );
+        assert_ne!(view, t);
+        assert_eq!(view.identity(db), t.identity(db));
+
+        let int = KnownClass::Int.to_instance(db, &env);
+        let context = GenericContext::from_typevar_instances(db, &env, [t, u]);
+        let mapping = TypeMapping::ApplySpecializationWithMaterialization {
+            specialization: ApplySpecialization::specialization(
+                context.specialize(db, vec![Type::TypeVar(view), int]),
+            ),
+            materialization_kind: MaterializationKind::Top,
+        };
+        let result = t
+            .apply_type_mapping_impl(db, &mapping, &ApplyTypeMappingVisitor::new(&env))
+            .as_typevar()
+            .expect("the retained typevar should remain a typevar");
+        let u_context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let expected = specialize_typevar(db, &env, view, u_context, int);
+        assert_eq!(result.identity(db), expected.identity(db));
+        assert_eq!(
+            result.typevar(db).bound_or_constraints(db, &env),
+            expected.typevar(db).bound_or_constraints(db, &env),
+        );
+    }
+
+    #[test]
+    fn self_domain_projection_identity() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let u = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let t_context = GenericContext::from_typevar_instances(db, &env, [t]);
+        let u_context = GenericContext::from_typevar_instances(db, &env, [u]);
+        let domain = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(t)]);
+        let self_typevar = BoundTypeVarInstance::synthetic_self(
+            db,
+            domain,
+            BindingContext::Synthetic(env.program(db)),
+        );
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        let mapping = |context, ty| specialization_mapping(db, context, ty);
+        let projected_int = map_self(db, &env, self_typevar, &mapping(t_context, int));
+        let constructed_int = BoundTypeVarInstance::synthetic_self(
+            db,
+            KnownClass::List.to_specialized_instance(db, &env, &[int]),
+            BindingContext::Synthetic(env.program(db)),
+        );
+        assert_eq!(projected_int.identity(db), constructed_int.identity(db));
+
+        assert_eq!(
+            map_self(
+                db,
+                &env,
+                self_typevar,
+                &mapping(t_context, Type::TypeVar(t))
+            )
+            .identity(db),
+            self_typevar.identity(db)
+        );
+        assert_eq!(
+            projected_int.identity(db),
+            map_self(db, &env, self_typevar, &mapping(t_context, int)).identity(db)
+        );
+        assert_ne!(
+            projected_int.identity(db),
+            map_self(db, &env, self_typevar, &mapping(t_context, str)).identity(db)
+        );
+        let staged = map_self(
+            db,
+            &env,
+            map_self(
+                db,
+                &env,
+                self_typevar,
+                &mapping(t_context, Type::TypeVar(u)),
+            ),
+            &mapping(u_context, int),
+        );
+        assert_eq!(projected_int.identity(db), staged.identity(db));
+
+        let context = GenericContext::from_typevar_instances(db, &env, [t, self_typevar]);
+        let mapping_with_retained_self =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
+                specialization: context.specialize(db, vec![int, Type::TypeVar(self_typevar)]),
+            });
+        let retained_self = self_typevar
+            .apply_type_mapping_impl(
+                db,
+                &mapping_with_retained_self,
+                &ApplyTypeMappingVisitor::new(&env),
+            )
+            .as_typevar()
+            .expect("the retained Self should remain a typevar");
+        assert_eq!(retained_self.identity(db), projected_int.identity(db));
+
+        // Another view of the bound shares the binder identity, even after owner specialization.
+        let view = self_typevar.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::object()))
+        });
+        assert_eq!(view.identity(db), self_typevar.identity(db));
+        let projected_view = map_self(db, &env, view, &mapping(t_context, int));
+        assert_eq!(projected_view.identity(db), projected_int.identity(db));
+        assert_eq!(
+            projected_view.typevar(db).bound_or_constraints(db, &env),
+            Some(TypeVarBoundOrConstraints::UpperBound(Type::object()))
+        );
+        assert_ne!(projected_view.typevar(db), projected_int.typevar(db));
+    }
+
+    #[test]
+    fn owned_self_freshening_commutes_with_projection() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let domain = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(t)]);
+        let self_typevar = BoundTypeVarInstance::synthetic_self(
+            db,
+            domain,
+            BindingContext::Synthetic(env.program(db)),
+        );
+        let context = GenericContext::from_typevar_instances(db, &env, [self_typevar, t]);
+        let freshen_mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context: context,
+            delta: 1,
+        };
+        let visitor = ApplyTypeMappingVisitor::new(&env);
+        let fresh_t = t
+            .apply_type_mapping_impl(db, &freshen_mapping, &visitor)
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        let fresh_self = self_typevar
+            .apply_type_mapping_impl(db, &freshen_mapping, &visitor)
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        let int = KnownClass::Int.to_instance(db, &env);
+        let t_context = GenericContext::from_typevar_instances(db, &env, [t]);
+        let fresh_t_context = GenericContext::from_typevar_instances(db, &env, [fresh_t]);
+        let mapping = |context| specialization_mapping(db, context, int);
+        let projected = map_self(db, &env, self_typevar, &mapping(t_context));
+        let projected_context = GenericContext::from_typevar_instances(db, &env, [projected, t]);
+        let projected_freshen = TypeMapping::FreshenBoundTypeVars {
+            generic_context: projected_context,
+            delta: 1,
+        };
+        let fresh_projected = projected
+            .apply_type_mapping_impl(db, &projected_freshen, &visitor)
+            .as_typevar()
+            .expect("freshening a typevar should return a typevar");
+        assert_ne!(fresh_self.identity(db), self_typevar.identity(db));
+        assert_eq!(
+            map_self(db, &env, fresh_self, &mapping(fresh_t_context)).identity(db),
+            fresh_projected.identity(db)
+        );
+    }
+
+    #[test]
+    fn materialized_self_domain_keeps_its_canonical_identity() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let t = BoundTypeVarInstance::synthetic(
+            db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let domain =
+            KnownClass::Dict.to_specialized_instance(db, &env, &[Type::TypeVar(t), Type::any()]);
+        let self_typevar = BoundTypeVarInstance::synthetic_self(
+            db,
+            domain,
+            BindingContext::Synthetic(env.program(db)),
+        );
+        let materialized = self_typevar.materialize_impl(
+            db,
+            MaterializationKind::Top,
+            &ApplyTypeMappingVisitor::new(&env),
+        );
+        assert_ne!(materialized.typevar(db), self_typevar.typevar(db));
+        assert_eq!(materialized.identity(db), self_typevar.identity(db));
+
+        let context = GenericContext::from_typevar_instances(db, &env, [t]);
+        let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+            context.specialize(db, vec![KnownClass::Int.to_instance(db, &env)]),
+        ));
+        let projected = map_self(db, &env, self_typevar, &mapping);
+        let projected_view = map_self(db, &env, materialized, &mapping);
+        assert_eq!(projected.identity(db), projected_view.identity(db));
+        assert_ne!(projected.typevar(db), projected_view.typevar(db));
+
+        let gradual_specialization =
+            ApplySpecialization::specialization(context.specialize(db, vec![Type::any()]));
+        let plain = map_self(
+            db,
+            &env,
+            self_typevar,
+            &TypeMapping::ApplySpecialization(gradual_specialization),
+        );
+        let materializing = map_self(
+            db,
+            &env,
+            self_typevar,
+            &TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: gradual_specialization,
+                materialization_kind: MaterializationKind::Top,
+            },
+        );
+        assert_eq!(plain.identity(db), materializing.identity(db));
+        assert_ne!(plain.typevar(db), materializing.typevar(db));
+    }
+
+    #[test]
+    fn transposed_self_domain_keeps_its_canonical_identity() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let self_typevar = BoundTypeVarInstance::synthetic_self(
+            db,
+            KnownClass::Int.to_class_literal(db, &env),
+            BindingContext::Synthetic(env.program(db)),
+        );
+        let view = self_typevar.map_bound_or_constraints(db, |_| {
+            Some(TypeVarBoundOrConstraints::UpperBound(
+                KnownClass::Str.to_class_literal(db, &env),
+            ))
+        });
+        let transposed = self_typevar
+            .to_instance(db, &env)
+            .map(InstanceProjection::into_inner);
+        let transposed_view = view
+            .to_instance(db, &env)
+            .map(InstanceProjection::into_inner);
+        assert!(transposed.is_some());
+        assert!(transposed_view.is_some());
+        assert_eq!(
+            transposed.map(|ty| ty.identity(db)),
+            transposed_view.map(|ty| ty.identity(db))
+        );
+        assert_ne!(transposed, transposed_view);
+    }
+
     #[test]
     fn typevar_set_empty_set_is_none() {
         let db = setup_db();
@@ -2426,6 +3119,15 @@ mod tests {
 
         assert_ne!(lazy, eager);
         assert_eq!(lazy.identity(&db), eager.identity(&db));
+
+        let context = GenericContext::from_typevar_instances(&db, &env, [u]);
+        let lazy_after_no_op = specialize_typevar(&db, &env, lazy, context, Type::TypeVar(v));
+        let eager_after_no_op = specialize_typevar(&db, &env, eager, context, Type::TypeVar(v));
+        assert_eq!(
+            lazy_after_no_op.identity(&db),
+            eager_after_no_op.identity(&db)
+        );
+        assert_eq!(lazy_after_no_op.identity(&db), lazy.identity(&db));
 
         let left = TypeVarSet::from_typevars(&db, [lazy, u, eager]);
         let right = TypeVarSet::from_typevars(&db, [eager, v, lazy]);

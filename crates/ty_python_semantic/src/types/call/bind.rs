@@ -746,6 +746,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
                     CallableItem::Constructor(binding) => {
+                        binding.set_inferable_class_context(generic_context);
                         for overload in &mut binding.entry.overloads {
                             overload.signature.generic_context = GenericContext::merge_optional(
                                 db,
@@ -6474,7 +6475,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return !check_type_context
                 || self.is_partial_application
                 || actual
-                    .apply_specialization(db, specialization)
+                    .apply_call_argument_specialization(db, specialization)
                     .is_assignable_to(db, self.env, expected_ty);
         }
 
@@ -6746,8 +6747,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut expected_ty = declared_type;
         if let Some(specialization) = self.merged_specialization() {
-            if !constructor_receiver {
-                argument_type = argument_type.apply_specialization(db, specialization);
+            // An ordinary bound method's receiver is a value from the caller, so the method's
+            // inferred type arguments must not rewrite type variables captured by that receiver.
+            // A constructor receiver can instead be a template for the instance being inferred.
+            let ordinary_receiver =
+                matches!(argument, Argument::Synthetic) && self.constructor_kind.is_none();
+            if !constructor_receiver && !ordinary_receiver {
+                argument_type = if matches!(argument, Argument::Synthetic) {
+                    argument_type.apply_specialization(db, specialization)
+                } else {
+                    // The caller's type variables can occur inside the actual argument. Substitute
+                    // inferred types without changing the bounds of retained caller variables.
+                    argument_type.apply_call_argument_specialization(db, specialization)
+                };
             }
             expected_ty = expected_ty.apply_specialization(db, specialization);
         }

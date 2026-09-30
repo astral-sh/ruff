@@ -1575,7 +1575,7 @@ fn inherited_user_defined_mixin_new<'db>(
             };
             Some(
                 match Type::FunctionLiteral(function)
-                    .apply_optional_owner_specialization_to_member(db, specialization)
+                    .apply_optional_specialization(db, specialization)
                 {
                     Type::FunctionLiteral(function) => EnumMethodBinding::Function(function),
                     _ => EnumMethodBinding::Opaque,

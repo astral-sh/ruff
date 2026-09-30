@@ -991,6 +991,31 @@ class Box(Generic[T, U]):
         return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
+### Explicit constructor type arguments in an enclosing method
+
+An explicitly supplied class type argument remains fixed even when the call occurs inside the class
+that binds it. A bare constructor can still infer its type arguments.
+
+```py
+from typing_extensions import Generic, Self, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T, U]):
+    def __init__(self, value: T, receiver: U) -> None:
+        reveal_type(Box[T, Self](value, self))  # revealed: Box[T@Box, Self@__init__]
+        Box[T, str]("wrong", "ok")  # error: [invalid-argument-type]
+        reveal_type(Box("value", self))  # revealed: Box[str, Self@__init__]
+
+    def wrap(self, value: T) -> None:
+        reveal_type(Box[T, Self](value, self))  # revealed: Box[T@Box, Self@wrap]
+        Box[T, Self]("wrong", self)  # error: [invalid-argument-type]
+        Alias = Box[T, str]
+        Alias("wrong", "ok")  # error: [invalid-argument-type]
+        reveal_type(Box("value", self))  # revealed: Box[str, Self@wrap]
+```
+
 ### Constructing through a classmethod receiver
 
 A constructor call through a classmethod receiver keeps an enclosing `TypeVarTuple` when checking
@@ -1612,6 +1637,91 @@ class DescriptorChild(DescriptorParent[T]): ...
 
 reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
+```
+
+## Forwarding `cls` to a generic superclass constructor
+
+A generic subclass can pass its `cls` to the superclass's `__new__` method and retain its `Self`
+return type. The superclass's specialized parameter types still apply.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+class Child(Base[T]):
+    def __new__(cls, value: T) -> Self:
+        result = super().__new__(cls, value)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+
+class IntChild(Base[int]):
+    def __new__(cls, value: int) -> Self:
+        super().__new__(cls, "wrong")  # error: [invalid-argument-type]
+        return super().__new__(cls, value)  # no diagnostic
+```
+
+The `cls` argument can also be passed through a generic type alias.
+
+```py
+from typing_extensions import TypeAliasType
+
+Class = TypeAliasType("Class", type[T], type_params=(T,))
+
+class AliasedChild(Base[T]):
+    def __new__(cls, value: T) -> Self:
+        aliased_cls: Class[Self] = cls
+        result = super().__new__(aliased_cls, value)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+The same applies to constructors inherited through a generic tuple subclass.
+
+```py
+class TupleBase(tuple[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls, (value,))
+
+class TupleChild(TupleBase[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls, value)  # no diagnostic
+```
+
+## Calling a generic superclass initializer from a classmethod
+
+A classmethod can allocate an instance and pass it to the unbound superclass initializer. The
+initializer still checks the other arguments against the superclass specialization.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init__(self, value: T) -> None: ...
+
+class Child(Base[T]):
+    @classmethod
+    def build(cls, value: T) -> Self:
+        instance = cls.__new__(cls)
+        super().__init__(instance, value)  # no diagnostic
+        reveal_type(instance)  # revealed: Self@build
+        return instance
+
+class IntChild(Base[int]):
+    @classmethod
+    def build(cls, value: int) -> Self:
+        instance = cls.__new__(cls)
+        super().__init__(instance, "wrong")  # error: [invalid-argument-type]
+        super().__init__(instance, value)  # no diagnostic
+        return instance
 ```
 
 ## Fallback MROs preserve generic class identity
@@ -2770,6 +2880,184 @@ class Child(Base[U]):
 def check(child: Child[str]) -> None:
     reveal_type(child.items)  # revealed: list[str]
     child.items.append(1)  # error: [invalid-argument-type]
+```
+
+## Calling differently specialized bound methods
+
+Each arm retains the relationship between its receiver and the class's type argument, whether the
+union is formed before or after accessing the method.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+    def pair_with_values(self, values: list[T]) -> tuple[Self, T]:
+        return self, self.value
+
+def pairs(a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@pairs], T@pairs]
+    reveal_type(box.pair())
+
+def pairs_reversed(a: Box[str], b: Box[T], cond: bool):
+    box = b if cond else a
+    # revealed: tuple[Box[T@pairs_reversed], T@pairs_reversed] | tuple[Box[str], str]
+    reveal_type(box.pair())
+
+def bound_pairs(a: Box[str], b: Box[T], cond: bool):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str] | tuple[Box[T@bound_pairs], T@bound_pairs]
+    reveal_type(pair())
+
+def bound_pairs_reversed(a: Box[str], b: Box[T], cond: bool):
+    pair = b.pair if cond else a.pair
+    # revealed: tuple[Box[T@bound_pairs_reversed], T@bound_pairs_reversed] | tuple[Box[str], str]
+    reveal_type(pair())
+```
+
+An expected return type also provides context for the call:
+
+```py
+def contextual_argument(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    return box.pair_with_values([])  # no diagnostic
+
+def inferred_result(a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@inferred_result], T@inferred_result]
+    reveal_type(box.pair_with_values([]))
+
+def wrong_return(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
+    box = a if cond else b
+    return box.pair()  # error: [invalid-return-type]
+```
+
+## Calling specialized bound methods through aliases and inheritance
+
+A class and its type arguments can be specialized through aliases without changing its bound method
+types.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self, TypeAlias
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+BoxAlias: TypeAlias = Box[T]
+IntAlias: TypeAlias = int
+
+def repeated(a: Box[int], b: BoxAlias[int], cond: bool):
+    static_assert(is_equivalent_to(TypeOf[a.pair], TypeOf[b.pair]))
+    pair = a.pair if cond else b.pair
+    reveal_type(pair())  # revealed: tuple[Box[int], int]
+
+def aliased_argument(a: Box[int], b: Box[IntAlias], cond: bool):
+    static_assert(is_equivalent_to(TypeOf[a.pair], TypeOf[b.pair]))
+    pair = a.pair if cond else b.pair
+    reveal_type(pair())  # revealed: tuple[Box[int], int]
+
+def reordered_union(a: Box[int | str], b: Box[str | int], cond: bool):
+    static_assert(is_equivalent_to(TypeOf[a.pair], TypeOf[b.pair]))
+    pair = a.pair if cond else b.pair
+    reveal_type(pair())  # revealed: tuple[Box[int | str], int | str]
+```
+
+An inherited generic base retains the receiver and the specialized value type.
+
+```py
+class NestedBox(Box[list[U]], Generic[U]): ...
+
+def inherited(a: NestedBox[int], b: Box[list[int]], cond: bool):
+    static_assert(is_subtype_of(TypeOf[a.pair], TypeOf[b.pair]))
+    static_assert(not is_subtype_of(TypeOf[b.pair], TypeOf[a.pair]))
+    reveal_type(a.pair())  # revealed: tuple[NestedBox[int], list[int]]
+    reveal_type(b.pair())  # revealed: tuple[Box[list[int]], list[int]]
+    pair = a.pair if cond else b.pair
+    reveal_type(pair())  # revealed: tuple[Box[list[int]], list[int]]
+```
+
+For sibling subclasses, each result keeps the type of its own receiver.
+
+```py
+class First(Box[int]): ...
+class Second(Box[int]): ...
+
+def subclasses(a: First, b: Second, cond: bool):
+    reveal_type(a.pair())  # revealed: tuple[First, int]
+    reveal_type(b.pair())  # revealed: tuple[Second, int]
+    pair = a.pair if cond else b.pair
+    reveal_type(pair())  # revealed: tuple[First, int] | tuple[Second, int]
+
+def subclasses_reversed(a: First, b: Second, cond: bool):
+    pair = b.pair if cond else a.pair
+    reveal_type(pair())  # revealed: tuple[Second, int] | tuple[First, int]
+```
+
+## Calling a union of generic methods
+
+A method's type parameter is inferred from the argument without changing the caller's type
+parameters or the receiver's specialization.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self, value: U) -> tuple[Self, T, U]:
+        return self, self.value, value
+
+def call(a: Box[str], b: Box[T], cond: bool, value: U):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str, U@call] | tuple[Box[T@call], T@call, U@call]
+    reveal_type(pair(value))
+
+def wrong_return(a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
+    pair = a.pair if cond else b.pair
+    return pair(value)  # error: [invalid-return-type]
+```
+
+## Dictionary methods on unions
+
+Methods on differently specialized dictionaries accept the shared key type and retain the value
+types from both alternatives.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def compare(first: dict[str, T], second: dict[str, int]) -> None:
+    for incoming, current in ((first, first), (second, second)):
+        for key, data in incoming.items():  # no diagnostic
+            reveal_type(data)  # revealed: T@compare | int
+            reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

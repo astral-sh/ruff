@@ -1678,6 +1678,75 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Generic constructor aliases
+
+A bare class alias infers its type arguments, while an explicitly specialized alias keeps its type
+arguments fixed, including type variables from an enclosing class.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class LegacyBox(Generic[T]):
+    def __init__(self, value: T) -> None: ...
+    def check(self, value: T) -> None:
+        Alias = LegacyBox
+        reveal_type(Alias(1))  # revealed: LegacyBox[int]
+        reveal_type(Alias[T](value))  # revealed: LegacyBox[T@LegacyBox]
+        Alias[T]("wrong")  # error: [invalid-argument-type]
+
+        Fixed = LegacyBox[T]
+        reveal_type(Fixed(value))  # revealed: LegacyBox[T@LegacyBox]
+        Fixed("wrong")  # error: [invalid-argument-type]
+
+        Concrete = LegacyBox[int]
+        reveal_type(Concrete(1))  # revealed: LegacyBox[int]
+        Concrete("wrong")  # error: [invalid-argument-type]
+
+class Box[T]:
+    def __init__(self, value: T) -> None: ...
+    def check(self, value: T) -> None:
+        Alias = Box
+        reveal_type(Alias(1))  # revealed: Box[int]
+        reveal_type(Alias[T](value))  # revealed: Box[T@Box]
+        Alias[T]("wrong")  # error: [invalid-argument-type]
+
+        Fixed = Box[T]
+        reveal_type(Fixed(value))  # revealed: Box[T@Box]
+        Fixed("wrong")  # error: [invalid-argument-type]
+
+        Concrete = Box[int]
+        reveal_type(Concrete(1))  # revealed: Box[int]
+        Concrete("wrong")  # error: [invalid-argument-type]
+```
+
+Inference also works when the constructor explicitly annotates `self`, including from within the
+same generic class.
+
+```py
+V = TypeVar("V")
+
+class AnnotatedLegacyBox(Generic[T]):
+    def __init__(self: "AnnotatedLegacyBox[V]", value: V) -> None:
+        reveal_type(AnnotatedLegacyBox(int("1")))  # revealed: AnnotatedLegacyBox[int]
+
+    def check(self) -> None:
+        reveal_type(AnnotatedLegacyBox(int("1")))  # revealed: AnnotatedLegacyBox[int]
+
+class AnnotatedBox[T]:
+    def __init__[V](self: "AnnotatedBox[V]", value: V) -> None:
+        reveal_type(AnnotatedBox(int("1")))  # revealed: AnnotatedBox[int]
+
+    def check(self) -> None:
+        reveal_type(AnnotatedBox(int("1")))  # revealed: AnnotatedBox[int]
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py
