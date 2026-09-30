@@ -103,8 +103,11 @@ use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
+use crate::types::callable::CallableTypeKind;
 use crate::types::class::GenericAlias;
-use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::projection::ProjectionError;
+#[cfg(test)]
+use crate::types::constraints::projection::SolutionBudget;
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
@@ -745,14 +748,37 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         builder: &'c ConstraintSetBuilder<'db>,
         to_remove: TypeVarSet<'db>,
     ) -> Self {
+        let ControlFlow::Continue(result) = self.reduce_inferable_with_limits(
+            db,
+            env,
+            builder,
+            to_remove,
+            &mut UnboundedSolutionLimits,
+        );
+        result
+    }
+
+    fn reduce_inferable_with_limits<L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
+        to_remove: TypeVarSet<'db>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, Self> {
         self.verify_builder(builder);
         if to_remove == TypeVarSet::None {
-            return self;
+            return ControlFlow::Continue(self);
         }
         let mut storage = builder.storage.borrow_mut();
-        let (node, derived_source_order) =
-            self.node
-                .exists(db, env, &mut storage, to_remove, self.source_order);
+        let (node, derived_source_order) = self.node.exists_with_limits(
+            db,
+            env,
+            &mut storage,
+            to_remove,
+            self.source_order,
+            limits,
+        )?;
         // The eliminated typevars must also leave the source-order history. Otherwise recursive
         // relations can re-import each other's quantified constraints after their live graphs have
         // stabilized. Keep the original order of the remaining entries and append derived facts.
@@ -767,7 +793,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 storage.ordered_source_order(source_order, Some(constraint_source_order))
             });
         let source_order = storage.ordered_source_order(source_order, derived_source_order);
-        Self::from_node(builder, node, source_order)
+        ControlFlow::Continue(Self::from_node(builder, node, source_order))
     }
 
     /// Applies a type mapping to every constraint in this constraint set.
@@ -2417,13 +2443,40 @@ impl NodeId {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
+        let ControlFlow::Continue(result) = self.is_always_satisfied_with_limits(
+            db,
+            env,
+            storage,
+            source_order,
+            &mut UnboundedSolutionLimits,
+        );
+        result
+    }
+
+    /// Returns whether this BDD is always satisfied, charging each visited node to `limits`.
+    fn is_always_satisfied_with_limits<'db, L: SolutionLimits>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        source_order: Option<SourceOrderId>,
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, bool> {
         match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
+            Node::AlwaysTrue => ControlFlow::Continue(true),
+            Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
+                let mut visitor = IsNeverSatisfiedVisitor { limits };
+                match path.visit_negated(db, env, storage, self, &mut visitor) {
+                    ControlFlow::Continue(()) => ControlFlow::Continue(true),
+                    ControlFlow::Break(LimitedSatisfactionBreak::Satisfied) => {
+                        ControlFlow::Continue(false)
+                    }
+                    ControlFlow::Break(LimitedSatisfactionBreak::Limit(error)) => {
+                        ControlFlow::Break(error)
+                    }
+                }
             }
         }
     }
@@ -2488,8 +2541,16 @@ impl NodeId {
                     false
                 } else {
                     let mut path = interior.path_assignments(db, env, storage, source_order);
-                    path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                        .is_continue()
+                    path.visit(
+                        db,
+                        env,
+                        storage,
+                        self,
+                        &mut IsNeverSatisfiedVisitor {
+                            limits: &mut UnboundedSolutionLimits,
+                        },
+                    )
+                    .is_continue()
                 };
                 storage.never_satisfied_cache.insert(self, result);
                 result
@@ -2754,31 +2815,33 @@ impl NodeId {
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
     /// The result will return true whenever `self` returns true for _any_ assignment of those
     /// typevars. The result will not contain any constraints that mention those typevars.
-    fn exists<'db>(
+    fn exists_with_limits<'db, L: SolutionLimits>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (Self, Option<SourceOrderId>) {
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, (Self, Option<SourceOrderId>)> {
         if bound_typevars == TypeVarSet::None {
-            return (self, None);
+            return ControlFlow::Continue((self, None));
         }
 
         let Node::Interior(interior) = self.node() else {
-            return (self, None);
+            return ControlFlow::Continue((self, None));
         };
 
         let key = (self, bound_typevars, source_order);
         if let Some(result) = storage.exists_cache.get(&key) {
-            return *result;
+            return ControlFlow::Continue(*result);
         }
 
-        let result = interior.exists_inner(db, env, storage, bound_typevars, source_order);
+        let result =
+            interior.exists_inner(db, env, storage, bound_typevars, source_order, limits)?;
 
         storage.exists_cache.insert(key, result);
-        result
+        ControlFlow::Continue(result)
     }
 
     fn remove_noninferable<'db, L: SolutionLimits>(
@@ -3471,9 +3534,12 @@ pub(crate) enum CandidateSolutions<'db> {
     /// The constraint set is trivially satisfied, and places no restrictions on any of the
     /// inferable typevars
     Unconstrained,
-    /// The constraint set has a fix set of solutions. Each solution provides a lower and upper
+    /// The constraint set has a fixed set of solutions. Each solution provides a lower and upper
     /// bound for each inferable typevar.
-    Constrained(Box<[CandidateSolution<'db>]>),
+    Constrained {
+        inferable: TypeVarSet<'db>,
+        paths: Box<[CandidateSolution<'db>]>,
+    },
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
@@ -3482,7 +3548,7 @@ pub(crate) struct CandidateSolution<'db> {
     validity: SolutionValidity<'db>,
 }
 
-/// Limits shared by the preprocessing and collection walks used to extract solutions.
+/// Limits shared by the preprocessing, collection, and validation walks used to extract solutions.
 trait SolutionLimits {
     type Break;
 
@@ -3556,33 +3622,6 @@ impl<'db> CandidateSolutions<'db> {
     /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
     /// path allowance. No partially collected family is returned when either limit is exhausted.
-    fn compute_bounded(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        budget: SolutionBudget,
-    ) -> Result<Self, ProjectionError> {
-        let mut limits = BoundedSolutionLimits {
-            remaining_paths: budget.paths,
-            remaining_visits: budget.visits,
-        };
-        match Self::compute_with_limits(
-            db,
-            env,
-            storage,
-            node,
-            inferable,
-            source_order,
-            &mut limits,
-        ) {
-            ControlFlow::Continue(result) => Ok(result),
-            ControlFlow::Break(error) => Err(error),
-        }
-    }
-
     fn compute_with_limits<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3809,7 +3848,10 @@ impl<'db> CandidateSolutions<'db> {
             typevars: typevars.into_boxed_slice(),
             validity: SolutionValidity::Valid,
         };
-        ControlFlow::Continue(Some(CandidateSolutions::Constrained(Box::new([candidate]))))
+        ControlFlow::Continue(Some(CandidateSolutions::Constrained {
+            inferable,
+            paths: Box::new([candidate]),
+        }))
     }
 
     pub(crate) fn solve(
@@ -3818,7 +3860,7 @@ impl<'db> CandidateSolutions<'db> {
         env: &ProgramEnvironment<'db>,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|_variance, path_bound| {
+        self.solve_with(db, env, |_variance, path_bound| {
             CandidateSolutions::default_solve(db, env, builder, path_bound)
         })
     }
@@ -3829,28 +3871,38 @@ impl<'db> CandidateSolutions<'db> {
     /// the path's available bindings, but marks the resulting path family as incomplete.
     pub(crate) fn solve_with(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Solutions<'db> {
-        let Ok(solutions) = self.try_solve_with(choose, |_| Ok::<(), Infallible>(()));
+        let ControlFlow::Continue(solutions) =
+            self.try_solve_with(db, env, &mut UnboundedSolutionLimits, choose, |_| {
+                ControlFlow::<Infallible>::Continue(())
+            });
         solutions
     }
 
     /// Checks each retained solution before collecting it or solving the next path.
-    fn try_solve_with<E>(
+    fn try_solve_with<L: SolutionLimits>(
         &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        limits: &mut L,
         mut choose: impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
         ) -> PathBoundSolution<'db>,
-        mut check_solution: impl FnMut(&Solution<'db>) -> Result<(), E>,
-    ) -> Result<Solutions<'db>, E> {
-        let paths = match self {
+        mut check_solution: impl FnMut(&Solution<'db>) -> ControlFlow<L::Break>,
+    ) -> ControlFlow<L::Break, Solutions<'db>> {
+        let (inferable, paths) = match self {
             CandidateSolutions::Unsatisfiable => {
                 let solutions = SolutionPaths::Complete(Vec::default());
-                return Ok(Solutions::Unsatisfiable(solutions));
+                return ControlFlow::Continue(Solutions::Unsatisfiable(solutions));
             }
-            CandidateSolutions::Unconstrained => return Ok(Solutions::Unconstrained),
-            CandidateSolutions::Constrained(paths) => paths,
+            CandidateSolutions::Unconstrained => {
+                return ControlFlow::Continue(Solutions::Unconstrained);
+            }
+            CandidateSolutions::Constrained { inferable, paths } => (*inferable, paths),
         };
 
         let mut valid_solutions = Vec::with_capacity(paths.len());
@@ -3858,7 +3910,8 @@ impl<'db> CandidateSolutions<'db> {
         let mut valid_exceeded_budget = false;
         let mut invalid_exceeded_budget = false;
         for path in paths {
-            let Some((solution, path_exceeded_budget)) = Self::solve_path_with(path, &mut choose)
+            let Some((solution, path_exceeded_budget)) =
+                Self::solve_path_with(db, env, inferable, path, limits, &mut choose)?
             else {
                 continue;
             };
@@ -3874,49 +3927,167 @@ impl<'db> CandidateSolutions<'db> {
 
         if !valid_solutions.is_empty() {
             let solutions = SolutionPaths::new(valid_solutions, valid_exceeded_budget);
-            return Ok(Solutions::Constrained(solutions));
+            return ControlFlow::Continue(Solutions::Constrained(solutions));
         }
 
         for solution in &invalid_solutions {
             check_solution(solution)?;
         }
         let solutions = SolutionPaths::new(invalid_solutions, invalid_exceeded_budget);
-        Ok(Solutions::Unsatisfiable(solutions))
+        ControlFlow::Continue(Solutions::Unsatisfiable(solutions))
     }
 
     /// Solves one complete path, retaining whether any of its bindings used a fallback.
     /// A later unsatisfiable bound rejects the path even if an earlier bound exhausted its budget.
-    fn solve_path_with(
+    fn solve_path_with<L: SolutionLimits>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
         candidate: &CandidateSolution<'db>,
+        limits: &mut L,
         choose: &mut impl FnMut(
             TypeVarVariance,
             &CandidateTypeVarSolution<'db>,
         ) -> PathBoundSolution<'db>,
-    ) -> Option<(Solution<'db>, bool)> {
+    ) -> ControlFlow<L::Break, Option<(Solution<'db>, bool)>> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
+        let mut to_validate =
+            SmallVec::<[(TypeVarSolution<'db>, TypeVarVariance, Type<'db>); 1]>::new();
+        // An inferred ParamSpec can retain the generic context of a callable whose parameters it
+        // captures. For `def f[T](x: T) -> T` matched against `Callable[P, R]`, `P` can retain
+        // the callable-local `T`, while `R` is solved to `T`. That `T` remains inferable when
+        // checking `R` against its upper bound. Keep complete ParamSpec solutions so we can
+        // identify those variables.
+        let mut captured_paramspecs = SmallVec::<[Type<'db>; 1]>::new();
+        // If solving any inferable ParamSpec exceeds its budget, its fallback (if any) may omit
+        // the generic context. We cannot reliably distinguish callable-local variables from
+        // caller-fixed ones, so skip upper-bound validation; the path is already marked incomplete.
+        let mut incomplete_paramspec = false;
         let mut exceeded_budget = false;
         for path_bound in &candidate.typevars {
-            let ty = match choose(path_bound.variance(), path_bound) {
-                PathBoundSolution::Solved(ty) => Some(ty),
-                PathBoundSolution::Unsolved => None,
-                PathBoundSolution::Unsatisfiable => return None,
+            let (ty, complete) = match choose(path_bound.variance(), path_bound) {
+                PathBoundSolution::Solved(ty) => (Some(ty), true),
+                PathBoundSolution::Unsolved => (None, true),
+                PathBoundSolution::Unsatisfiable => return ControlFlow::Continue(None),
                 PathBoundSolution::BudgetExceeded { fallback } => {
                     exceeded_budget = true;
-                    fallback
+                    (fallback, false)
                 }
             };
+            if path_bound.bound_typevar.is_paramspec(db)
+                && path_bound.bound_typevar.is_inferable(db, inferable)
+            {
+                if complete {
+                    captured_paramspecs.extend(ty);
+                } else {
+                    incomplete_paramspec = true;
+                }
+            }
             if let Some(ty) = ty {
-                solved_typevars.push(TypeVarSolution {
-                    bound_typevar: path_bound.bound_typevar,
+                let bound_typevar = path_bound.bound_typevar;
+                let solution = TypeVarSolution {
+                    bound_typevar,
                     solution: ty,
+                };
+                if complete
+                    && bound_typevar.is_inferable(db, inferable)
+                    && let Some(bound) = bound_typevar.typevar(db).upper_bound(db, env)
+                    && any_over_type_expanding_aliases(db, env, ty, Type::is_type_var)
+                {
+                    to_validate.push((solution, path_bound.variance(), bound));
+                }
+                solved_typevars.push(solution);
+            }
+        }
+        if to_validate.is_empty() || incomplete_paramspec {
+            return ControlFlow::Continue(Some((
+                Solution {
+                    solved_typevars,
+                    validity: candidate.validity.clone(),
+                },
+                exceeded_budget,
+            )));
+        }
+        let captured = RefCell::new(SmallVec::<[BoundTypeVarInstance<'db>; 1]>::new());
+        for paramspec in captured_paramspecs {
+            any_over_type_expanding_aliases(db, env, paramspec, |nested| {
+                if let Type::Callable(callable) = nested
+                    && callable.kind(db) == CallableTypeKind::ParamSpecValue
+                {
+                    captured.borrow_mut().extend(
+                        callable
+                            .signatures(db)
+                            .overloads
+                            .iter()
+                            .flat_map(|signature| {
+                                signature
+                                    .generic_context
+                                    .into_iter()
+                                    .flat_map(|context| context.variables(db))
+                            }),
+                    );
+                }
+                false
+            });
+        }
+        let captured = TypeVarSet::from_typevars(db, captured.into_inner());
+        let mut violations = match &candidate.validity {
+            SolutionValidity::Valid => Vec::new(),
+            SolutionValidity::Invalid(violations) => violations.to_vec(),
+        };
+        // Validate the selected type rather than just the evidence: the caller's chooser can
+        // produce a different binding from the one represented by the original constraints.
+        for (solution, variance, bound) in to_validate {
+            let TypeVarSolution {
+                bound_typevar,
+                solution: ty,
+            } = solution;
+            // Relations involving variables still being inferred must remain available for joint
+            // solving. Only check choices containing a fixed or captured type variable here.
+            let has_inferable = |nested: Type<'db>| {
+                nested
+                    .as_typevar()
+                    .is_some_and(|typevar| typevar.is_inferable(db, inferable))
+            };
+            if any_over_type_expanding_aliases(db, env, ty, has_inferable)
+                || any_over_type_expanding_aliases(db, env, bound, has_inferable)
+            {
+                continue;
+            }
+            let constraints = ConstraintSetBuilder::new();
+            let relation =
+                ty.when_assignable_to(db, env, bound, &constraints, inferable.merge(db, captured));
+            let relation =
+                relation.reduce_inferable_with_limits(db, env, &constraints, captured, limits)?;
+            let always_satisfied = relation.node.is_always_satisfied_with_limits(
+                db,
+                env,
+                &mut constraints.storage.borrow_mut(),
+                relation.source_order,
+                limits,
+            )?;
+            if !always_satisfied
+                && !violations.iter().any(|violation| {
+                    violation.bound_typevar == bound_typevar
+                        && matches!(violation.kind, SolutionViolationKind::UpperBound(_))
+                })
+            {
+                violations.push(SolutionViolation {
+                    bound_typevar,
+                    variance,
+                    kind: SolutionViolationKind::UpperBound(Some(ty)),
                 });
             }
         }
         let solution = Solution {
             solved_typevars,
-            validity: candidate.validity.clone(),
+            validity: if violations.is_empty() {
+                SolutionValidity::Valid
+            } else {
+                SolutionValidity::Invalid(violations.into_boxed_slice())
+            },
         };
-        Some((solution, exceeded_budget))
+        ControlFlow::Continue(Some((solution, exceeded_budget)))
     }
 
     /// The default solution selection logic for a single typevar on a single BDD path.
@@ -4175,20 +4346,21 @@ impl InteriorNode {
         result
     }
 
-    fn exists_inner<'db>(
+    fn exists_inner<'db, L: SolutionLimits>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         bound_typevars: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let ControlFlow::Continue(result) = self.abstract_inner(
+        limits: &mut L,
+    ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)> {
+        self.abstract_inner(
             db,
             env,
             storage,
             source_order,
-            &mut UnboundedSolutionLimits,
+            limits,
             // Remove any node that constrains one of `bound_typevars`, or that has a lower/upper
             // bound that mentions one of them. Removed constraints are still added to `path`, so
             // the sequent map can propagate any derived constraints that do not mention the
@@ -4196,8 +4368,7 @@ impl InteriorNode {
             &mut |storage: &ConstraintSetStorage<'_>, constraint| {
                 storage.constraint_mentions_typevars(db, constraint, bound_typevars)
             },
-        );
-        result
+        )
     }
 
     fn remove_noninferable<'db, L: SolutionLimits>(
@@ -4763,6 +4934,10 @@ trait PathFold {
     type Result;
     type Break;
 
+    fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+        ControlFlow::Continue(())
+    }
+
     /// Returns the base case value that represents a satisfied path.
     fn satisfied<'db>(
         &mut self,
@@ -4806,6 +4981,10 @@ where
     type Result = <T as PathFold>::Result;
     type Interior = ();
     type Break = <T as PathFold>::Break;
+
+    fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+        PathFold::visit_node(self)
+    }
 
     fn visit_satisfied<'db>(
         &mut self,
@@ -4868,14 +5047,26 @@ where
     }
 }
 
-/// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
-/// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
-/// unsatisfiable. A `Break` result indicates the opposite.
-struct IsNeverSatisfiedVisitor;
+enum LimitedSatisfactionBreak<B> {
+    Satisfied,
+    Limit(B),
+}
 
-impl PathFold for IsNeverSatisfiedVisitor {
+/// A path visitor that breaks early if it encounters a satisfied path or exceeds a limit. A
+/// `Continue` result means no satisfied path was found, so the BDD is unsatisfiable.
+struct IsNeverSatisfiedVisitor<'a, L> {
+    limits: &'a mut L,
+}
+
+impl<L: SolutionLimits> PathFold for IsNeverSatisfiedVisitor<'_, L> {
     type Result = ();
-    type Break = ();
+    type Break = LimitedSatisfactionBreak<L::Break>;
+
+    fn visit_node(&mut self) -> ControlFlow<Self::Break> {
+        self.limits
+            .visit_node()
+            .map_break(LimitedSatisfactionBreak::Limit)
+    }
 
     fn satisfied<'db>(
         &mut self,
@@ -4883,7 +5074,7 @@ impl PathFold for IsNeverSatisfiedVisitor {
         _storage: &mut ConstraintSetStorage<'db>,
         _path: &PathAssignments,
     ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Break(())
+        ControlFlow::Break(LimitedSatisfactionBreak::Satisfied)
     }
 
     fn unsatisfied<'db>(
@@ -5082,19 +5273,17 @@ mod tests {
         max_paths: usize,
         max_visits: usize,
     ) -> Result<CandidateSolutions<'db>, ProjectionError> {
-        CandidateSolutions::compute_bounded(
+        set.bounded_path_bounds(
             db,
             &db.program_environment(),
-            &mut set.builder.storage.borrow_mut(),
-            set.node,
             inferable,
-            set.source_order,
             SolutionBudget {
                 paths: max_paths,
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
         )
+        .map(|(paths, _)| paths)
     }
 
     fn solution<'db>(
@@ -5488,6 +5677,79 @@ mod tests {
     }
 
     #[test]
+    fn bounded_tautology_check_respects_visit_limit() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let builder = ConstraintSetBuilder::new();
+        let t = create_typevar(db, "T");
+        let upper = |class: KnownClass| {
+            ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                &env,
+                &builder,
+                t,
+                class.to_instance(db, &env),
+            )
+        };
+        let bool_bound = upper(KnownClass::Bool);
+        let int_bound = upper(KnownClass::Int);
+        let tautology = bool_bound
+            .negate(db, &builder)
+            .or(db, &builder, || int_bound);
+        let mut storage = builder.storage.borrow_mut();
+
+        for (set, expected) in [(int_bound, false), (tautology, true)] {
+            let mut counter = CountSolutionLimits::default();
+            assert_eq!(
+                set.node.is_always_satisfied_with_limits(
+                    db,
+                    &env,
+                    &mut storage,
+                    set.source_order,
+                    &mut counter,
+                ),
+                ControlFlow::Continue(expected)
+            );
+            assert!(counter.visits > 0);
+
+            for (visits, expected_result) in [
+                (
+                    counter.visits - 1,
+                    ControlFlow::Break(ProjectionError::TraversalBudgetExceeded),
+                ),
+                (counter.visits, ControlFlow::Continue(expected)),
+            ] {
+                let mut limits = BoundedSolutionLimits {
+                    remaining_visits: visits,
+                    remaining_paths: 0,
+                };
+                assert_eq!(
+                    set.node.is_always_satisfied_with_limits(
+                        db,
+                        &env,
+                        &mut storage,
+                        set.source_order,
+                        &mut limits,
+                    ),
+                    expected_result
+                );
+            }
+        }
+
+        for (node, expected) in [(ALWAYS_TRUE, true), (ALWAYS_FALSE, false)] {
+            let mut limits = BoundedSolutionLimits {
+                remaining_visits: 0,
+                remaining_paths: 0,
+            };
+            assert_eq!(
+                node.is_always_satisfied_with_limits(db, &env, &mut storage, None, &mut limits),
+                ControlFlow::Continue(expected)
+            );
+        }
+    }
+
+    #[test]
     fn bounded_path_fast_paths_respect_limits() {
         let db = setup_db();
         let db = &db;
@@ -5625,10 +5887,13 @@ mod tests {
         );
         assert_eq!(PathBoundSolution::Unsolved.as_type(), None);
         assert_eq!(
-            CandidateSolutions::Constrained(Box::new([CandidateSolution {
-                typevars: Box::new([path_bound]),
-                validity: SolutionValidity::Valid,
-            }]))
+            CandidateSolutions::Constrained {
+                inferable: TypeVarSet::from_typevars(db, [t]),
+                paths: Box::new([CandidateSolution {
+                    typevars: Box::new([path_bound]),
+                    validity: SolutionValidity::Valid,
+                }]),
+            }
             .solve(db, &env, &builder,),
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])]))
         );
@@ -5796,8 +6061,11 @@ class E: ...
                     expected_paths.reverse();
                 }
                 assert_eq!(
-                    CandidateSolutions::Constrained(paths.into_boxed_slice())
-                        .solve(db, &env, &builder,),
+                    CandidateSolutions::Constrained {
+                        inferable: TypeVarSet::from_typevars(db, [t, u]),
+                        paths: paths.into_boxed_slice(),
+                    }
+                    .solve(db, &env, &builder,),
                     Solutions::Constrained(SolutionPaths::BudgetExceeded(expected_paths))
                 );
             }

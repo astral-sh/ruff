@@ -13,7 +13,11 @@ use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
     SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions, TypeVarSolution,
 };
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
+use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::typevar::{
+    BindingContext, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarNonce, TypeVarSet,
+};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
 };
@@ -281,6 +285,147 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
         PathBoundSolution::Unsolved
     });
     assert!(matches!(result, Ok(Solutions::Constrained(_))));
+}
+
+#[test]
+fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S");
+    let u = create_typevar(db, "U");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    for fixed in [[s, u], [u, s]] {
+        let builder = ConstraintSetBuilder::new();
+        let lower = |ty| ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, ty);
+        let set =
+            lower(Type::TypeVar(fixed[0])).or(db, &builder, || lower(Type::TypeVar(fixed[1])));
+        let result = set.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            |_, candidate| CandidateSolutions::default_solve(db, &env, &builder, candidate),
+        );
+        let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+            panic!("expected invalid paths, got {result:?}");
+        };
+        let violations = paths
+            .iter()
+            .flat_map(Solution::violations)
+            .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            violations,
+            fixed.map(|variable| (
+                t,
+                SolutionViolationKind::UpperBound(Some(Type::TypeVar(variable)))
+            ))
+        );
+    }
+}
+
+#[test]
+fn custom_choice_must_satisfy_declared_upper_bound() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = Type::TypeVar(create_typevar(db, "S"));
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, Type::object());
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
+        PathBoundSolution::Solved(s)
+    });
+    let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+        panic!("expected invalid path, got {result:?}");
+    };
+    let violations = paths
+        .iter()
+        .flat_map(Solution::violations)
+        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        violations,
+        [(t, SolutionViolationKind::UpperBound(Some(s)))]
+    );
+}
+
+#[test]
+fn incomplete_paramspec_does_not_reject_potentially_captured_typevar() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = Type::TypeVar(create_typevar(db, "S"));
+    let paramspec_identity = TypeVarIdentity::new(
+        db,
+        Name::new_static("P"),
+        None,
+        TypeVarKind::Pep695ParamSpec,
+    );
+    let paramspec = BoundTypeVarInstance::new(
+        db,
+        TypeVarInstance::new(db, paramspec_identity, None, None, None),
+        BindingContext::Synthetic(env.program(db)),
+        None,
+        TypeVarNonce::NONE,
+    );
+    let paramspec_value = Type::paramspec_value_callable(db, Parameters::empty());
+    let candidates = CandidateSolutions::Constrained {
+        inferable: TypeVarSet::from_typevars(db, [t, paramspec]),
+        paths: Box::new([CandidateSolution {
+            typevars: Box::new([
+                CandidateTypeVarSolution::from_equivalence(t, s),
+                CandidateTypeVarSolution::from_equivalence(paramspec, paramspec_value),
+            ]),
+            validity: SolutionValidity::Valid,
+        }]),
+    };
+    let solve = |choice| {
+        candidates.solve_with(db, &env, |_, candidate| {
+            if candidate.bound_typevar == paramspec {
+                choice
+            } else {
+                PathBoundSolution::Solved(s)
+            }
+        })
+    };
+
+    // An incomplete ParamSpec may have omitted S's generic context, even when it has a fallback.
+    for fallback in [None, Some(paramspec_value)] {
+        let mut bindings = vec![binding(t, s)];
+        bindings.extend(fallback.map(|ty| binding(paramspec, ty)));
+        assert_eq!(
+            solve(PathBoundSolution::BudgetExceeded { fallback }),
+            Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![solution(bindings)]))
+        );
+    }
+
+    // A complete ParamSpec with no captured variables does not excuse the fixed variable S.
+    let result = solve(PathBoundSolution::Solved(paramspec_value));
+    let Solutions::Unsatisfiable(SolutionPaths::Complete(paths)) = result else {
+        panic!("expected invalid path, got {result:?}");
+    };
+    let violations = paths
+        .iter()
+        .flat_map(Solution::violations)
+        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        violations,
+        [(t, SolutionViolationKind::UpperBound(Some(s)))]
+    );
 }
 
 #[test]
@@ -757,18 +902,25 @@ class E: ...
     // Charging the input alone does not prevent that expansion; the fold also needs a bounded
     // intersection constructor.
     for alternatives in [[left, right], [right, left]] {
-        let paths = CandidateSolutions::Constrained(
-            alternatives
+        let paths = CandidateSolutions::Constrained {
+            inferable: TypeVarSet::from_typevars(db, [t]),
+            paths: alternatives
                 .map(|ty| CandidateSolution {
                     typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
                         as Box<[_]>,
                     validity: SolutionValidity::Valid,
                 })
                 .into(),
-        );
+        };
 
         assert_eq!(
             paths.try_fold_with(
+                db,
+                &env,
+                &mut super::super::BoundedSolutionLimits {
+                    remaining_paths: usize::MAX,
+                    remaining_visits: usize::MAX,
+                },
                 |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
@@ -784,4 +936,83 @@ class E: ...
         );
     }
     Ok(())
+}
+
+#[test]
+fn validation_shares_the_projection_visit_budget() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let s = create_typevar(db, "S");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+
+    // Binding an explicitly annotated receiver retains the condition `int <= S` in the
+    // signature. The assignment to the declared callable bound therefore remains nonterminal.
+    let bound = Type::single_callable(db, Signature::new(Parameters::empty(), Type::object()));
+    let selected = Type::single_callable(
+        db,
+        Signature::new(
+            Parameters::from_annotation(
+                db,
+                [Parameter::positional_only(None).with_annotated_type(Type::TypeVar(s))],
+            ),
+            Type::TypeVar(s),
+        )
+        .bind_self_with_receiver(db, &env, Some(int), None),
+    );
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
+    let u = create_typevar(db, "U");
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+    let builder = ConstraintSetBuilder::new();
+    let set = exact(db, &builder, t, bound)
+        .and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
+    let default_budget = SolutionBudget::default();
+    let (_, remaining) = set
+        .bounded_path_bounds(db, &env, inferable, default_budget)
+        .unwrap();
+    let budget = SolutionBudget {
+        visits: default_budget.visits - remaining.remaining_visits,
+        ..default_budget
+    };
+
+    // The first alternative is retained. The second requires validation, but collection has
+    // consumed the visit budget, so neither API may return the prefix as a complete result.
+    let mut selected_paths = 0;
+    let result = set.solutions_with(db, &env, inferable, budget, |_, candidate| {
+        if candidate.bound_typevar == t {
+            selected_paths += 1;
+            PathBoundSolution::Solved(if selected_paths == 1 { bound } else { selected })
+        } else {
+            CandidateSolutions::default_solve(db, &env, &builder, candidate)
+        }
+    });
+    assert_eq!(selected_paths, 2);
+    assert_eq!(result, Err(ProjectionError::TraversalBudgetExceeded));
+
+    let mut selected_paths = 0;
+    let mut folded_paths = 0;
+    let result = set.try_fold_solutions(
+        db,
+        &env,
+        inferable,
+        budget,
+        |_, candidate| {
+            if candidate.bound_typevar == t {
+                selected_paths += 1;
+                PathBoundSolution::Solved(if selected_paths == 1 { bound } else { selected })
+            } else {
+                CandidateSolutions::default_solve(db, &env, &builder, candidate)
+            }
+        },
+        0,
+        |count, _, _| {
+            folded_paths += 1;
+            Ok(count + 1)
+        },
+    );
+    assert_eq!(selected_paths, 2);
+    assert_eq!(folded_paths, 1);
+    assert_eq!(result, Err(ProjectionError::TraversalBudgetExceeded));
 }
