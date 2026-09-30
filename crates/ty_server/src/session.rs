@@ -26,7 +26,7 @@ use ty_project::metadata::Options;
 use ty_project::watch::ChangeEvent;
 use ty_project::{
     ChangeResult, Db as _, ProjectDatabase, ProjectMetadata, ProjectReloadResult,
-    ScriptEnvironmentAvailability, UseUv, UvSyncChanges,
+    ScriptEnvironmentAvailability, UseUv, UvSyncChanges, UvWorkspace,
 };
 
 use index::DocumentError;
@@ -776,11 +776,11 @@ impl Session {
                 configuration_file.clone(),
                 workspace_directory,
                 &system,
-                self.use_uv,
             )
         } else {
-            ProjectMetadata::discover_with_uv(workspace_directory, &system, self.use_uv)
-        };
+            ProjectMetadata::discover(workspace_directory, &system)
+        }
+        .map(|metadata| metadata.with_use_uv(self.use_uv));
 
         let (mut metadata, discovery_result) =
             match metadata.context("Failed to discover project configuration") {
@@ -811,7 +811,15 @@ impl Session {
                     .apply_configuration_files(&system)
                     .context("Failed to apply configuration files"),
             )
-            .and_then(|()| ProjectDatabase::fallible(metadata.clone(), system.clone()));
+            .and_then(|()| {
+                if metadata.use_uv().workspace_discovery_enabled() {
+                    let workspace = UvWorkspace::discover(workspace_directory, &system);
+                    metadata
+                        .apply_uv_workspace(&system, workspace)
+                        .context("Failed to discover uv workspace")?;
+                }
+                ProjectDatabase::fallible(metadata.clone(), system.clone())
+            });
 
         let mut db = project.unwrap_or_else(|err| {
             tracing::error!(
