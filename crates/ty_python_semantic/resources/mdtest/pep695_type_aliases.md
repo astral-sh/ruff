@@ -372,7 +372,7 @@ def f(condition: bool):
     alias = Left
     reveal_type(alias)  # revealed: TypeAliasType
 
-    while condition:
+    while condition:  # error: [invariant-while-condition]
         type Right = str
         alias |= Right
         reveal_type(alias)  # revealed: <types.UnionType special-form 'int | str'>

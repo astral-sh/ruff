@@ -1134,6 +1134,16 @@
             }
           ]
         },
+        "invariant-while-condition": {
+          "title": "detects while loops whose condition cannot change between iterations",
+          "description": "## What it does\n\nDetects `while` loops whose condition has unknown initial truthiness but cannot change between\niterations.\n\n## Why is this bad?\n\nIf the condition is initially false, the loop never runs. If it is initially true, testing it again\ncannot end the loop. This often indicates that the condition should be updated inside the loop.\n\nThe rule checks unchanged local variables with immutable values, such as booleans, and identity\ncomparisons of unchanged local variables. It excludes conditions with calls, attribute lookups, or\npotentially stateful truthiness or comparisons, and variables writable from another scope. Explicit\nliteral conditions such as `while True`, `while 1`, and `while 0` are not reported. Conditions whose\ntruthiness is statically known are handled by `redundant-condition` and `redundant-condition-strict`\ninstead.\n\n## Examples\n\n```py\nimport time\n\n\ndef wait(condition: bool):\n    while condition:  # error: [invariant-while-condition]\n        time.sleep(0.5)\n        print(\"waiting...\")\n```\n\nIf this behavior is intentional, test the condition once and use an explicit infinite loop:\n\n```py\nimport time\n\n\ndef wait(condition: bool):\n    if condition:\n        while True:\n            time.sleep(0.5)\n            print(\"waiting...\")\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "isinstance-against-protocol": {
           "title": "reports invalid runtime checks against protocol classes",
           "description": "## What it does\n\nReports invalid runtime checks against `Protocol` classes. This includes explicit calls\n`isinstance()`/`issubclass()` against non-runtime-checkable protocols, `issubclass()` calls against\nprotocols that have non-method members, and implicit `isinstance()` checks against\nnon-runtime-checkable protocols via pattern matching.\n\n## Why is this bad?\n\nThese calls (implicit or explicit) raise `TypeError` at runtime.\n\n## Examples\n\n```python\nfrom typing_extensions import Protocol, runtime_checkable\n\n\nclass HasX(Protocol):\n    x: int\n\n\n@runtime_checkable\nclass HasY(Protocol):\n    y: int\n\n\ndef f(arg: object, arg2: type):\n    # not runtime-checkable\n    isinstance(arg, HasX)  # error: [isinstance-against-protocol]\n    # not runtime-checkable\n    issubclass(arg2, HasX)  # error: [isinstance-against-protocol]\n\n\ndef g(arg: object):\n    match arg:\n        # not runtime-checkable\n        case HasX():  # error: [isinstance-against-protocol]\n            pass\n\n\ndef h(arg2: type):\n    isinstance(arg2, HasY)  # fine (runtime-checkable)\n\n    # `HasY` is runtime-checkable, but has non-method members,\n    # so it still can't be used in `issubclass` checks)\n    issubclass(arg2, HasY)  # error: [isinstance-against-protocol]\n```\n\n## References\n\n- [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)",

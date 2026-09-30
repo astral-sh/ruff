@@ -3427,14 +3427,14 @@ mapping, so its entry type is `object`.
 
 ```py
 def match_loop_carried_capture(flag: bool, x: int) -> None:
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         match x:
             case x:
                 reveal_type(x)  # revealed: int
 
 def match_loop_carried_sequence_capture(flag: bool) -> None:
     x = (1,)
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         match x:
             case [x]:
                 reveal_type(x)  # revealed: Literal[1]
@@ -3444,20 +3444,20 @@ class CycleBox:
 
 def match_loop_carried_class_capture(flag: bool) -> None:
     x = CycleBox()
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         match x:
             case CycleBox(value=x):
                 reveal_type(x)  # revealed: int
 
 def match_loop_carried_mapping_capture(flag: bool) -> None:
     x = {"value": 1}
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         match x:
             case {"value": x}:
                 reveal_type(x)  # revealed: object
 
 def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         match x:
             case int(x):
                 reveal_type(x)  # revealed: int

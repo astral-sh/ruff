@@ -40,7 +40,7 @@ use crate::{
         call::bind::CallableDescription,
         context::InferContext,
         definition_expression_type_in_scope,
-        diagnostic::typing_module_for_fix,
+        diagnostic::{INVARIANT_WHILE_CONDITION, typing_module_for_fix},
         enum_metadata,
         function::KnownFunction,
         infer::{
@@ -58,6 +58,20 @@ use crate::{
 use super::{ConditionKind, RedundantCondition, exemptions::condition_definition_info};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
+    pub(super) fn report_invariant_while_condition(&self, statement: &ast::StmtWhile) {
+        let Some(builder) = self
+            .context
+            .report_lint(&INVARIANT_WHILE_CONDITION, &*statement.test)
+        else {
+            return;
+        };
+        let mut diagnostic =
+            builder.into_diagnostic("Loop condition does not change between iterations");
+        diagnostic.help(
+            "If this is intentional, move the condition to an `if` statement and use `while True`",
+        );
+    }
+
     pub(super) fn report_redundant_condition<'ctx>(
         &'ctx self,
         condition: &RedundantCondition<'_, 'db>,

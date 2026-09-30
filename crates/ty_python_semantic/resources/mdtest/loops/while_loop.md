@@ -5,7 +5,7 @@
 ```py
 def _(flag: bool):
     x = 1
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         x = 2
 
     reveal_type(x)  # revealed: Literal[1, 2]
@@ -16,7 +16,7 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     x = 1
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         x = 2
     else:
         reveal_type(x)  # revealed: Literal[1, 2]
@@ -31,7 +31,7 @@ def _(flag: bool):
 def _(flag: bool, flag2: bool):
     x = 1
     y = 0
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         x = 2
         if flag2:
             y = 4
@@ -78,7 +78,7 @@ Make sure that the boundness information is correctly tracked in `while` loop co
 
 ```py
 def _(flag: bool):
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         x = 1
 
     # error: [possibly-unresolved-reference]
@@ -89,7 +89,7 @@ def _(flag: bool):
 
 ```py
 def _(flag: bool):
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         y = 1
     else:
         x = 1
@@ -104,7 +104,7 @@ def _(flag: bool):
 
 ```py
 def _(flag: bool, flag2: bool):
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         x = 1
         if flag2:
             break
@@ -423,7 +423,7 @@ def stop() -> bool:
 
 def f(repeat: bool):
     x = 0
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         x  # error: [possibly-unresolved-reference]
         while True:
             if stop():
@@ -444,7 +444,7 @@ def stop() -> bool:
 
 def f(repeat: bool):
     x = 0
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(x)  # revealed: Literal[0]
         while True:
             if stop():
@@ -466,7 +466,7 @@ def stop() -> bool:
 
 def f(repeat: bool):
     x = 1
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(x)  # revealed: Literal[1]
         while x:
             if stop():
@@ -1132,7 +1132,7 @@ def f(box: Box, replacement: Box, repeat: bool):
     if box.value:
         return
 
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(box.value)  # revealed: bool
         while True:
             if stop():

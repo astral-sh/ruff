@@ -1547,7 +1547,7 @@ class C:
 
     def __init__(self, repeat: bool, replacement: "C") -> None:
         self.value
-        while repeat:
+        while repeat:  # error: [invariant-while-condition]
             self = replacement
 ```
 

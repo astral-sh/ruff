@@ -537,7 +537,7 @@ def finally_runs_before_break():
             reveal_type(x)  # revealed: Literal["break"]
 
 def finally_runs_before_continue(cond: bool):
-    while cond:
+    while cond:  # error: [invariant-while-condition]
         x = "before"
         try:
             x = "continue"

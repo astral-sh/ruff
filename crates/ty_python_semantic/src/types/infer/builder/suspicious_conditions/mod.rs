@@ -1,5 +1,5 @@
 //! Logic for reporting boolean tests with fixed truthiness, or suspicious tests of values typed as
-//! `Callable`, `Iterable`, or unions containing `None`.
+//! `Callable`, `Iterable`, or unions containing `None`, and invariant loop conditions.
 //!
 //! This module classifies tests and selects which expressions to report. [`exemptions`] handles
 //! assertions, defensive branches, and environment checks; [`diagnostic`] builds messages and fixes.
@@ -53,6 +53,7 @@
 
 mod diagnostic;
 mod exemptions;
+mod loops;
 
 use bitflags::bitflags;
 use ruff_python_ast::{
@@ -71,8 +72,9 @@ use crate::{
         CallableTypes, KnownClass, KnownInstanceType, MemberLookupPolicy, Type, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
-            REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT, TRUTHINESS_TEST_OF_CALLABLE,
-            TRUTHINESS_TEST_OF_ITERABLE, TRUTHINESS_TEST_OF_NONE_UNION,
+            INVARIANT_WHILE_CONDITION, REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT,
+            TRUTHINESS_TEST_OF_CALLABLE, TRUTHINESS_TEST_OF_ITERABLE,
+            TRUTHINESS_TEST_OF_NONE_UNION,
         },
         infer::TypeInferenceBuilder,
         typevar::TypeVarSet,
@@ -394,6 +396,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// - None of the relevant rules are enabled in the user's configuration
     fn should_check_redundant_conditions(&self) -> bool {
         static RELEVANT_RULES: &[&LintMetadata] = &[
+            &INVARIANT_WHILE_CONDITION,
             &REDUNDANT_CONDITION,
             &REDUNDANT_CONDITION_STRICT,
             &TRUTHINESS_TEST_OF_CALLABLE,
@@ -626,6 +629,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
                 ast::Stmt::While(while_statement) => {
+                    self.check_invariant_while_condition(while_statement);
                     let boolean_test =
                         self.boolean_test(&while_statement.test, ExpressionContext::Condition);
                     for condition in self

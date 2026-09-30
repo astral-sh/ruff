@@ -195,6 +195,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
     registry.register_lint(&TRUTHINESS_TEST_OF_NONE_UNION);
     registry.register_lint(&REDUNDANT_CONDITION);
+    registry.register_lint(&INVARIANT_WHILE_CONDITION);
     registry.register_lint(&REDUNDANT_CONDITION_STRICT);
     registry.register_lint(&TRUTHINESS_TEST_OF_CALLABLE);
     registry.register_lint(&TRUTHINESS_TEST_OF_ITERABLE);
@@ -1396,6 +1397,15 @@ declare_lint! {
         summary: "detects truthiness checks that conflate `None` with other falsy values",
         status: LintStatus::stable("0.0.84"),
         default_level: Level::Ignore,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/invariant-while-condition.md")]
+    pub(crate) static INVARIANT_WHILE_CONDITION = {
+        summary: "detects while loops whose condition cannot change between iterations",
+        status: LintStatus::stable("0.0.85"),
+        default_level: Level::Warn,
     }
 }
 

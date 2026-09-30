@@ -443,7 +443,7 @@ branch unreachable.
 ```py
 def loop_condition(flag: bool):
     value = 0
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         if value < 1 < 0:
             value = Comparable()
         reveal_type(value)  # revealed: Literal[0]

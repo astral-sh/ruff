@@ -2636,7 +2636,7 @@ from typing_extensions import dataclass_transform
 
 def repeat(flag: bool):
     transform = None
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         transform = dataclass_transform(field_specifiers=(lambda: transform,))
     reveal_type(transform)  # revealed: None | <decorator produced by typing.dataclass_transform>
 ```

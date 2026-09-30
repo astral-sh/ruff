@@ -364,7 +364,7 @@ literal type or using the rejected value.
 ```py
 def rejected(repeat: bool):
     values: dict[str, int | None] = {"a": 1}
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(values["a"])  # revealed: int
         values = {"a": "bad"}  # error: [invalid-assignment]
         assert values["a"] is not None
@@ -388,7 +388,7 @@ class C:
 
 def f(c: C, repeat: bool) -> int:
     reveal_type(c.values["a"])  # revealed: int
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(c.values["a"])  # revealed: int
         c.values = {"a": "bad"}
     return c.values["a"]
@@ -400,7 +400,7 @@ Inferring that assignment must converge without using the setter's input type fo
 ```py
 def loop_carried_value(c: C, repeat: bool) -> int:
     reveal_type(c.values["a"])  # revealed: int
-    while repeat:
+    while repeat:  # error: [invariant-while-condition]
         reveal_type(c.values["a"])  # revealed: int
         c.values = {"a": str(c.values["a"])}
     return c.values["a"]

@@ -133,13 +133,13 @@ def f(x: int) -> int:
 
 def loop(flag: bool) -> None:
     value = partial(f)
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         value = value | None  # error: [unsupported-operator]
     reveal_type(value)  # revealed: partial[(x: int) -> int] | Unknown
 
 def reverse_loop(flag: bool) -> None:
     value = staticmethod(f)
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         value = None | value  # error: [unsupported-operator]
     reveal_type(value)  # revealed: staticmethod[def f(x: int) -> int] | Unknown
 ```

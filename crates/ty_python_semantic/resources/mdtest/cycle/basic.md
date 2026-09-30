@@ -58,7 +58,7 @@ accumulating a new fixed-length alternative on each inference iteration.
 ```py
 def repeat(flag: bool) -> None:
     value = ()
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         value += (1,)
     reveal_type(value)  # revealed: tuple[Literal[1], ...]
 ```
@@ -71,7 +71,7 @@ type preserves those shapes:
 ```py
 def alternate(flag: bool):
     value = (1,)
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         value = ("a", "b") if len(value) == 1 else (1,)
     reveal_type(value)  # revealed: tuple[Literal[1]] | tuple[Literal["a"], Literal["b"]]
 ```

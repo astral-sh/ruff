@@ -3066,6 +3066,7 @@ filters:
 
 ```py
 def condition_contexts(value: int, enabled: bool):
+    # error: [invariant-while-condition]
     while enabled and value is not None:  # error: [redundant-condition-strict] "Condition `value is not None` is always true"
         break
     
@@ -3122,9 +3123,9 @@ def short_circuit_operands(value: object, enabled: bool):
 
 ```snapshot
 error[redundant-condition-strict]: Condition is always false
-  --> src/mdtest_snippet.py:43:20
+  --> src/mdtest_snippet.py:44:20
    |
-43 |     if enabled or (value and False):  # snapshot: redundant-condition-strict
+44 |     if enabled or (value and False):  # snapshot: redundant-condition-strict
    |                    ^^^^^^^^^^^^^^^ Inferred type is `~AlwaysTruthy`
 ```
 
@@ -5330,7 +5331,7 @@ always-truthy condition environment-dependent, whether the aliases are names or 
 ```py
 def plain_cycle(flag: bool):
     first = second = "ready"
-    while flag:
+    while flag:  # error: [invariant-while-condition]
         first = second
         second = first
     if first:  # error: [redundant-condition] "Nonempty string `first` is always truthy (has type `Literal["ready"]`)"
@@ -5340,7 +5341,7 @@ class AttributeCycle:
     def check(self, flag: bool):
         self.first = self.second = "ready"
 
-        while flag:
+        while flag:  # error: [invariant-while-condition]
             self.first = self.second
             self.second = self.first
 
@@ -5358,7 +5359,7 @@ import sys
 class PlatformAttributeCycle:
     def check(self, flag: bool):
         self.first = self.second = "ready"
-        while flag:
+        while flag:  # error: [invariant-while-condition]
             self.first = self.second
             self.second = self.first
             self.second = sys.platform
