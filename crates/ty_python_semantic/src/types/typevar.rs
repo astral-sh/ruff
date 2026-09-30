@@ -24,7 +24,10 @@ use crate::{
         definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{
+            self, TypeCollector, TypeVisitor, any_over_type_expanding_aliases,
+            walk_type_with_recursion_guard,
+        },
     },
 };
 use ty_python_core::{
@@ -1260,6 +1263,9 @@ impl<'db> BoundTypeVarInstance<'db> {
         specialization: Specialization<'db>,
         env: &ProgramEnvironment<'db>,
     ) -> Self {
+        // A retained `Self` describes the method's receiver domain, not a materialized member.
+        // Preserve gradual owner arguments so that either materialization remains a valid receiver.
+        let specialization = specialization.with_materialization_kind(db, None);
         let mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
         let visitor = ApplyTypeMappingVisitor::new(env);
@@ -1462,6 +1468,22 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
         }
+    }
+
+    /// Preserves this type variable's upper bound in a gradual type argument.
+    pub(super) fn bound_type_argument(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if !any_over_type_expanding_aliases(db, env, ty, |ty| ty.is_dynamic()) {
+            return ty;
+        }
+        let Some(upper_bound) = self.top_materialized_upper_bound(db) else {
+            return ty;
+        };
+        IntersectionType::from_two_elements(db, env, ty, upper_bound)
     }
 
     /// Returns the static upper bound used when materializing a gradual type argument.
