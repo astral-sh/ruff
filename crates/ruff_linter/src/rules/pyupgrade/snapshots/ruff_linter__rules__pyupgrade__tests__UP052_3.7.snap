@@ -1,0 +1,285 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:11:17
+   |
+10 | @contextmanager
+11 | def simple() -> Iterator[int]:
+   |                 ^^^^^^^^^^^^^
+12 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+10 | @contextmanager
+   - def simple() -> Iterator[int]:
+11 + def simple() -> t.Generator[int, None, None]:
+12 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> UP052.py:16:29
+   |
+15 | @asynccontextmanager
+16 | async def asynchronous() -> AsyncIterator[str]:
+   |                             ^^^^^^^^^^^^^^^^^^
+17 |     yield "value"
+   |
+help: Replace with `AsyncGenerator`
+   |
+15 | @asynccontextmanager
+   - async def asynchronous() -> AsyncIterator[str]:
+16 + async def asynchronous() -> t.AsyncGenerator[str, None]:
+17 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:21:18
+   |
+20 | @cm
+21 | def aliased() -> I[str]:
+   |                  ^^^^^^
+22 |     yield "value"
+   |
+help: Replace with `Generator`
+   |
+20 | @cm
+   - def aliased() -> I[str]:
+21 + def aliased() -> Generator[str, None, None]:
+22 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> UP052.py:26:30
+   |
+25 | @cl.asynccontextmanager
+26 | async def aliased_async() -> AI[int]:
+   |                              ^^^^^^^
+27 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+1  | from collections import abc
+   - from collections.abc import AsyncIterator as AI, Generator, Iterator as I
+2  + from collections.abc import AsyncIterator as AI, Generator, Iterator as I, AsyncGenerator
+3  | from contextlib import asynccontextmanager, contextmanager
+--------------------------------------------------------------------------------
+25 | @cl.asynccontextmanager
+   - async def aliased_async() -> AI[int]:
+26 + async def aliased_async() -> AsyncGenerator[int, None]:
+27 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:31:20
+   |
+30 | @cl.contextmanager
+31 | def qualified() -> abc.Iterator[tuple[int, str]]:
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+32 |     yield (1, "value")
+   |
+help: Replace with `Generator`
+   |
+30 | @cl.contextmanager
+   - def qualified() -> abc.Iterator[tuple[int, str]]:
+31 + def qualified() -> Generator[tuple[int, str], None, None]:
+32 |     yield (1, "value")
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:36:18
+   |
+35 | @contextmanager
+36 | def quoted() -> "t.Iterator[str]":
+   |                  ^^^^^^^^^^^^^^^
+37 |     yield "value"
+   |
+help: Replace with `Generator`
+   |
+35 | @contextmanager
+   - def quoted() -> "t.Iterator[str]":
+36 + def quoted() -> "t.Generator[str, None, None]":
+37 |     yield "value"
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> UP052.py:41:30
+   |
+40 | @asynccontextmanager
+41 | async def quoted_async() -> 't.AsyncIterator[int]':
+   |                              ^^^^^^^^^^^^^^^^^^^^
+42 |     yield 1
+   |
+help: Replace with `AsyncGenerator`
+   |
+40 | @asynccontextmanager
+   - async def quoted_async() -> 't.AsyncIterator[int]':
+41 + async def quoted_async() -> 't.AsyncGenerator[int, None]':
+42 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:46:25
+   |
+45 | @contextmanager
+46 | def complex_string() -> "Iter" "ator[int]":
+   |                         ^^^^^^^^^^^^^^^^^^
+47 |     yield 1
+   |
+help: Replace with `Generator`
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:51:25
+   |
+50 |   @contextmanager
+51 |   def trailing_comma() -> Iterator[
+   |  _________________________^
+52 | |     int,  # yielded type
+53 | | ]:
+   | |_^
+54 |       yield 1
+   |
+help: Replace with `Generator`
+   |
+50 | @contextmanager
+   - def trailing_comma() -> Iterator[
+   -     int,  # yielded type
+51 + def trailing_comma() -> t.Generator[
+52 +     int, None, None,  # yielded type
+53 | ]:
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:58:29
+   |
+57 | @contextmanager
+58 | def parenthesized_item() -> Iterator[(int),]:
+   |                             ^^^^^^^^^^^^^^^^
+59 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+57 | @contextmanager
+   - def parenthesized_item() -> Iterator[(int),]:
+58 + def parenthesized_item() -> t.Generator[(int), None, None,]:
+59 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:63:30
+   |
+62 | @contextmanager
+63 | def parenthesized_tuple() -> Iterator[(int,)]:
+   |                              ^^^^^^^^^^^^^^^^
+64 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+62 | @contextmanager
+   - def parenthesized_tuple() -> Iterator[(int,)]:
+63 + def parenthesized_tuple() -> t.Generator[(int, None, None,)]:
+64 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:68:37
+   |
+67 | @contextmanager
+68 | def quoted_parenthesized_item() -> "Iterator[(int),]":
+   |                                     ^^^^^^^^^^^^^^^^
+69 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+67 | @contextmanager
+   - def quoted_parenthesized_item() -> "Iterator[(int),]":
+68 + def quoted_parenthesized_item() -> "t.Generator[(int), None, None,]":
+69 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:73:24
+   |
+72 | @contextmanager
+73 | def returns_value() -> Iterator[int]:
+   |                        ^^^^^^^^^^^^^
+74 |     yield 1
+75 |     return "done"
+   |
+help: Replace with `Generator`
+   |
+72 | @contextmanager
+   - def returns_value() -> Iterator[int]:
+73 + def returns_value() -> t.Generator[int, None, object]:
+74 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:79:22
+   |
+78 | @contextmanager
+79 | def yields_from() -> Iterator[int]:
+   |                      ^^^^^^^^^^^^^
+80 |     yield from (1, 2)
+   |
+help: Replace with `Generator`
+   |
+78 | @contextmanager
+   - def yields_from() -> Iterator[int]:
+79 + def yields_from() -> t.Generator[int, None, None]:
+80 |     yield from (1, 2)
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+  --> UP052.py:85:26
+   |
+83 | @other_decorator
+84 | @contextmanager
+85 | def outer_decorator() -> Iterator[int]:
+   |                          ^^^^^^^^^^^^^
+86 |     yield 1
+   |
+help: Replace with `Generator`
+   |
+84 | @contextmanager
+   - def outer_decorator() -> Iterator[int]:
+85 + def outer_decorator() -> t.Generator[int, None, None]:
+86 |     yield 1
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+UP052 Use `Generator` instead of `Iterator` for a context manager
+   --> UP052.py:147:31
+    |
+145 | def shadowed_typing(t, object):
+146 |     @contextmanager
+147 |     def version_specific() -> Iterator[int]:
+    |                               ^^^^^^^^^^^^^
+148 |         yield 1
+149 |         return "done"
+    |
+help: Replace with `Generator`
+
+UP052 Use `Generator` instead of `Iterator` for a context manager
+   --> UP052.py:154:25
+    |
+152 | def shadowed_generator(t, Generator):
+153 |     @contextmanager
+154 |     def cannot_fix() -> Iterator[int]:
+    |                         ^^^^^^^^^^^^^
+155 |         yield 1
+    |
+help: Replace with `Generator`

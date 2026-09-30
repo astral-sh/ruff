@@ -1027,6 +1027,7 @@ mod tests {
         	replace-str-enum (UP042),
         	while-one (UP048),
         	deprecated-abc-decorator (UP051),
+        	context-manager-iterator (UP052),
         	if-exp-instead-of-or-operator (FURB110),
         	repeated-append (FURB113),
         	delete-full-slice (FURB131),
