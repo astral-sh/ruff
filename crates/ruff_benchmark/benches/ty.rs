@@ -1096,6 +1096,35 @@ class Node(Protocol):
     }
 }
 
+/// Regression benchmark for a recursive protocol with a specialized receiver.
+///
+/// Comparing these types can repeatedly bind `read` to deeper specializations of `Node`.
+fn benchmark_recursive_protocol_specialized_receiver(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def child(self) -> Node[tuple[T, T]]: ...
+    def read(self: Node[int]) -> int: ...
+
+static_assert(is_subtype_of(Top[Node[int]], Node[int]))
+"#;
+
+    criterion.bench_function("ty_micro[recursive_protocol_specialized_receiver]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -2243,6 +2272,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_recursive_protocol_specialized_receiver,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,
