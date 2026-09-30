@@ -173,12 +173,13 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
 ///         def f(self, other: Annotated[C, ...]): ...
 ///     ```
 ///
-/// * `super().__new__`/`cls` call:
+/// * `super().__new__`/`object.__new__`/`cls` call:
 ///
 ///     ```python
 ///     class C:
 ///         def __new__(cls): ...
 ///             instance = super().__new__(cls)
+///             instance = object.__new__(cls)
 ///         @classmethod
 ///         def m(cls):
 ///             instance = cls()
@@ -294,7 +295,7 @@ impl TypeChecker for SameClassInstanceChecker {
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `self`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__(cls)`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
         // `this = self` — a direct assignment from `self`, but only when
         // `self` is actually a function parameter (not a local rebinding).
@@ -319,15 +320,33 @@ impl TypeChecker for SameClassInstanceChecker {
             }
 
             Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
-                let Expr::Call(ast::ExprCall { func, .. }) = &**value else {
+                if attr != "__new__" {
                     return false;
+                }
+
+                if let Expr::Call(ast::ExprCall { func, .. }) = &**value
+                    && let Expr::Name(ast::ExprName { id: func, .. }) = &**func
+                    && func == "super"
+                {
+                    return true;
+                }
+
+                // `object.__new__(cls)`, `object().__new__(cls)`: only when the
+                // instance is created for the current class.
+                let is_object = match &**value {
+                    Expr::Call(ast::ExprCall {
+                        func, arguments, ..
+                    }) => arguments.is_empty() && semantic.match_builtin_expr(func, "object"),
+                    value => semantic.match_builtin_expr(value, "object"),
                 };
 
-                let Expr::Name(ast::ExprName { id: func, .. }) = &**func else {
-                    return false;
-                };
-
-                func == "super" && attr == "__new__"
+                is_object
+                    && call.arguments.args.first().is_some_and(|arg| {
+                        arg.as_name_expr().is_some_and(|name| {
+                            matches!(&*name.id, "cls" | "mcs")
+                                || Self::is_current_class_name(name, semantic)
+                        })
+                    })
             }
 
             _ => false,
