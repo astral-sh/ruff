@@ -607,8 +607,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
-    /// constraints in this constraint set hold. Panics if neither of the types being compared are
-    /// a typevar. (That case is handled by `Type::has_relation_to`.)
+    /// constraints in this constraint set hold.
     pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
@@ -618,12 +617,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         rhs: Type<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        let mut storage = builder.storage.borrow_mut();
-        let (node, extra_source_order) =
-            self.node
-                .implies_subtype_of(db, env, &mut storage, lhs, rhs);
-        let source_order = storage.ordered_source_order(self.source_order, extra_source_order);
-        Self::from_node(builder, node, source_order)
+        let when = lhs.when_constraint_set_subtype_of(db, env, rhs, builder);
+        self.implies(db, builder, || when)
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
@@ -2646,11 +2641,6 @@ impl NodeId {
         }
     }
 
-    fn implies(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> Self {
-        // p → q == ¬p ∨ q
-        self.negate(storage).or(storage, other)
-    }
-
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
     /// result.
     fn iff(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> Self {
@@ -2716,49 +2706,6 @@ impl NodeId {
                 if_true_or_uncertain.or(storage, if_false)
             }
         }
-    }
-
-    fn implies_subtype_of<'db>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        lhs: Type<'db>,
-        rhs: Type<'db>,
-    ) -> (Self, Option<SourceOrderId>) {
-        // When checking subtyping involving a typevar, we can turn the subtyping check into a
-        // constraint (i.e, "is `T` a subtype of `int` becomes the constraint `T ≤ int`), and then
-        // check when the BDD implies that constraint.
-        //
-        // Note that we are NOT guaranteed that `lhs` and `rhs` will always be fully static, since
-        // these types are coming in from arbitrary subtyping checks that the caller might want to
-        // perform. So we have to take the appropriate materialization when translating the check
-        // into a constraint.
-        let (constraint, constraint_source_order) = match (lhs, rhs) {
-            (Type::TypeVar(bound_typevar), _) => {
-                let constraints = Constraint::new_upper_bound(
-                    db,
-                    env,
-                    ConstraintProvenance::Evidence,
-                    bound_typevar,
-                    rhs.bottom_materialization(db, env),
-                );
-                Constraint::new_nodes(db, env, storage, constraints)
-            }
-            (_, Type::TypeVar(bound_typevar)) => {
-                let constraints = Constraint::new_lower_bound(
-                    db,
-                    ConstraintProvenance::Evidence,
-                    bound_typevar,
-                    lhs.top_materialization(db, env),
-                );
-                Constraint::new_nodes(db, env, storage, constraints)
-            }
-            _ => panic!("at least one type should be a typevar"),
-        };
-
-        let node = self.implies(storage, constraint);
-        (node, constraint_source_order)
     }
 
     /// Returns a new BDD that is the _existential abstraction_ of `self` for a set of typevars.
