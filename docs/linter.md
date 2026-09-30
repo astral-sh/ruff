@@ -294,7 +294,7 @@ enable this entire category.
 
 The `formatting` category contains rules that overlap with code formatters like the Ruff formatter
 or Black. If you use a code formatter, you will likely want to leave this category off. On the other
-hand, if you don't use a code formatter and rely on lint rules to format your code, you can select
+hand, if you don't use a code formatter and rely on lint rules to enforce a consistent code format, you can select
 those rules from this category. Note that it contains rules beyond those related to PEP 8, however,
 so you may still want to select a subset of the `formatting` rules rather than the whole category.
 
