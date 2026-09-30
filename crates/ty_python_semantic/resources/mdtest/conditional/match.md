@@ -744,6 +744,21 @@ def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool)
     reveal_type(result)  # revealed: Literal[1, 2, 3]
 ```
 
+The type of a name captured by the pattern can make the guard always true:
+
+```py
+def enum_with_capture_dependent_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
+    match value:
+        # `red` is always `Color.RED`, so the guard is true and the second case is unreachable.
+        case Color.RED as red if red is Color.RED:
+            result = 1
+        case Color.RED:
+            result = 2
+        case _:
+            result = 3
+    reveal_type(result)  # revealed: Literal[1, 3]
+```
+
 ## Matching on enum | None without covering None
 
 When matching on a union of an enum and None, code after the match should still be reachable if None

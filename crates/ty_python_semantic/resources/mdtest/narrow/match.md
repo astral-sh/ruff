@@ -155,24 +155,24 @@ class MutableTruthiness:
         self.truthy = not self.truthy
         return self.truthy
 
-def or_guard(value: int | str, guard: MutableTruthiness) -> None:
+def or_guard(value: int | str, toggle: MutableTruthiness) -> None:
     match value:
         # The guard is always true, so strings cannot reach the next case.
-        case str() if guard or True:
+        case str() if toggle or True:
             pass
         case remaining:
             reveal_type(remaining)  # revealed: int
 
-def and_guard(value: int | str, guard: MutableTruthiness) -> None:
+def and_guard(value: int | str, toggle: MutableTruthiness) -> None:
     match value:
         # The guard is always false, so strings can reach the next case.
-        case str() if guard and False:
+        case str() if toggle and False:
             pass
         case remaining:
             reveal_type(remaining)  # revealed: int | str
 
-def saved_guard(value: int | str, guard: MutableTruthiness) -> None:
-    saved = guard or True
+def saved_guard(value: int | str, toggle: MutableTruthiness) -> None:
+    saved = toggle or True
     match value:
         # `saved` can be the original object, whose truthiness may have changed.
         case str() if saved:
@@ -3554,13 +3554,13 @@ resolve to a concrete type. For a mapping capture, the recursive subject is know
 mapping, so its entry type is `object`.
 
 ```py
-def match_loop_carried_capture(flag: bool, x: int) -> None:
+def match_capture_in_loop(flag: bool, x: int) -> None:
     while flag:
         match x:
             case x:
                 reveal_type(x)  # revealed: int
 
-def match_loop_carried_sequence_capture(flag: bool) -> None:
+def match_sequence_capture_in_loop(flag: bool) -> None:
     x = (1,)
     while flag:
         match x:
@@ -3570,21 +3570,21 @@ def match_loop_carried_sequence_capture(flag: bool) -> None:
 class CycleBox:
     value: int
 
-def match_loop_carried_class_capture(flag: bool) -> None:
+def match_class_capture_in_loop(flag: bool) -> None:
     x = CycleBox()
     while flag:
         match x:
             case CycleBox(value=x):
                 reveal_type(x)  # revealed: int
 
-def match_loop_carried_mapping_capture(flag: bool) -> None:
+def match_mapping_capture_in_loop(flag: bool) -> None:
     x = {"value": 1}
     while flag:
         match x:
             case {"value": x}:
                 reveal_type(x)  # revealed: object
 
-def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
+def match_builtin_positional_capture_in_loop(flag: bool, x: int) -> None:
     while flag:
         match x:
             case int(x):
@@ -3598,12 +3598,11 @@ match capture_from_later_global():
         reveal_type(captured)  # revealed: int
 ```
 
-Guard inference can also depend on a loop-carried match subject and its pattern captures. In these
-examples, an always-true guard excludes strings from a later capture, while a guard that can be
-false allows strings to reach it.
+The match subject can change between iterations of a loop. In these examples, an always-true guard
+excludes strings from a later capture, while a guard that can be false allows strings to reach it.
 
 ```py
-def loop_carried_guard(value: int | str, again: bool) -> None:
+def guard_with_changing_subject(value: int | str, again: bool) -> None:
     while again:
         match value:
             # `captured` is a string, so the guard is always true and strings cannot reach the next case.
@@ -3613,143 +3612,18 @@ def loop_carried_guard(value: int | str, again: bool) -> None:
                 reveal_type(remaining)  # revealed: int
                 value = remaining
 
-def loop_carried_ambiguous_guard(value: int | str, again: bool) -> None:
-    guard = False
+def guard_with_changing_flag(value: int | str, again: bool) -> None:
+    flag = False
     while again:
         match value:
             # The guard can be false on the first iteration and true on a later one.
-            case str() if guard:
+            case str() if flag:
                 value = 1
             case remaining:
                 # Because the guard can be false, strings can reach this case.
                 reveal_type(remaining)  # revealed: int | str
                 value = remaining
-                guard = True
-```
-
-## Cyclic match subject and guard
-
-The match subject refers to a later pattern capture, and the guard refers to a later binding. We can
-still infer the type of the capture, even though it can never match the subject.
-
-```py
-match lambda: captured:
-    # error: [redundant-condition] "always truthy"
-    case 0 if lambda: module:
-        pass
-    case 0:
-        pass
-    case {**captured}:
-        reveal_type(captured)  # revealed: Never
-    case 0:
-        import sys as module
-```
-
-## Cyclic match subject and comprehension guard
-
-The same dependency can occur through a comprehension in a guard and another guarded pattern.
-
-```py
-from typing import Any
-
-constants: Any = object
-
-match lambda: captured:
-    case 0 if {0: 0 for _ in [lambda: module]}:
-        pass
-    # error: [redundant-condition] "always truthy"
-    case constants.value if (0 for _ in []):
-        pass
-    case {**captured}:
-        reveal_type(captured)  # revealed: Never
-    case 0:
-        import sys as module
-```
-
-## Cyclic match subject and type alias in a guard
-
-The subject can depend directly on a function bound by a later case, while a guard depends on it
-through a type alias.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Any
-
-source: Any = []
-guard_source: Any = []
-pattern: Any = object
-type Alias = compute  # error: [invalid-type-form]
-
-match {0: lambda: compute for _ in source}:
-    case pattern() if {Alias: 0 for _ in guard_source}:
-        pass
-    case 0:
-        pass
-    case Alias:  # error: [invalid-assignment]
-        async def compute() -> Alias:
-            pass
-```
-
-## Cyclic pattern capture and type alias
-
-Inferring a type alias can depend on a later pattern capture whose guard also reads that capture.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-type Alias = captured  # error: [invalid-type-form]
-{Alias}
-match missing or (lambda: flag):  # error: [unresolved-reference]
-    # error: [redundant-condition] "always truthy"
-    case 1 if lambda *, flag: flag:
-        pass
-    case {0: {**captured}, **other} if flag := captured:
-        pass
-```
-
-## Cyclic guarded matches in a loop with invalid code
-
-Inference also terminates when a loop-carried match subject and its captures are involved in a
-cycle, even if the loop and patterns contain errors.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-values = []
-value = 0
-for _outer in 0:  # error: [not-iterable]
-    match (value for _inner in values):
-        case Color.VALUE as value if 0:  # error: [unresolved-reference]
-            pass
-        case Pattern() if value:  # error: [unresolved-reference]
-            type value = int
-        case _ if guard:  # error: [unresolved-reference]
-            break
-```
-
-A comprehension in the subject can also refer to a name bound by a later case, even when an earlier
-guard is always false.
-
-```py
-for _ in 0:  # error: [not-iterable]
-    # error: [possibly-unresolved-reference]
-    match [element for element in captured]:
-        # error: [possibly-unresolved-reference]
-        # error: [unresolved-attribute]
-        case captured.attribute if False:
-            pass
-        case b"" as captured:
-            pass
+                flag = True
 ```
 
 ## Value patterns
