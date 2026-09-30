@@ -29,6 +29,7 @@ def cast_to_call(value: Callable[[], T | Awaitable[T]] | Call[T]) -> Call[T]:
 
 def wait(value: Callable[[], T] | Call[T]) -> T:
     call = cast_to_call(value)
+    # TODO: Refine the validated specializations to reveal Call[T@wait] and accept the return.
     reveal_type(call)  # revealed: Call[Awaitable[T@wait] | T@wait]
     return call.result()  # error: [invalid-return-type]
 ```

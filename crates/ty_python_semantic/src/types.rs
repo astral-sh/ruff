@@ -2365,6 +2365,12 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Checks whether the visited type contents contain no dynamic types.
+    ///
+    /// This is not a complete test for semantic staticness: the visitor skips original function
+    /// signatures and can find `Any` inside already-materialized types such as `Top[list[Any]]`.
+    /// Callers that need to determine whether top and bottom materializations differ should compare
+    /// those materializations directly.
     fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }

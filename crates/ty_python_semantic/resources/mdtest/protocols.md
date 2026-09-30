@@ -6993,6 +6993,7 @@ def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
+    # TODO: Validate and refine individual specializations to reveal Consumer[int].
     reveal_type(extract(value))  # revealed: Consumer[int] | int
 ```
 
@@ -7305,6 +7306,7 @@ bad_assignment: Node[int] = Mismatched(1)  # error: [invalid-assignment]
 def extract[U](node: Node[U]) -> U:
     raise NotImplementedError
 
+# TODO: Refine the structural and inherited specializations separately to reveal str | Literal[1].
 reveal_type(extract(Mismatched(1)))  # revealed: object
 ```
 
