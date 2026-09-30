@@ -2545,7 +2545,7 @@ pub(crate) struct InvocationConstraints<'db, 'c> {
 /// Completed callback renaming and specialization used when validating the outer arguments.
 #[derive(Default)]
 pub(crate) struct InvocationSpecialization<'db> {
-    invocation_specialization: Option<Specialization<'db>>,
+    specialization: Option<Specialization<'db>>,
     freshened_callbacks: FxHashMap<(CallableType<'db>, CallableType<'db>), CallableType<'db>>,
     /// A callback instantiated separately for each expanded argument list stays generic for validation.
     repeated_callback: Option<Signature<'db>>,
@@ -2605,7 +2605,7 @@ impl<'db> InvocationSpecialization<'db> {
         } else {
             actual
         };
-        actual.apply_optional_specialization(db, self.invocation_specialization)
+        actual.apply_optional_specialization(db, self.specialization)
     }
 }
 
@@ -3022,7 +3022,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     /// Retain callback renaming and solved invocation types after collecting all evidence.
     pub(crate) fn into_invocation_specialization(self) -> InvocationSpecialization<'db> {
         InvocationSpecialization {
-            invocation_specialization: self.invocation_specialization,
+            specialization: self.invocation_specialization,
             freshened_callbacks: self.freshened_callbacks,
             repeated_callback: self
                 .paramspec_capture
