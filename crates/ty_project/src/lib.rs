@@ -36,7 +36,8 @@ use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
 pub use uv::{
-    ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, uv_test_env_vars,
+    ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, UvWorkspace,
+    uv_test_env_vars,
 };
 
 mod db;

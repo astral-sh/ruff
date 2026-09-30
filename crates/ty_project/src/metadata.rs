@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::FileRootKind;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -103,7 +103,11 @@ impl ProjectMetadata {
         use_uv: UseUv,
     ) -> Result<Self, ProjectMetadataError> {
         let metadata = Self::load_config_file(path, root, system, use_uv)?;
-        Ok(metadata.with_workspace(Self::uv_workspace_environment(root, system, use_uv)))
+        if use_uv.workspace_discovery_enabled() {
+            Ok(metadata.with_workspace(UvWorkspace::discover(root, system)))
+        } else {
+            Ok(metadata)
+        }
     }
 
     fn load_config_file(
@@ -207,36 +211,14 @@ impl ProjectMetadata {
         system: &dyn System,
         use_uv: UseUv,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let workspace = Self::uv_workspace_environment(path, system, use_uv);
+        let workspace = if use_uv.workspace_discovery_enabled() {
+            UvWorkspace::discover(path, system)
+        } else {
+            UvWorkspace::default()
+        };
 
         Self::discover_with_uv_workspace(path, system, workspace)
             .map(|metadata| metadata.with_use_uv(use_uv))
-    }
-
-    fn uv_workspace_environment(
-        path: &SystemPath,
-        system: &dyn System,
-        use_uv: UseUv,
-    ) -> UvWorkspace {
-        if use_uv.workspace_discovery_enabled() {
-            let metadata = uv::Uv::new(system)
-                .map_err(uv::uv_executable_error)
-                .map_err(uv::UvMetadataError::Invocation)
-                .and_then(|uv| uv.metadata(system, &uv::MetadataTarget::Workspace(path)));
-
-            match metadata {
-                Ok(metadata) => UvWorkspace {
-                    metadata: Some(metadata),
-                    error: None,
-                },
-                Err(error) => UvWorkspace {
-                    metadata: None,
-                    error: Some(error.to_diagnostic(Severity::Warning)),
-                },
-            }
-        } else {
-            UvWorkspace::default()
-        }
     }
 
     fn discover_with_uv_workspace(

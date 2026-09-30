@@ -77,13 +77,13 @@ use ruff_db::FxDashMap;
 use ruff_db::cancellation::CancellationTokenSource;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::File;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use salsa::Setter;
 
 use crate::script::script_tag;
 use crate::uv::{
-    ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError, UvMetadataResult,
-    UvMetadataService, UvSyncTask,
+    MetadataTarget, ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError,
+    UvMetadataResult, UvMetadataService, UvSyncTask, uv_executable_error,
 };
 use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
 
@@ -356,18 +356,16 @@ impl UvEnvironments {
                     };
                     drop(project_sync);
                     let project = db.project();
-                    let workspace = match Uv::parse_metadata_output(db.system(), output) {
-                        Ok(metadata) => UvWorkspace {
-                            metadata: Some(metadata),
-                            error: None,
-                        },
+                    let mut workspace = UvWorkspace::from_metadata_result(
+                        Uv::parse_metadata_output(db.system(), output),
+                    );
+                    if workspace.error.is_some() {
                         // Keep the last working uv metadata so a failed refresh does not change
                         // the environment used for checking. Report the new error instead.
-                        Err(error) => UvWorkspace {
-                            error: Some(error.to_diagnostic(Severity::Warning)),
-                            ..project.metadata(db).uv_workspace().clone()
-                        },
-                    };
+                        workspace
+                            .metadata
+                            .clone_from(&project.metadata(db).uv_workspace().metadata);
+                    }
                     changes.project = Some(match project.rediscover(db, &path, workspace) {
                         Ok(result) => result,
                         Err(error) => {
@@ -527,9 +525,36 @@ impl UvSyncChanges {
 /// Applied workspace metadata and the error from its latest request.
 /// Both fields are absent when no workspace metadata has been requested.
 #[derive(Debug, Default, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) struct UvWorkspace {
+pub struct UvWorkspace {
     pub(crate) metadata: Option<UvMetadata>,
     pub(crate) error: Option<Diagnostic>,
+}
+
+impl UvWorkspace {
+    /// Obtains uv workspace metadata for `path`.
+    ///
+    /// Failures are retained as diagnostics for the project to report.
+    pub fn discover(path: &SystemPath, system: &dyn System) -> Self {
+        let metadata = Uv::new(system)
+            .map_err(uv_executable_error)
+            .map_err(UvMetadataError::Invocation)
+            .and_then(|uv| uv.metadata(system, &MetadataTarget::Workspace(path)));
+
+        Self::from_metadata_result(metadata)
+    }
+
+    fn from_metadata_result(metadata: Result<UvMetadata, UvMetadataError>) -> Self {
+        match metadata {
+            Ok(metadata) => Self {
+                metadata: Some(metadata),
+                error: None,
+            },
+            Err(error) => Self {
+                metadata: None,
+                error: Some(error.to_diagnostic(Severity::Warning)),
+            },
+        }
+    }
 }
 
 /// Whether a script environment is suitable for operations that depend on its dependencies.
