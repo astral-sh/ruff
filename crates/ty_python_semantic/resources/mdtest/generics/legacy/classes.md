@@ -3042,5 +3042,113 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Calling differently specialized bound methods
+
+Each arm retains the relationship between its receiver and the class's type argument, whether the
+union is formed before or after accessing the method.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+    def pair_with_values(self, values: list[T]) -> tuple[Self, T]:
+        return self, self.value
+
+def pairs(a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@pairs], T@pairs]
+    reveal_type(box.pair())
+
+def pairs_reversed(a: Box[str], b: Box[T], cond: bool):
+    box = b if cond else a
+    # revealed: tuple[Box[T@pairs_reversed], T@pairs_reversed] | tuple[Box[str], str]
+    reveal_type(box.pair())
+
+def bound_pairs(a: Box[str], b: Box[T], cond: bool):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str] | tuple[Box[T@bound_pairs], T@bound_pairs]
+    reveal_type(pair())
+
+def bound_pairs_reversed(a: Box[str], b: Box[T], cond: bool):
+    pair = b.pair if cond else a.pair
+    # revealed: tuple[Box[T@bound_pairs_reversed], T@bound_pairs_reversed] | tuple[Box[str], str]
+    reveal_type(pair())
+```
+
+An expected return type also provides context for the call:
+
+```py
+def contextual_argument(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str] | tuple[Box[T], T]:
+    box = a if cond else b
+    return box.pair_with_values([])  # no diagnostic
+
+def inferred_result(a: Box[str], b: Box[T], cond: bool):
+    box = a if cond else b
+    # revealed: tuple[Box[str], str] | tuple[Box[T@inferred_result], T@inferred_result]
+    reveal_type(box.pair_with_values([]))
+
+def wrong_return(a: Box[str], b: Box[T], cond: bool) -> tuple[Box[str], str]:
+    box = a if cond else b
+    return box.pair()  # error: [invalid-return-type]
+```
+
+## Calling a union of generic methods
+
+A method's type parameter is inferred from the argument without changing the caller's type
+parameters or the receiver's specialization.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self, value: U) -> tuple[Self, T, U]:
+        return self, self.value, value
+
+def call(a: Box[str], b: Box[T], cond: bool, value: U):
+    pair = a.pair if cond else b.pair
+    # revealed: tuple[Box[str], str, U@call] | tuple[Box[T@call], T@call, U@call]
+    reveal_type(pair(value))
+
+def wrong_return(a: Box[str], b: Box[T], cond: bool, value: U) -> tuple[Box[str], str, int]:
+    pair = a.pair if cond else b.pair
+    return pair(value)  # error: [invalid-return-type]
+```
+
+## Dictionary methods on unions
+
+Methods on differently specialized dictionaries accept the shared key type and retain the value
+types from both alternatives.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def compare(first: dict[str, T], second: dict[str, int]) -> None:
+    for incoming, current in ((first, first), (second, second)):
+        for key, data in incoming.items():  # no diagnostic
+            reveal_type(data)  # revealed: T@compare | int
+            reveal_type(current.get(key))  # revealed: T@compare | None | int
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
