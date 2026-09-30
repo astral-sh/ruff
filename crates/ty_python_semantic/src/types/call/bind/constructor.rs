@@ -52,7 +52,7 @@ pub(super) struct ConstructorBinding<'db> {
     pub(super) entry: CallableBinding<'db>,
     /// Context for the constructor callable: the instance type being constructed and the kind of
     /// constructor method.
-    pub(super) constructor_context: ConstructorContext<'db>,
+    constructor_context: ConstructorContext<'db>,
     /// Class type variables that can be inferred by this constructor call. Explicitly supplied
     /// class arguments are fixed, even when they contain type variables from the caller.
     inferable_class_context: Option<GenericContext<'db>>,
