@@ -10,14 +10,18 @@ request already addresses the issue, do not submit a competing one without maint
 
 ## PR conventions
 
-Add appropriate GitHub labels to pull requests if you have permission to do so; if you don't,
-there's no need to worry about it. Labels can affect whether and how a pull request appears in the
-Ruff or ty changelog. The `[tool.rooster]` and `[tool.rooster.section-labels]` sections in
-[Ruff's `pyproject.toml`](pyproject.toml) and
-[ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml) specify which
-labels affect each changelog.
+Before opening a PR, inspect the repository's available GitHub labels and the current Rooster
+configuration, including required and ignored labels, in the `[tool.rooster]` and
+`[tool.rooster.section-labels]` sections of [Ruff's `pyproject.toml`](pyproject.toml) and
+[ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml). Labels such as
+`internal`, `testing`, and `ci` can exclude a PR from a changelog. Decide whether and how the change
+should appear in each changelog, then select appropriate labels.
 
 When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label.
+
+If you have permission, apply the selected labels when creating the PR or afterward, then verify
+that the PR's actual labels include them and have the intended effect on each changelog. If the
+available labels or a Rooster configuration could not be inspected, say so when reporting the PR.
 
 ## Code Review Rules
 
