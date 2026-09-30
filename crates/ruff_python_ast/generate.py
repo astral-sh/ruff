@@ -175,13 +175,16 @@ class Node:
 
         fields = []
         for field_name in self.source_order:
-            field = None
             for field in self.fields:
                 if field.skip_source_order():
                     continue
                 if field.name == field_name:
+                    fields.append(field)
                     break
-            fields.append(field)
+            else:
+                raise ValueError(
+                    f"{self.name}: no source-order field named {field_name!r}"
+                )
         return fields
 
 
