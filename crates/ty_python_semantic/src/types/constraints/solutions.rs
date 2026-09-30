@@ -10,8 +10,9 @@ use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
-    CandidateTypeVarSolver, ConstraintAssignment, ConstraintId, ConstraintSetStorage, NodeId,
-    SolutionLimits, SolutionValidity, SolutionViolation, SolutionViolationKind,
+    CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
+    ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
+    SolutionViolationKind,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
@@ -123,6 +124,10 @@ type ProcessSatisfied<'a, 'db, L, B> = dyn FnMut(
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
+    /// The relation before non-inferable variables are projected away. Used to recover the
+    /// original upper bounds for diagnostics, since projected paths can contain derived bounds
+    /// that obscure the original evidence.
+    original_node: NodeId,
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
 
@@ -161,10 +166,12 @@ impl<'db> SolutionWalker<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         source_orders: FxIndexSet<ConstraintId>,
         inferable: TypeVarSet<'db>,
+        original_node: NodeId,
     ) -> Self {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,
+            original_node,
             inferable,
             inferable_support,
             declared_constraint_solutions: FxHashMap::default(),
@@ -537,11 +544,11 @@ impl<'db> SolutionWalker<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
+        constraints: impl Iterator<Item = ConstraintId>,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let mut evidence = CandidateTypeVarSolver::default();
-        for (constraint, _) in path.positive_constraints() {
+        for constraint in constraints {
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
                 && constraint.provenance() == ConstraintProvenance::Evidence
@@ -588,6 +595,117 @@ impl<'db> SolutionWalker<'db> {
         let when_source_order =
             storage.ordered_source_order(when_lower_source_order, when_upper_source_order);
         !when.is_never_satisfied(db, env, storage, when_source_order)
+    }
+
+    /// Finds evidence that excludes every declared constraint without relying on both sides of
+    /// the inferred range together. A conflict between otherwise valid bounds is not itself a
+    /// violation of the type variable's declaration.
+    fn constraint_failure_evidence<L: SolutionLimits>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        evidence: &CandidateTypeVarSolution<'db>,
+        constrained: &Constrained<'db>,
+    ) -> ControlFlow<L::Break, Option<ConstraintFailureEvidence<'db>>> {
+        if let Some(lower) = evidence.inference_lower(db, env)
+            && constrained.declared_constraints.iter().all(|declared| {
+                let when = lower.when_assignable_to_owned(
+                    db,
+                    env,
+                    declared.constrained_ty.top_materialization(db, env),
+                    self.inferable,
+                );
+                let (when, source_order) = storage.load(db, env, &when);
+                when.is_never_satisfied(db, env, storage, source_order)
+            })
+        {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Lower(lower)));
+        }
+
+        // The projected path may contain derived constraints such as `T <= Never`, and source
+        // order also contains constraints from other alternatives. Only collect individual bounds
+        // from the original relation when it is a single conjunction: then each positive edge
+        // necessarily applies to the whole relation. As in `NodeId::is_single_conjunction`, both
+        // a second live branch and an uncertain branch rule out that interpretation. Charge this
+        // scan to the traversal budget because diagnostic collection can occur on many paths.
+        let bound_typevar = evidence.bound_typevar;
+        let mut upper_bounds = Vec::new();
+        let mut current = self.original_node;
+        loop {
+            limits.visit_node()?;
+            let interior = match current.node() {
+                Node::AlwaysTrue => break,
+                Node::AlwaysFalse => {
+                    upper_bounds.clear();
+                    break;
+                }
+                Node::Interior(_) => storage.interior_node_data(current),
+            };
+            if interior.if_uncertain != ALWAYS_FALSE
+                || (interior.if_true != ALWAYS_FALSE && interior.if_false != ALWAYS_FALSE)
+            {
+                upper_bounds.clear();
+                break;
+            }
+            if interior.if_true == ALWAYS_FALSE {
+                current = interior.if_false;
+                continue;
+            }
+            current = interior.if_true;
+            let constraint_id = interior.constraint;
+            let constraint = storage.constraint_data(constraint_id);
+            if constraint.provenance() != ConstraintProvenance::Evidence {
+                continue;
+            }
+            if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
+                let order = self
+                    .source_orders
+                    .get_index_of(&constraint_id)
+                    .unwrap_or(usize::MAX);
+                upper_bounds.push((order, upper));
+            }
+        }
+        upper_bounds.sort_by_key(|(order, _)| *order);
+        let mut unique = FxIndexSet::default();
+        unique.extend(upper_bounds.into_iter().map(|(_, upper)| upper));
+        let has_never = unique.shift_remove(&Type::Never);
+        let upper_bounds: Box<[_]> = unique.into_iter().collect();
+
+        let excludes_every_constraint =
+            |storage: &mut ConstraintSetStorage<'db>, bounds: &[Type<'db>]| {
+                !bounds.is_empty()
+                    && constrained.declared_constraints.iter().all(|declared| {
+                        let mut when = ALWAYS_TRUE;
+                        let mut source_order = None;
+                        for upper in bounds {
+                            let relation = declared
+                                .constrained_ty
+                                .bottom_materialization(db, env)
+                                .when_assignable_to_owned(db, env, *upper, self.inferable);
+                            let (next, next_order) = storage.load(db, env, &relation);
+                            when = when.and(storage, next);
+                            source_order = storage.ordered_source_order(source_order, next_order);
+                        }
+                        when.is_never_satisfied(db, env, storage, source_order)
+                    })
+            };
+        if excludes_every_constraint(storage, &upper_bounds) {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(upper_bounds)));
+        }
+        if has_never && excludes_every_constraint(storage, &[Type::Never]) {
+            return ControlFlow::Continue(Some(ConstraintFailureEvidence::Upper(Box::new([
+                Type::Never,
+            ]))));
+        }
+        // The solver can still establish an upper-bound failure after projection, even when the
+        // original relation has alternatives or no longer contains the individual clauses.
+        let inferred_upper: Vec<_> = evidence.upper.iter_evidence().collect();
+        ControlFlow::Continue(
+            excludes_every_constraint(storage, &inferred_upper)
+                .then_some(ConstraintFailureEvidence::UpperUnknown),
+        )
     }
 
     /// Having found a satisfiable path in the BDD, validates that path against the declared upper
@@ -720,7 +838,14 @@ impl<'db> SolutionWalker<'db> {
         // Note that a fixed caller typevar can only be preserved when its constraints are a subset
         // of this typevar's constraints. A bounded typevar may specialize below its bound, so it
         // must be promoted to an individual declared constraint instead.
-        let Some(evidence) = Self::candidate_evidence(db, env, storage, path, bound_typevar) else {
+        let Some(evidence) = Self::candidate_evidence(
+            db,
+            env,
+            storage,
+            path.positive_constraints()
+                .map(|(constraint, _)| constraint),
+            bound_typevar,
+        ) else {
             // If the evidence is not satisfiable, then we can return early; none of the
             // constraints can possibly be satisfied.
             return ControlFlow::Continue(());
@@ -900,7 +1025,7 @@ impl<'db> SolutionWalker<'db> {
         let previously_pending = self.pending.len();
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
             let constraint = storage.constraint_data(constraint);
-            constraint.provides_lower_bound_for(db, bound_typevar)
+            constraint.lower_bound_for(db, bound_typevar).is_some()
         });
 
         // A constraint preferred over every potentially valid alternative will also be preferred
@@ -1070,7 +1195,9 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         path: &PathAssignments,
-        typevar_violations: Option<&FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind>>,
+        typevar_violations: Option<
+            &FxHashMap<BoundTypeVarInstance<'db>, SolutionViolationKind<'db>>,
+        >,
     ) -> Option<PendingCandidateSolution<'db>> {
         // Sort the constraints in each path by their `source_order`s, to ensure that we construct
         // any unions or intersections in our type mappings in a stable order. Constraints might
@@ -1145,13 +1272,17 @@ impl<'db> SolutionWalker<'db> {
                 };
 
                 if let Some(typevar_violations) = typevar_violations
-                    && let Some(&kind) = typevar_violations.get(&bound_typevar)
+                    && let Some(kind) = typevar_violations.get(&bound_typevar)
                 {
                     violations.push(SolutionViolation {
                         bound_typevar,
-                        argument,
                         variance: solution.variance(),
-                        kind,
+                        kind: match kind {
+                            SolutionViolationKind::UpperBound(_) => {
+                                SolutionViolationKind::UpperBound(argument)
+                            }
+                            kind @ SolutionViolationKind::Constraints { .. } => kind.clone(),
+                        },
                     });
                 }
 
@@ -1227,14 +1358,23 @@ impl<'db> SolutionWalker<'db> {
                 )?;
             }
             if !satisfied {
-                violations.insert(*bound_typevar, SolutionViolationKind::UpperBound);
+                violations.insert(*bound_typevar, SolutionViolationKind::UpperBound(None));
             }
         }
 
+        // Construct diagnostic lower bounds in the same stable source order as normal solutions.
+        let mut inference_constraints: Vec<_> = path.positive_constraints().collect();
+        inference_constraints.sort_by_key(|(_, source)| self.source_orders.get_index_of(source));
         for (bound_typevar, constrained_typevar) in constrained {
-            let Some(evidence) = Self::candidate_evidence(db, env, storage, path, *bound_typevar)
-            else {
-                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
+            let Some(evidence) = Self::candidate_evidence(
+                db,
+                env,
+                storage,
+                inference_constraints
+                    .iter()
+                    .map(|(constraint, _)| *constraint),
+                *bound_typevar,
+            ) else {
                 continue;
             };
 
@@ -1268,8 +1408,23 @@ impl<'db> SolutionWalker<'db> {
                     )?;
                 }
             }
-            if !satisfied {
-                violations.insert(*bound_typevar, SolutionViolationKind::Constraints);
+            if !satisfied
+                && let Some(evidence) = self.constraint_failure_evidence(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    &evidence,
+                    constrained_typevar,
+                )?
+            {
+                violations.insert(
+                    *bound_typevar,
+                    SolutionViolationKind::Constraints {
+                        constraints: constrained_typevar.typevar_constraints,
+                        evidence,
+                    },
+                );
             }
         }
 
@@ -1282,6 +1437,7 @@ impl<'db> SolutionWalker<'db> {
         if let Some(pending) =
             self.pending_candidate_solution(db, env, storage, path, Some(&violations))
         {
+            limits.satisfied_path()?;
             self.pending.push(pending);
         }
         ControlFlow::Continue(())
@@ -1326,6 +1482,7 @@ struct UpperBound {
 }
 
 struct Constrained<'db> {
+    typevar_constraints: TypeVarConstraints<'db>,
     declared_constraints: SmallVec<[DeclaredConstraint<'db>; 4]>,
 }
 
@@ -1463,7 +1620,7 @@ impl<'db> Validations<'db> {
         declared_constraints: TypeVarConstraints<'db>,
     ) {
         self.constrained.entry(bound_typevar).or_insert_with(|| {
-            let declared_constraints = declared_constraints
+            let validations = declared_constraints
                 .elements(db)
                 .iter()
                 .map(|&constrained_ty| {
@@ -1489,7 +1646,8 @@ impl<'db> Validations<'db> {
                 })
                 .collect();
             Constrained {
-                declared_constraints,
+                typevar_constraints: declared_constraints,
+                declared_constraints: validations,
             }
         });
     }

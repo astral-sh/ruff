@@ -34,8 +34,8 @@ use crate::types::ProgramEnvironment;
 use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, ConstraintSetBuilder,
-    PathBoundSolution, SolutionPaths, Solutions,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintSet,
+    ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -80,6 +80,7 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
+use ty_python_core::definition::Definition;
 use ty_python_core::{ProgramFile, semantic_index};
 
 pub(crate) use self::constructor::ConstructorCallableKind;
@@ -6332,6 +6333,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     self.errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: None,
+                        argument: None,
                     });
                 }
 
@@ -6433,6 +6435,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     error,
                     argument_index: argument_indices
                         .and_then(|(first, last)| (first == last).then_some(first)),
+                    argument: Some(SpecializationErrorContext {
+                        parameter_definition: parameter.definition(),
+                        expected_ty: formal,
+                        provided_ty: None,
+                    }),
                 });
             }
             return !check_type_context;
@@ -6652,6 +6659,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
                     argument_index: relation.adjusted_argument_index,
+                    argument: Some(SpecializationErrorContext {
+                        parameter_definition: self.signature.parameters()
+                            [relation.matched_parameter.index]
+                            .definition(),
+                        expected_ty: relation.declared_type,
+                        provided_ty: Some(relation.argument_type),
+                    }),
                 });
             }
         }
@@ -8981,6 +8995,18 @@ pub(crate) enum InvalidDataclassArgument {
     WeakrefSlotRequiresSlots,
 }
 
+/// Argument and parameter context for a specialization error.
+///
+/// This preserves the expected type, the provided type when available, and the parameter
+/// definition so diagnostics can explain the failed inference in terms of the original call.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SpecializationErrorContext<'db> {
+    parameter_definition: Option<Definition<'db>>,
+    expected_ty: Type<'db>,
+    /// Absent when inference combines multiple arguments into a variadic tuple.
+    provided_ty: Option<Type<'db>>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
@@ -9038,6 +9064,7 @@ pub(crate) enum BindingError<'db> {
     SpecializationError {
         error: SpecializationError<'db>,
         argument_index: Option<usize>,
+        argument: Option<SpecializationErrorContext<'db>>,
     },
     PropertyHasNoGetter(PropertyInstanceType<'db>),
     PropertyHasNoSetter(PropertyInstanceType<'db>),
@@ -9653,23 +9680,56 @@ impl<'db> BindingError<'db> {
             Self::SpecializationError {
                 error,
                 argument_index,
+                argument,
             } => {
                 let range = context.get_range(node, *argument_index);
                 let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
-                let argument_type = error.argument_type();
-                let argument_ty_display = argument_type.display(db, env);
-
+                let (constraint_evidence, constraints) = match error {
+                    SpecializationError::MismatchedConstraint {
+                        constraints,
+                        evidence,
+                        ..
+                    } => {
+                        let types = match evidence {
+                            ConstraintFailureEvidence::Lower(bound) => std::slice::from_ref(bound),
+                            ConstraintFailureEvidence::Upper(bounds) => bounds.as_ref(),
+                            ConstraintFailureEvidence::UpperUnknown => &[],
+                        };
+                        (Some(types), Some(constraints.elements(db)))
+                    }
+                    SpecializationError::MismatchedBound { .. } => (None, None),
+                };
+                let defining_class =
+                    CallableDescription::defining_class(db, callable_ty).map(Type::ClassLiteral);
+                let types = argument
+                    .iter()
+                    .flat_map(|argument| [Some(argument.expected_ty), argument.provided_ty])
+                    .flatten()
+                    .chain(constraint_evidence.into_iter().flatten().copied())
+                    .chain(constraints.into_iter().flatten().copied())
+                    .chain(defining_class);
+                let display_settings =
+                    DisplaySettings::from_possibly_ambiguous_types(db, env, types);
+                let qualified_callable_description = constraint_evidence.and_then(|_| {
+                    CallableDescription::new_with_settings(db, callable_ty, Some(&display_settings))
+                });
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
+                    qualified_callable_description
+                        .as_ref()
+                        .or(callable_description)
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
 
                 match error {
-                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
+                    SpecializationError::MismatchedBound {
+                        bound_typevar,
+                        argument,
+                    } => {
+                        let argument_ty_display = argument.display(db, env);
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
                         diag.set_primary_annotation_message(format_args!(
@@ -9683,23 +9743,84 @@ impl<'db> BindingError<'db> {
                                 .display(db, env)
                         ));
                     }
-                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
-                        let typevar = bound_typevar.typevar(context.db());
-                        let typevar_name = typevar.name(context.db());
-                        diag.set_primary_annotation_message(format_args!(
-                            "Argument type `{argument_ty_display}` does not \
-                                satisfy constraints ({}) of type variable `{typevar_name}`",
-                            typevar
-                                .constraints(db, env)
-                                .expect(
-                                    "type variable should have constraints if this error occurs"
+                    SpecializationError::MismatchedConstraint {
+                        bound_typevar,
+                        constraints,
+                        evidence,
+                    } => {
+                        let typevar_name = bound_typevar.typevar(db).name(db);
+                        let explanation = match evidence {
+                            ConstraintFailureEvidence::Lower(bound) => {
+                                let bound = bound.display_with(db, env, display_settings.clone());
+                                format!(
+                                    "Inferred lower bound `{bound}` does not satisfy \
+                                     constraints ({}) of type variable `{typevar_name}`",
+                                    constraints.elements(db).iter().format_with(", ", |ty, f| f(
+                                        &format_args!(
+                                            "`{}`",
+                                            ty.display_with(db, env, display_settings.clone())
+                                        )
+                                    ))
                                 )
-                                .iter()
-                                .format_with(", ", |ty, f| f(&format_args!(
-                                    "`{}`",
-                                    ty.display(db, env)
-                                )))
-                        ));
+                            }
+                            ConstraintFailureEvidence::Upper(bounds) => {
+                                if let [bound] = bounds.as_ref() {
+                                    format!(
+                                        "No allowed specialization of `{typevar_name}` satisfies \
+                                         the inferred upper bound `{}`",
+                                        bound.display_with(db, env, display_settings.clone())
+                                    )
+                                } else {
+                                    format!(
+                                        "No allowed specialization of `{typevar_name}` satisfies \
+                                         all inferred upper bounds: {}",
+                                        bounds.iter().format_with(", ", |ty, f| f(&format_args!(
+                                            "`{}`",
+                                            ty.display_with(db, env, display_settings.clone())
+                                        )))
+                                    )
+                                }
+                            }
+                            ConstraintFailureEvidence::UpperUnknown => {
+                                format!(
+                                    "No allowed specialization of `{typevar_name}` satisfies \
+                                     the inferred upper bounds"
+                                )
+                            }
+                        };
+
+                        if let Some(argument) = argument
+                            && let Some(provided_ty) = argument.provided_ty
+                        {
+                            let provided =
+                                provided_ty.display_with(db, env, display_settings.clone());
+                            let expected =
+                                argument.expected_ty.display_with(db, env, display_settings);
+                            diag.set_primary_annotation_message(format_args!(
+                                "Expected `{expected}`, found `{provided}`"
+                            ));
+                            let concise_message =
+                                format!("{}: {explanation}", diag.concise_message());
+                            diag.set_concise_message(concise_message);
+                            diag.info(explanation);
+                        } else {
+                            diag.set_primary_annotation_message(explanation);
+                        }
+
+                        if let Some(definition) = argument
+                            .as_ref()
+                            .and_then(|argument| argument.parameter_definition)
+                        {
+                            let module = parsed_module(db, definition.python_file(db)).load(db);
+                            let mut sub = SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "Parameter declared here",
+                            );
+                            sub.annotate(Annotation::primary(
+                                definition.full_range(db, &module).into(),
+                            ));
+                            diag.sub(sub);
+                        }
                     }
                 }
 

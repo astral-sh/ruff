@@ -9,11 +9,11 @@ use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProje
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
-    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintSet,
-    ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths,
-    SolutionValidity, Solutions, TypeVarSolution,
+    CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
+    SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions, TypeVarSolution,
 };
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
 };
@@ -154,6 +154,133 @@ fn path_limit_is_checked_before_solving() {
             assert_eq!(selected, 8);
         }
     }
+}
+
+#[test]
+fn invalid_paths_respect_projection_budgets() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let bool = known_instance(db, KnownClass::Bool);
+    let bytes = known_instance(db, KnownClass::Bytes);
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+        Some(TypeVarBoundOrConstraints::Constraints(
+            TypeVarConstraints::new(db, [int, str].as_slice()),
+        ))
+    });
+    let builder = ConstraintSetBuilder::new();
+    let upper = |ty| ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, ty);
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+    let choose = |_, _: &CandidateTypeVarSolution<'_>| PathBoundSolution::Unsolved;
+
+    // Both alternatives fail the declaration. Their retained diagnostics still consume the
+    // path budget, even though neither contributes a valid solution.
+    let alternatives = upper(bool).or(db, &builder, || upper(bytes));
+    for paths in [0, 1] {
+        assert_eq!(
+            alternatives.solutions_with(
+                db,
+                &env,
+                inferable,
+                SolutionBudget {
+                    paths,
+                    ..SolutionBudget::default()
+                },
+                choose,
+            ),
+            Err(ProjectionError::PathBudgetExceeded)
+        );
+    }
+
+    // Each retained upper bound also consumes the type budget.
+    let conjunction = upper(str).and(db, &builder, || upper(bytes));
+    let result = conjunction.solutions_with(
+        db,
+        &env,
+        inferable,
+        SolutionBudget {
+            type_terms: 1,
+            ..SolutionBudget::default()
+        },
+        choose,
+    );
+    assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
+    assert!(matches!(
+        conjunction.solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget {
+                type_terms: 2,
+                ..SolutionBudget::default()
+            },
+            choose,
+        ),
+        Ok(Solutions::Unsatisfiable(_))
+    ));
+}
+
+#[test]
+fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let bool = known_instance(db, KnownClass::Bool);
+    let bytes = known_instance(db, KnownClass::Bytes);
+    let declared_constraints = TypeVarConstraints::new(db, [int, str].as_slice());
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+        Some(TypeVarBoundOrConstraints::Constraints(declared_constraints))
+    });
+    let builder = ConstraintSetBuilder::new();
+    let upper = |ty| ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, ty);
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    for bounds in [[bool, bytes], [bytes, bool]] {
+        let set = upper(bounds[0]).or(db, &builder, || upper(bounds[1]));
+        let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
+            PathBoundSolution::Unsolved
+        });
+        let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+            panic!("expected invalid paths");
+        };
+        assert!(!paths.is_empty());
+        for path in paths {
+            assert!(!path.violations().is_empty());
+            for violation in path.violations() {
+                let SolutionViolationKind::Constraints {
+                    constraints,
+                    evidence,
+                } = &violation.kind
+                else {
+                    panic!("expected constraint violation, got {:?}", violation.kind);
+                };
+                assert_eq!(*constraints, declared_constraints);
+                match evidence {
+                    ConstraintFailureEvidence::Upper(bounds) => {
+                        assert!(
+                            bounds.len() == 1 && [bool, bytes].contains(&bounds[0]),
+                            "alternative bounds were combined: {bounds:?}"
+                        );
+                    }
+                    ConstraintFailureEvidence::UpperUnknown => {}
+                    other @ ConstraintFailureEvidence::Lower(_) => {
+                        panic!("expected upper-bound evidence, got {other:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    // A failing alternative must not produce a diagnostic when another alternative is valid.
+    let set = upper(bool).or(db, &builder, || upper(str));
+    let result = set.solutions_with(db, &env, inferable, SolutionBudget::default(), |_, _| {
+        PathBoundSolution::Unsolved
+    });
+    assert!(matches!(result, Ok(Solutions::Constrained(_))));
 }
 
 #[test]
