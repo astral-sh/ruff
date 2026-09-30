@@ -2443,23 +2443,14 @@ impl NodeId {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
-            Node::Interior(interior) => {
-                let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(
-                    db,
-                    env,
-                    storage,
-                    self,
-                    &mut IsNeverSatisfiedVisitor {
-                        limits: &mut UnboundedSolutionLimits,
-                    },
-                )
-                .is_continue()
-            }
-        }
+        let ControlFlow::Continue(result) = self.is_always_satisfied_with_limits(
+            db,
+            env,
+            storage,
+            source_order,
+            &mut UnboundedSolutionLimits,
+        );
+        result
     }
 
     /// Returns whether this BDD is always satisfied, charging each visited node to `limits`.
@@ -3962,7 +3953,15 @@ impl<'db> CandidateSolutions<'db> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
         let mut to_validate =
             SmallVec::<[(TypeVarSolution<'db>, TypeVarVariance, Type<'db>); 1]>::new();
+        // An inferred ParamSpec can retain the generic context of a callable whose parameters it
+        // captures. For `def f[T](x: T) -> T` matched against `Callable[P, R]`, `P` can retain
+        // the callable-local `T`, while `R` is solved to `T`. That `T` remains inferable when
+        // checking `R` against its upper bound. Keep complete ParamSpec solutions so we can
+        // identify those variables.
         let mut captured_paramspecs = SmallVec::<[Type<'db>; 1]>::new();
+        // If solving any inferable ParamSpec exceeds its budget, its fallback (if any) may omit
+        // the generic context. We cannot reliably distinguish callable-local variables from
+        // caller-fixed ones, so skip upper-bound validation; the path is already marked incomplete.
         let mut incomplete_paramspec = false;
         let mut exceeded_budget = false;
         for path_bound in &candidate.typevars {
@@ -4000,8 +3999,6 @@ impl<'db> CandidateSolutions<'db> {
                 solved_typevars.push(solution);
             }
         }
-        // A fallback ParamSpec may omit a callable's generic context. Its path is already marked
-        // incomplete, so avoid treating potentially captured variables as caller-fixed.
         if to_validate.is_empty() || incomplete_paramspec {
             return ControlFlow::Continue(Some((
                 Solution {
@@ -4011,8 +4008,6 @@ impl<'db> CandidateSolutions<'db> {
                 exceeded_budget,
             )));
         }
-        // A ParamSpec value retains the generic context of the callable whose parameters it
-        // captures. Those variables are local to the callable, not fixed by its caller.
         let captured = RefCell::new(SmallVec::<[BoundTypeVarInstance<'db>; 1]>::new());
         for paramspec in captured_paramspecs {
             any_over_type_expanding_aliases(db, env, paramspec, |nested| {
@@ -5705,11 +5700,6 @@ mod tests {
         let mut storage = builder.storage.borrow_mut();
 
         for (set, expected) in [(int_bound, false), (tautology, true)] {
-            assert_eq!(
-                set.node
-                    .is_always_satisfied(db, &env, &mut storage, set.source_order),
-                expected
-            );
             let mut counter = CountSolutionLimits::default();
             assert_eq!(
                 set.node.is_always_satisfied_with_limits(

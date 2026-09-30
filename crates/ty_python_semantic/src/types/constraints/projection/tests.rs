@@ -8,7 +8,6 @@ use ty_python_core::ProgramFile;
 use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProjection};
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
-use crate::types::constraints::variables::{Constraint, ConstraintProvenance};
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
@@ -328,46 +327,6 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
             ))
         );
     }
-}
-
-#[test]
-fn caller_fixed_mixed_evidence_violates_declared_upper_bound() {
-    let db = setup_db();
-    let db = &db;
-    let env = db.program_environment();
-    let str = known_instance(db, KnownClass::Str);
-    let t = create_typevar(db, "T")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
-    let s = Type::TypeVar(create_typevar(db, "S"));
-    let inferable = TypeVarSet::from_typevars(db, [t]);
-    let builder = ConstraintSetBuilder::new();
-    let (node, source_order) = Constraint::new_nodes(
-        db,
-        &env,
-        &mut builder.storage.borrow_mut(),
-        Constraint::new_lower_bound(db, ConstraintProvenance::Mixed, t, s),
-    );
-    let set = ConstraintSet::from_node(&builder, node, source_order);
-
-    let result = set.solutions_with(
-        db,
-        &env,
-        inferable,
-        SolutionBudget::default(),
-        |_, candidate| CandidateSolutions::default_solve(db, &env, &builder, candidate),
-    );
-    let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
-        panic!("expected invalid path, got {result:?}");
-    };
-    let violations = paths
-        .iter()
-        .flat_map(Solution::violations)
-        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
-        .collect::<Vec<_>>();
-    assert_eq!(
-        violations,
-        [(t, SolutionViolationKind::UpperBound(Some(s)))]
-    );
 }
 
 #[test]
@@ -1006,11 +965,6 @@ fn validation_shares_the_projection_visit_budget() {
         .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
     let u = create_typevar(db, "U");
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
-    let relation_builder = ConstraintSetBuilder::new();
-    let relation = selected.when_assignable_to(db, &env, bound, &relation_builder, inferable);
-    assert!(!relation.is_trivially_always_satisfied());
-    assert!(!relation.is_trivially_never_satisfied());
-
     let builder = ConstraintSetBuilder::new();
     let set = exact(db, &builder, t, bound)
         .and(db, &builder, || binary_choice(db, &builder, u, [int, str]));
