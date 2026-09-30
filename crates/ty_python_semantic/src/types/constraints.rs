@@ -2484,8 +2484,8 @@ impl NodeId {
         Some(interior.constraint)
     }
 
-    /// Checks whether this BDD represents a single conjunction (of an arbitrary number of
-    /// positive or negative constraints).
+    /// Checks whether this BDD represents a single conjunction, of an arbitrary number of positive
+    /// or negative constraints, with no quantifiers.
     fn is_single_conjunction(self, storage: &mut ConstraintSetStorage<'_>) -> bool {
         // A BDD can be viewed as an encoding of the formula's DNF representation (OR of ANDs).
         // Each path from the root node to the `always` terminals represents one of the disjoints.
@@ -2515,6 +2515,11 @@ impl NodeId {
                     // The uncertain branch must also be never for a simple conjunction, since it
                     // contributes to all paths.
                     if data.if_uncertain != ALWAYS_FALSE {
+                        return false;
+                    }
+
+                    // If this constraint is a quantifier, it's not a simple conjunction.
+                    if data.constraint.as_atomic(storage).is_none() {
                         return false;
                     }
 
