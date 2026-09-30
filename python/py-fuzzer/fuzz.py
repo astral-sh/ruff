@@ -67,6 +67,7 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
                 TY_TARGET_PLATFORM,
             ],
             capture_output=True,
+            check=False,
             text=True,
         )
     return completed_process.returncode not in {0, 1, 2}
@@ -78,6 +79,8 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
         [
             ruff_executable,
             "check",
+            # Keep project settings out of parser checks, including for older Ruff versions.
+            "--isolated",
             "--config",
             "lint.select=[]",
             "--no-cache",
@@ -87,6 +90,7 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
             "-",
         ],
         capture_output=True,
+        check=False,
         text=True,
         input=code,
     )
