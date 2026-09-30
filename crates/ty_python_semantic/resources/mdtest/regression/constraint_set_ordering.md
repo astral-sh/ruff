@@ -114,7 +114,7 @@ def nested_transitive[T, U, V]() -> None:
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=Never, V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[T=list[int], V=bytes], Solution[V=bytes]]
     # TODO: sometimes: revealed tuple[Solution[T=list[int], U=int], Solution[U=Never, V=bytes], Solution[V=bytes]]
-    # revealed: tuple[Solution[T=list[int], U=int], Solution[V=bytes]]
+    # revealed: tuple[Solution[U=int, T=list[int]], Solution[V=bytes]]
     reveal_type(constraints.solutions(inferable=tuple[T, U, V]))
 ```
 
@@ -207,7 +207,7 @@ def chain_stu[S, T, U]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[Solution[S=T@chain_stu | U@chain_stu | int]]
+    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -223,7 +223,7 @@ def chain_uts[U, T, S]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[Solution[S=T@chain_uts | U@chain_uts | int]]
+    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))

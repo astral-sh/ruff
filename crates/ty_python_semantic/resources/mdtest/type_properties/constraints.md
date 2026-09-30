@@ -1383,24 +1383,22 @@ def symbolic_relationship_reversed[N, I]() -> None:
 
 def fixed_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(N, I, N)
-    # TODO: revealed: tuple[Solution[I=int]]
-    # revealed: tuple[Solution[I=int | N@fixed_noninferable, N=I@fixed_noninferable]]
+    # revealed: tuple[Solution[I=int]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def fixed_nested_noninferable[I, N]() -> None:
     constraints = ConstraintSet.range(int, N, int) & ConstraintSet.range(list[N], I, list[N])
-    # TODO: revealed: tuple[Solution[I=list[int]]]
-    # revealed: tuple[Solution[I=list[int] | list[N@fixed_nested_noninferable]]]
+    # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def gradual_noninferable_any[I, N]() -> None:
     constraints = ConstraintSet.range(Any, N, Any) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Any | N@gradual_noninferable_any, N=I@gradual_noninferable_any]]
+    # revealed: tuple[Solution[I=Any]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def gradual_noninferable_unknown[I, N]() -> None:
     constraints = ConstraintSet.range(Unknown, N, Unknown) & ConstraintSet.range(N, I, N)
-    # revealed: tuple[Solution[I=Unknown | N@gradual_noninferable_unknown, N=I@gradual_noninferable_unknown]]
+    # revealed: tuple[Solution[I=Unknown]]
     reveal_type(constraints.solutions(inferable=tuple[I]))
 
 def lower_bounded_noninferable[I, N]() -> None:
@@ -1429,20 +1427,17 @@ from ty_extensions._internal import ConstraintSet
 
 def invariant_declared_upper[I, N: int]() -> None:
     constraints = ConstraintSet.range(list[N], I, list[int])
-    # TODO: revealed: tuple[Solution[I=list[int]]]
-    # revealed: tuple[Solution[I=list[N@invariant_declared_upper] | list[int]]]
+    # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
 
 def invariant_explicit_upper[I, N]() -> None:
     constraints = ConstraintSet.range(Never, N, int) & ConstraintSet.range(list[N], I, list[int])
-    # TODO: revealed: tuple[Solution[I=list[int]]]
-    # revealed: tuple[Solution[I=list[N@invariant_explicit_upper] | list[int]]]
+    # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
 
 def invariant_finite_domain[I, N: (int, str)]() -> None:
     constraints = ConstraintSet.range(list[N], I, list[int])
-    # TODO: revealed: tuple[Solution[I=list[int]]]
-    # revealed: tuple[Solution[I=list[N@invariant_finite_domain] | list[int]]]
+    # revealed: tuple[Solution[I=list[int]]]
     reveal_type(constraints.solutions_for(I, inferable=tuple[I]))
 
 def invariant_unfixed_declared_upper[I, N: int]() -> None:

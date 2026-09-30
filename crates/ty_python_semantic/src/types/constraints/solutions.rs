@@ -1226,6 +1226,9 @@ impl<'db> SolutionWalker<'db> {
         // retain that stable per-tie ordering.
         let mut typevars: Vec<_> = path
             .positive_constraints()
+            // Ignore any constraints that were replaced with other constraints on this path due to
+            // substituting an exact type for some typevar.
+            .filter(|(constraint, _)| !path.constraint_is_substituted(*constraint))
             .map(|(constraint, source_constraint)| {
                 let source_order = self
                     .source_orders

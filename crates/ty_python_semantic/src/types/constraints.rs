@@ -6173,7 +6173,7 @@ class E: ...
             },
             // The unrelated `V = bytes` alternative must not pick up bindings for `T` or `U`.
             [
-                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[T=list[int], U=int; V=bytes]",
+                "never=false always=false merged=[T=list[int], U=int, V=bytes] paths=[U=int, T=list[int]; V=bytes]",
             ],
         );
     }
