@@ -1608,6 +1608,31 @@ reveal_type(Aliased[str].constant)  # revealed: int
 Aliased[int].constant = 1
 ```
 
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar[U: A | B](value: U):
+    # TODO: This should not error once member lookup supports union upper bounds.
+    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
 ## Metaclasses of specialized classes
 
 Specializing a class preserves its valid metaclass. Without an explicit metaclass, conflicting
