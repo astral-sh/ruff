@@ -2576,7 +2576,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // use the stored generic context to simplify bounds for compatibility inference.
         let signature_context = |signature: &Signature<'db>| {
             signature.generic_context.filter(|_| {
-                !signature.is_paramspec_value || self.typevar_evaluation != TypeVarEvaluation::Lazy
+                !signature.is_paramspec_value()
+                    || self.typevar_evaluation != TypeVarEvaluation::Lazy
             })
         };
         // If either signature is generic, freshen that signature's typevars before considering
