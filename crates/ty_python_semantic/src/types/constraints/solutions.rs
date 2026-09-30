@@ -491,16 +491,22 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 AtomicConstraintId(constraint_id),
                 process_node,
             ),
-            Constraint::Existential(existential) => self.visit_existential_constraint(
-                db,
-                env,
-                storage,
-                path,
-                polarity,
-                interior,
-                existential.body,
-                process_node,
-            ),
+            Constraint::Existential(existential) => {
+                let locals = existential.locals.clone();
+                let body = existential.body;
+                path.with_quantified_typevars(&locals, |path| {
+                    self.visit_existential_constraint(
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        interior,
+                        body,
+                        process_node,
+                    )
+                })
+            }
         }
     }
 
@@ -633,7 +639,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 node,
                 &|this, storage, path, polarity, child| {
                     this.visit_node_and_then(
-                        db, env, storage, path, polarity, child, process_satisfied,
+                        db,
+                        env,
+                        storage,
+                        path,
+                        polarity,
+                        child,
+                        process_satisfied,
                     )
                 },
             ),
@@ -673,26 +685,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             &|this, storage, path| {
                 // Note that we never negate existential's body, even when we are walking the
                 // negation of the existential _node_.
-                process_node(
-                    this,
-                    storage,
-                    path,
-                    Polarity::Positive,
-                    existential_body,
-                )
+                process_node(this, storage, path, Polarity::Positive, existential_body)
             },
         )?;
 
         // Under positive polarity, the existential's `if_uncertain` edge holds regardless of
         // whether the quantifier itself holds, so we don't need to check the body.
         if polarity == Polarity::Positive {
-            process_node(
-                self,
-                storage,
-                path,
-                polarity,
-                interior.if_uncertain,
-            )?;
+            process_node(self, storage, path, polarity, interior.if_uncertain)?;
         }
 
         // Last, walk the outgoing edge that depends on the existential _not_ holding. For each
@@ -1552,6 +1552,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             // Ignore any constraints that were replaced with other constraints on this path due to
             // substituting an exact type for some typevar.
             .filter(|(constraint, _)| !path.constraint_is_substituted(*constraint))
+            // Ignore any constraints that reference a quantified-away typevar. Those are local to
+            // the existential's body, and should not leak outside. The sequent map should have
+            // propagated any information about how the quantified-away typevars related to the
+            // inferable typevars.
+            .filter(|(constraint, _)| {
+                let constraint_support = storage.constraint_support(constraint.into_inner());
+                !path.quantified_typevars.overlaps_with(constraint_support)
+            })
             .map(|(constraint, source_constraint)| {
                 let source_order = self
                     .source_orders
