@@ -1,5 +1,5 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/mod.rs
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 expression: transformed.source_code()
 ---
 from contextlib import asynccontextmanager, contextmanager

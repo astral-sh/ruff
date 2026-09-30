@@ -11,14 +11,15 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_ast::PythonVersion;
+    use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
     use ruff_python_semantic::{MemberNameImport, NameImport};
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
-    use crate::test::{test_path, test_snippet};
+    use crate::source_kind::SourceKind;
+    use crate::test::{test_contents, test_path, test_resource_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
@@ -125,6 +126,77 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case("UP052.py", 15, 14)]
+    #[test_case("UP052_cross_module.py", 3, 3)]
+    #[test_case("UP052_version.py", 1, 1)]
+    fn context_manager_generator_fixes_fixture(
+        filename: &str,
+        expected_diagnostics: usize,
+        expected_fixes: usize,
+    ) -> Result<()> {
+        let path = test_resource_path("fixtures/pyupgrade").join(filename);
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings =
+            settings::LinterSettings::for_rule(Rule::ContextManagerGenerator).with_preview_mode();
+        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
+        assert_eq!(diagnostics.len(), expected_diagnostics);
+        assert_eq!(
+            diagnostics
+                .iter()
+                .filter(|diagnostic| diagnostic.fix().is_some())
+                .count(),
+            expected_fixes
+        );
+        insta::assert_snapshot!(format!("fixed__{filename}"), transformed.source_code());
+        Ok(())
+    }
+
+    #[test]
+    fn context_manager_generator_aliases() -> Result<()> {
+        let diagnostics = test_path(
+            "pyupgrade/UP052_aliases.py",
+            &settings::LinterSettings::for_rule(Rule::ContextManagerGenerator).with_preview_mode(),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn context_manager_generator_py37() -> Result<()> {
+        let diagnostics = test_path(
+            "pyupgrade/UP052_version.py",
+            &settings::LinterSettings::for_rule(Rule::ContextManagerGenerator)
+                .with_preview_mode()
+                .with_target_version(PythonVersion::PY37),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn context_manager_generator_fixes() -> Result<()> {
+        let diagnostics = test_path(
+            "pyupgrade/UP052_shadowing.py",
+            &settings::LinterSettings::for_rule(Rule::ContextManagerGenerator).with_preview_mode(),
+        )?;
+        assert_eq!(diagnostics.len(), 3);
+        assert!(diagnostics[2].fix().is_none());
+
+        let path = test_resource_path("fixtures").join("pyupgrade/UP052_shadowing.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = settings::LinterSettings::for_rules(vec![
+            Rule::ContextManagerGenerator,
+            Rule::UnusedImport,
+        ])
+        .with_preview_mode()
+        .with_target_version(PythonVersion::PY37);
+        let (_, transformed) = test_contents(&source_kind, &path, &settings);
+        insta::assert_snapshot!(transformed.source_code());
         Ok(())
     }
 

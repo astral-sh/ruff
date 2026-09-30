@@ -11,7 +11,7 @@ mod tests {
 
     use anyhow::Result;
     use regex::Regex;
-    use ruff_python_ast::{PySourceType, PythonVersion, SourceType, TomlSourceType};
+    use ruff_python_ast::{PythonVersion, TomlSourceType};
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
@@ -796,11 +796,6 @@ mod tests {
     #[test_case(Rule::OsPathCommonprefix, Path::new("RUF071.py"))]
     #[test_case(Rule::UselessFinally, Path::new("RUF072.py"))]
     #[test_case(Rule::FStringPercentFormat, Path::new("RUF073.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_aliases.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_cross_module.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_version.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_shadowing.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -811,23 +806,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn context_manager_generator_fixes() -> Result<()> {
-        let path = test_resource_path("fixtures").join("ruff/RUF079_shadowing.py");
-        let source_type = SourceType::Python(PySourceType::from(&path));
-        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
-        let settings =
-            LinterSettings::for_rules(vec![Rule::ContextManagerGenerator, Rule::UnusedImport])
-                .with_preview_mode()
-                .with_target_version(PythonVersion::PY37);
-        let (_, transformed) = test_contents(&source_kind, &path, &settings);
-        insta::assert_snapshot!(transformed.source_code());
-        Ok(())
-    }
-
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_py_version_sensitive.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_cross_module.py"))]
-    #[test_case(Rule::ContextManagerGenerator, Path::new("RUF079_version.py"))]
     fn preview_rules_py37(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__py37__{}_{}",

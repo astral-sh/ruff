@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+expression: transformed.source_code()
+---
+from collections.abc import AsyncIterator, Iterator
+from contextlib import asynccontextmanager, contextmanager
+from typing import AsyncGenerator, Generator, Iterator as TypingIterator
+
+
+@contextmanager
+def synchronous() -> Generator[int, None, None]:
+    yield 1
+
+
+@asynccontextmanager
+async def asynchronous() -> AsyncGenerator[int, None]:
+    yield 1
+
+
+@contextmanager
+def already_typing() -> Generator[int, None, None]:
+    yield 1

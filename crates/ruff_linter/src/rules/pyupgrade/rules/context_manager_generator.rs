@@ -20,9 +20,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// deprecated in typeshed.
 ///
 /// ## Example
+///
 /// ```python
 /// from collections.abc import Iterator
 /// from contextlib import contextmanager
+///
 ///
 /// @contextmanager
 /// def example() -> Iterator[int]:
@@ -30,9 +32,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 /// Use instead:
+///
 /// ```python
 /// from collections.abc import Generator
 /// from contextlib import contextmanager
+///
 ///
 /// @contextmanager
 /// def example() -> Generator[int, None, None]:
@@ -76,7 +80,7 @@ impl Violation for ContextManagerGenerator {
     }
 }
 
-/// RUF079
+/// UP052
 pub(crate) fn context_manager_generator(checker: &Checker, function: &ast::StmtFunctionDef) {
     let Some(decorator) = function.decorator_list.last() else {
         return;

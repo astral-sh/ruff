@@ -1,8 +1,8 @@
 ---
-source: crates/ruff_linter/src/rules/ruff/mod.rs
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-RUF079 [*] Use `Generator` instead of `Iterator` for a context manager
- --> RUF079_aliases.py:7:23
+UP052 [*] Use `Generator` instead of `Iterator` for a context manager
+ --> UP052_aliases.py:7:23
   |
 6 | @_contextmanager
 7 | def synchronous() -> "_Iterator[int]":
@@ -18,8 +18,8 @@ help: Replace with `Generator`
   |
 note: This is an unsafe fix and may change runtime behavior
 
-RUF079 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
-  --> RUF079_aliases.py:12:30
+UP052 [*] Use `AsyncGenerator` instead of `AsyncIterator` for a context manager
+  --> UP052_aliases.py:12:30
    |
 11 | @_asynccontextmanager
 12 | async def asynchronous() -> "_AsyncIterator[str]":
