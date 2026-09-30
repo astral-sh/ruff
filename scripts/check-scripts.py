@@ -22,17 +22,15 @@
 # missing-direct-dependency = "warn"
 # ///
 
-"""Update script lockfiles and check scripts with ty.
+"""Update script lockfiles.
 
-Build ty unless `--ty-binary` supplies an existing executable.
-Add `--check` to verify lockfiles without updating them.
+Run `uv run --locked scripts/check-scripts.py --check` to verify them.
+Use `--write-ty-args-file <path>` to write the discovered scripts to an argument file for ty.
 """
 
 from __future__ import annotations
 
 import argparse
-import json
-import os
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -98,37 +96,24 @@ def scripts() -> Iterator[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--check", action="store_true", help="Check lockfiles without updating them"
     )
-    parser.add_argument(
-        "--ty-binary", type=Path, help="Path to ty; builds ty if omitted"
+    mode.add_argument(
+        "--write-ty-args-file",
+        type=Path,
+        help="Write script paths to an argument file for ty",
     )
     args = parser.parse_args()
 
-    if args.ty_binary is None:
-        print("Building ty...", flush=True)
-        subprocess.run(["cargo", "build", "-p", "ty"], cwd=ROOT, check=True)
-        print("Built ty.", flush=True)
-        metadata = subprocess.run(
-            ["cargo", "metadata", "--no-deps", "--format-version=1"],
-            cwd=ROOT,
-            check=True,
-            stdout=subprocess.PIPE,
-            text=True,
+    if args.write_ty_args_file is not None:
+        args.write_ty_args_file.write_text(
+            "".join(f"{script}\n" for script in scripts()), encoding="utf-8"
         )
-        target_dir = Path(json.loads(metadata.stdout)["target_directory"])
-        ty_binary = (
-            target_dir / "debug" / ("ty.exe" if sys.platform == "win32" else "ty")
-        )
-    else:
-        ty_binary = args.ty_binary.resolve()
-
-    assert ty_binary.is_file(), f"ty binary is not a file: {ty_binary}"
+        return 0
 
     failed = False
-    # Enable experimental support for installing PEP 723 script dependencies.
-    ty_env = os.environ | {"TY_UV": "scripts", "UV_LOCKED": "true"}
 
     for script in scripts():
         print(script, flush=True)
@@ -138,10 +123,6 @@ def main() -> int:
         else:
             command.append("--no-locked")
         result = subprocess.run(command, cwd=ROOT, check=False)
-        failed |= result.returncode != 0
-
-        command = [str(ty_binary), "check", str(script), "--color=always"]
-        result = subprocess.run(command, cwd=ROOT, env=ty_env, check=False)
         failed |= result.returncode != 0
 
     return int(failed)
