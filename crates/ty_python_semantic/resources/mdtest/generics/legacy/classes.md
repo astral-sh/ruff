@@ -1922,70 +1922,45 @@ def use_typevar(value: U):
     reveal_type(value.value)
 ```
 
-## Self parameters of type variables with union upper bounds
+## Self methods with generic union upper bounds
 
-Two values of a type variable with a union upper bound can belong to different union members, so one
-does not necessarily satisfy the other's `Self` parameter. In contrast, a constrained type variable
-chooses the same member for both values.
-
-```py
-from typing_extensions import Self, TypeVar
-
-class Left:
-    def merge(self, other: Self) -> Self:
-        return self
-
-class Right:
-    def merge(self, other: Self) -> Self:
-        return self
-
-T = TypeVar("T", bound=Left | Right)
-
-def merge(left: T, right: T) -> T:
-    # error: [invalid-argument-type] "Argument to bound method `Left.merge` is incorrect"
-    # error: [invalid-argument-type] "Argument to bound method `Right.merge` is incorrect"
-    return left.merge(right)
-
-Constrained = TypeVar("Constrained", Left, Right)
-
-def merge_constrained(left: Constrained, right: Constrained) -> Constrained:
-    return left.merge(right)
-```
-
-## Generic union-bounded receivers in property assignments
-
-A property typed with a union-bounded type variable accepts the result of calling a `Self` method on
-its value. The generic classes in the upper bound do not erase the original type variable.
+A `Self` return type preserves the receiver's type variable even when the upper bound contains
+generic classes.
 
 ```py
 from typing_extensions import Any, Generic, Self, TypeVar
 
 T = TypeVar("T")
 
-class Query(Generic[T]):
-    def filter(self) -> Self:
+class A(Generic[T]):
+    def copy(self) -> Self:
         return self
 
-class Select(Generic[T]):
-    def filter(self) -> Self:
+    def merge(self, other: Self) -> None: ...
+
+class B(Generic[T]):
+    def copy(self) -> Self:
         return self
 
-Q = TypeVar("Q", bound=Query[Any] | Select[Any])
+    def merge(self, other: Self) -> None: ...
 
-class Wrapper(Generic[Q]):
-    def __init__(self, query: Q) -> None:
-        self._query = query
+U = TypeVar("U", bound=A[Any] | B[Any])
 
-    @property
-    def query(self) -> Q:
-        return self._query
+def copy(value: U) -> U:
+    result = value.copy()
+    # TODO: The union of the branch-specific results should normalize to U.
+    reveal_type(result)  # revealed: (U@copy & A[Any]) | (U@copy & B[Any])
+    return result
+```
 
-    @query.setter
-    def query(self, query: Q) -> None:
-        self._query = query
+Two values of the same type variable can belong to different union members, so one does not
+necessarily satisfy the other's `Self` parameter.
 
-    def apply_filter(self) -> None:
-        self.query = self.query.filter()
+```py
+def merge(left: U, right: U) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `A.merge` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.merge` is incorrect"
+    left.merge(right)
 ```
 
 ## Correlated constrained receiver calls

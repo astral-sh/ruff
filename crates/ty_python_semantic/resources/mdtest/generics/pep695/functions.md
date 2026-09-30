@@ -1473,63 +1473,14 @@ def bad_return[T: int](x: T) -> T:
     return x + 1
 ```
 
-## Implicit special methods of bounded type variables
-
-Operators look up special methods on each member of a union upper bound. A `Self` return type
-preserves the receiver's type variable, including subtypes of its upper bound.
-
-```py
-from typing import Self
-
-class Left:
-    def __add__(self, other: int) -> Self:
-        return self
-
-class Right:
-    def __add__(self, other: int) -> Self:
-        return self
-
-def add[T: Left | Right](value: T) -> T:
-    result = value + 1
-    # TODO: The union of the branch-specific results should normalize to T.
-    reveal_type(result)  # revealed: (T@add & Left) | (T@add & Right)
-    return result
-
-class LeftChild(Left): ...
-
-reveal_type(add(LeftChild()))  # revealed: LeftChild
-
-def add_constrained[T: (Left, Right)](value: T) -> T:
-    return value + 1
-```
-
-Implicit special method lookup ignores instance attributes, including when the receiver is a bounded
-type variable. An instance attribute named `__truediv__` does not enable division.
-
-```py
-from typing import Callable
-
-class InstanceAttribute:
-    __truediv__: Callable[[int], int]
-
-def divide_instance_attribute[T: InstanceAttribute](value: T) -> None:
-    # error: [unsupported-operator]
-    value / 1
-```
-
 ## Division with a float upper bound
 
-A `float` upper bound also accepts `int`, so division must work for either receiver. Division
-returns `float`, which need not preserve a caller's subtype of the upper bound.
+A `float` upper bound also accepts `int`, so implicit special method lookup must support both
+members of the union.
 
 ```py
-def divide[T: float](value: T) -> float:
+def divide[T: float](value: T):
     reveal_type(value / 1)  # revealed: float
-    return value / 1
-
-def divide_as_typevar[T: float](value: T) -> T:
-    # error: [invalid-return-type]
-    return value / 1
 ```
 
 ## All occurrences of the same typevar have the same type

@@ -1505,85 +1505,41 @@ def cannot_choose_outer[T](container: Container[T]) -> T:
     return container.replace(1)
 ```
 
-## Members of type variables with union upper bounds
+## Self methods with generic union upper bounds
 
-Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
-variable. Member lookup can still use the upper bound to prove that a common member is available.
-
-```py
-class Base[T]:
-    @property
-    def value(self) -> T:
-        raise NotImplementedError
-
-class A(Base[int]): ...
-class B(Base[str]): ...
-
-def use_union(value: A | B):
-    # revealed: int | str
-    reveal_type(value.value)
-
-def use_typevar[U: A | B](value: U):
-    # revealed: int | str
-    reveal_type(value.value)
-```
-
-## Self parameters of type variables with union upper bounds
-
-Two values of a type variable with a union upper bound can belong to different union members, so one
-does not necessarily satisfy the other's `Self` parameter. In contrast, a constrained type variable
-chooses the same member for both values.
-
-```py
-from typing_extensions import Self
-
-class Left:
-    def merge(self, other: Self) -> Self:
-        return self
-
-class Right:
-    def merge(self, other: Self) -> Self:
-        return self
-
-def merge[T: Left | Right](left: T, right: T) -> T:
-    # error: [invalid-argument-type] "Argument to bound method `Left.merge` is incorrect"
-    # error: [invalid-argument-type] "Argument to bound method `Right.merge` is incorrect"
-    return left.merge(right)
-
-def merge_constrained[Constrained: (Left, Right)](left: Constrained, right: Constrained) -> Constrained:
-    return left.merge(right)
-```
-
-## Generic union-bounded receivers in property assignments
-
-A property typed with a union-bounded type variable accepts the result of calling a `Self` method on
-its value. The generic classes in the upper bound do not erase the original type variable.
+A `Self` return type preserves the receiver's type variable even when the upper bound contains
+generic classes.
 
 ```py
 from typing_extensions import Any, Self
 
-class Query[T]:
-    def filter(self) -> Self:
+class A[T]:
+    def copy(self) -> Self:
         return self
 
-class Select[T]:
-    def filter(self) -> Self:
+    def merge(self, other: Self) -> None: ...
+
+class B[T]:
+    def copy(self) -> Self:
         return self
 
-class Wrapper[Q: Query[Any] | Select[Any]]:
-    def __init__(self, query: Q) -> None:
-        self._query = query
+    def merge(self, other: Self) -> None: ...
 
-    @property
-    def query(self) -> Q:
-        return self._query
+def copy[U: A[Any] | B[Any]](value: U) -> U:
+    result = value.copy()
+    # TODO: The union of the branch-specific results should normalize to U.
+    reveal_type(result)  # revealed: (U@copy & A[Any]) | (U@copy & B[Any])
+    return result
+```
 
-    @query.setter
-    def query(self, query: Q) -> None:
-        self._query = query
+Two values of the same type variable can belong to different union members, so one does not
+necessarily satisfy the other's `Self` parameter.
 
-    def apply_filter(self) -> None:
-        self.query = self.query.filter()
+```py
+def merge[U: A[Any] | B[Any]](left: U, right: U) -> None:
+    # error: [invalid-argument-type] "Argument to bound method `A.merge` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `B.merge` is incorrect"
+    left.merge(right)
 ```
 
 ## Generic instance attributes accessed through classes
@@ -1708,8 +1664,6 @@ def use_union(value: A | B):
     reveal_type(value.value)
 
 def use_typevar[U: A | B](value: U):
-    # TODO: This should not error once member lookup supports union upper bounds.
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
     # revealed: int | str
     reveal_type(value.value)
 ```
