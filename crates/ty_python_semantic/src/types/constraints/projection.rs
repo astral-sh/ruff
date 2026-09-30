@@ -130,7 +130,7 @@ impl<'db> ConstraintSet<'db, '_> {
         )
     }
 
-    fn bounded_path_bounds(
+    pub(super) fn bounded_path_bounds(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

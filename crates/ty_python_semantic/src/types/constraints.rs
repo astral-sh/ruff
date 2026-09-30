@@ -2448,8 +2448,16 @@ impl NodeId {
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
+                path.visit_negated(
+                    db,
+                    env,
+                    storage,
+                    self,
+                    &mut IsNeverSatisfiedVisitor {
+                        limits: &mut UnboundedSolutionLimits,
+                    },
+                )
+                .is_continue()
             }
         }
     }
@@ -2468,7 +2476,7 @@ impl NodeId {
             Node::AlwaysFalse => ControlFlow::Continue(false),
             Node::Interior(interior) => {
                 let mut path = interior.path_assignments(db, env, storage, source_order);
-                let mut visitor = LimitedIsNeverSatisfiedVisitor { limits };
+                let mut visitor = IsNeverSatisfiedVisitor { limits };
                 match path.visit_negated(db, env, storage, self, &mut visitor) {
                     ControlFlow::Continue(()) => ControlFlow::Continue(true),
                     ControlFlow::Break(LimitedSatisfactionBreak::Satisfied) => {
@@ -2542,8 +2550,16 @@ impl NodeId {
                     false
                 } else {
                     let mut path = interior.path_assignments(db, env, storage, source_order);
-                    path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                        .is_continue()
+                    path.visit(
+                        db,
+                        env,
+                        storage,
+                        self,
+                        &mut IsNeverSatisfiedVisitor {
+                            limits: &mut UnboundedSolutionLimits,
+                        },
+                    )
+                    .is_continue()
                 };
                 storage.never_satisfied_cache.insert(self, result);
                 result
@@ -3615,34 +3631,6 @@ impl<'db> CandidateSolutions<'db> {
     /// Visits include the concrete-conjunction fast path and both BDD walks. The path limit
     /// counts materialized constrained paths; an unconstrained or unsatisfiable result needs no
     /// path allowance. No partially collected family is returned when either limit is exhausted.
-    #[cfg(test)]
-    fn compute_bounded(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        storage: &mut ConstraintSetStorage<'db>,
-        node: NodeId,
-        inferable: TypeVarSet<'db>,
-        source_order: Option<SourceOrderId>,
-        budget: SolutionBudget,
-    ) -> Result<Self, ProjectionError> {
-        let mut limits = BoundedSolutionLimits {
-            remaining_paths: budget.paths,
-            remaining_visits: budget.visits,
-        };
-        match Self::compute_with_limits(
-            db,
-            env,
-            storage,
-            node,
-            inferable,
-            source_order,
-            &mut limits,
-        ) {
-            ControlFlow::Continue(result) => Ok(result),
-            ControlFlow::Break(error) => Err(error),
-        }
-    }
-
     fn compute_with_limits<L: SolutionLimits>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -3972,7 +3960,8 @@ impl<'db> CandidateSolutions<'db> {
         ) -> PathBoundSolution<'db>,
     ) -> ControlFlow<L::Break, Option<(Solution<'db>, bool)>> {
         let mut solved_typevars = Vec::with_capacity(candidate.typevars.len());
-        let mut to_validate = SmallVec::<[(usize, TypeVarVariance, Type<'db>); 1]>::new();
+        let mut to_validate =
+            SmallVec::<[(TypeVarSolution<'db>, TypeVarVariance, Type<'db>); 1]>::new();
         let mut captured_paramspecs = SmallVec::<[Type<'db>; 1]>::new();
         let mut incomplete_paramspec = false;
         let mut exceeded_budget = false;
@@ -3997,17 +3986,18 @@ impl<'db> CandidateSolutions<'db> {
             }
             if let Some(ty) = ty {
                 let bound_typevar = path_bound.bound_typevar;
+                let solution = TypeVarSolution {
+                    bound_typevar,
+                    solution: ty,
+                };
                 if complete
                     && bound_typevar.is_inferable(db, inferable)
                     && let Some(bound) = bound_typevar.typevar(db).upper_bound(db, env)
                     && any_over_type_expanding_aliases(db, env, ty, Type::is_type_var)
                 {
-                    to_validate.push((solved_typevars.len(), path_bound.variance(), bound));
+                    to_validate.push((solution, path_bound.variance(), bound));
                 }
-                solved_typevars.push(TypeVarSolution {
-                    bound_typevar,
-                    solution: ty,
-                });
+                solved_typevars.push(solution);
             }
         }
         // A fallback ParamSpec may omit a callable's generic context. Its path is already marked
@@ -4052,11 +4042,11 @@ impl<'db> CandidateSolutions<'db> {
         };
         // Validate the selected type rather than just the evidence: the caller's chooser can
         // produce a different binding from the one represented by the original constraints.
-        for (index, variance, bound) in to_validate {
+        for (solution, variance, bound) in to_validate {
             let TypeVarSolution {
                 bound_typevar,
                 solution: ty,
-            } = solved_typevars[index];
+            } = solution;
             // Relations involving variables still being inferred must remain available for joint
             // solving. Only check choices containing a fixed or captured type variable here.
             let has_inferable = |nested: Type<'db>| {
@@ -5062,64 +5052,18 @@ where
     }
 }
 
-/// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
-/// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
-/// unsatisfiable. A `Break` result indicates the opposite.
-struct IsNeverSatisfiedVisitor;
-
-impl PathFold for IsNeverSatisfiedVisitor {
-    type Result = ();
-    type Break = ();
-
-    fn satisfied<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Break(())
-    }
-
-    fn unsatisfied<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn impossible<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn combine<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _if_true: Self::Result,
-        _if_uncertain: Self::Result,
-        _if_false: Self::Result,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-}
-
 enum LimitedSatisfactionBreak<B> {
     Satisfied,
     Limit(B),
 }
 
-struct LimitedIsNeverSatisfiedVisitor<'a, L> {
+/// A path visitor that breaks early if it encounters a satisfied path or exceeds a limit. A
+/// `Continue` result means no satisfied path was found, so the BDD is unsatisfiable.
+struct IsNeverSatisfiedVisitor<'a, L> {
     limits: &'a mut L,
 }
 
-impl<L: SolutionLimits> PathFold for LimitedIsNeverSatisfiedVisitor<'_, L> {
+impl<L: SolutionLimits> PathFold for IsNeverSatisfiedVisitor<'_, L> {
     type Result = ();
     type Break = LimitedSatisfactionBreak<L::Break>;
 
@@ -5334,19 +5278,17 @@ mod tests {
         max_paths: usize,
         max_visits: usize,
     ) -> Result<CandidateSolutions<'db>, ProjectionError> {
-        CandidateSolutions::compute_bounded(
+        set.bounded_path_bounds(
             db,
             &db.program_environment(),
-            &mut set.builder.storage.borrow_mut(),
-            set.node,
             inferable,
-            set.source_order,
             SolutionBudget {
                 paths: max_paths,
                 visits: max_visits,
                 ..SolutionBudget::default()
             },
         )
+        .map(|(paths, _)| paths)
     }
 
     fn solution<'db>(

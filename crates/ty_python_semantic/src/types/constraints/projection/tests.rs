@@ -15,7 +15,10 @@ use crate::types::constraints::{
     SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::signatures::{Parameter, Parameters, Signature};
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
+use crate::types::typevar::{
+    BindingContext, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarNonce, TypeVarSet,
+};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
 };
@@ -384,6 +387,75 @@ fn custom_choice_must_satisfy_declared_upper_bound() {
         PathBoundSolution::Solved(s)
     });
     let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+        panic!("expected invalid path, got {result:?}");
+    };
+    let violations = paths
+        .iter()
+        .flat_map(Solution::violations)
+        .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        violations,
+        [(t, SolutionViolationKind::UpperBound(Some(s)))]
+    );
+}
+
+#[test]
+fn incomplete_paramspec_does_not_reject_potentially_captured_typevar() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = Type::TypeVar(create_typevar(db, "S"));
+    let paramspec_identity = TypeVarIdentity::new(
+        db,
+        Name::new_static("P"),
+        None,
+        TypeVarKind::Pep695ParamSpec,
+    );
+    let paramspec = BoundTypeVarInstance::new(
+        db,
+        TypeVarInstance::new(db, paramspec_identity, None, None, None),
+        BindingContext::Synthetic(env.program(db)),
+        None,
+        TypeVarNonce::NONE,
+    );
+    let paramspec_value = Type::paramspec_value_callable(db, Parameters::empty());
+    let candidates = CandidateSolutions::Constrained {
+        inferable: TypeVarSet::from_typevars(db, [t, paramspec]),
+        paths: Box::new([CandidateSolution {
+            typevars: Box::new([
+                CandidateTypeVarSolution::from_equivalence(t, s),
+                CandidateTypeVarSolution::from_equivalence(paramspec, paramspec_value),
+            ]),
+            validity: SolutionValidity::Valid,
+        }]),
+    };
+    let solve = |choice| {
+        candidates.solve_with(db, &env, |_, candidate| {
+            if candidate.bound_typevar == paramspec {
+                choice
+            } else {
+                PathBoundSolution::Solved(s)
+            }
+        })
+    };
+
+    // An incomplete ParamSpec may have omitted S's generic context, even when it has a fallback.
+    for fallback in [None, Some(paramspec_value)] {
+        let mut bindings = vec![binding(t, s)];
+        bindings.extend(fallback.map(|ty| binding(paramspec, ty)));
+        assert_eq!(
+            solve(PathBoundSolution::BudgetExceeded { fallback }),
+            Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![solution(bindings)]))
+        );
+    }
+
+    // A complete ParamSpec with no captured variables does not excuse the fixed variable S.
+    let result = solve(PathBoundSolution::Solved(paramspec_value));
+    let Solutions::Unsatisfiable(SolutionPaths::Complete(paths)) = result else {
         panic!("expected invalid path, got {result:?}");
     };
     let violations = paths
