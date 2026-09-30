@@ -43,6 +43,9 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     yield 1
 /// ```
 ///
+/// On Python 3.13 and later, the fix omits the default type arguments and uses
+/// `Generator[int]` or `AsyncGenerator[int]`.
+///
 /// ## Fix safety
 /// The fix is unsafe because it changes the function's runtime annotations
 /// and may add an import, introducing a new name in the module. For a generator
@@ -53,17 +56,20 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// The rule checks functions whose innermost decorator is a contextlib
 /// context manager and whose bodies contain a `yield` or `yield from`.
 ///
+/// ## Options
+/// - `target-version`
+///
 /// ## References
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 /// - [Python documentation: `contextlib.asynccontextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
-pub(crate) struct ContextManagerGenerator {
+pub(crate) struct ContextManagerIterator {
     iterator: &'static str,
     generator: &'static str,
 }
 
-impl Violation for ContextManagerGenerator {
+impl Violation for ContextManagerIterator {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
@@ -81,7 +87,7 @@ impl Violation for ContextManagerGenerator {
 }
 
 /// UP052
-pub(crate) fn context_manager_generator(checker: &Checker, function: &ast::StmtFunctionDef) {
+pub(crate) fn context_manager_iterator(checker: &Checker, function: &ast::StmtFunctionDef) {
     let Some(decorator) = function.decorator_list.last() else {
         return;
     };
@@ -137,7 +143,7 @@ pub(crate) fn context_manager_generator(checker: &Checker, function: &ast::StmtF
     }
 
     let mut diagnostic = checker.report_diagnostic(
-        ContextManagerGenerator {
+        ContextManagerIterator {
             iterator,
             generator,
         },
@@ -180,29 +186,28 @@ pub(crate) fn context_manager_generator(checker: &Checker, function: &ast::StmtF
         } else {
             import?
         };
-        let return_type = if visitor.returns_value {
-            "object"
-        } else {
-            "None"
-        };
         let (object_edit, return_type) = if visitor.returns_value {
             checker.importer().get_or_import_builtin_symbol(
-                return_type,
+                "object",
                 function.start(),
                 checker.semantic(),
             )?
         } else {
-            (None, return_type.to_string())
+            (None, "None".to_string())
         };
-        let arguments = if function.is_async {
-            ", None".to_string()
-        } else {
-            format!(", None, {return_type}")
-        };
+        let arguments =
+            if checker.target_version() >= PythonVersion::PY313 && !visitor.returns_value {
+                None
+            } else if function.is_async {
+                Some(", None".to_string())
+            } else {
+                Some(format!(", None, {return_type}"))
+            };
         Ok(Fix::unsafe_edits(
             Edit::range_replacement(binding, value.range()),
-            [import_edit, Edit::insertion(arguments, item_range.end())]
+            [import_edit]
                 .into_iter()
+                .chain(arguments.map(|arguments| Edit::insertion(arguments, item_range.end())))
                 .chain(object_edit),
         ))
     });

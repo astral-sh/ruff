@@ -11,15 +11,14 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use ruff_python_ast::{PySourceType, PythonVersion, SourceType};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_semantic::{MemberNameImport, NameImport};
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
-    use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_path, test_resource_path, test_snippet};
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
@@ -129,32 +128,17 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn context_manager_generator_fixes() -> Result<()> {
-        let path = test_resource_path("fixtures/pyupgrade/UP052.py");
-        let source_type = SourceType::Python(PySourceType::from(&path));
-        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
-        let settings =
-            settings::LinterSettings::for_rule(Rule::ContextManagerGenerator).with_preview_mode();
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
-        assert_eq!(diagnostics.len(), 17);
-        assert_eq!(
-            diagnostics
-                .iter()
-                .filter(|diagnostic| diagnostic.fix().is_some())
-                .count(),
-            15
-        );
-        insta::assert_snapshot!("fixed__UP052.py", transformed.source_code());
-
-        let settings = settings.with_target_version(PythonVersion::PY37);
-        let (diagnostics, transformed) = test_contents(&source_kind, &path, &settings);
-        assert_eq!(diagnostics.len(), 17);
-        assert!(
-            transformed
-                .source_code()
-                .contains("def version_specific() -> Iterator[int]:")
-        );
+    #[test_case(PythonVersion::PY37)]
+    #[test_case(PythonVersion::PY312)]
+    #[test_case(PythonVersion::PY313)]
+    fn context_manager_iterator(target_version: PythonVersion) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP052.py"),
+            &settings::LinterSettings::for_rule(Rule::ContextManagerIterator)
+                .with_preview_mode()
+                .with_target_version(target_version),
+        )?;
+        assert_diagnostics!(format!("UP052_{target_version}"), diagnostics);
         Ok(())
     }
 

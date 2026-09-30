@@ -4711,7 +4711,7 @@
         "complex-structure",
         "complexity",
         "constant-imported-as-non-constant",
-        "context-manager-generator",
+        "context-manager-iterator",
         "continue-in-finally",
         "continue-outside-loop",
         "convert-named-tuple-functional-to-class",
