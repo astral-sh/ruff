@@ -120,6 +120,8 @@ pub(super) enum Sequent<C, FuelCost = ()> {
         ante1: C,
         ante2: C,
         post: C,
+        /// Whether this sequent represents a _substitution_ of `ante1` with `post`.
+        is_substitution: bool,
         fuel_cost: FuelCost,
     },
 }
@@ -289,6 +291,22 @@ impl<'db> SequentMap<'db> {
             ante1,
             ante2,
             post,
+            is_substitution: false,
+            fuel_cost: (),
+        });
+    }
+
+    fn add_substitution(
+        &mut self,
+        substituted: Constraint<'db>,
+        ante: Constraint<'db>,
+        post: Constraint<'db>,
+    ) {
+        self.pending.push(Sequent::PairImplication {
+            ante1: substituted,
+            ante2: ante,
+            post,
+            is_substitution: true,
             fuel_cost: (),
         });
     }
@@ -813,7 +831,11 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.into_lower_bound().map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        if right.is_equivalence() {
+            map.add_substitution(left.into(), right.into(), derived.into());
+        } else {
+            map.add_pair_implication(left.into(), right.into(), derived.into());
+        }
     }
 
     fn add_covariant_upper_tightened_sequent(
@@ -847,7 +869,11 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.into_upper_bound().map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        if right.is_equivalence() {
+            map.add_substitution(left.into(), right.into(), derived.into());
+        } else {
+            map.add_pair_implication(left.into(), right.into(), derived.into());
+        }
     }
 
     fn add_covariant_equivalence_tightened_sequent(
@@ -881,7 +907,7 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        map.add_substitution(left.into(), right.into(), derived.into());
     }
 
     fn add_contravariant_tightened_sequent(
@@ -912,7 +938,11 @@ impl<'db> Constraint<'db> {
             )
         {
             let derived = lower.into_lower_bound().map(provenance, replacement);
-            map.add_pair_implication(lower.into(), upper.into(), derived.into());
+            if upper.is_equivalence() {
+                map.add_substitution(lower.into(), upper.into(), derived.into());
+            } else {
+                map.add_pair_implication(lower.into(), upper.into(), derived.into());
+            }
         }
 
         // If β contains T contravariantly, substitute α for T:
@@ -934,7 +964,11 @@ impl<'db> Constraint<'db> {
             )
         {
             let derived = upper.into_upper_bound().map(provenance, replacement);
-            map.add_pair_implication(lower.into(), upper.into(), derived.into());
+            if lower.is_equivalence() {
+                map.add_substitution(upper.into(), lower.into(), derived.into());
+            } else {
+                map.add_pair_implication(lower.into(), upper.into(), derived.into());
+            }
         }
     }
 
@@ -970,7 +1004,7 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        map.add_substitution(left.into(), right.into(), derived.into());
     }
 
     fn add_covariant_lower_weakened_sequent(
@@ -1075,7 +1109,7 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        map.add_substitution(left.into(), right.into(), derived.into());
     }
 
     fn add_contravariant_lower_weakened_sequent(
@@ -1180,7 +1214,7 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        map.add_substitution(left.into(), right.into(), derived.into());
     }
 
     fn add_invariant_weakened_sequent(
@@ -1215,7 +1249,7 @@ impl<'db> Constraint<'db> {
         };
         let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
         let derived = left.map(provenance, replacement);
-        map.add_pair_implication(left.into(), right.into(), derived.into());
+        map.add_substitution(left.into(), right.into(), derived.into());
     }
 }
 
@@ -1715,17 +1749,20 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         _reversed: bool,
     ) {
         // Given constraints `T = α` and `T ≤ U`, `α ≤ U` must also hold.
+        // Retaining the equality makes this an equivalent replacement for `T ≤ U`, so the
+        // fixed `T` does not remain in `U`'s inference bounds.
         if self.typevar.is_same_typevar_as(db, other.left) {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let derived = ConcreteLowerBound::new(provenance, other.right, self.bound);
-            map.add_pair_implication(self.into(), other.into(), derived.into());
+            map.add_substitution(other.into(), self.into(), derived.into());
         }
 
         // Given constraints `T = α` and `U ≤ T`, `U ≤ α` must also hold.
+        // The retained equality likewise makes this an equivalent replacement for `U ≤ T`.
         if self.typevar.is_same_typevar_as(db, other.right) {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let derived = ConcreteUpperBound::new(provenance, other.left, self.bound);
-            map.add_pair_implication(self.into(), other.into(), derived.into());
+            map.add_substitution(other.into(), self.into(), derived.into());
         }
 
         // We can infer sequents from `T = α` and `S ≤ U` if α _contains_ S or U.
@@ -1754,7 +1791,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         if let Some(other_typevar) = other_typevar {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let derived = ConcreteEquivalenceBound::new(provenance, other_typevar, self.bound);
-            map.add_pair_implication(self.into(), other.into(), derived.into());
+            map.add_substitution(other.into(), self.into(), derived.into());
         }
 
         // We can infer sequents from `T = α` and `S = U` if α _contains_ U.
