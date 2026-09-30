@@ -7688,12 +7688,11 @@ impl<'db> Type<'db> {
 
         let class_literal = class.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
-        let inferable_class_context =
-            if matches!(self, Type::ClassLiteral(_) | Type::GenericAlias(_)) {
-                class_generic_context
-            } else {
-                None
-            };
+        let inferable_class_context = if matches!(self, Type::ClassLiteral(_)) {
+            class_generic_context
+        } else {
+            None
+        };
         let constructor_member_policy =
             if class_generic_context.is_some() && inferable_class_context.is_none() {
                 MemberLookupPolicy::NO_INHERITED_GENERIC_CONTEXT
@@ -9220,23 +9219,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Projects a member from its generic owner, applying the owner's specialization to both
-    /// ordinary occurrences and the domain of any retained synthetic `Self` variable.
-    ///
-    /// Rewriting the `Self` domain is specific to this projection boundary. Inference and other
-    /// ordinary specializations must preserve that domain as fixed evidence.
-    fn apply_optional_owner_specialization_to_member(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Type<'db> {
-        if let Some(specialization) = specialization {
-            self.apply_specialization_impl(db, specialization, true)
-        } else {
-            self
-        }
-    }
-
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
@@ -9248,19 +9230,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
-        self.apply_specialization_impl(db, specialization, false)
-    }
-
-    /// Applies either an ordinary specialization or an enclosing-owner specialization.
-    ///
-    /// Both modes share the same leaf fast paths. They differ only in whether a retained synthetic
-    /// `Self` domain is part of the substitution.
-    fn apply_specialization_impl(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-        specialize_self_domain: bool,
-    ) -> Type<'db> {
         if let Type::NominalInstance(instance) = self
             && !instance.is_definition_generic(db)
         {
@@ -9271,8 +9240,12 @@ impl<'db> Type<'db> {
             && !typevar.is_paramspec(db)
         {
             match specialization.get(db, typevar) {
+                Some(Type::TypeVar(mapped))
+                    if typevar.is_same_typevar_as(db, mapped)
+                        && (typevar.specialization_may_change_domain(db)
+                            || mapped.specialization_may_change_domain(db)) => {}
                 Some(mapped) if specialization.materialization_kind(db).is_none() => return mapped,
-                None if !specialize_self_domain || !typevar.typevar(db).is_self(db) => return self,
+                None if !typevar.specialization_may_change_domain(db) => return self,
                 _ => {}
             }
         }
@@ -9327,13 +9300,13 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization, specialize_self_domain)
+        self.apply_specialization_inner(db, specialization)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
@@ -9345,13 +9318,9 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-        specialize_self_domain: bool,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let apply_specialization = ApplySpecialization::Specialization {
-            specialization,
-            specialize_self_domain,
-        };
+        let apply_specialization = ApplySpecialization::specialization(specialization);
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(apply_specialization),
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
@@ -11081,7 +11050,7 @@ impl<'db> TypeMapping<'_, 'db> {
                         Some(_) => false, // Specialized to a concrete type, filter out
                     }
                 });
-                if specialization.specialize_self_domain() {
+                if specialization.specializes_typevar_domains() {
                     let kept = kept.filter_map(|bound_typevar| {
                         Type::TypeVar(bound_typevar)
                             .apply_type_mapping(

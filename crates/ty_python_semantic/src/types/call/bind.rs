@@ -746,6 +746,7 @@ impl<'db> Bindings<'db> {
                         }
                     }
                     CallableItem::Constructor(binding) => {
+                        binding.set_inferable_class_context(generic_context);
                         for overload in &mut binding.entry.overloads {
                             overload.signature.generic_context = GenericContext::merge_optional(
                                 db,
@@ -3835,42 +3836,54 @@ impl<'db> CallableBinding<'db> {
         // `*arg` where `arg` is a union of a 2-tuple and a 3-tuple, we shouldn't eliminate any
         // overload for arity reasons before trying argument expansion.
         let argument_expansions = call_arguments.expansions(db, env);
-        let (should_retry_after_provisional_arity, overloads_for_expansion) = if self
-            .should_retry_after_provisional_arity(&argument_expansions)
-        {
-            // We will retry all overloads after argument expansion.
-            (true, (0..self.overloads.len()).collect())
-        } else {
-            match self.matching_overload_index() {
-                MatchingOverloadIndex::None => {
-                    // If no candidate overloads remain from the arity check, we can stop here. We
-                    // still perform type checking for non-overloaded function to provide better
-                    // user experience.
-                    if let [overload] = self.overloads.as_mut_slice() {
-                        overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+        let (should_retry_after_provisional_arity, overloads_for_expansion) =
+            if self.should_retry_after_provisional_arity(&argument_expansions) {
+                // We will retry all overloads after argument expansion.
+                (true, (0..self.overloads.len()).collect())
+            } else {
+                match self.matching_overload_index() {
+                    MatchingOverloadIndex::None => {
+                        // If no candidate overloads remain from the arity check, we can stop here. We
+                        // still perform type checking for non-overloaded function to provide better
+                        // user experience.
+                        if let [overload] = self.overloads.as_mut_slice() {
+                            overload.check_types(
+                                db,
+                                env,
+                                constraints,
+                                call_arguments.as_ref(),
+                                call_expression_tcx,
+                            );
+                        }
+                        return;
                     }
-                    return;
+                    MatchingOverloadIndex::Single(index) => {
+                        // If only one candidate overload remains, it is the winning match. Evaluate
+                        // it as a regular (non-overloaded) call.
+                        self.matching_overload_before_type_checking = Some(index);
+                        self.overloads[index].check_types(
+                            db,
+                            env,
+                            constraints,
+                            call_arguments.as_ref(),
+                            call_expression_tcx,
+                        );
+                        return;
+                    }
+                    MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
                 }
-                MatchingOverloadIndex::Single(index) => {
-                    // If only one candidate overload remains, it is the winning match. Evaluate
-                    // it as a regular (non-overloaded) call.
-                    self.matching_overload_before_type_checking = Some(index);
-                    self.overloads[index].check_types(
-                        db,
-                        env,
-                        call_arguments.as_ref(),
-                        call_expression_tcx,
-                    );
-                    return;
-                }
-                MatchingOverloadIndex::Multiple(indexes) => (false, indexes),
-            }
-        };
+            };
 
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, env, call_arguments.as_ref(), call_expression_tcx);
+            overload.check_types(
+                db,
+                env,
+                constraints,
+                call_arguments.as_ref(),
+                call_expression_tcx,
+            );
         }
 
         tracing::trace!(
@@ -4055,7 +4068,13 @@ impl<'db> CallableBinding<'db> {
                 );
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, env, expanded_arguments, call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        env,
+                        constraints,
+                        expanded_arguments,
+                        call_expression_tcx,
+                    );
                 }
 
                 tracing::trace!(
@@ -6728,7 +6747,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut expected_ty = declared_type;
         if let Some(specialization) = self.merged_specialization() {
-            if !constructor_receiver {
+            // An ordinary bound method's receiver is a value from the caller, so the method's
+            // inferred type arguments must not rewrite type variables captured by that receiver.
+            // A constructor receiver can instead be a template for the instance being inferred.
+            let ordinary_receiver =
+                matches!(argument, Argument::Synthetic) && self.constructor_kind.is_none();
+            if !constructor_receiver && !ordinary_receiver {
                 argument_type = argument_type.apply_specialization(db, specialization);
             }
             expected_ty = expected_ty.apply_specialization(db, specialization);
@@ -8152,13 +8176,10 @@ impl<'db> Binding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
-        // Each overload is an independent inference problem. Two candidates can contain
-        // typevars with the same identity but different specialized bounds, so sharing a
-        // builder would make the second candidate reuse the first candidate's bounds.
-        let constraints = &ConstraintSetBuilder::new();
         let parameters = self.signature.parameters();
 
         if parameters.is_top() {

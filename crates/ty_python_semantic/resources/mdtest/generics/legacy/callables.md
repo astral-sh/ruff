@@ -1289,3 +1289,173 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Returning an unbound method of a specialized class
+
+The returned method's `Self` is bounded by the specialized class. Specializing the enclosing
+function also specializes that bound, including when the method passes through another function.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+def method(box: Box[T]) -> TypeOf[Box[T].pair]:
+    return Box[T].pair
+
+def forward(box: Box[list[T]]) -> TypeOf[Box[list[T]].pair]:
+    return method(box)
+
+def check(box: Box[int], other: Box[str], nested: Box[list[int]]) -> None:
+    pair = method(box)
+    reveal_type(pair(box))  # revealed: tuple[Box[int], int]
+    pair(other)  # error: [invalid-argument-type] "does not satisfy upper bound `Box[int]`"
+    reveal_type(forward(nested)(nested))  # revealed: tuple[Box[list[int]], list[int]]
+```
+
+The same relationship holds when a function recursively returns the method.
+
+```py
+def recursive(box: Box[T], n: int) -> TypeOf[Box[T].pair]:
+    if n:
+        pair = recursive(box, n - 1)
+        reveal_type(pair(box))  # revealed: tuple[Box[T@recursive], T@recursive]
+        return pair
+    return Box[T].pair
+
+def check_recursive(box: Box[int]) -> None:
+    reveal_type(recursive(box, 1)(box))  # revealed: tuple[Box[int], int]
+```
+
+## Returning an unbound method with a ParamSpec
+
+Specialization of the returned method applies to both its `Self` bound and its parameter list.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import ParamSpec, Self
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class Box(Generic[T, P]):
+    value: T
+
+    def pair(self, *args: P.args, **kwargs: P.kwargs) -> tuple[Self, T]:
+        return self, self.value
+
+def method(box: Box[T, P]) -> TypeOf[Box[T, P].pair]:
+    return Box[T, P].pair
+
+def check(box: Box[int, [str]]) -> None:
+    pair = method(box)
+    reveal_type(pair(box, "value"))  # revealed: tuple[Box[int, (str, /)], int]
+    pair(box, 1)  # error: [invalid-argument-type] "Expected `str`, found `Literal[1]`"
+```
+
+## A constructor accepting a generic method and capturing `Self`
+
+The constructor receives an unbound method whose `Self` is bounded by `Box[T]`. Its `owner` type
+argument is a different `Self`, captured from the calling method. A recursive call to the
+constructor similarly captures its caller's `Self`.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+class Wrapper(Generic[T, U]):
+    def __init__(self, value: T, owner: U, pair: TypeOf[Box[T].pair]) -> None:
+        reveal_type(Wrapper[T, Self](value, self, pair))  # revealed: Wrapper[T@Wrapper, Self@__init__]
+        self.owner = owner
+        self.pair = pair
+
+class Caller(Generic[T]):
+    def wrap(self, value: T, box: Box[T]) -> Wrapper[T, Self]:
+        result = Wrapper[T, Self](value, self, Box[T].pair)
+        reveal_type(result.owner)  # revealed: Self@wrap
+        reveal_type(result.pair(box))  # revealed: tuple[Box[T@Caller], T@Caller]
+        return result
+
+def check(caller: Caller[int], box: Box[int]) -> None:
+    result = caller.wrap(1, box)
+    reveal_type(result.owner)  # revealed: Caller[int]
+    reveal_type(result.pair(box))  # revealed: tuple[Box[int], int]
+```
+
+## Calling generic bound methods from generic methods
+
+The receiver retains the calling method's `Self` while the called method infers its own type
+variable. This also applies to recursive calls to the same method.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def pair(self, value: U, again: bool = False) -> tuple[Self, U]:
+        if again:
+            reveal_type(self.pair(value))  # revealed: tuple[Self@pair, U@pair]
+        return self, value
+
+    def forward(self, value: U) -> tuple[Self, U]:
+        reveal_type(self.pair(value))  # revealed: tuple[Self@forward, U@forward]
+        return self.pair(value)
+
+def check(box: Box[int]) -> None:
+    reveal_type(box.pair("value"))  # revealed: tuple[Box[int], Literal["value"]]
+    box.pair("value", "wrong")  # error: [invalid-argument-type]
+```
+
+## Specializing a type alias for a generic method
+
+Specializing the alias also specializes the returned method's `Self` bound, including through a
+nested alias.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def pair(self) -> tuple[Self, T]:
+        return self, self.value
+
+type Pair[U] = TypeOf[Box[U].pair]
+type Nested[U] = Pair[list[U]]
+
+def check(pair: Pair[int], box: Box[int], other: Box[str], nested: Nested[int], lists: Box[list[int]]) -> None:
+    reveal_type(pair(box))  # revealed: tuple[Box[int], int]
+    pair(other)  # error: [invalid-argument-type]
+    reveal_type(nested(lists))  # revealed: tuple[Box[list[int]], list[int]]
+```

@@ -1367,7 +1367,7 @@ impl<'db> Specialization<'db> {
     /// MRO of `B[int]`.
     fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(other.generic_context(db).program(db));
-        self.apply_specialization_impl(db, other, false, &ApplyTypeMappingVisitor::new(env))
+        self.apply_specialization_impl(db, other, &ApplyTypeMappingVisitor::new(env))
     }
 
     /// Compose specializations while preserving the enclosing transformation's recursion guard.
@@ -1375,14 +1375,12 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
-        specialize_self_domain: bool,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let specialized = self.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
                 specialization: other,
-                specialize_self_domain,
             }),
             &[],
             visitor,
@@ -2260,12 +2258,6 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 pub enum ApplySpecialization<'a, 'db> {
     Specialization {
         specialization: Specialization<'db>,
-        /// Whether to substitute free owner variables in the declared domain of a retained
-        /// synthetic `Self`.
-        ///
-        /// This is only set when projecting a member from its enclosing generic owner. Ordinary
-        /// specialization preserves that domain as fixed evidence.
-        specialize_self_domain: bool,
     },
     TypeAlias(Specialization<'db>),
     Partial {
@@ -2288,19 +2280,20 @@ pub enum ApplySpecialization<'a, 'db> {
 
 impl<'db> ApplySpecialization<'_, 'db> {
     pub(crate) fn specialization(specialization: Specialization<'db>) -> Self {
-        Self::Specialization {
-            specialization,
-            specialize_self_domain: false,
-        }
+        Self::Specialization { specialization }
     }
 
-    pub(crate) fn specialize_self_domain(self) -> bool {
+    /// Whether this specialization maps the domains of retained type variables.
+    ///
+    /// `Partial` also resolves type arguments and solver dependencies, preserving captured
+    /// declarations; its recursion guard substitutes `Never` for a skipped variable. `Single`
+    /// is used for sequent substitutions, whose variance checks do not inspect retained domains.
+    pub(crate) fn specializes_typevar_domains(self) -> bool {
         match self {
-            Self::Specialization {
-                specialize_self_domain,
-                ..
-            } => specialize_self_domain,
-            Self::WithBindings { specialization, .. } => specialization.specialize_self_domain(),
+            Self::Specialization { .. } | Self::TypeAlias(_) => true,
+            Self::WithBindings { specialization, .. } => {
+                specialization.specializes_typevar_domains()
+            }
             _ => false,
         }
     }
@@ -2322,7 +2315,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
-            ApplySpecialization::Specialization { specialization, .. }
+            ApplySpecialization::Specialization { specialization }
             | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
@@ -2364,7 +2357,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     /// context, preserving skipped type variables in partial specializations as identity mappings.
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
-            ApplySpecialization::Specialization { specialization, .. }
+            ApplySpecialization::Specialization { specialization }
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,
@@ -4847,6 +4840,25 @@ mod tests {
                 TypeVarVariance::Invariant,
             )
         })
+    }
+
+    #[test]
+    fn recursive_specialization_preserves_a_captured_self_domain() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let [u] = create_typevars(db, ["U"]);
+        let bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
+        let captured = BoundTypeVarInstance::synthetic_self(
+            db,
+            bound,
+            BindingContext::Synthetic(env.program(db)),
+        );
+        let context = GenericContext::from_typevar_instances(db, &env, [u]);
+
+        // Skipping U while resolving U -> Self must not replace U inside Self's bound with Never.
+        let specialization = context.specialize_recursive(db, [Some(Type::TypeVar(captured))]);
+        assert_eq!(specialization.get(db, u), Some(Type::TypeVar(captured)));
     }
 
     fn exact_alternatives<'db, 'c, const N: usize>(

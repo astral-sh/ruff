@@ -1961,7 +1961,7 @@ impl<'db> ClassType<'db> {
                 .map(|specialization| specialization.tuple_runtime_element_specialization(db));
             class_literal
                 .own_class_member(db, env, inherited_generic_context, specialization, name)
-                .map_type(|ty| ty.apply_optional_owner_specialization_to_member(db, specialization))
+                .map_type(|ty| ty.apply_optional_specialization(db, specialization))
         };
 
         match name {
@@ -2276,9 +2276,7 @@ impl<'db> ClassType<'db> {
 
                 class_literal
                     .instance_member(db, env, specialization, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, specialization)
-                    })
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
             }
         }
     }
@@ -2333,9 +2331,7 @@ impl<'db> ClassType<'db> {
                 generic
                     .origin(db)
                     .own_instance_member(db, env, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, Some(specialization))
-                    })
+                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
     }
