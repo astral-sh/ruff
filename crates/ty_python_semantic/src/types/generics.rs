@@ -4461,6 +4461,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let when = self.constraint_for_relation(formal, actual, relation_polarity);
                 let analysis = self.analyze_constraint_set(when);
                 let is_gradual = |ty: Type<'db>| {
+                    // `Type::is_fully_static` can miss `Any` in original function signatures. It also
+                    // treats `Top[list[Any]]` as gradual, although its materializations are equal.
                     ty.bottom_materialization(db, self.env) != ty.top_materialization(db, self.env)
                 };
                 let use_legacy_inference = polarity.is_covariant()
