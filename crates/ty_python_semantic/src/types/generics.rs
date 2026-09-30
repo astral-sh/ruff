@@ -1367,7 +1367,7 @@ impl<'db> Specialization<'db> {
     /// MRO of `B[int]`.
     fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
         let env = &ProgramEnvironment::from_program(other.generic_context(db).program(db));
-        self.apply_specialization_impl(db, other, &ApplyTypeMappingVisitor::new(env))
+        self.apply_specialization_impl(db, other, true, &ApplyTypeMappingVisitor::new(env))
     }
 
     /// Compose specializations while preserving the enclosing transformation's recursion guard.
@@ -1375,13 +1375,17 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
+        specialize_typevar_domains: bool,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        let specialization = if specialize_typevar_domains {
+            ApplySpecialization::specialization(other)
+        } else {
+            ApplySpecialization::PreserveTypeVarDomains(other)
+        };
         let specialized = self.apply_type_mapping_impl(
             db,
-            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
-                specialization: other,
-            }),
+            &TypeMapping::ApplySpecialization(specialization),
             &[],
             visitor,
         );
@@ -2259,6 +2263,8 @@ pub enum ApplySpecialization<'a, 'db> {
     Specialization {
         specialization: Specialization<'db>,
     },
+    /// Substitute types without specializing retained type variable bounds or constraints.
+    PreserveTypeVarDomains(Specialization<'db>),
     TypeAlias(Specialization<'db>),
     Partial {
         generic_context: GenericContext<'db>,
@@ -2316,6 +2322,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     ) -> Option<Type<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization }
+            | ApplySpecialization::PreserveTypeVarDomains(specialization)
             | ApplySpecialization::TypeAlias(specialization) => {
                 specialization.get(db, bound_typevar)
             }
@@ -2358,6 +2365,7 @@ impl<'db> ApplySpecialization<'_, 'db> {
     pub(crate) fn as_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             ApplySpecialization::Specialization { specialization }
+            | ApplySpecialization::PreserveTypeVarDomains(specialization)
             | ApplySpecialization::TypeAlias(specialization) => Some(specialization),
             ApplySpecialization::Partial {
                 generic_context,

@@ -1428,6 +1428,73 @@ def check(box: Box[int]) -> None:
     box.pair("value", "wrong")  # error: [invalid-argument-type]
 ```
 
+## Recursive calls with class and method type variables
+
+A recursive call infers the method's type variable while preserving the class's type argument and
+the calling method's own type variable.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def pair(self, value: U, stored: T, recurse: bool) -> tuple[U, T]:
+        if recurse:
+            reveal_type(self.pair(123, stored, False))  # revealed: tuple[Literal[123], T@Box]
+            reveal_type(self.pair(value, stored, False))  # revealed: tuple[U@pair, T@Box]
+        return value, stored
+```
+
+## Contextual lambdas in generic method calls
+
+The callback receives the class's type argument as context, and the method infers its return type
+from the callback.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Box(Generic[T]):
+    def apply(self, value: T, transform: Callable[[T], U]) -> U:
+        return transform(value)
+
+    def contextual(self, value: T) -> T:
+        self.apply(value, lambda item: reveal_type(item))  # revealed: T@Box
+        reveal_type(self.apply(value, lambda item: item))  # revealed: T@Box
+        return self.apply(value, lambda item: item)
+```
+
+## Contextual variadic calls with `Self`
+
+A variadic superclass method preserves the caller's `Self` in the inferred tuple.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self, TypeVarTuple, Unpack
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Base(Generic[T]):
+    def collect(self, *args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
+        return args
+
+class Child(Base[T]):
+    def collect_self(self) -> tuple[Self]:
+        result: tuple[Self] = super().collect(self)
+        reveal_type(result)  # revealed: tuple[Self@collect_self]
+        return result
+```
+
 ## Specializing a type alias for a generic method
 
 Specializing the alias also specializes the returned method's `Self` bound, including through a

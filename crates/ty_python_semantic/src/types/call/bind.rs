@@ -6475,7 +6475,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return !check_type_context
                 || self.is_partial_application
                 || actual
-                    .apply_specialization(db, specialization)
+                    .apply_call_argument_specialization(db, specialization)
                     .is_assignable_to(db, self.env, expected_ty);
         }
 
@@ -6753,7 +6753,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             let ordinary_receiver =
                 matches!(argument, Argument::Synthetic) && self.constructor_kind.is_none();
             if !constructor_receiver && !ordinary_receiver {
-                argument_type = argument_type.apply_specialization(db, specialization);
+                argument_type = if matches!(argument, Argument::Synthetic) {
+                    argument_type.apply_specialization(db, specialization)
+                } else {
+                    // The caller's type variables can occur inside the actual argument. Substitute
+                    // inferred types without changing the bounds of retained caller variables.
+                    argument_type.apply_call_argument_specialization(db, specialization)
+                };
             }
             expected_ty = expected_ty.apply_specialization(db, specialization);
         }

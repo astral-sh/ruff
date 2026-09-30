@@ -1639,6 +1639,91 @@ reveal_type(DescriptorChild.descriptor)  # revealed: Unknown
 reveal_type(DescriptorChild[int].descriptor)  # revealed: int
 ```
 
+## Forwarding `cls` to a generic superclass constructor
+
+A generic subclass can pass its `cls` to the superclass's `__new__` method and retain its `Self`
+return type. The superclass's specialized parameter types still apply.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+class Child(Base[T]):
+    def __new__(cls, value: T) -> Self:
+        result = super().__new__(cls, value)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+
+class IntChild(Base[int]):
+    def __new__(cls, value: int) -> Self:
+        super().__new__(cls, "wrong")  # error: [invalid-argument-type]
+        return super().__new__(cls, value)  # no diagnostic
+```
+
+The `cls` argument can also be passed through a generic type alias.
+
+```py
+from typing_extensions import TypeAliasType
+
+Class = TypeAliasType("Class", type[T], type_params=(T,))
+
+class AliasedChild(Base[T]):
+    def __new__(cls, value: T) -> Self:
+        aliased_cls: Class[Self] = cls
+        result = super().__new__(aliased_cls, value)
+        reveal_type(result)  # revealed: Self@__new__
+        return result
+```
+
+The same applies to constructors inherited through a generic tuple subclass.
+
+```py
+class TupleBase(tuple[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls, (value,))
+
+class TupleChild(TupleBase[T]):
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls, value)  # no diagnostic
+```
+
+## Calling a generic superclass initializer from a classmethod
+
+A classmethod can allocate an instance and pass it to the unbound superclass initializer. The
+initializer still checks the other arguments against the superclass specialization.
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    def __init__(self, value: T) -> None: ...
+
+class Child(Base[T]):
+    @classmethod
+    def build(cls, value: T) -> Self:
+        instance = cls.__new__(cls)
+        super().__init__(instance, value)  # no diagnostic
+        reveal_type(instance)  # revealed: Self@build
+        return instance
+
+class IntChild(Base[int]):
+    @classmethod
+    def build(cls, value: int) -> Self:
+        instance = cls.__new__(cls)
+        super().__init__(instance, "wrong")  # error: [invalid-argument-type]
+        super().__init__(instance, value)  # no diagnostic
+        return instance
+```
+
 ## Fallback MROs preserve generic class identity
 
 Putting `Base` before its subclass makes the MRO inconsistent. During error recovery, the fallback

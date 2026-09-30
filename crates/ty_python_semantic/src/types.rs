@@ -9230,6 +9230,24 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Type<'db> {
+        self.apply_specialization_impl(db, specialization, true)
+    }
+
+    /// Apply a call's inferred specialization without rewriting domains captured by its arguments.
+    fn apply_call_argument_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        self.apply_specialization_impl(db, specialization, false)
+    }
+
+    fn apply_specialization_impl(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        specialize_typevar_domains: bool,
+    ) -> Type<'db> {
         if let Type::NominalInstance(instance) = self
             && !instance.is_definition_generic(db)
         {
@@ -9239,7 +9257,17 @@ impl<'db> Type<'db> {
         if let Type::TypeVar(typevar) = self
             && !typevar.is_paramspec(db)
         {
-            match specialization.get(db, typevar) {
+            let mapped_typevar = specialization.get(db, typevar);
+            if !specialize_typevar_domains {
+                match mapped_typevar {
+                    Some(mapped) if specialization.materialization_kind(db).is_none() => {
+                        return mapped;
+                    }
+                    None => return self,
+                    _ => {}
+                }
+            }
+            match mapped_typevar {
                 Some(Type::TypeVar(mapped))
                     if typevar.is_same_typevar_as(db, mapped)
                         && (typevar.specialization_may_change_domain(db)
@@ -9300,13 +9328,13 @@ impl<'db> Type<'db> {
             return self;
         }
 
-        self.apply_specialization_inner(db, specialization)
+        self.apply_specialization_inner(db, specialization, specialize_typevar_domains)
     }
 
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>| {
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, specialization: Specialization<'db>, _| {
             let env = ProgramEnvironment::from_program(
                 specialization.generic_context(db).program(db),
             );
@@ -9318,9 +9346,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
+        specialize_typevar_domains: bool,
     ) -> Type<'db> {
         let env = &ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
-        let apply_specialization = ApplySpecialization::specialization(specialization);
+        let apply_specialization = if specialize_typevar_domains {
+            ApplySpecialization::specialization(specialization)
+        } else {
+            ApplySpecialization::PreserveTypeVarDomains(specialization)
+        };
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(apply_specialization),
             Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
