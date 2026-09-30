@@ -71,7 +71,7 @@ impl ConstraintProvenance {
 pub(super) struct UnsatisfiableBound;
 
 /// One condition that can be checked by an interior node in a constraint set BDD
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) enum Constraint<'db> {
     Atomic(AtomicConstraint<'db>),
 }
@@ -111,7 +111,7 @@ impl<'db> Constraint<'db> {
     }
 
     pub(super) fn apply_type_mapping_impl(
-        self,
+        &self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
@@ -125,14 +125,14 @@ impl<'db> Constraint<'db> {
         }
     }
 
-    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
+    pub(super) fn types(&self) -> impl Iterator<Item = Type<'db>> {
         match self {
             Constraint::Atomic(atomic) => atomic.types(),
         }
     }
 
     pub(super) fn display<'a>(
-        self,
+        &'a self,
         db: &'db dyn Db,
         env: &'a ProgramEnvironment<'db>,
         holds: Option<bool>,
