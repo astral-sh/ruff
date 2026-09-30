@@ -3864,7 +3864,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             return match self.relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => self.never(),
+                TypeRelation::Subtyping => self.never(),
                 TypeRelation::Redundancy { .. } => result.intersect(
                     db,
                     self.constraints,
@@ -4253,7 +4253,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     return match self.relation {
                                         TypeRelation::Assignability => result,
                                         TypeRelation::Subtyping
-                                        | TypeRelation::SubtypingAssuming
                                         | TypeRelation::Redundancy { .. } => self.never(),
                                     };
                                 }

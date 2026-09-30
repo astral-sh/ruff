@@ -169,43 +169,6 @@ pub(crate) enum TypeRelation {
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Redundancy { pure: bool },
-
-    /// The "constraint implication" relationship, aka "implies subtype of".
-    ///
-    /// This relationship tests whether one type is a [subtype][Self::Subtyping] of another,
-    /// assuming that the constraints in a particular constraint set hold.
-    ///
-    /// For concrete types (types that do not contain typevars), this relationship is the same as
-    /// [subtyping][Self::Subtyping]. (Constraint sets place restrictions on typevars, so if you
-    /// are not comparing typevars, the constraint set can have no effect on whether subtyping
-    /// holds.)
-    ///
-    /// If you're comparing a typevar, we have to consider what restrictions the constraint set
-    /// places on that typevar to determine if subtyping holds. For instance, if you want to check
-    /// whether `T ≤ int`, then the answer will depend on what constraint set you are considering:
-    ///
-    /// ```text
-    /// implies_subtype_of(T ≤ bool, T, int) ⇒ true
-    /// implies_subtype_of(T ≤ int, T, int)  ⇒ true
-    /// implies_subtype_of(T ≤ str, T, int)  ⇒ false
-    /// ```
-    ///
-    /// In the first two cases, the constraint set ensures that `T` will always specialize to a
-    /// type that is a subtype of `int`. In the final case, the constraint set requires `T` to
-    /// specialize to a subtype of `str`, and there is no such type that is also a subtype of
-    /// `int`.
-    ///
-    /// There are two constraint sets that deserve special consideration.
-    ///
-    /// - The "always true" constraint set does not place any restrictions on any typevar. In this
-    ///   case, `implies_subtype_of` will return the same result as `when_subtype_of`, even if
-    ///   you're comparing against a typevar.
-    ///
-    /// - The "always false" constraint set represents an impossible situation. In this case, every
-    ///   subtype check will be vacuously true, even if you're comparing two concrete types that
-    ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
-    ///   will return true!)
-    SubtypingAssuming,
 }
 
 impl TypeRelation {
@@ -220,9 +183,7 @@ impl TypeRelation {
     const fn can_safely_assume_reflexivity(self, ty: Type<'_>) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
-            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
-                ty.subtyping_is_always_reflexive()
-            }
+            TypeRelation::Subtyping => ty.subtyping_is_always_reflexive(),
         }
     }
 
@@ -377,40 +338,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Return the constraints under which this type is a subtype of type `target`, assuming that
-    /// all of the restrictions in `constraints` hold.
-    ///
-    /// See [`TypeRelation::SubtypingAssuming`] for more details.
-    pub(super) fn when_subtype_of_assuming<'c>(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        target: Type<'db>,
-        assuming: ConstraintSet<'db, 'c>,
-        constraints: &'c ConstraintSetBuilder<'db>,
-        inferable: TypeVarSet<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
-        let checker = TypeRelationChecker {
-            env,
-            constraints,
-            inferable,
-            relation: TypeRelation::SubtypingAssuming,
-            typevar_evaluation: TypeVarEvaluation::Eager,
-            context_tree: None,
-            given: assuming,
-            perform_expensive_checks: true,
-            relation_visitor: &relation_visitor,
-            disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
-            materialization_visitor: &materialization_visitor,
-        };
-        checker.check_type_pair(db, self, target)
-    }
-
     /// Return true if this type is assignable to type `target`.
     ///
     /// See `TypeRelation::Assignability` for more details.
@@ -476,7 +403,6 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
-            given: ConstraintSet::from_bool(&builder, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -794,7 +720,6 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation,
             context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -928,7 +853,6 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             typevar_evaluation,
             relation_visitor: &relation_visitor,
@@ -982,7 +906,6 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1006,7 +929,6 @@ impl<'db> Type<'db> {
             constraints: &constraints,
             inferable: TypeVarSet::None,
             context_tree: Some(context.clone()),
-            given: ConstraintSet::from_bool(&constraints, false),
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&constraints),
             disjointness_visitor: &IsDisjointVisitor::default(&constraints),
@@ -1037,7 +959,6 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1108,7 +1029,6 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     context_tree: Option<ErrorContextTree<'db>>,
-    given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
@@ -1143,7 +1063,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1211,7 +1130,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1235,7 +1153,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1474,9 +1391,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // implementation of redundancy may not generally lead to simpler types in many
                 // situations.
                 let source_ty = match self.relation {
-                    TypeRelation::Subtyping
-                    | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => source,
+                    TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => source,
                     TypeRelation::Assignability => source.bottom_materialization(db, self.env),
                 };
                 intersection
@@ -1484,9 +1399,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .iter()
                     .when_all(db, self.constraints, |&negative| {
                         let negative = match self.relation {
-                            TypeRelation::Subtyping
-                            | TypeRelation::Redundancy { .. }
-                            | TypeRelation::SubtypingAssuming => negative,
+                            TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => negative,
                             TypeRelation::Assignability => {
                                 negative.bottom_materialization(db, self.env)
                             }
@@ -1790,16 +1703,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let env = self.env;
-
-        // Handle constraint implication first. If either `source` or `target` is a typevar, check
-        // the constraint set to see if the corresponding constraint is satisfied.
-        if self.relation == TypeRelation::SubtypingAssuming
-            && (source.is_type_var() || target.is_type_var())
-        {
-            return self
-                .given
-                .implies_subtype_of(db, env, self.constraints, source, target);
-        }
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a
         // constraint set.
@@ -2152,7 +2055,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                    TypeRelation::Subtyping => false,
                     TypeRelation::Assignability => true,
                     TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
@@ -2164,7 +2067,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
+                    TypeRelation::Subtyping => false,
                     TypeRelation::Assignability => true,
                     TypeRelation::Redundancy { .. } => match source {
                         Type::Dynamic(_) => true,
@@ -3060,7 +2963,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
-            given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
@@ -3076,7 +2978,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
-            given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -3107,7 +3008,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
     typevar_evaluation: TypeVarEvaluation,
 
@@ -3134,7 +3034,6 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             typevar_evaluation: self.typevar_evaluation,
             constraints: self.constraints,
             context_tree: None,
-            given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
@@ -3179,7 +3078,6 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
-    given: ConstraintSet<'db, 'c>,
     perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
@@ -3209,7 +3107,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             context_tree: None,
-            given: ConstraintSet::from_bool(constraints, false),
             perform_expensive_checks: true,
             disjointness_visitor,
             relation_visitor,
@@ -3229,7 +3126,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
-            given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -3268,7 +3164,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
-            given: self.given,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
