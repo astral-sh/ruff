@@ -340,8 +340,9 @@ impl<'db> OwnedConstraintSet<'db> {
                 .iter()
                 .map(|node| node.constraint)
                 .unique()
-                .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
-                .flat_map(Constraint::types)
+                .flat_map(|constraint| {
+                    inner.constraints[inner.retained_constraint_index(constraint)].types()
+                })
         })
     }
 }
@@ -819,13 +820,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let mut constraints = SmallVec::<[_; 8]>::new();
         self.node
             .for_each_unique_constraint(&storage, &mut |constraint_id| {
-                let constraint = storage.constraint_data(constraint_id);
-                constraints.push((constraint_id, constraint));
+                constraints.push(constraint_id);
             });
         // Mapping can intern constraints and typevars. Preserve their source order rather than
         // letting the old diagram's variable order determine the rebuilt diagram's ordering.
         let source_orders = storage.calculate_source_orders(self.source_order);
-        constraints.sort_unstable_by_key(|(constraint, _)| {
+        constraints.sort_unstable_by_key(|constraint| {
             constraint
                 .as_atomic(&storage)
                 .and_then(|constraint| source_orders.get_index_of(&constraint))
@@ -833,11 +833,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         drop(storage);
 
         let mut mapped_constraints = FxHashMap::default();
-        for (constraint_id, constraint) in constraints {
-            mapped_constraints.insert(
-                constraint_id,
-                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor),
-            );
+        for constraint_id in constraints {
+            let storage = self.builder.storage.borrow();
+            let constraint = storage.constraint_data(constraint_id).clone();
+            drop(storage);
+            mapped_constraints.insert(constraint_id, constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor));
         }
 
         let mut storage = self.builder.storage.borrow_mut();
@@ -1032,7 +1032,7 @@ impl<'db> ConstraintSetStorage<'db> {
             compacted
                 .constraint_indices
                 .iter_ones()
-                .zip(compacted.constraints.iter().copied())
+                .zip(compacted.constraints.iter().cloned())
                 .map(|(old_index, constraint)| (constraint, ConstraintId::from_usize(old_index))),
         );
         self.node_cache.extend(
@@ -1371,7 +1371,7 @@ impl<'db> ConstraintSetStorage<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraint: Constraint<'db>,
+        constraint: &Constraint<'db>,
     ) -> Support {
         let mut support = Support::default();
         match constraint {
@@ -1409,9 +1409,9 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
-        let support = self.intern_constraint_typevars(db, env, data);
+        let support = self.intern_constraint_typevars(db, env, &data);
         let support_id = self.intern_support(support);
-        let id = self.constraints.push(data);
+        let id = self.constraints.push(data.clone());
         self.constraint_supports.push(support_id);
         let id = self.adjusted_constraint_id(id);
         self.constraint_cache.insert(data, id);
@@ -1458,17 +1458,17 @@ impl<'db> ConstraintSetStorage<'db> {
             .expect("typevar should be interned before ordering")
     }
 
-    fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
+    fn constraint_data(&self, constraint: ConstraintId) -> &Constraint<'db> {
         if let Some(compacted) = &self.compacted {
             let index = constraint.index();
             let split = compacted.constraint_indices.len();
             if index < split {
                 let compacted_index = compacted.retained_constraint_index(constraint);
-                return compacted.constraints[compacted_index];
+                return &compacted.constraints[compacted_index];
             }
-            return self.constraints[ConstraintId::from_usize(index - split)];
+            return &self.constraints[ConstraintId::from_usize(index - split)];
         }
-        self.constraints[constraint]
+        &self.constraints[constraint]
     }
 
     fn atomic_constraint_data(&self, constraint: AtomicConstraintId) -> AtomicConstraint<'db> {
@@ -1476,7 +1476,7 @@ impl<'db> ConstraintSetStorage<'db> {
         let Constraint::Atomic(atomic) = self.constraint_data(constraint.into_inner()) else {
             panic!("atomic constraint should be atomic");
         };
-        atomic
+        *atomic
     }
 
     fn cached_constraint_bound_depth(
@@ -5077,7 +5077,7 @@ mod tests {
             t,
             actual_bound,
         ));
-        let support = storage.intern_constraint_typevars(db, &env, data.into());
+        let support = storage.intern_constraint_typevars(db, &env, &data.into());
         let mentioned = support
             .iter()
             .map(|typevar| storage.typevar_data(typevar))
@@ -5139,7 +5139,7 @@ mod tests {
                 t,
                 u,
             ));
-            let support = storage.intern_constraint_typevars(db, &env, data.into());
+            let support = storage.intern_constraint_typevars(db, &env, &data.into());
             let mentioned = support
                 .iter()
                 .map(|typevar| storage.typevar_data(typevar))
