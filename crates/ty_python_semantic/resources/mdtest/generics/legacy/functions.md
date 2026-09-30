@@ -3314,7 +3314,7 @@ constraints:
 
 ```py
 def _(x: Intersection[Box[Unrelated1], Marker]) -> None:
-    # error: [invalid-argument-type] "Argument to function `unbox` is incorrect: Argument type `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
+    # error: [invalid-argument-type] "Inferred lower bound `Unrelated1` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
     reveal_type(unbox(x))  # revealed: Unknown
 ```
 
