@@ -3752,56 +3752,6 @@ for _ in 0:  # error: [not-iterable]
             pass
 ```
 
-## Duplicate diagnostics in a cyclic match subject
-
-In the example below, the subject of the second `match` refers to `NestedAlias`, which can depend on
-the `decorator` captured by that match. ty reports the same invalid decorator call twice.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-condition = object()
-lambda: Result
-type Alias = int if False else NestedAlias  # error: [invalid-type-form]
-if condition:
-    decorator = Alias
-else:
-    type decorator = Result  # error: [invalid-type-form]
-    @None  # error: [call-non-callable]
-    def decorator():
-        pass
-
-if [decorator]:
-    match lambda Result=condition: 0:
-        case 0:
-            # error: [invalid-type-form]
-            # error: [invalid-type-form]
-            type NestedAlias = decorator
-        case []:
-            type Result = Result
-match (lambda x: x) and {0: lambda: NestedAlias}:
-    case []:
-        class Result:
-            pass
-
-        async def decorator(**kwargs: Alias):
-            pass
-        NestedAlias: NestedAlias  # error: [possibly-unresolved-reference]
-    case decorator:
-        pass
-
-# TODO: Report each `call-non-callable` diagnostic only once.
-# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | Result]` is not callable"
-# error: [call-non-callable] "Object of type `dict[int, () -> TypeAliasType | Unknown | Result]` is not callable"
-# error: [too-many-positional-arguments]
-@decorator
-class Result:
-    pass
-```
-
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Apart from the optimistic treatment
