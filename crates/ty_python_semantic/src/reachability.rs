@@ -250,18 +250,6 @@ pub(crate) enum PatternSubjectExpansion {
 /// Caching the subject type narrowed by the patterns before each case lets the next case reuse it
 /// instead of rebuilding it from the union of all preceding patterns, which can repeatedly
 /// distribute the same intersections.
-///
-/// The query key excludes the inferred subject type, which can change during a cycle through a
-/// pattern capture. Inferring it within the query lets Salsa recognize and normalize that cycle.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
-    },
-    heap_size = ruff_memory_usage::heap_size
-)]
 pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
@@ -280,14 +268,40 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
             }
         };
     };
-    let previous = *previous;
-    let narrowed_by_previous_patterns = type_narrowed_by_previous_patterns(db, previous, expansion);
+    type_narrowed_after_pattern(db, *previous, expansion)
+}
 
-    let narrowed_by_pattern = type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns);
+/// Return the match subject's type after this case, excluding values matched by its pattern when
+/// its guard cannot reject them.
+///
+/// Reachability analysis can reuse this result for an unguarded case when checking whether the
+/// pattern covers every remaining value. Later cases use it to exclude values already matched.
+///
+/// The query key excludes the inferred subject type, which can change during a cycle through a
+/// pattern capture. Inferring it within the query lets Salsa recognize and normalize that cycle.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
+        result.cycle_normalized(db, &env, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_after_pattern<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    expansion: PatternSubjectExpansion,
+) -> Type<'db> {
+    let narrowed_by_previous_patterns =
+        type_narrowed_by_previous_patterns(db, predicate, expansion);
+
+    let narrowed_by_pattern =
+        type_narrowed_by_pattern(db, predicate, narrowed_by_previous_patterns);
     // If the pattern does not narrow the subject, the guard's truthiness cannot affect the result.
     // Skipping its inference also avoids cycles through the subject or a pattern capture.
     if narrowed_by_pattern == narrowed_by_previous_patterns
-        || !pattern_guard_allows_all_matches(db, previous)
+        || !pattern_guard_allows_all_matches(db, predicate)
     {
         narrowed_by_previous_patterns
     } else {
@@ -535,7 +549,13 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
+    // This check concerns the pattern itself. The cached type after the case also accounts for
+    // its guard and may therefore retain values matched by the pattern.
+    let next_narrowed_subject_ty = if predicate.guard(db).is_none() {
+        type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded)
+    } else {
+        type_narrowed_by_pattern(db, predicate, narrowed_subject_ty)
+    };
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
