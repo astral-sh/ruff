@@ -17,7 +17,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `contextlib.contextmanager` and `contextlib.asynccontextmanager` require
 /// generators, which support methods such as `throw` that are not guaranteed
 /// by the iterator protocols. The iterator overloads of these decorators are
-/// deprecated in typeshed.
+/// deprecated in [typeshed](https://github.com/python/typeshed/blob/main/stdlib/contextlib.pyi).
 ///
 /// ## Example
 ///

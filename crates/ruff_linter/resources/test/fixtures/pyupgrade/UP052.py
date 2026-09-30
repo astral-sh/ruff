@@ -1,22 +1,23 @@
 from collections import abc
-from collections.abc import AsyncIterator as AI, Iterator as I
-from contextlib import asynccontextmanager as acm, contextmanager as cm
+from collections.abc import AsyncIterator as AI, Generator, Iterator as I
+from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager as cm
 from typing import Iterator, AsyncIterator
 import contextlib as cl
 import typing as t
 
 
-@cm
+@contextmanager
 def simple() -> Iterator[int]:
     yield 1
 
 
-@acm
+@asynccontextmanager
 async def asynchronous() -> AsyncIterator[str]:
     yield "value"
 
 
-@cl.contextmanager
+@cm
 def aliased() -> I[str]:
     yield "value"
 
@@ -26,85 +27,85 @@ async def aliased_async() -> AI[int]:
     yield 1
 
 
-@cm
+@cl.contextmanager
 def qualified() -> abc.Iterator[tuple[int, str]]:
     yield (1, "value")
 
 
-@cm
+@contextmanager
 def quoted() -> "t.Iterator[str]":
     yield "value"
 
 
-@acm
+@asynccontextmanager
 async def quoted_async() -> 't.AsyncIterator[int]':
     yield 1
 
 
-@cm
+@contextmanager
 def complex_string() -> "Iter" "ator[int]":
     yield 1
 
 
-@cm
+@contextmanager
 def trailing_comma() -> Iterator[
     int,  # yielded type
 ]:
     yield 1
 
 
-@cm
+@contextmanager
 def parenthesized_item() -> Iterator[(int),]:
     yield 1
 
 
-@cm
+@contextmanager
 def parenthesized_tuple() -> Iterator[(int,)]:
     yield 1
 
 
-@cm
+@contextmanager
 def quoted_parenthesized_item() -> "Iterator[(int),]":
     yield 1
 
 
-@cm
+@contextmanager
 def returns_value() -> Iterator[int]:
     yield 1
     return "done"
 
 
-@cm
+@contextmanager
 def yields_from() -> Iterator[int]:
     yield from (1, 2)
 
 
 @other_decorator
-@cm
+@contextmanager
 def outer_decorator() -> Iterator[int]:
     yield 1
 
 
 # These do not apply a context manager directly to a generator function.
-@cm
+@contextmanager
 @other_decorator
 def inner_decorator() -> Iterator[int]:
     yield 1
 
 
-@cm
+@contextmanager
 def returns_iterator() -> Iterator[int]:
     return iter([1])
 
 
-@cm
+@contextmanager
 def nested_yield() -> Iterator[int]:
     def inner():
         yield 1
     return inner()
 
 
-@cm
+@contextmanager
 def lambda_yield() -> Iterator[int]:
     inner = lambda: (yield 1)
     return inner()
@@ -114,26 +115,41 @@ def not_decorated() -> Iterator[int]:
     yield 1
 
 
-@cm
+@contextmanager
 def already_correct() -> t.Generator[int, None, None]:
     yield 1
 
 
-@cm
+@contextmanager
 def wrong_iterator() -> AsyncIterator[int]:
     yield 1
 
 
-@acm
+@asynccontextmanager
 async def wrong_async_iterator() -> Iterator[int]:
     yield 1
 
 
-@cm
+@contextmanager
 def bare_iterator() -> Iterator:
     yield 1
 
 
-@cm
+@contextmanager
 def invalid_arguments() -> Iterator[int, str]:
     yield 1
+
+
+# A shadowed typing alias forces reuse of collections.abc.Generator, which
+# cannot be subscripted on Python 3.7.
+def shadowed_typing(t, object):
+    @contextmanager
+    def version_specific() -> Iterator[int]:
+        yield 1
+        return "done"
+
+
+def shadowed_generator(t, Generator):
+    @contextmanager
+    def cannot_fix() -> Iterator[int]:
+        yield 1
