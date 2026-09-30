@@ -2104,10 +2104,11 @@ impl<'db> TypeVarConstraints<'db> {
         other: Self,
     ) -> bool {
         self.elements(db).iter().all(|constraint| {
-            other
-                .elements(db)
-                .iter()
-                .any(|other_constraint| constraint.is_equivalent_to(db, env, *other_constraint))
+            other.elements(db).iter().any(|other_constraint| {
+                // Union types preserve element order, so `int | str` and `str | int` can
+                // compare unequal with `==` even though they are equivalent constraints.
+                constraint.is_equivalent_to(db, env, *other_constraint)
+            })
         })
     }
 

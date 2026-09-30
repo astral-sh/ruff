@@ -2488,6 +2488,22 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+Equivalent constraints also match when their union members appear in a different order. The caller's
+type variable is preserved through the call:
+
+```py
+UnionT = TypeVar("UnionT", int | str, bytes)
+UnionS = TypeVar("UnionS", str | int, bytes)
+
+def union_callee(value: UnionT) -> UnionT:
+    return value
+
+def union_caller(value: UnionS) -> UnionS:
+    result = union_callee(value)
+    reveal_type(result)  # revealed: UnionS@union_caller
+    return result  # no diagnostic
+```
+
 A fixed constrained typevar and a gradual argument can provide separate bounds for another
 constrained typevar. Both bounds are non-concrete, so we preserve their combined family solution
 rather than adding the individual constraints `A` and `B` to it.
