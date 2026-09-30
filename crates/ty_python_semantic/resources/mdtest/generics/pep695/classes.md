@@ -1505,6 +1505,87 @@ def cannot_choose_outer[T](container: Container[T]) -> T:
     return container.replace(1)
 ```
 
+## Members of type variables with union upper bounds
+
+Unlike constraints, a union upper bound does not enumerate the possible assignments of a type
+variable. Member lookup can still use the upper bound to prove that a common member is available.
+
+```py
+class Base[T]:
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class A(Base[int]): ...
+class B(Base[str]): ...
+
+def use_union(value: A | B):
+    # revealed: int | str
+    reveal_type(value.value)
+
+def use_typevar[U: A | B](value: U):
+    # revealed: int | str
+    reveal_type(value.value)
+```
+
+## Self parameters of type variables with union upper bounds
+
+Two values of a type variable with a union upper bound can belong to different union members, so one
+does not necessarily satisfy the other's `Self` parameter. In contrast, a constrained type variable
+chooses the same member for both values.
+
+```py
+from typing_extensions import Self
+
+class Left:
+    def merge(self, other: Self) -> Self:
+        return self
+
+class Right:
+    def merge(self, other: Self) -> Self:
+        return self
+
+def merge[T: Left | Right](left: T, right: T) -> T:
+    # error: [invalid-argument-type] "Argument to bound method `Left.merge` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `Right.merge` is incorrect"
+    return left.merge(right)
+
+def merge_constrained[Constrained: (Left, Right)](left: Constrained, right: Constrained) -> Constrained:
+    return left.merge(right)
+```
+
+## Generic union-bounded receivers in property assignments
+
+A property typed with a union-bounded type variable accepts the result of calling a `Self` method on
+its value. The generic classes in the upper bound do not erase the original type variable.
+
+```py
+from typing_extensions import Any, Self
+
+class Query[T]:
+    def filter(self) -> Self:
+        return self
+
+class Select[T]:
+    def filter(self) -> Self:
+        return self
+
+class Wrapper[Q: Query[Any] | Select[Any]]:
+    def __init__(self, query: Q) -> None:
+        self._query = query
+
+    @property
+    def query(self) -> Q:
+        return self._query
+
+    @query.setter
+    def query(self, query: Q) -> None:
+        self._query = query
+
+    def apply_filter(self) -> None:
+        self.query = self.query.filter()
+```
+
 ## Generic instance attributes accessed through classes
 
 Class access cannot select a specialization of an instance attribute. This restriction applies to

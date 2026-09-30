@@ -1918,10 +1918,74 @@ def use_union(value: A | B):
     reveal_type(value.value)
 
 def use_typevar(value: U):
-    # TODO: This should not error once member lookup supports union upper bounds.
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
     # revealed: int | str
     reveal_type(value.value)
+```
+
+## Self parameters of type variables with union upper bounds
+
+Two values of a type variable with a union upper bound can belong to different union members, so one
+does not necessarily satisfy the other's `Self` parameter. In contrast, a constrained type variable
+chooses the same member for both values.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class Left:
+    def merge(self, other: Self) -> Self:
+        return self
+
+class Right:
+    def merge(self, other: Self) -> Self:
+        return self
+
+T = TypeVar("T", bound=Left | Right)
+
+def merge(left: T, right: T) -> T:
+    # error: [invalid-argument-type] "Argument to bound method `Left.merge` is incorrect"
+    # error: [invalid-argument-type] "Argument to bound method `Right.merge` is incorrect"
+    return left.merge(right)
+
+Constrained = TypeVar("Constrained", Left, Right)
+
+def merge_constrained(left: Constrained, right: Constrained) -> Constrained:
+    return left.merge(right)
+```
+
+## Generic union-bounded receivers in property assignments
+
+A property typed with a union-bounded type variable accepts the result of calling a `Self` method on
+its value. The generic classes in the upper bound do not erase the original type variable.
+
+```py
+from typing_extensions import Any, Generic, Self, TypeVar
+
+T = TypeVar("T")
+
+class Query(Generic[T]):
+    def filter(self) -> Self:
+        return self
+
+class Select(Generic[T]):
+    def filter(self) -> Self:
+        return self
+
+Q = TypeVar("Q", bound=Query[Any] | Select[Any])
+
+class Wrapper(Generic[Q]):
+    def __init__(self, query: Q) -> None:
+        self._query = query
+
+    @property
+    def query(self) -> Q:
+        return self._query
+
+    @query.setter
+    def query(self, query: Q) -> None:
+        self._query = query
+
+    def apply_filter(self) -> None:
+        self.query = self.query.filter()
 ```
 
 ## Correlated constrained receiver calls
