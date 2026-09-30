@@ -8,7 +8,7 @@ dependencies = [
     "pysource-codegen>=0.6.0",
     "pysource-minimize>=0.8.0",
     "rich-argparse>=1.7.0",
-    "ruff>=0.11.9",
+    "ruff>=0.16.8",
     "termcolor>=3.1.0",
 ]
 
@@ -59,33 +59,37 @@ skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
 select = [
+    "correctness",
+    "suspicious",
+    "complexity",
+    "performance",
+    "style",
+
     "ARG",
     "E",
     "F",
     "B",
-    "B9",
     "C4",
     "SIM",
     "I",
     "UP",
-    "PIE",
     "PGH",
     "PYI",
     "RUF",
 ]
 ignore = [
     # only relevant if you run a script with `python -0`,
-    "B011",
+    "assert-false",
     # These are enforced by, or incompatible with, the ruff formatter:
-    "E203",
-    "E501",
+    "whitespace-before-punctuation",
+    "line-too-long",
 ]
 unfixable = [
-    "F841",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
-    "F601",   # automatic fix might obscure issue
-    "F602",   # automatic fix might obscure issue
-    "B018",   # automatic fix might obscure issue
-    "RUF017", # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
+    "unused-variable",                    # ruff keeps the call, but mostly it's best to get rid of it all
+    "multi-value-repeated-key-literal",   # automatic fix might obscure issue
+    "multi-value-repeated-key-variable",  # automatic fix might obscure issue
+    "useless-expression",                 # automatic fix might obscure issue
+    "quadratic-list-summation",           # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
 ]
 
 [tool.ruff.lint.isort]
