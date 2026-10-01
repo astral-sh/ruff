@@ -227,37 +227,37 @@ impl<'a> CleanupVisitor<'a, '_> {
     }
 
     fn cancellation_types(&self, expr: &Expr) -> CancellationTypes {
-        if let Expr::Tuple(tuple) = expr {
-            return tuple
+        match expr {
+            Expr::Tuple(tuple) => tuple
                 .iter()
                 .fold(CancellationTypes::empty(), |types, expr| {
                     types | self.cancellation_types(expr)
-                });
-        }
-        if let Expr::Call(call) = expr {
-            return if call.arguments.is_empty()
-                && self
-                    .checker
-                    .semantic()
-                    .resolve_qualified_name(&call.func)
-                    .is_some_and(|name| name.segments() == ["anyio", "get_cancelled_exc_class"])
-            {
-                CancellationTypes::CATCH_ALL
-            } else {
-                CancellationTypes::empty()
-            };
-        }
-        self.checker.semantic().resolve_qualified_name(expr).map_or(
-            CancellationTypes::empty(),
-            |name| match name.segments() {
-                ["", "BaseException"] => CancellationTypes::CATCH_ALL,
-                ["trio", "Cancelled"] => CancellationTypes::TRIO,
-                ["asyncio", "CancelledError"] | ["asyncio", "exceptions", "CancelledError"] => {
-                    CancellationTypes::ASYNCIO
+                }),
+            Expr::Call(call) => {
+                if call.arguments.is_empty()
+                    && self
+                        .checker
+                        .semantic()
+                        .resolve_qualified_name(&call.func)
+                        .is_some_and(|name| name.segments() == ["anyio", "get_cancelled_exc_class"])
+                {
+                    CancellationTypes::CATCH_ALL
+                } else {
+                    CancellationTypes::empty()
                 }
-                _ => CancellationTypes::empty(),
-            },
-        )
+            }
+            _ => self.checker.semantic().resolve_qualified_name(expr).map_or(
+                CancellationTypes::empty(),
+                |name| match name.segments() {
+                    ["", "BaseException"] => CancellationTypes::CATCH_ALL,
+                    ["trio", "Cancelled"] => CancellationTypes::TRIO,
+                    ["asyncio", "CancelledError"] | ["asyncio", "exceptions", "CancelledError"] => {
+                        CancellationTypes::ASYNCIO
+                    }
+                    _ => CancellationTypes::empty(),
+                },
+            ),
+        }
     }
 
     fn safe_await(&self, expr: &Expr) -> bool {
