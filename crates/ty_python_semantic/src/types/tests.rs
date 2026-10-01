@@ -675,6 +675,31 @@ fn pending_narrowing_intersections_are_order_independent() {
 }
 
 #[test]
+fn recursive_annotated_normalization() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let list_of = |ty| KnownClass::List.to_specialized_instance(&db, &env, &[ty]);
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+
+    // Metadata does not add another level of recursion to the annotated type.
+    let recursive = annotated(list_of(div));
+    assert_eq!(
+        recursive.recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(list_of(div))).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        recursive.recursive_type_normalized_impl(&db, &env, div, true),
+        None
+    );
+}
+
+#[test]
 fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let db = setup_db();
     let env = db.program_environment();

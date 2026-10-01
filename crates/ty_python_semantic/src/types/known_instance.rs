@@ -419,7 +419,7 @@ impl<'db> KnownInstanceType<'db> {
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Literal),
             Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, true)
+                .recursive_type_normalized_impl(db, env, div, nested)
                 .map(Self::Annotated),
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
