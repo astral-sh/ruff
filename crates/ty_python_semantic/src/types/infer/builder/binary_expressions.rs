@@ -15,9 +15,9 @@ use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
-    DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance,
+    DynamicType, InternedConstraintSet, IntersectionType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance,
 };
 
 enum BinaryExpressionOperandTypes<'db> {
@@ -424,17 +424,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<Type<'db>> {
-        let result = Type::try_call_bin_op_result(
-            self.db(),
-            self.program_environment(),
-            left_ty,
-            op,
-            right_ty,
-        )?;
-        state
-            .deprecated_functions
-            .extend(&result.deprecated_functions);
-        Some(result.return_type)
+        let db = self.db();
+        let env = self.program_environment();
+        let alternatives = |ty: Type<'db>| {
+            let bound = if let Type::TypeVar(typevar) = ty
+                && let Some(TypeVarBoundOrConstraints::UpperBound(Type::Union(bound))) =
+                    typevar.typevar(db).bound_or_constraints(db, env)
+            {
+                Some(bound)
+            } else {
+                None
+            };
+            bound
+                .map(|bound| bound.elements(db))
+                .unwrap_or_default()
+                .iter()
+                .map(move |element| {
+                    (
+                        *element,
+                        IntersectionType::from_two_elements(db, env, ty, *element),
+                    )
+                })
+                .chain(bound.is_none().then_some((ty, ty)))
+        };
+
+        // A union upper bound permits different members for the two operands, even when
+        // they share a type variable. Resolve normal and reflected methods for each pair.
+        // Intersecting with the original operand preserves subtypes in `Self` returns.
+        let left_alternatives = alternatives(left_ty);
+        let right_alternatives = alternatives(right_ty);
+        let mut results = UnionBuilder::new(db, env);
+        for left in left_alternatives {
+            for right in right_alternatives.clone() {
+                let result = Type::try_call_bin_op_result(db, env, left, op, right)?;
+                state
+                    .deprecated_functions
+                    .extend(&result.deprecated_functions);
+                results.add_in_place(result.return_type);
+            }
+        }
+        Some(results.build())
     }
 
     /// Infer the result type and collect deprecated methods for the enclosing operation.

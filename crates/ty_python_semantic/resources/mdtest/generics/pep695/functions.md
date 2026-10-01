@@ -1482,9 +1482,34 @@ arithmetic operations are available on that type:
 def f[T: float](value: T):
     reveal_type(value + 1)  # revealed: float
     reveal_type(value + 1.0)  # revealed: float
-    # TODO: Adding two values of the bounded type variable should be supported.
+    reveal_type(value + value)  # revealed: float
+```
+
+## Binary operators with union upper bounds
+
+Operator results preserve the original type variable when each member returns `Self`:
+
+```py
+from typing_extensions import Self
+
+class A:
+    def __add__(self, other: object) -> Self:
+        return self
+
+class B:
+    def __add__(self, other: object) -> Self:
+        return self
+
+def add[T: A | B](left: T, right: T) -> T:
+    return left + right
+```
+
+The operands can belong to different members of the bound, so `str + A` must also be supported:
+
+```py
+def mixed[U: A | str](left: U, right: U):
     # error: [unsupported-operator]
-    reveal_type(value + value)  # revealed: Unknown
+    left + right
 ```
 
 ## All occurrences of the same typevar have the same type

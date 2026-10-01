@@ -161,31 +161,39 @@ impl<'db> Type<'db> {
     /// Memoize the return type and deprecations from binary dunder resolution, without retaining
     /// the full call bindings or repeating overload selection at each expression.
     /// Returns `None` if resolution fails; callers remain responsible for call-site diagnostics.
+    /// Each operand pairs its lookup type with the receiver used for binding `Self`.
     pub(crate) fn try_call_bin_op_result(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        left_ty: Type<'db>,
+        left_ty: (Type<'db>, Type<'db>),
         op: ast::Operator,
-        right_ty: Type<'db>,
+        right_ty: (Type<'db>, Type<'db>),
     ) -> Option<&'db BinaryOperationResult<'db>> {
         #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,
-            left_ty: Type<'db>,
+            left_ty: (Type<'db>, Type<'db>),
             op: ast::Operator,
-            right_ty: Type<'db>,
+            right_ty: (Type<'db>, Type<'db>),
         ) -> Option<BinaryOperationResult<'db>> {
             let env = &ProgramEnvironment::from_program(program);
-            Type::try_call_bin_op(db, env, left_ty, op, right_ty)
-                .ok()
-                .map(|bindings| BinaryOperationResult {
-                    return_type: bindings.return_type(db, env),
-                    deprecated_functions: bindings
-                        .deprecated_functions(db)
-                        .map(|(_, function)| function)
-                        .collect(),
-                })
+            Type::try_call_bin_op_with_receivers(
+                db,
+                env,
+                left_ty,
+                op,
+                right_ty,
+                MemberLookupPolicy::default(),
+            )
+            .ok()
+            .map(|bindings| BinaryOperationResult {
+                return_type: bindings.return_type(db, env),
+                deprecated_functions: bindings
+                    .deprecated_functions(db)
+                    .map(|(_, function)| function)
+                    .collect(),
+            })
         }
 
         try_call_bin_op_result_impl(db, env.program(db), left_ty, op, right_ty).as_ref()
@@ -216,6 +224,53 @@ impl<'db> Type<'db> {
         right_ty: Type<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallBinOpError> {
+        Self::try_call_bin_op_with_receivers(
+            db,
+            env,
+            (left_ty, left_ty),
+            op,
+            (right_ty, right_ty),
+            policy,
+        )
+    }
+
+    /// Resolve operators using each branch's lookup type while retaining its narrowed receiver.
+    fn try_call_bin_op_with_receivers(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        (left_ty, left_receiver): (Type<'db>, Type<'db>),
+        op: ast::Operator,
+        (right_ty, right_receiver): (Type<'db>, Type<'db>),
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallBinOpError> {
+        let call_dunder = |lookup: Type<'db>, receiver, name: &str, argument| {
+            let mut arguments = CallArguments::positional([argument]);
+            if lookup == receiver {
+                lookup.try_call_dunder_with_policy(
+                    db,
+                    env,
+                    name,
+                    &mut arguments,
+                    TypeContext::default(),
+                    policy,
+                )
+            } else {
+                Self::try_call_dunder_member_impl(
+                    db,
+                    env,
+                    lookup.member_lookup_with_policy_and_receiver(
+                        db,
+                        env,
+                        name,
+                        policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        Some(receiver),
+                    ),
+                    &mut arguments,
+                    TypeContext::default(),
+                )
+            }
+        };
+
         // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
         // the Python spec [1] is:
         //
@@ -243,36 +298,17 @@ impl<'db> Type<'db> {
                     left_class.member(db, env, reflected_dunder).place,
                 )
             {
-                let call_on_right_instance = right_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    reflected_dunder,
-                    &mut CallArguments::positional([left_ty]),
-                    TypeContext::default(),
-                    policy,
-                );
+                let call_on_right_instance =
+                    call_dunder(right_ty, right_receiver, reflected_dunder, left_receiver);
 
                 if reflected_priority == ReflectedMethodPriority::Definitely {
                     return Ok(call_on_right_instance.or_else(|_| {
-                        left_ty.try_call_dunder_with_policy(
-                            db,
-                            env,
-                            op.dunder(),
-                            &mut CallArguments::positional([right_ty]),
-                            TypeContext::default(),
-                            policy,
-                        )
+                        call_dunder(left_ty, left_receiver, op.dunder(), right_receiver)
                     })?);
                 }
 
-                let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
-                    op.dunder(),
-                    &mut CallArguments::positional([right_ty]),
-                    TypeContext::default(),
-                    policy,
-                );
+                let call_on_left_instance =
+                    call_dunder(left_ty, left_receiver, op.dunder(), right_receiver);
 
                 return match (call_on_right_instance, call_on_left_instance) {
                     (Ok(right_bindings), Ok(left_bindings)) => {
@@ -293,26 +329,18 @@ impl<'db> Type<'db> {
             }
         }
 
-        let call_on_left_instance = left_ty.try_call_dunder_with_policy(
-            db,
-            env,
-            op.dunder(),
-            &mut CallArguments::positional([right_ty]),
-            TypeContext::default(),
-            policy,
-        );
+        let call_on_left_instance =
+            call_dunder(left_ty, left_receiver, op.dunder(), right_receiver);
 
         call_on_left_instance.or_else(|_| {
             if left_ty == right_ty {
                 Err(CallBinOpError::NotSupported)
             } else {
-                Ok(right_ty.try_call_dunder_with_policy(
-                    db,
-                    env,
+                Ok(call_dunder(
+                    right_ty,
+                    right_receiver,
                     op.reflected_dunder(),
-                    &mut CallArguments::positional([left_ty]),
-                    TypeContext::default(),
-                    policy,
+                    left_receiver,
                 )?)
             }
         })
