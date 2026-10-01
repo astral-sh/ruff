@@ -2172,7 +2172,7 @@ def inherited[T](x: Nested[T]):
     reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
 ```
 
-### Specializing descriptor overloads on protocols
+## Specializing descriptor overloads on protocols
 
 A descriptor can select different overloads for different protocol specializations. We specialize
 its declaration before resolving the member type required by the protocol.
@@ -2203,6 +2203,55 @@ class BytesValue:
 
 static_assert(is_assignable_to(BytesValue, HasValue[str]))
 static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
+## Specializing protocol attributes to methods
+
+An attribute specialized to a function is checked as a method. The bound signatures match even
+though their unbound receivers have different types.
+
+```py
+from typing import Protocol, cast
+
+def method(self: object) -> int:
+    return 1
+
+class HasMethod[T](Protocol):
+    method: T = cast(T, method)
+
+class Concrete:
+    def method(self) -> int:
+        return 1
+
+def preserve[T](value: HasMethod[T], signature: T) -> HasMethod[T]:
+    return value
+
+reveal_type(preserve(Concrete(), method).method())  # revealed: int
+```
+
+## Specializing protocol attributes to callbacks
+
+A member specialized to an ordinary `__call__` method describes the candidate's call signature. A
+class's `__call__` attribute does not determine what constructing that class returns.
+
+```py
+from typing import Protocol, cast
+
+def call(self: object) -> int:
+    return 1
+
+class Callback[T](Protocol):
+    __call__: T = cast(T, call)
+
+class Concrete:
+    @staticmethod
+    def __call__() -> int:
+        return 1
+
+def preserve[T](value: Callback[T], signature: T) -> Callback[T]:
+    return value
+
+result: int = preserve(Concrete, call)()  # error: [invalid-argument-type]
 ```
 
 ## Subscripting non-generic classes

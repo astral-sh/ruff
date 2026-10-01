@@ -3061,6 +3061,59 @@ static_assert(is_assignable_to(BytesValue, HasValue[str]))
 static_assert(not is_assignable_to(BytesValue, HasValue[int]))
 ```
 
+## Specializing protocol attributes to methods
+
+An attribute specialized to a function is checked as a method. The bound signatures match even
+though their unbound receivers have different types.
+
+```py
+from typing import Protocol, TypeVar, cast
+
+T = TypeVar("T")
+
+def method(self: object) -> int:
+    return 1
+
+class HasMethod(Protocol[T]):
+    method: T = cast(T, method)
+
+class Concrete:
+    def method(self) -> int:
+        return 1
+
+def preserve(value: HasMethod[T], signature: T) -> HasMethod[T]:
+    return value
+
+reveal_type(preserve(Concrete(), method).method())  # revealed: int
+```
+
+## Specializing protocol attributes to callbacks
+
+A member specialized to an ordinary `__call__` method describes the candidate's call signature. A
+class's `__call__` attribute does not determine what constructing that class returns.
+
+```py
+from typing import Protocol, TypeVar, cast
+
+T = TypeVar("T")
+
+def call(self: object) -> int:
+    return 1
+
+class Callback(Protocol[T]):
+    __call__: T = cast(T, call)
+
+class Concrete:
+    @staticmethod
+    def __call__() -> int:
+        return 1
+
+def preserve(value: Callback[T], signature: T) -> Callback[T]:
+    return value
+
+result: int = preserve(Concrete, call)()  # error: [invalid-argument-type]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
