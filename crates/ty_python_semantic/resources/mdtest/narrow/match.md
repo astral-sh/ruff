@@ -4613,3 +4613,66 @@ def custom_inequality(x: UnequalTag | StringTag):
         case _:
             reveal_type(x)  # revealed: UnequalTag
 ```
+
+## Strict narrowing with complex generic bases
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+class Base[T]: ...
+
+class Nested[T](Base[list[T]]):
+    item: T
+
+def nested(value: Base[list[int]]):
+    match value:
+        case Nested(item=item):
+            reveal_type(item)  # revealed: int
+    if isinstance(value, Nested):
+        reveal_type(value.item)  # revealed: int
+
+class Base2[T, U]: ...
+
+class Partial[T](Base2[T, int]):
+    item: T
+
+def partial(value: Base2[str, int]):
+    match value:
+        case Partial(item=item):
+            reveal_type(item)  # revealed: str
+    if isinstance(value, Partial):
+        reveal_type(value.item)  # revealed: str
+
+class Mixed[T, U]:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: U) -> None: ...
+
+class Repeated[T](Mixed[T, T]):
+    item: T
+
+def repeated(value: Mixed[str, str]):
+    match value:
+        case Repeated(item=item):
+            reveal_type(item)  # revealed: str
+    if isinstance(value, Repeated):
+        reveal_type(value.item)  # revealed: str
+
+def repeated_range(value: Mixed[object, str]):
+    if isinstance(value, Repeated):
+        reveal_type(value.item)  # revealed: object
+
+class FixedBase[T, U]:
+    first: T
+
+class FixedChild[T, U](FixedBase[list[T], U]):
+    def check(self, value: FixedBase[list[T], str]):
+        if isinstance(value, FixedChild):
+            reveal_type(value.first)  # revealed: list[T@FixedChild]
+```
