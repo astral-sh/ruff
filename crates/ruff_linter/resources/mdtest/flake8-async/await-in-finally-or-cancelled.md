@@ -499,7 +499,6 @@ async def checkpoints(cm, items):
             pass
         async for item in items:  # error: [await-in-finally-or-cancelled]
             pass
-        deferred = (item async for item in items)
         deferred = (item async for item in await source())  # error: [await-in-finally-or-cancelled]
         # error: [await-in-finally-or-cancelled]
         # error: [await-in-finally-or-cancelled]

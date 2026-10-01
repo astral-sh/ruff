@@ -73,6 +73,8 @@ use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
 /// The rule visits branches and loops in source order without analyzing
 /// execution paths or rebinding of scope variables. It can therefore miss
 /// unshielded cancellation points or report ones that are shielded at runtime.
+/// Deferred generator and lambda bodies are visited even though creating those
+/// expressions does not execute their bodies.
 /// It assumes that argument-free `.aclose()` methods implement cancellation-safe
 /// cleanup, without checking the receiver's type.
 ///
@@ -115,10 +117,9 @@ pub(crate) fn await_in_finally_or_cancelled<'a>(
     checker: &Checker<'a>,
     function: &'a ast::StmtFunctionDef,
 ) {
-    if !function.is_async
-        || !checker
-            .semantic()
-            .seen_module(Modules::TRIO | Modules::ANYIO)
+    if !checker
+        .semantic()
+        .seen_module(Modules::TRIO | Modules::ANYIO)
     {
         return;
     }
@@ -359,17 +360,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 self.visit_expr(&await_.value);
                 if !self.safe_await(&await_.value) {
                     self.checkpoint(expr.range());
-                }
-            }
-            // A generator expression's body is deferred until iteration.
-            Expr::Generator(generator) => {
-                if let Some(first) = generator.generators.first() {
-                    self.visit_expr(&first.iter);
-                }
-            }
-            Expr::Lambda(lambda) => {
-                if let Some(parameters) = &lambda.parameters {
-                    self.visit_parameters(parameters);
                 }
             }
             _ => visitor::walk_expr(self, expr),
