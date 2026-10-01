@@ -217,13 +217,11 @@ if sys.version_info >= (3, 11):
 
 # Can take or return anything depending on what's in the registry.
 @overload
-def adapt(obj: Any, proto: Any, /) -> Any:
-    """Adapt given object to given protocol."""
+def adapt(obj: Any, proto: Any, /) -> Any: ...
 @overload
 def adapt(obj: Any, proto: Any, alt: _T, /) -> Any | _T: ...
 
-def complete_statement(statement: str) -> bool:
-    """Checks if a string contains a complete SQL statement."""
+def complete_statement(statement: str) -> bool: ...
 
 if sys.version_info >= (3, 12):
     @overload
@@ -237,12 +235,7 @@ if sys.version_info >= (3, 12):
         uri: bool = False,
         *,
         autocommit: bool = ...,
-    ) -> Connection:
-        """Open a connection to the SQLite database file 'database'.
-
-        You can use ":memory:" to open a database connection to a database that
-        resides in RAM instead of on disk.
-        """
+    ) -> Connection: ...
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -279,12 +272,7 @@ else:
         check_same_thread: bool = True,
         cached_statements: int = 128,
         uri: bool = False,
-    ) -> Connection:
-        """Opens a connection to the SQLite database file database.
-
-        You can use ":memory:" to open a database connection to a database that resides
-        in RAM instead of on disk.
-        """
+    ) -> Connection: ...
     @overload
     def connect(
         database: StrOrBytesPath,
@@ -309,8 +297,7 @@ else:
         uri: bool = False,
     ) -> _ConnectionT: ...
 
-def enable_callback_tracebacks(enable: bool, /) -> None:
-    """Enable or disable callback functions throwing errors to stderr."""
+def enable_callback_tracebacks(enable: bool, /) -> None: ...
 
 if sys.version_info < (3, 12):
     # takes a pos-or-keyword argument because there is a C wrapper
@@ -318,17 +305,7 @@ if sys.version_info < (3, 12):
         "Deprecated since Python 3.10; removed in Python 3.12. "
         "Open database in URI mode using `cache=shared` parameter instead."
     )
-    def enable_shared_cache(do_enable: int) -> None:  # undocumented
-        """Enable or disable shared cache mode for the calling thread.
+    def enable_shared_cache(do_enable: int) -> None: ...  # undocumented
 
-        This method is deprecated and will be removed in Python 3.12.
-        Shared cache is strongly discouraged by the SQLite 3 documentation.
-        If shared cache must be used, open the database in URI mode using
-        the cache=shared query parameter.
-        """
-
-def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None:
-    """Register a function to adapt Python objects to SQLite values."""
-
-def register_converter(typename: str, converter: _Converter, /) -> None:
-    """Register a function to convert SQLite values to Python objects."""
+def register_adapter(type: type[_T], adapter: _Adapter[_T], /) -> None: ...
+def register_converter(typename: str, converter: _Converter, /) -> None: ...
