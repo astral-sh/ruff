@@ -77,10 +77,11 @@ pub(crate) struct CheckCommand {
     #[arg(long, conflicts_with("fix"))]
     pub(crate) add_ignore: bool,
 
-    /// Run the command within the given project directory.
+    /// Discover the project from the given directory.
     ///
-    /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
-    /// as will the project's virtual environment (`.venv`) unless the `venv-path` option is set.
+    /// ty searches for configuration files by walking up the directory tree from the given directory.
+    /// The discovered project root is also used to find the project's virtual environment (`.venv`)
+    /// and to determine which files to check when no paths are provided.
     ///
     /// Other command-line arguments (such as relative paths) will be resolved relative to the current working directory.
     #[arg(long, value_name = "PROJECT")]
