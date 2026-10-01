@@ -1,3 +1,4 @@
+"""Execute computations asynchronously using threads or processes."""
 import sys
 
 from ._base import (
