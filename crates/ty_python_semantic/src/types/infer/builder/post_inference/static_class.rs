@@ -198,21 +198,16 @@ fn method_is_bound_at_class_exit<'db>(
 
 /// Reports a conflict if the declared types of attribute `name` are not all equivalent.
 ///
-/// Only declarations made in methods are checked here. Without any, there is nothing to report:
-/// class-body declarations on their own are checked like declarations of any other symbol.
-fn report_conflicting_attribute_declarations<'db>(
+/// The first declaration's type is the reference type, and the diagnostic points at the first
+/// declaration that disagrees with it.
+fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
     context: &InferContext<'db, '_>,
     name: &str,
-    class_body_declarations: &[(Definition<'db>, Type<'db>)],
-    method_declarations: &[(Definition<'db>, Type<'db>)],
+    declarations: impl IntoIterator<Item = &'a (Definition<'db>, Type<'db>)>,
 ) {
-    if method_declarations.is_empty() {
-        return;
-    }
-
     let db = context.db();
     let env = context.program_environment();
-    let mut declarations = class_body_declarations.iter().chain(method_declarations);
+    let mut declarations = declarations.into_iter();
     let Some((_, first_type)) = declarations.next() else {
         return;
     };
@@ -310,18 +305,18 @@ fn check_conflicting_attribute_declarations<'db>(
             add_annotated_declarations(db, declarations, method_declarations);
         }
 
-        report_conflicting_attribute_declarations(
-            context,
-            name,
-            &class_body_declarations,
-            &instance_method_declarations,
-        );
-        report_conflicting_attribute_declarations(
-            context,
-            name,
-            &class_body_declarations,
-            &classmethod_declarations,
-        );
+        for method_declarations in [&instance_method_declarations, &classmethod_declarations] {
+            // Class-body declarations on their own are checked like declarations of any other
+            // symbol, so only attributes that are also declared in a method are checked here.
+            if method_declarations.is_empty() {
+                continue;
+            }
+            report_conflicting_attribute_declarations(
+                context,
+                name,
+                class_body_declarations.iter().chain(method_declarations),
+            );
+        }
     }
 }
 
