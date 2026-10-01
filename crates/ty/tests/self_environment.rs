@@ -1,17 +1,29 @@
 //! Tests that execute ty from inside a Python environment.
+//!
+//! Copying the executable can race with any concurrent process spawn: a child can inherit the
+//! writable copy descriptor, causing Linux to reject execution with `ETXTBSY`. Keep these tests
+//! in their own executable, and hold `TEST_LOCK` for every test so copying and spawning cannot
+//! overlap between tests. The other CLI tests can continue to run in parallel.
 
 pub mod common;
 
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{Mutex, PoisonError},
+};
 
 use anyhow::Context as _;
 use insta_cmd::assert_cmd_snapshot;
 
 use common::CliTest;
 
+static TEST_LOCK: Mutex<()> = Mutex::new(());
+
 /// ty should include site packages from its own environment when no other environment is found.
 #[test]
 fn ty_environment_is_only_environment() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let ty_venv_site_packages = if cfg!(windows) {
         "ty-venv/Lib/site-packages"
     } else {
@@ -60,6 +72,8 @@ fn ty_environment_is_only_environment() -> anyhow::Result<()> {
 /// from ty's environment should take precedence.
 #[test]
 fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let ty_venv_site_packages = if cfg!(windows) {
         "ty-venv/Lib/site-packages"
     } else {
@@ -143,6 +157,8 @@ fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
 /// When `VIRTUAL_ENV` is set, ty should *not* discover its own environment's site-packages.
 #[test]
 fn ty_environment_and_active_environment() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let ty_venv_site_packages = if cfg!(windows) {
         "ty-venv/Lib/site-packages"
     } else {
@@ -223,6 +239,8 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
 /// include the environment's site-packages in its search path.
 #[test]
 fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let ty_system_site_packages = if cfg!(windows) {
         "system-python/Lib/site-packages"
     } else {
@@ -268,6 +286,8 @@ fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
 /// where ty's venv takes priority but both are included.
 #[test]
 fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let ty_system_site_packages = if cfg!(windows) {
         "system-python/Lib/site-packages"
     } else {
@@ -338,6 +358,8 @@ fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
 
 #[test]
 fn find_does_not_fall_back_to_path_or_own_executable() -> anyhow::Result<()> {
+    let _lock = TEST_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+
     let case = CliTest::with_file("own environment/pyvenv.cfg", "home = .\n")?;
     let own_ty = case.root().join(if cfg!(windows) {
         "own environment/Scripts/ty.exe"
