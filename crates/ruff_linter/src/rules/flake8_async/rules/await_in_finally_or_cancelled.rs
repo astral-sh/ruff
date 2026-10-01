@@ -1,3 +1,5 @@
+use bitflags::bitflags;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::{self, Visitor};
@@ -149,9 +151,17 @@ struct CleanupVisitor<'a, 'b> {
 
 // Keep the cancellation families separate: catching Trio cancellation does
 // not consume an asyncio cancellation raised by AnyIO's asyncio backend.
-const TRIO_CANCELLED: u8 = 1;
-const ASYNCIO_CANCELLED: u8 = 2;
-const ALL_CANCELLED: u8 = 4;
+bitflags! {
+    #[derive(Clone, Copy)]
+    struct CancellationTypes: u8 {
+        const TRIO = 1 << 0;
+        const ASYNCIO = 1 << 1;
+        // A catch-all handler does not establish that asyncio cancellation is
+        // relevant. Keep it separate from the explicit cancellation families
+        // until deciding which remaining families a handler can catch.
+        const CATCH_ALL = 1 << 2;
+    }
+}
 
 fn enables_shield(expr: &Expr) -> bool {
     expr.is_literal_expr()
@@ -216,11 +226,13 @@ impl<'a> CleanupVisitor<'a, '_> {
         false
     }
 
-    fn cancellation_types(&self, expr: &Expr) -> u8 {
+    fn cancellation_types(&self, expr: &Expr) -> CancellationTypes {
         if let Expr::Tuple(tuple) = expr {
             return tuple
                 .iter()
-                .fold(0, |types, expr| types | self.cancellation_types(expr));
+                .fold(CancellationTypes::empty(), |types, expr| {
+                    types | self.cancellation_types(expr)
+                });
         }
         if let Expr::Call(call) = expr {
             return if call.arguments.is_empty()
@@ -230,22 +242,22 @@ impl<'a> CleanupVisitor<'a, '_> {
                     .resolve_qualified_name(&call.func)
                     .is_some_and(|name| name.segments() == ["anyio", "get_cancelled_exc_class"])
             {
-                ALL_CANCELLED
+                CancellationTypes::CATCH_ALL
             } else {
-                0
+                CancellationTypes::empty()
             };
         }
-        self.checker
-            .semantic()
-            .resolve_qualified_name(expr)
-            .map_or(0, |name| match name.segments() {
-                ["", "BaseException"] => ALL_CANCELLED,
-                ["trio", "Cancelled"] => TRIO_CANCELLED,
+        self.checker.semantic().resolve_qualified_name(expr).map_or(
+            CancellationTypes::empty(),
+            |name| match name.segments() {
+                ["", "BaseException"] => CancellationTypes::CATCH_ALL,
+                ["trio", "Cancelled"] => CancellationTypes::TRIO,
                 ["asyncio", "CancelledError"] | ["asyncio", "exceptions", "CancelledError"] => {
-                    ASYNCIO_CANCELLED
+                    CancellationTypes::ASYNCIO
                 }
-                _ => 0,
-            })
+                _ => CancellationTypes::empty(),
+            },
+        )
     }
 
     fn safe_await(&self, expr: &Expr) -> bool {
@@ -420,32 +432,34 @@ impl<'a> CleanupVisitor<'a, '_> {
                 handler
                     .type_
                     .as_ref()
-                    .map_or(ALL_CANCELLED, |expr| self.cancellation_types(expr))
+                    .map_or(CancellationTypes::CATCH_ALL, |expr| {
+                        self.cancellation_types(expr)
+                    })
             })
             .collect();
-        let mut remaining = TRIO_CANCELLED;
+        let mut remaining = CancellationTypes::TRIO;
         if self.checker.semantic().seen_module(Modules::ANYIO)
             || handler_types
                 .iter()
-                .any(|types| types & ASYNCIO_CANCELLED != 0)
+                .any(|types| types.contains(CancellationTypes::ASYNCIO))
         {
-            remaining |= ASYNCIO_CANCELLED;
+            remaining.insert(CancellationTypes::ASYNCIO);
         }
         for (handler, types) in stmt.handlers.iter().zip(handler_types) {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
             self.context = context;
             self.boundary = boundary;
             self.scopes.clone_from(&handler_entry);
-            let types = if types & ALL_CANCELLED != 0 {
-                TRIO_CANCELLED | ASYNCIO_CANCELLED
+            let types = if types.contains(CancellationTypes::CATCH_ALL) {
+                CancellationTypes::TRIO | CancellationTypes::ASYNCIO
             } else {
                 types
             };
-            if context.is_none() && types & remaining != 0 {
+            if context.is_none() && types.intersects(remaining) {
                 self.context = Some(CleanupContext::Except);
                 self.boundary = self.scopes.len();
                 if !stmt.is_star {
-                    remaining &= !types;
+                    remaining.remove(types);
                 }
             }
             if let Some(type_) = &handler.type_ {
