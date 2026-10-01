@@ -31,6 +31,7 @@ impl<'db> LambdaSignatureMapping<'db> {
             ..ApplyTypeMappingVisitor::new(&env)
         };
         infer_lambda_signature(db, self.source)
+            .signatures(db)
             .overload_return_type_or_unknown(db, &env)
             .apply_type_mapping_impl(
                 db,

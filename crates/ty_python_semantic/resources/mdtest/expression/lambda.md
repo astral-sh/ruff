@@ -157,6 +157,34 @@ a6: Callable[[int], None] = lambda: None
 a7: Callable[[], str] = lambda: 1
 ```
 
+## Comparing signatures
+
+Separate lambdas can have equivalent signatures. Parameter names, defaults, and return types still
+distinguish their signatures. Gradual signatures are equivalent without being subtypes of each
+other.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to, is_subtype_of
+
+first = lambda value: value
+second = lambda value: value
+renamed = lambda other: other
+optional = lambda value=None: value
+
+static_assert(is_equivalent_to(TypeOf[first], TypeOf[second]))
+static_assert(not is_subtype_of(TypeOf[first], TypeOf[second]))
+static_assert(not is_equivalent_to(TypeOf[first], TypeOf[renamed]))
+static_assert(not is_equivalent_to(TypeOf[first], TypeOf[optional]))
+
+one = lambda: 1
+also_one = lambda: 1
+two = lambda: 2
+
+static_assert(is_subtype_of(TypeOf[one], TypeOf[also_one]))
+static_assert(not is_equivalent_to(TypeOf[one], TypeOf[two]))
+```
+
 ## Function-like behavior of lambdas
 
 All `lambda` functions are instances of `types.FunctionType` and should have access to the same set

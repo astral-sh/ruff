@@ -819,20 +819,19 @@ impl<'db> LambdaSignature<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = ProgramEnvironment::from_scope(self.scope(db));
-        infer_lambda_signature(db, self).variance_of(db, &env, typevar)
+        infer_lambda_signature(db, self)
+            .signatures(db)
+            .variance_of(db, &env, typevar)
     }
 }
 
-/// Complete a lambda signature without including its inferred return type in its identity.
+/// Intern a lambda's inferred signature separately from its source identity.
 #[salsa::tracked(
-    returns(ref),
-    cycle_initial=|_, id, _| CallableSignature::single(Signature::dynamic(Type::divergent(id))),
+    returns(copy),
+    cycle_initial=|db, id, _| CallableType::function_like(db, Signature::dynamic(Type::divergent(id))),
     heap_size=ruff_memory_usage::heap_size
 )]
-fn infer_lambda_signature<'db>(
-    db: &'db dyn Db,
-    lambda: LambdaSignature<'db>,
-) -> CallableSignature<'db> {
+fn infer_lambda_signature<'db>(db: &'db dyn Db, lambda: LambdaSignature<'db>) -> CallableType<'db> {
     let return_ty = match lambda.mapping(db) {
         Some(mapping) => mapping.return_type(db),
         None => infer_scope_types(
@@ -842,7 +841,7 @@ fn infer_lambda_signature<'db>(
         )
         .expression_type(lambda.body(db)),
     };
-    CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty))
+    CallableType::function_like(db, Signature::new(lambda.parameters(db).clone(), return_ty))
 }
 
 impl<'db> CallableType<'db> {
@@ -881,7 +880,29 @@ impl<'db> CallableType<'db> {
     pub(crate) fn signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
         match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => signatures,
-            SignatureSource::Lambda(lambda) => infer_lambda_signature(db, *lambda),
+            SignatureSource::Lambda(lambda) => infer_lambda_signature(db, *lambda).signatures(db),
+        }
+    }
+
+    /// Resolve the signature for structural comparisons, preserving callable metadata.
+    ///
+    /// Distinct lambdas with identical signatures share this callable. References within the
+    /// signature retain their source identities, so recursive returns are not unfolded here.
+    fn with_inferred_signatures(self, db: &'db dyn Db) -> Self {
+        match self.signature_source(db) {
+            SignatureSource::Explicit(_) => self,
+            SignatureSource::Lambda(lambda) => {
+                let inferred = infer_lambda_signature(db, *lambda);
+                if self.kind(db) == inferred.kind(db) && self.deprecated(db).is_none() {
+                    return inferred;
+                }
+                Self::new_internal(
+                    db,
+                    inferred.signature_source(db),
+                    self.kind(db),
+                    self.deprecated(db),
+                )
+            }
         }
     }
 
@@ -1339,6 +1360,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && target.runtime_class(db) != source.runtime_class(db)
         {
             return self.never();
+        }
+        let inferred_source = source.with_inferred_signatures(db);
+        let inferred_target = target.with_inferred_signatures(db);
+        if inferred_source != source || inferred_target != target {
+            // Reuse the relation cache across lambdas with identical inferred signatures.
+            return self.check_type_pair(
+                db,
+                Type::Callable(inferred_source),
+                Type::Callable(inferred_target),
+            );
         }
         self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
