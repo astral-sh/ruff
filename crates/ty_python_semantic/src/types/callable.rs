@@ -831,19 +831,16 @@ fn infer_lambda_signature<'db>(
     db: &'db dyn Db,
     lambda: LambdaSignature<'db>,
 ) -> CallableSignature<'db> {
-    if let Some(mapping) = lambda.mapping(db) {
-        let return_ty = mapping.return_type(db);
-        return CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty));
-    }
-    let inference = infer_scope_types(
-        db,
-        lambda.scope(db),
-        TypeContext::new(lambda.return_annotation(db)),
-    );
-    CallableSignature::single(Signature::new(
-        lambda.parameters(db).clone(),
-        inference.expression_type(lambda.body(db)),
-    ))
+    let return_ty = match lambda.mapping(db) {
+        Some(mapping) => mapping.return_type(db),
+        None => infer_scope_types(
+            db,
+            lambda.scope(db),
+            TypeContext::new(lambda.return_annotation(db)),
+        )
+        .expression_type(lambda.body(db)),
+    };
+    CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty))
 }
 
 impl<'db> CallableType<'db> {
@@ -1177,47 +1174,28 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        if let SignatureSource::Lambda(lambda) = self.signature_source(db)
-            && (type_mapping.is_structural()
-                || matches!(type_mapping,
-                    TypeMapping::ApplySpecialization(specialization)
-                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                    if specialization.preserves_lazy_signatures()))
-        {
-            // A lambda's body is a separate query, just like a named function's signature.
-            // Binding an enclosing recursive type must not run that query or rewrite its body.
-            return Self::new_internal(
-                db,
-                SignatureSource::<CallableSignature<'db>>::Lambda(lambda.map_inputs(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                )),
-                self.kind(db),
-                self.deprecated(db),
-            );
-        }
-
-        if let SignatureSource::Lambda(lambda) = self.signature_source(db)
-            && let Some(mapping) = LambdaMapping::from_type_mapping(db, *lambda, type_mapping)
-        {
-            let mapped = lambda.apply_mapping(db, mapping, tcx, visitor);
-            return Self::new_internal(
-                db,
-                SignatureSource::<CallableSignature<'db>>::Lambda(mapped),
-                self.kind(db),
-                self.deprecated(db),
-            );
-        }
-
-        let signatures = self.signatures(db);
-        let mapped = signatures.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        if &mapped == signatures {
-            self
-        } else {
-            self.with_signatures(db, mapped)
-        }
+        let source = match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => {
+                let mapped = signatures.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                if &mapped == signatures {
+                    return self;
+                }
+                SignatureSource::Explicit(mapped)
+            }
+            SignatureSource::Lambda(lambda) => {
+                let mapped = match LambdaMapping::from_type_mapping(db, *lambda, type_mapping) {
+                    Some(mapping) => lambda.apply_mapping(db, mapping, tcx, visitor),
+                    None => {
+                        // A lambda's body is a separate query, just like a named function's
+                        // signature. Binding an enclosing recursive type must not run that
+                        // query or rewrite its body.
+                        lambda.map_inputs(db, type_mapping, tcx, visitor)
+                    }
+                };
+                SignatureSource::Lambda(mapped)
+            }
+        };
+        Self::new_internal(db, source, self.kind(db), self.deprecated(db))
     }
 
     pub(super) fn find_legacy_typevars_impl(
