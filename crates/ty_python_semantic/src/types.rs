@@ -5940,6 +5940,12 @@ impl<'db> Type<'db> {
                         // On the first union element, we can bind `E1.f` to a receiver of type
                         // `T & E1`, which is accepted by `Self: E1`, and similarly for `E2.f`.
                         // In this example, the result is `list[T & E1] | set[T & E2]`.
+                        //
+                        // The `Type::TypeVar` match arm below delegates member lookup to the
+                        // type variable's upper bound (`E1 | E2` in this example), preserving
+                        // the original receiver (`T`). Here, we distribute lookup over the union
+                        // and intersect each member with that receiver to obtain `T & E1`
+                        // and `T & E2`, respectively.
                         let receiver = receiver.map(|receiver| {
                             IntersectionType::from_two_elements(db, env, receiver, *elem)
                         });
