@@ -3757,7 +3757,7 @@ pub(crate) fn report_issubclass_check_against_protocol_with_non_method_members<'
     context: &'db InferContext<'db, '_>,
     call: &ast::ExprCall,
     protocol: ProtocolClass<'db>,
-    non_method_members: &[ProtocolMember<'db, 'db>],
+    non_method_members: &[ProtocolMember<'db>],
 ) {
     let Some(builder) = context.report_lint(&ISINSTANCE_AGAINST_PROTOCOL, call) else {
         return;

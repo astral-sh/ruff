@@ -481,13 +481,10 @@ impl<'db> ProtocolInterfaceView<'db> {
         Self { interface, ..self }
     }
 
-    pub(super) fn members<'a>(
+    pub(super) fn members(
         self,
         db: &'db dyn Db,
-    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>>
-    where
-        'db: 'a,
-    {
+    ) -> impl ExactSizeIterator<Item = ProtocolMember<'db>> {
         self.interface
             .inner(db)
             .iter()
@@ -529,15 +526,11 @@ impl<'db> ProtocolInterfaceView<'db> {
         })
     }
 
-    pub(super) fn member_by_name<'a>(
-        self,
-        db: &'db dyn Db,
-        name: &'a str,
-    ) -> Option<ProtocolMember<'a, 'db>> {
+    pub(super) fn member_by_name(self, db: &'db dyn Db, name: &str) -> Option<ProtocolMember<'db>> {
         self.interface
             .inner(db)
-            .get(name)
-            .map(|data| ProtocolMember {
+            .get_key_value(name)
+            .map(|(name, data)| ProtocolMember {
                 name,
                 data,
                 specialized_class: self.specialized_class,
@@ -752,7 +745,7 @@ pub(super) fn walk_protocol_instance_interface<
 /// Walks the types of a protocol member after binding any implicit receiver to `receiver_ty`.
 pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    member: &ProtocolMember<'_, 'db>,
+    member: &ProtocolMember<'db>,
     receiver_ty: Type<'db>,
     visitor: &V,
 ) {
@@ -881,13 +874,10 @@ impl<'db> ProtocolInterface<'db> {
         Self::new(db, env.program(db), members)
     }
 
-    pub(super) fn members<'a>(
+    pub(super) fn members(
         self,
         db: &'db dyn Db,
-    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>>
-    where
-        'db: 'a,
-    {
+    ) -> impl ExactSizeIterator<Item = ProtocolMember<'db>> {
         self.inner(db).iter().map(|(name, data)| ProtocolMember {
             name,
             data,
@@ -899,7 +889,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn filter_members(
         self,
         db: &'db dyn Db,
-        mut predicate: impl FnMut(&ProtocolMember<'_, 'db>) -> bool,
+        mut predicate: impl FnMut(&ProtocolMember<'db>) -> bool,
     ) -> Self {
         Self::new(
             db,
@@ -923,7 +913,7 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).len()
     }
 
-    pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
+    pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db>> {
         self.members(db)
             .filter(|member| !member.is_method(db))
             .collect()
@@ -965,7 +955,7 @@ impl<'db> ProtocolInterface<'db> {
             .get(name)
             .and_then(|data| {
                 ProtocolMemberAccess {
-                    declaration: *data,
+                    declaration: data,
                     mode: ProtocolMemberAccessMode::Instance,
                     materialization: None,
                 }
@@ -1476,7 +1466,7 @@ impl<'db> ProtocolPropertyType<'db> {
 /// Describes instance or class-based access to a protocol member.
 #[derive(Debug, Copy, Clone)]
 struct ProtocolMemberAccess<'db> {
-    declaration: ProtocolMemberData<'db>,
+    declaration: &'db ProtocolMemberData<'db>,
     mode: ProtocolMemberAccessMode,
     materialization: Option<MaterializationKind>,
 }
@@ -2042,9 +2032,9 @@ impl<'db> ProtocolMemberKind<'db> {
 
 /// A single member of a protocol interface.
 #[derive(Debug, PartialEq, Eq)]
-pub(super) struct ProtocolMember<'a, 'db> {
-    name: &'a str,
-    data: &'a ProtocolMemberData<'db>,
+pub(super) struct ProtocolMember<'db> {
+    name: &'db Name,
+    data: &'db ProtocolMemberData<'db>,
     specialized_class: Option<GenericAlias<'db>>,
     materialization: Option<MaterializationKind>,
 }
@@ -2065,7 +2055,7 @@ pub(super) enum StructuralMemberPriority {
 
 fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    member: &ProtocolMember<'_, 'db>,
+    member: &ProtocolMember<'db>,
     visitor: &V,
 ) {
     if member.materialization.is_some() {
@@ -2082,21 +2072,21 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
-impl<'a, 'db> ProtocolMember<'a, 'db> {
+impl<'db> ProtocolMember<'db> {
     /// Specialization can change an attribute into a method or property, so member classification
     /// and access must use the same resolved data.
     #[inline]
-    fn specialized_data(&self, db: &'db dyn Db) -> &ProtocolMemberData<'db> {
+    fn specialized_data(&self, db: &'db dyn Db) -> &'db ProtocolMemberData<'db> {
         // Retain the declaration while the specialized member is unavailable during cycle recovery.
         self.specialized_class
             .and_then(|alias| {
-                cached_protocol_member(db, ClassType::Generic(alias), Name::new(self.name)).as_ref()
+                cached_protocol_member(db, ClassType::Generic(alias), self.name.clone()).as_ref()
             })
             .unwrap_or(self.data)
     }
 
     /// Resolves the member once for all read, write, and classification checks in a comparison.
-    fn specialized(&self, db: &'db dyn Db) -> ProtocolMember<'_, 'db> {
+    fn specialized(&self, db: &'db dyn Db) -> ProtocolMember<'db> {
         ProtocolMember {
             data: self.specialized_data(db),
             specialized_class: None,
@@ -2104,7 +2094,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         }
     }
 
-    pub(super) fn name(&self) -> &'a str {
+    pub(super) fn name(&self) -> &'db str {
         self.name
     }
 
@@ -2153,7 +2143,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         .nominal_class(db, env)
                 })
                 .is_some_and(|class| {
-                    effective_superclass_variable_kind(db, class, Name::new(self.name))
+                    effective_superclass_variable_kind(db, class, self.name.clone())
                         == Some(VariableKind::Instance)
                         && [
                             class
@@ -2346,7 +2336,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// up on the type by Python or its standard library.
     fn uses_special_method_lookup(&self) -> bool {
         matches!(
-            self.name,
+            self.name.as_str(),
             "__abs__"
                 | "__add__"
                 | "__aenter__"
@@ -2475,7 +2465,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     fn access(&self, db: &'db dyn Db, mode: ProtocolMemberAccessMode) -> ProtocolMemberAccess<'db> {
         ProtocolMemberAccess {
-            declaration: *self.specialized_data(db),
+            declaration: self.specialized_data(db),
             mode,
             materialization: self.materialization,
         }
@@ -2612,7 +2602,7 @@ fn protocol_member_read_type<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     receiver_ty: Type<'db>,
-    member: &ProtocolMember<'_, 'db>,
+    member: &ProtocolMember<'db>,
     access: ProtocolMemberAccessMode,
 ) -> Option<Type<'db>> {
     // A callback protocol describes call syntax. Use the candidate's callable type instead of an
@@ -2670,7 +2660,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         receiver_ty: Type<'db>,
-        member: &ProtocolMember<'_, 'db>,
+        member: &ProtocolMember<'db>,
         required: ProtocolMemberAccess<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
@@ -2833,7 +2823,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         receiver_ty: Type<'db>,
-        member: &ProtocolMember<'_, 'db>,
+        member: &ProtocolMember<'db>,
         required: Option<ProtocolMemberAccess<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         let Some(required) = required else {
@@ -2844,7 +2834,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             if let Some(context) = self.report_context() {
                 context.push(ErrorContext::ProtocolMemberClassVarMismatch {
-                    member_name: member.name.into(),
+                    member_name: member.name.clone(),
                     ty,
                 });
             }
@@ -2921,7 +2911,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        member: &ProtocolMember<'_, 'db>,
+        member: &ProtocolMember<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         let member = &member.specialized(db);
@@ -2930,11 +2920,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if let Some(context) = self.report_context() {
             if member.has_incompatible_class_variable_declaration(db, env, ty) {
                 context.push(ErrorContext::ProtocolMemberClassVarMismatch {
-                    member_name: member.name.into(),
+                    member_name: member.name.clone(),
                     ty,
                 });
                 context.push(ErrorContext::ProtocolMemberIncompatible {
-                    member_name: member.name.into(),
+                    member_name: member.name.clone(),
                 });
                 return self.never();
             }
@@ -2973,7 +2963,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     context.push(ErrorContext::ProtocolSpecialMethodNotDefinedOnMetaType);
                 }
                 context.push(ErrorContext::ProtocolMemberNotDefined {
-                    member_name: member.name.into(),
+                    member_name: member.name.clone(),
                     ty,
                 });
                 return self.never();
@@ -2997,7 +2987,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && result.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::ProtocolMemberIncompatible {
-                member_name: member.name.into(),
+                member_name: member.name.clone(),
             });
         }
         result
@@ -3043,7 +3033,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && result.is_never_satisfied(db, env, self.inferable)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
-                        member_name: member.name.into(),
+                        member_name: member.name.clone(),
                     });
                 }
                 result
@@ -3182,7 +3172,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && source_member.is_none()
                 {
                     context.push(ErrorContext::ProtocolMemberNotDefined {
-                        member_name: target_member.name.into(),
+                        member_name: target_member.name.clone(),
                         ty: source_type,
                     });
                     return self.never();
@@ -3196,12 +3186,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             source_type,
                             ProtocolMemberAccess {
-                                declaration: *source_data,
+                                declaration: source_data,
                                 mode,
                                 materialization: source_member.materialization,
                             },
                             ProtocolMemberAccess {
-                                declaration: *target_data,
+                                declaration: target_data,
                                 mode,
                                 materialization: target_member.materialization,
                             },
@@ -3217,7 +3207,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     && result.is_never_satisfied(db, env, self.inferable)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
-                        member_name: target_member.name.into(),
+                        member_name: target_member.name.clone(),
                     });
                 }
                 result
@@ -3233,7 +3223,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn protocol_member_write_is_definitely_missing_from_ty(
         &self,
         db: &'db dyn Db,
-        member: &ProtocolMember<'_, 'db>,
+        member: &ProtocolMember<'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
@@ -3268,7 +3258,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     pub(super) fn protocol_member_has_disjoint_type_from_ty(
         &self,
         db: &'db dyn Db,
-        member: &ProtocolMember<'_, 'db>,
+        member: &ProtocolMember<'db>,
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
