@@ -8715,6 +8715,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(&lambda_expression.body, tcx);
     }
 
+    /// Infer a lambda default for diagnostics and retain its source when available.
+    fn infer_lambda_parameter_default(
+        &mut self,
+        parameter: &ast::ParameterWithDefault,
+    ) -> Option<ParameterDefault<'db>> {
+        let default_ty = self.infer_expression(parameter.default()?, TypeContext::default());
+        Some(self.index.try_definition(&parameter.parameter).map_or(
+            ParameterDefault::Inferred(default_ty),
+            ParameterDefault::Deferred,
+        ))
+    }
+
     fn infer_lambda_expression(
         &mut self,
         lambda_expression: &ast::ExprLambda,
@@ -8765,14 +8777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default(param.default().map(|default_expr| {
-                            let default_ty =
-                                self.infer_expression(default_expr, TypeContext::default());
-                            self.index.try_definition(&param.parameter).map_or(
-                                ParameterDefault::Inferred(default_ty),
-                                ParameterDefault::Deferred,
-                            )
-                        }));
+                        .with_optional_default(self.infer_lambda_parameter_default(param));
 
                     if let Some(annotated_type) = parameter_types.next() {
                         parameter.with_annotated_type(annotated_type)
@@ -8787,14 +8792,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default(param.default().map(|default_expr| {
-                            let default_ty =
-                                self.infer_expression(default_expr, TypeContext::default());
-                            self.index.try_definition(&param.parameter).map_or(
-                                ParameterDefault::Inferred(default_ty),
-                                ParameterDefault::Deferred,
-                            )
-                        }));
+                        .with_optional_default(self.infer_lambda_parameter_default(param));
 
                     if let Some(annotated_type) = parameter_types.next() {
                         parameter.with_annotated_type(annotated_type)
@@ -8813,14 +8811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     Parameter::keyword_only(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default(param.default().map(|default_expr| {
-                            let default_ty =
-                                self.infer_expression(default_expr, TypeContext::default());
-                            self.index.try_definition(&param.parameter).map_or(
-                                ParameterDefault::Inferred(default_ty),
-                                ParameterDefault::Deferred,
-                            )
-                        }))
+                        .with_optional_default(self.infer_lambda_parameter_default(param))
                 })
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters.kwarg.as_ref().map(|param| {
