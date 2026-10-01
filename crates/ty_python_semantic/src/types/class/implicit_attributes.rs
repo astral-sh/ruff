@@ -23,16 +23,16 @@ use ty_python_core::{
     semantic_index, use_def_map,
 };
 
-pub(crate) fn method_matches_decorator(
+/// Classifies a method in a class body as an instance method, classmethod, or staticmethod.
+///
+/// Returns `None` for scopes that are not functions, such as a comprehension nested in a method.
+pub(in crate::types) fn method_decorator(
     db: &dyn Db,
     index: &SemanticIndex,
     module: &ParsedModuleRef,
     method_scope: &Scope,
-    target_method_decorator: MethodDecorator,
-) -> bool {
-    let Some(method_def) = method_scope.node().as_function() else {
-        return true;
-    };
+) -> Option<MethodDecorator> {
+    let method_def = method_scope.node().as_function()?;
 
     // Check the decorators directly on the AST node to determine if this method
     // is a classmethod or staticmethod. This is more reliable than checking the
@@ -63,11 +63,13 @@ pub(crate) fn method_matches_decorator(
         is_staticmethod = true;
     }
 
-    match target_method_decorator {
-        MethodDecorator::None => !is_classmethod && !is_staticmethod,
-        MethodDecorator::ClassMethod => is_classmethod,
-        MethodDecorator::StaticMethod => is_staticmethod,
-    }
+    Some(if is_classmethod {
+        MethodDecorator::ClassMethod
+    } else if is_staticmethod {
+        MethodDecorator::StaticMethod
+    } else {
+        MethodDecorator::None
+    })
 }
 
 #[salsa::tracked]
@@ -173,7 +175,8 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
-            if !method_matches_decorator(db, index, &module, method_scope, target_method_decorator)
+            if method_decorator(db, index, &module, method_scope)
+                .is_some_and(|decorator| decorator != target_method_decorator)
             {
                 continue;
             }
@@ -240,7 +243,8 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
-            if !method_matches_decorator(db, index, &module, binding_scope, target_method_decorator)
+            if method_decorator(db, index, &module, binding_scope)
+                .is_some_and(|decorator| decorator != target_method_decorator)
             {
                 continue;
             }
@@ -466,7 +470,7 @@ fn implicit_attribute_binding_type<'db>(
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_attribute_names<'db>(
+pub(in crate::types) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {

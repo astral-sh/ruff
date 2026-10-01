@@ -390,6 +390,26 @@ class C:
         self.x: bytes = b"a"
 ```
 
+Conflicts among instance-method declarations and among class-method declarations are reported
+separately.
+
+```py
+class D:
+    def set_instance_value(self) -> None:
+        self.x: int = 1
+
+    def reset_instance_value(self) -> None:
+        self.x: str = "a"  # error: [conflicting-declarations]
+
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: int = 1
+
+    @classmethod
+    def reset_class_value(cls) -> None:
+        cls.x: bytes = b"a"  # error: [conflicting-declarations]
+```
+
 #### Singleton promotion happens after unioning implicit assignments
 
 ```py

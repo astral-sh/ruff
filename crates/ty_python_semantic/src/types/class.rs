@@ -5,8 +5,8 @@ pub(crate) use self::dynamic_literal::{
     DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict, dynamic_class_bases_argument,
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
-pub(crate) use self::implicit_attributes::method_matches_decorator;
 use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
+pub(super) use self::implicit_attributes::{implicit_attribute_names, method_decorator};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
