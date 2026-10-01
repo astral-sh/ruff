@@ -281,8 +281,14 @@ else:
     if sys.platform == "win32":
         # These functions are implemented in the deprecated ``nturl2path`` module,
         # but remain part of the public ``urllib.request`` API.
-        def url2pathname(url: str) -> str: ...
-        def pathname2url(p: str) -> str: ...
+        def url2pathname(url: str) -> str:
+            """OS-specific conversion from a relative URL of the 'file' scheme
+to a file system path; not recommended for general use.
+"""
+        def pathname2url(p: str) -> str:
+            """OS-specific conversion from a file system path to a relative URL
+of the 'file' scheme; not recommended for general use.
+"""
 
     else:
         def url2pathname(pathname: str) -> str:
@@ -319,7 +325,13 @@ def parse_keqv_list(l: list[str]) -> dict[str, str]:
     """Parse list of key=value strings where keys are not duplicated."""
 
 if sys.platform == "win32" or sys.platform == "darwin":
-    def proxy_bypass(host: str) -> Any: ...  # undocumented
+    def proxy_bypass(host: str) -> Any:  # undocumented
+        """Return True, if host should be bypassed.
+
+Checks proxy settings gathered from the environment, if specified,
+or the registry.
+
+"""
 
 else:
     def proxy_bypass(host: str, proxies: Mapping[str, str] | None = None) -> Any:  # undocumented
