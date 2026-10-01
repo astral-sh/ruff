@@ -287,23 +287,25 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::FunctionDef(function) => {
-                // Defaults and decorators execute in the enclosing scope.
+                // Match flake8-async's independent context for definition headers.
+                // Function bodies are checked separately after name resolution.
+                let context = self.context;
+                let boundary = self.boundary;
+                self.context =
+                    (function.name.as_str() == "__aexit__").then_some(CleanupContext::AsyncExit);
+                self.boundary = self.scopes.len();
                 for decorator in &function.decorator_list {
                     self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = &function.type_params {
+                    self.visit_type_params(type_params);
                 }
                 self.visit_parameters(&function.parameters);
                 if let Some(returns) = &function.returns {
                     self.visit_annotation(returns);
                 }
-            }
-            Stmt::ClassDef(class) => {
-                for decorator in &class.decorator_list {
-                    self.visit_decorator(decorator);
-                }
-                if let Some(arguments) = &class.arguments {
-                    self.visit_arguments(arguments);
-                }
-                self.visit_body(&class.body);
+                self.context = context;
+                self.boundary = boundary;
             }
             Stmt::Try(stmt) => self.visit_try(stmt),
             Stmt::With(with_stmt) => {
@@ -343,12 +345,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                     }
                 }
             }
-            Stmt::AnnAssign(assign) => {
-                if let Some(value) = &assign.value {
-                    self.visit_expr(value);
-                }
-                self.visit_expr(&assign.target);
-            }
             Stmt::For(for_stmt) if for_stmt.is_async => {
                 self.checkpoint(for_stmt.range());
                 visitor::walk_stmt(self, stmt);
@@ -377,14 +373,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 }
             }
             _ => visitor::walk_expr(self, expr),
-        }
-    }
-
-    fn visit_annotation(&mut self, expr: &'a Expr) {
-        if !self.checker.semantic().future_annotations_or_stub()
-            && self.checker.target_version() < ast::PythonVersion::PY314
-        {
-            self.visit_expr(expr);
         }
     }
 }

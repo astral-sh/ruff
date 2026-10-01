@@ -745,8 +745,8 @@ async def context_manager_cleanup():
 
 ### Definition boundaries
 
-Defaults are evaluated in the enclosing cleanup context, while nested bodies are independent except
-for their own cleanup methods.
+Nested function and method bodies are independent of the surrounding cleanup context. Their own
+cleanup methods are checked separately.
 
 ```py
 import trio
@@ -756,7 +756,7 @@ async def definition_boundaries():
     try:
         ...
     finally:
-        async def nested(value=await factory()):  # error: [await-in-finally-or-cancelled]
+        async def nested():
             await cleanup()
 
         class Nested:
@@ -845,89 +845,4 @@ async def cleanup():
 
 async def __aexit__(*args):
     await finish()
-```
-
-## Annotation evaluation
-
-Annotation expressions are evaluated before Python 3.14, while default expressions are evaluated
-in every supported version.
-
-### Python 3.13
-
-Annotation and default expressions are evaluated in the enclosing cleanup context on Python 3.13.
-
-```toml
-preview = true
-target-version = "py313"
-lint.select = ["ASYNC102"]
-```
-
-```py
-import trio
-
-
-async def cleanup():
-    try:
-        ...
-    finally:
-        # error: [await-in-finally-or-cancelled]
-        # error: [await-in-finally-or-cancelled]
-        async def annotated(value: await factory()) -> await factory():
-            await work()
-
-        async def default(value=await factory()):  # error: [await-in-finally-or-cancelled]
-            await work()
-```
-
-### Python 3.14
-
-Python 3.14 defers annotation evaluation, but still evaluates default expressions immediately.
-
-```toml
-preview = true
-target-version = "py314"
-lint.select = ["ASYNC102"]
-```
-
-```py
-import trio
-
-
-async def cleanup():
-    try:
-        ...
-    finally:
-        async def annotated(value: await factory()) -> await factory():
-            await work()
-
-        async def default(value=await factory()):  # error: [await-in-finally-or-cancelled]
-            await work()
-```
-
-### Future annotations
-
-With postponed annotation evaluation on Python 3.13, only the default expression is evaluated in
-the cleanup context.
-
-```toml
-preview = true
-target-version = "py313"
-lint.select = ["ASYNC102"]
-```
-
-```py
-from __future__ import annotations
-
-import trio
-
-
-async def cleanup():
-    try:
-        ...
-    finally:
-        async def annotated(value: await factory()) -> await factory():
-            await work()
-
-        async def default(value=await factory()):  # error: [await-in-finally-or-cancelled]
-            await work()
 ```
