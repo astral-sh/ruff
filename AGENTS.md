@@ -127,7 +127,7 @@ Never edit snapshot files or inline snapshot bodies manually. Regenerate them by
 ## Running Clippy
 
 ```sh
-cargo clippy --workspace --all-targets --all-features -- -D warnings
+CARGO_BUILD_WARNINGS=deny cargo clippy --workspace --all-targets --all-features
 ```
 
 ## Running Debug Builds

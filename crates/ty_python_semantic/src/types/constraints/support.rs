@@ -62,11 +62,7 @@ impl Support {
             .iter_mut()
             .enumerate()
             .find(|(_, chunk)| **chunk != 0)?;
-        let first_set_bit_in_chunk = first_nonempty_chunk.trailing_zeros() as usize;
-        debug_assert!(
-            first_set_bit_in_chunk != CHUNK_SIZE,
-            "nonempty chunk should not be empty"
-        );
+        let first_set_bit_in_chunk = first_nonempty_chunk.lowest_one()? as usize;
 
         // Clear out the bit we just found, and then return it
         *first_nonempty_chunk ^= 1 << first_set_bit_in_chunk;
@@ -91,10 +87,7 @@ impl Support {
             // Iterate through the set bits in this chunk
             std::iter::from_fn(move || {
                 // Find the lowest set bit, if there is one
-                let index = chunk.trailing_zeros() as usize;
-                if index == CHUNK_SIZE {
-                    return None;
-                }
+                let index = chunk.lowest_one()? as usize;
 
                 // Clear out the bit we just found.
                 chunk ^= 1 << index;
@@ -188,5 +181,30 @@ impl Sub<&Support> for &Support {
             *lhs &= !(*rhs);
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CHUNK_SIZE, Support};
+    use crate::types::constraints::TypeVarId;
+
+    #[test]
+    fn pop_and_iter_across_chunks() {
+        let typevars =
+            [0, CHUNK_SIZE - 1, 2 * CHUNK_SIZE, 3 * CHUNK_SIZE - 1].map(TypeVarId::from_usize);
+        let mut support = Support::default();
+        assert_eq!(support.iter().count(), 0);
+        assert_eq!(support.pop(), None);
+
+        for typevar in typevars.into_iter().rev() {
+            support.insert(typevar);
+        }
+        assert_eq!(support.iter().collect::<Vec<_>>(), typevars);
+        for typevar in typevars {
+            assert_eq!(support.pop(), Some(typevar));
+        }
+        assert_eq!(support.iter().count(), 0);
+        assert_eq!(support.pop(), None);
     }
 }
