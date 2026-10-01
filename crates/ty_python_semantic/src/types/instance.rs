@@ -781,7 +781,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         {
             return false;
         }
-        has_property |= !template_member.is_method();
+        has_property |= !template_member.is_method(db);
         has_explicit_receiver |= template_member.has_explicit_receiver_annotation(db);
         if has_property && has_explicit_receiver {
             return false;
