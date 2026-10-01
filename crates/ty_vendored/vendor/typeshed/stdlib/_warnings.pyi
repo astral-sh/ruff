@@ -1,6 +1,7 @@
 """_warnings provides basic warning filtering support.
 It is a helper module to speed up interpreter start-up.
 """
+
 import sys
 from typing import Any, overload
 
@@ -20,19 +21,19 @@ if sys.version_info >= (3, 12):
     ) -> None:
         """Issue a warning, or maybe ignore it or raise an exception.
 
-  message
-    Text of the warning message.
-  category
-    The Warning category subclass. Defaults to UserWarning.
-  stacklevel
-    How far up the call stack to make this warning appear. A value of 2 for
-    example attributes the warning to the caller of the code calling warn().
-  source
-    If supplied, the destroyed object which emitted a ResourceWarning
-  skip_file_prefixes
-    An optional tuple of module filename prefixes indicating frames to skip
-    during stacklevel computations for stack frame attribution.
-"""
+        message
+          Text of the warning message.
+        category
+          The Warning category subclass. Defaults to UserWarning.
+        stacklevel
+          How far up the call stack to make this warning appear. A value of 2 for
+          example attributes the warning to the caller of the code calling warn().
+        source
+          If supplied, the destroyed object which emitted a ResourceWarning
+        skip_file_prefixes
+          An optional tuple of module filename prefixes indicating frames to skip
+          during stacklevel computations for stack frame attribution.
+        """
     @overload
     def warn(
         message: Warning,
