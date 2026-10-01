@@ -173,7 +173,7 @@ impl<'db> LambdaSignature<'db> {
                     .materialize_typevar_bounds_and_defaults,
                 ..ApplyTypeMappingVisitor::new(&env)
             };
-            let context = TypeContext::new(mapping.context);
+            let context = mapping.context;
             let transformation = mapping.mapping.as_type_mapping();
             let flipped = transformation.flip();
             return type_dependencies(

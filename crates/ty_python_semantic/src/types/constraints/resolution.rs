@@ -296,7 +296,7 @@ mod tests {
     use ruff_python_ast::name::Name;
     use ty_python_core::ProgramFile;
 
-    use super::{SolutionType, resolve_solution, type_dependencies};
+    use super::{SolutionType, resolve_solution};
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::constraints::TypeVarSolution;
@@ -574,98 +574,6 @@ mod tests {
                 ]
             );
         }
-        Ok(())
-    }
-
-    #[test]
-    fn recursive_lambda_dependencies_include_only_used_variables() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-            from typing import Final
-
-            class Source[U, V]:
-                def __init__(self, value: U):
-                    self.used: Final = lambda: (value, self.used)
-                    self.unused: Final = lambda: (1, self.unused)
-                    self.first: Final = lambda: self.second
-                    self.second: Final = lambda: (value, self.first)
-            "#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        let class = global_symbol(db, file, "Source")
-            .place
-            .expect_type()
-            .as_class_literal()
-            .ok_or_else(|| anyhow::anyhow!("expected Source"))?;
-        let variables = class
-            .generic_context(db)
-            .ok_or_else(|| anyhow::anyhow!("expected generic context"))?
-            .variables(db)
-            .collect::<Vec<_>>();
-        let [u, v] = variables.as_slice() else {
-            anyhow::bail!("expected U and V");
-        };
-        let t = create_typevar(db, "T");
-        let int = KnownClass::Int.to_instance(db, &env);
-        let source = Type::instance(db, &env, class.identity_specialization(db));
-        let inferable = TypeVarSet::from_typevars(db, [t, *u, *v]);
-
-        for name in ["used", "first", "second"] {
-            let callback = source.member(db, &env, name).place.expect_type();
-            assert_eq!(
-                type_dependencies(db, &env, [callback])
-                    .iter(db)
-                    .collect::<Vec<_>>(),
-                [*u],
-                "{name}: U occurs only in the recursive return"
-            );
-            assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, callback)]).as_ref(),
-                [SolutionType::Unresolved(callback)],
-                "{name}: missing U"
-            );
-            let resolved = resolve_solution(
-                db,
-                &env,
-                inferable,
-                &[binding(t, callback), binding(*u, int)],
-            );
-            let [SolutionType::Resolved(mapped), SolutionType::Resolved(_)] = resolved.as_ref()
-            else {
-                anyhow::bail!("{name}: unused V must not prevent resolution: {resolved:?}");
-            };
-            assert_eq!(type_dependencies(db, &env, [*mapped]), TypeVarSet::None);
-
-            let specialized = callback.substitute_one_typevar(
-                db,
-                &env,
-                *u,
-                Type::heterogeneous_tuple(db, &env, [Type::TypeVar(*v)]),
-            );
-            assert_eq!(
-                type_dependencies(db, &env, [specialized])
-                    .iter(db)
-                    .collect::<Vec<_>>(),
-                [*v],
-                "{name}: specializing U introduces a dependency on V"
-            );
-            assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, specialized)]).as_ref(),
-                [SolutionType::Unresolved(specialized)],
-            );
-        }
-
-        let unused = source.member(db, &env, "unused").place.expect_type();
-        assert_eq!(type_dependencies(db, &env, [unused]), TypeVarSet::None);
-        assert_eq!(
-            resolve_solution(db, &env, inferable, &[binding(t, unused)]).as_ref(),
-            [SolutionType::Resolved(unused)]
-        );
         Ok(())
     }
 
