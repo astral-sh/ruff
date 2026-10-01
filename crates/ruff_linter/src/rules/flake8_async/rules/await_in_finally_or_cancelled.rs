@@ -69,6 +69,8 @@ use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
 /// functions, aliases of cancel scope objects, or dynamically computed values.
 /// Only single-target assignments with literal values update the tracked shield
 /// state. Only the first recognized cancel scope in a `with` statement is tracked.
+/// Async context managers are checked before their bodies, so changes to shielding
+/// before exit are not modeled.
 /// The rule visits branches and loops in source order without analyzing
 /// execution paths or rebinding of scope variables. It can therefore miss
 /// unshielded cancellation points or report ones that are shielded at runtime.
@@ -172,7 +174,7 @@ fn enables_shield(expr: &Expr) -> bool {
 }
 
 impl<'a> CleanupVisitor<'a, '_> {
-    fn checkpoint(&self, range: TextRange) -> bool {
+    fn checkpoint(&self, range: TextRange) {
         if let Some(context) = self.context
             && !self.scopes[self.boundary..]
                 .iter()
@@ -180,9 +182,7 @@ impl<'a> CleanupVisitor<'a, '_> {
         {
             self.checker
                 .report_diagnostic(AwaitInFinallyOrCancelled { context }, range);
-            return true;
         }
-        false
     }
 
     fn cancellation_types(&self, expr: &Expr) -> CancellationTypes {
@@ -350,32 +350,20 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 self.visit_body(&class.body);
             }
             Stmt::Try(stmt) => self.visit_try(stmt),
-            Stmt::With(stmt) => {
+            Stmt::With(with_stmt) => {
+                if with_stmt.is_async
+                    && with_stmt
+                        .items
+                        .iter()
+                        .any(|item| !self.scope(item).is_some_and(|scope| scope.task_group))
+                {
+                    self.checkpoint(with_stmt.range());
+                }
                 let count = self.scopes.len();
-                let mut exits = Vec::new();
-                let mut tracked = false;
-                for item in &stmt.items {
-                    self.visit_expr(&item.context_expr);
-                    let scope = self.scope(item);
-                    let checkpoint =
-                        stmt.is_async && !scope.as_ref().is_some_and(|scope| scope.task_group);
-                    let reported = checkpoint && self.checkpoint(item.range());
-                    exits.push((item, self.scopes.len(), checkpoint, reported));
-                    if !tracked && let Some(scope) = scope {
-                        self.scopes.push(scope);
-                        tracked = true;
-                    }
-                    if let Some(target) = &item.optional_vars {
-                        self.visit_expr(target);
-                    }
+                if let Some(scope) = with_stmt.items.iter().find_map(|item| self.scope(item)) {
+                    self.scopes.push(scope);
                 }
-                self.visit_body(&stmt.body);
-                for (item, scopes, checkpoint, reported) in exits.into_iter().rev() {
-                    self.scopes.truncate(scopes);
-                    if checkpoint && !reported {
-                        self.checkpoint(item.range());
-                    }
-                }
+                visitor::walk_stmt(self, stmt);
                 self.scopes.truncate(count);
             }
             Stmt::Assign(assign) => {

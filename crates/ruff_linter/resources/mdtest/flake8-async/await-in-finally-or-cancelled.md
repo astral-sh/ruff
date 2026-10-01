@@ -522,10 +522,6 @@ async def checkpoints(cm, items):
     finally:
         async with cm:  # error: [await-in-finally-or-cancelled]
             pass
-        # error: [await-in-finally-or-cancelled]
-        # error: [await-in-finally-or-cancelled]
-        async with cm, manager():
-            pass
         async for item in items:  # error: [await-in-finally-or-cancelled]
             pass
         result = [item async for item in items]  # error: [await-in-finally-or-cancelled]
@@ -576,24 +572,6 @@ async def nursery_cleanup():
         async with trio.open_nursery() as nursery:
             nursery.cancel_scope.shield = True
             await cleanup()
-```
-
-### Context-manager exit checkpoints
-
-An async context manager can become unshielded between entry and exit. A literal assignment that
-disables its surrounding shield causes Ruff to report the exit checkpoint.
-
-```py
-import trio
-
-
-async def disable_shield_before_exit(cm):
-    try:
-        ...
-    finally:
-        with trio.CancelScope(shield=True) as scope:
-            async with cm:  # error: [await-in-finally-or-cancelled]
-                scope.shield = False
 ```
 
 ### Cancellation-safe cleanup operations
