@@ -535,7 +535,7 @@ impl Drop for TypeDetailGuard<'_, '_, '_, '_> {
     fn drop(&mut self) {
         // The fallibility here is primarily retrieving `TypeWriter::Details`
         // everything else is ideally-never-fails pedantry (yay for pedantry!)
-        if let TypeWriter::Details(details) = &mut self.inner
+        if let TypeWriter::Details(details) = &mut *self.inner
             && let Some(start) = self.start
             && let Some(payload) = self.payload.take()
         {
