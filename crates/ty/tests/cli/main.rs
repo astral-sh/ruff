@@ -13,9 +13,8 @@ mod uv_workspace;
 #[path = "../common/mod.rs"]
 pub mod common;
 
-use std::{fmt::Write, path::Path};
+use std::fmt::Write;
 
-use anyhow::Context as _;
 use insta_cmd::assert_cmd_snapshot;
 
 use common::{CliTest, user_config_directory_env_var};
@@ -832,27 +831,4 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     ");
 
     Ok(())
-}
-
-impl CliTest {
-    /// Return [`Self`] with the ty binary copied to the specified path instead.
-    pub(crate) fn with_ty_at(mut self, dest_path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let dest_path = dest_path.as_ref();
-        let dest_path = self.project_dir.join(dest_path);
-
-        Self::ensure_parent_directory(&dest_path)?;
-        std::fs::copy(&self.ty_binary_path, &dest_path)
-            .with_context(|| format!("Failed to copy ty binary to `{}`", dest_path.display()))?;
-
-        self.ty_binary_path = dest_path;
-        Ok(self)
-    }
-}
-
-fn site_packages_filter(python_version: &str) -> String {
-    if cfg!(windows) {
-        "Lib/site-packages".to_string()
-    } else {
-        format!("lib/python{}/site-packages", regex::escape(python_version))
-    }
 }
