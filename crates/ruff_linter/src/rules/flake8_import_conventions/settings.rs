@@ -13,6 +13,7 @@ use crate::settings::types::PreviewMode;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
+    ("datetime", "dt"),
     ("matplotlib", "mpl"),
     ("matplotlib.pyplot", "plt"),
     ("networkx", "nx"),

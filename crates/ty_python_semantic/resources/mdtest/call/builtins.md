@@ -601,6 +601,11 @@ def clean(value: dict[str, int] | str | None) -> None:
 
 ## `dict` keyword arguments with a shadowed `typing` module
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 An empty first-party `typing` module hides the definitions that make `dict` generic. Calls with one
 or more named keyword arguments still check their values and recover with `Unknown`, just like
 dictionary literals.

@@ -6520,10 +6520,10 @@ Source with applied edits:
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing.pyi:LL:30
+          --> stdlib/typing.pyi:LL:22
            |
-        LL |             def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
-           |                              ^^^^
+        LL |                 cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = (), qualname: str | None = None
+           |                      ^^^^
         info: Source
           --> main2.py:LL:20
            |
@@ -6531,10 +6531,10 @@ Source with applied edits:
            |                    ^^^^
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing.pyi:LL:41
+          --> stdlib/typing.pyi:LL:33
            |
-        LL |             def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
-           |                                         ^^^^^
+        LL |                 cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = (), qualname: str | None = None
+           |                                 ^^^^^
         info: Source
           --> main2.py:LL:32
            |
@@ -6566,7 +6566,7 @@ Source with applied edits:
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/typing_extensions.pyi:LL:17
+          --> stdlib/typing.pyi:LL:17
            |
         LL |                 name: str,
            |                 ^^^^

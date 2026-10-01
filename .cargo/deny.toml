@@ -59,7 +59,6 @@ allow-build-scripts = [
     "tikv-jemalloc-sys",
     "typeid",
     "typenum",
-    "unicode_names2",
     "wasm-bindgen",
     "wasm-bindgen-shared",
     "winapi",

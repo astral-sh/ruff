@@ -584,6 +584,70 @@ See the [ruff-ecosystem package](https://github.com/astral-sh/ruff/tree/main/pyt
 1. Bump the Rust version in Ruff's conda forge recipe. See [this PR](https://github.com/conda-forge/ruff-feedstock/pull/266) for an example.
 1. Enjoy the new Rust version!
 
+## Updating the Python version
+
+1. Update `PythonVersion::latest` in `crates/ruff_python_ast/src/python_version.rs` to the latest
+    version.
+
+1. Update `PythonVersion::default` in the same file, assuming that version has also reached
+    end-of-life. You can check this schedule
+    [here](https://devguide.python.org/versions/#supported-versions).
+
+1. Update the `Options::target_version` metadata and docs in `crates/ruff_workspace/src/options.rs`.
+
+1. Remove any preview warnings about the new version, typically in
+    `crates/ruff_linter/src/linter.rs`
+
+1. Run the tests and update snapshots
+
+    Note that if the tests were intentionally exercising behavior on a particular version, you may need
+    to pin the version in the tests or add new tests to maintain coverage. Otherwise, prefer updating
+    the snapshots in place.
+
+1. Also consider updating the values for ty in the following locations:
+
+    - `PythonVersion::latest_ty` in `crates/ruff_python_ast/src/python_version.rs`
+    - The default in the `EnvironmentOptions::python_version` metadata in
+        `crates/ty_project/src/metadata/options.rs`
+
+1. Regenerate the affected schemas with `cargo dev generate-all`
+
+See [#28792](https://github.com/astral-sh/ruff/pull/28792) and
+[#20725](https://github.com/astral-sh/ruff/pull/20725) for previous examples.
+
+### Updating the supported Unicode version
+
+When adding support for a new Python version, update Ruff's Unicode data to match
+the Unicode standard used by that Python version. Check the target interpreter's
+`unicodedata.unidata_version` to find the required version.
+
+Check that the `unicode-ident` and `unicode-normalization` dependencies also
+support that Unicode version; the parser uses them to recognize and normalize
+identifiers.
+
+Unicode names and aliases for `\N{...}` escapes are vendored in
+[`ruff_unicode_names2`](https://github.com/astral-sh/ruff/blob/main/crates/ruff_unicode_names2/README.md). To update them:
+
+1. Download `UnicodeData.txt` and `NameAliases.txt` from
+    `https://www.unicode.org/Public/<version>/ucd/` and replace both files in
+    `crates/ruff_unicode_names2/data/`.
+
+1. Update the Unicode version in `crates/ruff_unicode_names2/src/lib.rs` and its
+    README, and the data source URLs in `crates/ruff_unicode_names2/build.rs`.
+
+1. Add a parser regression test for a name introduced in the new Unicode version.
+    Run the parser tests and the vendored library's exhaustive tests:
+
+    ```shell
+    cargo test -p ruff_python_parser
+    cargo +nightly test -p ruff_unicode_names2 --lib
+    ```
+
+The build script regenerates the lookup tables from these files automatically;
+there are no generated tables to check in. Preserve the vendored crate's strict,
+case-insensitive matching when taking upstream changes: Python requires spaces,
+hyphens, and underscores to match the registered name or alias.
+
 ## Benchmarking and Profiling
 
 We have several ways of benchmarking and profiling Ruff:

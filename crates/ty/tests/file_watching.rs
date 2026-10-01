@@ -1947,7 +1947,7 @@ fn recreating_default_environment_updates_inferred_python_version() -> anyhow::R
     case.apply_changes(&changes);
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     case.write_virtual_environment(&environment, PythonVersion::PY311)?;
@@ -1984,7 +1984,7 @@ fn repairing_default_environment_updates_inferred_python_version() -> anyhow::Re
     })?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     // Write a valid `pyvenv.cfg`.
@@ -2031,7 +2031,7 @@ fn creating_site_packages_after_metadata_updates_inferred_python_version() -> an
     case.apply_changes(&changes);
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     let library = case.project_path(".venv").join(library);
@@ -2086,7 +2086,7 @@ fn moving_configured_interpreter_parent_into_project_updates_inferred_python_ver
     })?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     // Moving the parent can produce a single directory event for the whole environment.
@@ -2138,7 +2138,7 @@ fn repairing_activated_environment_updates_inferred_python_version() -> anyhow::
     )?;
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[14]]`"
+        @"main.py:5:13: info[revealed-type] Revealed type: `tuple[Literal[3], Literal[15]]`"
     );
 
     case.write_virtual_environment(case.project_path("active-env"), PythonVersion::PY311)?;
@@ -2224,7 +2224,7 @@ fn reloading_options_updates_inferred_python_version_diagnostics_when_metadata_i
 
     assert_snapshot!(
         case.render_diagnostics(&case.db().check()),
-        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.14 instead."
+        @".venv/pyvenv.cfg: warning[unsupported-python-version] Ignoring unsupported inferred Python version `3.16`; ty will use Python 3.15 instead."
     );
 
     std::fs::rename(
