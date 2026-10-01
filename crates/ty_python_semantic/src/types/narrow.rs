@@ -4682,6 +4682,14 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let (_, place) = type_is.place_info(db)?;
                 let mut target = type_is.return_type(db);
 
+                // An unresolved target does not establish that either branch is unreachable.
+                // Materializing Divergent to object here would discard the recursive marker
+                // from the negative branch before its target type becomes available.
+                if target.is_divergent() {
+                    self.is_provisional = true;
+                    return None;
+                }
+
                 if let Some(kind) = type_is.materialization_kind(db) {
                     let kind = if is_positive { kind } else { kind.flip() };
                     target = target.materialization(db, &self.env, kind);
