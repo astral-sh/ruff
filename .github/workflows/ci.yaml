@@ -34,6 +34,28 @@ env:
   MDTEST_EXTERNAL: "1"
 
 jobs:
+  security-review:
+    needs: determine_changes
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
+    uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@45c506043c254690f2612686e5d5a72c81c251a4
+    with:
+      runner: depot-ubuntu-22.04-16
+      helper-runner: github-ubuntu-24.04-x86_64-4
+      # renovate: datasource=github-release-attachments depName=astral-sh/uv
+      uv-version: "0.12.18"
+      uv-checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
+      # Keep the review tools outside the checkout when switching to the PR head.
+      setup-command: |
+        export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/pull-request-review-tools"
+        uv sync --locked --only-dev
+        echo "$UV_PROJECT_ENVIRONMENT/bin" >> "$GITHUB_PATH"
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      contents: read
+      id-token: write
+      issues: read
+      pull-requests: read
+
   determine_changes:
     name: "Determine changes"
     # CI on main is redundant in the security repository.
