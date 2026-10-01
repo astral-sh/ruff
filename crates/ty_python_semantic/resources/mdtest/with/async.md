@@ -903,6 +903,43 @@ async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
 reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
 ```
 
+## Async context manager yielding a protocol with a recursive receiver
+
+The context manager can yield a protocol whose receiver is specialized with the same protocol.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Protocol, TypeVar
+
+class Stream[T](Protocol):
+    def flatten(self: Stream[Stream[T]]) -> None: ...
+
+@asynccontextmanager  # no diagnostic
+async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
+    yield value
+
+reveal_type(open_stream)  # revealed: (value: Stream[int]) -> _AsyncGeneratorContextManager[Stream[int], None]
+
+T = TypeVar("T", covariant=True)
+
+class LegacyStream(Protocol[T]):
+    def flatten(self: LegacyStream[LegacyStream[T]]) -> None: ...
+
+@asynccontextmanager  # no diagnostic
+async def open_legacy_stream(value: LegacyStream[int]) -> AsyncGenerator[LegacyStream[int], None]:
+    yield value
+
+reveal_type(open_legacy_stream)  # revealed: (value: LegacyStream[int]) -> _AsyncGeneratorContextManager[LegacyStream[int], None]
+```
+
 ## Async context manager yielding a legacy recursive generic protocol
 
 The same comparison is supported with legacy type parameters.

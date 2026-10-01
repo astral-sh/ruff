@@ -1125,6 +1125,34 @@ static_assert(is_subtype_of(Top[Node[int]], Node[int]))
     });
 }
 
+/// Regression benchmark for a recursively specialized context-manager yield type.
+fn benchmark_async_context_manager_recursive_protocol(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = r#"
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Protocol
+
+class Stream[T](Protocol):
+    def flatten(self: Stream[Stream[T]]) -> None: ...
+
+@asynccontextmanager
+async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
+    yield value
+"#;
+
+    criterion.bench_function("ty_micro[async_context_manager_recursive_protocol]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for large calls to a gradual variadic tail.
 ///
 /// Without the gradual-call shortcut, every positional argument type is folded into the same
@@ -2273,6 +2301,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
     benchmark_recursive_protocol_specialized_receiver,
+    benchmark_async_context_manager_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,
     benchmark_very_large_tuple,

@@ -614,12 +614,17 @@ fn recursive_protocol_materialization_is_noop<'db>(
                             specialization.materialization_kind(db).is_some()
                                 || specialization.tuple(db).is_some()
                                 || specialization.types(db).iter().any(|ty| {
-                                    !specialization_argument_is_static(
-                                        db,
-                                        self.env,
-                                        *ty,
-                                        self.class_context,
-                                    )
+                                    if matches!(ty, Type::ProtocolInstance(_)) {
+                                        self.visit_type(db, *ty);
+                                        self.invalid.get()
+                                    } else {
+                                        !specialization_argument_is_static(
+                                            db,
+                                            self.env,
+                                            *ty,
+                                            self.class_context,
+                                        )
+                                    }
                                 }),
                         );
                     }
@@ -765,23 +770,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut result = self.never();
         let source_protocol = ty.as_protocol_instance();
 
-        // Every gradual type lies between its bottom and top materializations. Comparing the
-        // exact same class specialization can therefore settle these directions without expanding
-        // a recursive protocol's members or confusing opposite materialization requirements.
+        // Every gradual type lies between its bottom and top materializations, and is assignable
+        // to and from either one. Comparing the exact same class specialization can therefore
+        // settle these directions without expanding a recursive protocol's members.
         if let Some(source) = source_protocol
-            && matches!(
-                (
-                    source.materialization_kind(db),
-                    protocol.materialization_kind(db)
-                ),
-                (
-                    None | Some(MaterializationKind::Bottom),
-                    Some(MaterializationKind::Top)
-                ) | (Some(MaterializationKind::Bottom), None)
-            )
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin == target_origin
+            && (match (
+                source.materialization_kind(db),
+                protocol.materialization_kind(db),
+            ) {
+                (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
+                | (Some(MaterializationKind::Bottom), None) => true,
+                (Some(MaterializationKind::Top), None)
+                | (None, Some(MaterializationKind::Bottom))
+                    if self.relation.is_assignability() =>
+                {
+                    // A specialization may already carry a separate materialization marker.
+                    // In that case, the unwrapped protocol need not be the original type.
+                    source_origin
+                        .static_class_literal(db)
+                        .is_some_and(|(_, specialization)| {
+                            specialization.is_none_or(|specialization| {
+                                specialization.materialization_kind(db).is_none()
+                            })
+                        })
+                }
+                _ => false,
+            })
         {
             return self.always();
         }
@@ -817,6 +834,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             )
         {
             return self.always();
+        }
+
+        // A no-op materialization can also be removed before comparing different
+        // specializations. The ordinary comparison still checks their full relationship.
+        if let Some(source) = source_protocol
+            && let (Some(source_origin), Some(target_origin)) =
+                (source.materialized_origin(db), protocol.class_origin(db))
+            && source_origin.class_literal(db) == target_origin.class_literal(db)
+            && recursive_protocol_materialization_is_noop(
+                db,
+                self.env.program(db),
+                source,
+                ProtocolInstanceType::from_class(source_origin),
+            )
+        {
+            return self.check_type_pair(
+                db,
+                Type::ProtocolInstance(ProtocolInstanceType::from_class(source_origin)),
+                Type::ProtocolInstance(protocol),
+            );
         }
 
         let source_protocol_as_nominal =
