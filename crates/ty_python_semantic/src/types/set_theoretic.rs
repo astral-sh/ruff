@@ -916,6 +916,31 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Returns whether a direct positive or negative element is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.positive(db)
+            .iter()
+            .chain(self.negative(db))
+            .copied()
+            .any(Type::is_alias_like)
+    }
+
+    /// Normalize direct aliases without expanding aliases nested inside containers.
+    pub(crate) fn expand_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db, env);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.resolve_type_alias(db));
+        }
+        for negative in self.negative(db) {
+            builder.add_negative_in_place(negative.resolve_type_alias(db));
+        }
+        builder.build()
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1116,18 +1141,13 @@ impl<'db> IntersectionType<'db> {
         if type_mapping.is_structural() {
             return Type::Intersection(IntersectionType::new(db, positive, negative));
         }
-        // Rebuilding an unchanged intersection can expand aliases such as `Not[A]` in
-        // `type A = list[Not[A]]`, unfolding the recursive type on every mapping. Nonrecursive
-        // aliases still need normalization: an alias can hide `object` or a double negation.
-        if positive == *self.positive(db)
-            && negative == *self.negative(db)
-            && positive.iter().chain(&negative).all(|ty| match ty {
-                Type::TypeAlias(alias) => alias.is_recursive(db),
-                _ => true,
-            })
+        let negative_alias = if positive.is_empty()
+            && let NegativeIntersectionElements::Single(ty @ Type::TypeAlias(_)) = &negative
         {
-            return Type::Intersection(self);
-        }
+            Some(*ty)
+        } else {
+            None
+        };
         let mut builder = IntersectionBuilder::new(db, visitor.env);
         for positive in positive {
             builder.add_positive_in_place(positive);
@@ -1135,7 +1155,21 @@ impl<'db> IntersectionType<'db> {
         for negative in &negative {
             builder.add_negative_in_place(*negative);
         }
-        builder.build()
+        let mapped = builder.build();
+
+        // Normalize before preserving an alias: its body can expose `object`, a union, or
+        // another negation. If normalization only expands the single excluded type, keep
+        // its alias so mappings of `type A = list[Not[A]]` do not unfold it repeatedly.
+        if let Some(alias) = negative_alias
+            && let Type::Intersection(intersection) = mapped
+            && intersection.positive(db).is_empty()
+            && intersection.negative(db)
+                == &NegativeIntersectionElements::Single(alias.resolve_type_alias(db))
+        {
+            alias.negate(db, visitor.env)
+        } else {
+            mapped
+        }
     }
 
     /// Map a type transformation over all positive elements of the intersection. Leave the
