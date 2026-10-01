@@ -1473,6 +1473,20 @@ def bad_return[T: int](x: T) -> T:
     return x + 1
 ```
 
+## Using float as an upper bound
+
+An upper bound of `float` is internally treated as if the bound would be `float | int`. Normal
+arithmetic operations are available on that type:
+
+```py
+def f[T: float](value: T):
+    reveal_type(value + 1)  # revealed: float
+    reveal_type(value + 1.0)  # revealed: float
+    # TODO: Adding two values of the bounded type variable should be supported.
+    # error: [unsupported-operator]
+    reveal_type(value + value)  # revealed: Unknown
+```
+
 ## All occurrences of the same typevar have the same type
 
 If a typevar appears multiple times in a function signature, all occurrences have the same type.

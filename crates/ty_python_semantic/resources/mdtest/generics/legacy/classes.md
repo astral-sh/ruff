@@ -1918,10 +1918,34 @@ def use_union(value: A | B):
     reveal_type(value.value)
 
 def use_typevar(value: U):
-    # TODO: This should not error once member lookup supports union upper bounds.
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
     # revealed: int | str
     reveal_type(value.value)
+```
+
+## Self methods on narrowed union-bounded type variables
+
+Narrowing a union-bounded type variable preserves both the type variable and the narrowing when
+binding `Self` to each member of the upper bound.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class A:
+    def f(self) -> list[Self]:
+        return [self]
+
+class B:
+    def f(self) -> set[Self]:
+        return {self}
+
+class Marker: ...
+
+T = TypeVar("T", bound=A | B)
+
+def f(obj: T):
+    if isinstance(obj, Marker):
+        reveal_type(obj)  # revealed: T@f & Marker
+        reveal_type(obj.f())  # revealed: list[T@f & Marker & A] | set[T@f & Marker & B]
 ```
 
 ## Correlated constrained receiver calls
