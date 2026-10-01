@@ -812,7 +812,24 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                 state.follows = Follows::Docstring;
             }
 
-            if !logical_line.is_comment_only {
+            if logical_line.is_comment_only {
+                // Track the start of the comment group that directly precedes the current line.
+                // A blank line ends the previous group, since the comments after it belong to the
+                // definition rather than to the statement above.
+                if logical_line.blank_lines > 0 {
+                    state.comment_block_start = Some(
+                        self.locator
+                            .line_start(logical_line.first_token_range.start()),
+                    );
+                } else {
+                    state.comment_block_start.get_or_insert(
+                        self.locator
+                            .line_start(logical_line.first_token_range.start()),
+                    );
+                }
+            } else {
+                state.comment_block_start = None;
+
                 state.is_not_first_logical_line = true;
 
                 state.last_non_comment_line_end = logical_line.logical_line_end;
@@ -861,7 +878,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
             {
                 diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
                     self.stylist.line_ending().to_string(),
-                    self.locator.line_start(state.last_non_comment_line_end),
+                    state.blank_line_insertion_offset(),
                 )));
             }
         }
@@ -933,7 +950,7 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                                 - line.preceding_blank_lines.count())
                                 as usize,
                         ),
-                        self.locator.line_start(state.last_non_comment_line_end),
+                        state.blank_line_insertion_offset(),
                     )));
                 }
             }
@@ -1092,7 +1109,24 @@ struct BlankLinesState {
     /// Used for the fix in case a comment separates two non-comment logical lines to make the comment "stick"
     /// to the second line instead of the first.
     last_non_comment_line_end: TextSize,
+    /// The start of the comment group that directly precedes the current logical line, if any.
+    /// E301 and E302 anchor their insertions here so that the blank lines they add land before the
+    /// comment block instead of between the preceding statement and the block.
+    comment_block_start: Option<TextSize>,
     previous_unindented_line_kind: Option<LogicalLineKind>,
+}
+
+impl BlankLinesState {
+    /// The offset at which E301 and E302 should insert missing blank lines.
+    ///
+    /// When the definition is preceded by a comment block, the blank lines belong before the
+    /// block. Inserting them at the end of the preceding statement instead would separate the
+    /// comments from the definition, which both isort and the formatter then move back, so the
+    /// two rules would never converge.
+    fn blank_line_insertion_offset(&self) -> TextSize {
+        self.comment_block_start
+            .unwrap_or(self.last_non_comment_line_end)
+    }
 }
 
 #[derive(Copy, Clone, Debug)]

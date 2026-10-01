@@ -202,10 +202,10 @@ E302 [*] Expected 2 blank lines, found 0
     |
 help: Add missing blank line(s)
     |
-943 |     # comment
+942 |     pass
+943 +
 944 +
-945 +
-946 | def test_clientmodel():
+945 |     # comment
     |
 
 E302 [*] Expected 2 blank lines, found 0
@@ -220,10 +220,10 @@ E302 [*] Expected 2 blank lines, found 0
     |
 help: Add missing blank line(s)
     |
-952 |         # comment
+951 |     pass
+952 +
 953 +
-954 +
-955 | def test_clientmodel():
+954 |         # comment
     |
 
 E302 [*] Expected 2 blank lines, found 0

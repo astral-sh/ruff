@@ -18,6 +18,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{isort, pycodestyle};
     use crate::settings::types::PreviewMode;
+    use crate::source_kind::SourceKind;
     use crate::test::{assert_notebook_path, test_path, test_resource_path};
     use crate::{assert_diagnostics, settings};
 
@@ -327,6 +328,72 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(
+        Rule::BlankLineBetweenMethods,
+        Path::new("E30_comment_before_definition.py")
+    )]
+    #[test_case(
+        Rule::BlankLinesTopLevel,
+        Path::new("E30_comment_before_definition.py")
+    )]
+    fn blank_lines_comment_before_definition(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pycodestyle").join(path).as_path(),
+            &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// The `E302` and `I001` fixes must converge when a comment block separates an import from a
+    /// definition. `E302` used to insert the blank line at the end of the import, leaving `I001` to
+    /// move it back, so the two rules undid each other until the iteration limit was reached.
+    /// See <https://github.com/astral-sh/ruff/issues/12611> and
+    /// <https://github.com/astral-sh/ruff/issues/20853>.
+    #[test]
+    fn blank_lines_top_level_isort_fix_converges_after_comment_block() {
+        let source = "\
+import os
+
+# Comment about the system.
+
+# Comment about the function.
+def main():
+    pass
+";
+        // `test_contents` applies the fixes repeatedly and panics if they never converge, so
+        // reaching this point at all is the regression guard. It returns the diagnostics from
+        // before any fix was applied, so only the fixed source is checked here.
+        let source_kind = SourceKind::Python {
+            code: source.to_string(),
+            is_stub: false,
+        };
+        let (_diagnostics, fixed) = crate::test::test_contents(
+            &source_kind,
+            Path::new("main.py"),
+            &settings::LinterSettings::for_rules([Rule::BlankLinesTopLevel, Rule::UnsortedImports]),
+        );
+
+        // The blank lines go between the comment block and the import, so that the comments stay
+        // attached to `main`. Inserting them after the import instead is what `I001` undoes, which
+        // is what caused the two rules to loop. This also matches where the formatter puts them.
+        assert_eq!(
+            fixed.source_code(),
+            "\
+import os
+
+# Comment about the system.
+
+
+# Comment about the function.
+def main():
+    pass
+",
+            "unexpected fixed source"
+        );
     }
 
     #[test_case(Rule::BlankLineBetweenMethods)]

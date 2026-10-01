@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E301 [*] Expected 1 blank line, found 0
+  --> E30_comment_before_definition.py:18:5
+   |
+16 |         pass
+17 |     # Comment about the method.
+18 |     def b(self):
+   |     ^^^
+19 |         pass
+   |
+help: Add missing blank line
+   |
+16 |         pass
+17 +
+18 |     # Comment about the method.
+   |
