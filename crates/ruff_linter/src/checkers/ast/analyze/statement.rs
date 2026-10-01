@@ -550,6 +550,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::ImplicitClassVarInDataclass) {
                 ruff::rules::implicit_class_var_in_dataclass(checker, class_def);
             }
+            if checker.is_rule_enabled(Rule::MutableTypeAnnotationInFrozenDataclass) {
+                ruff::rules::mutable_type_annotation_in_frozen_dataclass(checker, class_def);
+            }
         }
         Stmt::Import(ast::StmtImport {
             names,
