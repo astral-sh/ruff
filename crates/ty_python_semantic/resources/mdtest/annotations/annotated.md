@@ -172,3 +172,18 @@ class C(Annotated): ...
 
 reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 ```
+
+## Recursive runtime values
+
+`TypeOf` can make an `Annotated` value refer to the type of another runtime `Annotated` object.
+Inference preserves the outer object and collapses the recursive wrapped type.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+value = int
+while True:
+    value = Annotated[TypeOf[value], "metadata"]
+    reveal_type(value)  # revealed: <special-form 'typing.Annotated[Divergent, <metadata>]'>
+```

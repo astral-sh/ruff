@@ -418,9 +418,18 @@ impl<'db> KnownInstanceType<'db> {
             Self::Literal(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::Literal),
-            Self::Annotated(ty) => ty
-                .recursive_type_normalized_impl(db, env, div, nested)
-                .map(Self::Annotated),
+            Self::Annotated(ty) => {
+                // Keep the runtime Annotated object when its wrapped type diverges. The wrapped
+                // type is still nested: TypeOf can make it another runtime Annotated object.
+                let inner = ty.recursive_type_normalized_impl(db, env, div, true);
+                if nested {
+                    inner.map(Self::Annotated)
+                } else {
+                    Some(Self::Annotated(
+                        inner.unwrap_or_else(|| InternedType::new(db, div)),
+                    ))
+                }
+            }
             Self::TypeGenericAlias(ty) => ty
                 .recursive_type_normalized_impl(db, env, div, true)
                 .map(Self::TypeGenericAlias),

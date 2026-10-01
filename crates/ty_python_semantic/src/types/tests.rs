@@ -683,10 +683,9 @@ fn recursive_annotated_normalization() {
     let annotated =
         |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
 
-    // Metadata does not add another level of recursion to the annotated type.
-    let recursive = annotated(list_of(div));
+    let recursive = annotated(div);
     assert_eq!(
-        recursive.recursive_type_normalized_impl(&db, &env, div, false),
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, false),
         Some(recursive)
     );
     assert_eq!(
@@ -694,7 +693,11 @@ fn recursive_annotated_normalization() {
         Some(recursive)
     );
     assert_eq!(
-        recursive.recursive_type_normalized_impl(&db, &env, div, true),
+        annotated(recursive).recursive_type_normalized_impl(&db, &env, div, false),
+        Some(recursive)
+    );
+    assert_eq!(
+        annotated(list_of(div)).recursive_type_normalized_impl(&db, &env, div, true),
         None
     );
 }
