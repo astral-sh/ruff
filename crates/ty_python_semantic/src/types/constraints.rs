@@ -451,7 +451,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             let constraints = Constraint::new_equivalence_bound(
                 db,
                 env,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 typevar,
                 lower,
             );
@@ -460,8 +460,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
 
         let constraints = iter::chain(
-            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, lower),
-            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, upper),
+            Constraint::new_lower_bound(db, ConstraintProvenance::INFERRED, typevar, lower),
+            Constraint::new_upper_bound(db, env, ConstraintProvenance::INFERRED, typevar, upper),
         );
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
@@ -477,7 +477,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
         let constraints =
-            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, lower);
+            Constraint::new_lower_bound(db, ConstraintProvenance::INFERRED, typevar, lower);
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
@@ -492,7 +492,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
         let constraints =
-            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, upper);
+            Constraint::new_upper_bound(db, env, ConstraintProvenance::INFERRED, typevar, upper);
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
@@ -513,7 +513,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let constraints = Constraint::new_equivalence_bound(
             db,
             env,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             bound,
         );
@@ -1803,9 +1803,10 @@ enum SourceOrder {
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
 ///
-/// Validity and evidence clauses are stored separately. Clauses may be unions, keeping
-/// bounds such as `(A | B) & (C | D)` factored rather than distributing them into the DNF
-/// representation used by [`Type`].
+/// Validity, inferred, declared, and combined clauses are stored separately. For each evidence
+/// source, bounds derived from validity are kept separate from pure evidence. Clauses may be
+/// unions, keeping bounds such as `(A | B) & (C | D)` factored rather than distributing them into
+/// the DNF representation used by [`Type`].
 ///
 /// An empty validity set represents an unconstrained validity upper bound of `object`. This avoids
 /// allocating or checking the intersection identity on every path. An explicit evidence bound of
@@ -1817,7 +1818,11 @@ enum SourceOrder {
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct UpperBound<'db> {
     evidence: FxOrderSet<Type<'db>>,
+    declared: FxOrderSet<Type<'db>>,
+    combined: FxOrderSet<Type<'db>>,
     mixed: FxOrderSet<Type<'db>>,
+    declared_mixed: FxOrderSet<Type<'db>>,
+    combined_mixed: FxOrderSet<Type<'db>>,
     validity: FxOrderSet<Type<'db>>,
 }
 
@@ -1835,11 +1840,19 @@ impl<'db> UpperBound<'db> {
     }
 
     fn iter_evidence(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
-        self.evidence.iter().copied()
+        self.evidence
+            .iter()
+            .chain(&self.declared)
+            .chain(&self.combined)
+            .copied()
     }
 
     fn iter_mixed(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
-        self.mixed.iter().copied()
+        self.mixed
+            .iter()
+            .chain(&self.declared_mixed)
+            .chain(&self.combined_mixed)
+            .copied()
     }
 
     fn iter_validity(&self) -> impl Iterator<Item = Type<'db>> + Clone + '_ {
@@ -1853,11 +1866,14 @@ impl<'db> UpperBound<'db> {
     }
 
     fn has_evidence(&self) -> bool {
-        !self.evidence.is_empty()
+        !self.evidence.is_empty() || !self.declared.is_empty() || !self.combined.is_empty()
     }
 
     fn has_inference(&self) -> bool {
-        !self.evidence.is_empty() || !self.mixed.is_empty()
+        self.has_evidence()
+            || !self.mixed.is_empty()
+            || !self.declared_mixed.is_empty()
+            || !self.combined_mixed.is_empty()
     }
 
     /// Returns an existing upper-bound clause if every other clause is redundant with it.
@@ -1895,48 +1911,39 @@ impl<'db> UpperBound<'db> {
     }
 
     fn add_clause(&mut self, provenance: ConstraintProvenance, ty: Type<'db>) {
-        if provenance == ConstraintProvenance::Validity && ty.is_object() {
+        if provenance == ConstraintProvenance::VALIDITY && ty.is_object() {
             return;
         }
 
-        if provenance == ConstraintProvenance::Mixed && self.mixed.contains(&Type::Never) {
+        let inferred = provenance.contains(ConstraintProvenance::INFERRED);
+        let declared = provenance.contains(ConstraintProvenance::DECLARED);
+        let validity = provenance.contains(ConstraintProvenance::VALIDITY);
+        let clauses = match (inferred, declared, validity) {
+            (true, false, false) => &mut self.evidence,
+            (false, true, false) => &mut self.declared,
+            (true, true, false) => &mut self.combined,
+            (true, false, true) => &mut self.mixed,
+            (false, true, true) => &mut self.declared_mixed,
+            (true, true, true) => &mut self.combined_mixed,
+            (false, false, _) => &mut self.validity,
+        };
+        if clauses.contains(&Type::Never) {
             return;
         }
-
-        if provenance == ConstraintProvenance::Evidence && self.evidence.contains(&Type::Never) {
-            return;
+        // Unlike `Never`, bottom-materialized divergent markers must not absorb other clauses.
+        if ty == Type::Never {
+            clauses.clear();
         }
-
-        match (provenance, ty) {
-            (ConstraintProvenance::Evidence, Type::Never) => {
-                self.evidence.clear();
-                self.evidence.insert(Type::Never);
-            }
-            (ConstraintProvenance::Mixed, Type::Never) => {
-                self.mixed.clear();
-                self.mixed.insert(Type::Never);
-            }
-            (ConstraintProvenance::Validity, Type::Never) => {
-                self.validity.clear();
-                self.validity.insert(Type::Never);
-            }
-            (ConstraintProvenance::Evidence, _) => {
-                self.evidence.insert(ty);
-            }
-            (ConstraintProvenance::Mixed, _) => {
-                self.mixed.insert(ty);
-            }
-            (ConstraintProvenance::Validity, _) => {
-                if !self.validity.contains(&Type::Never) {
-                    self.validity.insert(ty);
-                }
-            }
-        }
+        clauses.insert(ty);
     }
 
     fn shrink_to_fit(&mut self) {
         self.evidence.shrink_to_fit();
+        self.declared.shrink_to_fit();
+        self.combined.shrink_to_fit();
         self.mixed.shrink_to_fit();
+        self.declared_mixed.shrink_to_fit();
+        self.combined_mixed.shrink_to_fit();
         self.validity.shrink_to_fit();
     }
 
@@ -2729,7 +2736,7 @@ impl NodeId {
                 let constraints = Constraint::new_upper_bound(
                     db,
                     env,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                     bound_typevar,
                     rhs.bottom_materialization(db, env),
                 );
@@ -2738,7 +2745,7 @@ impl NodeId {
             (_, Type::TypeVar(bound_typevar)) => {
                 let constraints = Constraint::new_lower_bound(
                     db,
-                    ConstraintProvenance::Evidence,
+                    ConstraintProvenance::INFERRED,
                     bound_typevar,
                     lhs.top_materialization(db, env),
                 );
@@ -3100,18 +3107,14 @@ impl<'db> CandidateTypeVarSolver<'db> {
         // element is typically cheap (in that it does not involve a combinatorial
         // explosion from distributing the clause through an existing disjunction). So we
         // don't need to be as clever here as in `add_upper`.
-        match provenance {
-            ConstraintProvenance::Evidence => {
+        if provenance.is_evidence() {
+            if provenance.contains(ConstraintProvenance::VALIDITY) {
+                self.mixed_lower.insert(ty);
+            } else {
                 self.evidence_lower.insert(ty);
             }
-            ConstraintProvenance::Mixed => {
-                self.mixed_lower.insert(ty);
-            }
-            ConstraintProvenance::Validity => {
-                if !ty.is_never() {
-                    self.validity_lower.insert(ty);
-                }
-            }
+        } else if !ty.is_never() {
+            self.validity_lower.insert(ty);
         }
     }
 
@@ -3790,7 +3793,7 @@ impl<'db> CandidateSolutions<'db> {
                 return ControlFlow::Continue(None);
             }
 
-            bounds.add_upper(ConstraintProvenance::Validity, bound);
+            bounds.add_upper(ConstraintProvenance::VALIDITY, bound);
         }
 
         limits.satisfied_path()?;
@@ -5182,7 +5185,7 @@ mod tests {
         );
         let actual_bound = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let mut storage = ConstraintSetStorage::default();
-        let data = ConcreteUpperBound::new(ConstraintProvenance::Evidence, t, actual_bound);
+        let data = ConcreteUpperBound::new(ConstraintProvenance::INFERRED, t, actual_bound);
         let support = storage.intern_constraint_typevars(db, &env, data.into());
         let mentioned = support
             .iter()
@@ -5233,7 +5236,7 @@ mod tests {
                 u.freshness(db),
             );
             let mut storage = ConstraintSetStorage::default();
-            let data = TypeVarRangeBound::new(db, ConstraintProvenance::Evidence, t, u);
+            let data = TypeVarRangeBound::new(db, ConstraintProvenance::INFERRED, t, u);
             let support = storage.intern_constraint_typevars(db, &env, data.into());
             let mentioned = support
                 .iter()
@@ -5333,10 +5336,10 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
 
         let mut upper = UpperBound::from_clause(int);
-        upper.add_clause(ConstraintProvenance::Evidence, Type::Never);
+        upper.add_clause(ConstraintProvenance::INFERRED, Type::Never);
         assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
 
-        upper.add_clause(ConstraintProvenance::Evidence, int);
+        upper.add_clause(ConstraintProvenance::INFERRED, int);
         assert_eq!(upper.evidence, FxOrderSet::from_iter([Type::Never]));
     }
 
@@ -5364,7 +5367,7 @@ mod tests {
         ] {
             let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(ConstraintProvenance::Evidence, clause);
+                upper.add_clause(ConstraintProvenance::INFERRED, clause);
             }
 
             assert_eq!(upper.evidence.len(), 2);
@@ -5401,7 +5404,7 @@ mod tests {
         for clauses in [[int_or_str, int_or_bytes], [int_or_bytes, int_or_str]] {
             let mut upper = UpperBound::unconstrained();
             for clause in clauses {
-                upper.add_clause(ConstraintProvenance::Evidence, clause);
+                upper.add_clause(ConstraintProvenance::INFERRED, clause);
             }
             assert_eq!(upper.as_single_bound(db, &env), None);
         }
@@ -5415,7 +5418,7 @@ mod tests {
         let int = known_instance(db, KnownClass::Int);
         let u = Type::TypeVar(create_typevar(db, "U"));
         let mut upper = UpperBound::from_clause(u);
-        upper.add_clause(ConstraintProvenance::Evidence, int);
+        upper.add_clause(ConstraintProvenance::INFERRED, int);
         assert_eq!(upper.as_single_bound(db, &env), None);
     }
 
@@ -5643,11 +5646,11 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let mut bounds = CandidateTypeVarSolver::default();
         bounds.add_lower(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             known_instance(db, KnownClass::Int),
         );
         bounds.add_upper(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             known_instance(db, KnownClass::Str),
         );
         let mut storage = builder.storage.borrow_mut();
@@ -5749,10 +5752,10 @@ class E: ...
         for lower in [None, Some(Type::any())] {
             let mut bounds = CandidateTypeVarSolver::default();
             if let Some(lower) = lower {
-                bounds.add_lower(ConstraintProvenance::Evidence, lower);
+                bounds.add_lower(ConstraintProvenance::INFERRED, lower);
             }
-            bounds.add_upper(ConstraintProvenance::Evidence, left);
-            bounds.add_upper(ConstraintProvenance::Evidence, right);
+            bounds.add_upper(ConstraintProvenance::INFERRED, left);
+            bounds.add_upper(ConstraintProvenance::INFERRED, right);
             let mut storage = builder.storage.borrow_mut();
             let exhausted = bounds
                 .finish(db, &env, &mut storage, t)
@@ -5815,7 +5818,7 @@ class E: ...
         assert!(IntersectionType::bounded_from_elements(db, &env, gradual_upper).is_none());
         let mut bounds = CandidateTypeVarSolver::default();
         for upper in gradual_upper {
-            bounds.add_upper(ConstraintProvenance::Evidence, upper);
+            bounds.add_upper(ConstraintProvenance::INFERRED, upper);
         }
         let mut storage = builder.storage.borrow_mut();
         let exhausted = bounds
@@ -6174,8 +6177,8 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(str), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6212,9 +6215,9 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
-            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(str), None),
+            PermutedConstraint(u, ConstraintProvenance::INFERRED, Some(bytes), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6242,9 +6245,9 @@ class E: ...
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
-            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
-            PermutedConstraint(x, ConstraintProvenance::Evidence, Some(int), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(str), None),
+            PermutedConstraint(u, ConstraintProvenance::INFERRED, Some(bytes), None),
+            PermutedConstraint(x, ConstraintProvenance::INFERRED, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6270,8 +6273,8 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let int = KnownClass::Int.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(str), None),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(str), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(int), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6301,10 +6304,10 @@ class E: ...
         let list_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
         let list_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(list_u)),
-            PermutedConstraint(u, ConstraintProvenance::Evidence, None, Some(int)),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(list_int), None),
-            PermutedConstraint(v, ConstraintProvenance::Evidence, Some(bytes), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, None, Some(list_u)),
+            PermutedConstraint(u, ConstraintProvenance::INFERRED, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(list_int), None),
+            PermutedConstraint(v, ConstraintProvenance::INFERRED, Some(bytes), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6337,9 +6340,9 @@ class E: ...
         let str = KnownClass::Str.to_instance(db, &env);
         let bytes = KnownClass::Bytes.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(int)),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(str)),
-            PermutedConstraint(u, ConstraintProvenance::Evidence, Some(bytes), None),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, None, Some(str)),
+            PermutedConstraint(u, ConstraintProvenance::INFERRED, Some(bytes), None),
         ];
 
         check_solutions_for_constraint_orderings(
@@ -6369,10 +6372,10 @@ class E: ...
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let atoms = [
-            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(int)),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, None, Some(str)),
-            PermutedConstraint(t, ConstraintProvenance::Evidence, Some(int), None),
-            PermutedConstraint(u, ConstraintProvenance::Evidence, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, None, Some(int)),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, None, Some(str)),
+            PermutedConstraint(t, ConstraintProvenance::INFERRED, Some(int), None),
+            PermutedConstraint(u, ConstraintProvenance::INFERRED, None, Some(int)),
         ];
 
         check_solutions_for_constraint_orderings(

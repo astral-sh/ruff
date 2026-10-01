@@ -595,7 +595,7 @@ impl<'db> Constraint<'db> {
         let when = lower
             .bound()
             .when_constraint_set_assignable_to_owned(db, env, upper.bound());
-        let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+        let provenance = lower.provenance() | upper.provenance();
         Self::add_constraint_set_implication(
             map,
             provenance,
@@ -621,7 +621,7 @@ impl<'db> Constraint<'db> {
                 lower
                     .bound()
                     .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
-            let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+            let provenance = lower.provenance() | upper.provenance();
             Self::add_constraint_set_implication(
                 map,
                 provenance,
@@ -811,7 +811,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_lower_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -845,7 +845,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_upper_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -879,7 +879,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -891,7 +891,7 @@ impl<'db> Constraint<'db> {
         lower: impl ProvidesConcreteLowerBound<'db>,
         upper: impl ProvidesConcreteUpperBound<'db>,
     ) {
-        let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
+        let provenance = lower.provenance() | upper.provenance();
 
         // Given `α ≤ T` and `U ≤ β`, if α contains U contravariantly, substitute β for U:
         //
@@ -968,7 +968,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1003,7 +1003,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_lower_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1038,7 +1038,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_upper_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1073,7 +1073,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1108,7 +1108,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_lower_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1143,7 +1143,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.into_upper_bound().map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1178,7 +1178,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1213,7 +1213,7 @@ impl<'db> Constraint<'db> {
         ) else {
             return;
         };
-        let provenance = ConstraintProvenance::derived(left.provenance(), right.provenance());
+        let provenance = left.provenance() | right.provenance();
         let derived = left.map(provenance, replacement);
         map.add_pair_implication(left.into(), right.into(), derived.into());
     }
@@ -1345,7 +1345,7 @@ impl<'db> ConcreteLowerBound<'db> {
                     .bound
                     .is_constraint_set_equivalent_to(db, env, self.bound)
             {
-                let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+                let provenance = self.provenance | other.provenance;
                 let derived = TypeVarRangeBound::new(db, provenance, other.typevar, self.typevar);
                 map.add_pair_implication(self.into(), other.into(), derived.into());
             }
@@ -1372,7 +1372,7 @@ impl<'db> ConcreteLowerBound<'db> {
             || (self.typevar.is_paramspec(db)
                 && lower.is_constraint_set_equivalent_to(db, env, upper))
         {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let simplified = ConcreteEquivalenceBound::new(provenance, self.typevar, lower);
             map.add_pair_implication(self.into(), other.into(), simplified.into());
             return;
@@ -1404,7 +1404,7 @@ impl<'db> ConcreteLowerBound<'db> {
                     .bound
                     .is_constraint_set_equivalent_to(db, env, other.bound)
             {
-                let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+                let provenance = self.provenance | other.provenance;
                 let derived = TypeVarRangeBound::new(db, provenance, other.typevar, self.typevar);
                 map.add_pair_implication(self.into(), other.into(), derived.into());
             }
@@ -1434,7 +1434,7 @@ impl<'db> ConcreteLowerBound<'db> {
     ) {
         // Given constraints `α ≤ T` and `T ≤ U`, `α ≤ U` must also hold.
         if self.typevar.is_same_typevar_as(db, other.left) {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteLowerBound::new(provenance, other.right, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1461,7 +1461,7 @@ impl<'db> ConcreteLowerBound<'db> {
             None
         };
         if let Some(other_typevar) = other_typevar {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteLowerBound::new(provenance, other_typevar, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1583,7 +1583,7 @@ impl<'db> ConcreteUpperBound<'db> {
                     .bound
                     .is_constraint_set_equivalent_to(db, env, other.bound)
             {
-                let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+                let provenance = self.provenance | other.provenance;
                 let derived = TypeVarRangeBound::new(db, provenance, self.typevar, other.typevar);
                 map.add_pair_implication(self.into(), other.into(), derived.into());
             }
@@ -1613,7 +1613,7 @@ impl<'db> ConcreteUpperBound<'db> {
     ) {
         // Given constraints `T ≤ α` and `U ≤ T`, `U ≤ α` must also hold.
         if self.typevar.is_same_typevar_as(db, other.right) {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteUpperBound::new(provenance, other.left, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1640,7 +1640,7 @@ impl<'db> ConcreteUpperBound<'db> {
             None
         };
         if let Some(other_typevar) = other_typevar {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteUpperBound::new(provenance, other_typevar, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1694,7 +1694,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
             .bound
             .is_constraint_set_equivalent_to(db, env, other.bound)
         {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteEquivalenceBound::new(provenance, other.typevar, other.bound);
             map.add_single_implication(self.into(), derived.into());
             let derived = ConcreteEquivalenceBound::new(provenance, self.typevar, self.bound);
@@ -1716,14 +1716,14 @@ impl<'db> ConcreteEquivalenceBound<'db> {
     ) {
         // Given constraints `T = α` and `T ≤ U`, `α ≤ U` must also hold.
         if self.typevar.is_same_typevar_as(db, other.left) {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteLowerBound::new(provenance, other.right, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
 
         // Given constraints `T = α` and `U ≤ T`, `U ≤ α` must also hold.
         if self.typevar.is_same_typevar_as(db, other.right) {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteUpperBound::new(provenance, other.left, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1752,7 +1752,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
             None
         };
         if let Some(other_typevar) = other_typevar {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = ConcreteEquivalenceBound::new(provenance, other_typevar, self.bound);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1794,7 +1794,7 @@ impl<'db> TypeVarRangeBound<'db> {
         if self.left.is_same_typevar_as(db, other.right)
             && self.right.is_same_typevar_as(db, other.left)
         {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = TypeVarEquivalenceBound::new(db, provenance, self.left, self.right);
             map.add_pair_implication(self.into(), other.into(), derived.into());
             return;
@@ -1809,7 +1809,7 @@ impl<'db> TypeVarRangeBound<'db> {
             return;
         };
 
-        let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+        let provenance = self.provenance | other.provenance;
         let derived = TypeVarRangeBound::new(db, provenance, left, right);
         map.add_pair_implication(self.into(), other.into(), derived.into());
     }
@@ -1831,7 +1831,7 @@ impl<'db> TypeVarRangeBound<'db> {
             None
         };
         if let Some(replacement) = replacement {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = TypeVarRangeBound::new(db, provenance, self.left, replacement);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1845,7 +1845,7 @@ impl<'db> TypeVarRangeBound<'db> {
             None
         };
         if let Some(replacement) = replacement {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = TypeVarRangeBound::new(db, provenance, replacement, self.right);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1882,7 +1882,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
             None
         };
         if let Some(replacement) = replacement {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = TypeVarEquivalenceBound::new(db, provenance, self.left, replacement);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -1896,7 +1896,7 @@ impl<'db> TypeVarEquivalenceBound<'db> {
             None
         };
         if let Some(replacement) = replacement {
-            let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
+            let provenance = self.provenance | other.provenance;
             let derived = TypeVarEquivalenceBound::new(db, provenance, replacement, self.right);
             map.add_pair_implication(self.into(), other.into(), derived.into());
         }
@@ -2006,12 +2006,12 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let left = Constraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             Type::int_literal(0),
         ));
         let right = Constraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             Type::int_literal(1),
         ));
@@ -2035,12 +2035,12 @@ mod tests {
         let type_of_u = SubclassOfType::from(db, &env, u);
         let bool_class = KnownClass::Bool.to_class_literal(db, &env);
         let left = Constraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             type_of_u,
         ));
         let right = Constraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             bool_class,
         ));
