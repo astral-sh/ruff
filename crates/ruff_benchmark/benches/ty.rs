@@ -365,6 +365,26 @@ fn benchmark_recursive_collection_use_constraints(criterion: &mut Criterion) {
     });
 }
 
+/// Paroxython builds a dictionary of many lambdas with equivalent signatures. Their distinct
+/// identities should not require the constraint solver to compare every pair of values.
+fn benchmark_many_lambda_values(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = String::from("compare_spans = {\n");
+    for index in 0..162 {
+        writeln!(code, "    {index}: lambda x, y: x[0] < x[1] < y[0] < y[1],").unwrap();
+    }
+    code.push_str("}\n");
+
+    criterion.bench_function("ty_micro[many_lambda_values]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| assert!(case.db.check().is_empty()),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_complex_constrained_attributes_1(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -2182,6 +2202,7 @@ criterion_group!(
     benchmark_many_tuple_assignments,
     benchmark_tuple_implicit_instance_attributes,
     benchmark_recursive_collection_use_constraints,
+    benchmark_many_lambda_values,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
