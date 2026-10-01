@@ -441,6 +441,72 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Recursive lambda variance
+
+A read-only recursive lambda that produces `T` preserves covariance:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Producer[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, self.node)
+
+static_assert(is_subtype_of(Producer[int], Producer[object]))
+static_assert(not is_subtype_of(Producer[object], Producer[int]))
+
+node = Producer(1).node
+reveal_type(node()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
+```
+
+Returning a consumer of `T` makes the recursive lambda contravariant:
+
+```py
+class Consumer[T]:
+    def __init__(self, consume: Callable[[T], None]):
+        self.node: Final = lambda: (consume, self.node)
+
+static_assert(is_subtype_of(Consumer[object], Consumer[int]))
+static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
+Returning a callable that both accepts and returns `T` makes it invariant:
+
+```py
+class Transformer[T]:
+    def __init__(self, transform: Callable[[T], T]):
+        self.node: Final = lambda: (transform, self.node)
+
+static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
+static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Writable recursive lambda attributes
+
+A writable lambda attribute makes the class invariant, even when the lambda only produces `T`.
+Accessing the lambda through a specialized instance substitutes the class's type argument.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, self.node)
+
+static_assert(not is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+box = Box(1)
+reveal_type(box.node()[0])  # revealed: int
+reveal_type(box.node()[1]()[0])  # revealed: int
+reveal_type(box.node()[1]()[1]()[0])  # revealed: int
+```
+
 ## Recursive protocol variance
 
 A recursive protocol that only produces its type parameter is covariant. Returning that protocol

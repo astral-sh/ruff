@@ -6,20 +6,27 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassType,
+        FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
+        infer::infer_scope_types,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
+        variance::{VarianceInferable, VarianceOrigin, VarianceTerm},
         visitor, walk_signature,
     },
 };
 use ty_python_core::definition::Definition;
+use ty_python_core::{ExpressionNodeKey, scope::ScopeId};
+
+mod lambda;
+use lambda::{LambdaMapping, LambdaSignatureMapping};
 
 impl<'db> Type<'db> {
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
@@ -704,7 +711,7 @@ impl From<TypeRelation> for UpcastPolicy {
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    pub(crate) signatures: CallableSignature<'db>,
+    signature_source: SignatureSource<'db>,
 
     #[returns(copy)]
     pub(super) kind: CallableTypeKind,
@@ -715,43 +722,224 @@ pub struct CallableType<'db> {
     pub(crate) deprecated: Option<OverloadLiteral<'db>>,
 }
 
+/// A callable has either complete signatures or the inputs for inferring a lambda signature.
+/// The signature payload can be borrowed when looking up an interned callable.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum SignatureSource<'db, S = CallableSignature<'db>> {
+    /// Signatures stored directly. These include:
+    ///
+    /// - Callable annotations, such as `Callable[[int], str]`.
+    /// - Function signatures converted from [`FunctionType`].
+    /// - Synthesized signatures, such as tuple `__getitem__` overloads and `TypedDict` methods.
+    /// - `ParamSpec` argument lists represented as callable signatures.
+    ///
+    /// "Explicit" describes how the signatures are provided; their types can still be inferred.
+    Explicit(S),
+    /// Source inputs for a lambda signature, whose return type is inferred on demand.
+    Lambda(LambdaSignature<'db>),
+}
+
+// Borrowed signatures hash identically to owned signatures. Salsa only clones them when
+// inserting a new callable, rather than on every lookup of an existing callable.
+impl<'db> salsa::Lookup<SignatureSource<'db>> for SignatureSource<'db, &CallableSignature<'db>> {
+    fn into_owned(self) -> SignatureSource<'db> {
+        match self {
+            Self::Explicit(signatures) => SignatureSource::Explicit(signatures.clone()),
+            Self::Lambda(lambda) => SignatureSource::Lambda(lambda),
+        }
+    }
+}
+
+impl<'db> salsa::HashEqLike<SignatureSource<'db, &CallableSignature<'db>>>
+    for SignatureSource<'db>
+{
+    fn eq(&self, other: &SignatureSource<'db, &CallableSignature<'db>>) -> bool {
+        match (self, other) {
+            (Self::Explicit(left), SignatureSource::Explicit(right)) => left == *right,
+            (Self::Lambda(left), SignatureSource::Lambda(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     ty: CallableType<'db>,
     visitor: &V,
 ) {
-    for signature in &ty.signatures(db).overloads {
-        walk_signature(db, signature, visitor);
+    match ty.signature_source(db) {
+        SignatureSource::Lambda(lambda) if !visitor.should_visit_lazy_type_attributes() => {
+            visitor.notify_skipped_lazy_type_attributes();
+            for parameter in lambda.parameters(db) {
+                visitor.visit_type(db, parameter.annotated_type());
+            }
+        }
+        SignatureSource::Explicit(_) | SignatureSource::Lambda(_) => {
+            for signature in &ty.signatures(db).overloads {
+                walk_signature(db, signature, visitor);
+            }
+        }
     }
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
+/// The parameters and source inputs for a lazily inferred lambda signature.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LambdaSignature<'db> {
+    #[returns(ref)]
+    parameters: Parameters<'db>,
+    #[returns(copy)]
+    scope: ScopeId<'db>,
+    #[returns(copy)]
+    body: ExpressionNodeKey,
+    #[returns(copy)]
+    return_annotation: Option<Type<'db>>,
+    /// A transformation of another source-backed lambda, independent of its inferred body.
+    #[returns(ref)]
+    mapping: Option<LambdaSignatureMapping<'db>>,
+}
+
+impl get_size2::GetSize for LambdaSignature<'_> {}
+
+#[salsa::tracked]
+impl<'db> LambdaSignature<'db> {
+    /// Build the lambda's variance equation while keeping recursive lambda references symbolic.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _, _| VarianceTerm::BIVARIANT,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn variance_equation(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        let env = ProgramEnvironment::from_scope(self.scope(db));
+        infer_lambda_signature(db, self).variance_of(db, &env, typevar)
+    }
+}
+
+/// Complete a lambda signature without including its inferred return type in its identity.
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, id, _| CallableSignature::single(Signature::dynamic(Type::divergent(id))),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_lambda_signature<'db>(
+    db: &'db dyn Db,
+    lambda: LambdaSignature<'db>,
+) -> CallableSignature<'db> {
+    if let Some(mapping) = lambda.mapping(db) {
+        let return_ty = mapping.return_type(db);
+        return CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty));
+    }
+    let inference = infer_scope_types(
+        db,
+        lambda.scope(db),
+        TypeContext::new(lambda.return_annotation(db)),
+    );
+    CallableSignature::single(Signature::new(
+        lambda.parameters(db).clone(),
+        inference.expression_type(lambda.body(db)),
+    ))
+}
+
 impl<'db> CallableType<'db> {
+    /// Construct a callable with explicit signatures and the given binding behavior.
     pub(crate) fn new<S>(db: &'db dyn Db, signatures: S, kind: CallableTypeKind) -> Self
     where
-        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
-        CallableSignature<'db>: salsa::HashEqLike<S>,
+        SignatureSource<'db, S>: salsa::Lookup<SignatureSource<'db>> + std::hash::Hash,
+        SignatureSource<'db>: salsa::HashEqLike<SignatureSource<'db, S>>,
     {
-        Self::new_internal(db, signatures, kind, None)
+        Self::new_internal(db, SignatureSource::Explicit(signatures), kind, None)
+    }
+
+    /// Construct a lambda with a stable return-type reference and eagerly inferred parameters.
+    pub(super) fn lambda(
+        db: &'db dyn Db,
+        parameters: Parameters<'db>,
+        scope: ScopeId<'db>,
+        body: ExpressionNodeKey,
+        return_context: TypeContext<'db>,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            SignatureSource::<CallableSignature<'db>>::Lambda(LambdaSignature::new(
+                db,
+                parameters,
+                scope,
+                body,
+                return_context.annotation,
+                None,
+            )),
+            CallableTypeKind::FunctionLike,
+            None,
+        )
+    }
+
+    pub(crate) fn signatures(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
+        match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => signatures,
+            SignatureSource::Lambda(lambda) => infer_lambda_signature(db, *lambda),
+        }
+    }
+
+    /// Refer to a lambda's variance equation instead of expanding its recursive signature.
+    pub(super) fn variance_of(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => signatures.variance_of(db, env, typevar),
+            SignatureSource::Lambda(lambda) => {
+                VarianceTerm::variable(db, VarianceOrigin::Lambda(*lambda), typevar)
+            }
+        }
+    }
+
+    /// Inspect the parameters of a non-overloaded callable without inferring a lambda's body.
+    /// Lambda parameter inference calls this while that same body is being inferred.
+    pub(crate) fn single_parameters(self, db: &'db dyn Db) -> Option<&'db Parameters<'db>> {
+        match self.signature_source(db) {
+            SignatureSource::Explicit(signatures) => {
+                let [signature] = signatures.overloads.as_slice() else {
+                    return None;
+                };
+                Some(signature.parameters())
+            }
+            SignatureSource::Lambda(lambda) => Some(lambda.parameters(db)),
+        }
     }
 
     pub(crate) fn with_deprecated(self, db: &'db dyn Db, deprecated: OverloadLiteral<'db>) -> Self {
-        Self::new_internal(db, self.signatures(db), self.kind(db), Some(deprecated))
+        Self::new_internal(
+            db,
+            self.signature_source(db),
+            self.kind(db),
+            Some(deprecated),
+        )
     }
 
     /// Replace the signatures without losing binding behavior or deprecation metadata.
     pub(crate) fn with_signatures<S>(self, db: &'db dyn Db, signatures: S) -> Self
     where
-        S: salsa::Lookup<CallableSignature<'db>> + std::hash::Hash,
-        CallableSignature<'db>: salsa::HashEqLike<S>,
+        SignatureSource<'db, S>: salsa::Lookup<SignatureSource<'db>> + std::hash::Hash,
+        SignatureSource<'db>: salsa::HashEqLike<SignatureSource<'db, S>>,
     {
-        Self::new_internal(db, signatures, self.kind(db), self.deprecated(db))
+        Self::new_internal(
+            db,
+            SignatureSource::Explicit(signatures),
+            self.kind(db),
+            self.deprecated(db),
+        )
     }
 
     pub(crate) fn with_kind(self, db: &'db dyn Db, kind: CallableTypeKind) -> Self {
-        Self::new_internal(db, self.signatures(db), kind, self.deprecated(db))
+        Self::new_internal(db, self.signature_source(db), kind, self.deprecated(db))
     }
 
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
@@ -918,8 +1106,12 @@ impl<'db> CallableType<'db> {
     ) -> CallableType<'db> {
         Self::new_internal(
             db,
-            self.signatures(db)
-                .bind_method_receiver(db, env, receiver_type, typing_self_type),
+            SignatureSource::Explicit(self.signatures(db).bind_method_receiver(
+                db,
+                env,
+                receiver_type,
+                typing_self_type,
+            )),
             CallableTypeKind::Regular,
             self.deprecated(db),
         )
@@ -962,6 +1154,9 @@ impl<'db> CallableType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        if matches!(self.signature_source(db), SignatureSource::Lambda(_)) {
+            return Some(self);
+        }
         Some(
             self.with_signatures(
                 db,
@@ -982,11 +1177,47 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        self.with_signatures(
-            db,
-            self.signatures(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+        if let SignatureSource::Lambda(lambda) = self.signature_source(db)
+            && (type_mapping.is_structural()
+                || matches!(type_mapping,
+                    TypeMapping::ApplySpecialization(specialization)
+                    | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
+                    if specialization.preserves_lazy_signatures()))
+        {
+            // A lambda's body is a separate query, just like a named function's signature.
+            // Binding an enclosing recursive type must not run that query or rewrite its body.
+            return Self::new_internal(
+                db,
+                SignatureSource::<CallableSignature<'db>>::Lambda(lambda.map_inputs(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
+                self.kind(db),
+                self.deprecated(db),
+            );
+        }
+
+        if let SignatureSource::Lambda(lambda) = self.signature_source(db)
+            && let Some(mapping) = LambdaMapping::from_type_mapping(db, *lambda, type_mapping)
+        {
+            let mapped = lambda.apply_mapping(db, mapping, tcx, visitor);
+            return Self::new_internal(
+                db,
+                SignatureSource::<CallableSignature<'db>>::Lambda(mapped),
+                self.kind(db),
+                self.deprecated(db),
+            );
+        }
+
+        let signatures = self.signatures(db);
+        let mapped = signatures.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if &mapped == signatures {
+            self
+        } else {
+            self.with_signatures(db, mapped)
+        }
     }
 
     pub(super) fn find_legacy_typevars_impl(
@@ -997,8 +1228,15 @@ impl<'db> CallableType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        self.signatures(db)
-            .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+        visitor.visit(db, Type::Callable(self), || {
+            self.signatures(db).find_legacy_typevars_impl(
+                db,
+                env,
+                binding_context,
+                typevars,
+                visitor,
+            );
+        });
     }
 }
 
@@ -1143,6 +1381,21 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{Parameter, Type};
+
+    #[test]
+    fn owned_and_borrowed_signatures_share_callable_identity() {
+        let db = setup_db();
+        let signatures =
+            CallableSignature::single(Signature::new(Parameters::empty(), Type::object()));
+        let owned = CallableType::new(&db, signatures.clone(), CallableTypeKind::Regular);
+        let borrowed = CallableType::new(&db, &signatures, CallableTypeKind::Regular);
+        assert_eq!(owned, borrowed);
+
+        let replacement = CallableSignature::single(Signature::dynamic(Type::unknown()));
+        let borrowed = owned.with_signatures(&db, &replacement);
+        let owned = CallableType::new(&db, replacement, CallableTypeKind::Regular);
+        assert_eq!(owned, borrowed);
+    }
 
     #[test]
     fn paramspec_value_materializations_do_not_add_return_type() {
