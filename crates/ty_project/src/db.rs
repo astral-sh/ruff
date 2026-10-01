@@ -144,6 +144,25 @@ impl ProjectDatabase {
         db
     }
 
+    /// Creates a database that records reaching definitions during inference.
+    ///
+    /// The strategy determines how misconfigured settings are handled.
+    pub fn with_reaching_definitions_recording<S, Strategy: MisconfigurationStrategy>(
+        project_metadata: ProjectMetadata,
+        system: S,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<anyhow::Error>>
+    where
+        S: System + 'static + Send + Sync + RefUnwindSafe,
+    {
+        Self::new(
+            project_metadata,
+            system,
+            ReachingDefinitionsRecordingMode::Enabled,
+            strategy,
+        )
+    }
+
     /// Permanently freezes the most heavily read inputs that are immutable during a one-shot check.
     ///
     /// This is intentionally not exhaustive. It includes the program, the most heavily

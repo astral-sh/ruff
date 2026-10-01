@@ -24,6 +24,7 @@ use ty_python_core::{
     ProgramFile, attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
 };
 
+use crate::place::definitions::DefinitionResolution;
 use crate::place::implicit_builtins_symbol_scope;
 use crate::types::{ClassBase, ClassLiteral, ClassType, SubclassOfInner, Type, binding_type};
 use crate::{Db, FxIndexSet, ProgramEnvironment, module_docstring};
@@ -514,6 +515,17 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
     }
 
     resolved
+}
+
+/// Replaces synthetic bindings with their user-visible definitions while preserving resolution flags.
+///
+/// If any binding has no user-visible definition, the result is marked incomplete so refactoring
+/// consumers do not mistake a partial set of definitions for the full set.
+pub(crate) fn source_backed_resolution<'db>(
+    db: &'db dyn Db,
+    resolution: DefinitionResolution<'db>,
+) -> DefinitionResolution<'db> {
+    resolution.project_definitions(|definition| user_visible_definitions(db, [definition]))
 }
 
 /// Returns the user-visible definitions represented by a use-def binding.
