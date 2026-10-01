@@ -361,6 +361,38 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Negated aliases
+
+Negating an alias to `object` produces `Never`.
+
+```py
+from typing import Never, assert_type
+from ty_extensions import Not
+
+type Top = object
+
+def f(x: Not[Top]):
+    assert_type(x, Never)
+```
+
+Negating an alias to `Never` produces `object`.
+
+```py
+type Bottom = Never
+
+def g(x: Not[Bottom]):
+    assert_type(x, object)
+```
+
+Double negation cancels even when an alias separates the two negations.
+
+```py
+type NotInt = Not[int]
+
+def h(x: Not[NotInt]):
+    assert_type(x, int)
+```
+
 ## Gradual alias complements
 
 An alias containing `Any` and its complement do not simplify to `object`: their gradual types can
