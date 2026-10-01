@@ -71,3 +71,8 @@ class FrozenDataclassWithImmutableMembers:
     tuple1: tuple[int]    # no diagnostic
     set1: frozenset[int]    # no diagnostic
 ```
+
+## Known Limitations
+
+For Python versions < 3.15, frozendict is not defined. As a result this lint will still raise a diagnostic in such versions, and hence the tests don't cover this yet.
+It is recommended to set the pyproject.toml to use requires-python = ">=3.15".
