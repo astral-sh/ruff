@@ -68,7 +68,8 @@ use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
 /// group's `cancel_scope`). It cannot infer shielding performed by helper
 /// functions, aliases of cancel scope objects, or dynamically computed values.
 /// Only single-target assignments with literal values update the tracked shield
-/// state. The rule visits branches and loops in source order without analyzing
+/// state. Only the first recognized cancel scope in a `with` statement is tracked.
+/// The rule visits branches and loops in source order without analyzing
 /// execution paths or rebinding of scope variables. It can therefore miss
 /// unshielded cancellation points or report ones that are shielded at runtime.
 /// It assumes that argument-free `.aclose()` methods implement cancellation-safe
@@ -352,6 +353,7 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
             Stmt::With(stmt) => {
                 let count = self.scopes.len();
                 let mut exits = Vec::new();
+                let mut tracked = false;
                 for item in &stmt.items {
                     self.visit_expr(&item.context_expr);
                     let scope = self.scope(item);
@@ -359,8 +361,9 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                         stmt.is_async && !scope.as_ref().is_some_and(|scope| scope.task_group);
                     let reported = checkpoint && self.checkpoint(item.range());
                     exits.push((item, self.scopes.len(), checkpoint, reported));
-                    if let Some(scope) = scope {
+                    if !tracked && let Some(scope) = scope {
                         self.scopes.push(scope);
+                        tracked = true;
                     }
                     if let Some(target) = &item.optional_vars {
                         self.visit_expr(target);

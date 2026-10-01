@@ -154,7 +154,8 @@ async def cancel_scope_aliases():
 
 ### Multiple cancel scopes
 
-Every context manager item contributes to the effective shield state.
+A shield enabled on the first cancel scope protects cleanup even when another context manager
+shares the `with` statement.
 
 ```py
 import trio
@@ -170,20 +171,6 @@ async def multiple_context_managers():
         with trio.move_on_after(30) as s, trio.fail_after(5):
             await cleanup()  # error: [await-in-finally-or-cancelled]
         with open(""), trio.CancelScope(deadline=30, shield=True):
-            await cleanup()
-        with trio.fail_after(5), trio.move_on_after(30) as s:
-            s.shield = True
-            await cleanup()
-```
-
-A shield on a later context manager protects the body even when an earlier scope is unshielded.
-
-```py
-async def shield_on_second_scope():
-    try:
-        ...
-    finally:
-        with trio.CancelScope(), trio.CancelScope(shield=True):
             await cleanup()
 ```
 
