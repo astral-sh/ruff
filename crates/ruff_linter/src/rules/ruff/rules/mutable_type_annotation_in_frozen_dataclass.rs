@@ -8,6 +8,45 @@ use ruff_python_ast::{Stmt, StmtAnnAssign};
 use ruff_python_semantic::analyze::typing::is_immutable_annotation;
 use ruff_text_size::Ranged;
 
+/// ## What it does
+/// 
+/// Detects whether a frozen dataclass has a mutable type annotation
+///
+/// ## Why is this bad?
+/// 
+/// Frozen dataclasses are record classes in Python that are meant to be immutable.
+/// As a result, declaring an attribute of a dataclass with a mutable type annotation
+/// (e.g. list or dict) is senseless and should be avoided.
+/// 
+/// ## Example
+/// 
+/// ```py
+/// from dataclasses import dataclass
+///
+/// @dataclass(frozen=True)
+/// class SomeDataClass1:
+///     list1: list[int]    # snapshot: mutable-type-annotation-in-frozen-dataclass
+///
+/// @dataclass(frozen=True)
+/// class SomeDataClass2:
+///     dict1: dict[int, str]   # snapshot: mutable-type-annotation-in-frozen-dataclass
+///
+/// @dataclass(frozen=True)
+/// class SomeDataClass3:
+///     tuple1: tuple[int]
+/// ```
+///
+/// ## Use instead
+/// 
+/// Use tuples wherever applicable, or just avoid those fields altogether
+/// 
+/// ```py
+/// @dataclass(frozen=True)
+/// 
+/// class SomeDataClass1:
+///     list1: tuple[int]
+/// ```
+///
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
 pub(crate) struct MutableTypeAnnotationInFrozenDataclass;
