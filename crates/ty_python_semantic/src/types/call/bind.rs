@@ -5678,9 +5678,10 @@ struct ArgumentTypeChecker<'a, 'db> {
     call_expression_tcx: TypeContext<'db>,
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
-    is_partial_application: bool,
 
     inferable_typevars: TypeVarSet<'db>,
+
+    /// Type arguments inferred before argument validation begins.
     inference: Option<TypeVarInference<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
@@ -5788,8 +5789,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         call_expression_tcx: TypeContext<'db>,
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
-        is_partial_application: bool,
+        inferred: InferredCall<'db>,
     ) -> Self {
+        let InferredCall {
+            inferable_typevars,
+            inference,
+            errors: inference_errors,
+            constraint_set_errors,
+        } = inferred;
+        errors.extend(inference_errors);
         Self {
             db,
             env,
@@ -5803,47 +5811,82 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             call_expression_tcx,
             return_ty,
             errors,
-            is_partial_application,
-            inferable_typevars: TypeVarSet::None,
-            inference: None,
-            constraint_set_errors: vec![false; arguments.len()],
+            inferable_typevars,
+            inference,
+            constraint_set_errors,
         }
     }
+}
 
-    fn enumerate_argument_types(
-        &self,
-    ) -> impl Iterator<
-        Item = (
-            usize,
-            Option<usize>,
-            Argument<'a>,
-            &'a CallArgumentTypes<'db>,
-        ),
-    > + 'a {
-        let mut iter = self.arguments.iter().enumerate();
-        let mut num_synthetic_args = 0;
-        std::iter::from_fn(move || {
-            let (argument_index, (argument, argument_types)) = iter.next()?;
-            let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
-                // If we are erroring on a synthetic argument, we'll just emit the
-                // diagnostic on the entire Call node, since there's no argument node for
-                // this argument at the call site
-                num_synthetic_args += 1;
-                None
-            } else {
-                // Adjust the argument index to skip synthetic args, which don't appear at
-                // the call site and thus won't be in the Call node arguments list.
-                Some(argument_index - num_synthetic_args)
-            };
-            Some((
-                argument_index,
-                adjusted_argument_index,
-                argument,
-                argument_types,
-            ))
-        })
-    }
+fn enumerate_argument_types<'a, 'db>(
+    arguments: &'a CallArguments<'a, 'db>,
+) -> impl Iterator<
+    Item = (
+        usize,
+        Option<usize>,
+        Argument<'a>,
+        &'a CallArgumentTypes<'db>,
+    ),
+> + 'a {
+    let mut iter = arguments.iter().enumerate();
+    let mut num_synthetic_args = 0;
+    std::iter::from_fn(move || {
+        let (argument_index, (argument, argument_types)) = iter.next()?;
+        let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
+            // If we are erroring on a synthetic argument, we'll just emit the
+            // diagnostic on the entire Call node, since there's no argument node for
+            // this argument at the call site
+            num_synthetic_args += 1;
+            None
+        } else {
+            // Adjust the argument index to skip synthetic args, which don't appear at
+            // the call site and thus won't be in the Call node arguments list.
+            Some(argument_index - num_synthetic_args)
+        };
+        Some((
+            argument_index,
+            adjusted_argument_index,
+            argument,
+            argument_types,
+        ))
+    })
+}
 
+/// Completed inference and its diagnostics, passed together to argument validation.
+/// The suppression flags correspond to the retained errors, including after a retry.
+struct InferredCall<'db> {
+    /// Type variables from the signature that this call is allowed to solve.
+    inferable_typevars: TypeVarSet<'db>,
+    /// Inferred type arguments, or `None` when the signature is not generic.
+    inference: Option<TypeVarInference<'db>>,
+    /// Inference errors retained after any retry without the expected return type.
+    errors: Vec<BindingError<'db>>,
+    /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
+    constraint_set_errors: Vec<bool>,
+}
+
+/// Fixed inputs used to infer a call before its arguments are validated.
+/// No validation result can be written through this object.
+struct CallInference<'a, 'db> {
+    db: &'db dyn Db,
+    env: &'a ProgramEnvironment<'db>,
+    /// Signature used for argument matching, before this call's specialization.
+    signature: &'a Signature<'db>,
+    /// Argument types for each available type context, including synthetic receivers.
+    arguments: &'a CallArguments<'a, 'db>,
+    /// Parameter matches indexed by `arguments`; unpacked arguments can match multiple parameters.
+    argument_matches: &'a [MatchedArgument<'db>],
+    /// Expected result type used to prefer solutions compatible with the argument evidence.
+    call_expression_tcx: TypeContext<'db>,
+    /// Return type before applying this call's inferred type arguments.
+    return_ty: Type<'db>,
+    /// Whether a partial may leave variadic arguments for a later call.
+    is_partial_application: bool,
+    /// Type variables from the signature that this call is allowed to solve.
+    inferable_typevars: TypeVarSet<'db>,
+}
+
+impl<'a, 'db> CallInference<'a, 'db> {
     /// Yields the effective formal and actual types for each matched argument-parameter pair.
     ///
     /// Gradual variadic parameters do not contribute constraints. For unpacked tuple parameters,
@@ -5852,13 +5895,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let parameters: &'a Parameters<'db> = self.signature.parameters();
         let argument_matches: &'a [MatchedArgument<'db>] = self.argument_matches;
 
-        self.enumerate_argument_types().flat_map(
+        enumerate_argument_types(self.arguments).flat_map(
             move |(argument_index, adjusted_argument_index, _, argument_types)| {
                 argument_matches[argument_index]
                     .iter()
                     .filter_map(move |matched_parameter| {
                         let parameter_index = matched_parameter.index;
-                        if Self::is_gradual_variadic_parameter(parameters, parameter_index) {
+                        if ArgumentTypeChecker::is_gradual_variadic_parameter(
+                            parameters,
+                            parameter_index,
+                        ) {
                             return None;
                         }
 
@@ -5881,7 +5927,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             },
         )
     }
+}
 
+impl<'db> ArgumentTypeChecker<'_, 'db> {
     /// Returns argument-index mappings for arguments matched to the `ParamSpec` component.
     ///
     /// `prefix_len` is the number of parameters before the `ParamSpec` components in a callable like
@@ -5894,7 +5942,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// wrapper(f, 1, y="x")  # returns the indices for `1` and `y="x"`
     /// ```
     fn paramspec_argument_indices(&self, prefix_len: usize) -> Vec<(usize, Option<usize>)> {
-        self.enumerate_argument_types()
+        enumerate_argument_types(self.arguments)
             .filter_map(|(argument_index, adjusted_argument_index, _, _)| {
                 self.argument_matches[argument_index]
                     .parameters
@@ -5933,8 +5981,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let db = self.db;
         let env = self.env;
 
-        self.enumerate_argument_types()
-            .find_map(|(argument_index, _, argument, argument_types)| {
+        enumerate_argument_types(self.arguments).find_map(
+            |(argument_index, _, argument, argument_types)| {
                 if matches!(argument, Argument::Synthetic) {
                     return None;
                 }
@@ -6033,7 +6081,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                             overload_index,
                         })
                     })
-            })
+            },
+        )
     }
 
     fn merged_specialization(&self) -> Option<Specialization<'db>> {
@@ -6041,16 +6090,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.inference
             .map(|inference| inference.merged_specialization(db))
     }
+}
 
-    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+impl<'db> CallInference<'_, 'db> {
+    fn infer(self, constraints: &ConstraintSetBuilder<'db>) -> InferredCall<'db> {
         let db = self.db;
+        let mut constraint_set_errors = vec![false; self.arguments.len()];
         let Some(generic_context) = self.signature.generic_context else {
-            return;
+            return InferredCall {
+                inferable_typevars: self.inferable_typevars,
+                inference: None,
+                errors: Vec::new(),
+                constraint_set_errors,
+            };
         };
 
         let return_with_tcx = Some(self.return_ty).zip(self.call_expression_tcx.annotation);
 
-        self.inferable_typevars = generic_context.inferable_typevars(db);
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
 
         // Type variables for which we inferred a declared type based on a partially specialized
@@ -6216,6 +6272,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             &preferred_type_mappings,
             &partially_specialized_declared_type,
             &mut specialization_errors,
+            &mut constraint_set_errors,
         );
 
         // If we failed to prefer the declared type, attempt inference again, ignoring
@@ -6226,17 +6283,47 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if !assignable_to_declared_type {
             builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
-            self.constraint_set_errors.fill(false);
+            constraint_set_errors.fill(false);
 
             self.infer_argument_constraints(
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
                 &mut specialization_errors,
+                &mut constraint_set_errors,
             );
         }
 
-        self.errors.extend(specialization_errors);
+        let inference = self.solve(
+            constraints,
+            builder,
+            &preferred_type_mappings,
+            preferred_solutions_incomplete,
+            &mut specialization_errors,
+        );
+        InferredCall {
+            inferable_typevars: self.inferable_typevars,
+            inference: Some(inference),
+            errors: specialization_errors,
+            constraint_set_errors,
+        }
+    }
+
+    /// Solve the collected constraints, consuming the builder before argument validation.
+    ///
+    /// `preferred_type_mappings` contains choices from the expected result type, such as `T = object`
+    /// for `list[T]` in a `list[object]` context, used only when compatible with the argument evidence.
+    /// `preferred_solutions_incomplete` marks inference as incomplete when it uses preferences whose
+    /// computation reached a work limit.
+    fn solve<'c>(
+        &self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        mut builder: SpecializationBuilder<'db, 'c>,
+        preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        preferred_solutions_incomplete: bool,
+        specialization_errors: &mut Vec<BindingError<'db>>,
+    ) -> TypeVarInference<'db> {
+        let db = self.db;
 
         // Attempt to promote any promotable types assigned to the specialization.
         // The hook receives (typevar, bounds) and returns Some(solution) to override the default
@@ -6315,12 +6402,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             })
         };
 
-        let inference = match builder.build_inference_with(&mut choose) {
+        match builder.build_inference_with(&mut choose) {
             Ok(inference) => inference,
             Err(errors) => {
                 for error in errors {
                     // Report at-most one failure per type variable to avoid redundant diagnostics.
-                    if self.errors.iter().any(|existing| {
+                    if specialization_errors.iter().any(|existing| {
                         matches!(
                             existing,
                             BindingError::SpecializationError { error: existing, .. }
@@ -6330,7 +6417,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         continue;
                     }
 
-                    self.errors.push(BindingError::SpecializationError {
+                    specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: None,
                         argument: None,
@@ -6343,11 +6430,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     choose,
                 )
             }
-        };
-        let specialization = inference.merged_specialization(db);
-
-        self.return_ty = self.return_ty.apply_specialization(db, specialization);
-        self.inference = Some(inference);
+        }
     }
 
     /// Infers a variadic type variable tuple from every argument matched to `*args`.
@@ -6504,19 +6587,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         typevartuple: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        !self
-            .enumerate_argument_types()
-            .any(|(argument_index, _, argument, _)| {
-                !matches!(argument, Argument::Synthetic)
-                    && self.argument_matches[argument_index].iter().any(|matched| {
-                        matched.index != parameter_index
-                            && !self.signature.parameters()[matched.index]
-                                .annotated_type()
-                                .variance_of(db, self.env, typevartuple.identity(db))
-                                .evaluate(db)
-                                .is_covariant()
-                    })
-            })
+        !enumerate_argument_types(self.arguments).any(|(argument_index, _, argument, _)| {
+            !matches!(argument, Argument::Synthetic)
+                && self.argument_matches[argument_index].iter().any(|matched| {
+                    matched.index != parameter_index
+                        && !self.signature.parameters()[matched.index]
+                            .annotated_type()
+                            .variance_of(db, self.env, typevartuple.identity(db))
+                            .evaluate(db)
+                            .is_covariant()
+                })
+        })
     }
 
     /// Collects arguments matched to a starred parameter into their complete tuple shape.
@@ -6545,7 +6626,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Source indices of the first and last arguments matched to the variadic parameter.
         let mut argument_indices: Option<(usize, usize)> = None;
         for (argument_index, adjusted_argument_index, argument, argument_types) in
-            self.enumerate_argument_types()
+            enumerate_argument_types(self.arguments)
         {
             let matches = &self.argument_matches[argument_index];
             if !matches
@@ -6628,11 +6709,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn infer_argument_constraints<'c>(
-        &mut self,
+        &self,
         builder: &mut SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
         specialization_errors: &mut Vec<BindingError<'db>>,
+        constraint_set_errors: &mut [bool],
     ) -> bool {
         let db = self.db;
         for relation in self.argument_relations() {
@@ -6655,7 +6737,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
 
             if let Err(error) = builder.infer(relation.declared_type, relation.argument_type) {
-                self.constraint_set_errors[relation.argument_index] = true;
+                constraint_set_errors[relation.argument_index] = true;
                 specialization_errors.push(BindingError::SpecializationError {
                     error,
                     argument_index: relation.adjusted_argument_index,
@@ -6681,7 +6763,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     || builder.inferred_type_is_assignable_to(identity, preferred_ty)
             })
     }
+}
 
+impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn check_argument_type(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -6968,7 +7052,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         };
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
-            self.enumerate_argument_types()
+            enumerate_argument_types(self.arguments)
         {
             let matched_parameters = &self.argument_matches[argument_index].parameters;
             if !matched_parameters.is_empty()
@@ -7282,7 +7366,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        (self.inferable_typevars, self.inference, self.return_ty)
+        let return_ty = self.return_ty.apply_optional_specialization(
+            self.db,
+            self.inference
+                .map(|inference| inference.merged_specialization(self.db)),
+        );
+        (self.inferable_typevars, self.inference, return_ty)
     }
 }
 
@@ -8192,6 +8281,22 @@ impl<'db> Binding<'db> {
             return;
         }
 
+        let inferred = CallInference {
+            db,
+            env,
+            signature: &self.signature,
+            arguments,
+            argument_matches: &self.argument_matches,
+            call_expression_tcx,
+            return_ty: self.return_ty,
+            is_partial_application: self.is_partial_application,
+            inferable_typevars: self
+                .signature
+                .generic_context
+                .map_or(TypeVarSet::None, |context| context.inferable_typevars(db)),
+        }
+        .infer(constraints);
+
         let mut checker = ArgumentTypeChecker::new(
             db,
             env,
@@ -8204,14 +8309,9 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             self.return_ty,
             &mut self.errors,
-            self.is_partial_application,
+            inferred,
         );
-
-        // If this overload is generic, first see if we can infer a specialization of the function
-        // from the arguments that were passed in.
-        checker.infer_specialization(constraints);
         checker.check_argument_types(constraints);
-
         (self.inferable_typevars, self.inference, self.return_ty) = checker.finish();
     }
 
