@@ -2152,10 +2152,10 @@ impl OpenDocumentHandle {
 
                 // For non-virtual files, we clear diagnostics if:
                 //
-                // 1. The file does not belong to any workspace e.g., opening a random file from
-                //    outside the workspace because closing it acts like the file doesn't exists
-                // 2. The diagnostic mode is set to open-files only
-                // 3. The file was deleted before it was closed
+                // 1. The file was deleted before it was closed
+                // 2. The file does not belong to any workspace e.g., opening a random file from
+                //    outside the workspace because closing it acts like the file doesn't exist
+                // 3. The diagnostic mode is set to open-files only
                 is_deleted
                     || session.workspaces().for_path(path).is_none()
                     || session
