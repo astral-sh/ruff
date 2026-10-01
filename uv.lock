@@ -24,7 +24,6 @@ astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
 
 [manifest]
 build-constraints = [
-    { name = "flit-core", specifier = "==4.0.2" },
     { name = "hatch-fancy-pypi-readme", specifier = "==25.1.0" },
     { name = "hatch-vcs", specifier = "==0.5.0" },
     { name = "hatchling", specifier = "==1.32.0" },
@@ -491,7 +490,7 @@ wheels = [
 [[package]]
 name = "docstring-adder"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/docstring-adder.git#86fa6dd7681b9bb712084e1f6117410bc39928bf" }
+source = { git = "https://github.com/astral-sh/docstring-adder.git#a2c7f662beaa33867d6e9120bcb68858d571d882" }
 dependencies = [
     { name = "rich-argparse" },
     { name = "termcolor" },

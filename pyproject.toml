@@ -110,8 +110,13 @@ no-binary-package = [
     "typeshed-client",
 ]
 # Pin the isolated build environment for source-build exceptions.
+#
+# docstring-adder uses flit-core as its build backend and pins it in its own
+# build-system requirements, so we don't need to pin it here. A separate pin
+# here would also make updating docstring-adder more cumbersome: if its
+# flit-core pin changed, the conflicting pins would cause the build to fail
+# until the pin here was updated to match.
 build-constraint-dependencies = [
-    "flit-core==4.0.2",
     "hatch-fancy-pypi-readme==25.1.0",
     "hatch-vcs==0.5.0",
     "hatchling==1.32.0",
