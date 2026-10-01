@@ -969,54 +969,40 @@ async def local_import_and_shadowing():
             await cleanup()  # error: [await-in-finally-or-cancelled]
 ```
 
-### Shield-state data flow
+### Assignments to enclosing cancel scopes
 
-Shield mutations are tracked conservatively across branches, rebinding, and nested scopes.
+Assignments to an outer scope inside a nested `with` remain effective after the inner scope exits.
 
 ```py
 from anyio import CancelScope as Shield
 
 
-async def scope_mutations(flag):
+async def outer_scope_assignment():
     try:
         ...
     finally:
-        with Shield(shield=True) as scope:
-            scope.shield = flag
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-            scope.shield = True
-            await cleanup()
-            scope.shield: bool = False
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            if flag:
-                scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            if flag:
-                scope.shield = True
-            else:
-                scope.shield = True
-            await cleanup()
-        with Shield(shield=True) as scope:
-            if flag:
-                scope.shield = False
-            else:
-                await cleanup()  # The other branch remains shielded.
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            scope = other
-            scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
         with Shield() as outer:
             with Shield():
                 outer.shield = True
             await cleanup()
-        with Shield() as outer:
-            with Shield() as inner:
-                inner.shield = True
-                await cleanup()
-            await cleanup()  # error: [await-in-finally-or-cancelled]
+```
+
+### Context-manager exit checkpoints
+
+An async context manager can become unshielded between entry and exit. A literal assignment that
+disables its surrounding shield causes Ruff to report the exit checkpoint.
+
+```py
+import trio
+
+
+async def disable_shield_before_exit(cm):
+    try:
+        ...
+    finally:
+        with trio.CancelScope(shield=True) as scope:
+            async with cm:  # error: [await-in-finally-or-cancelled]
+                scope.shield = False
 ```
 
 ### Definition boundaries
@@ -1055,72 +1041,27 @@ class Manager:
             await cleanup()
 ```
 
-### Control flow and rebinding
+### Assignment-target cancellation points
 
-Control flow and assignment targets can introduce cancellation points or invalidate a shield.
+Await expressions in assignment targets are checked even when the assignment does not update a
+tracked shield.
 
 ```py
-from anyio import CancelScope as Shield
+import trio
 
 
-async def control_flow_and_targets(flag, cm):
+async def assignment_target_checkpoints(items, cm):
     try:
         ...
     finally:
-        with Shield(shield=True) as scope:
-            async with cm:  # error: [await-in-finally-or-cancelled]
-                scope.shield = False
-        with Shield(shield=True) as scope:
-            async for item in source:  # error: [await-in-finally-or-cancelled]
-                scope.shield = False
-        with Shield(shield=True) as scope:
-            while flag:
-                await cleanup()  # error: [await-in-finally-or-cancelled]
-                scope.shield = False
-        with Shield() as scope:
-            for item in source:
-                scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            match flag:
-                case 1:
-                    scope.shield = True
-                case _:
-                    await cleanup()  # error: [await-in-finally-or-cancelled]
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield(shield=True) as scope:
-            scope.shield &= False
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            (scope := other)
-            scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            scope, = [other]
-            scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
         (await factory()).field: int = 1  # error: [await-in-finally-or-cancelled]
         (await factory()).field: int  # error: [await-in-finally-or-cancelled]
         for (await factory()).field in items:  # error: [await-in-finally-or-cancelled]
             pass
-        with Shield(shield=True) as (await factory()).field:
-            await cleanup()
         # error: [await-in-finally-or-cancelled]
         # error: [await-in-finally-or-cancelled]
         async with cm as (await factory()).field:
             pass
-        with Shield(shield=True) as scope:
-            try:
-                scope.shield = False
-            except ValueError:
-                pass
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield(shield=True) as scope:
-            try:
-                ...
-            finally:
-                scope.shield = False
-            await cleanup()  # error: [await-in-finally-or-cancelled]
 ```
 
 ### Exception-handler type expressions
@@ -1138,194 +1079,25 @@ async def handler_type_checkpoints():
         await cleanup()  # error: [await-in-finally-or-cancelled]
 ```
 
-### Class-body bindings
+### Shield assignments in nested handlers
 
-Class bodies can mutate an enclosing shield unless a class-local binding shadows it.
+A handler nested inside an existing cleanup context retains that context's shields. Disabling
+the shield before raising an exception leaves the handler's cancellation point exposed.
 
 ```py
-from anyio import CancelScope as Shield
+import trio
 
 
-async def class_body_effects():
+async def nested_handler_assignment():
     try:
         ...
     finally:
-        with Shield(shield=True) as scope:
-            class DisablesOuterShield:
-                scope.shield = False
-
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield(shield=True) as scope:
-            class ShadowsOuterScope:
-                scope = other
-                scope.shield = False
-
-            await cleanup()
-```
-
-### Loop `else` paths
-
-Loop `else` assignments only establish a shield when every path reaches them.
-
-```py
-from anyio import CancelScope as Shield
-
-
-async def loop_else_shielding(items, flag):
-    try:
-        ...
-    finally:
-        with Shield() as scope:
-            for item in items:
-                break
-            else:
-                scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            while flag:
-                break
-            else:
-                scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            for item in items:
-                while flag:
-                    break
-            else:
-                scope.shield = True
-            await cleanup()
-```
-
-### Assignment-target evaluation
-
-Assignment targets are visited in evaluation order, including awaits inside targets.
-
-```py
-from anyio import CancelScope as Shield
-
-
-async def assignment_target_order():
-    try:
-        ...
-    finally:
-        with Shield(shield=True) as scope:
-            scope.shield = (await factory()).field = False  # error: [await-in-finally-or-cancelled]
-        with Shield(shield=True) as scope:
-            (scope.shield, (await factory()).field) = (False, value)  # error: [await-in-finally-or-cancelled]
-```
-
-Async-loop targets update shield state after the iteration checkpoint.
-
-```py
-async def async_for_target_state(source):
-    try:
-        ...
-    finally:
-        with Shield(shield=True) as scope:
-            async for scope.shield in source:  # error: [await-in-finally-or-cancelled]
-                pass
-        with Shield(shield=True) as scope:
-            async for scope in source:
-                pass
-```
-
-### Class-body control flow
-
-Class-body control flow is analyzed conservatively when it may change an enclosing shield.
-
-```py
-from anyio import CancelScope as Shield
-
-
-async def class_body_control_flow(flag):
-    try:
-        ...
-    finally:
-        with Shield(shield=True) as scope:
-            while flag:
-                await cleanup()  # error: [await-in-finally-or-cancelled]
-
-                class DisablesShield:
-                    scope.shield = False
-
-        with Shield(shield=True) as scope:
+        with trio.CancelScope(shield=True) as scope:
             try:
-                class DisablesShieldAndRaises:
-                    scope.shield = False
-                    raise ValueError
-            except ValueError:
-                await cleanup()  # error: [await-in-finally-or-cancelled]
-```
-
-A class body's `nonlocal` declaration makes writes affect the enclosing scope handle.
-
-```py
-async def class_body_nonlocal():
-    try:
-        ...
-    finally:
-        with Shield(shield=True) as scope:
-            class DisablesShield:
-                nonlocal scope
                 scope.shield = False
-
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-        with Shield() as scope:
-            class EnablesShield:
-                nonlocal scope
-                scope.shield = True
-
-            await cleanup()
-        with Shield() as scope:
-            class RebindsHandle:
-                nonlocal scope
-                scope = other
-                scope.shield = True
-
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-```
-
-### Nested loop `else` paths
-
-Breaks in nested loops do not incorrectly suppress the outer loop's `else` path.
-
-```py
-from anyio import CancelScope as Shield
-
-
-async def nested_loop_else_break(items, flag):
-    try:
-        ...
-    finally:
-        with Shield() as scope:
-            for item in items:
-                while flag:
-                    pass
-                else:
-                    break
-            else:
-                scope.shield = True
-            await cleanup()  # error: [await-in-finally-or-cancelled]
-```
-
-### Class-local rebinding
-
-Class-local rebinding prevents later writes from changing the enclosing cancel scope.
-
-```py
-from anyio import CancelScope as Shield
-
-
-async def class_body_local_rebinding():
-    try:
-        ...
-    finally:
-        with Shield(shield=True) as scope:
-            class ShadowsOuterScope:
-                scope = other
-
-            scope.shield = False
-            await cleanup()  # error: [await-in-finally-or-cancelled]
+                raise ValueError
+            except ValueError:
+                await trio.sleep(1)  # error: [await-in-finally-or-cancelled]
 ```
 
 ## Asyncio does not enable the rule

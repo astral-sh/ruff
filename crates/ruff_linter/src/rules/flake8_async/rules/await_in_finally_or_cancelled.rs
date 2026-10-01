@@ -1,7 +1,7 @@
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{Truthiness, loop_exits_early};
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::Modules;
@@ -67,8 +67,10 @@ use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
 /// `shield` attribute of a locally named cancel scope (or a nursery's or task
 /// group's `cancel_scope`). It cannot infer shielding performed by helper
 /// functions, aliases of cancel scope objects, or dynamically computed values.
-/// Shield assignments across loops and exception paths are treated
-/// conservatively, which can report code whose shielding depends on control flow.
+/// Only single-target assignments with literal values update the tracked shield
+/// state. The rule visits branches and loops in source order without analyzing
+/// execution paths or rebinding of scope variables. It can therefore miss
+/// unshielded cancellation points or report ones that are shielded at runtime.
 /// It assumes that argument-free `.aclose()` methods implement cancellation-safe
 /// cleanup, without checking the receiver's type.
 ///
@@ -127,12 +129,10 @@ pub(crate) fn await_in_finally_or_cancelled<'a>(
         context: (function.name.as_str() == "__aexit__").then_some(CleanupContext::AsyncExit),
         scopes: Vec::new(),
         boundary: 0,
-        class_depth: 0,
     }
     .visit_body(&function.body);
 }
 
-#[derive(Clone)]
 struct CancelScope<'a> {
     name: Option<&'a str>,
     task_group: bool,
@@ -143,10 +143,9 @@ struct CleanupVisitor<'a, 'b> {
     checker: &'b Checker<'a>,
     context: Option<CleanupContext>,
     scopes: Vec<CancelScope<'a>>,
-    /// Scopes entered before the current cleanup cannot shield its checkpoints.
+    /// Scopes entered before the current cleanup are excluded from shield checks
+    /// and assignments.
     boundary: usize,
-    /// Class-local bindings must not invalidate handles in the enclosing function.
-    class_depth: usize,
 }
 
 // Keep the cancellation families separate: catching Trio cancellation does
@@ -268,121 +267,10 @@ impl<'a> CleanupVisitor<'a, '_> {
         })
     }
 
-    fn is_class_local(&self, name: &ast::ExprName) -> bool {
-        if self.class_depth == 0 {
-            return false;
-        }
-        let semantic = self.checker.semantic();
-        let binding = semantic
-            .resolve_name(name)
-            .map(|binding_id| semantic.binding(binding_id))
-            .or_else(|| {
-                semantic
-                    .bindings
-                    .iter()
-                    .find(|binding| binding.range() == name.range())
-            });
-        binding.is_some_and(|binding| {
-            semantic.scopes[binding.scope].kind.is_class() && !binding.is_nonlocal()
-        })
-    }
-
-    fn assign(&mut self, target: &Expr, value: Option<&Expr>) {
-        match target {
-            Expr::Tuple(tuple) => {
-                for target in &tuple.elts {
-                    self.assign(target, None);
-                }
-                return;
-            }
-            Expr::List(list) => {
-                for target in &list.elts {
-                    self.assign(target, None);
-                }
-                return;
-            }
-            Expr::Starred(starred) => {
-                self.assign(&starred.value, None);
-                return;
-            }
-            _ => {}
-        }
-        // Rebinding the handle does not change the original scope's shield,
-        // but subsequent attribute writes must no longer modify that scope.
-        if let Expr::Name(name) = target {
-            if self.is_class_local(name) {
-                return;
-            }
-            for scope in &mut self.scopes {
-                if scope.name == Some(name.id.as_str()) {
-                    scope.name = None;
-                }
-            }
-            return;
-        }
-        let Expr::Attribute(attribute) = target else {
-            return;
-        };
-        if attribute.attr.as_str() != "shield" {
-            return;
-        }
-        let (receiver, task_group) = match &*attribute.value {
-            Expr::Attribute(attribute) if attribute.attr.as_str() == "cancel_scope" => {
-                (&*attribute.value, true)
-            }
-            expr => (expr, false),
-        };
-        if let Expr::Name(name) = receiver {
-            if self.is_class_local(name) {
-                return;
-            }
-            if let Some(scope) = self.scopes.iter_mut().rev().find(|scope| {
-                scope.name == Some(name.id.as_str()) && scope.task_group == task_group
-            }) {
-                scope.shielded = value.is_some_and(enables_shield);
-            }
-        }
-    }
-
-    fn visit_assignment_target(&mut self, target: &'a Expr, value: Option<&'a Expr>) {
-        match target {
-            Expr::Tuple(tuple) => {
-                for target in &tuple.elts {
-                    self.visit_assignment_target(target, None);
-                }
-            }
-            Expr::List(list) => {
-                for target in &list.elts {
-                    self.visit_assignment_target(target, None);
-                }
-            }
-            Expr::Starred(starred) => self.visit_assignment_target(&starred.value, None),
-            _ => {
-                self.visit_expr(target);
-                self.assign(target, value);
-            }
-        }
-    }
-
-    fn merge_scopes(&mut self, other: &[CancelScope<'a>]) {
-        for (scope, other) in self.scopes.iter_mut().zip(other) {
-            scope.shielded &= other.shielded;
-            if scope.name != other.name {
-                scope.name = None;
-            }
-        }
-    }
-
     fn visit_try(&mut self, stmt: &'a ast::StmtTry) {
         let context = self.context;
         let boundary = self.boundary;
-        let before = self.scopes.clone();
-        self.invalidate_assignments(&stmt.body);
-        let handler_entry = self.scopes.clone();
-        self.scopes = before;
         self.visit_body(&stmt.body);
-        self.visit_body(&stmt.orelse);
-        let mut outcomes = self.scopes.clone();
         let handler_types: Vec<_> = stmt
             .handlers
             .iter()
@@ -408,70 +296,33 @@ impl<'a> CleanupVisitor<'a, '_> {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
             self.context = context;
             self.boundary = boundary;
-            self.scopes.clone_from(&handler_entry);
             let types = if types.contains(CancellationTypes::CATCH_ALL) {
                 CancellationTypes::TRIO | CancellationTypes::ASYNCIO
             } else {
                 types
             };
-            if context.is_none() && types.intersects(remaining) {
-                self.context = Some(CleanupContext::Except);
+            if context.is_none() {
                 self.boundary = self.scopes.len();
-                if !stmt.is_star {
-                    remaining.remove(types);
+                if types.intersects(remaining) {
+                    self.context = Some(CleanupContext::Except);
+                    if !stmt.is_star {
+                        remaining.remove(types);
+                    }
                 }
             }
             if let Some(type_) = &handler.type_ {
                 self.visit_expr(type_);
             }
             self.visit_body(&handler.body);
-            self.merge_scopes(&outcomes);
-            outcomes.clone_from(&self.scopes);
         }
-        self.scopes = outcomes;
-        // The finally block also runs on exceptions not caught by any handler.
-        self.merge_scopes(&handler_entry);
+        self.context = context;
+        self.boundary = boundary;
+        self.visit_body(&stmt.orelse);
         self.context = Some(CleanupContext::Finally);
         self.boundary = self.scopes.len();
         self.visit_body(&stmt.finalbody);
         self.context = context;
         self.boundary = boundary;
-    }
-
-    fn invalidate_assignments(&mut self, body: &'a [Stmt]) {
-        // A loop can reach its next iteration after any write in the body, and
-        // an exception can transfer control before or after a write. Start
-        // these paths without assuming that a modified shield remains enabled.
-        AssignmentVisitor { visitor: self }.visit_body(body);
-    }
-}
-
-struct AssignmentVisitor<'a, 'b, 'c> {
-    visitor: &'c mut CleanupVisitor<'a, 'b>,
-}
-
-impl<'a> Visitor<'a> for AssignmentVisitor<'a, '_, '_> {
-    fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::FunctionDef(_) => return,
-            Stmt::ClassDef(class) => {
-                self.visitor.class_depth += 1;
-                self.visit_body(&class.body);
-                self.visitor.class_depth -= 1;
-                return;
-            }
-            Stmt::Assign(stmt) => {
-                for target in &stmt.targets {
-                    self.visitor.assign(target, None);
-                }
-            }
-            Stmt::AnnAssign(stmt) if stmt.value.is_some() => {
-                self.visitor.assign(&stmt.target, None);
-            }
-            Stmt::AugAssign(stmt) => self.visitor.assign(&stmt.target, None),
-            _ => {}
-        }
-        visitor::walk_stmt(self, stmt);
     }
 }
 
@@ -495,9 +346,7 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 if let Some(arguments) = &class.arguments {
                     self.visit_arguments(arguments);
                 }
-                self.class_depth += 1;
                 self.visit_body(&class.body);
-                self.class_depth -= 1;
             }
             Stmt::Try(stmt) => self.visit_try(stmt),
             Stmt::With(stmt) => {
@@ -510,9 +359,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                         stmt.is_async && !scope.as_ref().is_some_and(|scope| scope.task_group);
                     let reported = checkpoint && self.checkpoint(item.range());
                     exits.push((item, self.scopes.len(), checkpoint, reported));
-                    if let Some(target) = &item.optional_vars {
-                        self.assign(target, None);
-                    }
                     if let Some(scope) = scope {
                         self.scopes.push(scope);
                     }
@@ -530,84 +376,35 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 self.scopes.truncate(count);
             }
             Stmt::Assign(assign) => {
-                self.visit_expr(&assign.value);
-                for target in &assign.targets {
-                    self.visit_assignment_target(target, Some(&assign.value));
+                visitor::walk_stmt(self, stmt);
+                if let [Expr::Attribute(target)] = assign.targets.as_slice()
+                    && target.attr.as_str() == "shield"
+                    && assign.value.is_literal_expr()
+                {
+                    let receiver = match &*target.value {
+                        Expr::Attribute(attribute) if attribute.attr.as_str() == "cancel_scope" => {
+                            &*attribute.value
+                        }
+                        expr => expr,
+                    };
+                    if let Expr::Name(name) = receiver {
+                        for scope in &mut self.scopes[self.boundary..] {
+                            if scope.name == Some(name.id.as_str()) {
+                                scope.shielded = enables_shield(&assign.value);
+                            }
+                        }
+                    }
                 }
             }
-            Stmt::AnnAssign(stmt) => {
-                if let Some(value) = &stmt.value {
+            Stmt::AnnAssign(assign) => {
+                if let Some(value) = &assign.value {
                     self.visit_expr(value);
                 }
-                self.visit_expr(&stmt.target);
-                if let Some(value) = &stmt.value {
-                    self.assign(&stmt.target, Some(value));
-                }
+                self.visit_expr(&assign.target);
             }
-            Stmt::AugAssign(assign) => {
+            Stmt::For(for_stmt) if for_stmt.is_async => {
+                self.checkpoint(for_stmt.range());
                 visitor::walk_stmt(self, stmt);
-                self.assign(&assign.target, None);
-            }
-            Stmt::If(stmt) => {
-                self.visit_expr(&stmt.test);
-                let before = self.scopes.clone();
-                self.visit_body(&stmt.body);
-                let mut outcomes = self.scopes.clone();
-                let mut has_else = false;
-                for clause in &stmt.elif_else_clauses {
-                    self.scopes.clone_from(&before);
-                    self.visit_elif_else_clause(clause);
-                    has_else |= clause.test.is_none();
-                    self.merge_scopes(&outcomes);
-                    outcomes.clone_from(&self.scopes);
-                }
-                self.scopes = outcomes;
-                if !has_else {
-                    self.merge_scopes(&before);
-                }
-            }
-            Stmt::For(stmt) => {
-                self.visit_expr(&stmt.iter);
-                self.invalidate_assignments(&stmt.body);
-                if stmt.is_async {
-                    // A target write from one iteration affects the checkpoint
-                    // that starts the next iteration.
-                    self.assign(&stmt.target, None);
-                    self.checkpoint(stmt.range());
-                }
-                self.visit_assignment_target(&stmt.target, None);
-                let before = self.scopes.clone();
-                self.visit_body(&stmt.body);
-                self.merge_scopes(&before);
-                let before_else = self.scopes.clone();
-                self.visit_body(&stmt.orelse);
-                if loop_exits_early(&stmt.body) {
-                    self.merge_scopes(&before_else);
-                }
-            }
-            Stmt::While(stmt) => {
-                self.invalidate_assignments(&stmt.body);
-                self.visit_expr(&stmt.test);
-                let before = self.scopes.clone();
-                self.visit_body(&stmt.body);
-                self.merge_scopes(&before);
-                let before_else = self.scopes.clone();
-                self.visit_body(&stmt.orelse);
-                if loop_exits_early(&stmt.body) {
-                    self.merge_scopes(&before_else);
-                }
-            }
-            Stmt::Match(stmt) => {
-                self.visit_expr(&stmt.subject);
-                let before = self.scopes.clone();
-                let mut outcomes = before.clone();
-                for case in &stmt.cases {
-                    self.scopes.clone_from(&before);
-                    self.visit_match_case(case);
-                    self.merge_scopes(&outcomes);
-                    outcomes.clone_from(&self.scopes);
-                }
-                self.scopes = outcomes;
             }
             _ => visitor::walk_stmt(self, stmt),
         }
@@ -620,10 +417,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
                 if !self.safe_await(&await_.value) {
                     self.checkpoint(expr.range());
                 }
-            }
-            Expr::Named(named) => {
-                self.visit_expr(&named.value);
-                self.assign(&named.target, None);
             }
             // A generator expression's body is deferred until iteration.
             Expr::Generator(generator) => {
