@@ -63,7 +63,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `contextlib.contextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 /// - [Python documentation: `contextlib.asynccontextmanager`](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Suspicious)]
+#[violation_metadata(preview_since = "0.16.10", category = Category::Suspicious)]
 pub(crate) struct ContextManagerIterator {
     iterator: &'static str,
     generator: &'static str,

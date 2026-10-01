@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.16.10
+
+Released on 2026-10-01.
+
+### Preview features
+
+- Add a migration guide for categories ([#28087](https://github.com/astral-sh/ruff/pull/28087))
+- \[`pyupgrade`\] Add rule for context manager iterator annotations (`UP052`) ([#29000](https://github.com/astral-sh/ruff/pull/29000))
+
+### Performance
+
+- Reduce memory used by diagnostics ([#28951](https://github.com/astral-sh/ruff/pull/28951))
+
+### Server
+
+- Avoid running `uv format` in untrusted workspaces ([#28873](https://github.com/astral-sh/ruff/pull/28873))
+
+### Documentation
+
+- Fix links to moved changelog sections and renamed mdtests ([#28941](https://github.com/astral-sh/ruff/pull/28941))
+- Add Python 3.15 as a supported version ([#28907](https://github.com/astral-sh/ruff/pull/28907))
+- Add ty as a type checker example ([#28906](https://github.com/astral-sh/ruff/pull/28906))
+
+### Other changes
+
+- Update Rust toolchain to 1.99 and MSRV to 1.97 ([#29047](https://github.com/astral-sh/ruff/pull/29047))
+
+### Contributors
+
+- [@ntBre](https://github.com/ntBre)
+- [@spaceone](https://github.com/spaceone)
+- [@HardMax71](https://github.com/HardMax71)
+- [@charliermarsh](https://github.com/charliermarsh)
+
 ## 0.16.9
 
 Released on 2026-09-24.
