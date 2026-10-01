@@ -32,6 +32,8 @@ mod signature_help;
 mod stub_mapping;
 mod symbols;
 mod type_hierarchy;
+#[cfg(test)]
+mod will_rename;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
