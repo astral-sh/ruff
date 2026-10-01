@@ -1073,13 +1073,7 @@ pub(crate) fn enum_metadata<'db>(
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     // As a fast path, avoid looking up base classes if the class body is empty
-    if use_def_map
-        .all_end_of_scope_symbol_bindings()
-        .next()
-        .is_none()
-    {
-        return None;
-    }
+    use_def_map.all_end_of_scope_symbol_bindings().next()?;
 
     let env = ProgramEnvironment::from_file(class.program_file(db));
 
