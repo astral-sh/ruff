@@ -118,7 +118,7 @@ impl<'db> LambdaMapping<'db> {
         })
     }
 
-    pub(super) fn as_type_mapping(&self) -> TypeMapping<'_, 'db> {
+    fn as_type_mapping(&self) -> TypeMapping<'_, 'db> {
         match self {
             Self::Specialize {
                 specialization,
