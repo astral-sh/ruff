@@ -728,6 +728,45 @@ if value_{index}:
     Ok(())
 }
 
+/// Each specialized protocol member should depend only on its own declarations, rather than
+/// retaining dependencies on every other member of the protocol.
+#[test]
+fn specialized_protocol_member_dependencies_scale_linearly() -> anyhow::Result<()> {
+    let metadata_size = |fields| -> anyhow::Result<usize> {
+        let mut source = String::from("from typing import Protocol\n");
+        for class in ["P", "Q"] {
+            writeln!(source, "class {class}[T](Protocol):")?;
+            for index in 0..fields {
+                writeln!(source, "    field_{index}: T")?;
+            }
+        }
+        source.push_str("def compare(p: P[int]) -> Q[int]:\n    return p\n");
+
+        let mut db = TestDbBuilder::new()
+            .with_python_version(PythonVersion::PY312)
+            .with_file("/src/main.py", &source)
+            .build()?;
+        assert_file_diagnostics(&db, "/src/main.py", &[]);
+
+        let memory = ruff_memory_usage::attach_tracker(get_size2::StandardTracker::new(), || {
+            <dyn salsa::Database>::memory_usage(&mut db)
+        });
+        let members = &memory.queries["cached_protocol_member"];
+        assert_eq!(members.count(), 2 * fields);
+        Ok(members.size_of_metadata())
+    };
+
+    let small = metadata_size(32)?;
+    let large = metadata_size(64)?;
+    // Allow allocation overhead while rejecting quadratic growth, without depending on timing
+    // or the exact size of Salsa's dependency records.
+    assert!(
+        large <= 3 * small,
+        "doubling the number of protocol members grew metadata from {small} to {large} bytes"
+    );
+    Ok(())
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]
