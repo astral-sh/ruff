@@ -708,7 +708,7 @@ fn builtins_symbol_impl<'db>(
         resolver_environment,
         &ModuleName::new_static("__builtins__").unwrap(),
     )
-    .and_then(&resolver)
+    .and_then(resolver)
     .or_else(|| {
         resolve_module_confident(db, resolver_environment, &KnownModule::Builtins.name())
             .and_then(resolver)
