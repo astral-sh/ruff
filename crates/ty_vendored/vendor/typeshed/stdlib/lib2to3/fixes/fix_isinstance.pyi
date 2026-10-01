@@ -5,6 +5,7 @@ tokens as a leftover of the long -> int / unicode -> str conversion.
 eg.  isinstance(x, (int, long)) -> isinstance(x, (int, int))
        -> isinstance(x, int)
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

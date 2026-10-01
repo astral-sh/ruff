@@ -1,4 +1,5 @@
 """Recognize image file formats based on their first few bytes."""
+
 from _typeshed import StrPath
 from collections.abc import Callable
 from typing import Any, BinaryIO, Protocol, overload, type_check_only

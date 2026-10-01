@@ -1,6 +1,5 @@
-"""Python Character Mapping Codec mac_greek generated from 'MAPPINGS/VENDORS/APPLE/GREEK.TXT' with gencodec.py.
+"""Python Character Mapping Codec mac_greek generated from 'MAPPINGS/VENDORS/APPLE/GREEK.TXT' with gencodec.py."""
 
-"""
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer

@@ -8,6 +8,7 @@ available.
 Written by:   Fred L. Drake, Jr.
 Email:        <fdrake@acm.org>
 """
+
 from collections.abc import Mapping
 from distutils.ccompiler import CCompiler
 from typing import Final, Literal, overload
@@ -56,8 +57,10 @@ def get_config_vars(arg: str, /, *args: str) -> list[str | int]: ...
 
 def get_config_h_filename() -> str:
     """Return the path of pyconfig.h."""
+
 def get_makefile_filename() -> str:
     """Return the path of the Makefile."""
+
 def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None = None) -> str:
     """Return the directory containing installed Python header files.
 
@@ -69,6 +72,7 @@ def get_python_inc(plat_specific: bool | Literal[0, 1] = 0, prefix: str | None =
     If 'prefix' is supplied, use it instead of sys.base_prefix or
     sys.base_exec_prefix -- i.e., ignore 'plat_specific'.
     """
+
 def get_python_lib(
     plat_specific: bool | Literal[0, 1] = 0, standard_lib: bool | Literal[0, 1] = 0, prefix: str | None = None
 ) -> str:
@@ -85,6 +89,7 @@ def get_python_lib(
     If 'prefix' is supplied, use it instead of sys.base_prefix or
     sys.base_exec_prefix -- i.e., ignore 'plat_specific'.
     """
+
 def customize_compiler(compiler: CCompiler) -> None:
     """Do any platform-specific customization of a CCompiler instance.
 
