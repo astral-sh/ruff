@@ -380,13 +380,6 @@ impl<'a> Visitor<'a> for CleanupVisitor<'a, '_> {
         }
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'a ast::Comprehension) {
-        if comprehension.is_async {
-            self.checkpoint(comprehension.range());
-        }
-        visitor::walk_comprehension(self, comprehension);
-    }
-
     fn visit_annotation(&mut self, expr: &'a Expr) {
         if !self.checker.semantic().future_annotations_or_stub()
             && self.checker.target_version() < ast::PythonVersion::PY314

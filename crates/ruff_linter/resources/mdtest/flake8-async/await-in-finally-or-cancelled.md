@@ -483,8 +483,8 @@ async def handler_type_checkpoints():
 
 ### Implicit and explicit cancellation points
 
-Implicit and explicit cancellation points include async context managers, async iteration,
-comprehensions, and nested awaits.
+Async context managers and async iteration are implicit cancellation points. Await expressions
+are checked even when nested inside another expression.
 
 ```py
 import trio as t
@@ -499,7 +499,6 @@ async def checkpoints(cm, items):
             pass
         async for item in items:  # error: [await-in-finally-or-cancelled]
             pass
-        result = [item async for item in items]  # error: [await-in-finally-or-cancelled]
         deferred = (item async for item in items)
         deferred = (item async for item in await source())  # error: [await-in-finally-or-cancelled]
         # error: [await-in-finally-or-cancelled]
