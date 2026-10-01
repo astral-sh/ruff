@@ -711,7 +711,7 @@ impl From<TypeRelation> for UpcastPolicy {
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
-    signature_source: SignatureSource<'db>,
+    pub(super) signature_source: SignatureSource<'db>,
 
     #[returns(copy)]
     pub(super) kind: CallableTypeKind,
@@ -789,7 +789,7 @@ impl get_size2::GetSize for CallableType<'_> {}
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct LambdaSignature<'db> {
     #[returns(ref)]
-    parameters: Parameters<'db>,
+    pub(super) parameters: Parameters<'db>,
     #[returns(copy)]
     scope: ScopeId<'db>,
     #[returns(copy)]
