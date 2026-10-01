@@ -1938,6 +1938,32 @@ reveal_type(p.func is not combine)  # revealed: Literal[False]
 reveal_type(p.func(2, "x"))  # revealed: tuple[Literal[2], Literal["x"]]
 ```
 
+### Gradual partials in nested generic calls
+
+A nested generic call can promote a partial's wrapped function to a callable type. The promoted type
+still includes the original partial, including when its return type is gradual.
+
+```py
+from functools import partial
+from itertools import chain
+
+def f(): ...
+def g(value: int) -> int:
+    return value
+
+x = chain((partial(f),), (partial(g, 0),))
+reveal_type(x)  # revealed: chain[partial[() -> Unknown] | partial[() -> int]]
+y = tuple(chain((partial(f),), (partial(g, 0),)))
+reveal_type(y)  # revealed: tuple[partial[() -> Unknown] | partial[() -> int], ...]
+```
+
+The same applies when the iterable contains both a function and a partial with unbound parameters:
+
+```py
+z = list(zip((f, partial(g))))
+reveal_type(z)  # revealed: list[tuple[(() -> Unknown) | partial[(value: int) -> int]]]
+```
+
 ### Attribute assignment on partial results
 
 Attribute assignment should go through the standard nominal instance path:

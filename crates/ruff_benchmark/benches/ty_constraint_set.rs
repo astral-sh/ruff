@@ -438,7 +438,10 @@ def perform(rows: Rows) -> AllResults:
             |case| {
                 let Case { db } = case;
                 let result = db.check();
-                assert_eq!(result.len(), 0);
+                // TODO: Expanding the union argument would allow a different specialization for
+                // each alternative: https://github.com/astral-sh/ty/issues/3557.
+                assert!(matches!(result.as_slice(), [diagnostic]
+                    if diagnostic.id().is_lint_named("invalid-argument-type")));
             },
             BatchSize::SmallInput,
         );
