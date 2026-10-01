@@ -513,6 +513,8 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    /// Upper bounds currently being materialized, shared across nested materialization roots.
+    upper_bound_recursion: Option<&'env ActiveRecursionDetector<BoundTypeVarInstance<'db>>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -530,6 +532,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            upper_bound_recursion: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -607,6 +610,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            upper_bound_recursion: self.upper_bound_recursion,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }

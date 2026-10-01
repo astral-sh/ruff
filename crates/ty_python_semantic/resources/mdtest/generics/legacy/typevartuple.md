@@ -761,6 +761,27 @@ def forward(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., No
     accept(callbacks)
 ```
 
+### Bounded gradual elements and symbolic packs
+
+A bounded gradual tuple can choose its length, but its elements cannot match every possible
+specialization of an unrelated type variable tuple. An arbitrary pack can also contain elements
+outside the bound.
+
+```py
+from typing import Any
+from typing_extensions import TypeVarTuple, Unpack
+from ty_extensions import Intersection
+
+Ts = TypeVarTuple("Ts")
+
+def bounded_gradual_pack(
+    bounded: tuple[Intersection[Any, int], ...],
+    arbitrary: tuple[Unpack[Ts]],
+) -> None:
+    accepts_every_pack: tuple[Unpack[Ts]] = bounded  # error: [invalid-assignment]
+    restricts_every_element: tuple[Intersection[Any, int], ...] = arbitrary  # error: [invalid-assignment]
+```
+
 ## Tuple concatenation with type variables
 
 Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
