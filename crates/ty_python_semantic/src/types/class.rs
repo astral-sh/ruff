@@ -2274,11 +2274,8 @@ impl<'db> ClassType<'db> {
                     return Place::Undefined.into();
                 }
 
-                class_literal
-                    .instance_member(db, env, specialization, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, specialization)
-                    })
+                // MRO lookup specializes each member in its defining class.
+                class_literal.instance_member(db, env, specialization, name)
             }
         }
     }
