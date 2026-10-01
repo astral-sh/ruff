@@ -594,7 +594,7 @@ impl<'db> ProtocolInterfaceView<'db> {
             // Class access to an ordinary instance method requires only that the method
             // exists. Its unbound `self` is not part of structural compatibility and can
             // recursively refer to this protocol, so do not materialize that signature.
-            if materialized.is_instance_method() {
+            if materialized.is_instance_method(db) {
                 return false;
             }
 
@@ -625,7 +625,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .access(db, ProtocolMemberAccessMode::Instance)
                     .write()
                     .and_then(|write| write.requirement(db, env, Some(receiver_ty))),
-                member.qualifiers(),
+                member.qualifiers(db),
             )
         })
     }
@@ -648,7 +648,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .write()
                     .and_then(|write| write.requirement(db, env, Some(receiver_ty)))
                     .and_then(|requirement| requirement.accepted_type()),
-                member.qualifiers(),
+                member.qualifiers(db),
             )
         })
     }
@@ -668,7 +668,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .map(Place::bound)
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
-                qualifiers: member.qualifiers(),
+                qualifiers: member.qualifiers(db),
             })
             .unwrap_or_else(|| Type::object().member(db, env, name))
     }
@@ -693,14 +693,14 @@ impl<'db> ProtocolInterfaceView<'db> {
                     .map(Place::bound)
                     .unwrap_or(Place::Undefined)
                     .with_provenance(Provenance::from_definition(member.definition())),
-                qualifiers: member.qualifiers(),
+                qualifiers: member.qualifiers(db),
             }
         })
     }
 
     pub(super) fn member_is_property(self, db: &'db dyn Db, name: &str) -> bool {
         self.member_by_name(db, name)
-            .is_some_and(|member| member.is_property())
+            .is_some_and(|member| member.is_property(db))
     }
 }
 
@@ -914,7 +914,7 @@ impl<'db> ProtocolInterface<'db> {
 
     pub(super) fn non_method_members(self, db: &'db dyn Db) -> Vec<ProtocolMember<'db, 'db>> {
         self.members(db)
-            .filter(|member| !member.is_method())
+            .filter(|member| !member.is_method(db))
             .collect()
     }
 
@@ -930,7 +930,7 @@ impl<'db> ProtocolInterface<'db> {
     ) -> impl Iterator<Item = (Type<'db>, TypeVarVariance)> + 'a {
         self.members(db).flat_map(move |member| {
             // Instance methods are checked only through their bound instance signature.
-            let is_instance_method = member.is_instance_method();
+            let is_instance_method = member.is_instance_method(db);
             [
                 ProtocolMemberAccessMode::Instance,
                 ProtocolMemberAccessMode::Class,
@@ -2076,6 +2076,8 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'a, 'db> ProtocolMember<'a, 'db> {
+    /// Specialization can change an attribute into a method or property, so member classification
+    /// and access must use the same resolved data.
     fn specialized_data(&self, db: &'db dyn Db) -> ProtocolMemberData<'db> {
         // Retain the declaration while the specialized member is unavailable during cycle recovery.
         self.specialized_class
@@ -2087,8 +2089,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.name
     }
 
-    fn qualifiers(&self) -> TypeQualifiers {
-        self.data.qualifiers
+    fn qualifiers(&self, db: &'db dyn Db) -> TypeQualifiers {
+        self.specialized_data(db).qualifiers
     }
 
     /// Returns whether an instance declaration conflicts with a required writable class variable.
@@ -2117,7 +2119,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> bool {
-        let qualifiers = self.qualifiers();
+        let qualifiers = self.qualifiers(db);
         qualifiers.contains(TypeQualifiers::CLASS_VAR)
             && !qualifiers.contains(TypeQualifiers::FINAL)
             && ty
@@ -2150,11 +2152,17 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 })
     }
 
-    fn is_method(&self) -> bool {
-        matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    fn is_method(&self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.specialized_data(db).kind,
+            ProtocolMemberKind::Method(..)
+        )
     }
 
-    /// Returns whether an instance method has an explicit positional receiver annotation.
+    /// Returns whether an instance method declaration has an explicit positional receiver annotation.
+    ///
+    /// This check decides whether to try the recursive comparison shortcut. Inspect declarations
+    /// so it does not specialize recursive methods before checking finite requirements.
     pub(super) fn has_explicit_receiver_annotation(&self, db: &'db dyn Db) -> bool {
         match self.data.kind {
             ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) => {
@@ -2241,9 +2249,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         finite_priority
     }
 
-    fn is_instance_method(&self) -> bool {
+    fn is_instance_method(&self, db: &'db dyn Db) -> bool {
         matches!(
-            self.data.kind,
+            self.specialized_data(db).kind,
             ProtocolMemberKind::Method(_, ProtocolMethodKind::Instance)
         )
     }
@@ -2363,15 +2371,18 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         )
     }
 
-    fn is_class_method(&self) -> bool {
+    fn is_class_method(&self, db: &'db dyn Db) -> bool {
         matches!(
-            self.data.kind,
+            self.specialized_data(db).kind,
             ProtocolMemberKind::Method(_, ProtocolMethodKind::Class)
         )
     }
 
-    fn is_property(&self) -> bool {
-        matches!(self.data.kind, ProtocolMemberKind::Property { .. })
+    fn is_property(&self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.specialized_data(db).kind,
+            ProtocolMemberKind::Property { .. }
+        )
     }
 
     pub(super) fn definition(&self) -> Option<Definition<'db>> {
@@ -2400,7 +2411,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ) -> Option<ProtocolMemberAccess<'db>> {
         if mode == ProtocolMemberAccessMode::Class
             && (matches!(
-                (ty, self.data.kind),
+                (ty, self.specialized_data(db).kind),
                 (
                     Type::ModuleLiteral(_),
                     ProtocolMemberKind::Method(
@@ -2408,7 +2419,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                         ProtocolMethodKind::Instance | ProtocolMethodKind::Static
                     )
                 )
-            ) || (is_class_object_type(ty) && self.is_method()))
+            ) || (is_class_object_type(ty) && self.is_method(db)))
         {
             None
         } else {
@@ -2523,7 +2534,7 @@ fn protocol_member_read_type<'db>(
     // A callback protocol describes call syntax. Use the candidate's callable type instead of an
     // explicitly resolved `__call__` attribute, which can differ for class objects.
     if access == ProtocolMemberAccessMode::Instance
-        && member.is_method()
+        && member.is_method(db)
         && member.name == "__call__"
     {
         return Some(ty);
@@ -2532,7 +2543,7 @@ fn protocol_member_read_type<'db>(
     // Module-level functions and ordinary methods on class objects are matched through direct
     // member access. Special instance methods still use special-method lookup on the meta-type.
     let place = if access == ProtocolMemberAccessMode::Instance
-        && member.is_instance_method()
+        && member.is_instance_method(db)
         && !matches!(ty, Type::ModuleLiteral(_))
         && (!is_class_object_type(ty) || member.uses_special_method_lookup())
     {
@@ -2581,7 +2592,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let env = self.env;
         // Reading a member as `object` imposes no constraint on the type read. A class
         // attribute establishes presence without inferring a shadowing instance assignment.
-        if !member.is_method()
+        if !member.is_method(db)
             && required
                 .read()
                 .and_then(|read| read.result_type(db, env, None))
@@ -2609,7 +2620,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // `Self` returns `Factory`, not `type[Factory]`. Keep the bindings separate so a method
         // that returns an instance cannot satisfy a protocol that promises the class object.
         let protocol_self_binding_ty = ty.literal_fallback_instance(db, env).unwrap_or(ty);
-        if !member.is_method() {
+        if !member.is_method(db) {
             return required
                 .read()
                 .and_then(|read| read.result_type(db, env, Some(protocol_self_binding_ty)))
@@ -2632,7 +2643,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .or_else(|| ty.literal_fallback_instance(db, env))
             .unwrap_or(ty);
         let (implementation_receiver_binding_ty, protocol_receiver_binding_ty) =
-            if member.is_class_method() {
+            if member.is_class_method(db) {
                 (
                     implementation_self_binding_ty.to_meta_type(db, env),
                     protocol_self_binding_ty.to_meta_type(db, env),
@@ -2671,7 +2682,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ),
                     )
                 })
-        } else if member.is_instance_method() {
+        } else if member.is_instance_method(db) {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
@@ -2757,7 +2768,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         if required.mode == ProtocolMemberAccessMode::Class
-            && member.is_instance_method()
+            && member.is_instance_method(db)
             && required.read().is_some()
         {
             // The instance-side check is authoritative for the signature of a method
@@ -2858,7 +2869,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let class_access =
                 member.implementation_access(db, ty, ProtocolMemberAccessMode::Class);
             let class_read_missing = class_access.and_then(ProtocolMemberAccess::read).is_some()
-                && !(member.is_instance_method() && member.name == "__call__")
+                && !(member.is_instance_method(db) && member.name == "__call__")
                 && protocol_member_read_type(
                     db,
                     env,
@@ -2871,7 +2882,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             if instance_read_missing || class_read_missing {
                 if instance_read_missing
                     && is_class_object_type(ty)
-                    && member.is_instance_method()
+                    && member.is_instance_method(db)
                     && member.uses_special_method_lookup()
                 {
                     context.push(ErrorContext::ProtocolSpecialMethodNotDefinedOnMetaType);
@@ -2930,7 +2941,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     return self.always();
                 }
 
-                let result = if member.is_method() {
+                let result = if member.is_method(db) {
                     self.check_protocol_member_read(db, instance_ty, meta_ty, &member, required)
                 } else {
                     self.type_satisfies_protocol_member_access(
@@ -2967,8 +2978,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         if access == ProtocolMemberAccessMode::Class
-            && source_member.is_method()
-            && target_member.is_instance_method()
+            && source_member.is_method(db)
+            && target_member.is_instance_method(db)
         {
             // The instance-side check is authoritative for an ordinary method's signature. Class
             // access only establishes that the source member is also present on the class.
@@ -2987,7 +2998,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let ty = access
                     .read()
                     .and_then(|read| read.result_type(db, env, None))?;
-                if member.is_method()
+                if member.is_method(db)
                     && let Type::Callable(callable) = ty
                 {
                     Some(Type::Callable(protocol_apply_self_with_receiver(
@@ -3011,7 +3022,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             let result = self.check_type_pair(db, source, target);
             if let Some(context) = self.report_context()
-                && !target_member.is_method()
+                && !target_member.is_method(db)
                 && result.is_never_satisfied(db, env)
             {
                 context.push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
@@ -3172,7 +3183,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         let access = member.access(db, ProtocolMemberAccessMode::Instance);
-        let result = if !member.is_method() {
+        let result = if !member.is_method(db) {
             access
                 .read()
                 .and_then(|read| read.result_type(db, env, None))
