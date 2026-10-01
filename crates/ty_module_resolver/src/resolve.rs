@@ -359,6 +359,21 @@ pub fn file_to_module<'db>(
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
+    // A custom typeshed can be nested inside another search path. Its stubs must retain their
+    // stdlib names (e.g. `typing`, not `stubs.stdlib.typing`) so we recognize their known symbols.
+    // Do not fall back to an alias if the canonical module is shadowed or unavailable on this
+    // Python version.
+    let stdlib = &resolver_environment.search_paths(db).stdlib_path;
+    let stdlib_relative_path = match path {
+        SystemOrVendoredPathRef::System(path) => stdlib.relativize_system_path(path),
+        SystemOrVendoredPathRef::Vendored(path) => stdlib.relativize_vendored_path(path),
+    };
+    if let Some(relative_path) = stdlib_relative_path {
+        let name = relative_path.to_module_name()?;
+        let module = resolve_module_confident(db, resolver_environment, &name)?;
+        return (module.file(db) == Some(file)).then_some(module);
+    }
+
     file_to_module_impl(
         db,
         resolver_file,
@@ -695,10 +710,11 @@ pub struct SearchPaths {
     /// config settings themselves change.
     static_paths: Vec<SearchPath>,
 
-    /// Path to typeshed, which should come immediately after static paths.
+    /// Path to typeshed, which comes immediately after static paths.
     ///
-    /// This can currently only be None if the `SystemPath` this points to is already in `static_paths`.
-    stdlib_path: Option<SearchPath>,
+    /// Retained even when the same directory is also a static search path, so that its files keep
+    /// their standard-library identity.
+    stdlib_path: SearchPath,
 
     /// Path to the real stdlib, this replaces typeshed (`stdlib_path`) for goto-definition searches
     /// ([`ModuleResolveMode::Runtime`]).
@@ -872,25 +888,11 @@ impl SearchPaths {
             }
         });
 
-        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
-        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
-        // "remember" that fact for static paths.
-        //
-        // (We used to shove these into static_paths, so the above retain implicitly did this. I am opting to
-        // preserve this behaviour to avoid getting into the weeds of corner cases.)
-        let stdlib_path_is_shadowed = stdlib_path
-            .as_system_path()
-            .is_some_and(|path| seen_paths.contains(path));
         let real_stdlib_path_is_shadowed = real_stdlib_path
             .as_ref()
             .and_then(SearchPath::as_system_path)
             .is_some_and(|path| seen_paths.contains(path));
 
-        let stdlib_path = if stdlib_path_is_shadowed {
-            None
-        } else {
-            Some(stdlib_path)
-        };
         let real_stdlib_path = if real_stdlib_path_is_shadowed {
             None
         } else {
@@ -912,7 +914,7 @@ impl SearchPaths {
     pub fn empty(vendored: &VendoredFileSystem) -> Self {
         Self {
             static_paths: vec![],
-            stdlib_path: Some(SearchPath::vendored_stdlib()),
+            stdlib_path: SearchPath::vendored_stdlib(),
             real_stdlib_path: None,
             site_packages: vec![],
             typeshed_versions: vendored_typeshed_versions(vendored),
@@ -934,7 +936,7 @@ impl SearchPaths {
             .static_paths
             .iter()
             .chain(self.site_packages.iter())
-            .chain(&self.stdlib_path)
+            .chain(std::iter::once(&self.stdlib_path))
         {
             if let Some(system_path) = path.as_system_path() {
                 // Nested first-party paths reuse the project root. Other nested paths, such as
@@ -948,7 +950,7 @@ impl SearchPaths {
 
     fn stdlib(&self, mode: ModuleResolveMode) -> Option<&SearchPath> {
         match mode {
-            ModuleResolveMode::Typing => self.stdlib_path.as_ref(),
+            ModuleResolveMode::Typing => Some(&self.stdlib_path),
             ModuleResolveMode::Runtime | ModuleResolveMode::RuntimeSomeShadowingAllowed => {
                 self.real_stdlib_path.as_ref()
             }
@@ -956,9 +958,7 @@ impl SearchPaths {
     }
 
     pub fn custom_stdlib(&self) -> Option<&SystemPath> {
-        self.stdlib_path
-            .as_ref()
-            .and_then(SearchPath::as_system_path)
+        self.stdlib_path.as_system_path()
     }
 
     pub fn typeshed_versions(&self) -> &TypeshedVersions {
@@ -1179,8 +1179,13 @@ impl<'db> Iterator for SearchPathIterator<'db> {
             dynamic_paths,
         } = self;
 
+        // An explicit typeshed stdlib entry is redundant. Keep it in the stdlib position so
+        // extra-path stub overrides retain their priority.
+        let stdlib_system_path = stdlib_path.and_then(SearchPath::as_system_path);
         static_paths
-            .next()
+            .find(|path| {
+                stdlib_system_path.is_none_or(|stdlib| path.as_system_path() != Some(stdlib))
+            })
             .or_else(|| stdlib_path.take())
             .or_else(|| {
                 dynamic_paths
@@ -1907,7 +1912,7 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
-    use crate::module::ModuleKind;
+    use crate::module::{KnownModule, ModuleKind};
     use crate::module_name::ModuleName;
     use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -3437,5 +3442,92 @@ not_a_directory
         )
         .unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
+    }
+
+    #[test]
+    fn stdlib_identity_with_overlapping_search_paths() {
+        let TestCase { mut db, stdlib, .. } = TestCaseBuilder::new()
+            .with_mocked_typeshed(MockedTypeshed {
+                stdlib_files: &[("builtins.pyi", "")],
+                versions: "builtins: 3.0-",
+            })
+            .build();
+
+        for root in ["/", "/typeshed", "/typeshed/stdlib"] {
+            db.set_search_paths(
+                SearchPathSettings {
+                    extra_paths: vec![root.into()],
+                    custom_typeshed: Some("/typeshed".into()),
+                    ..SearchPathSettings::empty()
+                }
+                .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+                .unwrap(),
+            );
+
+            let module = path_to_module(&db, &FilePath::from(stdlib.join("builtins.pyi"))).unwrap();
+            assert_eq!(module.known(&db), Some(KnownModule::Builtins), "{root}");
+            assert_eq!(
+                resolve_module_confident(&db, &KnownModule::Builtins.name()),
+                Some(module)
+            );
+        }
+    }
+
+    #[test]
+    fn overlapping_stdlib_preserves_resolution_rules() {
+        let mut db = TestDb::new().with_python_version(PythonVersion::PY310);
+        db.write_files([
+            (
+                "/stubs/stdlib/VERSIONS",
+                "shadowed: 3.0-\nnew_module: 3.11-\n",
+            ),
+            ("/stubs/stdlib/shadowed.pyi", ""),
+            ("/stubs/stdlib/shadowed.py", ""),
+            ("/stubs/stdlib/new_module.pyi", ""),
+            ("/overrides/shadowed.pyi", ""),
+            ("/stubs/pkg/__init__.py", ""),
+            ("/stubs/pkg/member.py", ""),
+            ("/overrides/pkg/member.pyi", ""),
+        ])
+        .unwrap();
+        db.set_search_paths(
+            SearchPathSettings {
+                src_roots: vec!["/stubs".into()],
+                extra_paths: vec!["/stubs/stdlib".into(), "/overrides".into()],
+                custom_typeshed: Some("/stubs".into()),
+                ..SearchPathSettings::empty()
+            }
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .unwrap(),
+        );
+
+        for (name, path) in [
+            ("pkg.member", "/overrides/pkg/member.pyi"),
+            ("shadowed", "/overrides/shadowed.pyi"),
+        ] {
+            let name = ModuleName::new(name).unwrap();
+            let module = resolve_module_confident(&db, &name).unwrap();
+            assert_eq!(
+                module.file(&db).unwrap().path(&db),
+                &SystemPathBuf::from(path)
+            );
+        }
+        for path in ["shadowed.pyi", "new_module.pyi"] {
+            assert_eq!(
+                path_to_module(
+                    &db,
+                    &FilePath::from(SystemPathBuf::from("/stubs/stdlib").join(path))
+                ),
+                None,
+            );
+        }
+
+        let source =
+            resolve_real_module_confident(&db, &ModuleName::new_static("shadowed").unwrap())
+                .unwrap();
+        assert_eq!(
+            source.file(&db).unwrap().path(&db),
+            &SystemPathBuf::from("/stubs/stdlib/shadowed.py")
+        );
     }
 }
