@@ -3125,7 +3125,7 @@
           ]
         },
         "strictly-empty-init-modules": {
-          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\n`__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.",
           "type": [
             "boolean",
             "null"
