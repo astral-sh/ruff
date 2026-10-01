@@ -9,35 +9,10 @@ Cancellation points in `finally`, cancellation-catching exception handlers, and
 `__aexit__` methods must be protected by a shielded Trio or AnyIO cancel scope.
 The rule only applies when the module contains evidence that it uses Trio or AnyIO.
 
-<details>
-<summary>License for adapted flake8-async cases</summary>
-
 The reference cases are adapted from `async102.py`, `async102_anyio.py`, `async102_trio.py`, and
 `async102_120_py311.py` in the
 [flake8-async test suite](https://github.com/python-trio/flake8-async/tree/c695f61dd9e237375c197f20f3a3eb41885b4eca/tests/eval_files).
 The last file also covers ASYNC120, but this suite selects only ASYNC102.
-
-MIT License
-
-Copyright (c) 2022 Zac Hatfield-Dodds
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE.
-
-</details>
 
 ## Trio-compatible reference behavior
 
