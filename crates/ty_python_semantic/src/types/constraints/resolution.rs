@@ -5,6 +5,7 @@ use std::cell::{Cell, RefCell};
 use rustc_hash::FxHashMap;
 
 use super::TypeVarSolution;
+use crate::types::callable::SignatureSource;
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
@@ -77,7 +78,10 @@ impl<'db> Resolver<'_, 'db> {
             .visit(db, Type::TypeVar(binding.bound_typevar), || {
                 let original = binding.solution;
                 let replacements = RefCell::new(FxOrderMap::default());
-                if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
+                if !Dependencies::check(db, self.env, original, |dependency| {
+                    if !dependency.is_inferable(db, self.inferable) {
+                        return true;
+                    }
                     let Some(&index) = self.indices.get(&dependency.identity(db)) else {
                         return false;
                     };
@@ -117,18 +121,45 @@ impl<'db> Resolver<'_, 'db> {
                 // Some type forms preserve captured variables when specialized. For example, an
                 // alias changes its explicit arguments but can retain a free variable in its body.
                 // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
-                    .then_some(mapped)
+                Dependencies::check(db, self.env, mapped, |dependency| {
+                    !dependency.is_inferable(db, self.inferable)
+                })
+                .then_some(mapped)
             })
     }
 }
 
 struct VisitDependencies;
 
-/// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
+/// Collect the variables occurring in types, including lazy callable returns.
+pub(in crate::types) fn type_dependencies<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
+) -> TypeVarSet<'db> {
+    let variables = RefCell::new(FxOrderMap::default());
+    let query = |variable: BoundTypeVarInstance<'db>| {
+        variables
+            .borrow_mut()
+            .entry(variable.identity(db))
+            .or_insert(variable);
+        true
+    };
+    let visitor = Dependencies {
+        env,
+        query: &query,
+        satisfied: Cell::new(true),
+        visited: CycleDetector::new(()),
+    };
+    for ty in types {
+        visitor.visit_type(db, ty);
+    }
+    TypeVarSet::from_typevars(db, variables.into_inner().into_values())
+}
+
+/// Visits typevar occurrences, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
-    inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
     satisfied: Cell<bool>,
     visited: CycleDetector<'db, VisitDependencies, Type<'db>, (), 3>,
@@ -138,13 +169,11 @@ impl<'db> Dependencies<'_, 'db> {
     fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
         ty: Type<'db>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
         let visitor = Dependencies {
             env,
-            inferable,
             query: &query,
             satisfied: Cell::new(true),
             visited: CycleDetector::new(()),
@@ -189,9 +218,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             }
         }
         if let Type::TypeVar(typevar) = ty {
-            if typevar.is_inferable(db, self.inferable) {
-                self.satisfied.set((self.query)(typevar));
-            }
+            self.satisfied.set((self.query)(typevar));
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.
@@ -224,8 +251,26 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-        for signature in &callable.signatures(db).overloads {
-            self.signature(db, signature);
+        match callable.signature_source(db) {
+            SignatureSource::Explicit(signatures) => {
+                for signature in &signatures.overloads {
+                    self.signature(db, signature);
+                }
+            }
+            SignatureSource::Lambda(lambda) => {
+                for parameter in lambda.parameters(db) {
+                    self.visit_type(db, parameter.annotated_type());
+                    if let Some(default) = parameter.eager_default_type() {
+                        self.visit_type(db, default);
+                    }
+                }
+                if !self.satisfied.get() {
+                    return;
+                }
+                for variable in lambda.return_type_dependencies(db).iter(db) {
+                    self.visit_type(db, Type::TypeVar(variable));
+                }
+            }
         }
     }
 
@@ -251,7 +296,7 @@ mod tests {
     use ruff_python_ast::name::Name;
     use ty_python_core::ProgramFile;
 
-    use super::{SolutionType, resolve_solution};
+    use super::{SolutionType, resolve_solution, type_dependencies};
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::constraints::TypeVarSolution;
@@ -529,6 +574,98 @@ mod tests {
                 ]
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn recursive_lambda_dependencies_include_only_used_variables() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing import Final
+
+            class Source[U, V]:
+                def __init__(self, value: U):
+                    self.used: Final = lambda: (value, self.used)
+                    self.unused: Final = lambda: (1, self.unused)
+                    self.first: Final = lambda: self.second
+                    self.second: Final = lambda: (value, self.first)
+            "#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let class = global_symbol(db, file, "Source")
+            .place
+            .expect_type()
+            .as_class_literal()
+            .ok_or_else(|| anyhow::anyhow!("expected Source"))?;
+        let variables = class
+            .generic_context(db)
+            .ok_or_else(|| anyhow::anyhow!("expected generic context"))?
+            .variables(db)
+            .collect::<Vec<_>>();
+        let [u, v] = variables.as_slice() else {
+            anyhow::bail!("expected U and V");
+        };
+        let t = create_typevar(db, "T");
+        let int = KnownClass::Int.to_instance(db, &env);
+        let source = Type::instance(db, &env, class.identity_specialization(db));
+        let inferable = TypeVarSet::from_typevars(db, [t, *u, *v]);
+
+        for name in ["used", "first", "second"] {
+            let callback = source.member(db, &env, name).place.expect_type();
+            assert_eq!(
+                type_dependencies(db, &env, [callback])
+                    .iter(db)
+                    .collect::<Vec<_>>(),
+                [*u],
+                "{name}: U occurs only in the recursive return"
+            );
+            assert_eq!(
+                resolve_solution(db, &env, inferable, &[binding(t, callback)]).as_ref(),
+                [SolutionType::Unresolved(callback)],
+                "{name}: missing U"
+            );
+            let resolved = resolve_solution(
+                db,
+                &env,
+                inferable,
+                &[binding(t, callback), binding(*u, int)],
+            );
+            let [SolutionType::Resolved(mapped), SolutionType::Resolved(_)] = resolved.as_ref()
+            else {
+                anyhow::bail!("{name}: unused V must not prevent resolution: {resolved:?}");
+            };
+            assert_eq!(type_dependencies(db, &env, [*mapped]), TypeVarSet::None);
+
+            let specialized = callback.substitute_one_typevar(
+                db,
+                &env,
+                *u,
+                Type::heterogeneous_tuple(db, &env, [Type::TypeVar(*v)]),
+            );
+            assert_eq!(
+                type_dependencies(db, &env, [specialized])
+                    .iter(db)
+                    .collect::<Vec<_>>(),
+                [*v],
+                "{name}: specializing U introduces a dependency on V"
+            );
+            assert_eq!(
+                resolve_solution(db, &env, inferable, &[binding(t, specialized)]).as_ref(),
+                [SolutionType::Unresolved(specialized)],
+            );
+        }
+
+        let unused = source.member(db, &env, "unused").place.expect_type();
+        assert_eq!(type_dependencies(db, &env, [unused]), TypeVarSet::None);
+        assert_eq!(
+            resolve_solution(db, &env, inferable, &[binding(t, unused)]).as_ref(),
+            [SolutionType::Resolved(unused)]
+        );
         Ok(())
     }
 
