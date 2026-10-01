@@ -408,6 +408,21 @@ def f(x: A | Not[A]):
     reveal_type(x)  # revealed: list[Any] | ~A
 ```
 
+Negating a gradual alias is equivalent to negating its underlying type.
+
+```py
+from typing import assert_type
+
+def identity[T](x: T) -> T:
+    return x
+
+def g(x: Not[A]):
+    assert_type(identity(x), Not[list[Any]])
+
+def h(x: Not[list[Any]]):
+    assert_type(identity(x), Not[A])
+```
+
 ## Loop-carried augmented unions
 
 PEP 604 unions created by augmented assignment should converge when the previous loop iteration
@@ -1822,6 +1837,50 @@ type A = list[Not[A]]
 
 def f(x: A):
     reveal_type(x[0])  # revealed: ~A
+```
+
+The alias and its expanded body remain equivalent inside a negation.
+
+```py
+from typing import assert_type
+
+def g(x: Not[A]):
+    assert_type(x, Not[list[Not[A]]])
+```
+
+### Negated gradual recursive aliases
+
+A recursive alias containing `Any` and its expanded body also have equivalent negations.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Not
+
+type A = list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
+    assert_type(identity(x), Not[list[tuple[Any, A]]])
+    assert_type(identity(y), Not[A])
+
+    # error: [type-assertion-failure]
+    assert_type(identity(x), Not[list[int]])
+```
+
+### Negating recursive negations
+
+Double negation cancels even when the aliased type is recursive.
+
+```py
+from typing import assert_type
+from ty_extensions import Not
+
+type A = Not[list[A]]
+
+def f(x: Not[A]):
+    assert_type(x, list[A])
 ```
 
 ### Recursive invariant

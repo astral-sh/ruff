@@ -913,13 +913,8 @@ impl<'db> EnumComplementType<'db> {
                     .collect::<FxOrderSet<_>>(),
             ))
         } else {
-            let intersection = self.to_intersection(db, visitor.env);
-            let mapped = intersection.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-            if mapped == intersection {
-                Type::EnumComplement(self)
-            } else {
-                mapped
-            }
+            self.to_intersection(db, visitor.env)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
         }
     }
 

@@ -1825,6 +1825,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
             }
 
+            // Mapped negations retain alias references to avoid repeatedly unfolding recursive
+            // types. Expand direct aliases for comparison so `~A` and `~list[Any]` compare
+            // identically when `type A = list[Any]`.
+            (Type::Intersection(intersection), _) if intersection.has_aliases(db) => self
+                .with_recursion_guard(db, source, target, || {
+                    self.check_type_pair(db, intersection.expand_aliases(db, env), target)
+                }),
+
+            (_, Type::Intersection(intersection)) if intersection.has_aliases(db) => self
+                .with_recursion_guard(db, source, target, || {
+                    self.check_type_pair(db, source, intersection.expand_aliases(db, env))
+                }),
+
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
