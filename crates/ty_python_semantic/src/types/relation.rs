@@ -924,7 +924,6 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
@@ -933,7 +932,8 @@ impl<'db> Type<'db> {
             typevar_evaluation,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            signature_relation_visitor: materialization_visitor
+                .materialization_signature_relations(),
             materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -3219,7 +3219,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Recursive materialization fallbacks depend on the comparison root, so each directional
         // pass needs fresh materialization caches. Nested equivalence checks still share the
-        // materialization-equivalence recursion guard to avoid re-entering the same comparison.
+        // active type and signature comparisons so they can detect recursive materialization.
         let left_to_right_materialization_visitor =
             self.materialization_visitor.for_new_materialization_root();
         self.as_relation_checker(&left_to_right_materialization_visitor)

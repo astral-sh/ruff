@@ -34,6 +34,7 @@ use crate::types::generics::{
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
 };
+use crate::types::protocol_class::ProtocolMethodRelationKey;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
@@ -847,6 +848,7 @@ impl<'db> SignatureRelationKey<'db> {
 pub(crate) struct SignatureRelationVisitor<'db> {
     signatures: ActiveRecursionDetector<SignatureRelationKey<'db>>,
     pub(super) receiver_constraints: ActiveRecursionDetector<TypePair<'db>>,
+    pub(super) protocol_methods: ActiveRecursionDetector<ProtocolMethodRelationKey<'db>>,
 }
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(

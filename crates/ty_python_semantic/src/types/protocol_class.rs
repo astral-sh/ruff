@@ -12,7 +12,9 @@ use crate::types::attribute_write::{
     property_setter_value_type,
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{
+    DisjointnessChecker, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
+};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -2553,6 +2555,18 @@ struct ProtocolCallableSource<'db> {
     materialization: Option<MaterializationKind>,
 }
 
+/// Identifies a method comparison even when recursive protocol specializations keep growing.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(super) struct ProtocolMethodRelationKey<'db> {
+    source_definitions: Box<[Definition<'db>]>,
+    target_definition: Definition<'db>,
+    relation: TypeRelation,
+    typevar_evaluation: TypeVarEvaluation,
+    source_is_method: bool,
+    source_materialization: Option<MaterializationKind>,
+    target_materialization: Option<MaterializationKind>,
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Bind a complete method contract after its permitted receiver domain is known.
     ///
@@ -2613,59 +2627,94 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     .signatures(db)
                     .iter()
                     .when_all(db, self.constraints, |target_signature| {
-                        let domain = target_signature.protocol_receiver_type(
-                            db,
-                            env,
-                            target_receiver.runtime_type,
-                            target_receiver.self_type,
-                        );
-                        // Class-object implementations bind `Self` differently from the protocol.
-                        // Mixed instance/class methods likewise receive different runtime objects.
-                        let source_domain =
-                            if source_receiver.runtime_type == target_receiver.runtime_type {
-                                domain
-                            } else {
-                                source_receiver.runtime_type
-                            };
-                        let target = Type::Callable(self.bind_protocol_method_receiver(
-                            db,
-                            target.with_signatures(
-                                db,
-                                CallableSignature::single(target_signature.clone()),
-                            ),
-                            domain,
-                            target_receiver.self_type,
-                            None,
-                        ));
-                        // Materializing a signature can compare protocols again. Reuse the
-                        // visitor so those comparisons retain the active equivalence cycle guard.
-                        let target = target_materialization.map_or(target, |kind| {
-                            target.materialize(db, kind, self.materialization_visitor)
-                        });
-                        sources.iter().when_all(db, self.constraints, |source| {
-                            let source = if source_is_method {
-                                self.bind_protocol_method_receiver(
-                                    db,
-                                    *source,
-                                    source_domain,
-                                    source_receiver.self_type,
-                                    Some(source_receiver.runtime_type),
-                                )
-                            } else {
-                                protocol_apply_self_with_receiver(
-                                    db,
-                                    env.program(db),
-                                    *source,
-                                    source_receiver.runtime_type,
-                                    source_receiver.self_type,
-                                )
-                            };
-                            let source = Type::Callable(source);
-                            let source = source_materialization.map_or(source, |kind| {
-                                source.materialize(db, kind, self.materialization_visitor)
+                        let key = target_signature
+                            .definition()
+                            .filter(|_| {
+                                source_materialization.is_some() || target_materialization.is_some()
+                            })
+                            .and_then(|target_definition| {
+                                let source_definitions = sources
+                                    .iter()
+                                    .flat_map(|source| source.signatures(db).iter())
+                                    .map(Signature::definition)
+                                    .collect::<Option<Box<[_]>>>()?;
+                                Some(ProtocolMethodRelationKey {
+                                    source_definitions,
+                                    target_definition,
+                                    relation: self.relation,
+                                    typevar_evaluation: self.typevar_evaluation,
+                                    source_is_method,
+                                    source_materialization,
+                                    target_materialization,
+                                })
                             });
-                            self.check_type_pair(db, source, target)
-                        })
+                        let work = || {
+                            let domain = target_signature.protocol_receiver_type(
+                                db,
+                                env,
+                                target_receiver.runtime_type,
+                                target_receiver.self_type,
+                            );
+                            // Class-object implementations bind `Self` differently from the protocol.
+                            // Mixed instance/class methods likewise receive different runtime objects.
+                            let source_domain =
+                                if source_receiver.runtime_type == target_receiver.runtime_type {
+                                    domain
+                                } else {
+                                    source_receiver.runtime_type
+                                };
+                            let target = Type::Callable(self.bind_protocol_method_receiver(
+                                db,
+                                target.with_signatures(
+                                    db,
+                                    CallableSignature::single(target_signature.clone()),
+                                ),
+                                domain,
+                                target_receiver.self_type,
+                                None,
+                            ));
+                            // Materializing a signature can compare protocols again. Reuse the
+                            // visitor so those comparisons retain the active equivalence cycle guard.
+                            let target = target_materialization.map_or(target, |kind| {
+                                target.materialize(db, kind, self.materialization_visitor)
+                            });
+                            sources.iter().when_all(db, self.constraints, |source| {
+                                let source = if source_is_method {
+                                    self.bind_protocol_method_receiver(
+                                        db,
+                                        *source,
+                                        source_domain,
+                                        source_receiver.self_type,
+                                        Some(source_receiver.runtime_type),
+                                    )
+                                } else {
+                                    protocol_apply_self_with_receiver(
+                                        db,
+                                        env.program(db),
+                                        *source,
+                                        source_receiver.runtime_type,
+                                        source_receiver.self_type,
+                                    )
+                                };
+                                let source = Type::Callable(source);
+                                let source = source_materialization.map_or(source, |kind| {
+                                    source.materialize(db, kind, self.materialization_visitor)
+                                });
+                                self.check_type_pair(db, source, target)
+                            })
+                        };
+                        if let Some(key) = key {
+                            // Binding and materializing these methods can recursively compare
+                            // the same declarations before the signature comparison starts. The
+                            // outer comparison still checks every overload and protocol member.
+                            self.signature_relation_visitor.protocol_methods.visit(
+                                &key,
+                                || self.always(),
+                                work,
+                            )
+                        } else {
+                            work()
+                        }
                     })
             })
     }
