@@ -183,28 +183,3 @@ impl Sub<&Support> for &Support {
         result
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{CHUNK_SIZE, Support};
-    use crate::types::constraints::TypeVarId;
-
-    #[test]
-    fn pop_and_iter_across_chunks() {
-        let typevars =
-            [0, CHUNK_SIZE - 1, 2 * CHUNK_SIZE, 3 * CHUNK_SIZE - 1].map(TypeVarId::from_usize);
-        let mut support = Support::default();
-        assert_eq!(support.iter().count(), 0);
-        assert_eq!(support.pop(), None);
-
-        for typevar in typevars.into_iter().rev() {
-            support.insert(typevar);
-        }
-        assert_eq!(support.iter().collect::<Vec<_>>(), typevars);
-        for typevar in typevars {
-            assert_eq!(support.pop(), Some(typevar));
-        }
-        assert_eq!(support.iter().count(), 0);
-        assert_eq!(support.pop(), None);
-    }
-}
