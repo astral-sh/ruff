@@ -669,7 +669,7 @@ impl<'db> SolutionWalker<'db> {
         for constraint in constraints {
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
-                && constraint.provenance() == ConstraintProvenance::Evidence
+                && constraint.provenance() == ConstraintProvenance::INFERRED
             {
                 evidence.add_constraint(db, bound_typevar, constraint);
             }
@@ -774,7 +774,7 @@ impl<'db> SolutionWalker<'db> {
             current = interior.if_true;
             let constraint_id = interior.constraint;
             let constraint = storage.constraint_data(constraint_id);
-            if constraint.provenance() != ConstraintProvenance::Evidence {
+            if constraint.provenance() != ConstraintProvenance::INFERRED {
                 continue;
             }
             if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
@@ -1745,7 +1745,7 @@ impl<'db> Validations<'db> {
             let constraints = Constraint::new_upper_bound(
                 db,
                 env,
-                ConstraintProvenance::Validity,
+                ConstraintProvenance::VALIDITY,
                 bound_typevar,
                 bound,
             );
@@ -1781,7 +1781,7 @@ impl<'db> Validations<'db> {
                     let constraints = Constraint::new_equivalence_bound(
                         db,
                         env,
-                        ConstraintProvenance::Validity,
+                        ConstraintProvenance::VALIDITY,
                         bound_typevar,
                         constrained_ty,
                     );

@@ -15,34 +15,51 @@ use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
-/// The _provenance_ of a BDD constraint.
-///
-/// Most bounds come from specific relationships found at the call site — for instance, the
-/// relationship between the argument type and parameter annotation when invoking a generic
-/// function. These bounds express actual user intent, and are called _evidence_ bounds.
-///
-/// Other bounds are background limitations on which specializations are valid — for instance, a
-/// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
-/// don't want to choose a validity bound as a solution unless we have no other choice. There is
-/// often an evidence bound that is a better choice.
-///
-/// When we derive a new constraint from both an evidence constraint and a validity constraint, we
-/// produce a _mixed_ constraint. Sometimes we will need to treat that derived constraint the same
-/// as a validity constraint; other times we will need to treat it like an evidence constraint.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum ConstraintProvenance {
-    Validity,
-    Mixed,
-    Evidence,
+bitflags::bitflags! {
+    /// The _provenance_ of a BDD constraint.
+    ///
+    /// Every constraint has at least one provenance flag.
+    ///
+    /// Most bounds come from specific relationships found at the call site — for instance, the
+    /// relationship between the argument type and parameter annotation when invoking a generic
+    /// function. These bounds express actual user intent, and are called _evidence_ bounds.
+    ///
+    /// Other bounds are background limitations on which specializations are valid — for instance, a
+    /// typevar's declared `bound_or_constraints`. These are called _validity_ bounds. Importantly, we
+    /// don't want to choose a validity bound as a solution unless we have no other choice. There is
+    /// often an evidence bound that is a better choice.
+    ///
+    /// Derived constraints retain the union of their inputs' provenance. A constraint with both
+    /// evidence and validity is called _mixed_: sometimes we treat it as validity, and other times
+    /// as evidence.
+    ///
+    /// The expected type of a call supplies _declared_ evidence. Bounds derived from both inferred
+    /// and declared evidence constrain the solution, but do not independently contribute to either
+    /// source's preferred type. We track those sources separately from validity, including when a
+    /// derivation depends on all three.
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::SalsaValue)]
+    pub(crate) struct ConstraintProvenance: u8 {
+        /// Evidence from the call's arguments.
+        const INFERRED = 1 << 0;
+        /// Evidence from the call's expected type.
+        const DECLARED = 1 << 1;
+        /// Restrictions on which specializations are valid, rather than inference evidence.
+        const VALIDITY = 1 << 2;
+    }
 }
 
+impl get_size2::GetSize for ConstraintProvenance {}
+
 impl ConstraintProvenance {
-    /// Returns the provenance of a constraint derived from two existing constraints.
-    pub(super) const fn derived(left: Self, right: Self) -> Self {
-        match (left, right) {
-            (Self::Evidence, Self::Evidence) => Self::Evidence,
-            (Self::Validity, Self::Validity) => Self::Validity,
-            _ => Self::Mixed,
+    pub(super) const fn is_evidence(self) -> bool {
+        self.intersects(Self::INFERRED.union(Self::DECLARED))
+    }
+
+    pub(super) const fn as_declared(self) -> Self {
+        if self.is_evidence() {
+            self.difference(Self::INFERRED).union(Self::DECLARED)
+        } else {
+            self
         }
     }
 
@@ -63,7 +80,7 @@ impl ConstraintProvenance {
         match (combined == left_bound, combined == right_bound) {
             (true, false) => left_provenance,
             (false, true) => right_provenance,
-            _ => ConstraintProvenance::derived(left_provenance, right_provenance),
+            _ => left_provenance | right_provenance,
         }
     }
 }
