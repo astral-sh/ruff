@@ -1,5 +1,3 @@
-use bitflags::bitflags;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::visitor::{self, Visitor};
@@ -70,7 +68,8 @@ use crate::rules::flake8_async::helpers::{AsyncModule, MethodName};
 /// Only single-target assignments with literal values update the tracked shield
 /// state. Only the first recognized cancel scope in a `with` statement is tracked.
 /// Async context managers are checked before their bodies, so changes to shielding
-/// before exit are not modeled.
+/// before exit are not modeled. Only the first cancellation-catching handler of
+/// a try statement establishes a cleanup context, including for exception groups.
 /// The rule visits branches and loops in source order without analyzing
 /// execution paths or rebinding of scope variables. It can therefore miss
 /// unshielded cancellation points or report ones that are shielded at runtime.
@@ -151,20 +150,6 @@ struct CleanupVisitor<'a, 'b> {
     boundary: usize,
 }
 
-// Keep the cancellation families separate: catching Trio cancellation does
-// not consume an asyncio cancellation raised by AnyIO's asyncio backend.
-bitflags! {
-    #[derive(Clone, Copy)]
-    struct CancellationTypes: u8 {
-        const TRIO = 1 << 0;
-        const ASYNCIO = 1 << 1;
-        // A catch-all handler does not establish that asyncio cancellation is
-        // relevant. Keep it separate from the explicit cancellation families
-        // until deciding which remaining families a handler can catch.
-        const CATCH_ALL = 1 << 2;
-    }
-}
-
 fn enables_shield(expr: &Expr) -> bool {
     expr.is_literal_expr()
         && matches!(
@@ -185,37 +170,30 @@ impl<'a> CleanupVisitor<'a, '_> {
         }
     }
 
-    fn cancellation_types(&self, expr: &Expr) -> CancellationTypes {
+    fn catches_cancellation(&self, expr: &Expr) -> bool {
         match expr {
-            Expr::Tuple(tuple) => tuple
-                .iter()
-                .fold(CancellationTypes::empty(), |types, expr| {
-                    types | self.cancellation_types(expr)
-                }),
+            Expr::Tuple(tuple) => tuple.iter().any(|expr| self.catches_cancellation(expr)),
             Expr::Call(call) => {
-                if call.arguments.is_empty()
+                call.arguments.is_empty()
                     && self
                         .checker
                         .semantic()
                         .resolve_qualified_name(&call.func)
                         .is_some_and(|name| name.segments() == ["anyio", "get_cancelled_exc_class"])
-                {
-                    CancellationTypes::CATCH_ALL
-                } else {
-                    CancellationTypes::empty()
-                }
             }
-            _ => self.checker.semantic().resolve_qualified_name(expr).map_or(
-                CancellationTypes::empty(),
-                |name| match name.segments() {
-                    ["", "BaseException"] => CancellationTypes::CATCH_ALL,
-                    ["trio", "Cancelled"] => CancellationTypes::TRIO,
-                    ["asyncio", "CancelledError"] | ["asyncio", "exceptions", "CancelledError"] => {
-                        CancellationTypes::ASYNCIO
-                    }
-                    _ => CancellationTypes::empty(),
-                },
-            ),
+            _ => self
+                .checker
+                .semantic()
+                .resolve_qualified_name(expr)
+                .is_some_and(|name| {
+                    matches!(
+                        name.segments(),
+                        ["", "BaseException"]
+                            | ["trio", "Cancelled"]
+                            | ["asyncio", "CancelledError"]
+                            | ["asyncio", "exceptions", "CancelledError"]
+                    )
+                }),
         }
     }
 
@@ -272,43 +250,21 @@ impl<'a> CleanupVisitor<'a, '_> {
         let context = self.context;
         let boundary = self.boundary;
         self.visit_body(&stmt.body);
-        let handler_types: Vec<_> = stmt
-            .handlers
-            .iter()
-            .map(|handler| {
-                let ast::ExceptHandler::ExceptHandler(handler) = handler;
-                handler
-                    .type_
-                    .as_ref()
-                    .map_or(CancellationTypes::CATCH_ALL, |expr| {
-                        self.cancellation_types(expr)
-                    })
-            })
-            .collect();
-        let mut remaining = CancellationTypes::TRIO;
-        if self.checker.semantic().seen_module(Modules::ANYIO)
-            || handler_types
-                .iter()
-                .any(|types| types.contains(CancellationTypes::ASYNCIO))
-        {
-            remaining.insert(CancellationTypes::ASYNCIO);
-        }
-        for (handler, types) in stmt.handlers.iter().zip(handler_types) {
+        let mut cancelled_caught = false;
+        for handler in &stmt.handlers {
             let ast::ExceptHandler::ExceptHandler(handler) = handler;
             self.context = context;
             self.boundary = boundary;
-            let types = if types.contains(CancellationTypes::CATCH_ALL) {
-                CancellationTypes::TRIO | CancellationTypes::ASYNCIO
-            } else {
-                types
-            };
             if context.is_none() {
                 self.boundary = self.scopes.len();
-                if types.intersects(remaining) {
+                if !cancelled_caught
+                    && handler
+                        .type_
+                        .as_ref()
+                        .is_none_or(|expr| self.catches_cancellation(expr))
+                {
                     self.context = Some(CleanupContext::Except);
-                    if !stmt.is_star {
-                        remaining.remove(types);
-                    }
+                    cancelled_caught = true;
                 }
             }
             if let Some(type_) = &handler.type_ {

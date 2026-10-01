@@ -382,14 +382,11 @@ async def shielded_anyio_handler():
         await cleanup()
 ```
 
-### Handler tuples and cancellation families
+### Handler tuples
 
-A tuple can catch cancellation through any of its members. Trio and asyncio cancellation remain
-separate families: catching one does not consume the other. After both are caught, a later
-`BaseException` handler cannot catch cancellation again.
+A tuple can catch cancellation through any of its members, including an imported alias.
 
 ```py
-import asyncio
 import trio as t
 
 
@@ -398,15 +395,6 @@ async def exception_handlers():
         ...
     except (ValueError, t.Cancelled):
         await cleanup()  # error: [await-in-finally-or-cancelled]
-
-    try:
-        ...
-    except t.Cancelled:
-        await cleanup()  # error: [await-in-finally-or-cancelled]
-    except asyncio.CancelledError:
-        await cleanup()  # error: [await-in-finally-or-cancelled]
-    except BaseException:
-        await cleanup()
 ```
 
 ### Exception groups
@@ -417,9 +405,8 @@ target-version = "py311"
 lint.select = ["ASYNC102"]
 ```
 
-Every `except*` subgroup is independent, so a cancellation-catching subgroup does not make
-later subgroups safe. An ordinary-exception subgroup is outside this rule's scope even though
-ASYNC120 may report it.
+A cancellation-catching `except*` subgroup is a cleanup context. An ordinary-exception subgroup
+is outside this rule's scope even though ASYNC120 may report it.
 
 ```py
 import trio
@@ -441,18 +428,6 @@ async def exception_groups():
     except* BaseException:
         with trio.move_on_after(30, shield=True):
             await cleanup()
-```
-
-Successive cancellation-catching subgroups are both checked.
-
-```py
-async def cancellation_subgroups():
-    try:
-        ...
-    except* trio.Cancelled:
-        await cleanup()  # error: [await-in-finally-or-cancelled]
-    except* BaseException:
-        await cleanup()  # error: [await-in-finally-or-cancelled]
 ```
 
 ### Malformed handler expressions
