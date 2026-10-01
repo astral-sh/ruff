@@ -2798,6 +2798,73 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Recursive protocol intersections
+
+Specializing a recursive protocol method preserves the nested intersection through repeated calls.
+Regression test for <https://github.com/astral-sh/ty/issues/4099>.
+
+```py
+from __future__ import annotations
+from typing import Protocol, TypeVar
+from ty_extensions import Intersection, Not
+
+T = TypeVar("T")
+
+class A(Protocol[T]):
+    def make_invariant(self, value: T) -> T: ...
+    def cause_problems(self) -> A[Intersection[Not[A[T]], A[str]]]: ...
+
+def foo(x: A[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[T@foo]]
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[A[str] & ~A[A[str] & ~A[T@foo]]]
+```
+
+Inherited methods also preserve the specialization supplied by their generic base.
+
+```py
+class Nested(A[list[T]], Protocol[T]): ...
+
+def inherited(x: Nested[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
+```
+
+## Specializing descriptor overloads on protocols
+
+A descriptor can select different overloads for different protocol specializations. We specialize
+its declaration before resolving the member type required by the protocol.
+
+```py
+from __future__ import annotations
+from typing import Callable, Generic, Protocol, TypeVar, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> str: ...
+    @overload
+    def __get__(self: Descriptor[str], instance: object, owner: type | None = None) -> bytes: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str | bytes:
+        raise NotImplementedError
+
+T_co = TypeVar("T_co", covariant=True)
+
+class HasValue(Protocol[T_co]):
+    @Descriptor
+    def value(self) -> T_co: ...
+
+class BytesValue:
+    @property
+    def value(self) -> bytes:
+        return b"value"
+
+static_assert(is_assignable_to(BytesValue, HasValue[str]))
+static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.

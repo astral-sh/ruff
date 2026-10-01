@@ -1975,6 +1975,67 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+### Recursive protocol intersections
+
+Specializing a recursive protocol method preserves the nested intersection through repeated calls.
+Regression test for <https://github.com/astral-sh/ty/issues/4099>.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+from ty_extensions import Intersection, Not
+
+class A[T](Protocol):
+    def make_invariant(self, value: T) -> T: ...
+    def cause_problems(self) -> A[Intersection[Not[A[T]], A[str]]]: ...
+
+def foo[T](x: A[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[T@foo]]
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[A[str] & ~A[A[str] & ~A[T@foo]]]
+```
+
+Inherited methods also preserve the specialization supplied by their generic base.
+
+```py
+class Nested[T](A[list[T]], Protocol): ...
+
+def inherited[T](x: Nested[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
+```
+
+### Specializing descriptor overloads on protocols
+
+A descriptor can select different overloads for different protocol specializations. We specialize
+its declaration before resolving the member type required by the protocol.
+
+```py
+from __future__ import annotations
+from typing import Callable, Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Descriptor[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> str: ...
+    @overload
+    def __get__(self: Descriptor[str], instance: object, owner: type | None = None) -> bytes: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str | bytes:
+        raise NotImplementedError
+
+class HasValue[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+class BytesValue:
+    @property
+    def value(self) -> bytes:
+        return b"value"
+
+static_assert(is_assignable_to(BytesValue, HasValue[str]))
+static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
 ## Subscripting non-generic classes
 
 Subscripting a non-generic class in a type expression is an error. The invalid type expression

@@ -77,6 +77,20 @@ impl<'db> ProtocolClass<'db> {
         cached_protocol_interface(db, *self)
     }
 
+    /// Defers specialization until an individual member is accessed. Constructing all specialized
+    /// signatures here can expand recursive return types before a relation checks finite members.
+    pub(super) fn interface_view(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
+        let ClassType::Generic(alias) = *self else {
+            return ProtocolInterfaceView::new(self.interface(db), None);
+        };
+        let origin = ProtocolClass(alias.origin(db).identity_specialization(db));
+        ProtocolInterfaceView {
+            interface: origin.interface(db),
+            specialized_class: Some(self),
+            materialization: None,
+        }
+    }
+
     /// Structural variance inference currently excludes recursive type aliases and descriptor
     /// writes whose accepted values cannot be represented by a single type, leaving no write
     /// domain to use contravariantly.
@@ -94,13 +108,13 @@ impl<'db> ProtocolClass<'db> {
     /// invariant type variable as a read and then reuse that result as its write. Strip only the
     /// pending marker while constructing the shared interface so reads and writes can each apply
     /// the original materialization in their own variance position.
-    pub(super) fn unmaterialized_interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+    pub(super) fn unmaterialized_interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         let ClassType::Generic(alias) = *self else {
-            return self.interface(db);
+            return self.interface_view(db);
         };
         let specialization = alias.specialization(db);
         if specialization.materialization_kind(db).is_none() {
-            return self.interface(db);
+            return self.interface_view(db);
         }
 
         let alias = GenericAlias::new(
@@ -108,7 +122,7 @@ impl<'db> ProtocolClass<'db> {
             alias.origin(db),
             specialization.with_materialization_kind(db, None),
         );
-        ProtocolClass(ClassType::Generic(alias)).interface(db)
+        ProtocolClass(ClassType::Generic(alias)).interface_view(db)
     }
 
     /// Walk the effective non-method member types declared by this protocol.
@@ -208,7 +222,7 @@ impl<'db> ProtocolClass<'db> {
 
             #[expect(
                 clippy::iter_over_hash_type,
-                reason = "member names are unique within each class and both consumers are order-independent"
+                reason = "member names are unique within each class and consumers are order-independent"
             )]
             for (symbol_id, candidate) in direct_members {
                 let name = place_table.symbol(symbol_id).name();
@@ -420,13 +434,15 @@ pub(super) struct ProtocolInterface<'db> {
 
 impl get_size2::GetSize for ProtocolInterface<'_> {}
 
-/// A protocol interface together with the materialization applied to its requirements.
+/// A protocol interface together with its specialization and materialization.
 ///
 /// The original interface remains shared. A member's readable and writable types are
-/// materialized only when that member is accessed or compared.
+/// specialized and materialized only when that member is accessed or compared.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolInterfaceView<'db> {
     interface: ProtocolInterface<'db>,
+    // Descriptor overloads must be resolved after applying this class's specialization.
+    specialized_class: Option<ProtocolClass<'db>>,
     materialization: Option<MaterializationKind>,
 }
 
@@ -437,6 +453,7 @@ impl<'db> ProtocolInterfaceView<'db> {
     ) -> Self {
         Self {
             interface,
+            specialized_class: None,
             materialization,
         }
     }
@@ -445,8 +462,18 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface
     }
 
-    pub(super) const fn materialization_kind(self) -> Option<MaterializationKind> {
-        self.materialization
+    pub(super) const fn with_materialization(
+        self,
+        materialization: Option<MaterializationKind>,
+    ) -> Self {
+        Self {
+            materialization,
+            ..self
+        }
+    }
+
+    pub(super) const fn with_interface(self, interface: ProtocolInterface<'db>) -> Self {
+        Self { interface, ..self }
     }
 
     pub(super) fn members<'a>(
@@ -462,6 +489,7 @@ impl<'db> ProtocolInterfaceView<'db> {
             .map(move |(name, data)| ProtocolMember {
                 name,
                 data,
+                specialized_class: self.specialized_class,
                 materialization: self.materialization,
             })
     }
@@ -474,8 +502,20 @@ impl<'db> ProtocolInterfaceView<'db> {
     pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
         let env = ProgramEnvironment::from_program(self.interface.program(db));
         self.members(db).all(|member| {
-            !matches!(
+            if matches!(
                 member.structural_member_priority(db, &env),
+                StructuralMemberPriority::Recursive
+            ) {
+                return false;
+            }
+            // A finite declaration can acquire recursive types through its specialization.
+            let data = member.specialized_data(db);
+            !matches!(
+                ProtocolMember {
+                    data: &data,
+                    ..member
+                }
+                .structural_member_priority(db, &env),
                 StructuralMemberPriority::Recursive
             )
         })
@@ -492,6 +532,7 @@ impl<'db> ProtocolInterfaceView<'db> {
             .map(|data| ProtocolMember {
                 name,
                 data,
+                specialized_class: self.specialized_class,
                 materialization: self.materialization,
             })
     }
@@ -536,14 +577,15 @@ impl<'db> ProtocolInterfaceView<'db> {
             let original = ProtocolMember {
                 name: materialized.name,
                 data: materialized.data,
+                specialized_class: materialized.specialized_class,
                 materialization: None,
             };
 
             if materialized
-                .access(ProtocolMemberAccessMode::Instance)
+                .access(db, ProtocolMemberAccessMode::Instance)
                 .materialized_types(db, env)
                 != original
-                    .access(ProtocolMemberAccessMode::Instance)
+                    .access(db, ProtocolMemberAccessMode::Instance)
                     .materialized_types(db, env)
             {
                 return true;
@@ -557,10 +599,10 @@ impl<'db> ProtocolInterfaceView<'db> {
             }
 
             materialized
-                .access(ProtocolMemberAccessMode::Class)
+                .access(db, ProtocolMemberAccessMode::Class)
                 .materialized_types(db, env)
                 != original
-                    .access(ProtocolMemberAccessMode::Class)
+                    .access(db, ProtocolMemberAccessMode::Class)
                     .materialized_types(db, env)
         })
     }
@@ -580,7 +622,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.member_by_name(db, name).map(|member| {
             (
                 member
-                    .access(ProtocolMemberAccessMode::Instance)
+                    .access(db, ProtocolMemberAccessMode::Instance)
                     .write()
                     .and_then(|write| write.requirement(db, env, Some(receiver_ty))),
                 member.qualifiers(),
@@ -602,7 +644,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.member_by_name(db, name).map(|member| {
             (
                 member
-                    .access(ProtocolMemberAccessMode::Class)
+                    .access(db, ProtocolMemberAccessMode::Class)
                     .write()
                     .and_then(|write| write.requirement(db, env, Some(receiver_ty)))
                     .and_then(|requirement| requirement.accepted_type()),
@@ -620,7 +662,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
                 place: member
-                    .access(ProtocolMemberAccessMode::Instance)
+                    .access(db, ProtocolMemberAccessMode::Instance)
                     .read()
                     .and_then(|read| read.result_type(db, env, None))
                     .map(Place::bound)
@@ -643,7 +685,7 @@ impl<'db> ProtocolInterfaceView<'db> {
         name: &str,
     ) -> Option<PlaceAndQualifiers<'db>> {
         self.member_by_name(db, name).map(|member| {
-            let access = member.access(ProtocolMemberAccessMode::Class);
+            let access = member.access(db, ProtocolMemberAccessMode::Class);
             PlaceAndQualifiers {
                 place: access
                     .read()
@@ -704,7 +746,7 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
     visitor: &V,
 ) {
     let env = visitor.program_environment();
-    match member.data.kind {
+    match member.specialized_data(db).kind {
         ProtocolMemberKind::Method(method, kind) => {
             let method = member
                 .materialization
@@ -737,7 +779,7 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
         ProtocolMemberKind::Property { .. } => {
             walk_protocol_member_access(
                 db,
-                member.access(ProtocolMemberAccessMode::Instance),
+                member.access(db, ProtocolMemberAccessMode::Instance),
                 Some(receiver_ty),
                 visitor,
             );
@@ -820,7 +862,7 @@ impl<'db> ProtocolInterface<'db> {
                 let normalized = if let Some(prev_data) = prev_inner.get(name) {
                     curr_data.cycle_normalized(db, env, prev_data, cycle)
                 } else {
-                    curr_data.clone()
+                    *curr_data
                 };
                 (name.clone(), normalized)
             })
@@ -838,6 +880,7 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).iter().map(|(name, data)| ProtocolMember {
             name,
             data,
+            specialized_class: None,
             materialization: None,
         })
     }
@@ -856,10 +899,11 @@ impl<'db> ProtocolInterface<'db> {
                     predicate(&ProtocolMember {
                         name,
                         data,
+                        specialized_class: None,
                         materialization: None,
                     })
                 })
-                .map(|(name, data)| (name.clone(), data.clone()))
+                .map(|(name, data)| (name.clone(), *data))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -893,7 +937,7 @@ impl<'db> ProtocolInterface<'db> {
             ]
             .into_iter()
             .filter(move |mode| *mode != ProtocolMemberAccessMode::Class || !is_instance_method)
-            .flat_map(move |mode| member.access(mode).variances(db, env))
+            .flat_map(move |mode| member.access(db, mode).variances(db, env))
         })
     }
 
@@ -910,7 +954,7 @@ impl<'db> ProtocolInterface<'db> {
             .get(name)
             .and_then(|data| {
                 ProtocolMemberAccess {
-                    declaration: data,
+                    declaration: *data,
                     mode: ProtocolMemberAccessMode::Instance,
                     materialization: None,
                 }
@@ -1420,14 +1464,14 @@ impl<'db> ProtocolPropertyType<'db> {
 
 /// Describes instance or class-based access to a protocol member.
 #[derive(Debug, Copy, Clone)]
-struct ProtocolMemberAccess<'a, 'db> {
-    declaration: &'a ProtocolMemberData<'db>,
+struct ProtocolMemberAccess<'db> {
+    declaration: ProtocolMemberData<'db>,
     mode: ProtocolMemberAccessMode,
     materialization: Option<MaterializationKind>,
 }
 
-impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
-    fn read(self) -> Option<ProtocolMemberReadAccess<'a, 'db>> {
+impl<'db> ProtocolMemberAccess<'db> {
+    fn read(self) -> Option<ProtocolMemberReadAccess<'db>> {
         let supported = match self.declaration.kind {
             ProtocolMemberKind::Method(..) => true,
             ProtocolMemberKind::Property { read, .. } => {
@@ -1521,7 +1565,7 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
 
 fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
-    access: ProtocolMemberAccess<'_, 'db>,
+    access: ProtocolMemberAccess<'db>,
     self_type: Option<Type<'db>>,
     visitor: &V,
 ) {
@@ -1564,11 +1608,11 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
 
 /// A supported read operation, resolved only when its result type is needed.
 #[derive(Debug, Copy, Clone)]
-struct ProtocolMemberReadAccess<'a, 'db> {
-    access: ProtocolMemberAccess<'a, 'db>,
+struct ProtocolMemberReadAccess<'db> {
+    access: ProtocolMemberAccess<'db>,
 }
 
-impl<'db> ProtocolMemberReadAccess<'_, 'db> {
+impl<'db> ProtocolMemberReadAccess<'db> {
     fn result_type(
         self,
         db: &'db dyn Db,
@@ -1691,7 +1735,7 @@ fn cycle_normalized_optional_type<'db>(
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
@@ -1994,6 +2038,7 @@ impl<'db> ProtocolMemberKind<'db> {
 pub(super) struct ProtocolMember<'a, 'db> {
     name: &'a str,
     data: &'a ProtocolMemberData<'db>,
+    specialized_class: Option<ProtocolClass<'db>>,
     materialization: Option<MaterializationKind>,
 }
 
@@ -2021,16 +2066,23 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
             ProtocolMemberAccessMode::Instance,
             ProtocolMemberAccessMode::Class,
         ] {
-            walk_protocol_member_access(db, member.access(mode), None, visitor);
+            walk_protocol_member_access(db, member.access(db, mode), None, visitor);
         }
     } else {
-        for ty in member.data.kind.member_types() {
+        for ty in member.specialized_data(db).kind.member_types() {
             visitor.visit_type(db, ty);
         }
     }
 }
 
 impl<'a, 'db> ProtocolMember<'a, 'db> {
+    fn specialized_data(&self, db: &'db dyn Db) -> ProtocolMemberData<'db> {
+        // Retain the declaration while the specialized member is unavailable during cycle recovery.
+        self.specialized_class
+            .and_then(|class| cached_protocol_member(db, *class, Name::new(self.name)))
+            .unwrap_or(*self.data)
+    }
+
     pub(super) fn name(&self) -> &'a str {
         self.name
     }
@@ -2119,6 +2171,8 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     ///
     /// Simple finite members are cheapest, followed by finite overloads. Recursive members and
     /// aliases that contain a protocol or are themselves recursive are compared last.
+    /// Inspect the declaration before specialization: specializing a recursive signature can
+    /// itself require another protocol comparison, before finite requirements can reject it.
     pub(super) fn structural_member_priority(
         &self,
         db: &'db dyn Db,
@@ -2324,9 +2378,9 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.data.definition
     }
 
-    fn access(&self, mode: ProtocolMemberAccessMode) -> ProtocolMemberAccess<'a, 'db> {
+    fn access(&self, db: &'db dyn Db, mode: ProtocolMemberAccessMode) -> ProtocolMemberAccess<'db> {
         ProtocolMemberAccess {
-            declaration: self.data,
+            declaration: self.specialized_data(db),
             mode,
             materialization: self.materialization,
         }
@@ -2340,9 +2394,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     /// case needs a separate class-side check for the same member.
     fn implementation_access(
         &self,
+        db: &'db dyn Db,
         ty: Type<'db>,
         mode: ProtocolMemberAccessMode,
-    ) -> Option<ProtocolMemberAccess<'a, 'db>> {
+    ) -> Option<ProtocolMemberAccess<'db>> {
         if mode == ProtocolMemberAccessMode::Class
             && (matches!(
                 (ty, self.data.kind),
@@ -2357,7 +2412,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         {
             None
         } else {
-            Some(self.access(mode))
+            Some(self.access(db, mode))
         }
     }
 }
@@ -2521,7 +2576,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
-        required: ProtocolMemberAccess<'_, 'db>,
+        required: ProtocolMemberAccess<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         // Reading a member as `object` imposes no constraint on the type read. A class
@@ -2684,7 +2739,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         ty: Type<'db>,
         receiver_ty: Type<'db>,
         member: &ProtocolMember<'_, 'db>,
-        required: Option<ProtocolMemberAccess<'_, 'db>>,
+        required: Option<ProtocolMemberAccess<'db>>,
     ) -> ConstraintSet<'db, 'c> {
         let Some(required) = required else {
             return self.always();
@@ -2774,7 +2829,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         member: &ProtocolMember<'_, 'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let instance_access = member.implementation_access(ty, ProtocolMemberAccessMode::Instance);
+        let instance_access =
+            member.implementation_access(db, ty, ProtocolMemberAccessMode::Instance);
         if let Some(context) = self.report_context() {
             if member.has_incompatible_class_variable_declaration(db, env, ty) {
                 context.push(ErrorContext::ProtocolMemberClassVarMismatch {
@@ -2799,7 +2855,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ProtocolMemberAccessMode::Instance,
                 )
                 .is_none();
-            let class_access = member.implementation_access(ty, ProtocolMemberAccessMode::Class);
+            let class_access =
+                member.implementation_access(db, ty, ProtocolMemberAccessMode::Class);
             let class_read_missing = class_access.and_then(ProtocolMemberAccess::read).is_some()
                 && !(member.is_instance_method() && member.name == "__call__")
                 && protocol_member_read_type(
@@ -2831,7 +2888,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .type_satisfies_protocol_member_access(db, ty, ty, member, instance_access)
             .and(db, self.constraints, || {
                 let class_access =
-                    member.implementation_access(ty, ProtocolMemberAccessMode::Class);
+                    member.implementation_access(db, ty, ProtocolMemberAccessMode::Class);
                 self.type_satisfies_protocol_member_access(
                     db,
                     ty,
@@ -2868,7 +2925,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             .interface(db)
             .members(db)
             .when_all(db, self.constraints, |member| {
-                let required = member.access(ProtocolMemberAccessMode::Class);
+                let required = member.access(db, ProtocolMemberAccessMode::Class);
                 if required.read().is_none() && required.write().is_none() {
                     return self.always();
                 }
@@ -2909,24 +2966,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         access: ProtocolMemberAccessMode,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let source = source_member.access(access);
-
         if access == ProtocolMemberAccessMode::Class
             && source_member.is_method()
             && target_member.is_instance_method()
         {
             // The instance-side check is authoritative for an ordinary method's signature. Class
             // access only establishes that the source member is also present on the class.
-            return ConstraintSet::from_bool(self.constraints, source.read().is_some());
+            return self.always();
         }
-        let target = target_member.access(access);
+        let source = source_member.access(db, access);
+        let target = target_member.access(db, access);
 
         let read_result = if target.read().is_none() {
             self.always()
         } else if source.read().is_none() {
             self.never()
         } else {
-            let bind_read = |access: ProtocolMemberAccess<'_, 'db>,
+            let bind_read = |access: ProtocolMemberAccess<'db>,
                              member: &ProtocolMember<'_, 'db>| {
                 let ty = access
                     .read()
@@ -3081,7 +3137,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         if member
-            .access(ProtocolMemberAccessMode::Instance)
+            .access(db, ProtocolMemberAccessMode::Instance)
             .write()
             .is_none()
         {
@@ -3115,7 +3171,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         ty: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
-        let access = member.access(ProtocolMemberAccessMode::Instance);
+        let access = member.access(db, ProtocolMemberAccessMode::Instance);
         let result = if !member.is_method() {
             access
                 .read()
@@ -3260,6 +3316,55 @@ impl<'db> ProtocolMemberCandidate<'db> {
     ) -> Self {
         self.ty = self.ty.apply_optional_specialization(db, specialization);
         self
+    }
+
+    fn into_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType<'db>,
+    ) -> ProtocolMemberData<'db> {
+        let Self {
+            ty,
+            qualifiers,
+            definition,
+            bound_on_class,
+        } = self;
+
+        match ty {
+            Type::PropertyInstance(property) => ProtocolMemberData::property(
+                property
+                    .getter(db)
+                    .map(ProtocolPropertyType::property_getter),
+                property
+                    .setter(db)
+                    .map(ProtocolPropertyType::property_setter)
+                    .map(ProtocolMemberWrite::from_type),
+                definition,
+            ),
+            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
+                ProtocolMemberData::method(db, callable, definition)
+            }
+            Type::FunctionLiteral(function)
+                if bound_on_class.is_yes()
+                    || function.is_staticmethod(db)
+                    || function.is_classmethod(db) =>
+            {
+                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
+            }
+            _ if bound_on_class.is_yes()
+                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
+            {
+                if let Some(descriptor) =
+                    descriptor_decorated_protocol_member(db, env, ty, class, definition)
+                {
+                    descriptor
+                } else {
+                    ProtocolMemberData::attribute(ty, qualifiers, definition)
+                }
+            }
+            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+        }
     }
 
     fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
@@ -3411,52 +3516,51 @@ fn cached_protocol_interface<'db>(
         let specialization =
             specialization.map(|specialization| specialization.with_typevar_bounds(db));
         let candidate = candidate.apply_specialization(db, specialization);
-        let ProtocolMemberCandidate {
-            ty,
-            qualifiers,
-            definition,
-            bound_on_class,
-        } = candidate;
-
-        let member = match ty {
-            Type::PropertyInstance(property) => ProtocolMemberData::property(
-                property
-                    .getter(db)
-                    .map(ProtocolPropertyType::property_getter),
-                property
-                    .setter(db)
-                    .map(ProtocolPropertyType::property_setter)
-                    .map(ProtocolMemberWrite::from_type),
-                definition,
-            ),
-            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
-            }
-            Type::FunctionLiteral(function)
-                if bound_on_class.is_yes()
-                    || function.is_staticmethod(db)
-                    || function.is_classmethod(db) =>
-            {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
-            }
-            _ if bound_on_class.is_yes()
-                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
-            {
-                if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(db, &env, ty, class, definition)
-                {
-                    descriptor
-                } else {
-                    ProtocolMemberData::attribute(ty, qualifiers, definition)
-                }
-            }
-            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
-        };
+        let member = candidate.into_member(db, &env, class);
 
         members.insert(name.clone(), member);
     });
 
     ProtocolInterface::new(db, env.program(db), members)
+}
+
+/// Specializes only the requested member, including descriptor overload selection.
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa owns the query key; lint expectations cannot observe the generated function"
+)]
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _| None,
+    cycle_fn=|db, cycle, previous: &Option<ProtocolMemberData<'db>>, current: Option<ProtocolMemberData<'db>>, class: ClassType<'db>, _| {
+        let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+        current.map(|current| previous.as_ref().map_or(current, |previous| current.cycle_normalized(db, &env, previous, cycle)))
+    },
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn cached_protocol_member<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    name: Name,
+) -> Option<ProtocolMemberData<'db>> {
+    let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+    let mut member = None;
+    ProtocolClass(class).for_each_member_candidate(
+        db,
+        &env,
+        |candidate_name, candidate, specialization| {
+            if member.is_none() && candidate_name == &name {
+                let specialization =
+                    specialization.map(|specialization| specialization.with_typevar_bounds(db));
+                member = Some(
+                    candidate
+                        .apply_specialization(db, specialization)
+                        .into_member(db, &env, class),
+                );
+            }
+        },
+    );
+    member
 }
 
 fn protocol_interface_cycle_initial<'db>(
