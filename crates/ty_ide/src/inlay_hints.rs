@@ -6440,7 +6440,7 @@ Source with applied edits:
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/typing.pyi:LL:1
            |
-        LL | Protocol: _SpecialForm
+        LL | Protocol: type[_Protocol]
            | ^^^^^^^^
         info: Source
           --> main2.py:LL:26
