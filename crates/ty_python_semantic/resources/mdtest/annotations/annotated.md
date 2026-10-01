@@ -187,3 +187,45 @@ while True:
     value = Annotated[TypeOf[value], "metadata"]
     reveal_type(value)  # revealed: <special-form 'typing.Annotated[Divergent, <metadata>]'>
 ```
+
+## Recursive inferred attributes
+
+An inferred attribute can store successive runtime `Annotated` objects. The recursive approximation
+accepts the next assignment, both with and without a separate initializer.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+class Initialized:
+    def __init__(self):
+        self.value = int
+
+    def update(self):
+        self.value = Annotated[TypeOf[self.value], "metadata"]
+
+class Uninitialized:
+    def update(self):
+        self.value = Annotated[TypeOf[self.value], "metadata"]
+```
+
+## Distinct runtime values
+
+An `Annotated` object wrapping `int` is distinct from one wrapping `object`, even though `int` is a
+subtype of `object`.
+
+```py
+from typing import Annotated
+from ty_extensions._internal import TypeOf
+
+integer = Annotated[int, "metadata"]
+object_ = Annotated[object, "metadata"]
+
+def accepts_integer(value: TypeOf[integer]): ...
+def accepts_object(value: TypeOf[object_]): ...
+
+accepts_integer(integer)
+accepts_object(object_)
+accepts_integer(object_)  # error: [invalid-argument-type]
+accepts_object(integer)  # error: [invalid-argument-type]
+```

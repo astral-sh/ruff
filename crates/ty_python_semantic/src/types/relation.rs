@@ -2037,6 +2037,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(source)),
+                Type::KnownInstance(KnownInstanceType::Annotated(target)),
+            ) if source.inner(db).is_recursive_divergent()
+                || target.inner(db).is_recursive_divergent() =>
+            {
+                // Recursive inference preserves an Annotated object while replacing its wrapped
+                // type with Divergent. That approximation must accept another unfolding of the
+                // object, without making distinct concrete Annotated values interchangeable.
+                self.check_relation_in_invariant_position(
+                    db,
+                    source.inner(db),
+                    None,
+                    target.inner(db),
+                    None,
+                )
+            }
+
             // The read-only `__func__` and `__wrapped__` attributes expose the complete wrapped
             // object, so its attributes matter here as well as its call signature.
             (

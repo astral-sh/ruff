@@ -703,6 +703,29 @@ fn recursive_annotated_normalization() {
 }
 
 #[test]
+fn recursive_annotated_assignability() {
+    let db = setup_db();
+    let env = db.program_environment();
+    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let annotated =
+        |ty| Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(&db, ty)));
+    let recursive = annotated(div);
+    let integer = annotated(KnownClass::Int.to_instance(&db, &env));
+    let object = annotated(Type::object());
+
+    for concrete in [integer, object, annotated(recursive)] {
+        assert!(concrete.is_assignable_to(&db, &env, recursive));
+        assert!(recursive.is_assignable_to(&db, &env, concrete));
+        assert!(!concrete.is_subtype_of(&db, &env, recursive));
+        assert!(!recursive.is_subtype_of(&db, &env, concrete));
+    }
+    assert!(!integer.is_assignable_to(&db, &env, object));
+    assert!(!object.is_assignable_to(&db, &env, integer));
+    assert!(!Type::int_literal(1).is_assignable_to(&db, &env, recursive));
+    assert!(!recursive.is_assignable_to(&db, &env, KnownClass::Int.to_instance(&db, &env)));
+}
+
+#[test]
 fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     let db = setup_db();
     let env = db.program_environment();
