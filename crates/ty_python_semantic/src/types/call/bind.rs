@@ -6289,6 +6289,7 @@ impl<'db> CallInference<'_, 'db> {
 
         let inference = self.solve(
             constraints,
+            generic_context,
             builder,
             &preferred_type_mappings,
             preferred_solutions_incomplete,
@@ -6311,6 +6312,7 @@ impl<'db> CallInference<'_, 'db> {
     fn solve<'c>(
         &self,
         constraints: &'c ConstraintSetBuilder<'db>,
+        generic_context: GenericContext<'db>,
         mut builder: SpecializationBuilder<'db, 'c>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         preferred_solutions_incomplete: bool,
