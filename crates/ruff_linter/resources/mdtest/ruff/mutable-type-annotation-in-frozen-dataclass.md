@@ -20,7 +20,12 @@ class SomeDataClass2:
 
 @dataclass(frozen=True)
 class SomeDataClass3:
+    set1: set[int]  # snapshot: mutable-type-annotation-in-frozen-dataclass
+  
+@dataclass(frozen=True)
+class SomeDataClass4:
     tuple1: tuple[int]
+
 ```
 
 ```snapshot
@@ -36,6 +41,13 @@ error[RUF078]: Do not use mutable type annotations in a frozen dataclass
   |
 9 |     dict1: dict[int, str]   # snapshot: mutable-type-annotation-in-frozen-dataclass
   |            ^^^^^^^^^^^^^^
+
+
+error[RUF078]: Do not use mutable type annotations in a frozen dataclass
+  --> src/mdtest_snippet.py:13:11
+   |
+13 |     set1: set[int]  # snapshot: mutable-type-annotation-in-frozen-dataclass
+   |           ^^^^^^^^
 ```
 
 ## No errors
@@ -47,4 +59,15 @@ from dataclasses import dataclass
 @dataclass
 class UnfrozenDataclass:
     list1: list[int]    # no diagnostic
+```
+
+A frozen dataclass having only immutable members
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class FrozenDataclassWithImmutableMembers:
+    tuple1: tuple[int]    # no diagnostic
+    set1: frozenset[int]    # no diagnostic
 ```

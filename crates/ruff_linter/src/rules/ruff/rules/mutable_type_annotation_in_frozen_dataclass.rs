@@ -32,13 +32,20 @@ use ruff_text_size::Ranged;
 ///     dict1: dict[int, str]   # snapshot: mutable-type-annotation-in-frozen-dataclass
 ///
 /// @dataclass(frozen=True)
+/// class SomeDataClass2:
+///     set1: set[int]   # snapshot: mutable-type-annotation-in-frozen-dataclass
+///
+/// @dataclass(frozen=True)
 /// class SomeDataClass3:
-///     tuple1: tuple[int]
+///     tuple1: tuple[int]  # No error
+/// 
 /// ```
 ///
 /// ## Use instead
 /// 
-/// Use tuples wherever applicable, or just avoid those fields altogether
+/// - Use tuples instead of lists 
+/// - Use frozensets instead of sets
+/// - Use frozendicts instead of dicts (for Python versions >= 3.15)
 /// 
 /// ```py
 /// @dataclass(frozen=True)
@@ -75,7 +82,7 @@ pub(crate) fn mutable_type_annotation_in_frozen_dataclass(
     if !is_frozen {
         return;
     }
-
+    
     for statement in &classdef.body {
         let Stmt::AnnAssign(StmtAnnAssign { annotation, .. }) = statement else {
             continue;
