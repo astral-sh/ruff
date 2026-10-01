@@ -7,7 +7,7 @@ Released on 2026-10-01.
 ### Preview features
 
 - Add a migration guide for categories ([#28087](https://github.com/astral-sh/ruff/pull/28087))
-- Add rule for context manager iterator annotations (UP052) ([#29000](https://github.com/astral-sh/ruff/pull/29000))
+- \[`pyupgrade`\] Add rule for context manager iterator annotations (`UP052`) ([#29000](https://github.com/astral-sh/ruff/pull/29000))
 
 ### Performance
 
@@ -20,8 +20,8 @@ Released on 2026-10-01.
 ### Documentation
 
 - Fix links to moved changelog sections and renamed mdtests ([#28941](https://github.com/astral-sh/ruff/pull/28941))
-- docs(faq): add Python 3.15 as supported (preview) version ([#28907](https://github.com/astral-sh/ruff/pull/28907))
-- docs(faq): add ty as type checker example ([#28906](https://github.com/astral-sh/ruff/pull/28906))
+- Add Python 3.15 as a supported version ([#28907](https://github.com/astral-sh/ruff/pull/28907))
+- Add ty as a type checker example ([#28906](https://github.com/astral-sh/ruff/pull/28906))
 
 ### Other changes
 
