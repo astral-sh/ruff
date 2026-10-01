@@ -107,6 +107,146 @@ def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
             reveal_type(x)  # revealed: A
 ```
 
+## Previous patterns with guards
+
+A pattern with an always-true guard excludes the same values from later captures as an unguarded
+pattern. A false or ambiguous guard can let the matched value reach a later case.
+
+```py
+def always_true_guard(value: int | str) -> None:
+    match value:
+        # The guard is statically known to be true, so strings cannot reach the next case.
+        case str() if True:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+            reveal_type(value)  # revealed: int
+
+def always_false_guard(value: int | str) -> None:
+    match value:
+        # The guard is always false, so strings can reach the next case.
+        case str() if False:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+            reveal_type(value)  # revealed: int | str
+
+def ambiguous_guard(value: int | str, flag: bool) -> None:
+    match value:
+        # The guard may be false, so strings can reach the next case.
+        case str() if flag:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+            reveal_type(value)  # revealed: int | str
+```
+
+## Previous patterns with short-circuit guards
+
+When a guard is evaluated directly as a condition, short-circuiting can determine its outcome even
+if an operand's truthiness can change. Saving the result first can test the same object again, so
+its truthiness remains ambiguous.
+
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
+```py
+class MutableTruthiness:
+    truthy: bool = False
+
+    def __bool__(self) -> bool:
+        self.truthy = not self.truthy
+        return self.truthy
+
+def or_guard(value: int | str, toggle: MutableTruthiness) -> None:
+    match value:
+        # The guard is always true, so strings cannot reach the next case.
+        case str() if toggle or True:  # error: [redundant-condition-strict] "always true"
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+
+def and_guard(value: int | str, toggle: MutableTruthiness) -> None:
+    match value:
+        # The guard is always false, so strings can reach the next case.
+        case str() if toggle and False:  # error: [redundant-condition-strict] "always false"
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+
+def saved_guard(value: int | str, toggle: MutableTruthiness) -> None:
+    saved = toggle or True
+    match value:
+        # `saved` can be the original object, whose truthiness may have changed.
+        case str() if saved:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int | str
+```
+
+## Previous guards using pattern captures
+
+The guard can be proven always true from the type of a captured value. In each example, the later
+capture excludes the values matched by the guarded pattern.
+
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
+```py
+from typing import Literal
+
+def guard_using_capture(value: int | str) -> None:
+    match value:
+        # `captured` is a string, so the guard is always true and strings cannot reach the next case.
+        case str() as captured if captured is not None:  # error: [redundant-condition-strict] "always true"
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: int
+
+def guard_using_sequence_capture(value: tuple[int] | str) -> None:
+    match value:
+        # `captured` is an int, so the guard is always true and the tuple cannot reach the next case.
+        case [captured] if captured is not None:  # error: [redundant-condition-strict] "always true"
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: str
+
+def guard_using_comparison(value: Literal[1, 2]) -> None:
+    match value:
+        # `captured` is `Literal[1]`, so the guard is always true and `1` cannot reach the next case.
+        case 1 as captured if captured == 1:  # error: [redundant-condition-strict] "always true"
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: Literal[2]
+```
+
+## Multiple previous guarded patterns
+
+With multiple preceding guarded cases, only a pattern whose guard is always true excludes values
+from a later capture.
+
+```py
+def mixed_guards(value: int | str | bytes, flag: bool) -> None:
+    match value:
+        # The guard is false, so bytes can reach the last case.
+        case bytes() if False:
+            pass
+        # The guard is ambiguous, so strings can reach the last case.
+        case str() if flag:
+            pass
+        # The guard is always true, so ints cannot reach the last case.
+        case int() if True:
+            pass
+        case remaining:
+            reveal_type(remaining)  # revealed: str | bytes
+```
+
 ## Class patterns with generic classes
 
 ### Gradual mode
@@ -3425,14 +3565,20 @@ function defined before the capture. Direct, sequence, class, and built-in posit
 resolve to a concrete type. For a mapping capture, the recursive subject is known only to be a
 mapping, so its entry type is `object`.
 
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
 ```py
-def match_loop_carried_capture(flag: bool, x: int) -> None:
+def match_capture_in_loop(flag: bool, x: int) -> None:
     while flag:
         match x:
             case x:
                 reveal_type(x)  # revealed: int
 
-def match_loop_carried_sequence_capture(flag: bool) -> None:
+def match_sequence_capture_in_loop(flag: bool) -> None:
     x = (1,)
     while flag:
         match x:
@@ -3442,21 +3588,21 @@ def match_loop_carried_sequence_capture(flag: bool) -> None:
 class CycleBox:
     value: int
 
-def match_loop_carried_class_capture(flag: bool) -> None:
+def match_class_capture_in_loop(flag: bool) -> None:
     x = CycleBox()
     while flag:
         match x:
             case CycleBox(value=x):
                 reveal_type(x)  # revealed: int
 
-def match_loop_carried_mapping_capture(flag: bool) -> None:
+def match_mapping_capture_in_loop(flag: bool) -> None:
     x = {"value": 1}
     while flag:
         match x:
             case {"value": x}:
                 reveal_type(x)  # revealed: object
 
-def match_loop_carried_match_self_capture(flag: bool, x: int) -> None:
+def match_builtin_positional_capture_in_loop(flag: bool, x: int) -> None:
     while flag:
         match x:
             case int(x):
@@ -3468,6 +3614,34 @@ def capture_from_later_global() -> int:
 match capture_from_later_global():
     case captured:
         reveal_type(captured)  # revealed: int
+```
+
+The match subject can change between iterations of a loop. In these examples, an always-true guard
+excludes strings from a later capture, while a guard that can be false allows strings to reach it.
+
+```py
+def guard_with_changing_subject(value: int | str, again: bool) -> None:
+    while again:
+        match value:
+            # `captured` is a string, so the guard is always true and strings cannot reach the next case.
+            case str() as captured if captured is not None:  # error: [redundant-condition-strict] "always true"
+                value = 1
+            case remaining:
+                reveal_type(remaining)  # revealed: int
+                value = remaining
+
+def guard_with_changing_flag(value: int | str, again: bool) -> None:
+    flag = False
+    while again:
+        match value:
+            # The guard can be false on the first iteration and true on a later one.
+            case str() if flag:
+                value = 1
+            case remaining:
+                # Because the guard can be false, strings can reach this case.
+                reveal_type(remaining)  # revealed: int | str
+                value = remaining
+                flag = True
 ```
 
 ## Value patterns

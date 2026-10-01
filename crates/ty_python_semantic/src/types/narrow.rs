@@ -4,7 +4,8 @@ use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry
 
 use crate::place::loop_header_reachability;
 use crate::reachability::{
-    binding_reachability, narrow_type_by_constraint, type_narrowed_by_previous_patterns,
+    PatternSubjectExpansion, binding_reachability, narrow_type_by_constraint,
+    type_narrowed_by_previous_patterns,
 };
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
@@ -454,7 +455,8 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
 /// Infer the types of all names bound when `pattern` succeeds.
 ///
 /// The subject starts with its inferred type after removing values definitely matched by earlier
-/// unguarded cases. The analysis then checks the complete pattern before recording any bindings:
+/// cases with no guard or an always-true guard. The analysis then checks the complete pattern
+/// before recording any bindings:
 ///
 /// ```python
 /// def f(value: int | str) -> None:
@@ -479,8 +481,8 @@ pub(crate) fn pattern_success_types<'db>(
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
     let env = ProgramEnvironment::from_scope(subject.scope(db));
-    let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
-    let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
+    let incoming_subject_ty =
+        type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     PatternSuccessTypes {
