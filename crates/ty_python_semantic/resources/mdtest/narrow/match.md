@@ -147,6 +147,12 @@ When a guard is evaluated directly as a condition, short-circuiting can determin
 if an operand's truthiness can change. Saving the result first can test the same object again, so
 its truthiness remains ambiguous.
 
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
 ```py
 class MutableTruthiness:
     truthy: bool = False
@@ -158,7 +164,7 @@ class MutableTruthiness:
 def or_guard(value: int | str, toggle: MutableTruthiness) -> None:
     match value:
         # The guard is always true, so strings cannot reach the next case.
-        case str() if toggle or True:
+        case str() if toggle or True:  # error: [redundant-condition-strict] "always true"
             pass
         case remaining:
             reveal_type(remaining)  # revealed: int
@@ -166,7 +172,7 @@ def or_guard(value: int | str, toggle: MutableTruthiness) -> None:
 def and_guard(value: int | str, toggle: MutableTruthiness) -> None:
     match value:
         # The guard is always false, so strings can reach the next case.
-        case str() if toggle and False:
+        case str() if toggle and False:  # error: [redundant-condition-strict] "always false"
             pass
         case remaining:
             reveal_type(remaining)  # revealed: int | str
@@ -186,13 +192,19 @@ def saved_guard(value: int | str, toggle: MutableTruthiness) -> None:
 The guard can be proven always true from the type of a captured value. In each example, the later
 capture excludes the values matched by the guarded pattern.
 
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
 ```py
 from typing import Literal
 
 def guard_using_capture(value: int | str) -> None:
     match value:
         # `captured` is a string, so the guard is always true and strings cannot reach the next case.
-        case str() as captured if captured is not None:
+        case str() as captured if captured is not None:  # error: [redundant-condition-strict] "always true"
             pass
         case remaining:
             reveal_type(remaining)  # revealed: int
@@ -200,7 +212,7 @@ def guard_using_capture(value: int | str) -> None:
 def guard_using_sequence_capture(value: tuple[int] | str) -> None:
     match value:
         # `captured` is an int, so the guard is always true and the tuple cannot reach the next case.
-        case [captured] if captured is not None:
+        case [captured] if captured is not None:  # error: [redundant-condition-strict] "always true"
             pass
         case remaining:
             reveal_type(remaining)  # revealed: str
@@ -208,7 +220,7 @@ def guard_using_sequence_capture(value: tuple[int] | str) -> None:
 def guard_using_comparison(value: Literal[1, 2]) -> None:
     match value:
         # `captured` is `Literal[1]`, so the guard is always true and `1` cannot reach the next case.
-        case 1 as captured if captured == 1:
+        case 1 as captured if captured == 1:  # error: [redundant-condition-strict] "always true"
             pass
         case remaining:
             reveal_type(remaining)  # revealed: Literal[2]
@@ -3553,6 +3565,12 @@ function defined before the capture. Direct, sequence, class, and built-in posit
 resolve to a concrete type. For a mapping capture, the recursive subject is known only to be a
 mapping, so its entry type is `object`.
 
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
 ```py
 def match_capture_in_loop(flag: bool, x: int) -> None:
     while flag:
@@ -3606,7 +3624,7 @@ def guard_with_changing_subject(value: int | str, again: bool) -> None:
     while again:
         match value:
             # `captured` is a string, so the guard is always true and strings cannot reach the next case.
-            case str() as captured if captured is not None:
+            case str() as captured if captured is not None:  # error: [redundant-condition-strict] "always true"
                 value = 1
             case remaining:
                 reveal_type(remaining)  # revealed: int

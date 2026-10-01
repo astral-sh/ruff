@@ -702,6 +702,12 @@ def ambiguous_guard(value: int | str, flag: bool) -> None:
 An enum member matched by an always-true guarded case cannot reach the same pattern in a later case.
 A false or ambiguous guard can leave that pattern reachable.
 
+```toml
+[rules]
+# enabled for "educational purposes" in this section
+redundant-condition-strict = "error"
+```
+
 ```py
 from enum import Enum
 from typing import Literal
@@ -719,6 +725,7 @@ def enum_with_always_true_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
             result = 2
         case _:
             result = 3
+
     reveal_type(result)  # revealed: Literal[1, 3]
 
 def enum_with_always_false_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
@@ -730,6 +737,7 @@ def enum_with_always_false_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
             result = 2
         case _:
             result = 3
+
     reveal_type(result)  # revealed: Literal[2, 3]
 
 def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool) -> None:
@@ -741,6 +749,7 @@ def enum_with_ambiguous_guard(value: Literal[Color.RED, Color.BLUE], flag: bool)
             result = 2
         case _:
             result = 3
+
     reveal_type(result)  # revealed: Literal[1, 2, 3]
 ```
 
@@ -750,12 +759,13 @@ The type of a name captured by the pattern can make the guard always true:
 def enum_with_capture_dependent_guard(value: Literal[Color.RED, Color.BLUE]) -> None:
     match value:
         # `red` is always `Color.RED`, so the guard is true and the second case is unreachable.
-        case Color.RED as red if red is Color.RED:
+        case Color.RED as red if red is Color.RED:  # error: [redundant-condition-strict] "always true"
             result = 1
         case Color.RED:
             result = 2
         case _:
             result = 3
+
     reveal_type(result)  # revealed: Literal[1, 3]
 ```
 
