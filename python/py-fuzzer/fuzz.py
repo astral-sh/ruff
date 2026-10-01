@@ -56,44 +56,45 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     with tempfile.TemporaryDirectory() as tempdir:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
-        completed_process = subprocess.run(
-            [
-                ty_executable,
-                "check",
-                input_file,
-                "--python-version",
-                OLDEST_SUPPORTED_PYTHON,
-                "--python-platform",
-                TY_TARGET_PLATFORM,
-            ],
-            capture_output=True,
-            check=False,
-            text=True,
-        )
+        command = [
+            ty_executable,
+            "check",
+            input_file,
+            "--python-version",
+            OLDEST_SUPPORTED_PYTHON,
+            "--python-platform",
+            TY_TARGET_PLATFORM,
+        ]
+        try:
+            completed_process = subprocess.run(
+                command, capture_output=True, check=False, text=True, timeout=5
+            )
+        except subprocess.TimeoutExpired:
+            return True
     return completed_process.returncode not in {0, 1, 2}
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
     """Return `True` if the code triggers a parser error."""
-    completed_process = subprocess.run(
-        [
-            ruff_executable,
-            "check",
-            # Keep project settings out of parser checks, including for older Ruff versions.
-            "--isolated",
-            "--config",
-            "lint.select=[]",
-            "--no-cache",
-            "--target-version",
-            "py314",
-            "--preview",
-            "-",
-        ],
-        capture_output=True,
-        check=False,
-        text=True,
-        input=code,
-    )
+    command = [
+        ruff_executable,
+        "check",
+        # Keep project settings out of parser checks, including for older Ruff versions.
+        "--isolated",
+        "--config",
+        "lint.select=[]",
+        "--no-cache",
+        "--target-version",
+        "py314",
+        "--preview",
+        "-",
+    ]
+    try:
+        completed_process = subprocess.run(
+            command, capture_output=True, check=False, text=True, input=code, timeout=5
+        )
+    except subprocess.TimeoutExpired:
+        return True
     return completed_process.returncode != 0
 
 
@@ -155,10 +156,10 @@ class FuzzResult:
         if self.maybe_bug is not None:
             match self.executable:
                 case Executable.RUFF:
-                    panic_message = f"The following code triggers a {new}parser bug:"
+                    panic_message = f"The following code triggers a {new}parser bug or timeout:"
                 case Executable.TY:
                     panic_message = (
-                        f"The following code triggers a {new}ty panic with "
+                        f"The following code triggers a {new}ty panic or timeout with "
                         f"`--python-version={OLDEST_SUPPORTED_PYTHON} --python-platform={TY_TARGET_PLATFORM}`:"
                     )
                 case _ as unreachable:

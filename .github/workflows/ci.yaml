@@ -869,6 +869,8 @@ jobs:
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-old
 
+          git checkout --detach "$GITHUB_SHA"
+
           (
             uv run \
             --python="${PYTHON_VERSION}" \
