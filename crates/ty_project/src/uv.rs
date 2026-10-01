@@ -5,8 +5,8 @@ use ty_combine::Combine;
 use ty_static::EnvVars;
 
 pub(crate) use command::{MetadataTarget, Uv, uv_executable_error};
-pub(crate) use environments::{ProjectEnvironment, ScriptEnvironmentCacheKey, script_environment};
-pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges};
+pub use environments::{ScriptEnvironmentAvailability, UvEnvironments, UvSyncChanges, UvWorkspace};
+pub(crate) use environments::{ScriptEnvironmentCacheKey, script_environment};
 pub(crate) use metadata::{DependencyMetadataError, UvMetadata, UvMetadataError};
 pub(crate) use service::{
     ScriptSyncRequest, ScriptSyncTask, UvMetadataResult, UvMetadataService, UvSyncTask,
@@ -54,7 +54,8 @@ impl UseUv {
         }
     }
 
-    pub(super) const fn workspace_discovery_enabled(self) -> bool {
+    /// Whether uv should be used for workspace discovery.
+    pub const fn workspace_discovery_enabled(self) -> bool {
         matches!(self, Self::On)
     }
 

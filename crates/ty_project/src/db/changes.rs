@@ -363,9 +363,9 @@ impl ProjectDatabase {
             if metadata.use_uv().workspace_discovery_enabled() {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
-                // We're not refreshing uv metadata, so use the existing environment.
-                let environment = metadata.environment().clone();
-                match project.rediscover(self, path, environment) {
+                // We're not refreshing uv metadata, so use the existing workspace.
+                let workspace = metadata.uv_workspace().clone();
+                match project.rediscover(self, path, workspace) {
                     Ok(ProjectReloadResult::Unchanged) => {}
                     Ok(ProjectReloadResult::Changed { files_changed }) => {
                         result.project_changed = true;
@@ -642,7 +642,7 @@ fn affects_uv_metadata(db: &dyn Db, change: &ChangeEvent) -> bool {
             let project = db.project();
             let workspace_root = project
                 .metadata(db)
-                .uv_workspace()
+                .uv_workspace_metadata()
                 .map_or(project.root(db), |workspace| workspace.workspace_root());
             let is_included_workspace_directory = path.starts_with(workspace_root)
                 && project

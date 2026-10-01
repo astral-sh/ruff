@@ -248,7 +248,7 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let project_path = project.root(db);
     let workspace_root = project
         .metadata(db)
-        .uv_workspace()
+        .uv_workspace_metadata()
         .map(UvMetadata::workspace_root);
     let virtual_environment = project
         .program_settings(db)

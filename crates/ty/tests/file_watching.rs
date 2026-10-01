@@ -27,7 +27,7 @@ use ty_project::metadata::value::{RelativeGlobPattern, RelativePathBuf};
 #[cfg(unix)]
 use ty_project::watch::watch_paths;
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
-use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UseUv};
+use ty_project::{ChangeResult, Db, ProjectDatabase, ProjectMetadata, UvWorkspace};
 use ty_python_core::platform::PythonPlatform;
 use ty_static::EnvVars;
 
@@ -552,12 +552,7 @@ where
     }
 
     let mut project = if let Some(config_file_override) = config_file_override {
-        ProjectMetadata::from_config_file(
-            config_file_override,
-            &project_path,
-            &system,
-            UseUv::from_system(&system),
-        )?
+        ProjectMetadata::from_config_file(config_file_override, &project_path, &system)?
     } else {
         ProjectMetadata::discover(&project_path, &system)?
     };
@@ -567,6 +562,10 @@ where
     project.apply_configuration_files(&system)?;
     if let Some(override_options) = override_options {
         project.set_override_options(override_options);
+    }
+    if project.use_uv().workspace_discovery_enabled() {
+        let workspace = UvWorkspace::discover(&project_path, &system);
+        project.apply_uv_workspace(&system, workspace)?;
     }
 
     // We need a chance to create the directories here.

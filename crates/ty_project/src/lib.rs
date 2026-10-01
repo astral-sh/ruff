@@ -36,7 +36,8 @@ use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
 use uv::DependencyMetadataError;
 pub use uv::{
-    ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, uv_test_env_vars,
+    ScriptEnvironmentAvailability, UseUv, UvEnvironments, UvSyncChanges, UvWorkspace,
+    uv_test_env_vars,
 };
 
 mod db;
@@ -285,7 +286,7 @@ impl Project {
         db: &dyn Db,
     ) -> Result<Option<Box<DependencyMetadata>>, DependencyMetadataError> {
         let metadata = self.metadata(db);
-        let Some(workspace) = metadata.uv_workspace() else {
+        let Some(workspace) = metadata.uv_workspace_metadata() else {
             tracing::debug!(
                 "Skipping dependency checks for '{}': no uv workspace metadata is available",
                 metadata.root(),
@@ -375,11 +376,9 @@ impl Project {
         self,
         db: &mut dyn Db,
         path: &SystemPath,
-        environment: uv::ProjectEnvironment,
+        workspace: uv::UvWorkspace,
     ) -> Result<ProjectReloadResult, ProjectMetadataError> {
-        let mut metadata = self
-            .metadata(db)
-            .rediscover(db.system(), path, environment)?;
+        let mut metadata = self.metadata(db).rediscover(db.system(), path, workspace)?;
         if let Err(error) = metadata.apply_configuration_files(db.system()) {
             let error = anyhow::Error::new(error);
             tracing::error!(
@@ -802,7 +801,7 @@ impl Project {
     pub fn check_settings(&self, db: &dyn Db) -> Vec<Diagnostic> {
         let metadata = self.metadata(db);
         let uv_diagnostic = metadata.uv_diagnostic(db).or_else(|| {
-            let workspace = metadata.uv_workspace()?;
+            let workspace = metadata.uv_workspace_metadata()?;
             let error = self.dependency_metadata(db).as_ref().err()?;
             let mut diagnostic = error.to_diagnostic(DependencyProjectKind::Project);
             if let Ok(file) =
