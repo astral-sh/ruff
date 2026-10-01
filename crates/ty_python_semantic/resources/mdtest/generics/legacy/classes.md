@@ -2448,6 +2448,30 @@ class WithOverloadedMethod(Generic[T]):
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Instance attributes with substituted type variables
+
+Instance attributes are specialized once, even when the type arguments refer to the class's own type
+parameters.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]):
+    def __init__(self, first: T, second: U):
+        self.first: T = first
+        self.second: U = second
+
+    def swapped(self, other: "Pair[U, T]"):
+        reveal_type(other.first)  # revealed: U@Pair
+        reveal_type(other.second)  # revealed: T@Pair
+
+    def nested(self, other: "Pair[list[T], U]"):
+        reveal_type(other.first)  # revealed: list[T@Pair]
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
