@@ -1113,23 +1113,29 @@ impl<'db> IntersectionType<'db> {
                 ));
             }
         }
+        if type_mapping.is_structural() {
+            return Type::Intersection(IntersectionType::new(db, positive, negative));
+        }
         // Rebuilding an unchanged intersection can expand aliases such as `Not[A]` in
-        // `type A = list[Not[A]]`, unfolding the recursive type on every mapping.
-        if positive == *self.positive(db) && negative == *self.negative(db) {
+        // `type A = list[Not[A]]`, unfolding the recursive type on every mapping. Nonrecursive
+        // aliases still need normalization: an alias can hide `object` or a double negation.
+        if positive == *self.positive(db)
+            && negative == *self.negative(db)
+            && positive.iter().chain(&negative).all(|ty| match ty {
+                Type::TypeAlias(alias) => alias.is_recursive(db),
+                _ => true,
+            })
+        {
             return Type::Intersection(self);
         }
-        if type_mapping.is_structural() {
-            Type::Intersection(IntersectionType::new(db, positive, negative))
-        } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
-            for positive in positive {
-                builder.add_positive_in_place(positive);
-            }
-            for negative in &negative {
-                builder.add_negative_in_place(*negative);
-            }
-            builder.build()
+        let mut builder = IntersectionBuilder::new(db, visitor.env);
+        for positive in positive {
+            builder.add_positive_in_place(positive);
         }
+        for negative in &negative {
+            builder.add_negative_in_place(*negative);
+        }
+        builder.build()
     }
 
     /// Map a type transformation over all positive elements of the intersection. Leave the
