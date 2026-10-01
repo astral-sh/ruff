@@ -1093,13 +1093,17 @@ impl<'db> IntersectionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            let positive = self
-                .positive(db)
-                .iter()
-                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<FxOrderSet<_>>();
-            let mut negative = NegativeIntersectionElements::default();
+        let positive = self
+            .positive(db)
+            .iter()
+            .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect::<FxOrderSet<_>>();
+        let mut negative = NegativeIntersectionElements::default();
+        // Regular promotion removes negative contributions from intersections.
+        if !matches!(
+            type_mapping,
+            TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+        ) {
             for element in self.negative(db) {
                 negative.insert(element.apply_type_mapping_impl(
                     db,
@@ -1108,31 +1112,21 @@ impl<'db> IntersectionType<'db> {
                     visitor,
                 ));
             }
+        }
+        // Rebuilding an unchanged intersection can expand aliases such as `Not[A]` in
+        // `type A = list[Not[A]]`, unfolding the recursive type on every mapping.
+        if positive == *self.positive(db) && negative == *self.negative(db) {
+            return Type::Intersection(self);
+        }
+        if type_mapping.is_structural() {
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
             let mut builder = IntersectionBuilder::new(db, visitor.env);
-            for positive in self.positive(db) {
-                builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ));
+            for positive in positive {
+                builder.add_positive_in_place(positive);
             }
-            // Regular promotion should remove negative contributions from intersections,
-            // so we don't preserve them here when regular promotion is enabled.
-            if !matches!(
-                type_mapping,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-            ) {
-                for negative in self.negative(db) {
-                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                        db,
-                        &type_mapping.flip(),
-                        tcx,
-                        visitor,
-                    ));
-                }
+            for negative in &negative {
+                builder.add_negative_in_place(*negative);
             }
             builder.build()
         }

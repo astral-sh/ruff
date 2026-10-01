@@ -327,3 +327,22 @@ T = TypeVar("T")
 # error: [invalid-generic-class]
 class P[Ä(Protocol[T]): ...
 ```
+
+## Empty subscript on a recursive alias
+
+Regression test for <https://github.com/astral-sh/ty/issues/3195>.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def f(x: A):
+    # error: [invalid-syntax] "Expected index or slice expression"
+    reveal_type(x[])  # revealed: Unknown
+```
