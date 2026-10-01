@@ -1621,6 +1621,34 @@ class Node:
         return {"label": self.label, "children": [child.to_dict() for child in self.children]}
 ```
 
+### Copying recursive dictionaries
+
+Copying a dictionary with a recursive value type preserves compatibility with the original type.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4598>.
+
+```py
+type Nested = dict[str, Nested | int]
+
+def consume(value: Nested): ...
+def copy(value: Nested):
+    consume(dict(value))
+    copied = dict(value)
+    consume(copied)
+```
+
+The same applies when the recursive values include both lists and dictionaries.
+
+```py
+type JSON = str | int | float | bool | None | list[JSON] | dict[str, JSON]
+
+def consume_json(value: dict[str, JSON]): ...
+def copy_json(value: dict[str, JSON]):
+    consume_json(dict(value))
+    copied = dict(value)
+    consume_json(copied)
+```
+
 ### Cyclic defaults
 
 ```py
