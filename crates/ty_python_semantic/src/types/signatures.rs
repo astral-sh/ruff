@@ -52,7 +52,9 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
-use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
+use ty_python_core::definition::{
+    Definition, DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+};
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -4651,7 +4653,7 @@ struct ParametersData<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct Parameters<'db> {
+pub struct Parameters<'db> {
     data: Arc<ParametersData<'db>>,
 }
 
@@ -5244,7 +5246,7 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_type_mapping_impl<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -5612,7 +5614,7 @@ impl ParameterNamePrefix {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct Parameter<'db> {
+pub struct Parameter<'db> {
     /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
     annotated_type: Type<'db>,
 
@@ -5746,12 +5748,24 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    pub(crate) fn with_default_type(mut self, default: Type<'db>) -> Self {
+    pub(crate) fn with_default_type(self, default: Type<'db>) -> Self {
+        self.with_default(ParameterDefault::Inferred(default))
+    }
+
+    /// Attach a default while preserving whether its value is inferred eagerly or on demand.
+    pub(crate) fn with_optional_default(self, default: Option<ParameterDefault<'db>>) -> Self {
+        match default {
+            Some(default) => self.with_default(default),
+            None => self,
+        }
+    }
+
+    fn with_default(mut self, default: ParameterDefault<'db>) -> Self {
         match &mut self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
             | ParameterKind::PositionalOrKeyword { default_type, .. }
             | ParameterKind::KeywordOnly { default_type, .. } => {
-                *default_type = Some(ParameterDefault::Inferred(default));
+                *default_type = Some(default);
             }
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
                 panic!("cannot set default value for variadic parameter")
@@ -6128,25 +6142,41 @@ impl<'db> ParameterDefault<'db> {
     heap_size=ruff_memory_usage::heap_size
 )]
 fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> Type<'db> {
-    let DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) =
-        parameter.kind(db)
-    else {
-        return Type::unknown();
-    };
-    let Some(function) = parameter.scope(db).node(db).as_function() else {
-        return Type::unknown();
-    };
-    let program_file = parameter.program_file(db);
-    let function = semantic_index(db, program_file).expect_single_definition(function);
-    let module = parsed_module(db, program_file.python_file(db)).load(db);
-    let Some(default) = node.node(&module).default() else {
-        return Type::unknown();
-    };
-    // Use the function's default inference so the default retains its annotation context.
-    // Nested callable defaults still need the existing cycle-breaking normalization.
-    infer_function_default_types(db, function)
-        .expression_type(default)
-        .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
+    match parameter.kind(db) {
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
+            let Some(function) = parameter.scope(db).node(db).as_function() else {
+                return Type::unknown();
+            };
+            let program_file = parameter.program_file(db);
+            let function = semantic_index(db, program_file).expect_single_definition(function);
+            let module = parsed_module(db, program_file.python_file(db)).load(db);
+            let Some(default) = node.node(&module).default() else {
+                return Type::unknown();
+            };
+            // Use the function's default inference so the default retains its annotation context.
+            // Nested callable defaults still need the existing cycle-breaking normalization.
+            infer_function_default_types(db, function)
+                .expression_type(default)
+                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
+        }
+        DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+            parameter: ParameterDefinitionNodeKind::Parameter(node),
+            ..
+        }) => {
+            let file = parameter.program_file(db);
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            let Some(default) = node.node(&module).default() else {
+                return Type::unknown();
+            };
+            let scope = semantic_index(db, file)
+                .expression_scope_id(default)
+                .to_scope_id(db, file);
+            infer_complete_scope_types(db, scope)
+                .expression_type(default)
+                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
+        }
+        _ => Type::unknown(),
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -6277,7 +6307,9 @@ impl<'db> ParameterKind<'db> {
     ) -> Self {
         let apply_to_default_type = |default_type: &Option<ParameterDefault<'db>>| {
             default_type.map(|default| match type_mapping {
-                TypeMapping::ReplaceParameterDefaults => {
+                TypeMapping::ReplaceParameterDefaults
+                    if matches!(default, ParameterDefault::Inferred(_)) =>
+                {
                     ParameterDefault::Inferred(Type::unknown())
                 }
                 // Defaults describe values, not the set of accepted arguments. Promoting the

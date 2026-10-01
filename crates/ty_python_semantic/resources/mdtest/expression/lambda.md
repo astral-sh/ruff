@@ -175,3 +175,101 @@ reveal_type(x.__kwdefaults__)  # revealed: dict[str, Any] | None
 reveal_type(x.__module__)  # revealed: str
 reveal_type(x.__qualname__)  # revealed: str
 ```
+
+## Recursive return types
+
+A lambda can return itself inside a container. Following the recursive reference preserves the
+return type and the callable's parameter list:
+
+```py
+node = lambda: (1, node)
+
+reveal_type(node()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
+
+node()[1](0)  # error: [too-many-positional-arguments]
+```
+
+## Mutually recursive return types
+
+The return types remain distinct when two lambdas refer to each other:
+
+```py
+first = lambda: (1, second)
+second = lambda: ("two", first)
+
+reveal_type(first()[0])  # revealed: Literal[1]
+reveal_type(first()[1]()[0])  # revealed: Literal["two"]
+reveal_type(first()[1]()[1]()[0])  # revealed: Literal[1]
+reveal_type(second()[1]()[1]()[0])  # revealed: Literal["two"]
+```
+
+## Bound recursive lambdas
+
+Access through an instance binds the lambda's receiver. A recursive return referring to the class
+attribute remains unbound and still requires that receiver:
+
+```py
+class C:
+    method = lambda self: (1, C.method)
+
+c = C()
+reveal_type(c.method()[0])  # revealed: int
+reveal_type(c.method()[1](c)[0])  # revealed: int
+reveal_type(c.method()[1](c)[1](c)[0])  # revealed: int
+
+c.method(c)  # error: [too-many-positional-arguments]
+c.method()[1]()  # error: [missing-argument]
+```
+
+## Mutually recursive lambda methods
+
+Promotion of writable class attributes preserves the two recursive signatures and their distinct
+return types:
+
+```py
+class C:
+    first = lambda self: (1, C.second)
+    second = lambda self: ("two", C.first)
+
+c = C()
+reveal_type(c.first()[0])  # revealed: int
+reveal_type(c.first()[1](c)[0])  # revealed: str
+reveal_type(c.first()[1](c)[1](c)[0])  # revealed: int
+reveal_type(c.second()[1](c)[1](c)[0])  # revealed: str
+```
+
+## Displaying bound recursive lambdas
+
+A lambda can return a bound method referring to itself:
+
+```py
+class C:
+    method = lambda self: (1, C().method)
+
+reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
+```
+
+## Displaying growing recursive lambdas
+
+When each recursive return adds another container to a type argument, diagnostics display a finite
+prefix of the callable's return type:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Final
+
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, Grow([value]).node)
+
+node = Grow(1).node
+
+# error: [unresolved-attribute] "Object of type `() -> tuple[int, () -> tuple[list[int], () -> tuple[list[list[int]], () -> tuple[list[list[list[int]]], (...) -> ...]]]]` has no attribute `missing`"
+node.missing
+```

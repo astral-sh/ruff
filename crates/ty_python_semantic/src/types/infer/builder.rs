@@ -132,12 +132,12 @@ use crate::types::{
     ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    Parameter, ParameterDefault, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -8765,9 +8765,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
+                        .with_optional_default(param.default().map(|default_expr| {
+                            let default_ty =
+                                self.infer_expression(default_expr, TypeContext::default());
+                            self.index.try_definition(&param.parameter).map_or(
+                                ParameterDefault::Inferred(default_ty),
+                                ParameterDefault::Deferred,
+                            )
                         }));
 
                     if let Some(annotated_type) = parameter_types.next() {
@@ -8783,9 +8787,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
+                        .with_optional_default(param.default().map(|default_expr| {
+                            let default_ty =
+                                self.infer_expression(default_expr, TypeContext::default());
+                            self.index.try_definition(&param.parameter).map_or(
+                                ParameterDefault::Inferred(default_ty),
+                                ParameterDefault::Deferred,
+                            )
                         }));
 
                     if let Some(annotated_type) = parameter_types.next() {
@@ -8805,9 +8813,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     Parameter::keyword_only(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
+                        .with_optional_default(param.default().map(|default_expr| {
+                            let default_ty =
+                                self.infer_expression(default_expr, TypeContext::default());
+                            self.index.try_definition(&param.parameter).map_or(
+                                ParameterDefault::Inferred(default_ty),
+                                ParameterDefault::Deferred,
+                            )
                         }))
                 })
                 .collect::<Vec<_>>();
@@ -8856,11 +8868,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
-        Type::Callable(CallableType::new(
+        Type::Callable(CallableType::lambda(
             self.db(),
-            CallableSignature::single(Signature::new(parameters, return_ty)),
-            CallableTypeKind::FunctionLike,
+            parameters,
+            scope,
+            lambda_expression.body.as_ref().into(),
+            return_tcx,
         ))
     }
 
