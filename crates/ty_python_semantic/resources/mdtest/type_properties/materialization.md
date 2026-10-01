@@ -2868,6 +2868,22 @@ def annotated_generic_protocol_classes(
     reveal_type(aliased_bottom)  # revealed: type[Bottom[GenericMutable[Any]]]
 ```
 
+Materializing a generic class can also place the alias and its protocol in opposite
+materializations. Both directions remain incompatible:
+
+```py
+class Box[T]:
+    value: MutableAlias[T]
+    def accept_bottom(self, value: Bottom[GenericMutable[T]]) -> None: ...
+    def produce_top(self) -> Top[GenericMutable[T]]:
+        raise NotImplementedError
+    def accept(self, value: MutableAlias[T]) -> None: ...
+
+def compare_alias_materializations(top: Top[Box[Any]], bottom: Bottom[Box[Any]]) -> None:
+    bottom.accept_bottom(top.value)  # error: [invalid-argument-type]
+    top.accept(bottom.produce_top())  # error: [invalid-argument-type]
+```
+
 ### Nested generic protocols
 
 A protocol nested inside another generic type preserves its separate read and write requirements
@@ -3053,6 +3069,102 @@ static_assert(is_equivalent_to(LegacyNode[int], Top[LegacyNode[int]]))
 static_assert(is_equivalent_to(LegacyNode[int], Bottom[LegacyNode[int]]))
 ```
 
+### Fully static recursive protocol receivers
+
+A protocol may use another specialization of itself in an explicit receiver annotation.
+Materializing a fully static specialization leaves it unchanged, including when it is compared with
+a different specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+
+class Stream[T](Protocol):
+    def flatten(self: Stream[Stream[T]]) -> None: ...
+
+static_assert(is_equivalent_to(Top[Stream[int]], Stream[int]))
+static_assert(is_equivalent_to(Bottom[Stream[int]], Stream[int]))
+
+class Consumer[T](Protocol):
+    def flatten(self: Consumer[Consumer[T]]) -> None: ...
+    def consume(self, value: T) -> None: ...
+
+static_assert(is_equivalent_to(Bottom[Consumer[int]], Consumer[int]))
+static_assert(is_subtype_of(Top[Consumer[int]], Consumer[int]))
+static_assert(is_subtype_of(Consumer[int], Bottom[Consumer[int]]))
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class LegacyConsumer(Protocol[T_contra]):
+    def flatten(self: LegacyConsumer[LegacyConsumer[T_contra]]) -> None: ...
+    def consume(self, value: T_contra) -> None: ...
+
+static_assert(is_equivalent_to(Bottom[LegacyConsumer[int]], LegacyConsumer[int]))
+static_assert(is_subtype_of(Top[LegacyConsumer[int]], LegacyConsumer[int]))
+static_assert(is_subtype_of(LegacyConsumer[int], Bottom[LegacyConsumer[int]]))
+
+class ValuedStream[T](Protocol):
+    def flatten(self: ValuedStream[ValuedStream[T]]) -> None: ...
+    def value(self) -> T: ...
+
+static_assert(not is_assignable_to(Top[ValuedStream[int]], ValuedStream[ValuedStream[int]]))
+static_assert(not is_assignable_to(Bottom[ValuedStream[int]], ValuedStream[ValuedStream[int]]))
+
+T_co = TypeVar("T_co", covariant=True)
+
+class LegacyValuedStream(Protocol[T_co]):
+    def flatten(self: LegacyValuedStream[LegacyValuedStream[T_co]]) -> None: ...
+    def value(self) -> T_co: ...
+
+static_assert(not is_assignable_to(Top[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
+static_assert(not is_assignable_to(Bottom[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
+```
+
+### Recursive protocol receivers with gradual members
+
+A gradual member changes the materializations even when the receiver is recursively specialized.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
+
+class Stream[T](Protocol):
+    def flatten(self: Stream[Stream[T]]) -> None: ...
+    def value(self) -> Any: ...
+
+static_assert(not is_equivalent_to(Top[Stream[int]], Stream[int]))
+static_assert(not is_equivalent_to(Bottom[Stream[int]], Stream[int]))
+static_assert(is_assignable_to(Top[Stream[int]], Stream[int]))
+static_assert(is_assignable_to(Stream[int], Bottom[Stream[int]]))
+
+T_co = TypeVar("T_co", covariant=True)
+
+class LegacyStream(Protocol[T_co]):
+    def flatten(self: LegacyStream[LegacyStream[T_co]]) -> None: ...
+    def value(self) -> Any: ...
+
+static_assert(not is_equivalent_to(Top[LegacyStream[int]], LegacyStream[int]))
+static_assert(not is_equivalent_to(Bottom[LegacyStream[int]], LegacyStream[int]))
+static_assert(is_assignable_to(Top[LegacyStream[int]], LegacyStream[int]))
+static_assert(is_assignable_to(LegacyStream[int], Bottom[LegacyStream[int]]))
+```
+
 ### Recursive protocols with gradual members
 
 A recursive protocol can still change under materialization when it contains gradual types, even
@@ -3064,7 +3176,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Protocol, overload
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import Unknown, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to, is_subtype_of
 
 class AnyTree(Protocol):
     def add(self, children: list[AnyTree]) -> int: ...
@@ -3081,6 +3193,9 @@ static_assert(is_subtype_of(AnyTree, Top[AnyTree]))
 static_assert(is_subtype_of(Bottom[AnyTree], Top[AnyTree]))
 static_assert(not is_subtype_of(Top[AnyTree], AnyTree))
 static_assert(not is_subtype_of(AnyTree, Bottom[AnyTree]))
+static_assert(is_assignable_to(Top[AnyTree], AnyTree))
+static_assert(is_assignable_to(AnyTree, Bottom[AnyTree]))
+static_assert(not is_assignable_to(Top[AnyTree], Bottom[AnyTree]))
 static_assert(not is_equivalent_to(UnknownTree, Top[UnknownTree]))
 static_assert(not is_equivalent_to(UnknownTree, Bottom[UnknownTree]))
 static_assert(is_subtype_of(Bottom[UnknownTree], UnknownTree))
@@ -3128,7 +3243,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, TypeVar
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import Unknown, is_subtype_of
+from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
 
 class Node[T](Protocol):
     def child(self) -> Node[tuple[T, Any]]: ...
@@ -3137,6 +3252,9 @@ class Node[T](Protocol):
 
 static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
 static_assert(not is_subtype_of(Node[int], Bottom[Node[int]]))
+static_assert(is_assignable_to(Top[Node[int]], Node[int]))
+static_assert(is_assignable_to(Node[int], Bottom[Node[int]]))
+static_assert(not is_assignable_to(Top[Node[int]], Node[str]))
 
 T_co = TypeVar("T_co", covariant=True)
 
