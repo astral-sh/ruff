@@ -396,7 +396,7 @@ mod indexed {
                                 aligned && address.is_multiple_of(Self::ALIGNMENT),
                             )
                         });
-                let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
+                let offset_bits = ((max - base) / Self::ALIGNMENT).bit_width();
                 let relative_bits = u8::try_from(offset_bits)
                     .expect("an address offset cannot require more than u8::MAX bits")
                     + Self::KIND_BITS;

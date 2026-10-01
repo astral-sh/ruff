@@ -62,11 +62,7 @@ impl Support {
             .iter_mut()
             .enumerate()
             .find(|(_, chunk)| **chunk != 0)?;
-        let first_set_bit_in_chunk = first_nonempty_chunk.trailing_zeros() as usize;
-        debug_assert!(
-            first_set_bit_in_chunk != CHUNK_SIZE,
-            "nonempty chunk should not be empty"
-        );
+        let first_set_bit_in_chunk = first_nonempty_chunk.lowest_one()? as usize;
 
         // Clear out the bit we just found, and then return it
         *first_nonempty_chunk ^= 1 << first_set_bit_in_chunk;
@@ -91,10 +87,7 @@ impl Support {
             // Iterate through the set bits in this chunk
             std::iter::from_fn(move || {
                 // Find the lowest set bit, if there is one
-                let index = chunk.trailing_zeros() as usize;
-                if index == CHUNK_SIZE {
-                    return None;
-                }
+                let index = chunk.lowest_one()? as usize;
 
                 // Clear out the bit we just found.
                 chunk ^= 1 << index;
