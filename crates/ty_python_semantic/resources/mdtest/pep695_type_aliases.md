@@ -361,6 +361,21 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
+## Gradual alias complements
+
+An alias containing `Any` and its complement do not simplify to `object`: their gradual types can
+materialize differently.
+
+```py
+from typing import Any
+from ty_extensions import Not
+
+type A = list[Any]
+
+def f(x: A | Not[A]):
+    reveal_type(x)  # revealed: list[Any] | ~A
+```
+
 ## Loop-carried augmented unions
 
 PEP 604 unions created by augmented assignment should converge when the previous loop iteration
@@ -1738,6 +1753,43 @@ type X = tuple[X, int]
 
 def _(x: X):
     reveal_type(x is x)  # revealed: bool
+```
+
+### Recursive union complements
+
+This alias contains no gradual types, so its union with its complement covers every object. Indexing
+the list therefore yields `object`.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def f(x: A):
+    reveal_type(x)  # revealed: list[~A | A]
+    reveal_type(x[0])  # revealed: object
+```
+
+The order of the union members does not affect the result.
+
+```py
+type B = list[B | Not[B]]
+
+def g(x: B):
+    reveal_type(x[0])  # revealed: object
+```
+
+### Negated recursive aliases
+
+Indexing this list preserves the recursive alias inside its negation.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A]]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
 ```
 
 ### Recursive invariant
