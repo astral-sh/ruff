@@ -2741,6 +2741,15 @@ static_assert(is_assignable_to(Bottom[RecursiveValue[str]], Top[RecursiveValue[o
 static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[object]))
 ```
 
+An unmaterialized specialization is assignable to its own bottom materialization, and its top
+materialization is assignable to it. The opposite materializations are not necessarily assignable.
+
+```py
+static_assert(is_assignable_to(RecursiveValue[str], Bottom[RecursiveValue[str]]))
+static_assert(is_assignable_to(Top[RecursiveValue[str]], RecursiveValue[str]))
+static_assert(not is_assignable_to(Top[RecursiveValue[str]], Bottom[RecursiveValue[str]]))
+```
+
 Subtyping also rejects a top-materialized source against an unmaterialized target, and an
 unmaterialized source against a bottom-materialized target.
 
@@ -2754,6 +2763,43 @@ static_assert(not is_subtype_of(RecursiveValue[str], Bottom[RecursiveValue[objec
 static_assert(is_subtype_of(Bottom[RecursiveValue[str]], Top[RecursiveValue[object]]))
 static_assert(is_subtype_of(Bottom[RecursiveValue[str]], RecursiveValue[object]))
 static_assert(is_subtype_of(RecursiveValue[str], Top[RecursiveValue[object]]))
+```
+
+Materializations of different specializations still respect the protocol's variance:
+
+```py
+static_assert(is_subtype_of(Bottom[RecursiveValue[bool]], Bottom[RecursiveValue[int]]))
+static_assert(is_subtype_of(Top[RecursiveValue[bool]], Top[RecursiveValue[int]]))
+static_assert(not is_subtype_of(Bottom[RecursiveValue[int]], Bottom[RecursiveValue[bool]]))
+static_assert(not is_subtype_of(Top[RecursiveValue[int]], Top[RecursiveValue[bool]]))
+```
+
+A type parameter can appear only in an explicit receiver annotation. Materializing the protocol does
+not make those receiver requirements interchangeable:
+
+```py
+class Container[T](Protocol):
+    def get(self) -> T: ...
+
+class ReceiverOnly[T](Protocol):
+    marker: Any
+    def use(self: Container[T]) -> None: ...
+
+static_assert(not is_subtype_of(Bottom[ReceiverOnly[int]], Bottom[ReceiverOnly[object]]))
+static_assert(not is_subtype_of(Top[ReceiverOnly[int]], Top[ReceiverOnly[object]]))
+static_assert(not is_assignable_to(Bottom[ReceiverOnly[int]], Bottom[ReceiverOnly[object]]))
+static_assert(not is_assignable_to(Top[ReceiverOnly[int]], Top[ReceiverOnly[object]]))
+```
+
+For a mutable member, the direction of the comparison matters after materializing `Any`:
+
+```py
+class MutableValue[T](Protocol):
+    value: T
+
+static_assert(not is_assignable_to(Top[MutableValue[Any]], Top[MutableValue[int]]))
+static_assert(is_assignable_to(Bottom[MutableValue[Any]], Bottom[MutableValue[int]]))
+static_assert(not is_assignable_to(Bottom[MutableValue[int]], Bottom[MutableValue[Any]]))
 ```
 
 ### Generator delegation
