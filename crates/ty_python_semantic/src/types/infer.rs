@@ -672,8 +672,9 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
 
 /// Infer all types for a [`Statement`].
 ///
-/// This is useful when you want to infer a sub-expression with its natural type context, as
-/// statements are the minimal unit of code that can be inferred without external type context.
+/// This is useful when you want to infer a sub-expression with its natural type context.
+/// A statement, or an independent expression such as an `if` condition, provides that context
+/// without requiring inference of the entire scope.
 pub(super) fn infer_statement_types<'db>(
     db: &'db dyn Db,
     statement: Statement<'db>,

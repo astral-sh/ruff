@@ -243,7 +243,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
-    /// The statements we're currently visiting, with
+    /// The independently inferable statements or expressions we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
     /// The match case we're currently visiting.
@@ -2902,7 +2902,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+        // An expression can be registered for both a narrowing predicate and a lambda's type
+        // context. Reuse the same ingredient for both inference paths.
+        self.expressions_by_node
+            .get(&ExpressionNodeKey::from(expression_node))
+            .copied()
+            .unwrap_or_else(|| {
+                self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+            })
+    }
+
+    /// Visit an expression that does not require external type context. For example, the lambdas
+    /// in `if predicate(lambda x: x): ...` only require inference of the test expression.
+    fn visit_expression_statement(
+        &mut self,
+        expression: &'ast ast::Expr,
+        context: ExpressionContext,
+    ) {
+        self.push_statement(CurrentStatement::default());
+        match context {
+            ExpressionContext::Value => self.visit_expr(expression),
+            ExpressionContext::Condition => self.visit_condition(expression),
+        }
+        let mut current_statement = self.pop_statement();
+
+        // Collection constraints are only recorded for the statement kinds selected in
+        // `visit_stmt`, which excludes compound statement headers.
+        current_statement.collection_uses.clear();
+
+        self.record_statement(current_statement, |builder| {
+            Statement::Expression(builder.add_standalone_expression(expression))
+        });
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
@@ -2991,6 +3021,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .insert(statement_node.into(), statement);
 
         statement
+    }
+
+    fn record_statement(
+        &mut self,
+        current_statement: CurrentStatement<'ast, 'db>,
+        create_statement: impl FnOnce(&mut Self) -> Statement<'db>,
+    ) {
+        if current_statement.lambda_expressions.is_empty()
+            && current_statement.collection_uses.is_empty()
+        {
+            return;
+        }
+
+        let statement = create_statement(self);
+
+        // A lambda's body depends on the type context of its enclosing statement or expression.
+        // Inferring that statement separately avoids cycles involving the entire scope.
+        self.enclosing_lambda_statements.extend(
+            current_statement
+                .lambda_expressions
+                .into_iter()
+                .map(|lambda| (lambda.into(), statement)),
+        );
+
+        // Collection initializers depend on the statements that constrain their element types.
+        // Record those statements so inference does not depend on the entire scope.
+        let mut collection_defs = FxHashSet::default();
+        for (collection_def, use_expression) in current_statement.collection_uses {
+            // If the same collection is referenced multiple times in this statement,
+            // we only consider the first occurrence, as collection use constraints are
+            // tracked at the statement level.
+            if !collection_defs.insert(collection_def) {
+                continue;
+            }
+
+            self.uses_by_collection
+                .entry(collection_def)
+                .or_default()
+                .push((statement, use_expression));
+
+            self.collections_by_use
+                .insert(use_expression, collection_def);
+        }
     }
 
     fn with_type_params<T>(
@@ -4470,7 +4543,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .last()
                     .and_then(|clause| clause.test.as_ref());
                 let mut chain_start = final_elif_test.map(|_| self.flow_snapshot());
-                self.visit_condition(&node.test);
+                self.visit_expression_statement(&node.test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(&node.test);
                 let mut falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches() {
                     self.flow_restore(snapshots.truthy);
@@ -4528,7 +4601,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.current_use_def_map_mut()
                                 .set_if_chain_start(chain_start.take());
                         }
-                        self.visit_condition(elif_test);
+                        self.visit_expression_statement(elif_test, ExpressionContext::Condition);
                         self.current_use_def_map_mut().set_if_chain_start(None);
                         // A test expression is evaluated whether the branch is taken or not
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(elif_test);
@@ -4612,7 +4685,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // Visit the test expression after creating loop headers, so that loop-back values
                 // are visible.
-                self.visit_condition(test);
+                self.visit_expression_statement(test, ExpressionContext::Condition);
                 let condition_flow_snapshot = self.flow_snapshot_for_condition(test);
 
                 // Take the pre_loop snapshot from the post-test fallback flow before restoring the
@@ -4687,7 +4760,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     optional_vars,
                 } in items
                 {
-                    self.visit_expr(context_expr);
+                    if optional_vars.as_deref().is_none_or(ast::Expr::is_name_expr) {
+                        self.visit_expression_statement(context_expr, ExpressionContext::Value);
+                    } else {
+                        // Attribute and subscript targets can supply type context, so keep
+                        // their lambdas associated with the whole statement.
+                        self.visit_expr(context_expr);
+                    }
                     self.record_exception_checkpoint();
 
                     self.exception_context_stack_manager
@@ -4720,12 +4799,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             self.exception_context_stack_manager
                                 .record_deferred_terminal_context_manager_exit();
                         }
-                        let context_expr = &item.context_expr;
-                        let expression = self
-                            .expressions_by_node
-                            .get(&ExpressionNodeKey::from(context_expr))
-                            .copied()
-                            .unwrap_or_else(|| self.add_standalone_expression(context_expr));
+                        let expression = self.add_standalone_expression(&item.context_expr);
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::ContextManagerSuppresses {
                                 expression,
@@ -4777,7 +4851,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 let iter_expr = self.add_standalone_expression(iter);
-                self.visit_expr(iter);
+                if target.is_name_expr() {
+                    self.visit_expression_statement(iter, ExpressionContext::Value);
+                } else {
+                    // Preserve type context supplied by attribute or subscript targets.
+                    self.visit_expr(iter);
+                }
                 let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
                 self.record_exception_checkpoint_if(iteration_can_raise);
 
@@ -4884,7 +4963,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 debug_assert_eq!(self.current_match_case, None);
 
                 let subject_expr = self.add_standalone_expression(subject);
-                self.visit_expr(subject);
+                self.visit_expression_statement(subject, ExpressionContext::Value);
                 if cases.is_empty() {
                     return;
                 }
@@ -4990,7 +5069,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // while the next case is reached through `!P || (P && !G)`. Save `P && !G`
                     // separately so it can be merged with the pattern-failure state after the body.
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        self.visit_condition(guard);
+                        self.visit_expression_statement(guard, ExpressionContext::Condition);
                         let condition_flow_snapshot = self.flow_snapshot_for_condition(guard);
                         let falsy = if let Some(snapshots) = condition_flow_snapshot.into_branches()
                         {
@@ -5120,7 +5199,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         } = except_handler;
 
                         if let Some(handled_exceptions) = handled_exceptions {
-                            self.visit_expr(handled_exceptions);
+                            self.visit_expression_statement(
+                                handled_exceptions,
+                                ExpressionContext::Value,
+                            );
                         }
 
                         // If `handled_exceptions` above was `None`, it's something like `except as e:`,
@@ -5613,45 +5695,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             });
 
-        if current_statement.lambda_expressions.is_empty()
-            && current_statement.collection_uses.is_empty()
-        {
-            return;
-        }
-
-        let standalone_statement = self.add_standalone_statement(stmt);
-
-        // The body of a lambda expression needs access to the `Callable` type
-        // context the lambda is being inferred with, and so any statement
-        // containing a lambda must be inferable as a standalone statement
-        // to avoid large scope-level cycles.
-        self.enclosing_lambda_statements.extend(
-            current_statement
-                .lambda_expressions
-                .into_iter()
-                .map(|lambda| (lambda.into(), standalone_statement)),
-        );
-
-        // The inferred element type of a collection initializer depends on uses of
-        // the collection in its containing scope, and so each use must be part
-        // of an standalone inferable statement to avoid large scope-level cycles.
-        let mut collection_defs = FxHashSet::default();
-        for (collection_def, use_expression) in current_statement.collection_uses {
-            // If the same collection is referenced multiple times in this statement,
-            // we only consider the first occurrence, as collection use constraints are
-            // tracked at the statement level.
-            if !collection_defs.insert(collection_def) {
-                continue;
-            }
-
-            self.uses_by_collection
-                .entry(collection_def)
-                .or_default()
-                .push((standalone_statement, use_expression));
-
-            self.collections_by_use
-                .insert(use_expression, collection_def);
-        }
+        self.record_statement(current_statement, |builder| {
+            builder.add_standalone_statement(stmt)
+        });
     }
 
     fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {

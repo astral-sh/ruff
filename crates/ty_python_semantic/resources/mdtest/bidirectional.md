@@ -2079,6 +2079,137 @@ _: list[int | str] = f12()  # error: [invalid-assignment]
 reveal_type(f12)  # revealed: () -> list[int]
 ```
 
+## Lambda context in compound statements
+
+A callable parameter provides type context to a lambda argument even when the call appears in a
+condition:
+
+```py
+from typing import Callable
+
+def condition(callback: Callable[[int], int]) -> bool:
+    return callback(1) > 0
+
+if condition(lambda value: reveal_type(value)):  # revealed: int
+    reveal_type(1)  # revealed: Literal[1]
+elif condition(lambda value: reveal_type(value)):  # revealed: int
+    reveal_type("else")  # revealed: Literal["else"]
+
+while condition(lambda value: reveal_type(value)):  # revealed: int
+    reveal_type(1)  # revealed: Literal[1]
+    break
+```
+
+The same applies to calls that produce a loop's iterable:
+
+```py
+def iterable(callback: Callable[[int], int]) -> list[int]:
+    return [callback(1)]
+
+for item in iterable(lambda value: reveal_type(value)):  # revealed: int
+    reveal_type(item)  # revealed: int
+```
+
+Calls that create context managers provide context with or without an `as` target:
+
+```py
+class Manager:
+    def __enter__(self) -> int:
+        return 1
+
+    def __exit__(self, *args) -> None: ...
+
+def manager(callback: Callable[[int], int]) -> Manager:
+    return Manager()
+
+with (
+    manager(lambda value: reveal_type(value)),  # revealed: int
+    manager(lambda value: reveal_type(value)) as item,  # revealed: int
+):
+    reveal_type(item)  # revealed: int
+```
+
+As well as asynchronous context managers:
+
+```py
+class AsyncManager:
+    async def __aenter__(self) -> int:
+        return 1
+
+    async def __aexit__(self, *args) -> None: ...
+
+def async_manager(callback: Callable[[int], int]) -> AsyncManager:
+    return AsyncManager()
+
+async def _():
+    async with async_manager(lambda value: reveal_type(value)) as item:  # revealed: int
+        reveal_type(item)  # revealed: int
+
+    async with async_manager(lambda value: reveal_type(value)):  # revealed: int
+        reveal_type(1)  # revealed: Literal[1]
+```
+
+Calls in match subjects and guards also provide context to their arguments:
+
+```py
+def subject(callback: Callable[[int], int]) -> int:
+    return callback(1)
+
+match subject(lambda value: reveal_type(value)):  # revealed: int
+    case item if condition(lambda value: reveal_type(value)):  # revealed: int
+        reveal_type(item)  # revealed: int
+```
+
+An exception type expression provides the same context, whether or not the handler binds the
+exception:
+
+```py
+def exception_type(callback: Callable[[int], int]) -> type[ValueError]:
+    return ValueError
+
+try:
+    raise ValueError
+except exception_type(lambda value: reveal_type(value)) as error:  # revealed: int
+    reveal_type(error)  # revealed: ValueError
+
+try:
+    raise ValueError
+except exception_type(lambda value: reveal_type(value)):  # revealed: int
+    reveal_type(1)  # revealed: Literal[1]
+```
+
+## Lambda context from assignment targets
+
+The target of a `for` or `with` statement can also provide type context to a lambda. This
+`Container[T]` yields itself when iterated and returns itself from `__enter__`, so a target of type
+`Container[int]` provides `int` as context for the lambda parameter:
+
+```py
+from typing import Callable, Iterator, Self
+
+class Container[T]:
+    def __init__(self, callback: Callable[[T], T]) -> None: ...
+    def __iter__(self) -> Iterator[Self]:
+        yield self
+
+    def __enter__(self) -> Self:
+        return self
+
+    def __exit__(self, *args: object) -> None: ...
+
+def _(values: list[Container[int]]):
+    for values[0] in Container(lambda value: reveal_type(value)):  # revealed: int
+        reveal_type(values[0])  # revealed: Container[int]
+```
+
+The same context is available from the `with` target:
+
+```py
+def _(values: list[Container[int]]):
+    with Container(lambda value: reveal_type(value)) as values[0]:  # revealed: int
+        reveal_type(values[0])  # revealed: Container[int]
+```
+
 ## Lambda contextual inference through type aliases
 
 A lambda parameter is inferred from a callable behind a type alias, including aliases that resolve

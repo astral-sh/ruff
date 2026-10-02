@@ -308,7 +308,7 @@ pub struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
-    /// Map from a lambda expression to its containing statement.
+    /// Map from a lambda to the enclosing statement or expression that provides its type context.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
     // Map from a constraining use of a collection initializer to its definition.
@@ -1619,6 +1619,91 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
                 parameter: ParameterDefinitionNodeKind::VariadicKeywordParameter(_)
             })
         );
+    }
+
+    #[test]
+    fn lambda_statement_expressions() {
+        for (source, lambda_count) in [
+            (
+                "\
+if first(lambda x: x):
+    body(lambda x: x)
+elif second(lambda x: x):
+    pass
+elif third(lambda x: x):
+    pass
+",
+                4,
+            ),
+            (
+                "\
+while condition(lambda x: x):
+    body(lambda x: x)
+",
+                2,
+            ),
+            (
+                "\
+for item in iterable(lambda x: x):
+    body(lambda x: x)
+",
+                2,
+            ),
+            (
+                "\
+with first(lambda x: x), second(lambda x: x) as manager:
+    body(lambda x: x)
+",
+                3,
+            ),
+            (
+                "\
+match subject(lambda x: x):
+    case 1 if first(lambda x: x):
+        body(lambda x: x)
+    case _ if second(lambda x: x):
+        pass
+",
+                4,
+            ),
+            (
+                "\
+try:
+    pass
+except first(lambda x: x) as error:
+    body(lambda x: x)
+except second(lambda x: x):
+    pass
+",
+                3,
+            ),
+        ] {
+            let TestCase { db, file } = test_case(source);
+            let file = program_file(&db, file);
+            let module = parsed_module(&db, file.python_file(&db)).load(&db);
+            let index = semantic_index(&db, file);
+
+            assert!(index.try_statement(&module.syntax().body[0]).is_none());
+            assert_eq!(
+                index.enclosing_lambda_statements.iter().count(),
+                lambda_count
+            );
+
+            // Each lambda belongs to its own enclosing call, including the body call.
+            // The expression must be the same ingredient used by normal inference.
+            for (lambda, statement) in &index.enclosing_lambda_statements {
+                let Statement::Expression(expression) = statement else {
+                    panic!("expected an expression statement, got {statement:?}");
+                };
+                let node = expression.node_ref(&db).node(&module);
+                assert_eq!(index.try_expression(node), Some(*expression));
+                assert_matches!(node, ast::Expr::Call(call)
+                    if call.arguments.args.iter().any(|arg| ExpressionNodeKey::from(arg) == *lambda));
+            }
+
+            // Only the expression statement in the body needs a statement entry.
+            assert_eq!(index.statements_by_node.len(), 1);
+        }
     }
 
     /// Test case to validate that the comprehension scope is correctly identified and that the target

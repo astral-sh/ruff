@@ -2473,7 +2473,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If there is no handled exception, it's invalid syntax;
         // a diagnostic will have already been emitted
         let node_ty = node.map_or(Type::unknown(), |ty| {
-            self.infer_expression(ty, TypeContext::default())
+            self.infer_maybe_standalone_expression(ty, TypeContext::default())
         });
         let env = self.program_environment();
         let type_base_exception = KnownClass::BaseException.to_subclass_of(db, env);
