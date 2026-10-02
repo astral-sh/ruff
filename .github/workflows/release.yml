@@ -539,11 +539,13 @@ jobs:
 
   custom-publish-mirror:
     needs:
+      - sign-release-binaries
       - plan
       - announce
     uses: $/.github/workflows/publish-mirror.yml
     with:
       plan: ${{ needs.plan.outputs.val }}
+      signed-archives: ${{ needs.sign-release-binaries.outputs.github-archives }}
     secrets: inherit # zizmor: ignore[secrets-inherit]
     permissions:
       "contents": "read"
