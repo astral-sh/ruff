@@ -4844,6 +4844,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
+                // TODO: Represent `for` and `with` headers as standalone statements that include
+                // their targets, preserving type context without inferring the bodies.
                 let iter_expr = self.add_standalone_expression(iter);
                 self.visit_expr(iter);
                 let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
