@@ -8,10 +8,9 @@ use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
-    Binding, BindingId, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
+    Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Edit;
 use crate::Locator;
@@ -142,7 +141,7 @@ pub(crate) fn class_annotation_runtime_semantics(
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
     let semantics = base_class_runtime_semantics(class_def, semantic, settings);
-    if semantics.is_required() {
+    if matches!(semantics, RuntimeSemantics::Required) {
         return semantics;
     }
     semantics.combine(decorator_runtime_semantics(
@@ -158,54 +157,30 @@ fn base_class_runtime_semantics(
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> RuntimeSemantics {
-    fn inner(
-        class_def: &ast::StmtClassDef,
-        semantic: &SemanticModel,
-        base_classes: &FxHashMap<String, RuntimeSemantics>,
-        seen: &mut FxHashSet<BindingId>,
-    ) -> RuntimeSemantics {
-        let mut result = RuntimeSemantics::Default;
-        for expr in class_def.bases() {
-            match semantic
-                .resolve_qualified_name(map_subscript(expr))
-                .and_then(|qualified_name| {
-                    base_classes.iter().find(|(base_class, ..)| {
-                        QualifiedName::from_dotted_name(base_class) == qualified_name
-                    })
-                }) {
-                Some((_, RuntimeSemantics::Required)) => {
-                    return RuntimeSemantics::Required;
-                }
-                Some((_, semantics)) => {
-                    result = semantics.combine(result);
-                }
-                _ => {}
-            }
-            if let Some(id) = semantic.lookup_attribute(map_subscript(expr)) {
-                if seen.insert(id) {
-                    let binding = semantic.binding(id);
-                    if let Some(base_class) = binding
-                        .kind
-                        .as_class_definition()
-                        .map(|id| &semantic.scopes[*id])
-                        .and_then(|scope| scope.kind.as_class())
-                    {
-                        let semantics = inner(base_class, semantic, base_classes, seen);
-                        if semantics.is_required() {
-                            return semantics;
-                        }
-                        result = semantics.combine(result);
-                    }
-                }
-            }
-        }
-        result
-    }
     let base_classes = &settings.flake8_type_checking.runtime_evaluated_base_classes;
     if base_classes.is_empty() {
         return RuntimeSemantics::Default;
     }
-    inner(class_def, semantic, base_classes, &mut FxHashSet::default())
+    let mut result = RuntimeSemantics::Default;
+    analyze::class::any_qualified_base_class(class_def, semantic, |qualified_name| {
+        match base_classes
+            .iter()
+            .find(|(base_class, ..)| QualifiedName::from_dotted_name(base_class) == qualified_name)
+        {
+            Some((_, RuntimeSemantics::Required)) => {
+                // Once we encounter a runtime required name we can stop looking
+                // at the rest of the names by returning `true`
+                result = RuntimeSemantics::Required;
+                true
+            }
+            Some((_, semantics)) => {
+                result = semantics.combine(result);
+                false
+            }
+            _ => false,
+        }
+    });
+    result
 }
 
 fn decorator_runtime_semantics(

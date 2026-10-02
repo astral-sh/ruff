@@ -2400,20 +2400,13 @@ pub struct Flake8TypeCheckingOptions {
     /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-base-classes]
     /// "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
     /// ```
-    ///
-    /// In some rare cases you may wish to revert back to `"default"` semantics in a
-    /// configuration that extends another. This could be useful if you implement
-    /// something like Pydantic's `BaseModel` yourself and need `"default"` semantics for
-    /// this base class, but `"required"` semantics for all derived classes.
     #[option(
         default = "{}",
-        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\" | \"default\"]",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\"]",
         scope = "runtime-evaluated-base-classes",
         example = r#"
             "pydantic.BaseModel" = "required"
             "sqlalchemy.orm.DeclarativeBase" = "ambiguous"
-            # revert parent configuration's decision
-            "my_package.MyBase" = "default"
         "#
     )]
     runtime_evaluated_base_classes: Option<AnnotationSemanticsSelection>,
@@ -2440,17 +2433,14 @@ pub struct Flake8TypeCheckingOptions {
     /// Here `app.get` will correctly be identified as `fastapi.FastAPI.get`.
     ///
     /// Just like with `runtime-evaluated-base-classes` it's possible to mark
-    /// decorators as runtime `"ambiguous"` or revert a parent configuration's
-    /// setting back to the `"default"` semantics.
+    /// decorators as runtime `"ambiguous"`.
     #[option(
         default = "{}",
-        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\" | \"default\"]",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\"]",
         scope = "runtime-evaluated-decorators",
         example = r#"
             "pydantic.validate_call" = "required"
             "sqlalchemy.orm.declared_attr = "ambiguous"
-            # revert parent configuration's decision
-            "my_package.my_decorator" = "default"
         "#
     )]
     runtime_evaluated_decorators: Option<AnnotationSemanticsSelection>,
@@ -2521,8 +2511,8 @@ impl Flake8TypeCheckingOptions {
             {
                 AnnotationSemanticsSelection::Table(map) => map,
                 AnnotationSemanticsSelection::List(vector) => vector
-                    .iter()
-                    .map(|name| (name.clone(), RuntimeSemantics::Required))
+                    .into_iter()
+                    .map(|name| (name, RuntimeSemantics::Required))
                     .collect(),
             },
             runtime_evaluated_decorators: match self
@@ -2531,8 +2521,8 @@ impl Flake8TypeCheckingOptions {
             {
                 AnnotationSemanticsSelection::Table(map) => map,
                 AnnotationSemanticsSelection::List(vector) => vector
-                    .iter()
-                    .map(|name| (name.clone(), RuntimeSemantics::Required))
+                    .into_iter()
+                    .map(|name| (name, RuntimeSemantics::Required))
                     .collect(),
             },
             quote_annotations: self.quote_annotations.unwrap_or_default(),

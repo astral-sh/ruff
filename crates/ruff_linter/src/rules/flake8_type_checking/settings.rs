@@ -14,18 +14,7 @@ use std::fmt::{Display, Formatter};
 /// their decorators, but also via their base classes, so this determines
 /// what happens when two sources disagree)
 #[derive(
-    Debug,
-    Copy,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Serialize,
-    Deserialize,
-    CacheKey,
-    Default,
-    is_macro::Is,
+    Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, CacheKey, Default,
 )]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -41,6 +30,10 @@ pub enum RuntimeSemantics {
     /// Use the default runtime semantics of the targeted annotations, this
     /// exists so that child configurations can revert entries the parent
     /// configuration configured back to the default semantics.
+    // NOTE: Until we're sure how to properly support this with `extend` we
+    //       don't want to expose this at the configuration level, we still
+    //       need it as a possible result for the X_runtime_semantics helpers.
+    #[serde(skip)]
     Default,
 }
 
