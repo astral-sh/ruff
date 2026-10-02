@@ -1,7 +1,7 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::script::script_tag;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
-use crate::{ProjectMetadata, ProjectReloadResult};
+use crate::{GlobFilterCheckMode, ProjectMetadata, ProjectReloadResult};
 use std::collections::BTreeSet;
 
 use crate::walk::{ProjectFilesWalker, create_walker_builder};
@@ -9,6 +9,7 @@ use ruff_db::Db as _;
 use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::system_module_search_paths;
 use ty_python_core::program::FallibleStrategy;
 use ty_python_semantic::PythonEnvironment;
 
@@ -93,15 +94,15 @@ impl ProjectDatabase {
     pub fn apply_changes(&mut self, changes: &[ChangeEvent]) -> ChangeResult {
         let project = self.project();
         let project_root = project.root(self).to_path_buf();
-        let configuration_paths = ConfigurationPaths::from_metadata(project.metadata(self));
+        let metadata = project.metadata(self);
+        let configuration_paths = ConfigurationPaths::from_metadata(metadata);
+        // The initial uv metadata request may have failed before a workspace could be discovered.
+        let uv_enabled = metadata.use_uv().workspace_discovery_enabled();
         let virtual_environment = project.program_settings(self).virtual_environment.clone();
-        let python_path = project
-            .metadata(self)
-            .configured_python_path(self.system())
-            .or_else(|| {
-                PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
-                    .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
-            });
+        let python_path = metadata.configured_python_path(self.system()).or_else(|| {
+            PythonEnvironment::virtual_environment_candidate(Some(&project_root), self.system())
+                .map(|(path, _)| SystemPath::absolute(path, self.system().current_directory()))
+        });
         let program = self.project().program(self);
         let custom_stdlib_versions_path = program
             .custom_stdlib_search_path(self)
@@ -138,16 +139,31 @@ impl ProjectDatabase {
             Some(create_walker_builder(self, walk_roots)?.incremental_matcher())
         });
 
-        for change in changes {
+        // Classify the whole batch before syncing files. An earlier event for a deleted file
+        // can mark it as missing in the cache, preventing us from recognizing its deletion.
+        let changes: Vec<_> = changes.iter().map(|change| change.resolve(self)).collect();
+        for change in &changes {
+            let change = change.as_ref();
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
-            refresh_program_settings |= affects_python_environment(
+            let environment_changed = affects_python_environment(
                 change,
                 virtual_environment.as_deref(),
                 python_path.as_deref(),
             );
+            refresh_program_settings |= environment_changed;
+
+            // Recreating an environment can change uv's reported interpreter and installed
+            // module ownership without changing the lockfile.
+            if uv_enabled
+                && !reload_project
+                && (environment_changed || affects_uv_metadata(self, change))
+            {
+                reload_project = true;
+            }
 
             if let Some(path) = change.system_path() {
+                // Configuration changes can alter ty's settings and project root.
                 if configuration_paths.is_configuration(path, &project_root) {
                     File::sync_path(self, path);
                     reload_project = true;
@@ -284,16 +300,7 @@ impl ProjectDatabase {
                 }
 
                 ChangeEvent::Deleted { kind, path } => {
-                    let is_file = match kind {
-                        DeletedKind::File => true,
-                        DeletedKind::Directory => false,
-                        DeletedKind::Any => self
-                            .files
-                            .try_system(self, path)
-                            .is_some_and(|file| file.exists(self)),
-                    };
-
-                    if is_file {
+                    if *kind == DeletedKind::File {
                         if synced_files.insert(path.to_path_buf()) {
                             File::sync_path(self, path);
                         }
@@ -356,9 +363,9 @@ impl ProjectDatabase {
             if metadata.use_uv().workspace_discovery_enabled() {
                 result.project_sync_path = Some(path.to_path_buf());
             } else {
-                // We're not refreshing uv metadata, so use the existing environment.
-                let environment = metadata.environment().clone();
-                match project.rediscover(self, path, environment) {
+                // We're not refreshing uv metadata, so use the existing workspace.
+                let workspace = metadata.uv_workspace().clone();
+                match project.rediscover(self, path, workspace) {
                     Ok(ProjectReloadResult::Unchanged) => {}
                     Ok(ProjectReloadResult::Changed { files_changed }) => {
                         result.project_changed = true;
@@ -560,6 +567,95 @@ fn affects_python_environment(
             library
                 .and_then(SystemPath::parent)
                 .is_some_and(may_be_environment_root)
+        }
+        _ => false,
+    }
+}
+
+fn affects_uv_metadata(db: &dyn Db, change: &ChangeEvent) -> bool {
+    // `uv workspace metadata` checks and may update the lockfile before exporting it. It also
+    // reads the selected environment:
+    // - `pyproject.toml` defines workspace membership and dependencies, which affect
+    //   `workspace_root`, `members`, and `resolution`. A new file can also make this a uv
+    //   project for the first time. uv reads these files even when `--config-file` replaces
+    //   ty's project configuration, or when they belong to nested workspace members.
+    // - `uv.lock` supplies `members` and the dependency `resolution`. For example, `uv add` can
+    //   change the lockfile before the environment is synchronized.
+    // - `uv.toml` supplies resolver settings such as package indexes. If those settings make the
+    //   lockfile stale, the metadata command can resolve again and return a different `resolution`.
+    // - `.python-version` selects the interpreter uv uses to check or update the lockfile.
+    //   When the workspace has no `requires-python`, uv infers a lower bound from that interpreter.
+    //   This can change `resolution`: pinning 3.13 instead of 3.12 can remove dependencies
+    //   guarded by `python_version < '3.13'`.
+    // A matching name in an unrelated watched path may also trigger a refresh. The event path is
+    // not passed to uv, so it cannot make ty use the other project's metadata. If this project's
+    // metadata and settings are unchanged, the false positive only costs a no-op uv workspace metadata call.
+    match change {
+        ChangeEvent::Created { path, .. }
+        | ChangeEvent::Changed { path, .. }
+        | ChangeEvent::Deleted { path, .. }
+            if matches!(
+                path.file_name(),
+                Some("pyproject.toml" | "uv.lock" | "uv.toml" | ".python-version")
+            ) =>
+        {
+            true
+        }
+
+        // uv derives `module_owners` from installed distributions in `site-packages`, not just the
+        // lockfile. `uv pip uninstall` or `uv sync --frozen` can remove or create a `.dist-info`
+        // directory without updating `uv.lock`. Require `site-packages` to be the immediate
+        // parent: installed packages can contain vendored `.dist-info` directories that uv does
+        // not treat as installed distributions. Matching the parent by name also handles
+        // events through aliases such as `lib64` without filesystem reads. An unrelated
+        // environment only causes an extra refresh of this project's metadata.
+        ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. }
+            if path
+                .file_name()
+                .is_some_and(|name| name.ends_with(".dist-info"))
+                && path
+                    .parent()
+                    .is_some_and(|parent| parent.file_name() == Some("site-packages")) =>
+        {
+            true
+        }
+
+        // Moving a workspace member can produce only a directory event, with no separate
+        // event for its `pyproject.toml`. Refresh metadata because adding or removing a member
+        // can change `members` and `resolution`:
+        // - Check directories in the uv workspace against ty's include/exclude settings. A member
+        //   can affect resolution even when it is outside the paths passed to `ty check`.
+        //   If metadata loading failed, use ty's project root so directory changes can trigger a retry.
+        // - Check directories that contain a search path to detect changes to local dependencies.
+        //   For example, deleting `/dependency` removes the sources at `/dependency/src`.
+        //
+        // Using the project's include/exclude settings avoids reading ignore files on each
+        // event, at the cost of occasionally requesting unchanged metadata.
+        ChangeEvent::Created {
+            path,
+            kind: CreatedKind::Directory | CreatedKind::Any,
+        }
+        | ChangeEvent::Deleted {
+            path,
+            kind: DeletedKind::Directory | DeletedKind::Any,
+        } => {
+            let project = db.project();
+            let workspace_root = project
+                .metadata(db)
+                .uv_workspace_metadata()
+                .map_or(project.root(db), |workspace| workspace.workspace_root());
+            let is_included_workspace_directory = path.starts_with(workspace_root)
+                && project
+                    .settings(db)
+                    .src()
+                    .files
+                    .is_directory_maybe_included(path, GlobFilterCheckMode::Adhoc)
+                    .is_included();
+            let environment = project.program(db).resolver_environment(db);
+            let contains_search_path = system_module_search_paths(db, environment)
+                .any(|search_path| search_path.starts_with(path));
+
+            is_included_workspace_directory || contains_search_path
         }
         _ => false,
     }

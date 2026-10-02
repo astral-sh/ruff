@@ -234,11 +234,51 @@ use ty_python_core::{
     use_def_map,
 };
 
-/// Narrow `subject_ty` by all preceding unguarded match patterns.
+/// Controls whether the inferred match subject type is expanded before narrowing it by preceding
+/// patterns.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) enum PatternSubjectExpansion {
+    /// Use the inferred subject type directly when inferring pattern bindings.
+    Raw,
+    /// Expand the subject into a union of possible subtypes when analyzing pattern reachability.
+    /// If the subject cannot be expanded, use its inferred type directly.
+    Expanded,
+}
+
+/// Narrow the subject by preceding match patterns with no guard or an always-true guard.
 ///
-/// Caching each prefix lets the next case reuse the already-normalized subject instead of
-/// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
-/// same intersections.
+/// Caching the subject type narrowed by the patterns before each case lets the next case reuse it
+/// instead of rebuilding it from the union of all preceding patterns, which can repeatedly
+/// distribute the same intersections.
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    expansion: PatternSubjectExpansion,
+) -> Type<'db> {
+    let Some(previous) = predicate.previous_predicate(db) else {
+        let subject = predicate.subject(db);
+        let subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
+        return match expansion {
+            PatternSubjectExpansion::Raw => subject_ty,
+            PatternSubjectExpansion::Expanded => {
+                let env = ProgramEnvironment::from_scope(subject.scope(db));
+                expand_type(db, &env, subject_ty)
+                    .map(|types| UnionType::from_elements(db, &env, types))
+                    .unwrap_or(subject_ty)
+            }
+        };
+    };
+    type_narrowed_after_pattern(db, *previous, expansion)
+}
+
+/// Return the match subject's type after this case, excluding values matched by its pattern when
+/// its guard cannot reject them.
+///
+/// Reachability analysis can reuse this result for an unguarded case when checking whether the
+/// pattern covers every remaining value. Later cases use it to exclude values already matched.
+///
+/// The query key excludes the inferred subject type, which can change during a cycle through a
+/// pattern capture. Inferring it within the query lets Salsa recognize and normalize that cycle.
 #[salsa::tracked(
     returns(copy),
     cycle_initial = |_, id, _, _| Type::divergent(id),
@@ -248,37 +288,43 @@ use ty_python_core::{
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-pub(crate) fn type_narrowed_by_previous_patterns<'db>(
+fn type_narrowed_after_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
-    subject_ty: Type<'db>,
+    expansion: PatternSubjectExpansion,
 ) -> Type<'db> {
-    let Some(previous) = predicate.previous_predicate(db) else {
-        return subject_ty;
-    };
-    let previous = *previous;
     let narrowed_by_previous_patterns =
-        type_narrowed_by_previous_patterns(db, previous, subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, expansion);
 
-    if previous.guard(db).is_some() {
+    let narrowed_by_pattern =
+        type_narrowed_by_pattern(db, predicate, narrowed_by_previous_patterns);
+    // If the pattern does not narrow the subject, the guard's truthiness cannot affect the result.
+    // Skipping its inference also avoids cycles through the subject or a pattern capture.
+    if narrowed_by_pattern == narrowed_by_previous_patterns
+        || !pattern_guard_allows_all_matches(db, predicate)
+    {
         narrowed_by_previous_patterns
     } else {
-        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
+        narrowed_by_pattern
     }
+}
+
+/// Whether the guard cannot reject a value matched by the pattern.
+fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
+    // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
+    predicate
+        .guard(db)
+        .is_none_or(|guard| analyze_condition(db, guard).is_always_true())
 }
 
 /// Narrow `subject_ty` by a match pattern.
 ///
-/// This result is also the preceding-pattern prefix for the next unguarded case.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
-        let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
-    },
-    heap_size = ruff_memory_usage::heap_size
-)]
+/// If the case has no guard, or its guard is always true, the result is the subject type remaining
+/// after the case.
+///
+/// The callers cache the narrowed subject type and pattern reachability. While tracking this
+/// function separately might seem useful for caching, it can create a new query whenever a cyclic
+/// subject type changes, introducing fresh recursive markers on every iteration.
 fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
@@ -412,9 +458,10 @@ fn enum_member_pattern_coverage<'db>(
 
 /// Determine the static truthiness of a `match` case over a union of enum literals.
 ///
-/// The analysis removes enum members already matched by earlier unguarded cases, then decides
-/// whether the current case is impossible, exhaustive, or still ambiguous. Guarded cases remain
-/// ambiguous because the guard can reject an otherwise matching enum member.
+/// The analysis removes enum members already matched by earlier cases whose guards cannot reject
+/// them, then decides whether the current case is impossible, exhaustive, or still ambiguous.
+/// If any members remain and the current case has a guard, a pattern covering all of them is
+/// conservatively treated as ambiguous.
 fn analyze_enum_literal_union_pattern_predicate<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -432,7 +479,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     while let Some(previous) = previous_predicate.previous_predicate(db) {
         previous_predicate = *previous;
 
-        if previous_predicate.guard(db).is_some() {
+        if !pattern_guard_allows_all_matches(db, previous_predicate) {
             continue;
         }
 
@@ -490,11 +537,8 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let coverage_subject_ty = expand_type(db, &env, subject_ty)
-        .map(|types| UnionType::from_elements(db, &env, types))
-        .unwrap_or(subject_ty);
     let narrowed_subject_ty =
-        type_narrowed_by_previous_patterns(db, predicate, coverage_subject_ty);
+        type_narrowed_by_previous_patterns(db, predicate, PatternSubjectExpansion::Expanded);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -505,7 +549,13 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
+    // This check concerns the pattern itself. The cached type after the case also accounts for
+    // its guard and may therefore retain values matched by the pattern.
+    let next_narrowed_subject_ty = if predicate.guard(db).is_none() {
+        type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded)
+    } else {
+        type_narrowed_by_pattern(db, predicate, narrowed_subject_ty)
+    };
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -560,7 +610,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
     }
 }
 
-/// Infers complete preceding blocks of call predicates in source order.
+/// Infers complete blocks of call predicates at or before the given predicate, in source order.
 ///
 /// Predicate IDs are assigned in source order, but the decision diagrams intentionally order
 /// predicates in reverse to reduce their size. Inferring a later call can depend on the
@@ -568,8 +618,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// chain. Inferring the expressions in source order turns that chain into cache lookups while
 /// preserving normal reachability and narrowing during every inference.
 ///
-/// Because the prefix is based on predicate indices rather than graph reachability, branch-heavy
-/// code can warm calls from earlier source branches that this evaluation would not otherwise visit.
+/// Because calls are selected by predicate indices rather than graph reachability, branch-heavy
+/// code can cause earlier calls to be cached from branches that this evaluation would not otherwise
+/// visit.
 /// A demand-driven graph walk could avoid that work, but would require a more complex work list. We
 /// accept the broader eager pass because it keeps the ordering simple, and checking a scope will
 /// typically exercise most of its predicates eventually.
@@ -579,8 +630,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
 /// and analyzing it eagerly would bypass the range query's cycle recovery and could introduce a
 /// divergent inference cycle. For large scopes, keeping the complete-block pass unconditional
 /// ensures that tracked callers record the same dependencies on every thread. Small scopes do not
-/// need prefix warming to bound the Salsa stack, so their calls are evaluated entirely on demand.
-fn analyze_non_terminal_call_prefix<'db>(
+/// need to precompute calls to bound the Salsa stack, so their calls are evaluated entirely on
+/// demand.
+fn analyze_non_terminal_calls_up_to_predicate<'db>(
     db: &'db dyn Db,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
     root_predicate: ScopedPredicateId,
@@ -644,10 +696,10 @@ fn analyze_non_terminal_calls<'db>(
 
 /// Analyzes a power-of-two range of call-predicate blocks in source order.
 ///
-/// Prefixes can be decomposed into these canonical ranges and reused by later expression-inference
-/// queries. Splitting ranges in half keeps the Salsa query stack logarithmic even when the first
-/// requested prefix contains thousands of calls. Each leaf handles multiple calls iteratively to
-/// avoid retaining a Salsa argument and query result for every individual predicate.
+/// Calls at or before a predicate can be split into these canonical ranges, which later
+/// expression-inference queries can reuse. Splitting ranges in half keeps the Salsa query stack
+/// logarithmic even when a request covers thousands of calls. Each leaf handles multiple calls
+/// iteratively to avoid retaining a Salsa argument and query result for every individual predicate.
 ///
 /// Analyzing a call can re-enter reachability through expression inference and request this same
 /// range. Recovery is a no-op because the range only warms call queries; any call still needed for
@@ -678,7 +730,8 @@ fn analyze_non_terminal_call_range<'db>(
     analyze_non_terminal_call_range(db, scope, level - 1, child_index + 1);
 }
 
-/// Evaluates a reachability constraint after warming its statement-call prefix.
+/// Evaluates a reachability constraint, first caching complete blocks of statement calls up to its
+/// root predicate when the scope has many calls.
 ///
 /// Large scopes reuse canonical call ranges and sparse decision-diagram checkpoints; small scopes
 /// retain the direct evaluation path without creating either cached index.
@@ -695,7 +748,7 @@ fn evaluate_reachability_constraint<'db>(
     let constraints = use_def.reachability_constraints();
     let predicates = use_def.predicates();
     let root_predicate = constraints.get_interior_node(id).atom();
-    let has_many_calls = analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+    let has_many_calls = analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
     let call_predicates = has_many_calls.then(|| non_terminal_call_predicates(db, scope));
 
     evaluate_reachability_path(
@@ -862,7 +915,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         }
 
         let root_predicate = self.get_interior_node(id).atom();
-        analyze_non_terminal_call_prefix(db, predicates, root_predicate);
+        analyze_non_terminal_calls_up_to_predicate(db, predicates, root_predicate);
         evaluate_reachability_path(
             db,
             predicate_scope(db, &predicates[root_predicate]),
@@ -1520,7 +1573,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         let db = self.db;
         if self.is_join(id) {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
-            // then apply the incoming prefix constraint to its narrowed type.
+            // then apply the constraints accumulated before the join to its narrowed type.
             let suffix_ty = self.narrow_join(id);
             return apply_accumulated_narrowing(db, self.env, suffix_ty, accumulated);
         }

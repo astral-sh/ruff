@@ -26,9 +26,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::recursive::RecursiveType;
-use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
-};
+use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
 use crate::types::type_alias::QualifiedTypeAliasName;
 use crate::types::typevar::BoundTypeVarIdentity;
@@ -44,6 +42,9 @@ use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::semantic_index;
+
+/// Bound display expansion even when recursive specialization keeps changing the signature.
+const MAX_SIGNATURE_DISPLAY_DEPTH: usize = 4;
 
 /// A named item that can be either a class or a type alias.
 ///
@@ -150,6 +151,8 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Callable signatures can refer back to the same lambda through its lazy return type.
+    visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -535,7 +538,7 @@ impl Drop for TypeDetailGuard<'_, '_, '_, '_> {
     fn drop(&mut self) {
         // The fallibility here is primarily retrieving `TypeWriter::Details`
         // everything else is ideally-never-fails pedantry (yay for pedantry!)
-        if let TypeWriter::Details(details) = &mut self.inner
+        if let TypeWriter::Details(details) = &mut *self.inner
             && let Some(start) = self.start
             && let Some(payload) = self.payload.take()
         {
@@ -2019,10 +2022,9 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'_, 'db> {
         // Detect self-referential function types to prevent infinite recursion,
         // and limit display depth for chains of different function types
         // (e.g. multiple redefinitions with `TypeOf[foo]` return types).
-        const MAX_FUNCTION_TYPE_DISPLAY_DEPTH: usize = 4;
         let db = self.db;
         if self.settings.visited_function_types.contains(&self.ty)
-            || self.settings.visited_function_types.len() >= MAX_FUNCTION_TYPE_DISPLAY_DEPTH
+            || self.settings.visited_function_types.len() >= MAX_SIGNATURE_DISPLAY_DEPTH
         {
             f.set_invalid_type_annotation();
             f.write_str("def ")?;
@@ -2465,8 +2467,7 @@ impl<'db> CallableType<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplayCallableType<'a, 'db> {
         DisplayCallableType {
-            signatures: self.signatures(db),
-            kind: self.kind(db),
+            ty: *self,
             db,
             env,
             settings,
@@ -2475,8 +2476,7 @@ impl<'db> CallableType<'db> {
 }
 
 pub(crate) struct DisplayCallableType<'a, 'db> {
-    signatures: &'a CallableSignature<'db>,
-    kind: CallableTypeKind,
+    ty: CallableType<'db>,
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
     settings: DisplaySettings<'db>,
@@ -2485,22 +2485,31 @@ pub(crate) struct DisplayCallableType<'a, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let db = self.db;
-        match self.signatures.overloads.as_slice() {
+        if self.settings.visited_callable_types.contains(&self.ty) {
+            return f.write_str("Divergent");
+        }
+        if self.settings.visited_callable_types.len() >= MAX_SIGNATURE_DISPLAY_DEPTH {
+            f.set_invalid_type_annotation();
+            return f.write_str("(...) -> ...");
+        }
+        let mut settings = self.settings.clone();
+        Rc::make_mut(&mut settings.visited_callable_types).insert(self.ty);
+        match self.ty.signatures(db).overloads.as_slice() {
             [signature] => {
-                if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                if matches!(self.ty.kind(db), CallableTypeKind::ParamSpecValue) {
                     if signature.parameters().is_top() {
                         f.write_str("Top[")?;
                     }
                     signature
                         .parameters()
-                        .display_with(db, self.env, self.settings.clone())
+                        .display_with(db, self.env, settings.clone())
                         .fmt_detailed(f)?;
                     if signature.parameters().is_top() {
                         f.write_str("]")?;
                     }
                 } else {
                     signature
-                        .display_with(db, self.env, self.settings.clone())
+                        .display_with(db, self.env, settings.clone())
                         .fmt_detailed(f)?;
                 }
             }
@@ -2515,7 +2524,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(db, self.env, self.settings.clone()));
+                    join.entry(&signature.display_with(db, self.env, settings.clone()));
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -2700,7 +2709,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_str(" -> ")?;
 
             let should_parenthesize_return_type =
-                should_parenthesize_callable_type(self.return_ty, db);
+                should_parenthesize_callable_type(db, self.return_ty, &self.settings);
             if should_parenthesize_return_type {
                 f.write_char('(')?;
             }
@@ -3657,8 +3666,18 @@ impl Display for DisplayMaybeNegatedType<'_, '_> {
 /// avoid ambiguity in nested callable displays. The exceptions are:
 /// - Overloaded callables, which display as `Overload[...]` (already unambiguous)
 /// - Callables with top-materialization parameters, which display as `Top[...]` (already unambiguous)
-fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
+fn should_parenthesize_callable_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    settings: &DisplaySettings<'db>,
+) -> bool {
     if let Type::Callable(callable) = ty {
+        if settings.visited_callable_types.contains(&callable) {
+            return false;
+        }
+        if settings.visited_callable_types.len() >= MAX_SIGNATURE_DISPLAY_DEPTH {
+            return true;
+        }
         let overloads = &callable.signatures(db).overloads;
         overloads.len() == 1 && !overloads[0].parameters().is_top()
     } else {
@@ -3685,7 +3704,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
             f.write_char(')')
         };
         match self.ty {
-            ty if should_parenthesize_callable_type(ty, db) => write_parentheses(f),
+            ty if should_parenthesize_callable_type(db, ty, &self.settings) => write_parentheses(f),
             Type::KnownBoundMethod(_) | Type::FunctionLiteral(_) | Type::BoundMethod(_) => {
                 write_parentheses(f)
             }

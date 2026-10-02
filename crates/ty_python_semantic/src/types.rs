@@ -5914,6 +5914,41 @@ impl<'db> Type<'db> {
                     let mut error = None;
                     let mut properties = None;
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
+                        // Consider a method call on an object of type `T: E1 | E2`:
+                        //
+                        // ```py
+                        // from typing import Self, reveal_type
+                        //
+                        // class E1:
+                        //     def f(self) -> list[Self]:
+                        //         return [self]
+                        //
+                        // class E2:
+                        //     def f(self) -> set[Self]:
+                        //         return {self}
+                        //
+                        // def _[T: E1 | E2](obj: T):
+                        //     reveal_type(obj.f())
+                        // ```
+                        //
+                        // For `T: E1 | E2`, we can't bind `E1.f` to the full receiver type `T`,
+                        // since that would invalidate the implicit `self: Self` annotation of
+                        // `E1.f`, with `Self: E1`. But we can observe that `T = T & (E1 | E2)`:
+                        // `T` is a subtype of `E1 | E2` due to its bound, so intersecting the two
+                        // just gives us `T`. Expanding this gives `T = (T & E1) | (T & E2)`.
+                        //
+                        // On the first union element, we can bind `E1.f` to a receiver of type
+                        // `T & E1`, which is accepted by `Self: E1`, and similarly for `E2.f`.
+                        // In this example, the result is `list[T & E1] | set[T & E2]`.
+                        //
+                        // The `Type::TypeVar` match arm below delegates member lookup to the
+                        // type variable's upper bound (`E1 | E2` in this example), preserving
+                        // the original receiver (`T`). Here, we distribute lookup over the union
+                        // and intersect each member with that receiver to obtain `T & E1`
+                        // and `T & E2`, respectively.
+                        let receiver = receiver.map(|receiver| {
+                            IntersectionType::from_two_elements(db, env, receiver, *elem)
+                        });
                         let result = elem.member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
                         );
@@ -6290,6 +6325,20 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
+                Type::TypeVar(typevar)
+                    if let Some(bound_or_constraints) =
+                        typevar.typevar(db).bound_or_constraints(db, env) =>
+                {
+                    distribute_member_lookup_over_bound_or_constraints(
+                        db,
+                        env,
+                        bound_or_constraints,
+                        receiver.unwrap_or(this),
+                        name_str,
+                        policy,
+                    )
+                }
+
                 _ if policy.no_instance_fallback() => {
                     let receiver = receiver.unwrap_or(this);
                     let result = Type::invoke_descriptor_protocol(
@@ -6340,22 +6389,8 @@ impl<'db> Type<'db> {
                 {
                     Place::declared(Type::TypeVar(typevar.with_paramspec_attr(db, attr))).into()
                 }
-                Type::TypeVar(typevar) => {
-                    let receiver = receiver.unwrap_or(this);
-                    if let Some(bound_or_constraints) =
-                        typevar.typevar(db).bound_or_constraints(db, env)
-                    {
-                        distribute_member_lookup_over_bound_or_constraints(
-                            db,
-                            env,
-                            bound_or_constraints,
-                            receiver,
-                            name_str,
-                            policy,
-                        )
-                    } else {
-                        instance_like_member_lookup(db, env, key, receiver)
-                    }
+                Type::TypeVar(_) => {
+                    instance_like_member_lookup(db, env, key, receiver.unwrap_or(this))
                 }
 
                 Type::NominalInstance(instance)
@@ -7139,6 +7174,7 @@ impl<'db> Type<'db> {
                     }) => {
                         let mut bindings = dunder_callable.bindings_impl(db, env, recursion_guard);
                         bindings.replace_callable_type(dunder_callable, self);
+                        bindings.set_implicitly_invoked();
                         if boundness == Definedness::PossiblyUndefined {
                             bindings.set_dunder_call_is_possibly_unbound();
                         }

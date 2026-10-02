@@ -402,6 +402,106 @@ def f[T](value: T, callback=lambda: f) -> T:
 reveal_type(f)  # revealed: property
 ```
 
+## Class decorator annotations depend on the decorated class
+
+A decorator's annotations can refer to an instance of the decorated class. We report the invalid
+annotations and preserve the class binding, so constructor calls can still be checked.
+
+```pyi
+from typing_extensions import reveal_type
+
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+def identity(value: annotation) -> annotation: ...
+
+@identity
+class Example:
+    def __init__(self, name: str) -> None: ...
+
+annotation = Example("example")
+
+reveal_type(Example)  # revealed: <class 'Example'>
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
+## Class decorator annotations depend on the decorated class through a type alias
+
+A type alias can introduce the same dependency on the decorated class. Importers still see the class
+and can check its constructor arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`example.pyi`:
+
+```pyi
+type Alias = annotation
+
+def identity(value: Alias) -> Alias: ...
+
+@identity
+class Example:
+    def __init__(self, name: str) -> None: ...
+
+annotation = type[Example]
+```
+
+`main.py`:
+
+```py
+from example import Example
+
+reveal_type(Example)  # revealed: <class 'Example'>
+Example("example")
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
+## Dataclass outside a decorator whose annotations depend on the class
+
+An outer `@dataclass` still generates an initializer when the inner decorator's annotations depend
+on the decorated class.
+
+```pyi
+from dataclasses import dataclass
+from typing_extensions import reveal_type
+
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a parameter annotation"
+# error: [invalid-type-form] "Variable of type `Example` is not allowed in a return type annotation"
+def identity(value: annotation) -> annotation: ...
+
+@dataclass
+@identity
+class Example:
+    name: str
+
+annotation = Example("example")
+
+reveal_type(Example)  # revealed: <class 'Example'>
+reveal_type(Example("example").name)  # revealed: str
+Example()  # error: [missing-argument] "No argument provided for required parameter `name`"
+Example(123)  # error: [invalid-argument-type] "Expected `str`, found `Literal[123]`"
+```
+
+## Recursive lambda used as a class decorator
+
+The lambda returns a name that can refer back to the lambda itself. Inferring the decorated class
+converges even when another binding of that name has an unknown type.
+
+```py
+make = lambda cls: result
+try:
+    raise Exception
+except Exception:
+    @make
+    class result: ...
+
+    result = make
+finally:
+    from unknown_module import member as result  # error: [unresolved-import]
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.

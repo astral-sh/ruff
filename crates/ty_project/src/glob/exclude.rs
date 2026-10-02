@@ -20,7 +20,7 @@ use crate::glob::portable::AbsolutePortableGlobPattern;
 ///
 /// # Equality
 ///
-/// Two filters are equal if they're constructed from the same patterns (including order).
+/// Two filters are equal if they're constructed from the same absolute globs (including order).
 /// Two filters that exclude the exact same files but were constructed from different patterns aren't considered
 /// equal.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -112,7 +112,7 @@ impl ExcludeFilterBuilder {
 ///
 /// # Equality
 ///
-/// Two ignore matches are only equal if they're constructed from the same patterns (including order).
+/// Two ignore matchers are only equal if they're constructed from the same absolute globs (including order).
 /// Two matchers that were constructed from different patterns but result in
 /// including the same files don't compare equal.
 #[derive(Clone, get_size2::GetSize)]
@@ -192,7 +192,7 @@ impl Match {
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 struct IgnoreGlob {
-    /// The pattern that was originally parsed.
+    /// The original absolute glob, before removing negation or a trailing slash.
     original: String,
 
     /// This is a pattern allowing a path (it starts with a `!`, possibly undoing a previous ignore)
@@ -247,7 +247,7 @@ impl GitignoreBuilder {
         pattern: &AbsolutePortableGlobPattern,
     ) -> Result<&mut GitignoreBuilder, globset::Error> {
         let mut glob = IgnoreGlob {
-            original: pattern.relative().to_string(),
+            original: pattern.absolute().to_string(),
             is_allow: false,
             is_only_dir: false,
         };
@@ -289,5 +289,34 @@ impl GitignoreBuilder {
         self.globs.push(glob);
 
         Ok(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExcludeFilter, ExcludeFilterBuilder};
+    use crate::GlobFilterCheckMode;
+    use crate::glob::{PortableGlobKind, PortableGlobPattern};
+    use ruff_db::system::SystemPath;
+
+    #[test]
+    fn equality_accounts_for_pattern_root() -> anyhow::Result<()> {
+        let build = |root| -> anyhow::Result<ExcludeFilter> {
+            let mut builder = ExcludeFilterBuilder::new();
+            builder.add(
+                &PortableGlobPattern::parse("**/.venv/", PortableGlobKind::Exclude)?
+                    .into_absolute(root),
+            )?;
+            Ok(builder.build()?)
+        };
+        let member = build("/workspace/project")?;
+        let workspace = build("/workspace")?;
+        let environment = SystemPath::new("/workspace/.venv");
+
+        assert!(!member.match_directory(environment, GlobFilterCheckMode::Adhoc));
+        assert!(workspace.match_directory(environment, GlobFilterCheckMode::Adhoc));
+        assert_ne!(member, workspace);
+        assert_eq!(workspace, build("/workspace")?);
+        Ok(())
     }
 }

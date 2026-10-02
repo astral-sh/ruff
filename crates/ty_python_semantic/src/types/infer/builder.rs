@@ -5632,7 +5632,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let call_arguments = CallArguments::positional([decorated_ty]);
         let (return_ty, decorator_bindings) = match decorator_ty.try_call(db, env, &call_arguments)
         {
-            Ok(bindings) => (bindings.return_type(db, env), Some(bindings)),
+            Ok(bindings) => {
+                self.report_deprecated_functions(
+                    &decorator_node.expression,
+                    bindings.deprecated_decorator_functions(db),
+                );
+                (bindings.return_type(db, env), Some(bindings))
+            }
             Err(CallError(_, bindings)) => {
                 self.defer_decorator_call(decorator_node, decorated_ty);
                 (bindings.return_type(db, env), None)
@@ -9706,18 +9712,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        // Explicit function references already report implementation deprecations.
-        // Other calls reference an object or class, not the implicitly invoked method.
-        let is_function_reference = matches!(
-            callable_type,
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
-        );
-        self.report_deprecated_functions(
+        self.report_deprecated_call(
             func.as_ref(),
+            callable_type,
             bindings
                 .deprecated_functions(db)
-                .map(|(_, function)| function)
-                .filter(|function| function.is_overload(db) || !is_function_reference),
+                .map(|(_, function)| function),
         );
 
         if let Some(class) = class {
@@ -10407,6 +10407,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             diagnostic.set_primary_annotation_message(message);
         }
         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+    }
+
+    /// Report deprecations selected by a call, excluding implementations already reported by
+    /// explicit function references. Calls on other objects can invoke deprecated methods
+    /// implicitly, so their implementations still need to be reported.
+    fn report_deprecated_call(
+        &self,
+        ranged: impl Ranged,
+        callable_type: Type<'db>,
+        functions: impl IntoIterator<Item = OverloadLiteral<'db>>,
+    ) {
+        let db = self.db();
+        let is_function_reference = matches!(
+            callable_type,
+            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::Callable(_)
+        );
+        self.report_deprecated_functions(
+            ranged,
+            functions
+                .into_iter()
+                .filter(|function| function.is_overload(db) || !is_function_reference),
+        );
     }
 
     /// Report a deprecated callable only when its union alternative has no non-deprecated

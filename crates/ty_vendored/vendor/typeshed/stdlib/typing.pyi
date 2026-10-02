@@ -349,39 +349,6 @@ Union: _SpecialForm
 E.g. for int | str
 """
 
-Protocol: _SpecialForm
-"""Base class for protocol classes.
-
-Protocol classes are defined as::
-
-    class Proto(Protocol):
-        def meth(self) -> int:
-            ...
-
-Such classes are primarily used with static type checkers that recognize
-structural subtyping (static duck-typing).
-
-For example::
-
-    class C:
-        def meth(self) -> int:
-            return 0
-
-    def func(x: Proto) -> int:
-        return x.meth()
-
-    func(C())  # Passes static type check
-
-See PEP 544 for details. Protocol classes decorated with
-@typing.runtime_checkable act as simple-minded runtime protocols that check
-only the presence of given attributes, ignoring their type signatures.
-Protocol classes can be generic, they are defined as::
-
-    class GenProto[T](Protocol):
-        def meth(self) -> T:
-            ...
-"""
-
 Callable: _SpecialForm
 """Deprecated alias to collections.abc.Callable.
 
@@ -1348,6 +1315,42 @@ follows::
             return default
 """
 
+@type_check_only
+class _Protocol: ...
+
+Protocol: type[_Protocol]
+"""Base class for protocol classes.
+
+Protocol classes are defined as::
+
+    class Proto(Protocol):
+        def meth(self) -> int:
+            ...
+
+Such classes are primarily used with static type checkers that recognize
+structural subtyping (static duck-typing).
+
+For example::
+
+    class C:
+        def meth(self) -> int:
+            return 0
+
+    def func(x: Proto) -> int:
+        return x.meth()
+
+    func(C())  # Passes static type check
+
+See PEP 544 for details. Protocol classes decorated with
+@typing.runtime_checkable act as simple-minded runtime protocols that check
+only the presence of given attributes, ignoring their type signatures.
+Protocol classes can be generic, they are defined as::
+
+    class GenProto[T](Protocol):
+        def meth(self) -> T:
+            ...
+"""
+
 class _ProtocolMeta(ABCMeta):
     if sys.version_info >= (3, 12):
         def __init__(cls, *args: Any, **kwargs: Any) -> None: ...
@@ -1528,10 +1531,8 @@ class Awaitable(Protocol[_T_co]):
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
-class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
-    __name__: str
-    __qualname__: str
-
+@runtime_checkable
+class Coroutine(Awaitable[_ReturnT_nd_co], Protocol[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
     @abstractmethod
     def send(self, value: _SendT_nd_contra, /) -> _YieldT_co:
         """Send a value into the coroutine.

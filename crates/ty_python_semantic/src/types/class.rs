@@ -2274,11 +2274,11 @@ impl<'db> ClassType<'db> {
                     return Place::Undefined.into();
                 }
 
-                class_literal
-                    .instance_member(db, env, specialization, name)
-                    .map_type(|ty| {
-                        ty.apply_optional_owner_specialization_to_member(db, specialization)
-                    })
+                // MRO lookup already specializes each member in the class that defines it.
+                // Applying the receiver's specialization again would also substitute type
+                // variables inside the replacement types. For example, applying `T -> list[T]`
+                // twice changes an attribute's type from `list[T]` to `list[list[T]]`.
+                class_literal.instance_member(db, env, specialization, name)
             }
         }
     }

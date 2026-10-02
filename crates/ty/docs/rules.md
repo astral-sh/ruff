@@ -6353,12 +6353,17 @@ Checks for import statements for which the module cannot be resolved.
 
 Importing a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.
 
+These diagnostics can often be caused due to ty's Python environment or search paths being
+configured incorrectly. See the
+[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)
+for more details.
+
 **Examples**
 
 
 ```python
-# ModuleNotFoundError: No module named 'foo'
-import foo  # error
+# ModuleNotFoundError: No module named 'mathh'
+import mathh  # error
 ```
 
 ## `unresolved-reference`
@@ -7053,13 +7058,6 @@ Use instead:
 a = 20 / 2
 ```
 
-**Options**
-
-
-Set
-[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false` to prevent this rule from reporting unused `type: ignore` comments.
-
 ## `unused-type-ignore-comment`
 
 <small>
@@ -7100,7 +7098,7 @@ a = 20 / 2
 
 This rule is skipped if
 [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false`.
+is set to `false`.
 
 ## `useless-overload-body`
 

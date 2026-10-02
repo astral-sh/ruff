@@ -1377,21 +1377,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         //
                         // OnlyParamSpec[int]  # P: (int, /)
                         // ```
-                        let parameters =
-                            if param_type.is_todo() {
-                                Parameters::todo()
-                            } else if param_type.is_dynamic() && param_type != Type::any() {
-                                // If we ended up with an `Unknown` type here, it almost certainly means
-                                // that we already emitted an error elsewhere. Fallback to the more lenient
-                                // type.
-                                Parameters::unknown()
-                            } else {
-                                Parameters::from_annotation(
-                                    db,
-                                    [Parameter::positional_only(None)
-                                        .with_annotated_type(param_type)],
-                                )
-                            };
+                        let parameters = if param_type.is_todo() {
+                            Parameters::todo()
+                        } else if param_type.is_non_divergent_dynamic() && param_type != Type::any()
+                        {
+                            // If we ended up with an `Unknown` type here, it almost certainly means
+                            // that we already emitted an error elsewhere. Fallback to the more lenient
+                            // type.
+                            Parameters::unknown()
+                        } else {
+                            // Preserve cycle placeholders so recursive specializations can
+                            // be normalized instead of growing another parameter type.
+                            Parameters::from_annotation(
+                                db,
+                                [
+                                    Parameter::positional_only(None)
+                                        .with_annotated_type(param_type),
+                                ],
+                            )
+                        };
                         return Ok(Type::paramspec_value_callable(db, parameters));
                     }
 

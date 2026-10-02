@@ -594,7 +594,7 @@ help: Consider using a protocol instead, such as `typing.SupportsFloat`
 ## Invariant generic classes
 
 We show a special diagnostic hint for invariant generic classes. For more details, see the
-[`invalid_assignment_details.md`](./invalid_assignment_details.md) test.
+[`error_context.md`](./error_context.md#invariant-generic-classes) test.
 
 ```py
 def modify(xs: list[int]):

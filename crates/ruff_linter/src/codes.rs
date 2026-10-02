@@ -734,6 +734,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
         (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
+        (Pyupgrade, "052") => rules::pyupgrade::rules::ContextManagerIterator,
 
         // pydocstyle
         (Pydocstyle, "100") => rules::pydocstyle::rules::UndocumentedPublicModule,

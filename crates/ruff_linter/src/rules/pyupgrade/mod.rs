@@ -128,6 +128,20 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(PythonVersion::PY37)]
+    #[test_case(PythonVersion::PY312)]
+    #[test_case(PythonVersion::PY313)]
+    fn context_manager_iterator(target_version: PythonVersion) -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP052.py"),
+            &settings::LinterSettings::for_rule(Rule::ContextManagerIterator)
+                .with_preview_mode()
+                .with_target_version(target_version),
+        )?;
+        assert_diagnostics!(format!("UP052_{target_version}"), diagnostics);
+        Ok(())
+    }
+
     /// Test that enabling preview switches from `FA100` to the rule when `future-annotations` is on.
     #[test_case(Rule::NonPEP585Annotation, Path::new("UP006_4.py"))]
     #[test_case(Rule::NonPEP604AnnotationUnion, Path::new("UP007_2.py"))]

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "ruff"
-version = "0.16.9"
+version = "0.16.10"
 description = "An extremely fast Python linter and code formatter, written in Rust."
 authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
 readme = "README.md"
@@ -64,7 +64,7 @@ dev = [
     "astral-dev-toolchain-cargo-nextest>=0.9.143",
     "astral-dev-toolchain-cargo-shear>=1.13.4",
     "astral-dev-toolchain-hyperfine>=1.20.0",
-    "prek==0.4.14",
+    "prek==0.5.0",
 ]
 release = [
     "rooster==0.1.1",
@@ -100,6 +100,17 @@ typeshed-formatting = [
 
 [tool.uv]
 no-build = true
+# By default, uv records all `exclude-newer-package` exemptions in the lockfile for
+# every script in the repo, even when the corresponding package is not in the
+# lockfile for that script. This preview feature omits those entries, so changes
+# to unrelated exemptions don't cause script lockfiles to be updated when refreshed.
+# https://docs.astral.sh/uv/concepts/preview/#missing-exclude-newer-package-lock
+preview-features = ["missing-exclude-newer-package-lock"]
+# The `missing-exclude-newer-package-lock` preview feature requires uv 0.12.10 or later.
+# Before uv 0.12.10, adding an unrelated `exclude-newer-package` exemption could
+# also cause uv to update a script's lockfile the next time the script was run,
+# leading to unexpected lockfile changes in PRs.
+required-version = ">=0.12.10"
 # CI installs the local ecosystem runner and tools pinned to Git revisions.
 no-binary-package = [
     "black",
@@ -110,8 +121,13 @@ no-binary-package = [
     "typeshed-client",
 ]
 # Pin the isolated build environment for source-build exceptions.
+#
+# docstring-adder uses flit-core as its build backend and pins it in its own
+# build-system requirements, so we don't need to pin it here. A separate pin
+# here would also make updating docstring-adder more cumbersome: if its
+# flit-core pin changed, the conflicting pins would cause the build to fail
+# until the pin here was updated to match.
 build-constraint-dependencies = [
-    "flit-core==4.0.2",
     "hatch-fancy-pypi-readme==25.1.0",
     "hatch-vcs==0.5.0",
     "hatchling==1.32.0",

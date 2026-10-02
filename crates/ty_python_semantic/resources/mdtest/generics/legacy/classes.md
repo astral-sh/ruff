@@ -1918,10 +1918,34 @@ def use_union(value: A | B):
     reveal_type(value.value)
 
 def use_typevar(value: U):
-    # TODO: This should not error once member lookup supports union upper bounds.
-    # error: [invalid-attribute-access] "Invalid access to descriptor attribute `value`"
     # revealed: int | str
     reveal_type(value.value)
+```
+
+## Self methods on narrowed union-bounded type variables
+
+Narrowing a union-bounded type variable preserves both the type variable and the narrowing when
+binding `Self` to each member of the upper bound.
+
+```py
+from typing_extensions import Self, TypeVar
+
+class A:
+    def f(self) -> list[Self]:
+        return [self]
+
+class B:
+    def f(self) -> set[Self]:
+        return {self}
+
+class Marker: ...
+
+T = TypeVar("T", bound=A | B)
+
+def f(obj: T):
+    if isinstance(obj, Marker):
+        reveal_type(obj)  # revealed: T@f & Marker
+        reveal_type(obj.f())  # revealed: list[T@f & Marker & A] | set[T@f & Marker & B]
 ```
 
 ## Correlated constrained receiver calls
@@ -2448,6 +2472,30 @@ class WithOverloadedMethod(Generic[T]):
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## Instance attributes with substituted type variables
+
+Instance attributes are specialized once, even when the type arguments refer to the class's own type
+parameters.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class Pair(Generic[T, U]):
+    def __init__(self, first: T, second: U):
+        self.first: T = first
+        self.second: U = second
+
+    def swapped(self, other: "Pair[U, T]"):
+        reveal_type(other.first)  # revealed: U@Pair
+        reveal_type(other.second)  # revealed: T@Pair
+
+    def nested(self, other: "Pair[list[T], U]"):
+        reveal_type(other.first)  # revealed: list[T@Pair]
+```
+
 ## Materialized `TypeIs` return types
 
 A generic `TypeIs` in the return type of a class method is materialized along with the outer class:
@@ -2722,6 +2770,32 @@ def probe(value: Tree[int, str]):
     child = FirstChild(value)
     reveal_type(child)  # revealed: FirstChild[str]
     reveal_type(child.value)  # revealed: str
+```
+
+## Recursive constructor type context
+
+An invariant constructor can use a recursive type alias as context, including when its `__new__`
+method returns `Self`.
+
+```py
+from typing import Generic, TypeAlias, TypeVar
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+    def __new__(cls, value: T) -> Self:
+        return super().__new__(cls)
+
+Nested: TypeAlias = Box["Nested | int"]
+
+def copy(value: Nested) -> Nested:
+    return Box(value.value)
+
+def invalid() -> Nested:
+    return Box("wrong")  # error: [invalid-return-type]
 ```
 
 ## Aliased `Self` in explicit receivers

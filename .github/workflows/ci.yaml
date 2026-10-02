@@ -25,7 +25,7 @@ env:
   CARGO_PROFILE_DEV_OPT_LEVEL: 0
   CARGO_TERM_COLOR: always
   # renovate: datasource=github-releases depName=astral-sh/hawk
-  HAWK_VERSION: 0.1.13
+  HAWK_VERSION: 0.1.15
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
@@ -34,6 +34,28 @@ env:
   MDTEST_EXTERNAL: "1"
 
 jobs:
+  security-review:
+    needs: determine_changes
+    if: ${{ github.event_name == 'pull_request' && github.repository == 'astral-sh/ruff' && github.event.pull_request.head.repo.full_name == github.repository && needs.determine_changes.outputs.code == 'true' }}
+    uses: astral-sh/github-actions/.github/workflows/pull-request-security-review.yml@45c506043c254690f2612686e5d5a72c81c251a4
+    with:
+      runner: depot-ubuntu-22.04-16
+      helper-runner: github-ubuntu-24.04-x86_64-4
+      # renovate: datasource=github-release-attachments depName=astral-sh/uv
+      uv-version: "0.12.18"
+      uv-checksum: "89eadd7c76fc063887959510d5ba0ab1264dfd5f1143b925ddb73021a40acf16"
+      # Keep the review tools outside the checkout when switching to the PR head.
+      setup-command: |
+        export UV_PROJECT_ENVIRONMENT="$RUNNER_TEMP/pull-request-review-tools"
+        uv sync --locked --only-dev
+        echo "$UV_PROJECT_ENVIRONMENT/bin" >> "$GITHUB_PATH"
+    secrets: inherit # zizmor: ignore[secrets-inherit]
+    permissions:
+      contents: read
+      id-token: write
+      issues: read
+      pull-requests: read
+
   determine_changes:
     name: "Determine changes"
     # CI on main is redundant in the security repository.
@@ -323,6 +345,8 @@ jobs:
     needs: determine_changes
     if: ${{ needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main' }}
     timeout-minutes: 20
+    env:
+      CARGO_BUILD_WARNINGS: deny
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -335,9 +359,9 @@ jobs:
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
       - name: "Clippy"
-        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features --locked
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked
 
   hawk:
     name: "cargo hawk"
@@ -355,13 +379,13 @@ jobs:
           cache-workspace-crates: "false"
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
-        run: rustup toolchain install 1.98.0
+        run: rustup toolchain install 1.99.0
       - name: "Install Hawk"
         run: |
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
       - name: "Hawk"
-        run: cargo +1.98.0 hawk check --target-dir target/hawk -D warnings
+        run: cargo +1.99.0 hawk check --target-dir target/hawk -D warnings
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
@@ -428,7 +452,9 @@ jobs:
           # Enable experimental support for installing PEP 723 script dependencies.
           TY_UV: scripts
           UV_LOCKED: "true"
-        run: cargo run --quiet -p ty check scripts/*.py --color=always
+        run: |
+          uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
+          cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
@@ -542,7 +568,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24.19.0
+          node-version: 24.20.0
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
@@ -821,13 +847,13 @@ jobs:
           fi
 
   fuzz-ty:
-    name: "Fuzz for new ty panics"
+    name: "Fuzz for new ty panics/timeouts"
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
     needs:
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
-    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 10 || 20 }}
+    timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -868,6 +894,8 @@ jobs:
           git rev-list --format=%s --max-count=1 old_commit
           cargo build --profile=profiling --bin=ty
           mv target/profiling/ty ty-old
+
+          git checkout --detach "$GITHUB_SHA"
 
           (
             uv run \
@@ -1161,7 +1189,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 24.19.0
+          node-version: 24.20.0
           cache: "npm"
           cache-dependency-path: |
             playground/package-lock.json
@@ -1238,7 +1266,7 @@ jobs:
             | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
           mode: "simulation,memory"
           run: uv run --only-dev cargo codspeed run
@@ -1367,7 +1395,7 @@ jobs:
             | sudo tee /etc/apt/apt.conf.d/80-retries > /dev/null
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         with:
           mode: ${{ matrix.mode }}
           run: uv run --only-dev cargo codspeed run --bench "${{ matrix.target }}" "${{ matrix.filter }}"
@@ -1470,7 +1498,7 @@ jobs:
         run: find target/codspeed -type f -exec chmod +x {} +
 
       - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@4296e51e7041e24dadb86d1d6e8b9320d223dbe8 # v5.0.3
+        uses: CodSpeedHQ/action@373d6868929f444bc08d901fd0eb0ad52a8875ea # v5.2.1
         env:
           # enabling walltime flamegraphs adds ~6 minutes to the CI time, and they don't
           # appear to provide much useful insight for our walltime benchmarks right now

@@ -354,11 +354,9 @@ impl Iterator for RuleSetIterator {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let slice = self.set.0.get_mut(self.index as usize)?;
-            // `trailing_zeros` is guaranteed to return a value in [0;64]
-            #[expect(clippy::cast_possible_truncation)]
-            let bit = slice.trailing_zeros() as u16;
-
-            if bit < RuleSet::SLICE_BITS {
+            if let Some(bit) = slice.lowest_one() {
+                #[expect(clippy::cast_possible_truncation)]
+                let bit = bit as u16;
                 *slice ^= 1 << bit;
                 let rule_value = self.index * RuleSet::SLICE_BITS + bit;
                 // SAFETY: RuleSet guarantees that only valid rules are stored in the set.

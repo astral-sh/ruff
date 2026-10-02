@@ -106,7 +106,9 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
+use crate::types::typevar::{
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
+};
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
     walk_non_atomic_type, walk_type_with_recursion_guard,
@@ -3604,11 +3606,12 @@ impl<'db> CandidateSolutions<'db> {
         }
 
         let node_support = storage.node_support(node).cloned();
+        let original_node = node;
         let (node, derived_source_order) =
             node.remove_noninferable(db, env, storage, inferable, source_order, limits)?;
         source_orders.extend(storage.calculate_source_orders(derived_source_order));
 
-        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable);
+        let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, original_node);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
@@ -4505,18 +4508,43 @@ impl<'db> SolutionPaths<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum SolutionViolationKind {
-    UpperBound,
-    Constraints,
+/// Inference evidence that independently excludes every declared constraint.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum ConstraintFailureEvidence<'db> {
+    Lower(Type<'db>),
+    /// Upper bounds that must all hold on the same solution path.
+    Upper(Box<[Type<'db>]>),
+    /// Upper-bound evidence excluded every constraint, but its individual bounds aren't available.
+    UpperUnknown,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum SolutionViolationKind<'db> {
+    UpperBound(Option<Type<'db>>),
+    Constraints {
+        constraints: TypeVarConstraints<'db>,
+        evidence: ConstraintFailureEvidence<'db>,
+    },
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct SolutionViolation<'db> {
     pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
-    pub(crate) argument: Option<Type<'db>>,
     pub(crate) variance: TypeVarVariance,
-    pub(crate) kind: SolutionViolationKind,
+    pub(crate) kind: SolutionViolationKind<'db>,
+}
+
+impl<'db> SolutionViolation<'db> {
+    fn evidence_types(&self) -> &[Type<'db>] {
+        match &self.kind {
+            SolutionViolationKind::UpperBound(argument) => argument.as_slice(),
+            SolutionViolationKind::Constraints { evidence, .. } => match evidence {
+                ConstraintFailureEvidence::Lower(lower) => std::slice::from_ref(lower),
+                ConstraintFailureEvidence::Upper(upper) => upper,
+                ConstraintFailureEvidence::UpperUnknown => &[],
+            },
+        }
+    }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]

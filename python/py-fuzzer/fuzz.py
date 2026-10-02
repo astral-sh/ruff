@@ -26,10 +26,15 @@ from __future__ import annotations
 import argparse
 import ast
 import concurrent.futures
+import contextlib
 import enum
+import os
+import signal
 import subprocess
+import sys
 import tempfile
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
@@ -45,10 +50,53 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
+MINIMIZATION_BUDGET_SECONDS: Final = 60
 
 # ty supports `--python-version=3.8`, but typeshed only supports 3.10+,
 # so that's probably the oldest version we can usefully test with.
 OLDEST_SUPPORTED_PYTHON: Final = "3.10"
+
+
+class MinimizationTimedOut(Exception):
+    """Raised when a minimization check is requested after the time budget expires."""
+
+
+def run_executable(command: Sequence[str | Path], *, input: str | None = None) -> int:
+    """Run a command with a five-second timeout and return its exit code.
+
+    Send `input` to standard input if provided; otherwise, inherit standard
+    input from the caller. Standard output and standard error are discarded.
+    On POSIX, start the command in a new session and, on timeout, kill its
+    process group to terminate any children in that group without killing
+    the caller. On other platforms, kill only the command. Then raise
+    `subprocess.TimeoutExpired`.
+
+    Using a process group here is superior due to the fact that ty can
+    spawn `uv workspace metadata` in a subprocess when `TY_UV=1` is set;
+    killing only ty could leave uv running.
+    """
+    with subprocess.Popen(
+        command,
+        stdin=subprocess.PIPE if input is not None else None,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        start_new_session=os.name == "posix",
+    ) as process:
+        try:
+            process.communicate(input=input, timeout=5)
+        except subprocess.TimeoutExpired:
+            if os.name == "posix":
+                # The process group may have disappeared since the timeout
+                # if its members exited, leaving nothing in the group to kill.
+                # That would result in a `ProcessLookupError` that can be safely ignored.
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
+            else:
+                process.kill()
+            process.wait()
+            raise
+        return process.wait()
 
 
 def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
@@ -56,41 +104,42 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     with tempfile.TemporaryDirectory() as tempdir:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
-        completed_process = subprocess.run(
-            [
-                ty_executable,
-                "check",
-                input_file,
-                "--python-version",
-                OLDEST_SUPPORTED_PYTHON,
-                "--python-platform",
-                TY_TARGET_PLATFORM,
-            ],
-            capture_output=True,
-            text=True,
-        )
-    return completed_process.returncode not in {0, 1, 2}
+        command: list[str | Path] = [
+            ty_executable,
+            "check",
+            input_file,
+            "--python-version",
+            OLDEST_SUPPORTED_PYTHON,
+            "--python-platform",
+            TY_TARGET_PLATFORM,
+        ]
+        try:
+            returncode = run_executable(command)
+        except subprocess.TimeoutExpired:
+            return True
+    return returncode not in {0, 1, 2}
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
     """Return `True` if the code triggers a parser error."""
-    completed_process = subprocess.run(
-        [
-            ruff_executable,
-            "check",
-            "--config",
-            "lint.select=[]",
-            "--no-cache",
-            "--target-version",
-            "py314",
-            "--preview",
-            "-",
-        ],
-        capture_output=True,
-        text=True,
-        input=code,
-    )
-    return completed_process.returncode != 0
+    command: list[str | Path] = [
+        ruff_executable,
+        "check",
+        # Keep project settings out of parser checks, including for older Ruff versions.
+        "--isolated",
+        "--config",
+        "lint.select=[]",
+        "--no-cache",
+        "--target-version",
+        "py314",
+        "--preview",
+        "-",
+    ]
+    try:
+        returncode = run_executable(command, input=code)
+    except subprocess.TimeoutExpired:
+        return True
+    return returncode != 0
 
 
 def contains_bug(code: str, *, executable: Executable, executable_path: Path) -> bool:
@@ -151,10 +200,12 @@ class FuzzResult:
         if self.maybe_bug is not None:
             match self.executable:
                 case Executable.RUFF:
-                    panic_message = f"The following code triggers a {new}parser bug:"
+                    panic_message = (
+                        f"The following code triggers a {new}parser bug or timeout:"
+                    )
                 case Executable.TY:
                     panic_message = (
-                        f"The following code triggers a {new}ty panic with "
+                        f"The following code triggers a {new}ty panic or timeout with "
                         f"`--python-version={OLDEST_SUPPORTED_PYTHON} --python-platform={TY_TARGET_PLATFORM}`:"
                     )
                 case _ as unreachable:
@@ -204,8 +255,26 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
 
     assert minimizer_callback is not None
 
+    if not args.quiet:
+        print(f"Found a bug for seed {seed}; minimizing...", flush=True)
+
+    deadline = time.monotonic() + MINIMIZATION_BUDGET_SECONDS
+
+    def bounded_callback(candidate: str) -> bool:
+        """Check whether a candidate triggers a bug or timeout in the test executable.
+
+        If a baseline executable is provided, return `True` only when the
+        candidate does not trigger a bug or timeout in the baseline.
+
+        Raise `MinimizationTimedOut` if the budget has already expired. The
+        budget does not interrupt a check once it has started.
+        """
+        if time.monotonic() >= deadline:
+            raise MinimizationTimedOut
+        return minimizer_callback(candidate)
+
     try:
-        maybe_bug = MinimizedSourceCode(minimize_repro(code, minimizer_callback))
+        maybe_bug = MinimizedSourceCode(minimize_repro(code, bounded_callback))
     except CouldNotMinimize as e:
         # This is to double-check that there isn't a bug in
         # `pysource-minimize`/`pysource-codegen`.
@@ -216,6 +285,21 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
             raise e from None
         else:
             maybe_bug = MinimizedSourceCode(code)
+    except MinimizationTimedOut:
+        if not args.quiet:
+            print(f"Minimization timed out for seed {seed}; reporting original source.")
+        maybe_bug = MinimizedSourceCode(code)
+    # An input whose execution time is close to the timeout may time out during
+    # the minimizer's initial check but finish when the same source is rechecked.
+    # `pysource-minimize` currently raises a plain `ValueError` in this case, so
+    # catch it to preserve the original finding. This also catches unrelated
+    # `ValueError`s. Remove this handler once a release containing the fix in
+    # https://github.com/15r10nk/pysource-minimize/pull/50 is the minimum
+    # supported `pysource-minimize` version.
+    except ValueError as e:
+        if not args.quiet:
+            print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
+        maybe_bug = MinimizedSourceCode(code)
 
     return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
 

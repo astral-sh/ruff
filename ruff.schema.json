@@ -3143,7 +3143,7 @@
           ]
         },
         "strictly-empty-init-modules": {
-          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\n`__all__` assignments (see `RUF067`). Module and attribute docstrings are still allowed.",
           "type": [
             "boolean",
             "null"
@@ -4569,6 +4569,7 @@
         "UP05",
         "UP050",
         "UP051",
+        "UP052",
         "W",
         "W1",
         "W19",
@@ -4728,6 +4729,7 @@
         "complex-structure",
         "complexity",
         "constant-imported-as-non-constant",
+        "context-manager-iterator",
         "continue-in-finally",
         "continue-outside-loop",
         "convert-named-tuple-functional-to-class",

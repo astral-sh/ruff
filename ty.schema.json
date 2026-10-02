@@ -1576,7 +1576,7 @@
         },
         "unresolved-import": {
           "title": "detects unresolved imports",
-          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'foo'\nimport foo  # error\n```",
+          "description": "## What it does\n\nChecks for import statements for which the module cannot be resolved.\n\n## Why is this bad?\n\nImporting a module that cannot be resolved will raise a `ModuleNotFoundError` at runtime.\n\nThese diagnostics can often be caused due to ty's Python environment or search paths being\nconfigured incorrectly. See the\n[import troubleshooting FAQ](https://docs.astral.sh/ty/reference/typing-faq/#why-cant-ty-resolve-my-imports)\nfor more details.\n\n## Examples\n\n```python\n# ModuleNotFoundError: No module named 'mathh'\nimport mathh  # error\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1676,7 +1676,7 @@
         },
         "unused-ignore-comment": {
           "title": "detects unused `ty: ignore` comments",
-          "description": "## What it does\n\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nSet\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false` to prevent this rule from reporting unused `type: ignore` comments.",
+          "description": "## What it does\n\nChecks for `ty: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `ty: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # ty: ignore[division-by-zero]\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1686,7 +1686,7 @@
         },
         "unused-type-ignore-comment": {
           "title": "detects unused `type: ignore` comments",
-          "description": "## What it does\n\nChecks for `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `type: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # type: ignore\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nThis rule is skipped if\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nto `false`.",
+          "description": "## What it does\n\nChecks for `type: ignore` directives that are no longer applicable.\n\n## Why is this bad?\n\nA `type: ignore` directive that no longer matches any diagnostic violations is likely included by\nmistake, and should be removed to avoid confusion.\n\n## Examples\n\n```py\n# error\na = 20 / 2  # type: ignore\n```\n\nUse instead:\n\n```py\na = 20 / 2\n```\n\n## Options\n\nThis rule is skipped if\n[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)\nis set to `false`.",
           "default": "warn",
           "oneOf": [
             {

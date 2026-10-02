@@ -1324,6 +1324,634 @@ Referring to the function without calling it does not select an overload and doe
 f
 ```
 
+### Function decorator applications
+
+Applying a decorator reports the deprecation of the selected overload. An incompatible function does
+not select an overload.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("string functions are no longer supported")
+def decorate(fn: Callable[[], str]) -> str: ...
+@overload
+def decorate(fn: Callable[[], int]) -> int: ...
+def decorate(fn):
+    return fn()
+
+# error: [deprecated] "string functions are no longer supported"
+@decorate
+def string_result() -> str:
+    return ""
+
+@decorate  # no diagnostic
+def integer_result() -> int:
+    return 1
+
+# error: [no-matching-overload]
+@decorate
+def float_result() -> float:
+    return 1.0
+```
+
+### Class decorator applications
+
+Class decorators also report the overload selected by the decorated class.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+class Old: ...
+class New: ...
+
+@overload
+@deprecated("old classes are no longer supported")
+def decorate(cls: type[Old]) -> type[Old]: ...
+@overload
+def decorate(cls: type[New]) -> type[New]: ...
+def decorate(cls):
+    return cls
+
+# error: [deprecated] "old classes are no longer supported"
+@decorate
+class OldClass(Old): ...
+
+@decorate  # no diagnostic
+class NewClass(New): ...
+```
+
+### Explicit `__call__` of deprecated functions
+
+Referencing a deprecated function through its `__call__` method produces only one warning.
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("old function")
+def old(value: object) -> object:
+    return value
+
+# error: [deprecated] "old function"
+@old.__call__
+def function() -> None: ...
+
+# error: [deprecated] "old function"
+@old.__call__
+class Class: ...
+```
+
+### Conditional decorator applications
+
+A reference to a deprecated function warns once, even when the function is one of several possible
+decorators. A deprecated implicit call or constructor still produces its own warning.
+
+```py
+from typing_extensions import Self, deprecated
+
+@deprecated("old function")
+def old(value: object) -> object:
+    return value
+
+def new(value: object) -> object:
+    return value
+
+class Methods:
+    @deprecated("old method")
+    def old(self, value: object) -> object:
+        return value
+
+class CallableDecorator:
+    @deprecated("old __call__")
+    def __call__(self, value: object) -> object:
+        return value
+
+class InitDecorator:
+    @deprecated("old __init__")
+    def __init__(self, value: object) -> None: ...
+
+class NewDecorator:
+    @deprecated("old __new__")
+    def __new__(cls, value: object) -> Self:
+        return super().__new__(cls)
+
+callable_decorator = CallableDecorator()
+methods = Methods()
+
+def example(flag: bool):
+    # error: [deprecated] "old function"
+    @(old if flag else new)
+    def function() -> None: ...
+
+    # error: [deprecated] "old function"
+    @(old if flag else new)
+    class Class: ...
+
+    # error: [deprecated] "old method"
+    @(methods.old if flag else new)
+    def method_function() -> None: ...
+
+    # error: [deprecated] "old method"
+    @(methods.old if flag else new)
+    class MethodClass: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __call__"
+    @(old if flag else callable_decorator)
+    def callable_function() -> None: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __call__"
+    @(old if flag else callable_decorator)
+    class CallableClass: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __init__"
+    @(old if flag else InitDecorator)
+    def init_function() -> None: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __init__"
+    @(old if flag else InitDecorator)
+    class InitClass: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __new__"
+    @(old if flag else NewDecorator)
+    def new_function() -> None: ...
+
+    # error: [deprecated] "old function"
+    # error: [deprecated] "old __new__"
+    @(old if flag else NewDecorator)
+    class NewClass: ...
+```
+
+### Calls through union-valued aliases
+
+Ordinary calls through a union-valued alias also report a deprecated implementation.
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("old function")
+def old(value: object) -> object:
+    return value
+
+def new(value: object) -> object:
+    return value
+
+def ordinary_call(flag: bool):
+    # error: [deprecated] "old function"
+    choice = old if flag else new
+    choice(1)  # error: [deprecated] "old function"
+```
+
+### Conditional decorators with overloads
+
+The application reports a deprecated overload only when it is selected. A deprecated implementation
+still takes precedence over a deprecated overload.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+class Old: ...
+class New: ...
+
+@overload
+@deprecated("string functions are no longer supported")
+def decorate(value: Callable[[], str]) -> object: ...
+@overload
+def decorate(value: Callable[[], int]) -> object: ...
+@overload
+@deprecated("old classes are no longer supported")
+def decorate(value: type[Old]) -> object: ...
+@overload
+def decorate(value: type[New]) -> object: ...
+def decorate(value: object) -> object:
+    return value
+
+def identity(value: object) -> object:
+    return value
+
+@overload
+@deprecated("old overload")
+def outdated(value: Callable[[], str]) -> object: ...
+@overload
+def outdated(value: Callable[[], int]) -> object: ...
+@deprecated("old implementation")
+def outdated(value: object) -> object:
+    return value
+
+def example(flag: bool):
+    # error: [deprecated] "string functions are no longer supported"
+    @(decorate if flag else identity)
+    def string_result() -> str:
+        return ""
+
+    @(decorate if flag else identity)  # no diagnostic
+    def integer_result() -> int:
+        return 1
+
+    # error: [deprecated] "old classes are no longer supported"
+    @(decorate if flag else identity)
+    class OldClass(Old): ...
+
+    @(decorate if flag else identity)  # no diagnostic
+    class NewClass(New): ...
+
+    # error: [deprecated] "old implementation"
+    @(outdated if flag else identity)
+    def outdated_result() -> str:
+        return ""
+```
+
+### Conditional `__call__` definitions
+
+An implicit call warns when one possible definition of `__call__` is deprecated.
+
+```py
+from typing_extensions import deprecated
+
+flag = bool(input())
+
+class Decorator:
+    if flag:
+        @deprecated("old __call__")
+        def __call__(self, value: object) -> object:
+            return value
+
+    else:
+        def __call__(self, value: object) -> object:
+            return value
+
+decorator = Decorator()
+
+# error: [deprecated] "old __call__"
+@decorator
+def function() -> None: ...
+
+# error: [deprecated] "old __call__"
+@decorator
+class Class: ...
+```
+
+### Dataclass transformer decorators
+
+Class decorators marked with `dataclass_transform` also report the selected overload's deprecation,
+while retaining their dataclass behavior.
+
+```py
+from typing import overload
+from typing_extensions import dataclass_transform, deprecated
+
+class Old: ...
+class New: ...
+
+@overload
+@deprecated("old classes are no longer supported")
+def model(cls: type[Old]) -> type[Old]: ...
+@overload
+def model(cls: type[New]) -> type[New]: ...
+@dataclass_transform()
+def model(cls: type[object]) -> type[object]:
+    return cls
+
+# error: [deprecated] "old classes are no longer supported"
+@model
+class OldClass(Old):
+    value: int
+
+OldClass(1)  # no diagnostic
+
+@model  # no diagnostic
+class NewClass(New):
+    value: int
+
+NewClass(1)  # no diagnostic
+```
+
+### Callable instances as decorators
+
+The implicit `__call__` invocation reports both deprecated overloads and deprecated implementations.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+class Old: ...
+class New: ...
+
+class Decorator:
+    @overload
+    @deprecated("string functions are no longer supported")
+    def __call__(self, value: Callable[[], str]) -> str: ...
+    @overload
+    def __call__(self, value: Callable[[], int]) -> int: ...
+    @overload
+    @deprecated("old classes are no longer supported")
+    def __call__(self, value: type[Old]) -> type[Old]: ...
+    @overload
+    def __call__(self, value: type[New]) -> type[New]: ...
+    def __call__(self, value):
+        return value
+
+decorate = Decorator()
+
+# error: [deprecated] "string functions are no longer supported"
+@decorate
+def string_result() -> str:
+    return ""
+
+@decorate  # no diagnostic
+def integer_result() -> int:
+    return 1
+
+# error: [deprecated] "old classes are no longer supported"
+@decorate
+class OldClass(Old): ...
+
+@decorate  # no diagnostic
+class NewClass(New): ...
+
+class OldDecorator:
+    @deprecated("do not use this decorator")
+    def __call__(self, value: object) -> object:
+        return value
+
+old = OldDecorator()
+
+# error: [deprecated] "do not use this decorator"
+@old
+def old_function() -> None: ...
+
+# error: [deprecated] "do not use this decorator"
+@old
+class AnotherOldClass: ...
+```
+
+An explicit reference to `__call__` already reports its deprecation, so applying it produces only
+one warning.
+
+```py
+# error: [deprecated] "do not use this decorator"
+@old.__call__
+def explicit_call() -> None: ...
+
+# error: [deprecated] "do not use this decorator"
+@old.__call__
+class ExplicitCallClass: ...
+```
+
+### Constructor decorators
+
+When a class is used as a decorator, the selected constructor overload can be deprecated.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+class Decorator:
+    @overload
+    @deprecated("string functions are no longer supported")
+    def __init__(self, fn: Callable[[], str]) -> None: ...
+    @overload
+    def __init__(self, fn: Callable[[], int]) -> None: ...
+    def __init__(self, fn): ...
+
+# error: [deprecated] "string functions are no longer supported"
+@Decorator
+def string_result() -> str:
+    return ""
+
+@Decorator  # no diagnostic
+def integer_result() -> int:
+    return 1
+```
+
+An initializer is also called when `__new__` returns an instance of the class, including when the
+class has a custom metaclass.
+
+```py
+from typing_extensions import Self, deprecated
+
+class Decorator:
+    def __new__(cls, value: object) -> Self:
+        return super().__new__(cls)
+
+    @deprecated("old initializer")
+    def __init__(self, value: object) -> None: ...
+
+class Meta(type):
+    def __call__(cls, value: object) -> "WithMeta":
+        return super().__call__(value)
+
+class WithMeta(Decorator, metaclass=Meta): ...
+
+# error: [deprecated] "old initializer"
+@Decorator
+def function() -> None: ...
+
+# error: [deprecated] "old initializer"
+@Decorator
+class Class: ...
+
+# error: [deprecated] "old initializer"
+@WithMeta
+def meta_function() -> None: ...
+
+# error: [deprecated] "old initializer"
+@WithMeta
+class MetaClass: ...
+```
+
+### Deprecated decorator implementations
+
+The implementation's deprecation takes precedence over an overload's deprecation, and each
+application produces only one warning.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("old function overload")
+def decorate(value: Callable[[], str]) -> object: ...
+@overload
+def decorate(value: type[object]) -> object: ...
+@deprecated("entire decorator")
+def decorate(value: object) -> object:
+    return value
+
+# error: [deprecated] "entire decorator"
+@decorate
+def function() -> str:
+    return ""
+
+# error: [deprecated] "entire decorator"
+@decorate
+class Class: ...
+```
+
+### Transparent callable decorators
+
+A decorator that preserves a callable's signature still reports a selected deprecated overload.
+
+```py
+from collections.abc import Callable
+from typing import ParamSpec, TypeVar, overload
+from typing_extensions import deprecated
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+@overload
+def preserve(value: int) -> int: ...
+@overload
+@deprecated("use another decorator")
+def preserve(value: Callable[P, R]) -> Callable[P, R]: ...
+def preserve(value):
+    return value
+
+# error: [deprecated] "use another decorator"
+@preserve
+def function(value: int) -> str:
+    return str(value)
+```
+
+### Stacked function decorators
+
+The outer decorator selects an overload using the inner decorator's result.
+
+```py
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("integer overload")
+def outer(value: int) -> str: ...
+@overload
+def outer(value: str) -> str: ...
+def outer(value):
+    return str(value)
+
+def replace_with_int(fn: Callable[[], int]) -> int:
+    return fn()
+
+def replace_with_str(fn: Callable[[], int]) -> str:
+    return str(fn())
+
+# error: [deprecated] "integer overload"
+@outer
+@replace_with_int
+def first() -> int:
+    return 1
+
+@outer  # no diagnostic
+@replace_with_str
+def second() -> int:
+    return 1
+```
+
+### Stacked class decorators
+
+An outer decorator is called with the result of the inner decorator. Only the overload selected by
+that final application determines whether the outer decorator is deprecated.
+
+```py
+from typing import overload
+from typing_extensions import deprecated
+
+class Base: ...
+
+@overload
+@deprecated("class overload")
+def outer(value: type[Base]) -> int: ...
+@overload
+def outer(value: int) -> int: ...
+@overload
+@deprecated("string overload")
+def outer(value: str) -> str: ...
+def outer(value):
+    return value
+
+def replace_with_int(cls: type[Base]) -> int:
+    return 1
+
+def replace_with_str(cls: type[Base]) -> str:
+    return ""
+
+@outer  # no diagnostic
+@replace_with_int
+class First(Base): ...
+
+# error: [deprecated] "string overload"
+@outer
+@replace_with_str
+class Second(Base): ...
+```
+
+### Decorator applications inside `no_type_check`
+
+`no_type_check` suppresses deprecations from decorator applications in either decorator order and
+inside the function body.
+
+```py
+from collections.abc import Callable
+from typing import no_type_check, overload
+from typing_extensions import deprecated
+
+@overload
+@deprecated("string functions are no longer supported")
+def decorate(fn: Callable[[], str]) -> str: ...
+@overload
+def decorate(fn: Callable[[], int]) -> int: ...
+def decorate(fn):
+    return fn()
+
+@no_type_check
+@decorate  # no diagnostic
+def first() -> str: ...
+@decorate  # no diagnostic
+@no_type_check
+def second() -> str: ...
+@no_type_check
+def outer():
+    @decorate  # no diagnostic
+    def nested() -> str: ...
+```
+
+### `asynccontextmanager`
+
+`asynccontextmanager` deprecates the overload that accepts an `AsyncIterator` return annotation.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
+
+# error: [deprecated] "Annotating the return type as `-> AsyncIterator[Foo]`"
+@asynccontextmanager
+async def iterator() -> AsyncIterator[int]:
+    yield 1
+
+@asynccontextmanager  # no diagnostic
+async def generator() -> AsyncGenerator[int, None]:
+    yield 1
+```
+
 ### Deprecated implementations
 
 A deprecated implementation makes every call deprecated. Its message takes precedence over an

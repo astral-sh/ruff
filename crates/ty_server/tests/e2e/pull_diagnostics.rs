@@ -4,16 +4,18 @@ use anyhow::Result;
 use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::{
-    DocumentDiagnosticReport, PartialResultParams, PreviousResultId, ProgressNotification, Uri,
-    WorkDoneProgressBegin, WorkDoneProgressEnd, WorkDoneProgressParams, WorkspaceDiagnosticParams,
-    WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
+    DocumentDiagnosticReport, FileChangeType, PartialResultParams, PreviousResultId,
+    ProgressNotification, Uri, WorkDoneProgressBegin, WorkDoneProgressEnd, WorkDoneProgressParams,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReport, WorkspaceDiagnosticReportPartialResult,
     WorkspaceDocumentDiagnosticReport,
 };
 use lsp_types::{TextDocumentContentChangeWholeDocument, WorkspaceDiagnosticRequest};
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode};
 
-use crate::diagnostic_snapshots::condensed_document_diagnostic_snapshot;
+use crate::diagnostic_snapshots::{
+    condensed_document_diagnostic_snapshot, condensed_workspace_diagnostic_snapshot,
+};
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]
@@ -1416,6 +1418,59 @@ def foo() -> str:
         condensed_document_diagnostic_snapshot(diagnostics_after),
         @"1:11..1:13[ERROR]: Return type does not match returned value: expected `str`, found `Literal[42]`",
     );
+
+    Ok(())
+}
+
+#[test]
+fn closing_deleted_file_clears_diagnostics_before_watcher_notification() -> Result<()> {
+    let path = SystemPath::new("src/deleted.py");
+    let source = "value: int = 'wrong'\n";
+    let mut server = create_workspace_server_with_file(SystemPath::new("src"), path, source)?;
+    server.open_text_document(path, source, 1);
+
+    let initial = server.workspace_diagnostic_request(None, None);
+    let previous_result_ids = extract_result_ids_from_response(&initial);
+    insta::assert_snapshot!(condensed_workspace_diagnostic_snapshot(initial), @r#"
+    file://<temp_dir>/src/deleted.py
+    	0:13..0:20[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`
+    "#);
+
+    let request_id = server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
+        previous_result_ids: previous_result_ids.clone(),
+        ..WorkspaceDiagnosticParams::default()
+    });
+    assert_workspace_diagnostics_suspends_for_long_polling(&mut server, &request_id);
+
+    // Editors can delete the file and close it before the filesystem watcher reports deletion.
+    std::fs::remove_file(server.file_path(path))?;
+    server.close_text_document(path);
+    insta::assert_snapshot!(
+        condensed_document_diagnostic_snapshot(server.document_diagnostic_request(path, None)),
+        @"",
+    );
+
+    let after_close = server.await_response::<WorkspaceDiagnosticRequest>(&request_id);
+    insta::assert_snapshot!(
+        condensed_workspace_diagnostic_snapshot(after_close),
+        @"file://<temp_dir>/src/deleted.py",
+    );
+
+    // The later watcher notification must preserve the empty report.
+    server.did_change_watched_file(path, FileChangeType::Deleted);
+    let after_watcher = server.workspace_diagnostic_request(None, Some(previous_result_ids));
+    insta::assert_snapshot!(
+        condensed_workspace_diagnostic_snapshot(after_watcher),
+        @"file://<temp_dir>/src/deleted.py",
+    );
+
+    server.write_file(path, source)?;
+    server.did_change_watched_file(path, FileChangeType::Created);
+    let recreated = server.workspace_diagnostic_request(None, None);
+    insta::assert_snapshot!(condensed_workspace_diagnostic_snapshot(recreated), @r#"
+    file://<temp_dir>/src/deleted.py
+    	0:13..0:20[ERROR]: Object of type `Literal["wrong"]` is not assignable to `int`
+    "#);
 
     Ok(())
 }

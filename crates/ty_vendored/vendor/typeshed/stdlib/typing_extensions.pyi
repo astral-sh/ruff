@@ -220,12 +220,15 @@ if sys.version_info < (3, 15):
         function in @no_type_check.
         """
 
+@type_check_only
+class _Protocol: ...
+
 # Do not import (and re-export) Protocol or runtime_checkable from
 # typing module because type checkers need to be able to distinguish
 # typing.Protocol and typing_extensions.Protocol so they can properly
 # warn users about potential runtime exceptions when using typing.Protocol
 # on older versions of Python.
-Protocol: _SpecialForm
+Protocol: type[_Protocol]
 """Base class for protocol classes.
 
 Protocol classes are defined as::

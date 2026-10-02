@@ -6,14 +6,6 @@ requires-python = ">=3.11"
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
-[options.exclude-newer-package]
-astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
-
 [manifest]
 requirements = [{ name = "mypy-primer", git = "https://github.com/hauntsaninja/mypy_primer" }]
 build-constraints = [{ name = "setuptools", specifier = "==84.0.0" }]
@@ -21,4 +13,16 @@ build-constraints = [{ name = "setuptools", specifier = "==84.0.0" }]
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer#3058720299b812c393ad926bcca96eede20fa683" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer#e1f6fe93da5de0cbaf0ab00341d05968a0331fae" }
+dependencies = [
+    { name = "tomlkit" },
+]
+
+[[package]]
+name = "tomlkit"
+version = "0.15.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129, upload-time = "2026-07-17T01:48:04.562Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449, upload-time = "2026-07-17T01:48:05.728Z" },
+]

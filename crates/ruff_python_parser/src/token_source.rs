@@ -260,5 +260,5 @@ fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
 
     // Stay on a power-of-two bucket so that later geometric growth does not preserve an
     // arbitrary capacity offset.
-    Vec::with_capacity(1 << capacity_hint.ilog2())
+    Vec::with_capacity(capacity_hint.isolate_highest_one())
 }
