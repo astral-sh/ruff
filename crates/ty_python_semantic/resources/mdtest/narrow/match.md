@@ -3327,6 +3327,124 @@ def after_match(value: Record) -> None:
     reveal_type(value.item)  # revealed: int | str
 ```
 
+## Rebinding parents of a match subject
+
+Rebinding a parent of a nested match subject or a sequence-display element invalidates narrowing of
+the subject's or element's members.
+
+```py
+from typing import TypedDict
+
+class Box:
+    item: int | str
+
+class Data(TypedDict):
+    box: Box
+    item: int | str
+
+class Inner:
+    box: Box
+    data: Data
+
+class Outer:
+    inner: Inner
+
+class Holder:
+    outer: Outer
+
+def immediate_parent(value: Outer, replacement: Inner) -> None:
+    match value.inner.box:
+        case Box(item=int()):
+            reveal_type(value.inner.box.item)  # revealed: int
+            value.inner = replacement
+            reveal_type(value.inner.box.item)  # revealed: int | str
+            value.inner.box.item.bit_length()  # error: [unresolved-attribute]
+
+def distant_parent(value: Holder, replacement: Outer) -> None:
+    match value.outer.inner.box:
+        case Box(item=int()):
+            value.outer = replacement
+            reveal_type(value.outer.inner.box.item)  # revealed: int | str
+
+def subscript_subject(value: Outer, replacement: Inner) -> None:
+    match value.inner.data["box"]:
+        case Box(item=int()):
+            value.inner = replacement
+            reveal_type(value.inner.data["box"].item)  # revealed: int | str
+
+def mapping_pattern(value: Outer, replacement: Inner) -> None:
+    match value.inner.data:
+        case {"item": int()}:
+            value.inner = replacement
+            reveal_type(value.inner.data["item"])  # revealed: int | str
+
+def sequence_display(value: Outer, replacement: Inner) -> None:
+    match (value.inner.box,):
+        case (Box(item=int()),):
+            value.inner = replacement
+            reveal_type(value.inner.box.item)  # revealed: int | str
+```
+
+When constructing a loop header, ty registers assignment targets in the loop body before analyzing
+the body itself. This can register `value.outer.inner.box.item` before the match registers its
+ancestors. Rebinding an ancestor still invalidates the descendant's narrowing.
+
+```py
+def loop(value: Holder, replacement: Outer, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.outer.inner.box.item = 1
+        match value.outer.inner.box:
+            case Box(item=int()):
+                value.outer = replacement
+                reveal_type(value.outer.inner.box.item)  # revealed: int | str
+```
+
+An attribute and a string-key subscript with the same name are distinct places. Rebinding one does
+not invalidate narrowing of the other's members.
+
+```py
+class AttributeAndSubscript:
+    box: Box
+
+    def __getitem__(self, key: str) -> Box:
+        raise NotImplementedError
+
+    def __setitem__(self, key: str, value: Box) -> None:
+        raise NotImplementedError
+
+def distinct_places(value: AttributeAndSubscript, replacement: Box, item: int | str, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.box.item = item
+            value["box"].item = item
+        match value.box, value["box"]:
+            case Box(item=int()), Box(item=int()):
+                value.box = replacement
+                reveal_type(value.box.item)  # revealed: int | str
+                reveal_type(value["box"].item)  # revealed: int
+                value["box"] = replacement
+                reveal_type(value["box"].item)  # revealed: int | str
+```
+
+Long member paths use a different internal representation, but rebinding an ancestor still
+invalidates their narrowing.
+
+```py
+class Link:
+    child: "Link"
+    box: Box
+
+def deep_path(value: Link, replacement: Link, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.child.child.child.child.child.child.child.child.box.item = 1
+        match value.child.child.child.child.child.child.child.child.box:
+            case Box(item=int()):
+                value.child.child.child.child.child.child.child = replacement
+                reveal_type(value.child.child.child.child.child.child.child.child.box.item)  # revealed: int | str
+```
+
 ## Positional class patterns narrow attributes
 
 Positional patterns narrow the attributes named by `__match_args__`, including in later cases.

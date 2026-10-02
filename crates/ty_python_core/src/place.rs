@@ -9,6 +9,8 @@ use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
@@ -323,6 +325,11 @@ pub struct PlaceTableBuilder {
 
     associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
     associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
+
+    // Descendants can be registered before their ancestors. Associate them when an ancestor is
+    // registered so that rebinding it invalidates the descendants' bindings and narrowing.
+    pending_symbol_members: FxHashMap<Name, SmallVec<[ScopedMemberId; 4]>>,
+    pending_sub_members: FxHashMap<MemberExpr, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -389,7 +396,11 @@ impl PlaceTableBuilder {
         let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
-            let new_id = self.associated_symbol_members.push(SmallVec::new_const());
+            let descendants = self
+                .pending_symbol_members
+                .remove(self.symbols.symbol(id).name())
+                .unwrap_or_default();
+            let new_id = self.associated_symbol_members.push(descendants);
             debug_assert_eq!(new_id, id);
         }
 
@@ -400,23 +411,34 @@ impl PlaceTableBuilder {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
-            let new_id = self.associated_sub_members.push(SmallVec::new_const());
+            let member = self.member.member(id);
+            let descendants = self
+                .pending_sub_members
+                .remove(member.expression())
+                .unwrap_or_default();
+            let new_id = self.associated_sub_members.push(descendants);
             debug_assert_eq!(new_id, id);
 
-            let member = self.member.member(id);
-
-            // iterate over parents
-            for parent_id in
-                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
-            {
-                match parent_id {
-                    ScopedPlaceId::Symbol(scoped_symbol_id) => {
-                        self.associated_symbol_members[scoped_symbol_id].push(id);
-                    }
-                    ScopedPlaceId::Member(scoped_member_id) => {
-                        self.associated_sub_members[scoped_member_id].push(id);
-                    }
+            let mut expression = member.expression().as_ref();
+            while let Some(parent) = expression.parent() {
+                if let Some(parent_id) = self.member.member_id(parent.clone()) {
+                    self.associated_sub_members[parent_id].push(id);
+                } else {
+                    self.pending_sub_members
+                        .entry(parent.clone().into_owned())
+                        .or_default()
+                        .push(id);
                 }
+                expression = parent;
+            }
+            let root = expression.symbol_name();
+            if let Some(symbol_id) = self.symbols.symbol_id(root) {
+                self.associated_symbol_members[symbol_id].push(id);
+            } else {
+                self.pending_symbol_members
+                    .entry(Name::new(root))
+                    .or_default()
+                    .push(id);
             }
         }
 

@@ -727,7 +727,7 @@ level = "expect"
 reason = "the frozen map intentionally mirrors standard map iteration APIs"
 
 [[override]]
-lint = "hawk::dead_public"
+lint = "hawk::unnecessary_public"
 crate = "ty_python_core"
 item = "frozen::FrozenMap::<K, V>::values"
 kind = "inherent_method"

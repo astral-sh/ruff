@@ -471,6 +471,13 @@ pub(crate) struct MemberExprRef<'a> {
 }
 
 impl<'a> MemberExprRef<'a> {
+    pub(super) fn into_owned(self) -> MemberExpr {
+        MemberExpr {
+            path: CharStr::from(self.path),
+            segments: Segments::from_vec(self.segments.iter().collect()),
+        }
+    }
+
     pub(super) fn symbol_name(&self) -> &'a str {
         let end = self
             .segments
@@ -514,6 +521,12 @@ impl Hash for MemberExprRef<'_> {
         // Path on its own isn't 100% unique, but it should avoid
         // most collisions and avoids iterating all segments.
         self.path.hash(state);
+    }
+}
+
+impl Hash for MemberExpr {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_ref().hash(state);
     }
 }
 
