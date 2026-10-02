@@ -1,7 +1,8 @@
 use std::fmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::{BindingKind, Scope, ScopeId};
+use ruff_python_ast::Stmt;
+use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
@@ -37,6 +38,12 @@ use crate::codes::Category;
 /// Reassigning a local variable with another plain assignment (e.g., `x = x + 1`) is not
 /// flagged. Neither is reusing the same loop variable name in consecutive loops, or shadowing a
 /// bare annotation (e.g., `x: int`) that declares the type of a loop variable.
+///
+/// A loop variable is also not flagged when no code after the loop, including the loop's `else`
+/// clause, reads the name, since nothing can then observe that the earlier value was overwritten. This covers, for example, reusing the
+/// name of a temporary from the body of an earlier loop (e.g., `thread = Thread(...)` in one loop
+/// followed by `for thread in threads`). A loop that iterates over the earlier value while
+/// overwriting it (e.g., `for name, xs in zip(names, xs)`) is still flagged.
 ///
 /// This rule is based on `WPS440` (`BlockAndLocalOverlapViolation`) from
 /// `wemake-python-styleguide`.
@@ -163,8 +170,9 @@ pub(crate) fn block_variable_shadows_local(checker: &Checker, scope_id: ScopeId,
                 continue;
             }
 
-            // Bindings in different branches of an `if`, `match`, or `try` statement never hold a
-            // value at the same time, e.g.:
+            // Skip the block variable unless every path to it passes through the shadowed
+            // assignment. Bindings in different branches of an `if`, `match`, or `try` statement
+            // never hold a value at the same time:
             //
             // ```python
             // if condition:
@@ -172,11 +180,25 @@ pub(crate) fn block_variable_shadows_local(checker: &Checker, scope_id: ScopeId,
             // else:
             //     for defects in batches: ...
             // ```
-            if shadowed.source.is_none_or(|left| {
+            //
+            // But a block nested in a branch that the assignment precedes does overwrite it:
+            //
+            // ```python
+            // defects = []
+            // if condition:
+            //     for defects in batches: ...
+            // ```
+            if shadowed.source.is_none_or(|shadowed_source| {
                 binding
                     .source
-                    .is_none_or(|right| !semantic.same_branch(left, right))
+                    .is_none_or(|source| !semantic.dominates(shadowed_source, source))
             }) {
+                continue;
+            }
+
+            if kind == BlockVariableKind::LoopVariable
+                && overwritten_value_is_unobservable(semantic, shadowed, binding)
+            {
                 continue;
             }
 
@@ -190,4 +212,64 @@ pub(crate) fn block_variable_shadows_local(checker: &Checker, scope_id: ScopeId,
             );
         }
     }
+}
+
+/// Returns `true` if overwriting the earlier value with the loop variable can't affect any code.
+///
+/// That's the case when no code after the loop body reads the name (it would see the loop's last
+/// value instead of the earlier one) and the loop's header doesn't read the earlier value. Any other read
+/// of the earlier value has already happened by the time the loop starts: the semantic model
+/// resolves each read to the binding that's visible at that point, so reads inside or after the
+/// loop resolve to the loop variable instead.
+///
+/// For example, none of these loop variables are flagged:
+///
+/// ```python
+/// for _ in range(5):
+///     thread = Thread(target=work)
+///     threads.append(thread)
+/// for thread in threads:
+///     thread.join()
+///
+/// fig, ax = plt.subplots()
+/// ax.plot(xs, ys)
+/// for ax in axes:
+///     ax.grid()
+///
+/// result = []
+/// for result in stream():
+///     ...
+/// ```
+fn overwritten_value_is_unobservable(
+    semantic: &SemanticModel,
+    shadowed: &Binding,
+    loop_binding: &Binding,
+) -> bool {
+    let Some(Stmt::For(loop_statement)) = loop_binding.statement(semantic) else {
+        return false;
+    };
+    let loop_range = loop_statement.range();
+
+    // The loop's `else` clause runs after the last iteration, so a read there sees the loop's
+    // last value just like a read after the loop does:
+    //
+    // ```python
+    // for defects in snippets: ...
+    // else:
+    //     save(defects)
+    // ```
+    let body_end = loop_statement
+        .body
+        .last()
+        .map_or(loop_range.end(), Ranged::end);
+    let read_after_loop = loop_binding
+        .references()
+        .any(|reference_id| semantic.reference(reference_id).start() >= body_end);
+
+    // E.g. `for name, x in zip(names, x)`.
+    let read_by_loop_header = shadowed
+        .references()
+        .any(|reference_id| loop_range.contains_range(semantic.reference(reference_id).range()));
+
+    !read_after_loop && !read_by_loop_header
 }
