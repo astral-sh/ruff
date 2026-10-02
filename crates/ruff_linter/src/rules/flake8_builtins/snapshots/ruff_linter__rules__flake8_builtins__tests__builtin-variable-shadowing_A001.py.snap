@@ -173,3 +173,34 @@ A001 Variable `sum` is shadowing a Python builtin
 29 |
 30 | [0 for sum in ()]
    |        ^^^
+
+A001 Variable `id` is shadowing a Python builtin
+  --> A001.py:43:9
+   |
+41 |     # Other class-scope bindings shadow the builtin like at module level.
+42 |     # See https://github.com/astral-sh/ruff/issues/20179
+43 |     for id in [1]:
+   |         ^^
+44 |         pass
+   |
+
+A001 Variable `id` is shadowing a Python builtin
+  --> A001.py:46:6
+   |
+44 |         pass
+45 |
+46 |     (id := 2)
+   |      ^^
+47 |
+48 |     with open('file') as id:
+   |
+
+A001 Variable `id` is shadowing a Python builtin
+  --> A001.py:48:26
+   |
+46 |     (id := 2)
+47 |
+48 |     with open('file') as id:
+   |                          ^^
+49 |         pass
+   |
