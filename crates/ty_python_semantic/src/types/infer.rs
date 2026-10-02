@@ -833,7 +833,7 @@ enum TypeContextKind {
 #[derive(
     Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
 )]
-pub(crate) struct TypeContext<'db> {
+pub struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
     kind: TypeContextKind,
 }
