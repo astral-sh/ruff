@@ -446,7 +446,7 @@ impl DynamicContent {
 }
 
 #[derive(Clone, Copy)]
-enum DynamicContentMode {
+pub(super) enum DynamicContentMode {
     All,
     NonAny,
     /// Inspect type requirements affected by materialization.
@@ -460,45 +460,6 @@ pub(super) fn dynamic_content<'db>(
     ty: Type<'db>,
 ) -> DynamicContent {
     dynamic_content_impl(db, env, ty, DynamicContentMode::All).0
-}
-
-/// Results of inspecting the requirements affected by materialization.
-pub(super) struct MaterializationAnalysis {
-    content: DynamicContent,
-    can_skip_protocol_comparison: bool,
-}
-
-impl MaterializationAnalysis {
-    /// Whether the inspected requirements contain no dynamic types. Some requirements, such as
-    /// receiver binding or an unresolved descriptor setter, need additional checks.
-    pub(super) const fn has_no_detected_dynamic_content(&self) -> bool {
-        self.content.is_absent()
-    }
-
-    /// Static inspected types alone do not imply that a protocol satisfies itself: for example,
-    /// an explicit method receiver might not accept the protocol instance. This is a separate,
-    /// conservative check for skipping the entire structural comparison.
-    pub(super) const fn can_skip_protocol_comparison(&self) -> bool {
-        self.has_no_detected_dynamic_content() && self.can_skip_protocol_comparison
-    }
-}
-
-/// Inspect the requirements affected by both materializations of `ty`.
-///
-/// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
-/// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
-/// which do not affect whether one callable satisfies another's requirements.
-pub(super) fn analyze_materialization<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> MaterializationAnalysis {
-    let (content, can_skip_protocol_comparison) =
-        dynamic_content_impl(db, env, ty, DynamicContentMode::Materialization);
-    MaterializationAnalysis {
-        content,
-        can_skip_protocol_comparison,
-    }
 }
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
@@ -525,7 +486,7 @@ pub(super) fn non_any_dynamic_content<'db>(
     dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny).0
 }
 
-fn dynamic_content_impl<'db>(
+pub(super) fn dynamic_content_impl<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
@@ -1045,12 +1006,9 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{
-        CallableType, DynamicType, Parameter, Parameters, Signature, SpecialFormType, Type,
-        callable::CallableTypeKind, signatures::CallableSignature,
-    };
+    use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
 
-    use super::{CollectedTypes, analyze_materialization, dynamic_content};
+    use super::{CollectedTypes, DynamicContentMode, dynamic_content, dynamic_content_impl};
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {
@@ -1099,103 +1057,12 @@ mod tests {
         for name in ["callbacks", "partial_callback", "partial_call"] {
             let ty = global_symbol(&db, module, name).place.expect_type();
             assert!(
-                !analyze_materialization(&db, &env, ty).has_no_detected_dynamic_content(),
+                !dynamic_content_impl(&db, &env, ty, DynamicContentMode::Materialization)
+                    .0
+                    .is_absent(),
                 "{name}"
             );
         }
-        Ok(())
-    }
-
-    #[test]
-    fn protocol_materialization_proof_requires_inspectable_members() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-            from __future__ import annotations
-            from typing import Any, Protocol, TypedDict
-            from ty_extensions._internal import TypeOf
-
-            class ExplicitReceiver(Protocol):
-                def method(self: ExplicitReceiver) -> int: ...
-
-            class NestedReceiver(Protocol):
-                def inner(self) -> ExplicitReceiver: ...
-
-            class FunctionalTypedDict(Protocol):
-                def payload(self) -> TypeOf[TypedDict("Payload", {"value": int})(value=1)]: ...
-
-            class GradualFunctionalTypedDict(Protocol):
-                def payload(self) -> TypeOf[TypedDict("Payload", {"value": Any})(value=1)]: ...
-
-            nested_receiver: NestedReceiver
-            functional_typed_dict: FunctionalTypedDict
-            gradual_functional_typed_dict: GradualFunctionalTypedDict
-            "#,
-        )?;
-        let env = db.program_environment();
-        let file = system_path_to_file(&db, "/src/a.py")?;
-        let module = ProgramFile::new(&db, file, env.program(&db));
-        for (name, no_dynamic_content, can_skip) in [
-            ("nested_receiver", true, false),
-            ("functional_typed_dict", true, true),
-            ("gradual_functional_typed_dict", false, false),
-        ] {
-            let ty = global_symbol(&db, module, name).place.expect_type();
-            let analysis = analyze_materialization(&db, &env, ty);
-            assert_eq!(
-                analysis.has_no_detected_dynamic_content(),
-                no_dynamic_content,
-                "{name}"
-            );
-            assert_eq!(analysis.can_skip_protocol_comparison(), can_skip, "{name}");
-        }
-
-        let callable =
-            CallableType::single(&db, Signature::new(Parameters::empty(), Type::object()));
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
-        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
-
-        let callable = CallableType::new(
-            &db,
-            CallableSignature::from_overloads([]),
-            CallableTypeKind::FunctionLike,
-        );
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
-        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
-
-        for (ty, expected) in [(Type::object(), true), (Type::any(), false)] {
-            let synthesized = Type::protocol_with_readonly_members(&db, &env, [("value", ty)]);
-            assert_eq!(
-                analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison(),
-                expected
-            );
-
-            let callable = CallableType::single(
-                &db,
-                Signature::new(Parameters::standard([Parameter::positional_only(None)]), ty),
-            );
-            let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
-            assert_eq!(
-                analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison(),
-                expected
-            );
-        }
-
-        // A synthesized signature may already contain constraints from an earlier binding.
-        let signature = Signature::new(
-            Parameters::standard([
-                Parameter::positional_only(None).with_annotated_type(Type::Never),
-                Parameter::positional_only(None),
-            ]),
-            Type::object(),
-        )
-        .bind_self_with_receiver(&db, &env, Some(Type::object()), Some(Type::object()));
-        assert!(signature.has_implicit_positional_receiver_annotation());
-        assert!(signature.receiver_constraints().is_some());
-        let callable = CallableType::single(&db, signature);
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
-        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
         Ok(())
     }
 
@@ -1210,7 +1077,11 @@ mod tests {
             divergent.top_materialization(&db, &env),
             divergent.bottom_materialization(&db, &env),
         ] {
-            assert!(!analyze_materialization(&db, &env, ty).has_no_detected_dynamic_content());
+            assert!(
+                !dynamic_content_impl(&db, &env, ty, DynamicContentMode::Materialization)
+                    .0
+                    .is_absent()
+            );
         }
     }
 
