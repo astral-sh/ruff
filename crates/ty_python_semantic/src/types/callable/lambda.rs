@@ -3,7 +3,9 @@
 use std::cell::RefCell;
 
 use super::{LambdaSignature, infer_lambda_signature};
+use crate::types::constraints::resolution::type_dependencies;
 use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
+use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::any_over_type_including_alias_arguments;
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, MaterializationKind, PromotionKind, PromotionMode,
@@ -158,6 +160,55 @@ impl<'db> LambdaMapping<'db> {
 
 #[salsa::tracked]
 impl<'db> LambdaSignature<'db> {
+    /// Summarize dependencies without expanding each specialization of a recursive return.
+    /// Recursive references query the source's variable set; deferred mappings transform that
+    /// set instead of the return graph. Joining cycle approximations preserves dependencies
+    /// that are first encountered through another lambda.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| TypeVarSet::None,
+        cycle_fn=|db, _, previous: &TypeVarSet<'db>, current, _| previous.merge(db, current),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn return_type_dependencies(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+        let env = ProgramEnvironment::from_scope(self.scope(db));
+        if let Some(mapping) = self.mapping(db) {
+            let visitor = ApplyTypeMappingVisitor {
+                materialize_typevar_bounds_and_defaults: mapping
+                    .materialize_typevar_bounds_and_defaults,
+                ..ApplyTypeMappingVisitor::new(&env)
+            };
+            let context = TypeContext::new(mapping.context);
+            let transformation = mapping.mapping.as_type_mapping();
+            let flipped = transformation.flip();
+            return type_dependencies(
+                db,
+                &env,
+                mapping
+                    .source
+                    .return_type_dependencies(db)
+                    .iter(db)
+                    .flat_map(|variable| {
+                        // A returned type can contain both variance positions, e.g. in a callable.
+                        [&transformation, &flipped].map(|transformation| {
+                            Type::TypeVar(variable).apply_type_mapping_impl(
+                                db,
+                                transformation,
+                                context,
+                                &visitor,
+                            )
+                        })
+                    }),
+            );
+        }
+
+        type_dependencies(
+            db,
+            &env,
+            [infer_lambda_signature(db, self).overload_return_type_or_unknown(db, &env)],
+        )
+    }
+
     /// Variables in the lambda's lexical and contextual inputs after transformation.
     /// Inferring the body here would re-enter the transformation of its recursive references.
     #[salsa::tracked(

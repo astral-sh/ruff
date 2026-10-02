@@ -1360,3 +1360,41 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Recursive lambdas with growing type arguments
+
+A recursive lambda can add a container to its type argument at each call. Inferring an argument from
+the lambda does not require expanding all of its recursive return types.
+
+```py
+from typing import Final
+
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, Grow([value]).node)
+
+node = Grow(1).node
+
+# revealed: () -> tuple[int, () -> tuple[list[int], () -> tuple[list[list[int]], () -> tuple[list[list[list[int]]], (...) -> ...]]]]
+reveal_type(node)
+reveal_type(node()[0])  # revealed: int
+reveal_type(node()[1]()[0])  # revealed: list[int]
+reveal_type(node()[1]()[1]()[0])  # revealed: list[list[int]]
+```
+
+## Recursive lambdas with swapped type arguments
+
+Each recursive call applies the new arguments, even when the same lambda is reached again.
+
+```py
+from typing import Final
+
+class Swap[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node: Final = lambda: (value, Swap(other, value).node)
+
+node = Swap[int, str](1, "two").node
+reveal_type(node()[0])  # revealed: int
+reveal_type(node()[1]()[0])  # revealed: str
+reveal_type(node()[1]()[1]()[0])  # revealed: int
+```
