@@ -2902,8 +2902,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        // An expression can be registered for both a narrowing predicate and a lambda's type
-        // context. Reuse the same ingredient for both inference paths.
         self.expressions_by_node
             .get(&ExpressionNodeKey::from(expression_node))
             .copied()
@@ -2912,8 +2910,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
-    /// Visit an expression that does not require external type context. For example, the lambdas
-    /// in `if predicate(lambda x: x): ...` only require inference of the test expression.
+    /// Visit an expression that can also be registered as a standalone statement.
     fn visit_expression_statement(
         &mut self,
         expression: &'ast ast::Expr,
@@ -3036,8 +3033,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let statement = create_statement(self);
 
-        // A lambda's body depends on the type context of its enclosing statement or expression.
-        // Inferring that statement separately avoids cycles involving the entire scope.
+        // The body of a lambda expression needs access to the `Callable` type
+        // context the lambda is being inferred with, and so any statement
+        // containing a lambda must be inferable as a standalone statement
+        // to avoid large scope-level cycles.
         self.enclosing_lambda_statements.extend(
             current_statement
                 .lambda_expressions
@@ -3045,8 +3044,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .map(|lambda| (lambda.into(), statement)),
         );
 
-        // Collection initializers depend on the statements that constrain their element types.
-        // Record those statements so inference does not depend on the entire scope.
+        // The inferred element type of a collection initializer depends on uses of
+        // the collection in its containing scope, and so each use must be part
+        // of an standalone inferable statement to avoid large scope-level cycles.
         let mut collection_defs = FxHashSet::default();
         for (collection_def, use_expression) in current_statement.collection_uses {
             // If the same collection is referenced multiple times in this statement,
