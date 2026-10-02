@@ -795,7 +795,7 @@ pub struct LambdaSignature<'db> {
     #[returns(copy)]
     body: ExpressionNodeKey,
     #[returns(copy)]
-    return_annotation: Option<Type<'db>>,
+    return_context: TypeContext<'db>,
     /// A transformation of another source-backed lambda, independent of its inferred body.
     #[returns(ref)]
     mapping: Option<LambdaSignatureMapping<'db>>,
@@ -833,12 +833,8 @@ fn infer_lambda_signature<'db>(
 ) -> CallableSignature<'db> {
     let return_ty = match lambda.mapping(db) {
         Some(mapping) => mapping.return_type(db),
-        None => infer_scope_types(
-            db,
-            lambda.scope(db),
-            TypeContext::new(lambda.return_annotation(db)),
-        )
-        .expression_type(lambda.body(db)),
+        None => infer_scope_types(db, lambda.scope(db), lambda.return_context(db))
+            .expression_type(lambda.body(db)),
     };
     CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty))
 }
@@ -868,7 +864,7 @@ impl<'db> CallableType<'db> {
                 parameters,
                 scope,
                 body,
-                return_context.annotation,
+                return_context,
                 None,
             )),
             CallableTypeKind::FunctionLike,

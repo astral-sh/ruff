@@ -18,7 +18,7 @@ use ty_python_core::semantic_index;
 pub struct LambdaSignatureMapping<'db> {
     source: LambdaSignature<'db>,
     mapping: LambdaMapping<'db>,
-    context: Option<Type<'db>>,
+    context: TypeContext<'db>,
     materialize_typevar_bounds_and_defaults: bool,
 }
 
@@ -32,12 +32,7 @@ impl<'db> LambdaSignatureMapping<'db> {
         };
         infer_lambda_signature(db, self.source)
             .overload_return_type_or_unknown(db, &env)
-            .apply_type_mapping_impl(
-                db,
-                &self.mapping.as_type_mapping(),
-                TypeContext::new(self.context),
-                &visitor,
-            )
+            .apply_type_mapping_impl(db, &self.mapping.as_type_mapping(), self.context, &visitor)
     }
 }
 
@@ -195,7 +190,7 @@ impl<'db> LambdaSignature<'db> {
         for parameter in source.parameters(db) {
             collect(parameter.annotated_type());
         }
-        if let Some(annotation) = source.return_annotation(db) {
+        if let Some(annotation) = source.return_context(db).annotation {
             collect(annotation);
         }
         for mapping in mappings.into_iter().rev() {
@@ -205,7 +200,7 @@ impl<'db> LambdaSignature<'db> {
                     .materialize_typevar_bounds_and_defaults,
                 ..ApplyTypeMappingVisitor::new(&env)
             };
-            let context = TypeContext::new(mapping.context);
+            let context = mapping.context;
             let mapping = mapping.mapping.as_type_mapping();
             for variable in current {
                 // Captured variables can occur in either variance position in the body.
@@ -256,7 +251,9 @@ impl<'db> LambdaSignature<'db> {
             LambdaSignatureMapping {
                 source: deferred.source.map_inputs(db, mapping, tcx, visitor),
                 mapping: deferred_mapping,
-                context: deferred.context.map(map),
+                context: deferred
+                    .context
+                    .with_annotation(deferred.context.annotation.map(map)),
                 materialize_typevar_bounds_and_defaults: deferred
                     .materialize_typevar_bounds_and_defaults,
             }
@@ -267,7 +264,8 @@ impl<'db> LambdaSignature<'db> {
                 .apply_type_mapping_impl(db, mapping, tcx, visitor),
             self.scope(db),
             self.body(db),
-            self.return_annotation(db).map(map),
+            self.return_context(db)
+                .with_annotation(self.return_context(db).annotation.map(map)),
             deferred,
         )
     }
@@ -293,7 +291,7 @@ impl<'db> LambdaSignature<'db> {
                     previous.mapping,
                     LambdaMapping::Promote(..) | LambdaMapping::Materialize(_)
                 )
-                && previous.context == tcx.annotation
+                && previous.context == tcx
                 && previous.materialize_typevar_bounds_and_defaults
                     == visitor.materialize_typevar_bounds_and_defaults
             {
@@ -320,7 +318,7 @@ impl<'db> LambdaSignature<'db> {
 
         if let Some(previous) = self.mapping(db)
             && previous.mapping == mapping
-            && previous.context == tcx.annotation
+            && previous.context == tcx
             && previous.materialize_typevar_bounds_and_defaults
                 == visitor.materialize_typevar_bounds_and_defaults
             && matches!(
@@ -343,7 +341,7 @@ impl<'db> LambdaSignature<'db> {
         );
         let mut source = self;
         if let Some(previous_mapping) = self.mapping(db)
-            && previous_mapping.context == tcx.annotation
+            && previous_mapping.context == tcx
             && previous_mapping.materialize_typevar_bounds_and_defaults
                 == visitor.materialize_typevar_bounds_and_defaults
             && let LambdaMapping::Specialize {
@@ -385,11 +383,11 @@ impl<'db> LambdaSignature<'db> {
             parameters,
             source.scope(db),
             source.body(db),
-            source.return_annotation(db),
+            source.return_context(db),
             Some(LambdaSignatureMapping {
                 source,
                 mapping,
-                context: tcx.annotation,
+                context: tcx,
                 materialize_typevar_bounds_and_defaults: visitor
                     .materialize_typevar_bounds_and_defaults,
             }),

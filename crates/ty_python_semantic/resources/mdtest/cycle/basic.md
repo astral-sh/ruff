@@ -22,6 +22,71 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Recursive lambda in a boolean conditional
+
+A recursive lambda remains truthy when combined with another condition, even when its return type
+depends on an assignment in the branch.
+
+```py
+f = lambda: f
+if True and (lambda: f):  # error: [redundant-condition] "always truthy"
+    f = 0
+```
+
+The same applies to disjunctions and negated lambdas.
+
+```py
+g = lambda: g
+if False or not (lambda: g):  # error: [redundant-condition] "always truthy"
+    g = 0
+```
+
+The lambda can appear on either side of a conjunction.
+
+```py
+h = lambda: h
+# error: [redundant-condition] "always truthy"
+# error: [redundant-condition] "always truthy"
+if h and (lambda: h):
+    h = 0
+
+i = lambda: i
+# error: [redundant-condition] "always truthy"
+# error: [redundant-condition] "always truthy"
+if (lambda: i) and i:
+    i = 0
+```
+
+Conditions can also contain multiple nonconstant operands.
+
+```py
+j = lambda: j
+condition: bool = bool()
+# error: [redundant-condition] "always truthy"
+if j and condition and (lambda: j):
+    j = 0
+```
+
+## Recursive lambda in a boolean loop condition
+
+A loop condition can depend on a lambda whose return type changes in the loop body.
+
+```py
+f = lambda: f
+while True and (lambda: f):  # error: [redundant-condition] "always truthy"
+    f = 0
+```
+
+## Recursive lambda in a boolean assertion
+
+An assertion can constrain the bindings visible to a recursive lambda.
+
+```py
+f = lambda: f
+assert True and (lambda: f)  # error: [redundant-condition] "always truthy"
+f = 0
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:
