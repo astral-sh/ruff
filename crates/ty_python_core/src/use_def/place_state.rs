@@ -710,6 +710,12 @@ impl PlaceState {
             .get_or_insert_with(|| Box::new(self.bindings.clone()));
     }
 
+    pub(super) fn restore_enclosing_bindings(&mut self) {
+        if let Some(bindings) = self.enclosing_bindings.take() {
+            self.bindings = *bindings;
+        }
+    }
+
     pub(super) fn enclosing_bindings(&self) -> &Bindings {
         self.enclosing_bindings.as_deref().unwrap_or(&self.bindings)
     }

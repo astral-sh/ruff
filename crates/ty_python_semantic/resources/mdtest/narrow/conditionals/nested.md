@@ -555,3 +555,47 @@ def f(flag: bool):
                 class E:
                     reveal_type(g)  # revealed: str | Literal[1]
 ```
+
+### Deleting a class-local name
+
+A constraint on an outer member survives a class-local binding and deletion. After deletion, a new
+constraint on the outer member is visible to nested classes, but a constraint on a later class-local
+value is not.
+
+```py
+class Box:
+    item: int | str
+
+value = Box()
+
+class Outer:
+    if isinstance(value.item, int):
+        value = Box()
+        value.item = "local"
+        del value
+
+        class AfterDeletion:
+            reveal_type(value.item)  # revealed: int
+
+    value = Box()
+    del value
+    if isinstance(value.item, str):
+        class Inner:
+            reveal_type(value.item)  # revealed: str
+
+        value = Box()
+        if isinstance(value.item, int):
+            class AfterRebinding:
+                reveal_type(value.item)  # revealed: str
+
+def conditional(flag: bool):
+    value = Box()
+
+    class Outer:
+        if flag:
+            value = Box()
+            del value
+        if isinstance(value.item, str):
+            class Inner:
+                reveal_type(value.item)  # revealed: str
+```

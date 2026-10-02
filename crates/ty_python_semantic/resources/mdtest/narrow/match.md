@@ -3375,6 +3375,119 @@ def named_expression(value: Box) -> None:
     match subject := value:
         case Box(int()):
             reveal_type(subject.item)  # revealed: int
+
+def after_keyword_pattern(value: Box) -> None:
+    # The earlier keyword pattern must not prevent the positional pattern from narrowing `item`.
+    match value:
+        case Box(item=int()):
+            pass
+    match value:
+        case Box(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+```
+
+## Member narrowing after earlier cases
+
+Earlier cases can exclude union members or constrain one attribute before a later pattern narrows
+another attribute.
+
+```py
+from typing import final
+
+@final
+class A:
+    item: int | str
+
+@final
+class B:
+    item: int | str
+
+@final
+class C:
+    item: int | str
+
+def f(value: A | B) -> None:
+    match value:
+        case A():
+            pass
+        case B(item=int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def guarded(value: A | B, flag: bool) -> None:
+    match value:
+        case A() if flag:
+            pass
+        case B(item=int()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: A | B
+            reveal_type(value.item)  # revealed: int | str
+
+def display(value: A | B) -> None:
+    match (value,):
+        case (A(),):
+            pass
+        case (B(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def list_display(value: A | B) -> None:
+    match [value]:
+        case [A()]:
+            pass
+        case [B(item=int())]:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def guarded_display(value: A | B, flag: bool) -> None:
+    match (value,):
+        case (A(),) if flag:
+            pass
+        case (B(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def multiple_earlier_cases(value: A | B | C) -> None:
+    match (value,):
+        case (A(),):
+            pass
+        case (B(),):
+            pass
+        case (C(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def another_element_can_fail(value: A | B, flag: bool) -> None:
+    match (value, flag):
+        case (A(), True):
+            pass
+        case (B(item=int()), _):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+class Pair:
+    first: int | str
+    second: int | str
+
+def different_attributes(value: Pair) -> None:
+    match value:
+        case Pair(first=int()):
+            reveal_type(value.first)  # revealed: int
+        case Pair(second=int()):
+            reveal_type(value.first)  # revealed: str
+            reveal_type(value.second)  # revealed: int
+        case _:
+            reveal_type(value.first)  # revealed: str
+            reveal_type(value.second)  # revealed: str
 ```
 
 ## Class-body subjects and nested scopes
@@ -3452,6 +3565,33 @@ def named_key(value: Data) -> None:
             reveal_type(value["item"])  # revealed: int
         case _:
             reveal_type(value["item"])  # revealed: str
+
+def after_literal_key(value: Data) -> None:
+    # The earlier literal key must not prevent the named key from narrowing the same item.
+    match value:
+        case {"item": int()}:
+            pass
+    match value:
+        case {Keys.ITEM: int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+class Container:
+    __match_args__ = ("data",)
+    data: Data
+
+def nested_unknown_members(value: Container) -> None:
+    # A keyword and literal key must not prevent a later positional pattern and named key from
+    # narrowing the same item.
+    match value:
+        case Container(data={"item": int()}):
+            pass
+    match value:
+        case Container({Keys.ITEM: int()}):
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
 ```
 
 ## Patterns on elements of sequence displays

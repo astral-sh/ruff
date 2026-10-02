@@ -310,7 +310,10 @@ fn type_narrowed_after_pattern<'db>(
 }
 
 /// Whether the guard cannot reject a value matched by the pattern.
-fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
+pub(crate) fn pattern_guard_allows_all_matches(
+    db: &dyn Db,
+    predicate: PatternPredicate<'_>,
+) -> bool {
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
     predicate
         .guard(db)

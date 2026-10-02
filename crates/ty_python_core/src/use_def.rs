@@ -2761,6 +2761,19 @@ impl<'db> UseDefMapBuilder<'db> {
         state.preserve_enclosing_bindings();
     }
 
+    pub(super) fn restore_enclosing_bindings(&mut self, place: ScopedPlaceId) {
+        let pending = self.pending_reachability.current;
+        let state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let state = self.pending_reachability.materialize(
+            state,
+            pending,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        state.restore_enclosing_bindings();
+    }
+
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -3053,6 +3066,19 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings();
 
         bindings.iter().copied()
+    }
+
+    pub(super) fn has_live_value_binding(&mut self, place: ScopedPlaceId) -> bool {
+        let bindings: SmallVec<[_; 2]> = self
+            .current_bindings(place)
+            .map(|binding| binding.binding())
+            .collect();
+        bindings.into_iter().any(|binding| {
+            matches!(
+                self.all_definitions[binding],
+                DefinitionEntry::Unused(_) | DefinitionEntry::Used(_)
+            )
+        })
     }
 
     /// Restore the current builder places state to the given snapshot.
