@@ -7058,13 +7058,6 @@ Use instead:
 a = 20 / 2
 ```
 
-**Options**
-
-
-Set
-[`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false` to prevent this rule from reporting unused `type: ignore` comments.
-
 ## `unused-type-ignore-comment`
 
 <small>
@@ -7105,7 +7098,7 @@ a = 20 / 2
 
 This rule is skipped if
 [`analysis.respect-type-ignore-comments`](https://docs.astral.sh/ty/reference/configuration/#respect-type-ignore-comments)
-to `false`.
+is set to `false`.
 
 ## `useless-overload-body`
 
