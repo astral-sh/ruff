@@ -3,7 +3,6 @@ use std::fmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_python_semantic::{Binding, BindingKind, Scope, ScopeId, SemanticModel};
-use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -85,14 +84,13 @@ use crate::codes::Category;
 pub(crate) struct BlockVariableShadowsLocal {
     name: String,
     kind: BlockVariableKind,
-    row: SourceRow,
 }
 
 impl Violation for BlockVariableShadowsLocal {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlockVariableShadowsLocal { name, kind, row } = self;
-        format!("{kind} `{name}` shadows local variable assigned at {row}")
+        let BlockVariableShadowsLocal { name, kind } = self;
+        format!("{kind} `{name}` shadows a local variable")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -202,14 +200,16 @@ pub(crate) fn block_variable_shadows_local(checker: &Checker, scope_id: ScopeId,
                 continue;
             }
 
-            checker.report_diagnostic(
+            let mut diagnostic = checker.report_diagnostic(
                 BlockVariableShadowsLocal {
                     name: name.to_string(),
                     kind,
-                    row: checker.compute_source_row(shadowed.start()),
                 },
                 binding.range(),
             );
+            diagnostic
+                .secondary_annotation(format_args!("`{name}` previously assigned here"), shadowed);
+            diagnostic.set_primary_annotation_message(format_args!("`{name}` overwritten here"));
         }
     }
 }

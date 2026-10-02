@@ -1,309 +1,351 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF079 Loop variable `defects` shadows local variable assigned at line 3
+RUF079 Loop variable `defects` shadows a local variable
  --> RUF079.py:5:11
   |
+1 | ### Errors
+2 |
 3 | defects = get_defects()
+  | ------- `defects` previously assigned here
 4 |
 5 | for path, defects in snippets.items():  # RUF079
-  |           ^^^^^^^
+  |           ^^^^^^^ `defects` overwritten here
 6 |     report(path, defects)
   |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `total` shadows local variable assigned at line 12
+RUF079 Loop variable `total` shadows a local variable
   --> RUF079.py:13:9
    |
 11 | def loop_variable():
 12 |     total = 0
+   |     ----- `total` previously assigned here
 13 |     for total in values:  # RUF079
-   |         ^^^^^
+   |         ^^^^^ `total` overwritten here
 14 |         pass
 15 |     return total
    |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `index` shadows local variable assigned at line 19
+RUF079 Loop variable `index` shadows a local variable
   --> RUF079.py:20:9
    |
 18 | def default_for_empty_loop(start):
 19 |     index = start
+   |     ----- `index` previously assigned here
 20 |     for index in range(start, stop):  # RUF079
-   |         ^^^^^
+   |         ^^^^^ `index` overwritten here
 21 |         if done(index):
 22 |             break
    |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `item` shadows local variable assigned at line 27
+RUF079 Loop variable `item` shadows a local variable
   --> RUF079.py:28:20
    |
 26 | def nested_target():
 27 |     item = None
+   |     ---- `item` previously assigned here
 28 |     for idx, (key, item) in enumerate(pairs):  # RUF079
-   |                    ^^^^
+   |                    ^^^^ `item` overwritten here
 29 |         pass
 30 |     return item
    |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `rest` shadows local variable assigned at line 34
+RUF079 Loop variable `rest` shadows a local variable
   --> RUF079.py:35:17
    |
 33 | def starred_target(rows):
 34 |     rest = None
+   |     ---- `rest` previously assigned here
 35 |     for first, *rest in rows:  # RUF079
-   |                 ^^^^
+   |                 ^^^^ `rest` overwritten here
 36 |         pass
 37 |     return rest
    |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `left` shadows local variable assigned at line 42
-  --> RUF079.py:44:9
+RUF079 Loop variable `left` shadows a local variable
+  --> RUF079.py:43:9
    |
-42 |     left = get_left()
-43 |     right = get_right()
-44 |     for left, right in pairs:  # RUF079 (`left` only)
-   |         ^^^^
-45 |         pass
-46 |     return left
-   |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `result` shadows local variable assigned at line 50
-  --> RUF079.py:51:15
-   |
-49 | async def async_loop():
-50 |     result = []
-51 |     async for result in stream():  # RUF079
-   |               ^^^^^^
-52 |         pass
-53 |     return result
+40 | def target_with_several_names(pairs):
+41 |     left = get_left()
+   |     ---- `left` previously assigned here
+42 |     right = get_right()
+43 |     for left, right in pairs:  # RUF079 (`left` only)
+   |         ^^^^ `left` overwritten here
+44 |         pass
+45 |     return left
    |
 help: Rename the loop variable or the local variable
 
-RUF079 `with` target `handle` shadows local variable assigned at line 57
-  --> RUF079.py:58:30
+RUF079 Loop variable `result` shadows a local variable
+  --> RUF079.py:50:15
    |
-56 | def with_target():
-57 |     handle = open_default()
-58 |     with open("file.txt") as handle:  # RUF079
-   |                              ^^^^^^
-59 |         pass
-60 |     return handle
+48 | async def async_loop():
+49 |     result = []
+   |     ------ `result` previously assigned here
+50 |     async for result in stream():  # RUF079
+   |               ^^^^^^ `result` overwritten here
+51 |         pass
+52 |     return result
+   |
+help: Rename the loop variable or the local variable
+
+RUF079 `with` target `handle` shadows a local variable
+  --> RUF079.py:57:30
+   |
+55 | def with_target():
+56 |     handle = open_default()
+   |     ------ `handle` previously assigned here
+57 |     with open("file.txt") as handle:  # RUF079
+   |                              ^^^^^^ `handle` overwritten here
+58 |         pass
+59 |     return handle
    |
 help: Rename the `with` target or the local variable
 
-RUF079 `with` target `connection` shadows local variable assigned at line 64
-  --> RUF079.py:65:29
+RUF079 `with` target `connection` shadows a local variable
+  --> RUF079.py:64:29
    |
-63 | async def async_with_target():
-64 |     connection = get_default_connection()
-65 |     async with connect() as connection:  # RUF079
-   |                             ^^^^^^^^^^
-66 |         pass
-67 |     return connection
-   |
-help: Rename the `with` target or the local variable
-
-RUF079 `with` target `reader` shadows local variable assigned at line 71
-  --> RUF079.py:72:21
-   |
-70 | def with_tuple_target():
-71 |     reader = None
-72 |     with pair() as (reader, writer):  # RUF079
-   |                     ^^^^^^
-73 |         pass
+62 | async def async_with_target():
+63 |     connection = get_default_connection()
+   |     ---------- `connection` previously assigned here
+64 |     async with connect() as connection:  # RUF079
+   |                             ^^^^^^^^^^ `connection` overwritten here
+65 |         pass
+66 |     return connection
    |
 help: Rename the `with` target or the local variable
 
-RUF079 `with` target `container` shadows local variable assigned at line 77
-  --> RUF079.py:78:23
+RUF079 `with` target `reader` shadows a local variable
+  --> RUF079.py:71:21
    |
-76 | def with_target_reuses_context_manager():
-77 |     container = make_container()
-78 |     with container as container:  # RUF079
-   |                       ^^^^^^^^^
-79 |         pass
+69 | def with_tuple_target():
+70 |     reader = None
+   |     ------ `reader` previously assigned here
+71 |     with pair() as (reader, writer):  # RUF079
+   |                     ^^^^^^ `reader` overwritten here
+72 |         pass
    |
 help: Rename the `with` target or the local variable
 
-RUF079 Exception name `error` shadows local variable assigned at line 83
-  --> RUF079.py:86:26
+RUF079 `with` target `container` shadows a local variable
+  --> RUF079.py:77:23
    |
-84 |     try:
-85 |         pass
-86 |     except ValueError as error:  # RUF079
-   |                          ^^^^^
-87 |         pass
-88 |     return error  # NameError: `error` is deleted when the handler exits
+75 | def with_target_reuses_context_manager():
+76 |     container = make_container()
+   |     --------- `container` previously assigned here
+77 |     with container as container:  # RUF079
+   |                       ^^^^^^^^^ `container` overwritten here
+78 |         pass
+   |
+help: Rename the `with` target or the local variable
+
+RUF079 Exception name `error` shadows a local variable
+  --> RUF079.py:85:26
+   |
+81 | def exception_name():
+82 |     error = None
+   |     ----- `error` previously assigned here
+83 |     try:
+84 |         pass
+85 |     except ValueError as error:  # RUF079
+   |                          ^^^^^ `error` overwritten here
+86 |         pass
+87 |     return error  # NameError: `error` is deleted when the handler exits
    |
 help: Rename the exception name or the local variable
 
-RUF079 Loop variable `match` shadows local variable assigned at line 92
-  --> RUF079.py:94:9
+RUF079 Loop variable `match` shadows a local variable
+  --> RUF079.py:93:9
    |
-92 |     if (match := find()) is None:
-93 |         return
-94 |     for match in matches:  # RUF079
-   |         ^^^^^
-95 |         pass
-96 |     return match
+90 | def walrus():
+91 |     if (match := find()) is None:
+   |         ----- `match` previously assigned here
+92 |         return
+93 |     for match in matches:  # RUF079
+   |         ^^^^^ `match` overwritten here
+94 |         pass
+95 |     return match
    |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `match` shadows local variable assigned at line 100
-   --> RUF079.py:101:9
+RUF079 Loop variable `match` shadows a local variable
+   --> RUF079.py:100:9
     |
- 99 | def walrus_in_comprehension_read_after():
-100 |     found = [match for key in keys if (match := lookup(key)) is not None]
-101 |     for match in found:  # RUF079
-    |         ^^^^^
-102 |         report(match)
-103 |     return match
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `count` shadows local variable assigned at line 107
-   --> RUF079.py:108:9
-    |
-106 | def annotated_assignment():
-107 |     count: int = 0
-108 |     for count in counts:  # RUF079
-    |         ^^^^^
-109 |         pass
-110 |     return count
+ 98 | def walrus_in_comprehension_read_after():
+ 99 |     found = [match for key in keys if (match := lookup(key)) is not None]
+    |                                        ----- `match` previously assigned here
+100 |     for match in found:  # RUF079
+    |         ^^^^^ `match` overwritten here
+101 |         report(match)
+102 |     return match
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `defects` shadows local variable assigned at line 115
-   --> RUF079.py:116:13
+RUF079 Loop variable `count` shadows a local variable
+   --> RUF079.py:107:9
     |
-114 |     for batch in batches:
-115 |         defects = []
-116 |         for defects in batch:  # RUF079
-    |             ^^^^^^^
-117 |             pass
-118 |         report(defects)
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `option` shadows local variable assigned at line 122
-   --> RUF079.py:123:9
-    |
-121 | class Config:
-122 |     option = "default"
-123 |     for option in options:  # RUF079
-    |         ^^^^^^
-124 |         pass
-125 |     default = option
+105 | def annotated_assignment():
+106 |     count: int = 0
+    |     ----- `count` previously assigned here
+107 |     for count in counts:  # RUF079
+    |         ^^^^^ `count` overwritten here
+108 |         pass
+109 |     return count
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `defects` shadows local variable assigned at line 129
-   --> RUF079.py:130:9
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:115:13
     |
-128 | def reported_once():
-129 |     defects = []
-130 |     for defects in batches:  # RUF079
-    |         ^^^^^^^
-131 |         pass
-132 |     report(defects)
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `defects` shadows local variable assigned at line 138
-   --> RUF079.py:140:9
-    |
-138 |         defects = load(batch)
-139 |         report(defects)
-140 |     for defects in snippets:  # RUF079
-    |         ^^^^^^^
-141 |         pass
-142 |     save(defects)
+112 | def shadowed_inside_loop_body():
+113 |     for batch in batches:
+114 |         defects = []
+    |         ------- `defects` previously assigned here
+115 |         for defects in batch:  # RUF079
+    |             ^^^^^^^ `defects` overwritten here
+116 |             pass
+117 |         report(defects)
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `defects` shadows local variable assigned at line 146
-   --> RUF079.py:148:9
+RUF079 Loop variable `option` shadows a local variable
+   --> RUF079.py:122:9
     |
-146 |     defects = get_defects()
-147 |     report(defects)
-148 |     for defects in snippets:  # RUF079
-    |         ^^^^^^^
-149 |         pass
-150 |     save(defects)
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `defects` shadows local variable assigned at line 154
-   --> RUF079.py:156:9
-    |
-154 |     defects = get_defects()
-155 |     report(defects)
-156 |     for defects in snippets:  # RUF079
-    |         ^^^^^^^
-157 |         pass
-158 |     else:
+120 | class Config:
+121 |     option = "default"
+    |     ------ `option` previously assigned here
+122 |     for option in options:  # RUF079
+    |         ^^^^^^ `option` overwritten here
+123 |         pass
+124 |     default = option
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `defects` shadows local variable assigned at line 163
-   --> RUF079.py:165:13
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:129:9
     |
-163 |     defects = get_defects()
-164 |     if condition:
-165 |         for defects in snippets:  # RUF079
-    |             ^^^^^^^
-166 |             pass
-167 |     save(defects)
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `defects` shadows local variable assigned at line 171
-   --> RUF079.py:173:13
-    |
-171 |     defects = get_defects()
-172 |     with lock:
-173 |         for defects in snippets:  # RUF079
-    |             ^^^^^^^
-174 |             pass
-175 |     save(defects)
+127 | def reported_once():
+128 |     defects = []
+    |     ------- `defects` previously assigned here
+129 |     for defects in batches:  # RUF079
+    |         ^^^^^^^ `defects` overwritten here
+130 |         pass
+131 |     report(defects)
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `defects` shadows local variable assigned at line 179
-   --> RUF079.py:181:13
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:139:9
     |
-179 |     defects = get_defects()
-180 |     try:
-181 |         for defects in snippets:  # RUF079
-    |             ^^^^^^^
-182 |             pass
-183 |     except ValueError:
-    |
-help: Rename the loop variable or the local variable
-
-RUF079 Loop variable `xs` shadows local variable assigned at line 189
-   --> RUF079.py:191:15
-    |
-189 |     xs = get_xs()
-190 |     report(xs)
-191 |     for name, xs in zip(names, xs):  # RUF079
-    |               ^^
-192 |         pass
+135 | def temporary_from_earlier_loop_read_after():
+136 |     for batch in batches:
+137 |         defects = load(batch)
+    |         ------- `defects` previously assigned here
+138 |         report(defects)
+139 |     for defects in snippets:  # RUF079
+    |         ^^^^^^^ `defects` overwritten here
+140 |         pass
+141 |     save(defects)
     |
 help: Rename the loop variable or the local variable
 
-RUF079 Loop variable `xs` shadows local variable assigned at line 197
-   --> RUF079.py:198:15
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:147:9
     |
-196 |     xs = get_xs()
-197 |     xs += [extra]
-198 |     for name, xs in zip(names, xs):  # RUF079
-    |               ^^
-199 |         pass
+144 | def used_before_loop_and_read_after():
+145 |     defects = get_defects()
+    |     ------- `defects` previously assigned here
+146 |     report(defects)
+147 |     for defects in snippets:  # RUF079
+    |         ^^^^^^^ `defects` overwritten here
+148 |         pass
+149 |     save(defects)
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:155:9
+    |
+152 | def read_in_loop_else_clause():
+153 |     defects = get_defects()
+    |     ------- `defects` previously assigned here
+154 |     report(defects)
+155 |     for defects in snippets:  # RUF079
+    |         ^^^^^^^ `defects` overwritten here
+156 |         pass
+157 |     else:
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:164:13
+    |
+161 | def loop_in_later_if_branch(condition):
+162 |     defects = get_defects()
+    |     ------- `defects` previously assigned here
+163 |     if condition:
+164 |         for defects in snippets:  # RUF079
+    |             ^^^^^^^ `defects` overwritten here
+165 |             pass
+166 |     save(defects)
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:172:13
+    |
+169 | def loop_in_later_with_block():
+170 |     defects = get_defects()
+    |     ------- `defects` previously assigned here
+171 |     with lock:
+172 |         for defects in snippets:  # RUF079
+    |             ^^^^^^^ `defects` overwritten here
+173 |             pass
+174 |     save(defects)
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `defects` shadows a local variable
+   --> RUF079.py:180:13
+    |
+177 | def loop_in_later_try_block():
+178 |     defects = get_defects()
+    |     ------- `defects` previously assigned here
+179 |     try:
+180 |         for defects in snippets:  # RUF079
+    |             ^^^^^^^ `defects` overwritten here
+181 |             pass
+182 |     except ValueError:
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `xs` shadows a local variable
+   --> RUF079.py:190:15
+    |
+187 | def loop_header_reads_shadowed_value():
+188 |     xs = get_xs()
+    |     -- `xs` previously assigned here
+189 |     report(xs)
+190 |     for name, xs in zip(names, xs):  # RUF079
+    |               ^^ `xs` overwritten here
+191 |         pass
+    |
+help: Rename the loop variable or the local variable
+
+RUF079 Loop variable `xs` shadows a local variable
+   --> RUF079.py:197:15
+    |
+194 | def loop_header_reads_augmented_value():
+195 |     xs = get_xs()
+196 |     xs += [extra]
+    |     -- `xs` previously assigned here
+197 |     for name, xs in zip(names, xs):  # RUF079
+    |               ^^ `xs` overwritten here
+198 |         pass
     |
 help: Rename the loop variable or the local variable
