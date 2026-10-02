@@ -1,7 +1,7 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::token::{TokenKind, parenthesized_range};
-use ruff_python_ast::{self as ast, Expr, Operator, Stmt};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -133,26 +133,7 @@ fn fix_creates_docstring(checker: &Checker, expr: &ast::ExprBinOp) -> bool {
         return false;
     }
 
-    let semantic = checker.semantic();
-    let stmt = semantic.current_statement();
-    let Some(ast::StmtExpr { value, .. }) = stmt.as_expr_stmt() else {
-        return false;
-    };
-    // The concatenation must be the entire expression statement.
-    if value.range() != expr.range() {
-        return false;
-    }
-
-    // A docstring must be the first statement in the body of a module,
-    // function, or class.
-    let body = match semantic.current_statement_parent() {
-        Some(Stmt::FunctionDef(function)) => &function.body,
-        Some(Stmt::ClassDef(class)) => &class.body,
-        // No parent statement: the statement is at module level.
-        None => checker.module.python_ast,
-        _ => return false,
-    };
-    body.first() == Some(stmt)
+    checker.in_docstring_position(expr.range())
 }
 
 fn generate_fix(checker: &Checker, expr_bin_op: &ast::ExprBinOp) -> Option<Fix> {

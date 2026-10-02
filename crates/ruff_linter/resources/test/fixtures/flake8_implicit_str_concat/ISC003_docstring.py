@@ -6,7 +6,7 @@
     + "?"
 )
 
-# Not a docstring position: not the first statement in the module body.
+# Attribute docstring position (follows a simple assignment): fix is unsafe.
 x = 1
 (
     "not"
