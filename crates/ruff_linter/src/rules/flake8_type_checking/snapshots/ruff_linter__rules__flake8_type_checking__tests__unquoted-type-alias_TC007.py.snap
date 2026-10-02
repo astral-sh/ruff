@@ -142,6 +142,7 @@ TC007 [*] Add quotes to type alias
 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    |                 ^^^
 22 |     Bar)
+23 | j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
    |
 help: Add quotes
    |
@@ -149,7 +150,7 @@ help: Add quotes
    - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    -     Bar)
 21 + i: TypeAlias = ("Foo | Bar")
-22 |
+22 | j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
    |
 note: This is an unsafe fix and may change runtime behavior
 
@@ -160,8 +161,7 @@ TC007 [*] Add quotes to type alias
 21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
 22 |     Bar)
    |     ^^^
-23 |
-24 | type C = Foo   # OK
+23 | j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
    |
 help: Add quotes
    |
@@ -169,6 +169,18 @@ help: Add quotes
    - i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
    -     Bar)
 21 + i: TypeAlias = ("Foo | Bar")
-22 |
+22 | j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
    |
 note: This is an unsafe fix and may change runtime behavior
+
+TC007 Add quotes to type alias
+  --> TC007.py:23:16
+   |
+21 | i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
+22 |     Bar)
+23 | j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
+   |                ^^^
+24 |
+25 | type C = Foo   # OK
+   |
+help: Add quotes
