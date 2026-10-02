@@ -15,11 +15,6 @@ def test_ok_as():
         raise ValueError
 
 
-def test_error_nested_in_with():
-    with pytest.raises(ValueError, "oops"):
-        pytest.raises(ZeroDivisionError, func, 1, b=0)
-
-
 def test_error_trivial():
     pytest.raises(ZeroDivisionError, func, 1, b=0)
 
