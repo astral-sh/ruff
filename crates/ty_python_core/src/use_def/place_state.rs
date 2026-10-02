@@ -739,26 +739,25 @@ impl PlaceState {
 
     /// Update member bindings visible through an enclosing name after a class-body write.
     ///
-    /// The root is the name at the base of the member expression. When it is unbound in the class,
-    /// the write uses the enclosing name, so use the current member bindings. When it is bound,
-    /// retain the previous bindings visible through the enclosing name.
+    /// Keep the previous enclosing bindings where the objects may be distinct, and use the current
+    /// bindings where the write may have reached the enclosing object.
     pub(super) fn update_enclosing_bindings_after_write(
         &mut self,
-        local_root_reachability: ScopedReachabilityConstraintId,
-        outer_root_reachability: ScopedReachabilityConstraintId,
+        unchanged_reachability: ScopedReachabilityConstraintId,
+        write_reachability: ScopedReachabilityConstraintId,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
         let Some(enclosing) = &mut self.enclosing_bindings else {
             return;
         };
-        if outer_root_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+        if write_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
             return;
         }
 
-        enclosing.record_reachability_constraint(reachability_constraints, local_root_reachability);
+        enclosing.record_reachability_constraint(reachability_constraints, unchanged_reachability);
         let mut current = self.bindings.clone();
-        current.record_reachability_constraint(reachability_constraints, outer_root_reachability);
+        current.record_reachability_constraint(reachability_constraints, write_reachability);
         enclosing.merge(current, narrowing_constraints, reachability_constraints);
     }
 

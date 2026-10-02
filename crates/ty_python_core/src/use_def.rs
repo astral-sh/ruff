@@ -268,12 +268,13 @@ use crate::narrowing_constraints::{
 };
 use crate::place::{PlaceExprRef, ScopedPlaceId};
 use crate::predicate::{
-    PredicateOrLiteral, PredicatePolarity, Predicates, PredicatesBuilder, ScopedPredicateId,
+    Predicate, PredicateNode, PredicateOrLiteral, PredicatePolarity, Predicates, PredicatesBuilder,
+    ScopedPredicateId,
 };
 use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
-use crate::scope::{FileScopeId, ScopeKind, ScopeLaziness};
+use crate::scope::{FileScopeId, ScopeId, ScopeKind, ScopeLaziness};
 use crate::symbol::ScopedSymbolId;
 use crate::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
@@ -2801,10 +2802,11 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Update preserved member bindings visible through an enclosing name after a class-body write.
     ///
     /// The root is the name at the base of the member expression. When it is unbound in the class,
-    /// the write uses the enclosing name; when it is bound, the previous outer bindings remain.
+    /// the write uses the enclosing name. When it is bound, the two roots might still alias.
     /// `members` includes the written place and any descendants invalidated by the write.
     pub(super) fn update_enclosing_bindings_after_member_write(
         &mut self,
+        scope: ScopeId<'db>,
         root: ScopedSymbolId,
         members: impl Iterator<Item = ScopedMemberId> + Clone,
     ) {
@@ -2831,9 +2833,27 @@ impl<'db> UseDefMapBuilder<'db> {
                 .reachability_constraints
                 .add_or_constraint(*reachability, binding.reachability_constraint());
         }
-        if outer_root_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
-            return;
-        }
+        let (unchanged_reachability, write_reachability) =
+            if local_root_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+                (local_root_reachability, outer_root_reachability)
+            } else {
+                let predicate = self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                    node: PredicateNode::ClassMemberMayAlias(scope),
+                    is_positive: true,
+                }));
+                let aliases = self.reachability_constraints.add_atom(predicate);
+                let distinct = self.reachability_constraints.add_not_constraint(aliases);
+                let unchanged = self
+                    .reachability_constraints
+                    .add_and_constraint(local_root_reachability, distinct);
+                let local_write = self
+                    .reachability_constraints
+                    .add_and_constraint(local_root_reachability, aliases);
+                let write = self
+                    .reachability_constraints
+                    .add_or_constraint(outer_root_reachability, local_write);
+                (unchanged, write)
+            };
 
         let pending = self.pending_reachability.current;
         for member in members {
@@ -2847,8 +2867,8 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
             state.update_enclosing_bindings_after_write(
-                local_root_reachability,
-                outer_root_reachability,
+                unchanged_reachability,
+                write_reachability,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
             );

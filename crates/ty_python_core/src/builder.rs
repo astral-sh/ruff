@@ -44,6 +44,7 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionContext, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
+use crate::node_key::NodeKey;
 use crate::place::{
     PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
     match_subject_place_expressions,
@@ -1694,7 +1695,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let members =
             std::iter::once(member).chain(table.associated_place_ids(place).iter().copied());
-        self.use_def_maps[scope].update_enclosing_bindings_after_member_write(root, members);
+        let scope_id = self.current_scope_id();
+        self.use_def_maps[scope]
+            .update_enclosing_bindings_after_member_write(scope_id, root, members);
     }
 
     /// Push a new [`Definition`] onto the list of definitions
@@ -2541,6 +2544,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     | PredicateNode::FinallyNormalPathImpossible { .. }
                     | PredicateNode::IsNonEmptyIterable(_)
                     | PredicateNode::OrPatternAlternative(_)
+                    | PredicateNode::ClassMemberMayAlias(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -2943,6 +2947,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
         bindings_before_pattern: Option<ScopedPatternBindingsId>,
+        subject_binding_unchanged: bool,
     ) -> PatternPredicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
@@ -2964,6 +2969,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.current_scope(),
             subject,
             bindings_before_pattern,
+            subject_binding_unchanged,
             kind,
             guard,
             previous_pattern.map(Box::new),
@@ -3093,6 +3099,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
+        // Register members named directly in patterns before traversing unknown positional or
+        // mapping members. The second pass can then visit each pattern/place pair just once,
+        // without a later registration changing the set of children it needs to inspect.
+        for expression in expressions {
+            let Some(place) = PlaceExpr::try_from_expr(*expression) else {
+                continue;
+            };
+            self.add_place(place.clone());
+            for case in cases {
+                self.collect_pattern_subject_places(
+                    &place,
+                    &case.pattern,
+                    &mut FxHashSet::default(),
+                    &mut FxHashSet::default(),
+                    PatternPlaceRegistration::Create,
+                );
+            }
+        }
+
         let mut places_by_case = PatternPlacesByCase::default();
         for expression in expressions {
             let Some(place) = PlaceExpr::try_from_expr(*expression) else {
@@ -3107,7 +3132,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     &place,
                     &case.pattern,
                     &mut selected,
-                    PatternPlaceRegistration::Create,
+                    &mut FxHashSet::default(),
+                    PatternPlaceRegistration::ExistingOnly,
                 );
                 associated.extend(selected.iter().copied());
                 let mut selected: Vec<_> = selected.into_iter().collect();
@@ -3128,8 +3154,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: &PlaceExpr,
         pattern: &ast::Pattern,
         places: &mut FxHashSet<ScopedPlaceId>,
+        visited: &mut FxHashSet<PatternPlaceVisit>,
         registration: PatternPlaceRegistration,
     ) {
+        if matches!(registration, PatternPlaceRegistration::ExistingOnly) {
+            let Some(place) = self.current_place_table().place_id(subject.into()) else {
+                return;
+            };
+            if !visited.insert(PatternPlaceVisit {
+                pattern: NodeKey::from_node(pattern),
+                place,
+            }) {
+                return;
+            }
+        }
+
         match pattern {
             ast::Pattern::MatchClass(class) => {
                 for keyword in &class.arguments.keywords {
@@ -3139,13 +3178,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             &member,
                             &keyword.pattern,
                             places,
+                            visited,
                             registration,
                         );
                     }
                 }
                 for pattern in &class.arguments.patterns {
-                    self.collect_pattern_subject_places(subject, pattern, places, registration);
-                    self.collect_pattern_unknown_member_places(subject, pattern, places);
+                    self.collect_pattern_subject_places(
+                        subject,
+                        pattern,
+                        places,
+                        visited,
+                        registration,
+                    );
+                    if matches!(registration, PatternPlaceRegistration::ExistingOnly) {
+                        self.collect_pattern_unknown_member_places(
+                            subject, pattern, places, visited,
+                        );
+                    }
                 }
             }
 
@@ -3158,30 +3208,51 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                                 &member,
                                 pattern,
                                 places,
+                                visited,
                                 registration,
                             );
                         }
-                    } else {
-                        self.collect_pattern_unknown_member_places(subject, pattern, places);
+                    } else if matches!(registration, PatternPlaceRegistration::ExistingOnly) {
+                        self.collect_pattern_unknown_member_places(
+                            subject, pattern, places, visited,
+                        );
                     }
                 }
             }
 
             ast::Pattern::MatchSequence(sequence) => {
                 for pattern in &sequence.patterns {
-                    self.collect_pattern_subject_places(subject, pattern, places, registration);
+                    self.collect_pattern_subject_places(
+                        subject,
+                        pattern,
+                        places,
+                        visited,
+                        registration,
+                    );
                 }
             }
 
             ast::Pattern::MatchOr(or) => {
                 for pattern in &or.patterns {
-                    self.collect_pattern_subject_places(subject, pattern, places, registration);
+                    self.collect_pattern_subject_places(
+                        subject,
+                        pattern,
+                        places,
+                        visited,
+                        registration,
+                    );
                 }
             }
 
             ast::Pattern::MatchAs(as_pattern) => {
                 if let Some(pattern) = &as_pattern.pattern {
-                    self.collect_pattern_subject_places(subject, pattern, places, registration);
+                    self.collect_pattern_subject_places(
+                        subject,
+                        pattern,
+                        places,
+                        visited,
+                        registration,
+                    );
                 }
             }
 
@@ -3216,6 +3287,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject: &PlaceExpr,
         pattern: &ast::Pattern,
         places: &mut FxHashSet<ScopedPlaceId>,
+        visited: &mut FxHashSet<PatternPlaceVisit>,
     ) {
         // The index cannot resolve `__match_args__` or named mapping keys. Any existing direct
         // member can be the target; semantic analysis determines which one actually matches.
@@ -3238,6 +3310,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 &child,
                 pattern,
                 places,
+                visited,
                 PatternPlaceRegistration::ExistingOnly,
             );
         }
@@ -5344,6 +5417,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let mut post_case_snapshots = vec![];
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
+                let has_unknown_pattern_members = cases
+                    .iter()
+                    .any(|case| pattern_has_unknown_member(&case.pattern));
 
                 for (i, case) in cases.iter().enumerate() {
                     let case_derived_targets = places_by_case
@@ -5372,11 +5448,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                     // A previous guard can rebind the subject's name. Only use member constraints
                     // when the place still refers to the value evaluated for this match.
+                    let subject_binding_unchanged = (!case_derived_targets.is_empty()
+                        || has_unknown_pattern_members)
+                        && !subject_targets.is_empty()
+                        && subject_targets
+                            .iter()
+                            .all(|target| self.pattern_subject_binding_is_unchanged(target));
                     let mut input_targets = Vec::new();
-                    if !case_derived_targets.is_empty()
-                        && let Some(root) = subject_targets.first()
-                        && self.pattern_subject_binding_is_unchanged(root)
-                    {
+                    if !case_derived_targets.is_empty() && subject_binding_unchanged {
                         input_targets.extend(case_derived_targets.iter());
                     }
                     for target in &sequence_subject_targets {
@@ -5401,6 +5480,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         case.guard.as_deref(),
                         previous_pattern,
                         bindings_before_pattern,
+                        subject_binding_unchanged,
                     );
                     self.current_match_case = Some(CurrentMatchCase::new(
                         &case.pattern,
@@ -6576,6 +6656,12 @@ impl PatternPlacesByCase {
 enum PatternPlaceRegistration {
     Create,
     ExistingOnly,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct PatternPlaceVisit {
+    pattern: NodeKey,
+    place: ScopedPlaceId,
 }
 
 #[derive(Debug)]

@@ -3674,8 +3674,8 @@ def sequence_display(value: Pair) -> None:
             reveal_type(value.second)  # revealed: str
 ```
 
-When a member is matched only through positional patterns and never referenced as an expression, ty
-does not yet carry its narrowing to a later case.
+An earlier positional pattern or named mapping key narrows a later case even when the member is not
+referenced as an expression.
 
 ```py
 def positional_without_first_use(value: PositionalPair) -> None:
@@ -3685,7 +3685,59 @@ def positional_without_first_use(value: PositionalPair) -> None:
         case PositionalPair(str(), int()):
             pass
         case _:
-            reveal_type(value.second)  # revealed: int | str
+            reveal_type(value.second)  # revealed: str
+
+def intervening_case(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            pass
+        case PositionalPair(_, 0):
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+class NullablePair:
+    __match_args__ = ("first", "second")
+    first: int | str | None
+    second: int | str
+
+def alternative(value: NullablePair) -> None:
+    match value:
+        case NullablePair(int() | None, _):
+            pass
+        case NullablePair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+class Container:
+    __match_args__ = ("pair",)
+    pair: PositionalPair
+
+def nested_positional(value: Container) -> None:
+    match value:
+        case Container(PositionalPair(int(), _)):
+            pass
+        case Container(PositionalPair(str(), int())):
+            pass
+        case _:
+            reveal_type(value.pair.second)  # revealed: str
+
+from typing import Final
+
+class Keys:
+    FIRST: Final = "first"
+
+def named_key_without_first_use(value: Data) -> None:
+    match value:
+        case {Keys.FIRST: int()}:
+            pass
+        case {Keys.FIRST: str(), "second": int()}:
+            pass
+        case _:
+            reveal_type(value["second"])  # revealed: str
 ```
 
 A guard can fail even when its case's pattern matches, and it can rebind the subject's name before a
@@ -3710,6 +3762,24 @@ def rebound_subject(value: Pair, other: Pair, flag: bool) -> None:
                 pass
             case _:
                 reveal_type(value.second)  # revealed: int | str
+
+def guarded_positional(value: PositionalPair, flag: bool) -> None:
+    match value:
+        case PositionalPair(int(), _) if flag:
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+
+def rebound_positional(value: PositionalPair, other: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _) if (value := other) is None:
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
 ```
 
 ## Nested mapping patterns over recursive unions
@@ -3773,7 +3843,8 @@ def nested(value: Node) -> None:
 
 A match in a class body can narrow a member of a class-local subject. Rebinding the subject
 invalidates that narrowing. A nested class resolves the same name from the enclosing non-class
-scope, so it keeps constraints on the outer value rather than those on the class-local value.
+scope. A write through the class-local name can also affect the outer value if they refer to the
+same object. Here ty conservatively allows that possibility even after a `Box()` call.
 
 ```py
 class Box:
@@ -3797,7 +3868,7 @@ class Outer:
         reveal_type(global_box.item)  # revealed: Literal["local"]
 
         class Inner:
-            reveal_type(global_box.item)  # revealed: int
+            reveal_type(global_box.item)  # revealed: int | Literal["local"]
 
 class LocalSubject:
     global_box = Box()

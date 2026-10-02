@@ -239,6 +239,10 @@ pub enum PredicateNode<'db> {
     /// alternatives. The selected branch is unknown, but recording a predicate and its negation
     /// preserves the fact that exactly one branch is taken.
     OrPatternAlternative(ScopeId<'db>),
+    /// Whether a class-local root and an enclosing root refer to the same object.
+    /// The identity is unknown during analysis; its two outcomes distinguish a possible member
+    /// write from the path on which the enclosing object is unchanged.
+    ClassMemberMayAlias(ScopeId<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -345,6 +349,11 @@ pub struct PatternPredicate<'db> {
 
     #[returns(copy)]
     pub bindings_before_pattern: Option<ScopedPatternBindingsId>,
+
+    /// Whether the subject's bindings at this case are known to match those at subject evaluation.
+    /// False also covers cases where this information is not needed or was not recorded.
+    #[returns(copy)]
+    pub subject_binding_unchanged: bool,
 
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,

@@ -37,7 +37,7 @@ pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
@@ -131,6 +131,14 @@ pub enum PlaceExprRef<'a> {
 }
 
 impl<'a> PlaceExprRef<'a> {
+    /// Return the name at the root of this place, such as `x` for `x.y[0]`.
+    pub fn root_name(self) -> &'a str {
+        match self {
+            Self::Symbol(symbol) => symbol.name(),
+            Self::Member(member) => member.expression().as_ref().symbol_name(),
+        }
+    }
+
     /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
     pub const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {

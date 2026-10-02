@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
+use std::hash::Hash;
 
 use crate::place::loop_header_reachability;
 use crate::reachability::{
@@ -123,6 +124,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         | PredicateNode::IsNonTerminalCall(_)
         | PredicateNode::IsNonEmptyIterable(_)
         | PredicateNode::OrPatternAlternative(_)
+        | PredicateNode::ClassMemberMayAlias(_)
         | PredicateNode::StarImportPlaceholder(_) => (None, None),
     };
 
@@ -194,6 +196,75 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     let module = parsed_module(db, python_file).load(db);
     NarrowingConstraintsBuilder::new(db, &env, &module, PredicateNode::Pattern(pattern), false)
         .finish()
+}
+
+/// Return the constraints on unindexed members after `pattern` fails.
+///
+/// Positional class patterns and named mapping keys can refer to members that have no source
+/// expression and therefore no place ID. Retaining their constraints allows a later pattern to
+/// use those failures when determining which of its own subpatterns can fail.
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn unindexed_pattern_failure_constraints<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> Option<PatternPlaceConstraints<'db>> {
+    let subject = pattern.subject(db);
+    let program_file = pattern.program_file(db);
+    let env = ProgramEnvironment::from_file(program_file);
+    let module = parsed_module(db, program_file.python_file(db)).load(db);
+    let subject_node = subject.node_ref(db).node(&module);
+    let subject_place = PlaceExpr::try_from_expr(subject_node)?;
+    let kind = pattern.kind(db);
+    if !NarrowingConstraintsBuilder::pattern_can_narrow_members(kind) {
+        return None;
+    }
+
+    let subject_type =
+        type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
+    let mut builder =
+        NarrowingConstraintsBuilder::new(db, &env, &module, PredicateNode::Pattern(pattern), false);
+    let mut constraints = builder
+        .evaluate_related_pattern_places(
+            kind,
+            subject_type,
+            &subject_place,
+            PredicatePolarity::Negative,
+        )
+        .into_constraints()?;
+    constraints.retain(|place, _| matches!(place, PatternPlace::Unindexed(_)));
+    constraints.shrink_to_fit();
+    (!constraints.is_empty()).then_some(constraints)
+}
+
+/// Find the latest applicable failure constraint on an unindexed member before `pattern`.
+///
+/// A guard may reject a successful pattern or mutate the subject, so no constraint from that case
+/// or an earlier case is used across a guard. The query caches lookups across consecutive cases.
+#[salsa::tracked(
+    returns(as_ref),
+    cycle_initial=|_, _, _, _| None,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn unindexed_pattern_input_constraint<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+    place: PlaceExpr,
+) -> Option<NarrowingConstraint<'db>> {
+    if !pattern.subject_binding_unchanged(db) {
+        return None;
+    }
+    let previous = *pattern.previous_predicate(db)?;
+    if previous.guard(db).is_some() {
+        return None;
+    }
+    unindexed_pattern_failure_constraints(db, previous)
+        .and_then(|constraints| constraints.get(&PatternPlace::Unindexed(place.clone())))
+        .or_else(|| unindexed_pattern_input_constraint(db, previous, place))
+        .cloned()
 }
 
 #[salsa::tracked(
@@ -1442,29 +1513,50 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+type NarrowingConstraints<'db, K = ScopedPlaceId> = FxHashMap<K, NarrowingConstraint<'db>>;
 type FrozenNarrowingConstraints<'db> = FrozenMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+
+/// A member referenced by a pattern can be absent from the indexed source expressions.
+///
+/// In that case, retain its expression until semantic analysis resolves the pattern, so earlier
+/// failures can constrain it even though there is no place ID to attach to a source-level use.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum PatternPlace {
+    Indexed(ScopedPlaceId),
+    Unindexed(PlaceExpr),
+}
+
+impl PatternPlace {
+    fn new(places: &PlaceTable, expression: &PlaceExpr) -> Self {
+        places
+            .place_id(expression)
+            .map(Self::Indexed)
+            .unwrap_or_else(|| Self::Unindexed(expression.clone()))
+    }
+}
+
+type PatternPlaceConstraints<'db> = NarrowingConstraints<'db, PatternPlace>;
 
 /// Combines the constraints from two possible pattern outcomes, using conjunction for
 /// requirements or disjunction for alternatives.
 ///
 /// `None` represents an outcome that imposes no narrowing constraints.
-type MergePatternConstraints<'db> = fn(
-    Option<NarrowingConstraints<'db>>,
-    Option<NarrowingConstraints<'db>>,
-) -> Option<NarrowingConstraints<'db>>;
+type MergePatternConstraints<'db, K> = fn(
+    Option<NarrowingConstraints<'db, K>>,
+    Option<NarrowingConstraints<'db, K>>,
+) -> Option<NarrowingConstraints<'db, K>>;
 
 /// The outcome and narrowing constraints from a match pattern succeeding or failing.
 ///
 /// An impossible outcome contributes no alternative. A possible outcome with no constraints
 /// prevents the merged alternatives from narrowing.
 #[derive(Clone, Debug)]
-enum PatternNarrowingResult<'db> {
+enum PatternNarrowingResult<'db, K = ScopedPlaceId> {
     Impossible,
-    Possible(Option<NarrowingConstraints<'db>>),
+    Possible(Option<NarrowingConstraints<'db, K>>),
 }
 
-impl<'db> PatternNarrowingResult<'db> {
+impl<'db, K> PatternNarrowingResult<'db, K> {
     fn when_pattern_cannot_match(polarity: PredicatePolarity) -> Self {
         match polarity {
             PredicatePolarity::Positive => Self::Impossible,
@@ -1474,7 +1566,7 @@ impl<'db> PatternNarrowingResult<'db> {
 
     fn merge_alternatives(
         alternatives: impl Iterator<Item = Self>,
-        merge_constraints: MergePatternConstraints<'db>,
+        merge_constraints: MergePatternConstraints<'db, K>,
     ) -> Self {
         let mut alternatives = alternatives.filter_map(|alternative| match alternative {
             Self::Impossible => None,
@@ -1487,7 +1579,7 @@ impl<'db> PatternNarrowingResult<'db> {
         Self::Possible(alternatives.fold(first, merge_constraints))
     }
 
-    fn into_constraints(self) -> Option<NarrowingConstraints<'db>> {
+    fn into_constraints(self) -> Option<NarrowingConstraints<'db, K>> {
         match self {
             Self::Impossible | Self::Possible(None) => None,
             Self::Possible(Some(constraints)) => Some(constraints),
@@ -1496,7 +1588,7 @@ impl<'db> PatternNarrowingResult<'db> {
 
     fn merge_requirements(
         requirements: impl Iterator<Item = Self>,
-        merge_constraints: MergePatternConstraints<'db>,
+        merge_constraints: MergePatternConstraints<'db, K>,
     ) -> Self {
         let mut constraints = None;
 
@@ -1511,10 +1603,30 @@ impl<'db> PatternNarrowingResult<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+impl<'db> PatternNarrowingResult<'db, PatternPlace> {
+    fn into_indexed(self) -> PatternNarrowingResult<'db> {
+        match self {
+            Self::Impossible => PatternNarrowingResult::Impossible,
+            Self::Possible(constraints) => {
+                PatternNarrowingResult::Possible(constraints.and_then(|constraints| {
+                    let indexed: NarrowingConstraints<'db> = constraints
+                        .into_iter()
+                        .filter_map(|(place, constraint)| match place {
+                            PatternPlace::Indexed(place) => Some((place, constraint)),
+                            PatternPlace::Unindexed(_) => None,
+                        })
+                        .collect();
+                    (!indexed.is_empty()).then_some(indexed)
+                }))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct PatternPlaceCacheKey<'pattern, 'db> {
     pattern: PatternCacheKey<'pattern, 'db>,
-    place: ScopedPlaceId,
+    place: PatternPlace,
     polarity: PredicatePolarity,
 }
 
@@ -1564,9 +1676,9 @@ fn insert_narrowing_constraint<'db>(
 /// For each conjunction pair, we:
 /// - Take the right conjunct if it has a `replacement`
 /// - Intersect the constraints normally otherwise
-fn merge_constraints_and<'db>(
-    into: &mut NarrowingConstraints<'db>,
-    from: NarrowingConstraints<'db>,
+fn merge_constraints_and<'db, K: Eq + Hash>(
+    into: &mut NarrowingConstraints<'db, K>,
+    from: NarrowingConstraints<'db, K>,
 ) {
     #[expect(
         clippy::iter_over_hash_type,
@@ -1593,9 +1705,9 @@ fn merge_constraints_and<'db>(
 ///
 /// However, if a place appears in only one branch of the OR, we need to widen it
 /// to `object` in the overall result (because the other branch doesn't constrain it).
-fn merge_constraints_or<'db>(
-    into: &mut NarrowingConstraints<'db>,
-    from: NarrowingConstraints<'db>,
+fn merge_constraints_or<'db, K: Eq + Hash>(
+    into: &mut NarrowingConstraints<'db, K>,
+    from: NarrowingConstraints<'db, K>,
 ) {
     // For places that appear in `into` but not in `from`, widen to object
     into.retain(|key, _| from.contains_key(key));
@@ -1825,9 +1937,11 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     predicate: PredicateNode<'db>,
     is_positive: bool,
     is_provisional: bool,
+    pattern_success_analyzer: Option<PatternSuccessAnalyzer<'db, 'db>>,
     // Multiple union arms can reach the same nested pattern, subject type, place, and polarity.
     // Reuse its constraints within this analysis instead of repeating the work for each arm.
-    pattern_place_cache: FxHashMap<PatternPlaceCacheKey<'db, 'db>, PatternNarrowingResult<'db>>,
+    pattern_place_cache:
+        FxHashMap<PatternPlaceCacheKey<'db, 'db>, PatternNarrowingResult<'db, PatternPlace>>,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1845,6 +1959,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             predicate,
             is_positive,
             is_provisional: false,
+            pattern_success_analyzer: None,
             pattern_place_cache: FxHashMap::default(),
         }
     }
@@ -1866,7 +1981,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             | PredicateNode::FinallyNormalPathImpossible { .. }
             | PredicateNode::IsNonTerminalCall(_) => return None,
             PredicateNode::IsNonEmptyIterable(_) => return None,
-            PredicateNode::OrPatternAlternative(_) => return None,
+            PredicateNode::OrPatternAlternative(_) | PredicateNode::ClassMemberMayAlias(_) => {
+                return None;
+            }
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -2037,10 +2154,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn merge_optional_constraints_and(
-        left: Option<NarrowingConstraints<'db>>,
-        right: Option<NarrowingConstraints<'db>>,
-    ) -> Option<NarrowingConstraints<'db>> {
+    fn merge_optional_constraints_and<K: Eq + Hash>(
+        left: Option<NarrowingConstraints<'db, K>>,
+        right: Option<NarrowingConstraints<'db, K>>,
+    ) -> Option<NarrowingConstraints<'db, K>> {
         match (left, right) {
             (Some(mut left), Some(right)) => {
                 merge_constraints_and(&mut left, right);
@@ -2052,10 +2169,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn merge_optional_constraints_or(
-        left: Option<NarrowingConstraints<'db>>,
-        right: Option<NarrowingConstraints<'db>>,
-    ) -> Option<NarrowingConstraints<'db>> {
+    fn merge_optional_constraints_or<K: Eq + Hash>(
+        left: Option<NarrowingConstraints<'db, K>>,
+        right: Option<NarrowingConstraints<'db, K>>,
+    ) -> Option<NarrowingConstraints<'db, K>> {
         match (left, right) {
             (Some(mut left), Some(right)) => {
                 merge_constraints_or(&mut left, right);
@@ -2156,6 +2273,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let incoming_type =
                     type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
                 self.evaluate_related_pattern_places(kind, incoming_type, place, is_positive.into())
+                    .into_indexed()
                     .into_constraints()
             });
 
@@ -2287,7 +2405,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         // Success constraints are combined with the constraints from before this case later. If
         // success were analyzed against the narrowed input here, an incompatible pattern could
         // produce `Impossible`, which `into_constraints` would discard instead of recording the
@@ -2298,35 +2416,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else {
             self.pattern_input_type(subject, subject_type)
         };
-        let key = self
-            .places()
-            .place_id(subject)
-            .map(|place| PatternPlaceCacheKey {
-                pattern: PatternCacheKey {
-                    pattern,
-                    subject_ty: subject_type,
-                },
-                place,
-                polarity,
-            });
-        if let Some(key) = key
-            && let Some(result) = self.pattern_place_cache.get(&key)
-        {
+        let key = PatternPlaceCacheKey {
+            pattern: PatternCacheKey {
+                pattern,
+                subject_ty: subject_type,
+            },
+            place: PatternPlace::new(self.places(), subject),
+            polarity,
+        };
+        if let Some(result) = self.pattern_place_cache.get(&key) {
             return result.clone();
         }
 
         let result =
             self.evaluate_pattern_for_place_uncached(pattern, subject_type, subject, polarity);
-        if let Some(key) = key {
-            self.pattern_place_cache.insert(key, result.clone());
-        }
+        self.pattern_place_cache.insert(key, result.clone());
         result
     }
 
     /// Apply constraints retained from before the current match case to `subject_type`.
     ///
     /// Each retained binding's constraints narrow the input independently; the results are unioned.
-    /// If none were retained for the subject, return `subject_type` unchanged.
+    /// For an unindexed member, use an earlier unguarded pattern's failure constraint instead.
+    /// If no applicable constraints were retained, return `subject_type` unchanged.
     fn pattern_input_type(&self, subject: &PlaceExpr, subject_type: Type<'db>) -> Type<'db> {
         let db = self.db;
         let pattern = match self.predicate {
@@ -2334,10 +2446,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::SubjectElementPattern(element) => element.pattern,
             _ => return subject_type,
         };
-        let Some(input) = pattern.bindings_before_pattern(db) else {
-            return subject_type;
-        };
         let Some(place) = self.places().place_id(subject) else {
+            return unindexed_pattern_input_constraint(db, pattern, subject.clone())
+                .map(|constraint| {
+                    NarrowingConstraint::intersection(subject_type)
+                        .merge_constraint_and(constraint.clone())
+                        .evaluate_constraint_type(db, &self.env)
+                })
+                .unwrap_or(subject_type);
+        };
+        let Some(input) = pattern.bindings_before_pattern(db) else {
             return subject_type;
         };
         let index = semantic_index(db, pattern.program_file(db));
@@ -2369,7 +2487,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         let db = self.db;
 
         let constraint = if polarity.is_positive() {
@@ -2393,10 +2511,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             (remaining != subject_type).then(|| NarrowingConstraint::intersection(remaining))
         };
 
-        let subject_constraints = constraint.and_then(|constraint| {
-            self.places()
-                .place_id(subject)
-                .map(|place| NarrowingConstraints::from_iter([(place, constraint)]))
+        let subject_constraints = constraint.map(|constraint| {
+            PatternPlaceConstraints::from_iter([(
+                PatternPlace::new(self.places(), subject),
+                constraint,
+            )])
         });
 
         match self.evaluate_related_pattern_places(pattern, subject_type, subject, polarity) {
@@ -2413,7 +2532,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         // A mapping pattern like `case {"value": int()}` can add a constraint on
         // `subject["value"]` for a TypedDict; class patterns can constrain attributes. An `or` or
         // `as` pattern can contain either. The caller also handles the subject's own constraint
@@ -2628,8 +2747,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-        evaluate: impl FnOnce(&mut Self, Type<'db>) -> PatternNarrowingResult<'db>,
-    ) -> PatternNarrowingResult<'db> {
+        evaluate: impl FnOnce(&mut Self, Type<'db>) -> PatternNarrowingResult<'db, PatternPlace>,
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         if let Type::Union(union) = subject_type.resolve_type_alias(self.db) {
             PatternNarrowingResult::merge_alternatives(
                 union.elements(self.db).iter().map(|element| {
@@ -2648,7 +2767,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         let db = self.db;
         let class_type = infer_same_file_expression_type(db, kind.class, TypeContext::default())
             .resolve_type_alias(db);
@@ -2738,7 +2857,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: &PlaceExpr,
         name: &str,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         let db = self.db;
         let member = subject_type.member(db, &self.env, name).place;
         if !polarity.is_positive() && !member.is_definitely_bound() {
@@ -2757,7 +2876,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
-    ) -> PatternNarrowingResult<'db> {
+    ) -> PatternNarrowingResult<'db, PatternPlace> {
         let db = self.db;
         let Type::TypedDict(typed_dict) = subject_type.resolve_type_alias(db) else {
             return PatternNarrowingResult::Possible(None);
@@ -2808,7 +2927,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     /// pattern analysis.
     fn positive_subject_constraint(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
     ) -> Option<NarrowingConstraint<'db>> {
         let db = self.db;
@@ -2843,7 +2962,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 Some(constraint)
             }
             _ => {
-                let matched_subject_ty = PatternSuccessAnalyzer::new(db, self.scope())
+                let scope = self.scope();
+                let matched_subject_ty = self
+                    .pattern_success_analyzer
+                    .get_or_insert_with(|| PatternSuccessAnalyzer::new(db, scope))
                     .matched_subject_type(pattern, subject_ty);
                 (!matched_subject_ty.is_equivalent_to(db, &self.env, subject_ty))
                     .then(|| NarrowingConstraint::intersection(matched_subject_ty))
@@ -4210,7 +4332,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
-            PredicateNode::OrPatternAlternative(scope) => scope,
+            PredicateNode::OrPatternAlternative(scope)
+            | PredicateNode::ClassMemberMayAlias(scope) => scope,
             PredicateNode::SubjectElementPattern(subject_element) => {
                 subject_element.pattern.scope(db)
             }
@@ -5660,7 +5783,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             {
                 PatternNarrowingResult::Possible(None)
             } else {
-                result
+                result.into_indexed()
             };
         }
 

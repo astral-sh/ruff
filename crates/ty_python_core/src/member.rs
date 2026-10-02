@@ -17,7 +17,7 @@ use std::ops::{Deref, DerefMut};
 const LINEAR_SEARCH_THRESHOLD: usize = 8;
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct Member {
     expression: MemberExpr,
     flags: MemberFlags,
@@ -131,7 +131,7 @@ bitflags! {
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a member to be *bound* as opposed to *declared*.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, salsa::SalsaValue)]
      struct MemberFlags: u8 {
         const IS_BOUND              = 1 << 0;
         const IS_DECLARED           = 1 << 1;
@@ -154,7 +154,7 @@ impl get_size2::GetSize for MemberFlags {}
 /// - segments: stores where each segment starts and its kind (attribute, int subscript, string subscript)
 ///
 /// The symbol name can be extracted from the path by taking the text up to the first segment's start offset.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct MemberExpr {
     /// The entire path as a single immutable string.
     path: CharStr,
