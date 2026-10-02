@@ -129,6 +129,31 @@ help: Remove extraneous `f` prefix
 9  |     c = 1
    -     f"attribute docstring in a class body"  # snapshot: f-string-missing-placeholders
 10 +     "attribute docstring in a class body"  # snapshot: f-string-missing-placeholders
+11 | class Class:
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+This also applies to assignments nested within a class body.
+
+```py
+class Class:
+    if condition:
+        value = 1
+        f"attribute docstring"  # snapshot: f-string-missing-placeholders
+```
+
+```snapshot
+error[F541]: f-string without any placeholders
+  --> src/mdtest_snippet.py:14:9
+   |
+14 |         f"attribute docstring"  # snapshot: f-string-missing-placeholders
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+help: Remove extraneous `f` prefix
+   |
+13 |         value = 1
+   -         f"attribute docstring"  # snapshot: f-string-missing-placeholders
+14 +         "attribute docstring"  # snapshot: f-string-missing-placeholders
    |
 note: This is an unsafe fix and may change runtime behavior
 ```
