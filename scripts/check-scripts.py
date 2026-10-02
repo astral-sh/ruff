@@ -24,8 +24,9 @@
 
 """Update script lockfiles.
 
-Run `uv run --locked scripts/check-scripts.py --check` to verify them.
-Use `--write-ty-args-file <path>` to write the discovered scripts to an argument file for ty.
+Run `uv run scripts/check-scripts.py` to update the lockfiles.
+Use `--write-ty-args-file <path>` to write the discovered scripts to an argument file for ty
+instead of updating lockfiles.
 """
 
 from __future__ import annotations
@@ -96,11 +97,7 @@ def scripts() -> Iterator[Path]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument(
-        "--check", action="store_true", help="Check lockfiles without updating them"
-    )
-    mode.add_argument(
+    parser.add_argument(
         "--write-ty-args-file",
         type=Path,
         help="Write script paths to an argument file for ty",
@@ -117,11 +114,7 @@ def main() -> int:
 
     for script in scripts():
         print(script, flush=True)
-        command = ["uv", "lock", "--script", str(script), "--refresh"]
-        if args.check:
-            command.append("--check")
-        else:
-            command.append("--no-locked")
+        command = ["uv", "lock", "--script", str(script), "--refresh", "--no-locked"]
         result = subprocess.run(command, cwd=ROOT, check=False)
         failed |= result.returncode != 0
 

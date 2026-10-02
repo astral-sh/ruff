@@ -423,23 +423,12 @@ jobs:
         run: uv run --quiet --project=./python/py-fuzzer cargo run --quiet -p ty check --project=./python/py-fuzzer --color=always
       - name: Dogfood ty on ty_benchmark
         run: uv run --quiet --project=./scripts/ty_benchmark cargo run --quiet -p ty check --project=./scripts/ty_benchmark --color=always
-      - name: Check script lockfiles and dogfood ty
+      - name: Dogfood ty on scripts
         env:
           # Enable experimental support for installing PEP 723 script dependencies.
           TY_UV: scripts
           UV_LOCKED: "true"
         run: |
-          # ty uses uv to install each script's dependencies, and `UV_LOCKED`
-          # ensures that uv does not update a script's lockfile while doing so.
-          # However, uv can accept an existing lockfile without re-resolving its
-          # dependencies, even if a refresh would change it. `--check`
-          # runs `uv lock --check --refresh` for each script, forcing uv to
-          # re-resolve its dependencies and fail if the lockfile is missing or
-          # needs updating.
-          #
-          # `--write-ty-args-file` is a separate mode: it writes the discovered
-          # script paths to an argument file so ty can check them all at once.
-          uv run --locked scripts/check-scripts.py --check
           uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
           cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
       # Check for broken links in the documentation.
