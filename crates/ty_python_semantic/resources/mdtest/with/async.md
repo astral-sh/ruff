@@ -796,113 +796,6 @@ async def main_async_generator():
         reveal_type(session)  # revealed: Session
 ```
 
-## Async context manager yielding a recursive protocol with a fixed receiver
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Protocol
-
-class Node[T](Protocol):
-    def child0(self) -> Node[tuple[T, T]]: ...
-    def child1(self) -> Node[tuple[T, T]]: ...
-    def read(self: Node[int]) -> int: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
-    yield n
-
-reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
-```
-
-## Async context manager yielding a recursive protocol with a growing receiver
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Protocol
-
-class Node[T](Protocol):
-    def child0(self) -> Node[tuple[T, T]]: ...
-    def child1(self) -> Node[tuple[T, T]]: ...
-    def read(self: Node[tuple[T, T]]) -> T: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
-    yield n
-
-reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
-```
-
-## Async context manager yielding a recursive protocol with a recursive return type
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Protocol
-
-class Node[T](Protocol):
-    def child0(self) -> Node[tuple[T, T]]: ...
-    def child1(self) -> Node[tuple[T, T]]: ...
-    def read(self: Node[int]) -> Node[tuple[T, T]]: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
-    yield n
-
-reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
-```
-
-## Async context manager yielding a recursive protocol with overloaded receivers
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from __future__ import annotations
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Protocol, overload
-
-class Node[T](Protocol):
-    def child0(self) -> Node[tuple[T, T]]: ...
-    def child1(self) -> Node[tuple[T, T]]: ...
-    @overload
-    def read(self: Node[int]) -> int: ...
-    @overload
-    def read(self: Node[str]) -> str: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
-    yield n
-
-reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
-```
-
 ## Async context manager yielding a protocol with a recursive receiver
 
 The context manager can yield a protocol whose receiver is specialized with the same protocol.
@@ -917,7 +810,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Protocol, TypeVar
+from typing import Protocol
 
 class Stream[T](Protocol):
     def flatten(self: Stream[Stream[T]]) -> None: ...
@@ -927,42 +820,6 @@ async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
     yield value
 
 reveal_type(open_stream)  # revealed: (value: Stream[int]) -> _AsyncGeneratorContextManager[Stream[int], None]
-
-T = TypeVar("T", covariant=True)
-
-class LegacyStream(Protocol[T]):
-    def flatten(self: LegacyStream[LegacyStream[T]]) -> None: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_legacy_stream(value: LegacyStream[int]) -> AsyncGenerator[LegacyStream[int], None]:
-    yield value
-
-reveal_type(open_legacy_stream)  # revealed: (value: LegacyStream[int]) -> _AsyncGeneratorContextManager[LegacyStream[int], None]
-```
-
-## Async context manager yielding a legacy recursive generic protocol
-
-The same comparison is supported with legacy type parameters.
-
-```py
-from __future__ import annotations
-
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
-from typing import Protocol, TypeVar
-
-T = TypeVar("T", covariant=True)
-
-class Node(Protocol[T]):
-    def child0(self) -> Node[tuple[T, T]]: ...
-    def child1(self) -> Node[tuple[T, T]]: ...
-    def read(self: Node[tuple[T, T]]) -> T: ...
-
-@asynccontextmanager  # no diagnostic
-async def open_node(n: Node[int]) -> AsyncGenerator[Node[int], None]:
-    yield n
-
-reveal_type(open_node)  # revealed: (n: Node[int]) -> _AsyncGeneratorContextManager[Node[int], None]
 ```
 
 ## `asyncio.timeout`

@@ -1096,6 +1096,40 @@ class Node(Protocol):
     }
 }
 
+/// Comparing a recursive protocol whose specializations grow should not repeatedly expand its
+/// members.
+fn benchmark_recursive_protocol_growing_specialization(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let mut code = "\
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Node[T](Protocol):
+    def value(self) -> T: ...
+"
+    .to_string();
+    for i in 0..16 {
+        writeln!(
+            &mut code,
+            "    def child_{i}(self) -> Node[tuple[T, T]]: ..."
+        )
+        .ok();
+    }
+    code.push_str("\nstatic_assert(is_subtype_of(Top[Node[int]], Node[int]))\n");
+
+    criterion.bench_function("ty_micro[recursive_protocol_growing_specialization]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| assert_eq!(case.db.check().len(), 0),
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 /// Regression benchmark for a recursive protocol with a specialized receiver.
 ///
 /// Comparing these types can repeatedly bind `read` to deeper specializations of `Node`.
@@ -2300,6 +2334,7 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_materialized_recursive_protocol_subtyping,
     benchmark_recursive_protocol_materialization_scaling,
+    benchmark_recursive_protocol_growing_specialization,
     benchmark_recursive_protocol_specialized_receiver,
     benchmark_async_context_manager_recursive_protocol,
     benchmark_vararg_parameter_type_accumulation,

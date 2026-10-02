@@ -2683,6 +2683,43 @@ static_assert(not is_equivalent_to(Tree[Unknown], Top[Tree[Unknown]]))
 static_assert(not is_equivalent_to(Tree[Unknown], Bottom[Tree[Unknown]]))
 ```
 
+Materialization also leaves recursive return types unchanged when a receiver annotation names a
+fixed specialization:
+
+```py
+T_co = TypeVar("T_co", covariant=True)
+
+class Fixed(Protocol[T_co]):
+    def read(self: Fixed[int]) -> Fixed[tuple[T_co, T_co]]: ...
+
+static_assert(is_equivalent_to(Fixed[int], Top[Fixed[int]]))
+```
+
+The receiver itself can name a growing specialization:
+
+```py
+class Growing(Protocol[T_co]):
+    def child(self) -> Growing[tuple[T_co, T_co]]: ...
+    def read(self: Growing[tuple[T_co, T_co]]) -> T_co: ...
+
+static_assert(is_equivalent_to(Growing[int], Top[Growing[int]]))
+```
+
+Overloads can require different receiver specializations:
+
+```py
+from typing import overload
+
+class Overloaded(Protocol[T_co]):
+    def child(self) -> Overloaded[tuple[T_co, T_co]]: ...
+    @overload
+    def read(self: Overloaded[int]) -> int: ...
+    @overload
+    def read(self: Overloaded[str]) -> str: ...
+
+static_assert(is_equivalent_to(Overloaded[int], Top[Overloaded[int]]))
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an

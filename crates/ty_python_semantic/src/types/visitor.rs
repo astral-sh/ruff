@@ -449,16 +449,8 @@ impl DynamicContent {
 enum DynamicContentMode {
     All,
     NonAny,
-    /// Require enough information to prove that materialization preserves type requirements.
+    /// Inspect type requirements affected by materialization.
     Materialization,
-    /// A stricter proof for skipping structural comparison of a protocol.
-    ProtocolMaterialization,
-}
-
-impl DynamicContentMode {
-    const fn proves_materialization_is_noop(self) -> bool {
-        matches!(self, Self::Materialization | Self::ProtocolMaterialization)
-    }
 }
 
 /// Determine whether `ty` contains any dynamic type.
@@ -467,35 +459,46 @@ pub(super) fn dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::All)
+    dynamic_content_impl(db, env, ty, DynamicContentMode::All).0
 }
 
-/// Whether both materializations preserve the requirements described by `ty`.
+/// Results of inspecting the requirements affected by materialization.
+pub(super) struct MaterializationAnalysis {
+    content: DynamicContent,
+    can_skip_protocol_comparison: bool,
+}
+
+impl MaterializationAnalysis {
+    /// Whether the inspected requirements contain no dynamic types. Some requirements, such as
+    /// receiver binding or an unresolved descriptor setter, need additional checks.
+    pub(super) const fn has_no_detected_dynamic_content(&self) -> bool {
+        self.content.is_absent()
+    }
+
+    /// Static inspected types alone do not imply that a protocol satisfies itself: for example,
+    /// an explicit method receiver might not accept the protocol instance. This is a separate,
+    /// conservative check for skipping the entire structural comparison.
+    pub(super) const fn can_skip_protocol_comparison(&self) -> bool {
+        self.has_no_detected_dynamic_content() && self.can_skip_protocol_comparison
+    }
+}
+
+/// Inspect the requirements affected by both materializations of `ty`.
 ///
 /// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
 /// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
 /// which do not affect whether one callable satisfies another's requirements.
-pub(super) fn materialization_is_noop<'db>(
+pub(super) fn analyze_materialization<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
-) -> bool {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::Materialization).is_absent()
-}
-
-/// Prove that materialization leaves a protocol's requirements unchanged.
-///
-/// This stricter variant declines protocols with properties, descriptors, class variables, or
-/// class and static methods: instance-member walking alone does not necessarily cover all of
-/// their class-access and descriptor requirements. It also declines explicit receiver annotations,
-/// whose binding can introduce additional constraints, and synthesized protocols and non-static
-/// `TypedDict` types, whose stored interfaces can have been constructed from provisional results.
-pub(super) fn protocol_materialization_is_noop<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> bool {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::ProtocolMaterialization).is_absent()
+) -> MaterializationAnalysis {
+    let (content, can_skip_protocol_comparison) =
+        dynamic_content_impl(db, env, ty, DynamicContentMode::Materialization);
+    MaterializationAnalysis {
+        content,
+        can_skip_protocol_comparison,
+    }
 }
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
@@ -519,7 +522,7 @@ pub(super) fn non_any_dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny)
+    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny).0
 }
 
 fn dynamic_content_impl<'db>(
@@ -527,7 +530,7 @@ fn dynamic_content_impl<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     mode: DynamicContentMode,
-) -> DynamicContent {
+) -> (DynamicContent, bool) {
     struct DynamicContentVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         recursion_guard: TypeCollector<'db>,
@@ -536,6 +539,7 @@ fn dynamic_content_impl<'db>(
         active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
         content: Cell<DynamicContent>,
+        can_skip_protocol_comparison: Cell<bool>,
         mode: DynamicContentMode,
     }
 
@@ -561,7 +565,7 @@ fn dynamic_content_impl<'db>(
                 return;
             }
 
-            if self.mode.proves_materialization_is_noop() && ty.is_divergent() {
+            if matches!(self.mode, DynamicContentMode::Materialization) && ty.is_divergent() {
                 self.record(DynamicContent::Indeterminate);
                 return;
             }
@@ -582,7 +586,7 @@ fn dynamic_content_impl<'db>(
                 return;
             }
 
-            if self.mode.proves_materialization_is_noop() {
+            if matches!(self.mode, DynamicContentMode::Materialization) {
                 // The ordinary walker only visits updated signatures. Inferring an original
                 // signature here could re-enter recursive `TypeOf` evaluation, so do not claim
                 // that materialization leaves this function's requirements unchanged.
@@ -593,7 +597,7 @@ fn dynamic_content_impl<'db>(
         }
 
         fn visit_known_instance_type(&self, db: &'db dyn Db, known: KnownInstanceType<'db>) {
-            if self.mode.proves_materialization_is_noop()
+            if matches!(self.mode, DynamicContentMode::Materialization)
                 && let KnownInstanceType::FunctoolsPartial(partial)
                 | KnownInstanceType::FunctoolsPartialCall(partial) = known
             {
@@ -641,20 +645,27 @@ fn dynamic_content_impl<'db>(
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            if matches!(self.mode, DynamicContentMode::ProtocolMaterialization)
-                && (protocol.class_origin(db).is_none()
-                    || !protocol
-                        .interface(db)
-                        .has_only_implicitly_bound_instance_methods(db))
+            if self.can_skip_protocol_comparison.get()
+                && matches!(self.mode, DynamicContentMode::Materialization)
+                && !protocol
+                    .interface(db)
+                    .members_allow_materialization_shortcut(
+                        db,
+                        self.env,
+                        protocol.class_origin(db).is_none(),
+                    )
             {
-                self.record(DynamicContent::Indeterminate);
-                return;
+                // This does not prevent inspecting the types affected by materialization. It
+                // only means that unchanged types cannot settle the whole comparison by
+                // themselves; binding a receiver or resolving a descriptor may add constraints.
+                self.can_skip_protocol_comparison.set(false);
             }
-            let Some(class) = protocol.class_origin(db) else {
-                walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
-                return;
-            };
-            let Some((origin, specialization)) = class.static_class_literal(db) else {
+            let Some((origin, specialization)) = protocol
+                .class_origin(db)
+                .and_then(|class| class.static_class_literal(db))
+            else {
+                // The synthesized interface is immutable. A changed member produces a different
+                // protocol type; lazy types inside its members are still inspected here.
                 walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
                 return;
             };
@@ -684,12 +695,8 @@ fn dynamic_content_impl<'db>(
                 .defining_class()
                 .and_then(|class| class.static_class_literal(db))
             else {
-                if matches!(self.mode, DynamicContentMode::ProtocolMaterialization) {
-                    // Synthesized and dynamic schemas can be built from provisional inputs before
-                    // the proof query starts, so their dependencies cannot be re-read here.
-                    self.record(DynamicContent::Indeterminate);
-                    return;
-                }
+                // Synthesized schemas and inline functional TypedDict schemas are immutable
+                // snapshots; definition-backed schemas re-read their tracked field queries.
                 walk_typed_dict_type(db, typed_dict, self);
                 return;
             };
@@ -710,10 +717,14 @@ fn dynamic_content_impl<'db>(
         active_type_aliases: ActiveRecursionDetector::default(),
         active_recursive_types: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
+        can_skip_protocol_comparison: Cell::new(true),
         mode,
     };
     visitor.visit_type(db, ty);
-    visitor.content.get()
+    (
+        visitor.content.get(),
+        visitor.can_skip_protocol_comparison.get(),
+    )
 }
 
 /// Whether inspecting `ty` can encounter recursive types with changing specializations.
@@ -1036,11 +1047,10 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::{
         CallableType, DynamicType, Parameter, Parameters, Signature, SpecialFormType, Type,
+        callable::CallableTypeKind, signatures::CallableSignature,
     };
 
-    use super::{
-        CollectedTypes, dynamic_content, materialization_is_noop, protocol_materialization_is_noop,
-    };
+    use super::{CollectedTypes, analyze_materialization, dynamic_content};
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {
@@ -1078,7 +1088,6 @@ mod tests {
                 @property
                 def child(self) -> Recursive[T]: ...
 
-            plain: Recursive[int]
             callbacks: Recursive[Callbacks]
             partial_callback = partial(gradual_callback, 0)
             partial_call = partial_callback.__call__
@@ -1087,20 +1096,18 @@ mod tests {
         let env = db.program_environment();
         let file = system_path_to_file(&db, "/src/a.py")?;
         let module = ProgramFile::new(&db, file, env.program(&db));
-        for (name, expected) in [
-            ("plain", true),
-            ("callbacks", false),
-            ("partial_callback", false),
-            ("partial_call", false),
-        ] {
+        for name in ["callbacks", "partial_callback", "partial_call"] {
             let ty = global_symbol(&db, module, name).place.expect_type();
-            assert_eq!(materialization_is_noop(&db, &env, ty), expected, "{name}");
+            assert!(
+                !analyze_materialization(&db, &env, ty).has_no_detected_dynamic_content(),
+                "{name}"
+            );
         }
         Ok(())
     }
 
     #[test]
-    fn protocol_materialization_proof_requires_inspectable_static_methods() -> anyhow::Result<()> {
+    fn protocol_materialization_proof_requires_inspectable_members() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
             "/src/a.py",
@@ -1109,57 +1116,86 @@ mod tests {
             from typing import Any, Protocol, TypedDict
             from ty_extensions._internal import TypeOf
 
-            class Static(Protocol):
-                def children(self, values: list[Static]) -> list[Static]: ...
-
-            class Gradual(Protocol):
-                def children(self, values: list[Gradual]) -> list[Gradual]: ...
-                def value(self) -> Any: ...
-
-            class Property(Protocol):
-                @property
-                def value(self) -> int: ...
-
-            class Growing[T](Protocol):
-                def child(self) -> Growing[list[T]]: ...
-
             class ExplicitReceiver(Protocol):
                 def method(self: ExplicitReceiver) -> int: ...
+
+            class NestedReceiver(Protocol):
+                def inner(self) -> ExplicitReceiver: ...
 
             class FunctionalTypedDict(Protocol):
                 def payload(self) -> TypeOf[TypedDict("Payload", {"value": int})(value=1)]: ...
 
-            static: Static
-            gradual: Gradual
-            property_protocol: Property
-            growing: Growing[int]
-            explicit_receiver: ExplicitReceiver
+            class GradualFunctionalTypedDict(Protocol):
+                def payload(self) -> TypeOf[TypedDict("Payload", {"value": Any})(value=1)]: ...
+
+            nested_receiver: NestedReceiver
             functional_typed_dict: FunctionalTypedDict
+            gradual_functional_typed_dict: GradualFunctionalTypedDict
             "#,
         )?;
         let env = db.program_environment();
         let file = system_path_to_file(&db, "/src/a.py")?;
         let module = ProgramFile::new(&db, file, env.program(&db));
-        for (name, expected) in [
-            ("static", true),
-            ("gradual", false),
-            ("property_protocol", false),
-            ("growing", false),
-            ("explicit_receiver", false),
-            ("functional_typed_dict", false),
+        for (name, no_dynamic_content, can_skip) in [
+            ("nested_receiver", true, false),
+            ("functional_typed_dict", true, true),
+            ("gradual_functional_typed_dict", false, false),
         ] {
             let ty = global_symbol(&db, module, name).place.expect_type();
+            let analysis = analyze_materialization(&db, &env, ty);
             assert_eq!(
-                protocol_materialization_is_noop(&db, &env, ty),
-                expected,
+                analysis.has_no_detected_dynamic_content(),
+                no_dynamic_content,
                 "{name}"
             );
+            assert_eq!(analysis.can_skip_protocol_comparison(), can_skip, "{name}");
         }
 
         let callable =
             CallableType::single(&db, Signature::new(Parameters::empty(), Type::object()));
         let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
-        assert!(!protocol_materialization_is_noop(&db, &env, synthesized));
+        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
+
+        let callable = CallableType::new(
+            &db,
+            CallableSignature::from_overloads([]),
+            CallableTypeKind::FunctionLike,
+        );
+        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
+        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
+
+        for (ty, expected) in [(Type::object(), true), (Type::any(), false)] {
+            let synthesized = Type::protocol_with_readonly_members(&db, &env, [("value", ty)]);
+            assert_eq!(
+                analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison(),
+                expected
+            );
+
+            let callable = CallableType::single(
+                &db,
+                Signature::new(Parameters::standard([Parameter::positional_only(None)]), ty),
+            );
+            let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
+            assert_eq!(
+                analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison(),
+                expected
+            );
+        }
+
+        // A synthesized signature may already contain constraints from an earlier binding.
+        let signature = Signature::new(
+            Parameters::standard([
+                Parameter::positional_only(None).with_annotated_type(Type::Never),
+                Parameter::positional_only(None),
+            ]),
+            Type::object(),
+        )
+        .bind_self_with_receiver(&db, &env, Some(Type::object()), Some(Type::object()));
+        assert!(signature.has_implicit_positional_receiver_annotation());
+        assert!(signature.receiver_constraints().is_some());
+        let callable = CallableType::single(&db, signature);
+        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)]);
+        assert!(!analyze_materialization(&db, &env, synthesized).can_skip_protocol_comparison());
         Ok(())
     }
 
@@ -1174,7 +1210,7 @@ mod tests {
             divergent.top_materialization(&db, &env),
             divergent.bottom_materialization(&db, &env),
         ] {
-            assert!(!materialization_is_noop(&db, &env, ty));
+            assert!(!analyze_materialization(&db, &env, ty).has_no_detected_dynamic_content());
         }
     }
 

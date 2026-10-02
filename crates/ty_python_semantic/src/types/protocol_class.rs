@@ -470,27 +470,48 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.member_count(db)
     }
 
-    pub(super) fn has_only_implicitly_bound_instance_methods(self, db: &'db dyn Db) -> bool {
-        self.members(db).all(|member| {
-            let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
-                member.data.kind
-            else {
-                return false;
-            };
-            callable
-                .signatures(db)
-                .iter()
-                .all(Signature::has_implicit_positional_receiver_annotation)
+    pub(super) fn has_only_methods(self, db: &'db dyn Db) -> bool {
+        self.members(db).all(|member| member.is_method())
+    }
+
+    pub(super) fn members_allow_materialization_shortcut(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        is_synthesized: bool,
+    ) -> bool {
+        self.members(db).all(|member| match member.data.kind {
+            ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) => {
+                let signatures = callable.signatures(db);
+                (!is_synthesized || signatures.iter().next().is_some())
+                    && signatures.iter().all(|signature| {
+                        signature.has_implicit_positional_receiver_annotation()
+                            && (!is_synthesized || signature.receiver_constraints().is_none())
+                    })
+            }
+            // Synthesized read-only members store the read type directly, without an accessor.
+            ProtocolMemberKind::Property {
+                read: Some(ProtocolPropertyType::Annotation(_)),
+                write: None,
+            } if is_synthesized => true,
+            ProtocolMemberKind::Property { read, write } => {
+                property_accessors_are_inspectable(db, env, read, write)
+            }
+            _ => false,
         })
     }
 
-    pub(super) fn has_only_instance_methods_with_positional_receivers(
+    pub(super) fn has_only_inspectable_members_with_positional_receivers(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         class_context: Option<GenericContext<'db>>,
         class_origin: ClassLiteral<'db>,
     ) -> bool {
         self.members(db).all(|member| {
+            if let ProtocolMemberKind::Property { read, write } = member.data.kind {
+                return property_accessors_are_inspectable(db, env, read, write);
+            }
             let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
                 member.data.kind
             else {
@@ -1360,6 +1381,29 @@ enum ProtocolPropertyType<'db> {
     ///
     /// Here, assignment to `name` accepts `str | None`, from the `value` parameter.
     PropertySetter(Type<'db>),
+}
+
+/// The member walker needs resolved read and write types to prove materialization is a no-op.
+/// Descriptor requirements need additional checks, so only accept ordinary property accessors.
+fn property_accessors_are_inspectable<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    read: Option<ProtocolPropertyType<'db>>,
+    write: Option<ProtocolMemberWrite<'db>>,
+) -> bool {
+    matches!(read, None | Some(ProtocolPropertyType::PropertyGetter(_)))
+        && matches!(
+            write,
+            None | Some(ProtocolMemberWrite::Type(
+                ProtocolPropertyType::PropertySetter(_)
+            ))
+        )
+        && read.is_none_or(|getter| getter.resolve(db, env).is_some())
+        && write.is_none_or(|setter| {
+            setter
+                .domain()
+                .is_some_and(|setter| setter.resolve(db, env).is_some())
+        })
 }
 
 impl<'db> ProtocolPropertyType<'db> {

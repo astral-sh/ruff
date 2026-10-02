@@ -7201,8 +7201,9 @@ def valid(value: Chain[Iterable[int]]) -> None:
 
 ### Structurally equivalent recursive protocol specializations as receivers
 
-The type parameter appears only in a recursive reference to `Node`, so `Node[str]` satisfies the
-`Node[int]` receiver of `read` structurally. This holds for both type parameter syntaxes.
+Comparing the `child` return types of `Node[str]` and `Node[int]` leads back to the same comparison.
+No other member uses `T`, so their structures match at every depth. Thus `Node[str]` satisfies the
+`Node[int]` receiver of `read`, even though `str` is not a subtype of `int`.
 
 ```toml
 [environment]
@@ -7213,6 +7214,8 @@ python-version = "3.12"
 from __future__ import annotations
 
 from typing import Protocol, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
 
 class Node[T](Protocol):
     def child(self) -> Node[T]: ...
@@ -7220,6 +7223,8 @@ class Node[T](Protocol):
 
 class Readable(Protocol):
     def read(self) -> int: ...
+
+static_assert(is_subtype_of(Node[str], Node[int]))
 
 def check(node: Node[str]) -> Readable:
     return node  # no diagnostic
@@ -7230,6 +7235,8 @@ class LegacyNode(Protocol[T]):
     def child(self) -> LegacyNode[T]: ...
     def read(self: LegacyNode[int]) -> int: ...
 
+static_assert(is_subtype_of(LegacyNode[str], LegacyNode[int]))
+
 def check_legacy(node: LegacyNode[str]) -> Readable:
     return node  # no diagnostic
 ```
@@ -7238,8 +7245,7 @@ Matching receiver annotations do not make specializations equivalent if neither 
 satisfies the receiver type:
 
 ```py
-from ty_extensions import Top, static_assert
-from ty_extensions._internal import is_subtype_of
+from ty_extensions import Top
 
 class InvalidReceiver[T](Protocol):
     def child(self) -> InvalidReceiver[T]: ...

@@ -30,8 +30,8 @@ use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
-    materialization_is_noop, protocol_materialization_is_noop, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, analyze_materialization, any_over_type,
+    any_over_type_expanding_aliases, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -508,7 +508,13 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
-/// Prove that a protocol's requirements do not change under materialization.
+/// Conservatively determine whether materialization can be ignored and structural comparison
+/// skipped for a protocol.
+///
+/// First inspect the specialized interface directly, including ordinary properties and methods
+/// with implicit receivers. If that is inconclusive, inspect the interface using
+/// the protocol's own type parameters; this handles growing specializations and supported explicit
+/// receivers.
 ///
 /// The interface must be read inside this query. If a dependency is provisional during Salsa cycle
 /// recovery, `cycle_result` prevents an incomplete interface from being used as a proof; the
@@ -518,38 +524,67 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     cycle_result=|_, _, _, _| false,
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn protocol_materialization_is_provably_noop<'db>(
+fn protocol_materialization_allows_shortcut<'db>(
     db: &'db dyn Db,
     program: crate::Program<'db>,
     class: ProtocolClass<'db>,
 ) -> bool {
     let env = ProgramEnvironment::from_program(program);
-    protocol_materialization_is_noop(
+    analyze_materialization(
         db,
         &env,
         Type::ProtocolInstance(ProtocolInstanceType::from_class(class)),
     )
+    .can_skip_protocol_comparison()
+        || protocol_materialization_is_noop_with_type_parameters(db, &env, class)
 }
 
-/// Prove that materialization does not change a recursive protocol specialization.
+/// Check whether the materialized requirements permit the nominal cycle fallback.
 ///
-/// A recursive occurrence of the same protocol is treated as a leaf. If the arguments and the
-/// identity-specialized interface are static, materialization cannot change the interface even
-/// after a recursive specialization.
-///
-/// The proof is restricted to ordinary methods whose explicit receivers refer directly to the
-/// same protocol. Other receiver annotations can create constraints that this proof does not
-/// inspect.
+/// The fallback leaves the enclosing comparison in progress, unlike the shortcut that skips the
+/// whole comparison. It retains the fallback's broader treatment of receivers and descriptors.
+/// A cycle in the protocol interface query makes this check inconclusive.
 #[salsa::tracked(
     returns(copy),
-    cycle_result=|_, _, _, _, _| false,
+    cycle_result=|_, _, _, _| false,
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn recursive_protocol_materialization_is_noop<'db>(
+fn protocol_materialization_allows_nominal_cycle<'db>(
     db: &'db dyn Db,
     program: crate::Program<'db>,
-    source: ProtocolInstanceType<'db>,
-    target: ProtocolInstanceType<'db>,
+    class: ProtocolClass<'db>,
+) -> bool {
+    let env = ProgramEnvironment::from_program(program);
+    analyze_materialization(
+        db,
+        &env,
+        Type::ProtocolInstance(ProtocolInstanceType::from_class(class)),
+    )
+    .has_no_detected_dynamic_content()
+}
+
+/// Conservatively prove that materialization does not change a protocol specialization.
+///
+/// A `true` result guarantees that its requirements are unchanged. A `false` result may mean that
+/// the proof could not establish this, even if materialization is a no-op.
+///
+/// Unlike `Type::is_fully_static`, this checks the interface once using the protocol's own type
+/// parameters as placeholders (e.g. `P[T]` when checking `P[int]`) and checks the concrete
+/// arguments separately.
+/// A recursive occurrence of the same protocol is treated as a leaf after checking its arguments.
+/// This can prove that materialization leaves `P[int]` unchanged even when a member refers to
+/// `P[list[T]]`, without expanding an unbounded sequence of specializations.
+///
+/// The proof accepts ordinary properties and instance methods. Explicit receiver
+/// annotations must be direct, unmaterialized specializations of the same protocol, and are only
+/// supported for method-only interfaces. Other cases fall back to structural comparison.
+///
+/// This must be called from `protocol_materialization_allows_shortcut` so that `cycle_result`
+/// rejects provisional interface results.
+fn protocol_materialization_is_noop_with_type_parameters<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ProtocolClass<'db>,
 ) -> bool {
     struct ParameterVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
@@ -648,76 +683,60 @@ fn recursive_protocol_materialization_is_noop<'db>(
         }
     }
 
-    let (Some(source_class), Some(target_class)) =
-        (source.class_origin(db), target.class_origin(db))
-    else {
+    let Some((origin, specialization)) = class.static_class_literal(db) else {
         return false;
     };
-    if source_class != target_class {
-        return false;
-    }
-    let Some((origin, _)) = source_class.static_class_literal(db) else {
-        return false;
-    };
-    let Some(template) = origin.identity_specialization(db).into_protocol_class(db) else {
-        return false;
-    };
-    let source_interface = source.interface(db);
-    let target_interface = target.interface(db);
-    let template_interface = template.interface(db);
-    let template_view = ProtocolInterfaceView::new(template_interface, None);
-    if !target_interface
-        .members(db)
-        .any(|member| member.has_explicit_receiver_annotation(db))
+    if specialization
+        .is_some_and(|specialization| specialization.materialization_kind(db).is_some())
     {
         return false;
     }
+    let interface = ProtocolInterfaceView::new(class.interface(db), None);
+    let Some(template) = origin.identity_specialization(db).into_protocol_class(db) else {
+        return false;
+    };
+    let template_view = ProtocolInterfaceView::new(template.interface(db), None);
     let class_context = origin.generic_context(db);
-    if ![source_interface, target_interface, template_view]
-        .iter()
-        .all(|interface| {
-            interface.has_only_instance_methods_with_positional_receivers(
-                db,
-                class_context,
-                origin.into(),
-            )
-        })
-        || source_interface.member_count(db) != template_view.member_count(db)
-        || target_interface.member_count(db) != template_view.member_count(db)
-        || template_view.members(db).any(|member| {
-            source_interface.member_by_name(db, member.name()).is_none()
-                || target_interface.member_by_name(db, member.name()).is_none()
-        })
+    if ![interface, template_view].iter().all(|interface| {
+        interface.has_only_inspectable_members_with_positional_receivers(
+            db,
+            env,
+            class_context,
+            origin.into(),
+        )
+    }) || (!template_view.has_only_methods(db)
+        && template_view
+            .members(db)
+            .any(|member| member.has_explicit_receiver_annotation(db)))
+        || interface.member_count(db) != template_view.member_count(db)
+        || template_view
+            .members(db)
+            .any(|member| !interface.includes_member(db, member.name()))
     {
         return false;
     }
 
-    let env = ProgramEnvironment::from_program(program);
     if class_context.is_some_and(|context| {
         context.variables(db).any(|variable| {
             variable.is_paramspec(db)
                 || variable.is_typevartuple(db)
-                || variable
-                    .typevar(db)
-                    .bound_or_constraints(db, &env)
-                    .is_some()
-                || variable.typevar(db).default_type(db, &env).is_some()
+                || variable.typevar(db).bound_or_constraints(db, env).is_some()
+                || variable.typevar(db).default_type(db, env).is_some()
         })
     }) {
         return false;
     }
-    if let Some((_, Some(specialization))) = source_class.static_class_literal(db)
-        && (specialization.materialization_kind(db).is_some()
-            || specialization.tuple(db).is_some()
+    if let Some(specialization) = specialization
+        && (specialization.tuple(db).is_some()
             || specialization
                 .types(db)
                 .iter()
-                .any(|ty| !specialization_argument_is_static(db, &env, *ty, None)))
+                .any(|ty| !specialization_argument_is_static(db, env, *ty, None)))
     {
         return false;
     }
     let visitor = ParameterVisitor {
-        env: &env,
+        env,
         origin: origin.into(),
         class_context,
         invalid: Cell::new(false),
@@ -788,7 +807,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     if self.relation.is_assignability() =>
                 {
                     // A specialization may already carry a separate materialization marker.
-                    // In that case, the unwrapped protocol need not be the original type.
+                    // For example, materializing `Box[Any]`, where `Box[T]` has an invariant
+                    // `P[T]` member, can put `Top` on the `P[Any]` specialization. A separate
+                    // `Bottom` protocol wrapper then has that top-materialized specialization
+                    // as its origin, not the original gradual `P[Any]`.
                     source_origin
                         .static_class_literal(db)
                         .is_some_and(|(_, specialization)| {
@@ -803,57 +825,36 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.always();
         }
 
-        // In the opposite direction, top materialization can add requirements. Avoid expanding
-        // recursive members only when a complete, conservative proof shows that it does not.
+        // If both instances share a protocol class, a proof that materialization is a no-op can
+        // simplify their comparison.
         if let Some(source) = source_protocol
-            && source.materialization_kind(db) == Some(MaterializationKind::Top)
-            && protocol.materialization_kind(db).is_none()
-            && let (Some(source_origin), Some(target_origin)) =
-                (source.materialized_origin(db), protocol.class_origin(db))
-            && source_origin == target_origin
-            && protocol_materialization_is_provably_noop(db, self.env.program(db), source_origin)
-        {
-            return self.always();
-        }
-
-        if let Some(source) = source_protocol
-            && source != protocol
             && (source.materialization_kind(db).is_some()
                 || protocol.materialization_kind(db).is_some())
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
-            && source_origin == target_origin
-            && source_origin
-                .static_class_literal(db)
-                .is_some_and(|(_, specialization)| specialization.is_some())
-            && recursive_protocol_materialization_is_noop(
-                db,
-                self.env.program(db),
-                source,
-                protocol,
-            )
-        {
-            return self.always();
-        }
-
-        // A no-op materialization can also be removed before comparing different
-        // specializations. The ordinary comparison still checks their full relationship.
-        if let Some(source) = source_protocol
-            && let (Some(source_origin), Some(target_origin)) =
-                (source.materialized_origin(db), protocol.class_origin(db))
             && source_origin.class_literal(db) == target_origin.class_literal(db)
-            && recursive_protocol_materialization_is_noop(
-                db,
-                self.env.program(db),
-                source,
-                ProtocolInstanceType::from_class(source_origin),
-            )
         {
-            return self.check_type_pair(
-                db,
-                Type::ProtocolInstance(ProtocolInstanceType::from_class(source_origin)),
-                Type::ProtocolInstance(protocol),
-            );
+            // For the same specialization, unchanged requirements settle the relationship.
+            if source != protocol
+                && source_origin == target_origin
+                && protocol_materialization_allows_shortcut(db, self.env.program(db), source_origin)
+            {
+                return self.always();
+            }
+
+            // A no-op source materialization can be removed before comparing method-only
+            // interfaces. For recursive properties and attributes, keep the wrapper: removing
+            // it can make the cycle guard reject distinct specializations that stabilize.
+            if source.materialization_kind(db).is_some()
+                && source.interface(db).has_only_methods(db)
+                && protocol_materialization_allows_shortcut(db, self.env.program(db), source_origin)
+            {
+                return self.check_type_pair(
+                    db,
+                    Type::ProtocolInstance(ProtocolInstanceType::from_class(source_origin)),
+                    Type::ProtocolInstance(protocol),
+                );
+            }
         }
 
         let source_protocol_as_nominal =
@@ -1010,11 +1011,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
         for protocol in [source, target] {
             if let Some(origin) = protocol.materialized_origin(db)
-                && !materialization_is_noop(
-                    db,
-                    self.env,
-                    Type::ProtocolInstance(ProtocolInstanceType::from_class(origin)),
-                )
+                && !protocol_materialization_allows_nominal_cycle(db, self.env.program(db), origin)
             {
                 return None;
             }

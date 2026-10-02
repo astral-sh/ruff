@@ -1,6 +1,6 @@
 use crate::{Program, ProgramEnvironment};
 use std::borrow::Cow;
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, LazyCell, RefCell};
 use std::collections::hash_map::Entry;
 
 use itertools::Itertools;
@@ -1575,12 +1575,9 @@ impl<'db> Specialization<'db> {
             let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
             // Equivalence can recursively inspect a protocol's requirements. Only check it when
             // the result affects this materialization.
-            let dynamic_type = OnceCell::new();
-            let has_dynamic_type = || {
-                *dynamic_type.get_or_init(|| {
-                    !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
-                })
-            };
+            let has_dynamic_type = LazyCell::new(|| {
+                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
+            });
 
             match variance {
                 TypeVarVariance::Bivariant => {
@@ -1589,7 +1586,7 @@ impl<'db> Specialization<'db> {
                     top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-                    if bound_typevar.typevar(db).is_constrained(db) && has_dynamic_type() =>
+                    if bound_typevar.typevar(db).is_constrained(db) && *has_dynamic_type =>
                 {
                     has_unsimplified_dynamic_typevar = true;
                     vartype
@@ -1605,7 +1602,7 @@ impl<'db> Specialization<'db> {
 
                     if effective_materialization_kind == MaterializationKind::Top
                         && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(db)
-                        && has_dynamic_type()
+                        && *has_dynamic_type
                     {
                         IntersectionType::from_two_elements(
                             db,
@@ -1618,7 +1615,7 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= has_dynamic_type();
+                    has_unsimplified_dynamic_typevar |= *has_dynamic_type;
                     vartype
                 }
             }
