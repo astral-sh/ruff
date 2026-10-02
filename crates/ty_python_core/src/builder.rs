@@ -4763,8 +4763,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if optional_vars.as_deref().is_none_or(ast::Expr::is_name_expr) {
                         self.visit_expression_statement(context_expr, ExpressionContext::Value);
                     } else {
-                        // Attribute and subscript targets can supply type context, so keep
-                        // their lambdas associated with the whole statement.
+                        // Attribute and subscript targets can supply type context. Name targets
+                        // use default context in `infer_with_item_definition`.
                         self.visit_expr(context_expr);
                     }
                     self.record_exception_checkpoint();
@@ -4854,7 +4854,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if target.is_name_expr() {
                     self.visit_expression_statement(iter, ExpressionContext::Value);
                 } else {
-                    // Preserve type context supplied by attribute or subscript targets.
+                    // Attribute and subscript targets can supply type context, while
+                    // `infer_for_statement_definition` uses default context for names.
                     self.visit_expr(iter);
                 }
                 let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);

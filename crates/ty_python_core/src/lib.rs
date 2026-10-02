@@ -308,7 +308,7 @@ pub struct SemanticIndex<'db> {
     /// Map from nodes that create a scope to the scope they create.
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
-    /// Map from a lambda to the enclosing statement or expression that provides its type context.
+    /// Map from a lambda expression to its containing statement.
     enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
 
     // Map from a constraining use of a collection initializer to its definition.
