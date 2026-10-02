@@ -2,8 +2,8 @@ use ruff_python_ast::{self as ast, Arguments, Expr, ExprContext, Operator};
 use ruff_python_literal::cformat::{CFormatError, CFormatErrorType};
 
 use ruff_python_ast::types::Node;
+use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::analyze::typing;
-use ruff_python_semantic::{BindingKind, ScopeKind};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -386,20 +386,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                         pycodestyle::rules::ambiguous_variable_name(checker, id, expr.range());
                     }
                     if checker.is_rule_enabled(Rule::BuiltinVariableShadowing) {
-                        // In class scope, attribute bindings (e.g., `id = 1`) are covered by
-                        // `builtin-attribute-shadowing` (A003), but other bindings (e.g., a
-                        // `for` target or `:=`) are not and still shadow the builtin.
-                        let scope = checker.semantic.current_scope();
-                        let is_class_attribute = scope.kind.is_class()
-                            && scope.get(id).is_none_or(|binding_id| {
-                                matches!(
-                                    checker.semantic.binding(binding_id).kind,
-                                    BindingKind::Assignment | BindingKind::Annotation
-                                )
-                            });
-                        if !is_class_attribute {
-                            flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
-                        }
+                        flake8_builtins::rules::builtin_variable_shadowing(checker, id, *range);
                     }
                 }
                 _ => {}
