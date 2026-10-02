@@ -452,7 +452,9 @@ jobs:
           # Enable experimental support for installing PEP 723 script dependencies.
           TY_UV: scripts
           UV_LOCKED: "true"
-        run: cargo run --quiet -p ty check scripts/*.py --color=always
+        run: |
+          uv run --locked scripts/check-scripts.py --write-ty-args-file "$RUNNER_TEMP/script-paths.txt"
+          cargo run --quiet -p ty check "@$RUNNER_TEMP/script-paths.txt" --color=always
       # Check for broken links in the documentation.
       - run: cargo doc --all --no-deps
         env:
