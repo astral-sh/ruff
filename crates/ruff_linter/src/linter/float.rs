@@ -7,7 +7,7 @@ pub(crate) fn as_nan_float_string_literal(expr: &ast::Expr) -> Option<&'static s
     find_any_ignore_ascii_case(expr, &["nan", "+nan", "-nan"])
 }
 
-/// Returns `true` if `expr` is a string literal that represents a non-finite float.
+/// Checks if `expr` is a string literal that represents a non-finite float.
 /// E.g., `"NaN"`, "-inf", `"Infinity"`, or even `" +Inf \n \t"`.
 /// Return `None` if it's not. Else the lowercased, trimmed string literal,
 /// e.g., `Some("nan")`, `Some("-inf")`, or `Some("+infinity")`.
