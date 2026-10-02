@@ -3150,5 +3150,19 @@ def compare(first: dict[str, T], second: dict[str, int]) -> None:
             reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
 
+## Lambda defaults in generic base metadata
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the type variables bound by the
+subclass:
+
+```py
+from typing import Annotated, Generic, TypeVar, cast
+
+T = TypeVar("T")
+
+class Base(Generic[T]): ...
+class Derived(Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

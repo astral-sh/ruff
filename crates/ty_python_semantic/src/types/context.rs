@@ -180,6 +180,28 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         }
     }
 
+    /// Preserve semantic flags for defaults, including `no_type_check` suppression.
+    ///
+    /// Speculative diagnostic suppression stays local to the caller: the default's cached
+    /// inference must retain diagnostics for callers that need them.
+    pub(super) fn parameter_default_flags(&self) -> InferenceFlags {
+        // Keep this exhaustive so new context state is considered for default inference.
+        let Self {
+            inference_flags,
+            db: _,
+            program_environment: _,
+            scope: _,
+            file: _,
+            program_file: _,
+            module: _,
+            diagnostics: _,
+            diagnostics_suppressed: _,
+            bomb: _,
+        } = *self;
+
+        inference_flags
+    }
+
     /// The file for which the types are inferred.
     pub(crate) fn file(&self) -> File {
         self.file

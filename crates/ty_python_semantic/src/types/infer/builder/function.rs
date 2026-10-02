@@ -3,9 +3,9 @@ use crate::{
     reachability::ReachabilityConstraintsExtension,
     types::{
         Binding, CallArguments, CallableType, ClassBase, ClassLiteral, ClassType, DynamicType,
-        IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeContext, TypeVarBoundOrConstraints, TypeVarKind,
-        UnionBuilder, UnionType,
+        IntersectionBuilder, KnownClass, KnownInstanceType, ParamSpecAttrKind, Parameter,
+        SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
+        TypeVarBoundOrConstraints, TypeVarKind, UnionBuilder, UnionType,
         callable::CallableTypeKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -31,14 +31,15 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
+            InferParameterDefault, InferenceFlags, ParameterDefaultContext, StatementInference,
+            TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
             function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            infer_parameter_default_types, infer_statement_types, nearest_enclosing_function,
+            original_class_type, parameter_with_default,
         },
         infer_definition_types,
         list_members::all_members,
@@ -793,8 +794,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if function_has_deferred_annotations(function) {
             self.extend_definition(definition, infer_deferred_types(db, definition));
         }
-        if parameters_have_defaults(&function.parameters) {
-            self.extend_definition(definition, infer_function_default_types(db, definition));
+        for parameter in function.parameters.iter_non_variadic_params() {
+            if parameter.default().is_some() {
+                let parameter = self.index.expect_single_definition(&parameter.parameter);
+                self.extend_expression(infer_parameter_default_types(
+                    db,
+                    InferParameterDefault::new(db, parameter, ParameterDefaultContext::default()),
+                ));
+            }
         }
     }
 
@@ -814,36 +821,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
-    pub(super) fn infer_function_defaults(
-        &mut self,
-        definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
-    ) {
+    /// Infer a source default with its declaration's annotation and type-variable context.
+    pub(super) fn infer_parameter_default(&mut self, definition: Definition<'db>) {
         let db = self.db();
-        if !parameters_have_defaults(&function.parameters) {
+        let Some(parameter) = parameter_with_default(db, definition, self.module()) else {
             return;
-        }
-
-        self.suppress_errors_for_no_type_check(definition, function);
-        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
+        };
+        let Some(default) = parameter.default() else {
+            return;
+        };
 
         // In stub files, default values may reference names that are defined later in the file.
-        let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
+        self.deferred_state = self.in_stub().into();
 
-        // Borrow annotation types from their own inference result instead of copying that result
-        // into this query. Scope inference merges both regions when checking the whole function.
-        for param_with_default in function.parameters.iter_non_variadic_params() {
-            let Some(default) = param_with_default.default() else {
-                continue;
-            };
-            let annotation = param_with_default
+        let annotation = if let Some(function) = definition.scope(db).node(db).as_function() {
+            let function = function.node(self.module());
+            let owner = self.index.expect_single_definition(function);
+            self.suppress_errors_for_no_type_check(owner, function);
+            self.typevar_binding_context = Some(owner);
+            // Borrow the annotation without retaining a second copy in the default's result.
+            parameter
                 .annotation()
-                .map(|annotation| function_signature_expression_type(db, definition, annotation));
-            self.infer_expression(default, TypeContext::declared(annotation));
-        }
-
-        self.deferred_state = previous_deferred_state;
-        self.typevar_binding_context = previous_typevar_binding_context;
+                .map(|annotation| function_signature_expression_type(db, owner, annotation))
+        } else {
+            None
+        };
+        self.infer_expression(default, TypeContext::declared(annotation));
     }
 
     fn suppress_errors_for_no_type_check(
@@ -1459,16 +1462,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             node_index: _,
         } = parameter_with_default;
 
-        let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
+        let ty = if default.is_some() {
+            match self.lambda_parameter(index, lambda) {
+                Ok(parameter) => {
+                    let annotated = parameter.annotated_type();
+                    if !annotated.has_provisional_marker(db, self.program_environment()) {
+                        annotated
+                    } else {
+                        UnionType::from_two_elements(
+                            db,
+                            self.program_environment(),
+                            Type::Dynamic(DynamicType::UnknownLambdaParameter),
+                            parameter
+                                .default_type_for_inference(db)
+                                .unwrap_or_else(Type::unknown),
+                        )
+                    }
+                }
+                // The source signature supplies the default's evaluation context. A cycle's
+                // initial result leaves the parameter itself pending, rather than giving it
+                // an unknown type before its default can be inferred.
+                Err(pending) => pending,
+            }
+        } else if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
-        } else if let Some(default_expr) = default {
-            let default_ty = self.file_expression_type(default_expr);
-            UnionType::from_two_elements(
-                db,
-                self.program_environment(),
-                Type::Dynamic(DynamicType::UnknownLambdaParameter),
-                default_ty,
-            )
         } else {
             Type::Dynamic(DynamicType::UnknownLambdaParameter)
         };
@@ -1532,19 +1549,54 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let enclosing_stmt = infer_statement_types(
-            self.db(),
-            self.index.enclosing_lambda_statement(lambda.into())?,
-        );
-        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
-        let Some(parameters) = callable.single_parameters(self.db()) else {
-            // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
-            return None;
-        };
-
-        let parameter_type = parameters.as_slice()[index as usize].annotated_type();
+        let parameter_type = self.lambda_parameter(index, lambda).ok()?.annotated_type();
         (!parameter_type.has_provisional_marker(db, self.program_environment()))
             .then_some(parameter_type)
+    }
+
+    /// Read a lambda parameter and its default's evaluation context from the source signature.
+    fn lambda_parameter(
+        &self,
+        index: u32,
+        lambda: &ast::ExprLambda,
+    ) -> Result<Parameter<'db>, Type<'db>> {
+        let db = self.db();
+        let statement = self
+            .index
+            .enclosing_lambda_statement(lambda.into())
+            .ok_or_else(Type::unknown)?;
+        let statement = infer_statement_types(db, statement);
+        let lambda_type = match &statement {
+            StatementInference::Definition(definition, inference)
+                if inference.try_expression_type(lambda).is_none() =>
+            {
+                let expression = ast::ExprRef::Lambda(lambda);
+                let scope = self
+                    .index
+                    .expression_scope_id(&expression)
+                    .to_scope_id(db, self.program_file());
+                crate::types::definition_expression_type_in_scope(
+                    db,
+                    *definition,
+                    expression,
+                    scope,
+                )
+            }
+            _ => statement.expression_type(lambda),
+        };
+        let callable = lambda_type.as_callable().ok_or_else(|| {
+            if lambda_type.is_divergent() {
+                lambda_type
+            } else {
+                Type::unknown()
+            }
+        })?;
+        // TODO: If there are multiple applicable overloads, attempt multi-inference.
+        callable
+            .single_parameters(db)
+            .and_then(|parameters| parameters.as_slice().get(index as usize))
+            .cloned()
+            .ok_or_else(Type::unknown)
     }
 }
 

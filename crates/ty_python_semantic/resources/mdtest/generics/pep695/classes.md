@@ -2587,5 +2587,16 @@ def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
             reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
 
+## Lambda defaults in generic base metadata
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the subclass's type parameters:
+
+```py
+from typing import Annotated, cast
+
+class Base[T]: ...
+class Derived[T](Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

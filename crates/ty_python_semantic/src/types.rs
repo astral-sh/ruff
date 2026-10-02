@@ -37,13 +37,14 @@ pub use self::dedicated::pytest::{
 pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+use self::infer::{
+    InferParameterDefault, ParameterDefaultContext, implicit_alias_parameters,
+    infer_implicit_alias_type, infer_parameter_default_types,
+};
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
-};
-use self::infer::{
-    implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -128,7 +129,9 @@ pub use special_form::SpecialFormType;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
+use ty_python_core::{
+    ExpressionNodeKey, ProgramFile, Truthiness, place_table, semantic_index, use_def_map,
+};
 
 mod abstract_methods;
 mod attribute_write;
@@ -418,7 +421,7 @@ fn definition_expression_type<'db>(
 fn definition_expression_type_in_scope<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    expression: &ast::Expr,
+    expression: impl Copy + Into<ExpressionNodeKey> + Ranged,
     scope: ScopeId<'db>,
 ) -> Type<'db> {
     if scope == definition.scope(db) {
@@ -430,8 +433,32 @@ fn definition_expression_type_in_scope<'db>(
             infer_deferred_types(db, definition).try_expression_type(expression)
         {
             ty
-        } else if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            infer_function_default_types(db, definition).expression_type(expression)
+        } else if let DefinitionKind::Function(function) = definition.kind(db) {
+            let file = definition.program_file(db);
+            let module = parsed_module(db, file.python_file(db)).load(db);
+            function
+                .node(&module)
+                .parameters
+                .iter_non_variadic_params()
+                .find(|parameter| {
+                    parameter
+                        .default()
+                        .is_some_and(|default| default.range().contains_range(expression.range()))
+                })
+                .map(|parameter| {
+                    let parameter =
+                        semantic_index(db, file).expect_single_definition(&parameter.parameter);
+                    infer_parameter_default_types(
+                        db,
+                        InferParameterDefault::new(
+                            db,
+                            parameter,
+                            ParameterDefaultContext::default(),
+                        ),
+                    )
+                    .expression_type(expression)
+                })
+                .unwrap_or_else(Type::unknown)
         } else {
             Type::unknown()
         }
