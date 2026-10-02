@@ -9,7 +9,7 @@ use crate::session::client::Client;
 use lsp_types::HoverRequest;
 use lsp_types::{HoverParams, MarkupContent, Uri};
 use ty_ide::{MarkupKind, hover};
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 pub(crate) struct HoverRequestHandler;
 
@@ -35,20 +35,20 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
         };
 
-        let Some(range_info) = hover(db, file, offset) else {
+        let Some(range_info) = hover(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

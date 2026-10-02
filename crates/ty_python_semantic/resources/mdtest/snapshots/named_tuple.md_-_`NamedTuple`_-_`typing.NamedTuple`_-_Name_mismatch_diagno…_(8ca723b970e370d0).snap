@@ -30,6 +30,5 @@ warning[mismatched-type-name]: The name passed to `NamedTuple` must match the va
   |
 5 | Mismatch = NamedTuple("WrongName", [("x", int)])
   |                       ^^^^^^^^^^^ Expected "Mismatch", got "WrongName"
-  |
 
 ```

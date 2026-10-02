@@ -391,7 +391,6 @@ UP024 [*] Replace aliased errors with `OSError`
 54 | raise EnvironmentError(1)
 55 | raise IOError(1, 2)
    |       ^^^^^^^
-   |
 help: Replace `IOError` with builtin `OSError`
    |
 54 | raise EnvironmentError(1)

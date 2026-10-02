@@ -9,7 +9,7 @@ use anyhow::Result;
 use itertools::Itertools;
 use log::warn;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
+use ruff_db::diagnostic::{Diagnostic, LintName};
 use ruff_python_trivia::PythonWhitespace;
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
@@ -19,9 +19,12 @@ use rustc_hash::FxHashSet;
 use crate::Edit;
 use crate::Locator;
 use crate::fs::relativize_path;
+use crate::preview::is_human_readable_names_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
+use crate::settings::types::PreviewMode;
 use crate::suppression::{self, Suppressions};
+use crate::warn_user_once;
 
 /// Generates an array of edits that matches the length of `diagnostics`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
@@ -39,6 +42,7 @@ pub fn generate_suppression_edits(
     line_ending: LineEnding,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
@@ -51,6 +55,7 @@ pub fn generate_suppression_edits(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
     build_suppression_edits_by_diagnostic(comments, locator, line_ending, None, suppression_kind)
 }
@@ -165,7 +170,7 @@ pub(crate) fn rule_is_ignored(
         Ok(Some(NoqaLexerOutput {
             directive: Directive::Codes(codes),
             ..
-        })) => codes.includes(&code.noqa_code()),
+        })) => code.noqa_code().is_some_and(|code| codes.includes(&code)),
         _ => false,
     }
 }
@@ -180,19 +185,19 @@ pub(crate) enum FileExemption {
 }
 
 impl FileExemption {
-    /// Returns `true` if the file is exempt from the given rule, as identified by its noqa code.
-    pub(crate) fn contains_secondary_code(&self, needle: &SecondaryCode) -> bool {
-        match self {
-            FileExemption::All(_) => true,
-            FileExemption::Codes(codes) => codes.iter().any(|code| *needle == code.noqa_code()),
-        }
-    }
-
     /// Returns `true` if the file is exempt from the given rule.
     pub(crate) fn includes(&self, needle: Rule) -> bool {
         match self {
             FileExemption::All(_) => true,
             FileExemption::Codes(codes) => codes.contains(&needle),
+        }
+    }
+
+    /// Returns `true` if the file is exempt from the rule with the given name.
+    pub(crate) fn includes_name(&self, needle: LintName) -> bool {
+        match self {
+            FileExemption::All(_) => true,
+            FileExemption::Codes(rules) => rules.iter().any(|rule| rule.name() == needle),
         }
     }
 
@@ -276,13 +281,16 @@ impl<'a> FileNoqaDirectives<'a> {
 
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) at {path_display}:{line}: \
+                                {warning}"
                             );
                         }
 
                         if no_indentation_at_offset {
                             warn!(
-                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. File-level suppression comments must appear on their own line. For line-level suppression, omit the `ruff:` prefix."
+                                "Unexpected `# ruff: noqa` directive at {path_display}:{line}. \
+                                File-level suppression comments must appear on their own line. \
+                                For line-level suppression, omit the `ruff:` prefix."
                             );
                             continue;
                         }
@@ -744,14 +752,18 @@ pub(crate) enum LexicalError {
 impl Display for LexicalError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LexicalError::MissingCodes => fmt.write_str("expected a comma-separated list of codes (e.g., `# noqa: F401, F841`)."),
-            LexicalError::InvalidSuffix => {
-                fmt.write_str("expected `:` followed by a comma-separated list of codes (e.g., `# noqa: F401, F841`).")
-            }
-            LexicalError::InvalidCodeSuffix => {
-                fmt.write_str("expected code to consist of uppercase letters followed by digits only (e.g. `F401`)")
-            }
-
+            LexicalError::MissingCodes => fmt.write_str(
+                "expected a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidSuffix => fmt.write_str(
+                "expected `:` followed by a comma-separated list of codes \
+                (e.g., `# noqa: F401, F841`).",
+            ),
+            LexicalError::InvalidCodeSuffix => fmt.write_str(
+                "expected code to consist of uppercase letters followed by digits only \
+                (e.g. `F401`)",
+            ),
         }
     }
 }
@@ -763,7 +775,7 @@ impl Error for LexicalError {}
 pub enum SuppressionKind {
     /// A `noqa` comment
     Noqa,
-    /// A `ruff:ignore` comment
+    /// A `ruff: ignore` comment
     Ignore,
 }
 
@@ -780,6 +792,7 @@ pub(crate) fn add_suppression(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Result<usize> {
     let (count, output) = add_suppression_inner(
         path,
@@ -792,6 +805,7 @@ pub(crate) fn add_suppression(
         reason,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     fs::write(path, output)?;
@@ -810,6 +824,7 @@ fn add_suppression_inner(
     reason: Option<&str>,
     suppressions: &Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -827,6 +842,7 @@ fn add_suppression_inner(
         noqa_line_for,
         suppressions,
         suppression_kind,
+        preview,
     );
 
     let edits =
@@ -938,6 +954,7 @@ impl Ranged for ExistingDirective<'_> {
     }
 }
 
+#[expect(clippy::too_many_arguments)]
 fn find_suppression_comments<'a>(
     diagnostics: &'a [Diagnostic],
     locator: &'a Locator,
@@ -946,18 +963,19 @@ fn find_suppression_comments<'a>(
     noqa_line_for: &NoqaMapping,
     suppressions: &'a Suppressions,
     suppression_kind: SuppressionKind,
+    preview: PreviewMode,
 ) -> Vec<Option<SuppressionComment<'a>>> {
     // List of suppression comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<SuppressionComment<'a>>> = vec![];
 
     // Mark any non-ignored diagnostics.
     for message in diagnostics {
-        let Some(code) = message.secondary_code() else {
+        let Some(name) = message.id().as_lint() else {
             comments_by_line.push(None);
             continue;
         };
 
-        if exemption.contains_secondary_code(code) {
+        if exemption.includes_name(name) {
             comments_by_line.push(None);
             continue;
         }
@@ -979,7 +997,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1002,7 +1023,10 @@ fn find_suppression_comments<'a>(
                         continue;
                     }
                     Directive::Codes(codes) => {
-                        if codes.includes(code) {
+                        if message
+                            .secondary_code()
+                            .is_some_and(|code| codes.includes(code))
+                        {
                             comments_by_line.push(None);
                             continue;
                         }
@@ -1022,8 +1046,18 @@ fn find_suppression_comments<'a>(
         };
 
         let identifier = match suppression_kind {
-            SuppressionKind::Noqa => code.as_str(),
-            SuppressionKind::Ignore => message.name(),
+            SuppressionKind::Ignore if is_human_readable_names_enabled(preview) => message.name(),
+            SuppressionKind::Ignore => message.secondary_code_or_id(),
+            SuppressionKind::Noqa => {
+                let Some(code) = message.secondary_code() else {
+                    warn_user_once!(
+                        "Cannot add `noqa` comments for rules without codes; use `--add-ignore` instead."
+                    );
+                    comments_by_line.push(None);
+                    continue;
+                };
+                code.as_str()
+            }
         };
 
         comments_by_line.push(Some(SuppressionComment {
@@ -1060,7 +1094,7 @@ impl SuppressionEdit<'_> {
         }
         match self.suppression_kind {
             SuppressionKind::Noqa => write!(writer, "# noqa: ").unwrap(),
-            SuppressionKind::Ignore => write!(writer, "# ruff:ignore[").unwrap(),
+            SuppressionKind::Ignore => write!(writer, "# ruff: ignore[").unwrap(),
         }
         push_codes(
             writer,
@@ -1107,7 +1141,7 @@ fn generate_suppression_edit<'a>(
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, codes.start());
             existing_codes.extend(codes.iter().map(Code::as_str));
         }
-        // Add additional rule names to an existing `ruff:ignore` comment.
+        // Add additional rule names to an existing `ruff: ignore` comment.
         (Some(ExistingDirective::Ignore(comment)), SuppressionKind::Ignore) => {
             (edit_range, blank_line) = suppression_edit_range(locator, line_range, comment.start());
             existing_codes.extend(comment.codes_as_str(locator.contents()));
@@ -1205,7 +1239,8 @@ impl<'a> NoqaDirectives<'a> {
                         let path_display = relativize_path(path);
                         for warning in warnings {
                             warn!(
-                                "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
+                                "Missing or joined rule code(s) \
+                                at {path_display}:{line}: {warning}"
                             );
                         }
                     }
@@ -1231,10 +1266,7 @@ impl<'a> NoqaDirectives<'a> {
         Self { inner: directives }
     }
 
-    pub(crate) fn find_line_with_directive(
-        &self,
-        offset: TextSize,
-    ) -> Option<&NoqaDirectiveLine<'_>> {
+    fn find_line_with_directive(&self, offset: TextSize) -> Option<&NoqaDirectiveLine<'_>> {
         self.find_line_index(offset).map(|index| &self.inner[index])
     }
 
@@ -1368,6 +1400,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
     use crate::suppression::Suppressions;
@@ -1423,6 +1456,7 @@ mod tests {
             None,
             &suppressions,
             suppression_kind,
+            settings.preview,
         )
     }
 
@@ -1454,7 +1488,8 @@ mod tests {
         if second_count > 0 {
             writeln!(
                 output,
-                "## Additional suppressions added on a second pass: {second_count}\n\n```py\n{fixed}\n```\n"
+                "## Additional suppressions added on a second pass: \
+                {second_count}\n\n```py\n{fixed}\n```\n"
             )?;
         }
 
@@ -3070,7 +3105,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN001, ANN201, D103
+        def unused(x):  # ruff:ignore[ANN001, ARG001, D103]  # noqa: ANN201
             pass
         ```
         "
@@ -3132,7 +3167,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff:ignore[missing-return-type-undocumented-public-function]
+        def unused(x):  # noqa: ANN001, ARG001, D103  # ruff: ignore[missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3182,7 +3217,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import math  # noqa: F401  # ruff:ignore[noqa-comments]
+        import math  # noqa: F401  # ruff: ignore[noqa-comments]
 
         ```
         "
@@ -3213,7 +3248,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
+        def unused(x):  # ruff: ignore[ANN001, ARG001, D103, missing-return-type-undocumented-public-function]
             pass
         ```
         "
@@ -3243,7 +3278,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        def unused(x):  # ruff:ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
+        def unused(x):  # ruff: ignore[missing-return-type-undocumented-public-function, missing-type-function-argument, undocumented-public-function]
             pass
         ```
         "
@@ -3269,7 +3304,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        import z  # ruff:ignore[unsorted-imports]
+        import z  # ruff: ignore[unsorted-imports]
         import c
         import a
         ```
@@ -3301,7 +3336,7 @@ mod tests {
         ## Fixed source
 
         ```py
-        # ruff:ignore[ANN001, missing-return-type-undocumented-public-function]
+        # ruff: ignore[ANN001, missing-return-type-undocumented-public-function]
         def public(x):
             """Return x."""
             return x
@@ -3328,9 +3363,10 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
-        assert_eq!(output, format!("{contents}"));
+        assert_eq!(output, contents);
 
         let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
         let messages = [UnusedVariable {
@@ -3354,6 +3390,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -3387,6 +3424,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -3420,6 +3458,7 @@ mod tests {
             None,
             &Suppressions::default(),
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -3453,6 +3492,7 @@ print(
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,
@@ -3487,6 +3527,7 @@ bar =
             LineEnding::Lf,
             &suppressions,
             SuppressionKind::Noqa,
+            PreviewMode::Disabled,
         );
         assert_eq!(
             edits,

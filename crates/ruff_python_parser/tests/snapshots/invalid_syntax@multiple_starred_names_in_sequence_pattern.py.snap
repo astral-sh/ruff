@@ -102,11 +102,9 @@ Module(
 1 | match subject:
 2 |     case *first, *second, *third: ...
   |                  ^^^^^^^ Syntax Error: multiple starred names in sequence pattern
-  |
 
 
   |
 1 | match subject:
 2 |     case *first, *second, *third: ...
   |                           ^^^^^^ Syntax Error: multiple starred names in sequence pattern
-  |

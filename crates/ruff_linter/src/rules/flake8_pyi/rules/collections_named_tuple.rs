@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `collections.namedtuple` in stub files.
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 ///     age: int
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", category = Category::Pedantic)]
 pub(crate) struct CollectionsNamedTuple;
 
 impl Violation for CollectionsNamedTuple {

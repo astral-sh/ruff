@@ -171,18 +171,19 @@ x: list[Never] = []
 
 ## Tuples involving `Never`
 
-A type like `tuple[int, Never]` has no inhabitants, and so it is equivalent to `Never`:
+A type like `tuple[int, Never]` remains distinct from `Never`. A tuple annotation can describe
+user-defined subclasses, so its element types remain part of the type:
 
 ```py
 from ty_extensions import static_assert
 from ty_extensions._internal import is_equivalent_to
 from typing_extensions import Never
 
-static_assert(is_equivalent_to(tuple[int, Never], Never))
+static_assert(not is_equivalent_to(tuple[int, Never], Never))
 ```
 
-Note that this is not the case for the homogenous tuple type `tuple[Never, ...]` though, because
-that type is inhabited by the empty tuple:
+The homogeneous tuple type `tuple[Never, ...]` is also distinct from `Never`: it is inhabited by the
+empty tuple.
 
 ```py
 static_assert(not is_equivalent_to(tuple[Never, ...], Never))

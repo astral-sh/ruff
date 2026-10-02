@@ -1,3 +1,4 @@
+use std::assert_matches;
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -69,8 +70,9 @@ fn run_test(
                 return None;
             }
 
-            assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "ipynb" | "toml"),
+            assert_matches!(
+                embedded.lang,
+                "py" | "pyi" | "python" | "ipynb" | "toml",
                 "Supported file types are: py (or python), pyi, ipynb, toml, and ignore"
             );
 
@@ -148,9 +150,20 @@ fn run_test(
             };
             normalize_diagnostics(test_file.file, &mut diagnostics);
 
+            let path = test_file
+                .file
+                .path(db)
+                .as_system_path()
+                .expect("mdtest files are on the system");
+            let python_version = settings
+                .linter
+                .resolve_target_version(path.as_std_path())
+                .parser_version();
+
             let failure = match matcher::match_file(
                 db,
                 test_file.file,
+                python_version,
                 &diagnostics,
                 mdtest::RunOptions::default(),
             )
@@ -161,6 +174,7 @@ fn run_test(
                     test_file,
                     &inline_diagnostics,
                     &mut markdown_edits,
+                    str::to_owned,
                 )
             }) {
                 Ok(()) => None,

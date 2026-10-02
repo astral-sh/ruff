@@ -61,7 +61,6 @@ error[override-of-final-method]: Cannot override `Foo.method`
    |
 31 |     def method(self, x: str) -> str: ...  # error: [override-of-final-method]
    |         ^^^^^^ Overrides a definition from superclass `Foo`
-   |
 info: `Foo.method` is decorated with `@final`, forbidding overrides
  --> src/mdtest_snippet.pyi:7:9
   |
@@ -69,7 +68,6 @@ info: `Foo.method` is decorated with `@final`, forbidding overrides
   |         ------
 8 |         def method(self, x: int) -> int: ...
   |             ------ `Foo.method` defined here
-  |
 help: Remove all overloads for `method`
    |
 27 | class Bar(Foo):

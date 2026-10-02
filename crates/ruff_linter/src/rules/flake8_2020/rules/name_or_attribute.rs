@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `six.PY3`.
@@ -36,7 +37,7 @@ use crate::checkers::ast::Checker;
 /// - [Six documentation: `six.PY2`](https://six.readthedocs.io/#six.PY2)
 /// - [Six documentation: `six.PY3`](https://six.readthedocs.io/#six.PY3)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SixPY3;
 
 impl Violation for SixPY3 {

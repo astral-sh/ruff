@@ -171,7 +171,7 @@ export default function Chrome({
           <PanelGroup
             id="main-group"
             orientation="horizontal"
-            className="h-full"
+            className="grow min-h-0"
           >
             <Panel id="main" minSize={100}>
               <PanelGroup
@@ -192,6 +192,18 @@ export default function Chrome({
                       onBackToUserFile={handleBackToUserFile}
                     />
                   )}
+                  {files.currentVendoredFile == null &&
+                    selectedFileName === "ty.json" &&
+                    session.hasConfigurationFile() && (
+                      <div
+                        role="status"
+                        className="bg-amber-50 dark:bg-amber-900 px-3 py-2 border-b border-amber-200 dark:border-amber-700 text-sm text-amber-900 dark:text-amber-100"
+                      >
+                        <code>ty.json</code> is ignored while{" "}
+                        <code>ty.toml</code> or <code>pyproject.toml</code>{" "}
+                        exists.
+                      </div>
+                    )}
                   <Editor
                     theme={theme}
                     visible={true}
@@ -355,7 +367,7 @@ function useCheckResult(
     }
     // Monaco document edits mutate the workspace in place. The deferred
     // revision is an invalidation token for this memoized check.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // oxlint-disable-next-line react/exhaustive-deps
   }, [
     files,
     workspace,

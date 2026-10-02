@@ -7,7 +7,6 @@ W505 Doc line too long (57 > 50)
 1 | #!/usr/bin/env python3
 2 | """Here's a top-level ß9💣2ℝing that's over theß9💣2ℝ."""
   |                                                    ^^^^^^
-  |
 
 W505 Doc line too long (56 > 50)
  --> W505_utf_8.py:6:49
@@ -45,7 +44,6 @@ W505 Doc line too long (61 > 50)
    |
 18 | "This is also considered a ß9💣2ℝing, and is over theß9💣2ℝ."
    |                                                   ^^^^^^^^^^^
-   |
 
 W505 Doc line too long (82 > 50)
   --> W505_utf_8.py:24:50
@@ -64,4 +62,3 @@ W505 Doc line too long (85 > 50)
 30 |
 31 |     It's over theß9💣2ℝ on this line, which isn't the first line in the ß9💣2ℝing."""
    |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |

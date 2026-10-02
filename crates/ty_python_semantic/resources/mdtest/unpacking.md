@@ -119,7 +119,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 [a, *b, c] = (1, 2)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: list[Never]
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Literal[2]
 ```
 
@@ -128,7 +128,7 @@ reveal_type(c)  # revealed: Literal[2]
 ```py
 [a, *b, c] = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: list[Literal[2]]
+reveal_type(b)  # revealed: list[int]
 reveal_type(c)  # revealed: Literal[3]
 ```
 
@@ -137,7 +137,7 @@ reveal_type(c)  # revealed: Literal[3]
 ```py
 [a, *b, c, d] = (1, 2, 3, 4, 5, 6)
 reveal_type(a)  # revealed: Literal[1]
-reveal_type(b)  # revealed: list[Literal[2, 3, 4]]
+reveal_type(b)  # revealed: list[int]
 reveal_type(c)  # revealed: Literal[5]
 reveal_type(d)  # revealed: Literal[6]
 ```
@@ -148,7 +148,7 @@ reveal_type(d)  # revealed: Literal[6]
 [a, b, *c] = (1, 2, 3, 4)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
-reveal_type(c)  # revealed: list[Literal[3, 4]]
+reveal_type(c)  # revealed: list[int]
 ```
 
 ### Starred expression (6)
@@ -162,6 +162,31 @@ reveal_type(c)  # revealed: Unknown
 reveal_type(d)  # revealed: list[Unknown]
 reveal_type(e)  # revealed: Unknown
 reveal_type(f)  # revealed: Unknown
+```
+
+### Starred unpacking of a large tuple
+
+For performance, ty widens inferred integer literal types to `int` in tuples with more than 64
+elements. Unpacking preserves that widening: this unannotated assignment infers `int` for `first`
+and `list[int]` for `rest`, including when the elements come from a list literal expansion. Widening
+also applies inside nested tuple elements. Unpacking the small tuple `(0, (1,), 2)` instead infers
+`Literal[0]` and `Literal[1]` for the fixed targets.
+
+```py
+# fmt: off
+first, (second,), *rest = (*[
+    0, (1,), 2, 3, 4, 5, 6, 7, 8, 9,
+    10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+    20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+    30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+    50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    60, 61, 62, 63, 64,
+],)
+# fmt: on
+reveal_type(first)  # revealed: int
+reveal_type(second)  # revealed: int
+reveal_type(rest)  # revealed: list[int]
 ```
 
 ### Non-iterable unpacking
@@ -225,6 +250,41 @@ reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
 ```
 
+### Too few values in a list literal
+
+A list literal without starred elements has a known length. If it cannot fill all targets, we report
+the mismatch and infer `Unknown` for those targets, as with a tuple literal.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected 2"
+first, last = [1]
+reveal_type(first)  # revealed: Unknown
+reveal_type(last)  # revealed: Unknown
+```
+
+A starred target does not reduce the number of elements required by the fixed targets. On a length
+mismatch, its element type is also unknown.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+first, *rest, last = [1]
+reveal_type(first)  # revealed: Unknown
+reveal_type(rest)  # revealed: list[Unknown]
+reveal_type(last)  # revealed: Unknown
+```
+
+### Too many values in a list literal
+
+Without a starred target, every element needs a corresponding target. Extra elements cause an error
+and leave all targets with unknown types.
+
+```py
+# error: [invalid-assignment] "Too many values to unpack: Expected 2"
+first, last = [1, 2, 3]
+reveal_type(first)  # revealed: Unknown
+reveal_type(last)  # revealed: Unknown
+```
+
 ### Simple unpacking
 
 ```py
@@ -263,6 +323,335 @@ def _(value: list[int]):
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: list[int]
     reveal_type(c)  # revealed: int
+```
+
+## List and tuple literals
+
+### Starred targets
+
+Unpacking a list literal assigns each element to its corresponding target.
+
+```py
+first: int
+first, *rest = [1, "wrong"]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+```
+
+The starred target can also precede the fixed targets:
+
+```py
+*rest, last = ["one", "two", 3]
+reveal_type(rest)  # revealed: list[str]
+reveal_type(last)  # revealed: Literal[3]
+```
+
+A starred target between fixed targets excludes both the prefix and the suffix from its element
+type:
+
+```py
+[first, *rest, last] = [1, "two", "three", 4]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+reveal_type(last)  # revealed: Literal[4]
+```
+
+### Empty starred targets
+
+When the fixed targets consume every element, the starred target receives an empty list. As with an
+empty list literal, the element type is unknown, allowing values to be added later.
+
+```py
+first, *rest, last = [1, 2]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[Unknown]
+reveal_type(last)  # revealed: Literal[2]
+rest.append(3)
+
+(*empty,) = []
+reveal_type(empty)  # revealed: list[Unknown]
+```
+
+### Nested list literals
+
+Element positions are preserved when list literals are nested inside other list or tuple literals.
+
+```py
+(first, *rest), *outer_rest, (last,) = [[1, "two"], False, [3]]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+reveal_type(outer_rest)  # revealed: list[bool]
+reveal_type(last)  # revealed: Literal[3]
+```
+
+The same nested lists retain their element positions when the outer literal is a tuple.
+
+```py
+(first, *rest), *outer_rest, (last,) = ([1, "two"], False, [3])
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+reveal_type(outer_rest)  # revealed: list[bool]
+reveal_type(last)  # revealed: Literal[3]
+```
+
+Unpacking another iterable alongside a list literal does not affect the literal's element types.
+
+```py
+def nested(values: list[int]):
+    (first, *rest), (other,) = ([1, "two"], values)
+    reveal_type(first)  # revealed: Literal[1]
+    reveal_type(rest)  # revealed: list[str]
+    reveal_type(other)  # revealed: int
+```
+
+If a nested list has too few elements, only the targets unpacked from that list get unknown types.
+The sibling target retains its corresponding element's type.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+(first, *rest, last), other = [[1], 2]
+reveal_type(first)  # revealed: Unknown
+reveal_type(rest)  # revealed: list[Unknown]
+reveal_type(last)  # revealed: Unknown
+reveal_type(other)  # revealed: Literal[2]
+```
+
+A starred outer target does not hide a length mismatch inside either kind of literal.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected 2"
+(first, last), *rest = ([1],)
+reveal_type(first)  # revealed: Unknown
+reveal_type(last)  # revealed: Unknown
+
+# error: [invalid-assignment] "Not enough values to unpack: Expected 2"
+(first, last), *rest = [[1]]
+reveal_type(first)  # revealed: Unknown
+reveal_type(last)  # revealed: Unknown
+```
+
+### Incompatible targets
+
+An incompatible element still causes an error for its corresponding target.
+
+```py
+first: int
+# error: [invalid-assignment] "Object of type `Literal["wrong"]` is not assignable to `int`"
+first, *rest = ["wrong", 1]
+reveal_type(rest)  # revealed: list[int]
+```
+
+The starred target is checked against the list of collected elements.
+
+```py
+numbers: list[int]
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
+first, *numbers = [1, "wrong"]
+```
+
+### Capture-list inference
+
+A starred target receives a new list. Inferred literal element types are promoted, as in a list
+literal, so additional values of the same type can be appended.
+
+```py
+first, *rest = [1, "two"]
+rest.append("three")
+reveal_type(rest)  # revealed: list[str]
+
+first, *rest = (1, "two")
+rest.append("three")
+reveal_type(rest)  # revealed: list[str]
+
+first, *rest = (1,)
+rest.append("three")
+reveal_type(rest)  # revealed: list[Unknown]
+```
+
+The collected elements are also compatible with an explicitly annotated list.
+
+```py
+strings: list[str]
+first, *strings = [1, "two"]
+first, *strings = [1]
+```
+
+Singleton values follow the same inference rules as in a list literal.
+
+```py
+optional: list[int | None]
+first, *optional = [1, None]
+first, *optional = (1, None)
+```
+
+Explicit literal annotations are preserved when constructing the collected list.
+
+```py
+from typing import Literal
+
+def explicit_literal(value: Literal["one", "two"]):
+    first, *rest = [1, value]
+    reveal_type(rest)  # revealed: list[Literal["one", "two"]]
+    first, *rest = (1, value)
+    reveal_type(rest)  # revealed: list[Literal["one", "two"]]
+```
+
+### Collected tuple elements
+
+Homogeneous tuple literals of different lengths are promoted to a variable-length tuple element
+type, as in an ordinary list literal.
+
+```py
+rest: list[tuple[int, ...]]
+first, *rest = [(1,), (2,), (3, 4)]
+reveal_type(first)  # revealed: tuple[Literal[1]]
+reveal_type(rest)  # revealed: list[tuple[int, ...]]
+
+first, *rest = ((1,), (2,), (3, 4))
+reveal_type(first)  # revealed: tuple[Literal[1]]
+reveal_type(rest)  # revealed: list[tuple[int, ...]]
+```
+
+A tuple from a variable retains its annotated shape and prevents tuple-size promotion for the
+collected elements.
+
+```py
+def annotated_tuple(value: tuple[int, int]):
+    first, *rest = [0, (1,), value]
+    reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
+    first, *rest = (0, (1,), value)
+    reveal_type(rest)  # revealed: list[tuple[int] | tuple[int, int]]
+```
+
+Tuple literals collected between multiple expansions remain eligible for tuple-size promotion.
+
+```py
+def expanded_tuples(values: list[str]):
+    first, *rest, last = (0, *values, (1,), *values, (2, 3), False)
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[str | tuple[int, ...]]
+    reveal_type(last)  # revealed: Literal[False]
+
+    first, *rest, last = [0, *values, (1,), *values, (2, 3), False]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(rest)  # revealed: list[str | tuple[int, ...]]
+    reveal_type(last)  # revealed: Literal[False]
+```
+
+### Starred expressions on the right-hand side
+
+A starred element can contribute an unknown number of values. The literal's AST length does not
+determine whether it can fill the targets.
+
+```py
+def unpack(values: list[int]):
+    first, *rest, last = [*values]
+    reveal_type(first)  # revealed: int
+    reveal_type(rest)  # revealed: list[int]
+    reveal_type(last)  # revealed: int
+```
+
+Known elements before and after a starred expression keep their positions, for both tuple and list
+literals. Only the starred target collects the elements supplied by `values`.
+
+```py
+def fixed_ends(values: list[str]):
+    first: int
+    first, *rest, last = (1, *values, 2)
+    reveal_type(first)  # revealed: Literal[1]
+    reveal_type(rest)  # revealed: list[str]
+    reveal_type(last)  # revealed: Literal[2]
+
+    first, *rest, last = [1, *values, 2]
+    reveal_type(first)  # revealed: Literal[1]
+    reveal_type(rest)  # revealed: list[str]
+    reveal_type(last)  # revealed: Literal[2]
+```
+
+### Ambiguous positions around an expansion
+
+When an expansion may be empty, a fixed target can receive either one of its elements or a value
+from the other side of the expansion. We combine those possibilities without losing the types of the
+unambiguous targets.
+
+```py
+def ambiguous(values: list[str]):
+    first, second, *rest = (0, *values, 1)
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(second)  # revealed: str | Literal[1]
+    reveal_type(rest)  # revealed: list[str | int]
+
+    first, second, *rest = [0, *values, 1]
+    reveal_type(first)  # revealed: Literal[0]
+    reveal_type(second)  # revealed: str | Literal[1]
+    reveal_type(rest)  # revealed: list[str | int]
+```
+
+### Unpacking literal expansions
+
+Expanding a literal preserves its elements and length. These assignments fail even though their
+right-hand sides contain starred expressions.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+first, *rest, last = (*(1,),)
+reveal_type(first)  # revealed: Unknown
+reveal_type(rest)  # revealed: list[Unknown]
+reveal_type(last)  # revealed: Unknown
+
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+first, *rest, last = [*[1]]
+reveal_type(first)  # revealed: Unknown
+reveal_type(rest)  # revealed: list[Unknown]
+reveal_type(last)  # revealed: Unknown
+```
+
+A dictionary literal with a single key supplies one element.
+
+```py
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+first, *rest, last = (*{"key": 1},)
+# error: [invalid-assignment] "Not enough values to unpack: Expected at least 2"
+first, *rest, last = [*{"key": 1}]
+```
+
+### Unpacking a named expression
+
+A named expression preserves the structure of its value when unpacked immediately. The bound list
+itself still has an ordinary list type.
+
+```py
+first: int
+first, *rest = (items := (1, "two"))
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+
+first, *rest = (items := [1, "two"])
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(rest)  # revealed: list[str]
+reveal_type(items)  # revealed: list[int | str]
+```
+
+### Aliases in unpacked values
+
+Collected lists retain aliases in their element types.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Element = int | str
+
+def aliases(value: Element):
+    first, *rest = (value, value)
+    reveal_type(first)  # revealed: int | str
+    reveal_type(rest)  # revealed: list[Element]
+
+    first, *rest = [value, value]
+    reveal_type(first)  # revealed: int | str
+    reveal_type(rest)  # revealed: list[Element]
 ```
 
 ## Homogeneous tuples
@@ -460,7 +849,7 @@ def f(x: HeterogeneousTupleSubclass):
     reveal_type(o)  # revealed: I0
     reveal_type(p)  # revealed: I1
     reveal_type(q)  # revealed: I2
-    reveal_type(r)  # revealed: list[Never]
+    reveal_type(r)  # revealed: list[Unknown]
 
     # error: [invalid-assignment] "Not enough values to unpack: Expected at least 4"
     [s, t, u, v, *w] = x
@@ -572,7 +961,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 a, *b, c = "ab"
 reveal_type(a)  # revealed: Literal["a"]
-reveal_type(b)  # revealed: list[Never]
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Literal["b"]
 ```
 
@@ -581,7 +970,7 @@ reveal_type(c)  # revealed: Literal["b"]
 ```py
 a, *b, c = "abc"
 reveal_type(a)  # revealed: Literal["a"]
-reveal_type(b)  # revealed: list[Literal["b"]]
+reveal_type(b)  # revealed: list[str]
 reveal_type(c)  # revealed: Literal["c"]
 ```
 
@@ -590,7 +979,7 @@ reveal_type(c)  # revealed: Literal["c"]
 ```py
 a, *b, c, d = "abcdef"
 reveal_type(a)  # revealed: Literal["a"]
-reveal_type(b)  # revealed: list[Literal["b", "c", "d"]]
+reveal_type(b)  # revealed: list[str]
 reveal_type(c)  # revealed: Literal["e"]
 reveal_type(d)  # revealed: Literal["f"]
 ```
@@ -601,7 +990,7 @@ reveal_type(d)  # revealed: Literal["f"]
 a, b, *c = "abcd"
 reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: Literal["b"]
-reveal_type(c)  # revealed: list[Literal["c", "d"]]
+reveal_type(c)  # revealed: list[str]
 ```
 
 ### Starred expression (6)
@@ -719,7 +1108,7 @@ reveal_type(d)  # revealed: Unknown
 ```py
 a, *b, c = b"ab"
 reveal_type(a)  # revealed: Literal[97]
-reveal_type(b)  # revealed: list[Never]
+reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Literal[98]
 ```
 
@@ -728,7 +1117,7 @@ reveal_type(c)  # revealed: Literal[98]
 ```py
 a, *b, c = b"abc"
 reveal_type(a)  # revealed: Literal[97]
-reveal_type(b)  # revealed: list[Literal[98]]
+reveal_type(b)  # revealed: list[int]
 reveal_type(c)  # revealed: Literal[99]
 ```
 
@@ -737,7 +1126,7 @@ reveal_type(c)  # revealed: Literal[99]
 ```py
 a, *b, c, d = b"abcdef"
 reveal_type(a)  # revealed: Literal[97]
-reveal_type(b)  # revealed: list[Literal[98, 99, 100]]
+reveal_type(b)  # revealed: list[int]
 reveal_type(c)  # revealed: Literal[101]
 reveal_type(d)  # revealed: Literal[102]
 ```
@@ -748,7 +1137,7 @@ reveal_type(d)  # revealed: Literal[102]
 a, b, *c = b"abcd"
 reveal_type(a)  # revealed: Literal[97]
 reveal_type(b)  # revealed: Literal[98]
-reveal_type(c)  # revealed: list[Literal[99, 100]]
+reveal_type(c)  # revealed: list[int]
 ```
 
 ### Very long literal

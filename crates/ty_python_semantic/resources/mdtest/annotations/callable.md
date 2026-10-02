@@ -69,6 +69,75 @@ def _(c: Callable[[...], int]):
     reveal_type(c)  # revealed: (...) -> int
 ```
 
+The invalid parameter list also offers an autofix that replaces the list with an ellipsis.
+
+```py
+def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:17:32
+   |
+17 | def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace `[...]` with `...`
+   |
+16 |     reveal_type(c)  # revealed: (...) -> int
+   - def fixable(callback: Callable[[...], int]): ...  # snapshot: invalid-type-form
+17 + def fixable(callback: Callable[..., int]): ...  # snapshot: invalid-type-form
+18 | def with_comments(
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+A multiline parameter list can contain comments, so its brackets are not removed automatically.
+
+```py
+def with_comments(
+    callback: Callable[
+        [  # snapshot: invalid-type-form
+            # The callable accepts arbitrary arguments.
+            ...,  # The parameter description remains documented.
+        ],
+        int,
+    ],
+): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:20:9
+   |
+20 | /         [  # snapshot: invalid-type-form
+21 | |             # The callable accepts arbitrary arguments.
+22 | |             ...,  # The parameter description remains documented.
+23 | |         ],
+   | |_________^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
+A quoted callable annotation still receives the diagnostic, but its parsed source range cannot be
+rewritten directly.
+
+```py
+# snapshot: invalid-type-form
+def quoted(callback: "Callable[[...], int]"): ...
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+  --> src/mdtest_snippet.py:28:32
+   |
+28 | def quoted(callback: "Callable[[...], int]"): ...
+   |                                ^^^^^ Did you mean `Callable[..., int]`?
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+```
+
 ```py
 # error: [invalid-type-form] "`...` is not allowed in this context in a parameter annotation"
 def _(c: Callable[[int, ...], int]):
@@ -491,9 +560,8 @@ def f_okay(c: Callable[[], None]):
     if hasattr(c, "__qualname__"):
         reveal_type(c.__qualname__)  # revealed: object
 
-        # TODO: should be `property`
-        # (or complain that we don't know that `type(c)` has the attribute at all!)
-        reveal_type(type(c).__qualname__)  # revealed: @Todo(Intersection meta-type)
+        # This is the class object's own qualified name, not the instance's descriptor.
+        reveal_type(type(c).__qualname__)  # revealed: str
 
         # `hasattr` only guarantees that an attribute is readable.
         #
@@ -504,8 +572,8 @@ def f_okay(c: Callable[[], None]):
         # into a writable attribute...? What would that look like? Something like this?
         if (
             hasattr(type(c), "__qualname__")
-            and isinstance(type(c).__qualname__, property)
-            and type(c).__qualname__.fset is not None
+            and isinstance(descriptor := type(c).__qualname__, property)
+            and descriptor.fset is not None
         ):
             c.__qualname__ = "my_callable"  # error: [invalid-assignment]
 ```
@@ -526,6 +594,89 @@ class A(Base):
 
 # revealed: () -> A
 reveal_type(into_regular_callable(A))
+```
+
+### Callable objects used as `__new__`
+
+In the example below, a callable object creates instances of `Product`. Passing the class as a
+callback accepts the same arguments as constructing it directly: the constructor supplies `cls`,
+leaving the integer argument for the caller.
+
+```py
+from typing import Callable
+
+class Factory:
+    def __call__(self, cls: "type[Product]", value: int) -> "Product":
+        return object.__new__(cls)
+
+class Product:
+    __new__ = Factory()
+
+def create(factory: Callable[[int], Product]) -> Product:
+    return factory(1)
+
+reveal_type(create(Product))  # revealed: Product
+```
+
+### Unions of callable objects used as `__new__`
+
+In the example below, the selected constructor either returns its string argument or its length.
+Both alternatives accept a string, and converting the class to a callback preserves both possible
+return types.
+
+```py
+from typing import Callable
+
+class Text:
+    def __call__(self, cls: type, value: str) -> str:
+        return value
+
+class Length:
+    def __call__(self, cls: type, value: str) -> int:
+        return len(value)
+
+def check(use_text: bool):
+    class Convert:
+        __new__ = Text() if use_text else Length()
+
+    converter: Callable[[str], str | int] = Convert
+    reveal_type(converter("abc"))  # revealed: str | int
+```
+
+### Callable objects used as metaclass `__call__`
+
+In the example below, the metaclass delegates construction to a callable object that returns a
+string. Converting the class to a callback uses this object's signature. Since the object is not a
+descriptor, the class is not passed as an additional argument.
+
+```py
+from typing import Callable
+
+class Convert:
+    def __call__(self, value: int) -> str:
+        return str(value)
+
+class Meta(type):
+    __call__ = Convert()
+
+class Product(metaclass=Meta): ...
+
+def convert(callback: Callable[[int], str]) -> str:
+    return callback(1)
+
+reveal_type(convert(Product))  # revealed: str
+```
+
+### Classes with unknown bases
+
+In the example below, the unknown base class may provide a constructor that accepts an argument. We
+therefore allow the subclass to be passed to `map` as a callback.
+
+```py
+def example(base):
+    class ImportItem(base): ...
+
+    map(ImportItem, [])
 ```
 
 ## Nested callable relations still reach the leaf mismatch

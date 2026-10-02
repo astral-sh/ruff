@@ -7,8 +7,7 @@ Checks for dataclasses with invalid frozen inheritance:
 
 ## Why is this bad?
 
-Python raises a `TypeError` at runtime when either of these inheritance
-patterns occurs.
+Python raises a `TypeError` at runtime when either of these inheritance patterns occurs.
 
 ## Example
 

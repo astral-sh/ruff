@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the Python `requests` or `httpx` module that omit the
@@ -33,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// - [Requests documentation: Timeouts](https://requests.readthedocs.io/en/latest/user/advanced/#timeouts)
 /// - [httpx documentation: Timeouts](https://www.python-httpx.org/advanced/timeouts/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.213")]
+#[violation_metadata(stable_since = "v0.0.213", category = Category::Security)]
 pub(crate) struct RequestWithoutTimeout {
     implicit: bool,
     module: String,

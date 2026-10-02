@@ -40,4 +40,3 @@ TD002 Missing author in TODO; try: `# TODO(<author_name>): ...` or `# TODO @<aut
 13 | # TODO : and neither does this
 14 | # foo # TODO: this doesn't either
    |         ^^^^
-   |

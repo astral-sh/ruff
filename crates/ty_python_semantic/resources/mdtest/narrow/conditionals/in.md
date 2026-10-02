@@ -2,10 +2,13 @@
 
 ## `in` for tuples
 
+Broad integer subjects narrow to the integer literals present in the tuple. By default, equality
+narrowing does not add the boolean literals that also compare equal to `0` or `1`.
+
 ```py
 def _(x: int):
     if x in (1, 2, 3):
-        reveal_type(x)  # revealed: Literal[1, 2, 3, True]
+        reveal_type(x)  # revealed: Literal[1, 2, 3]
     else:
         reveal_type(x)  # revealed: int & ~Literal[1] & ~Literal[True] & ~Literal[2] & ~Literal[3]
 ```
@@ -117,6 +120,14 @@ def inline_set(value: Choice):
     else:
         reveal_type(value)  # revealed: Literal["a", "b"]
 
+def integer_list(value: int):
+    assert value in [1, 2]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def integer_set(value: int):
+    assert value in {0, 2}
+    reveal_type(value)  # revealed: Literal[0, 2]
+
 def literal_locals(value: Choice):
     a = "a"
     b = "b"
@@ -217,17 +228,18 @@ def _(x: Foo):
         reveal_type(x)  # revealed: Literal["a", "c"]
 ```
 
-## Enabling strict literal narrowing for membership
+## Enabling strict equality narrowing for membership
 
-With strict literal narrowing enabled, a broad union arm is preserved when a membership test
-succeeds, while literal arms are still narrowed safely:
+With strict equality narrowing enabled, a broad union arm and a broad element type are preserved
+when a membership test succeeds, while literal arms are still narrowed safely. Tuple elements are
+also preserved because their subclasses can override equality:
 
 ```toml
 [environment]
 python-version = "3.12"
 
 [analysis]
-strict-literal-narrowing = true
+strict-equality-semantics = true
 ```
 
 ```py
@@ -250,6 +262,26 @@ def inline_set(x: str):
         reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str & ~Literal["a"] & ~Literal["b"]
+
+def integer_list(x: int):
+    if x in [1, 2]:
+        reveal_type(x)  # revealed: int
+
+class Bar: ...
+
+def broad_element(x: Bar | None, values: list[Bar]):
+    if x in values:
+        reveal_type(x)  # revealed: Bar | None
+
+class EqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def broad_tuple_element(x: Bar | None, value: tuple[int, ...], values: list[tuple[int, ...]]):
+    if x in [value]:
+        reveal_type(x)  # revealed: Bar | None
+    if x in values:
+        reveal_type(x)  # revealed: Bar | None
 ```
 
 ## `in` for `str` and literal strings
@@ -472,14 +504,14 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
 
 def broad_element_type(x: str | None, values: dict[str, int]):
     if x in values:
-        reveal_type(x)  # revealed: str | None
+        reveal_type(x)  # revealed: str
     else:
         reveal_type(x)  # revealed: str | None
 
 def broad_element_type_with_unknown(values: dict[str, int]):
     x = [None][0]
     if x in values:
-        reveal_type(x)  # revealed: None | Unknown
+        reveal_type(x)  # revealed: Unknown & ~None
     else:
         reveal_type(x)  # revealed: None | Unknown
 ```
@@ -526,7 +558,8 @@ def unrelated_typevar(x: AlwaysEqual, y: U) -> U:
 ## Direct `not in` conditional
 
 ```py
-from typing import Any, Literal, TypeVar
+from enum import Enum
+from typing import Any, Literal, NewType, TypeVar
 
 T = TypeVar("T", Literal[1], Literal[2])
 
@@ -548,7 +581,7 @@ def broad_dict_element(x: str | None, values: dict[str, int]) -> None:
     if x not in values:
         reveal_type(x)  # revealed: str | None
     else:
-        reveal_type(x)  # revealed: str | None
+        reveal_type(x)  # revealed: str
 
 def union_tuple_slot(x: Literal[1, 2], values: tuple[Literal[1, 2]]) -> None:
     if x not in values:
@@ -578,6 +611,44 @@ def correlated_typevar(x: T | None, y: T) -> None:
     if x not in (y,):
         reveal_type(x)  # revealed: None
 
+def empty_tuple_slot(x: tuple[()] | None) -> None:
+    if x not in ((),):
+        reveal_type(x)  # revealed: None
+
+def fixed_tuple_slot(x: tuple[Literal[1], Literal["x"]] | None) -> None:
+    if x not in ((1, "x"),):
+        reveal_type(x)  # revealed: None
+
+# We optimistically assume that an unseen runtime subclass does not override `tuple.__eq__`.
+class OpenTupleSubclass(tuple[Literal[1], Literal["x"]]): ...
+
+def tuple_subclass_slot(x: OpenTupleSubclass | None, value: OpenTupleSubclass) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+WrappedTuple = NewType("WrappedTuple", tuple[Literal[1], Literal["x"]])
+
+def newtype_tuple_slot(x: WrappedTuple | None, value: WrappedTuple) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: None
+
+class ReflexiveEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+E = TypeVar("E", Literal[ReflexiveEnum.A], Literal[ReflexiveEnum.B])
+
+def reflexive_enum_literal_slot(x: Literal[ReflexiveEnum.A] | None, value: Literal[ReflexiveEnum.A]) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: Never
+
+def reflexive_enum_typevar_slot(x: E | None, value: E) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: Never
+
 def tuple_with_any_slot(x: str | None, missing: Any) -> None:
     if x not in (missing, None):
         reveal_type(x)  # revealed: str
@@ -600,6 +671,62 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
+## Combining `not in` conditions
+
+When either of two membership exclusions can hold, only the values excluded by both conditions
+remain excluded. The earlier `bytes` exclusion is preserved:
+
+```py
+def disjoint_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (20, 21):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+
+def overlapping_groups(value):
+    if isinstance(value, bytes):
+        return
+    if value not in (10, 11) or value not in (11, 12, 13):
+        reveal_type(value)  # revealed: Unknown & ~bytes & ~Literal[11]
+```
+
+Conjoining several disjoint groups still retains only the original `bytes` exclusion, without
+multiplying the redundant alternatives at each condition:
+
+```py
+def repeated_groups(value):
+    if isinstance(value, bytes):
+        return
+    if (
+        (value not in (10, 11) or value not in (12, 13))
+        and (value not in (14, 15) or value not in (16, 17))
+        and (value not in (18, 19) or value not in (20, 21))
+        and (value not in (22, 23) or value not in (24, 25))
+        and (value not in (26, 27) or value not in (28, 29))
+        and (value not in (30, 31) or value not in (32, 33))
+        and (value not in (34, 35) or value not in (36, 37))
+        and (value not in (38, 39) or value not in (40, 41))
+        and (value not in (42, 43) or value not in (44, 45))
+        and (value not in (46, 47) or value not in (48, 49))
+    ):
+        reveal_type(value)  # revealed: Unknown & ~bytes
+```
+
+## Recursive tuple slots
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+type Recursive = tuple[Recursive, int]
+
+def recursive_tuple_slot(x: Recursive | None, value: Recursive) -> None:
+    if x not in (value,):
+        reveal_type(x)  # revealed: tuple[Recursive, int] | None
+```
+
 ## Membership and equality
 
 When containment is known to compare items using equality, we can remove a union member that cannot
@@ -607,23 +734,54 @@ compare equal to any item in the container. A `TypedDict` cannot compare equal t
 final class with the default identity-based equality cannot compare equal to an integer. We retain
 types such as `int` and classes with custom equality when they might still match an item.
 
-A non-final element type can have a subclass that compares equal to `None`, so membership must
-preserve `None` just as an equality check does:
+A non-final element type is assumed not to have a subclass that overrides equality, so membership
+can remove `None` just as an equality check does. Different classes can still compare equal by
+identity, however, if one inherits from the other or they share a subclass through multiple
+inheritance. Membership must preserve these overlapping class types:
 
 ```py
 class Foo: ...
 
 def equality_and_membership(x: Foo | None, y: Foo, values: list[Foo]):
     if x == y:
-        reveal_type(x)  # revealed: Foo | None
+        reveal_type(x)  # revealed: Foo
+    if x in [y]:
+        reveal_type(x)  # revealed: Foo
     if x in values:
-        reveal_type(x)  # revealed: Foo | None
+        reveal_type(x)  # revealed: Foo
+
+class Base: ...
+class Child(Base): ...
+
+def inherited_membership(x: Base | None, y: Child, values: list[Child]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Base
+    if x in values:
+        reveal_type(x)  # revealed: Base
+
+class Left: ...
+class Right: ...
+class Shared(Left, Right): ...
+
+def overlapping_membership(x: Left | None, y: Right, values: list[Right]):
+    if x in [y]:
+        reveal_type(x)  # revealed: Left
+    if x in values:
+        reveal_type(x)  # revealed: Left
+
+def builtin_equality_and_membership(x: str | None, y: str, values: list[str]):
+    if x == y:
+        reveal_type(x)  # revealed: str
+    if x in [y]:
+        reveal_type(x)  # revealed: str
+    if x in values:
+        reveal_type(x)  # revealed: str
 
 class C: ...
 
 def broad_union_membership(origin: C | int):
     if origin in ("x",):
-        reveal_type(origin)  # revealed: C & ~int
+        reveal_type(origin)  # revealed: Never
 ```
 
 ```py
@@ -650,7 +808,7 @@ def default_equality(x: Token | Literal[1]):
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
-        reveal_type(x)  # revealed: Literal[1, True, "missing"]
+        reveal_type(x)  # revealed: Literal[1, "missing"]
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
@@ -659,6 +817,15 @@ def custom_equality(x: AlwaysEqual | Literal[1]):
 def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
     if x in values:
         reveal_type(x)  # revealed: Never
+
+def incompatible_tuple_key(
+    key: tuple[str, bool, bool],
+    values: dict[tuple[str, bool], int],
+) -> int | None:
+    if key in values:
+        reveal_type(key)  # revealed: Never
+        return values[key]
+    return None
 ```
 
 ## Custom containment methods
@@ -1046,6 +1213,11 @@ After the `isinstance` check, `values` has type `Iterable[Literal[1]] & tuple[ob
 semantics were checked: the `tuple` component establishes that membership compares against its
 elements, while the `Iterable` component constrains those elements to `Literal[1]`.
 
+```toml
+[analysis]
+strict-generic-narrowing = true
+```
+
 ```py
 from collections.abc import Iterable
 from typing import Literal, final
@@ -1111,15 +1283,14 @@ def custom_containment_component_prevents_narrowing(
 
 ## Range membership
 
-A `range` contains integers, but equality against a broad `int` element type cannot rule out a
-string literal:
+A `range` contains integers, so a string literal can be removed from the type of the tested value:
 
 ```py
 from typing import Literal
 
 def range_membership(value: Literal["x", 1], values: range) -> None:
     if value in values:
-        reveal_type(value)  # revealed: Literal["x", 1]
+        reveal_type(value)  # revealed: Literal[1]
 ```
 
 ## `TypedDict` key membership
@@ -1145,9 +1316,7 @@ def closed_typed_dict_container(value: Literal["present", "other", "missing", 1]
 
 def open_typed_dict_container(value: Literal["present", "other", "missing", 1], values: OpenValues) -> None:
     if value in values:
-        # TODO: It would be safe to narrow `1` away if we could distinguish exact `str` from a
-        # subclass of `str` with custom equality.
-        reveal_type(value)  # revealed: Literal["present", "other", "missing", 1]
+        reveal_type(value)  # revealed: Literal["present", "other", "missing"]
 ```
 
 ## bool
@@ -1168,8 +1337,12 @@ def _(x: bool | str):
 
 ## LiteralString
 
+Known literal-origin strings can safely narrow to the matching members of a literal tuple.
+
 ```py
+from typing import Literal
 from typing_extensions import LiteralString
+from ty_extensions import Intersection, Not
 
 def _(x: LiteralString):
     if x in ("a", "b", "c"):
@@ -1182,6 +1355,24 @@ def _(x: LiteralString | int):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: (LiteralString & ~Literal["a"] & ~Literal["b"] & ~Literal["c"]) | int
+```
+
+A string without literal origin can match a tuple member without gaining that member's origin.
+
+```py
+def without_literal_origin(value: Intersection[str, Not[LiteralString]]) -> None:
+    if value in ("hello",):
+        reveal_type(value)  # revealed: str & ~LiteralString
+```
+
+An excluded value cannot appear in a tuple when the candidate already has known literal origin.
+
+```py
+def trusted_value_is_excluded(value: Intersection[LiteralString, Not[Literal["hello"]]]) -> None:
+    reveal_type(value in ("hello",))  # revealed: Literal[False]
+
+    if value in ("hello",):
+        reveal_type(value)  # revealed: Never
 ```
 
 ## enums
@@ -1213,9 +1404,24 @@ def after_excluding_red_mixed(x: Color | int):
     if x is Color.RED:
         return
     if x in (Color.GREEN,):
-        reveal_type(x)  # revealed: Literal[Color.GREEN] | int
+        reveal_type(x)  # revealed: Literal[Color.GREEN]
     else:
         reveal_type(x)  # revealed: Literal[Color.BLUE] | int
+```
+
+Inline set literals also preserve the individual enum members for narrowing in either branch.
+
+```py
+def inline_enum_set(x: Color):
+    if x in {Color.RED, Color.GREEN}:
+        reveal_type(x)  # revealed: Literal[Color.RED, Color.GREEN]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.BLUE]
+
+    if x not in {Color.RED}:
+        reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    else:
+        reveal_type(x)  # revealed: Literal[Color.RED]
 ```
 
 When the container's element type is a union of enum literals, membership narrows to that union.
@@ -1270,9 +1476,7 @@ class Status(Enum):
 
 def test(x: Status | int):
     if x in (Status.PENDING, Status.APPROVED):
-        # int is included because custom __eq__ methods could make
-        # an int equal to Status.PENDING or Status.APPROVED, so we can't eliminate it
-        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
+        reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED]
     else:
         reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
 ```

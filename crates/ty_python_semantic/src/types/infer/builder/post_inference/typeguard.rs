@@ -15,6 +15,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     };
 
     let db = context.db();
+    let env = context.program_environment();
 
     let overload = function.literal(db).last_definition;
     let signature = overload.signature(db);
@@ -52,14 +53,14 @@ pub(crate) fn check_type_guard_definition<'db>(
     // For `TypeIs`, check that the narrowed type is assignable to the parameter type.
     if let Some(narrowed_ty) = narrowed_type {
         let param_ty = first_narrowed_param.annotated_type();
-        if !narrowed_ty.is_assignable_to(db, param_ty)
+        if !narrowed_ty.is_assignable_to(db, env, param_ty)
             && let Some(builder) = context.report_lint(&INVALID_TYPE_GUARD_DEFINITION, returns_expr)
         {
             builder.into_diagnostic(format_args!(
                 "Narrowed type `{narrowed}` is not assignable \
                     to the declared parameter type `{param}`",
-                narrowed = narrowed_ty.display(db),
-                param = param_ty.display(db)
+                narrowed = narrowed_ty.display(db, env),
+                param = param_ty.display(db, env)
             ));
         }
     }

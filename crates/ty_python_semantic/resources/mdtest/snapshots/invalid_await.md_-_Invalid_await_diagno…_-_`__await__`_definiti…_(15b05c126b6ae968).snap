@@ -34,7 +34,6 @@ error[invalid-await]: `InvalidAwaitArgs` is not awaitable
   |
 2 |     def __await__(self, value: int):
   |                  ------------------ parameters here
-  |
 info: `__await__` requires arguments and cannot be called implicitly
 
 ```

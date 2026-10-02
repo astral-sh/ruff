@@ -25,6 +25,7 @@
 //! [`await_request`]: TestServer::await_request
 //! [`await_notification`]: TestServer::await_notification
 
+mod capabilities;
 mod code_action;
 mod custom_extension;
 mod diagnostics;
@@ -65,7 +66,7 @@ use lsp_types::{
     DidChangeWorkspaceFoldersNotification, DidCloseTextDocumentNotification,
     DidOpenTextDocumentNotification, ExitNotification, InitializedNotification, Notification,
 };
-use ruff_server::{ConnectionInitializer, LogLevel, Server, init_logging};
+use ruff_server::{ConnectionInitializer, LogLevel, Server, WorkspaceTrust, init_logging};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
 
@@ -112,9 +113,6 @@ pub(crate) enum AwaitResponseError {
     /// The response came back, but was an error response, not a successful one.
     #[error("request failed because the server replied with an error: {0:?}")]
     RequestFailed(ResponseError),
-
-    #[error("malformed response message with both result and error: {0:#?}")]
-    MalformedResponse(Box<Response>),
 
     #[error("received multiple responses for the same request ID: {0:#?}")]
     MultipleResponses(Box<[Response]>),
@@ -209,7 +207,13 @@ impl TestServer {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
 
-            match Server::new(worker_threads, server_connection, None, true) {
+            match Server::new(
+                worker_threads,
+                server_connection,
+                None,
+                WorkspaceTrust::Trusted,
+                true,
+            ) {
                 Ok(server) => {
                     if let Err(err) = server.run() {
                         panic!("Server stopped with error: {err:?}");
@@ -418,23 +422,12 @@ impl TestServer {
 
                 let response = responses.pop().unwrap();
 
-                match response {
-                    Response {
-                        error: None,
-                        result: Some(result),
-                        ..
-                    } => {
+                match response.response_result {
+                    Ok(result) => {
                         return Ok(serde_json::from_value::<R::Result>(result)?);
                     }
-                    Response {
-                        error: Some(err),
-                        result: None,
-                        ..
-                    } => {
+                    Err(err) => {
                         return Err(AwaitResponseError::RequestFailed(err));
-                    }
-                    response => {
-                        return Err(AwaitResponseError::MalformedResponse(Box::new(response)));
                     }
                 }
             }
@@ -544,7 +537,6 @@ impl TestServer {
     ///
     /// If receiving the request fails.
     #[track_caller]
-    #[expect(dead_code)]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
         match self.try_await_request::<R>(None) {
             Ok(result) => result,
@@ -667,7 +659,6 @@ impl TestServer {
     }
 
     /// Get the initialization result
-    #[expect(dead_code)]
     pub(crate) fn initialization_result(&self) -> Option<&InitializeResult> {
         self.initialize_response.as_ref()
     }
@@ -1071,6 +1062,26 @@ impl TestServerBuilder {
             .text_document
             .get_or_insert_default()
             .diagnostic
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .formatting
+            .get_or_insert_default()
+            .dynamic_registration = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_range_formatting_dynamic_registration(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .range_formatting
             .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self

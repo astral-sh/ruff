@@ -42,7 +42,7 @@ expression: code_actions
                 "character": 11
               }
             },
-            "newText": "  # ty:ignore[possibly-missing-submodule]"
+            "newText": "  # ty: ignore[possibly-missing-submodule]"
           }
         ]
       }

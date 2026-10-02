@@ -46,11 +46,11 @@ reveal_type(z)  # revealed: Literal[987]
 ## Floats
 
 ```py
-reveal_type(1.0)  # revealed: float
+reveal_type(1.0)  # revealed: float*
 ```
 
 ## Complex
 
 ```py
-reveal_type(2j)  # revealed: complex
+reveal_type(2j)  # revealed: complex*
 ```

@@ -166,7 +166,6 @@ info[missing-type-argument]: Missing type argument for generic class `Foo` (expe
    |
 61 |     def method3(self: Foo):  # error: [missing-type-argument]
    |                       ^^^
-   |
 
 ```
 
@@ -176,7 +175,6 @@ error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<c
    |
 82 |         reveal_type(super())
    |                     ^^^^^^^
-   |
 info: Type variable `S` has `object` as its implicit upper bound
 info: `object` is not an instance or subclass of `<class 'Foo'>`
 help: Consider adding an upper bound to type variable `S`
@@ -189,7 +187,6 @@ error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<c
    |
 88 |         reveal_type(super())
    |                     ^^^^^^^
-   |
 info: Type variable `S` has upper bound `int`
 info: `int` is not an instance or subclass of `<class 'Foo'>`
 
@@ -201,7 +198,6 @@ error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<c
    |
 94 |         reveal_type(super())
    |                     ^^^^^^^
-   |
 info: Type variable `S` has constraints `int, str`
 info: `int | str` is not an instance or subclass of `<class 'Foo'>`
 
@@ -213,7 +209,6 @@ error[invalid-super-argument]: `S@method10` is a type variable with an abstract/
     |
 100 |         reveal_type(super())
     |                     ^^^^^^^
-    |
 info: Type variable `S` has upper bound `(...) -> str`
 
 ```

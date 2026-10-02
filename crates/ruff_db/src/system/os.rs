@@ -9,12 +9,13 @@ use super::walk_directory::{
 };
 use crate::max_parallelism;
 use crate::system::{
-    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
-    SystemVirtualPath, WhichError, WhichResult, WritableSystem,
+    Command, CommandExecutor, DirectoryEntry, FileType, Metadata, Result, System, SystemPath,
+    SystemPathBuf, SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
 use std::num::NonZeroUsize;
+use std::process::Output;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -129,6 +130,10 @@ impl System for OsSystem {
         }
     }
 
+    fn command_executor(&self) -> Option<&dyn CommandExecutor> {
+        Some(self)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
@@ -223,6 +228,35 @@ impl System for OsSystem {
     }
 }
 
+impl CommandExecutor for OsSystem {
+    fn execute(&self, command: Command) -> Result<Output> {
+        let directory = command
+            .get_current_dir()
+            .unwrap_or_else(|| self.current_directory());
+
+        let mut process = std::process::Command::new(command.get_executable());
+        process
+            .args(command.get_args())
+            .current_dir(directory.as_std_path());
+        if command.get_env_clear() {
+            process.env_clear();
+        }
+
+        for (name, value) in command.get_envs() {
+            if let Some(value) = value {
+                process.env(name, value);
+            } else {
+                process.env_remove(name);
+            }
+        }
+        process.output()
+    }
+
+    fn dyn_clone(&self) -> Box<dyn CommandExecutor> {
+        Box::new(self.clone())
+    }
+}
+
 impl WritableSystem for OsSystem {
     fn create_new_file(&self, path: &SystemPath) -> Result<()> {
         std::fs::File::create_new(path).map(drop)
@@ -230,6 +264,10 @@ impl WritableSystem for OsSystem {
 
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
+    }
+
+    fn remove_file(&self, path: &SystemPath) -> Result<()> {
+        std::fs::remove_file(path.as_std_path())
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {

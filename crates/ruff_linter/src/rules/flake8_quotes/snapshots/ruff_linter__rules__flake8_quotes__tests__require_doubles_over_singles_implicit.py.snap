@@ -112,7 +112,6 @@ Q000 [*] Single quotes found but double quotes preferred
 26 |     'This can use "single" quotes'
 27 | 'But this needs to be changed'
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Replace single quotes with double quotes
    |
 26 |     'This can use "single" quotes'

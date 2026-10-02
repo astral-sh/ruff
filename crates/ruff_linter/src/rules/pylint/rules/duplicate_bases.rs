@@ -6,6 +6,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Fix, FixAvailability, Violation};
 
@@ -55,7 +56,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.269")]
+#[violation_metadata(stable_since = "v0.0.269", category = Category::Correctness)]
 pub(crate) struct DuplicateBases {
     base: String,
     class: String,

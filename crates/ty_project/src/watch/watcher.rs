@@ -112,24 +112,8 @@ struct WatcherInner {
 }
 
 impl Watcher {
-    /// Sets up file watching for `path`.
-    pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Watching path: `{path}`");
-
-        self.inner_mut()
-            .watcher
-            .watch(path.as_std_path(), RecursiveMode::Recursive)
-    }
-
-    /// Stops file watching for `path`.
-    pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Unwatching path: `{path}`");
-
-        self.inner_mut().watcher.unwatch(path.as_std_path())
-    }
-
     /// Returns a transaction-like view for updating watched paths in one backend operation.
-    pub fn paths_mut(&mut self) -> WatcherPathsMut<'_> {
+    pub(crate) fn paths_mut(&mut self) -> WatcherPathsMut<'_> {
         WatcherPathsMut {
             inner: self.inner_mut().watcher.paths_mut(),
         }
@@ -140,13 +124,13 @@ impl Watcher {
     /// Pending events will be discarded.
     ///
     /// The call blocks until the watcher has stopped.
-    pub fn stop(mut self) {
+    pub(crate) fn stop(mut self) {
         tracing::debug!("Stop file watcher");
         self.set_stop();
     }
 
     /// Flushes any pending events.
-    pub fn flush(&self) {
+    pub(crate) fn flush(&self) {
         self.inner()
             .debouncer_sender
             .send(DebouncerMessage::Flush)
@@ -177,22 +161,22 @@ impl Watcher {
     }
 }
 
-pub struct WatcherPathsMut<'a> {
+pub(crate) struct WatcherPathsMut<'a> {
     inner: Box<dyn notify::PathsMut + 'a>,
 }
 
 impl WatcherPathsMut<'_> {
-    pub fn add(&mut self, path: &SystemPath) -> notify::Result<()> {
+    pub(crate) fn add(&mut self, path: &SystemPath) -> notify::Result<()> {
         tracing::debug!("Watching path: `{path}`");
         self.inner.add(path.as_std_path(), RecursiveMode::Recursive)
     }
 
-    pub fn remove(&mut self, path: &SystemPath) -> notify::Result<()> {
+    pub(crate) fn remove(&mut self, path: &SystemPath) -> notify::Result<()> {
         tracing::debug!("Unwatching path: `{path}`");
         self.inner.remove(path.as_std_path())
     }
 
-    pub fn commit(self) -> notify::Result<()> {
+    pub(crate) fn commit(self) -> notify::Result<()> {
         self.inner.commit()
     }
 }

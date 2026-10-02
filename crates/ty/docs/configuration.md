@@ -160,60 +160,128 @@ Defaults to `true`.
 
 ---
 
-### `strict-literal-narrowing`
+### `strict-equality-semantics`
 
-Whether equality-based checks should preserve broad builtin types rather than narrow them to
-literal types.
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
 
-By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-membership tests and literal match patterns, which use equality comparisons.
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
+```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` in strict mode.
+        return value
     return None
 ```
 
-Broad builtin types include subclasses, but literal types distinguish values by both their
-runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-builtin equality. For example:
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
 
 ```python
-class StringSubclass(str): ...
-
-result = parse(StringSubclass("a"))
-# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
 ```
 
-The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-respectively. This means enum members can encounter the same unsoundness:
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
 
 ```python
-from enum import StrEnum
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
 
-class Choice(StrEnum):
-    A = "a"
 
-result = parse(Choice.A)
-# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
 ```
 
-A subclass can also override `__eq__` to compare equal to a literal with a different value:
+**Default value**: `false`
 
-```python
-class MisleadingStr(str):
-    def __eq__(self, other: object) -> bool:
-        return True
+**Type**: `bool`
 
-result = parse(MisleadingStr("b"))
-# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-```
+**Example usage**:
 
-Enable this option to preserve the broader builtin type instead.
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+---
+
+### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty uses gradual generic narrowing, preserving compatible type
+arguments from the original type where possible. For example,
+`isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+If no specialization is available, the same check narrows a value of type `object`
+to `list[Unknown]`; items of any type can then be appended to the list. Class
+patterns such as `case list():` follow the same behavior.
 
 Defaults to `false`.
 
@@ -227,16 +295,16 @@ Defaults to `false`.
 
     ```toml
     [tool.ty.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
     [analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 ---
@@ -295,6 +363,10 @@ variable to point to your project's virtual environment. ty can also infer the l
 your environment from an activated Conda environment, and will look for a `.venv` directory
 in the project root if none of the above apply. Failing that, ty will look for a `python3`
 or `python` binary available in `PATH`.
+
+Scripts with inline metadata use their own Python environment. They can use an explicitly
+configured environment, an activated environment, or an environment selected by the editor.
+Unlike projects, they do not automatically use a `.venv` directory.
 
 [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
@@ -378,6 +450,9 @@ to determine a value:
    and attempt to infer the Python version of that environment
 3. Fall back to the default value (see below)
 
+Scripts with inline metadata use their `requires-python` field instead of
+`project.requires-python`. They do not inherit the Python version of the enclosing project.
+
 For some language features, ty can also understand conditionals based on comparisons
 with `sys.version_info`. These are commonly found in typeshed, for example,
 to reflect the differing contents of the standard library across Python versions.
@@ -417,6 +492,9 @@ if they exist and are not packages (i.e. they do not contain `__init__.py` or `_
 * `./src`
 * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
 * `./python`
+
+Scripts with inline metadata have no first-party roots by default because they are
+single-file programs. Set `root = ["."]` to allow importing local modules.
 
 **Default value**: `null`
 
@@ -643,6 +721,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -651,6 +732,9 @@ any module where the first component contains the substring `test`, use `*test*.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
@@ -684,6 +768,9 @@ When multiple patterns match, later entries take precedence.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -692,6 +779,9 @@ When multiple patterns match, later entries take precedence.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Replace all pandas and numpy imports with Any
     replace-imports-with-any = ["pandas.**", "numpy.**"]
@@ -720,6 +810,9 @@ Defaults to `true`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
@@ -728,6 +821,9 @@ Defaults to `true`.
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
     # Disable support for `type: ignore` comments
     respect-type-ignore-comments = false
@@ -735,60 +831,134 @@ Defaults to `true`.
 
 ---
 
-#### `strict-literal-narrowing`
+#### `strict-equality-semantics`
 
-Whether equality-based checks should preserve broad builtin types rather than narrow them to
-literal types.
+Configure ty's behavior regarding type inference and narrowing of equality
+checks. Defaults to `false`.
 
-By default, ty narrows `value` from `str` to `Literal["a"]` in the positive branch of
-`value == "a"`. When this option is enabled, `value` remains `str`. This also applies to
-membership tests and literal match patterns, which use equality comparisons.
+By default, ty makes various assumptions about equality checks that match the
+intuitions of most Python programmers, but may not be fully sound in all situations.
+Enabling this option makes ty more conservative about these assumptions, making it
+less likely to infer `Literal[True]` or `Literal[False]` as the result of an
+equality check. This has various effects on type checking, including fewer type
+narrowing opportunities and more conservative assumptions regarding control flow.
+
+One way in which ty will by default make unsound assumptions is by narrowing an
+object `x` of type `str` to `Literal["a"]` after an `if x == "a"` check. This is
+unsound because a subclass of `str` with value `"a"` will (by default) compare equal
+to `"a"`, but will not be of type `Literal["a"]`:
+
+```pycon
+>>> # `Literal["a"]` can only be inhabited by instances of exactly `str`, not
+>>> # subclasses, but str subclasses compare equal by default:
+>>> class StringSubclass(str): ...
+...
+>>> StringSubclass("a") == "a"
+True
+>>>
+>>> # This also applies to `StrEnum`s:
+>>> from enum import StrEnum
+>>> class MyEnum(StrEnum):
+...     A = "a"
+...
+>>> MyEnum.A == "a"
+True
+```
+
+Enabling this option prevents the unsound narrowing of `x` to `Literal["a"]`,
+and instead keeps it as `str`:
 
 ```python
 from typing import Literal
 
 def parse(value: str) -> Literal["a"] | None:
+    # with `strict-equality-semantics = true`, no narrowing will occur here,
+    # and an error will be emitted on the `return` statement.
     if value == "a":
-        return value  # Accepted by default; `value` remains `str` in strict mode.
+        return value
     return None
 ```
 
-Broad builtin types include subclasses, but literal types distinguish values by both their
-runtime type and value. This makes the narrowing unsound even for subclasses that inherit
-builtin equality. For example:
+Another assumption ty makes by default is that subclasses will never override `__eq__` or
+`__ne__`. This allows ty to narrow the following union based on an equality check, despite
+the fact that an instance of a subclass of `Foo` could compare equal to `None`, and it's
+perfectly valid to pass an instance of a subclass into the `x` parameter of this function:
 
 ```python
-class StringSubclass(str): ...
-
-result = parse(StringSubclass("a"))
-# Statically `Literal["a"] | None`, but `result` has runtime type `StringSubclass`.
+def narrow(x: Foo | None, other: Foo) -> None:
+    if x == other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since it is legal to subclass `Foo` and override its `__eq__` method.
+        reveal_type(x)
 ```
 
-The standard library's `StrEnum` and `IntEnum` types are also subclasses of `str` and `int`,
-respectively. This means enum members can encounter the same unsoundness:
+Many operations in Python implicitly call `__eq__` under the hood; enabling this option
+will also impact those operations. For example, this option will also impact narrowing from
+`in` checks, and narrowing in `match` statements that use value patterns:
 
 ```python
-from enum import StrEnum
+def narrow_in(x: Foo | None, other: list[Foo]) -> None:
+    if x in other:
+        # with this option enabled, `x` will still have type `Foo | None` here,
+        # since the `in` operator implicitly calls `__eq__` on each element of `other`.
+        reveal_type(x)
 
-class Choice(StrEnum):
-    A = "a"
 
-result = parse(Choice.A)
-# Statically `Literal["a"] | None`, but `result` has runtime type `Choice`.
+def narrow_match(x: str) -> None:
+    match x:
+        case "a":
+            # with this option enabled, `x` will still have type `str` here,
+            # since this `case` branch will be taken by any object that compares
+            # equal to `"a"`, including subclasses of `str`.
+            reveal_type(x)
 ```
 
-A subclass can also override `__eq__` to compare equal to a literal with a different value:
+**Default value**: `false`
 
-```python
-class MisleadingStr(str):
-    def __eq__(self, other: object) -> bool:
-        return True
+**Type**: `bool`
 
-result = parse(MisleadingStr("b"))
-# Statically `Literal["a"] | None`, but `result` contains `"b"` at runtime.
-```
+**Example usage**:
 
-Enable this option to preserve the broader builtin type instead.
+=== "pyproject.toml"
+
+    ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
+    [tool.ty.overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [[overrides]]
+    include = ["src"]
+
+    [overrides.analysis]
+    # Preserve broad builtin types instead of narrowing them to literals
+    strict-equality-semantics = true
+    ```
+
+---
+
+#### `strict-generic-narrowing`
+
+Whether ty should use strict narrowing for unspecialized generic classes in
+`isinstance()` and `issubclass()` checks, `match` class patterns, and `TypeIs` checks.
+
+When enabled, ty narrows to the top materialization of the class. For example,
+`isinstance(value, list)` narrows a value of type `object` to `Top[list[Unknown]]`,
+representing the (infinite) union of all possible `list` specializations. Iterating
+over the list would yield values of type `object`.
+
+When disabled, ty uses gradual generic narrowing, preserving compatible type
+arguments from the original type where possible. For example,
+`isinstance(value, list)` narrows a value of type `Sequence[int]` to `list[int]`.
+If no specialization is available, the same check narrows a value of type `object`
+to `list[Unknown]`; items of any type can then be appended to the list. Class
+patterns such as `case list():` follow the same behavior.
 
 Defaults to `false`.
 
@@ -801,17 +971,23 @@ Defaults to `false`.
 === "pyproject.toml"
 
     ```toml
+    [[tool.ty.overrides]]
+    include = ["src"]
+
     [tool.ty.overrides.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 === "ty.toml"
 
     ```toml
+    [[overrides]]
+    include = ["src"]
+
     [overrides.analysis]
-    # Preserve broad builtin types instead of narrowing them to literals
-    strict-literal-narrowing = true
+    # Use the top materialization when narrowing to an unspecialized generic class
+    strict-generic-narrowing = true
     ```
 
 ---
@@ -898,6 +1074,33 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 ---
 
+### `exclude-scripts`
+
+Whether to exclude files containing PEP 723 inline script metadata unless they are
+explicitly passed on the command line.
+
+**Default value**: `false`
+
+**Type**: `bool`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.src]
+    exclude-scripts = true
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [src]
+    exclude-scripts = true
+    ```
+
+---
+
 ### `include`
 
 A list of files and directories to check. The `include` option
@@ -973,43 +1176,6 @@ Enabled by default.
     ```toml
     [src]
     respect-ignore-files = false
-    ```
-
----
-
-### `root`
-
-!!! warning "Deprecated"
-    This option has been deprecated. Use `environment.root` instead.
-
-The root of the project, used for finding first-party modules.
-
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
-The project root (`.`) is always included. Additionally, the following directories are included
-if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
-
-* `./src`
-* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
-* `./python`
-
-**Default value**: `null`
-
-**Type**: `str`
-
-**Example usage**:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ty.src]
-    root = "./app"
-    ```
-
-=== "ty.toml"
-
-    ```toml
-    [src]
-    root = "./app"
     ```
 
 ---

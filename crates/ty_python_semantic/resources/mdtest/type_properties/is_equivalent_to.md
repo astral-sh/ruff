@@ -14,8 +14,8 @@ materializations of `B`, and all materializations of `B` are also materializatio
 
 ```py
 from typing_extensions import Literal, LiteralString, Protocol, Never
-from ty_extensions import Unknown, static_assert, AlwaysTruthy, AlwaysFalsy
-from ty_extensions._internal import TypeOf, is_equivalent_to
+from ty_extensions import static_assert, AlwaysTruthy, AlwaysFalsy
+from ty_extensions._internal import Unknown, TypeOf, is_equivalent_to
 from enum import Enum
 
 class Answer(Enum):
@@ -72,8 +72,8 @@ static_assert(is_equivalent_to(type, type[object]))
 ```py
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 
 static_assert(is_equivalent_to(Any, Any))
 static_assert(is_equivalent_to(Unknown, Unknown))
@@ -84,12 +84,102 @@ static_assert(not is_equivalent_to(type, type[Any]))
 static_assert(not is_equivalent_to(type[object], type[Any]))
 ```
 
+## Equivalent bounded gradual specializations
+
+A bounded generic specialized with a gradual type alias is equivalent to the same generic
+specialized with the expanded alias.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant bounded type parameter, this applies to aliases containing either `Any` or
+`Unknown`.
+
+```py
+from typing import Any
+
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
+
+type AnyTuple = tuple[Any, ...]
+type UnknownTuple = tuple[Unknown, ...]
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(BoundedCovariant[AnyTuple], BoundedCovariant[tuple[Any, ...]]))
+static_assert(is_equivalent_to(BoundedCovariant[UnknownTuple], BoundedCovariant[AnyTuple]))
+```
+
+The same gradual tuple alias remains equivalent when the bounded type parameter is invariant.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(is_equivalent_to(BoundedInvariant[AnyTuple], BoundedInvariant[tuple[Any, ...]]))
+```
+
+`Outer[int, Inner]` is equivalent to `Outer[int, Inner[Any]]` because `Inner` defaults to `Any`.
+`Outer[int]` is equivalent to the same explicit specialization because `Outer` defaults to
+`Inner[Any]`.
+
+```py
+class Inner[T: int = Any]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Outer[T: int, U: Inner[Any] = Inner[Any]]:
+    def get(self) -> U:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int, Inner]))
+static_assert(is_equivalent_to(Outer[int, Inner[Any]], Outer[int]))
+```
+
+## Bounded gradual specializations are distinct from upper bounds
+
+A generic specialized with a gradual type argument is not equivalent to the same generic specialized
+with the type parameter's upper bound.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+For a covariant type parameter:
+
+```py
+from typing import Any
+
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class BoundedCovariant[T: tuple[int, ...]]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+static_assert(not is_equivalent_to(BoundedCovariant[tuple[Any, ...]], BoundedCovariant[tuple[int, ...]]))
+```
+
+The same distinction applies to an invariant type parameter.
+
+```py
+class BoundedInvariant[T: tuple[int, ...]]:
+    value: T
+
+static_assert(not is_equivalent_to(BoundedInvariant[tuple[Any, ...]], BoundedInvariant[tuple[int, ...]]))
+```
+
 ## Unions and intersections
 
 ```pyi
 from typing import Any, Literal, TypeAlias
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 from enum import Enum
 
 static_assert(is_equivalent_to(str | int, str | int))
@@ -152,14 +242,65 @@ static_assert(is_equivalent_to(Any, ~None & Unknown | Unknown))
 ## Tuples
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to
 from typing import Any
 
 static_assert(is_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
 
 static_assert(not is_equivalent_to(tuple[str, int], tuple[str, int, bytes]))
 static_assert(not is_equivalent_to(tuple[str, int], tuple[int, str]))
+```
+
+## Recursive tuples with fixed ends
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Mutually recursive tuple aliases can describe the same nonempty trees. Moving a required element
+between the prefix and suffix does not change the type when every element has that same tree type.
+The type of the leaves still distinguishes integer trees from string trees.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type A = int | tuple[*tuple[A, ...], B]
+type B = int | tuple[*tuple[B, ...], A]
+type Prefix = int | tuple[Prefix, *tuple[Prefix, ...]]
+type Strings = str | tuple[*tuple[Strings, ...], Strings]
+
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
+```
+
+## Implicit recursive tuples with fixed ends
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Implicit aliases describe the same nonempty trees regardless of whether the required element appears
+at the start or end of the tuple. Integer and string leaves still distinguish different tree types.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+A = int | tuple[*tuple["A", ...], "B"]
+B = int | tuple[*tuple["B", ...], "A"]
+Prefix = int | tuple["Prefix", *tuple["Prefix", ...]]
+Strings = str | tuple[*tuple["Strings", ...], "Strings"]
+
+static_assert(is_equivalent_to(A, B))
+static_assert(is_equivalent_to(B, A))
+static_assert(is_equivalent_to(A, Prefix))
+static_assert(not is_equivalent_to(A, Strings))
 ```
 
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
@@ -371,8 +512,8 @@ Two unions containing different `Callable` types are equivalent even if the unio
 ordered:
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import RegularCallableTypeOf, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, RegularCallableTypeOf, is_equivalent_to
 
 def f(x): ...
 def g(x: Unknown): ...
@@ -489,8 +630,8 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, static_assert
-from ty_extensions._internal import CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
+from ty_extensions import static_assert
+from ty_extensions._internal import Unknown, CallableTypeOf, RegularCallableTypeOf, TypeOf, is_equivalent_to
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))

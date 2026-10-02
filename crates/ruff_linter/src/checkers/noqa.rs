@@ -57,17 +57,17 @@ pub(crate) fn check_noqa(
 
     // Remove any ignored diagnostics.
     'outer: for (index, diagnostic) in context.iter().enumerate() {
-        // Can't ignore syntax errors.
-        let Some(code) = diagnostic.secondary_code() else {
+        // Syntax errors and other non-lint diagnostics cannot be suppressed.
+        let Some(name) = diagnostic.id().as_lint() else {
             continue;
         };
 
-        if *code == Rule::BlanketNOQA.noqa_code() {
+        if name == Rule::BlanketNOQA.name() {
             continue;
         }
 
         // Apply file-level suppressions first
-        if exemption.contains_secondary_code(code) {
+        if exemption.includes_name(name) {
             ignored_diagnostics.push(index);
             continue;
         }
@@ -90,31 +90,15 @@ pub(crate) fn check_noqa(
             if let Some(directive_line) = noqa_directives.find_line_with_directive_mut(noqa_offset)
             {
                 let suppressed = match &directive_line.directive {
-                    Directive::All(_) => {
-                        let Ok(rule) = Rule::from_code(code) else {
-                            debug_assert!(false, "Invalid secondary code `{code}`");
-                            continue;
-                        };
-                        directive_line.matches.push(rule);
-                        ignored_diagnostics.push(index);
-                        true
-                    }
-                    Directive::Codes(directive) => {
-                        if directive.includes(code) {
-                            let Ok(rule) = Rule::from_code(code) else {
-                                debug_assert!(false, "Invalid secondary code `{code}`");
-                                continue;
-                            };
-                            directive_line.matches.push(rule);
-                            ignored_diagnostics.push(index);
-                            true
-                        } else {
-                            false
-                        }
-                    }
+                    Directive::All(_) => true,
+                    Directive::Codes(directive) => diagnostic
+                        .secondary_code()
+                        .is_some_and(|code| directive.includes(code)),
                 };
 
-                if suppressed {
+                if suppressed && let Ok(rule) = Rule::from_name(name.as_str()) {
+                    directive_line.matches.push(rule);
+                    ignored_diagnostics.push(index);
                     continue 'outer;
                 }
             }
@@ -176,7 +160,10 @@ pub(crate) fn check_noqa(
                     for original_code in codes.iter().map(Code::as_str) {
                         let code = get_redirect_target(original_code).unwrap_or(original_code);
                         if seen_codes.insert(original_code) {
-                            if Rule::UnusedNOQA.noqa_code() == code {
+                            if Rule::UnusedNOQA
+                                .noqa_code()
+                                .is_some_and(|noqa_code| noqa_code == code)
+                            {
                                 self_ignore = true;
                                 if context.is_rule_enabled(Rule::UnusedNOQA) {
                                     valid_codes.push(original_code);
@@ -187,7 +174,9 @@ pub(crate) fn check_noqa(
                             }
 
                             if context.is_rule_enabled(Rule::NoqaComments)
-                                && Rule::NoqaComments.noqa_code() == code
+                                && Rule::NoqaComments
+                                    .noqa_code()
+                                    .is_some_and(|noqa_code| noqa_code == code)
                             {
                                 suppress_noqa_comment = true;
                                 valid_codes.push(original_code);
@@ -199,7 +188,9 @@ pub(crate) fn check_noqa(
                                     diag.secondary_code().is_some_and(|noqa| *noqa == code)
                                 })
                             } else {
-                                matches.iter().any(|match_| match_.noqa_code() == code)
+                                matches.iter().any(|rule| {
+                                    rule.noqa_code().is_some_and(|noqa_code| noqa_code == code)
+                                })
                             } || settings
                                 .external
                                 .iter()

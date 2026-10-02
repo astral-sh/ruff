@@ -84,6 +84,7 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
     }
 
     // Patch typeshed and add the stubs for the `ty_extensions` package.
+    zip.add_directory("stdlib/ty_extensions/", options)?;
     for (source, destination) in TY_EXTENSIONS_STUBS {
         println!("adding file {source} as {destination} ...");
         zip.start_file(destination, options)?;

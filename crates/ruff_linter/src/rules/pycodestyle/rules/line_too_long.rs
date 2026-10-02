@@ -4,6 +4,7 @@ use ruff_source_file::Line;
 
 use crate::Violation;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::rules::pycodestyle::overlong::Overlong;
 use crate::settings::LinterSettings;
 
@@ -70,7 +71,7 @@ use crate::settings::LinterSettings;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.18")]
+#[violation_metadata(stable_since = "v0.0.18", category = Category::Formatting)]
 pub(crate) struct LineTooLong(usize, usize);
 
 impl Violation for LineTooLong {

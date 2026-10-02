@@ -6,6 +6,7 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::pad;
 use crate::preview::is_up024_precise_highlighting_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -36,7 +37,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.206")]
+#[violation_metadata(stable_since = "v0.0.206", category = Category::Suspicious)]
 pub(crate) struct OSErrorAlias {
     name: Option<String>,
 }

@@ -36,7 +36,7 @@ pub(super) struct StackedStack<'a, T> {
 
 impl<'a, T> StackedStack<'a, T> {
     #[cfg(test)]
-    pub(super) fn new(original: &'a [T]) -> Self {
+    fn new(original: &'a [T]) -> Self {
         Self::with_vec(original, Vec::new())
     }
 

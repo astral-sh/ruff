@@ -81,4 +81,3 @@ E501 Line too long (159 > 88)
 7 | …ed task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
 8 | …gured task-tags sometimes are longer than line-length so that you can easily find them with `git grep`
   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |

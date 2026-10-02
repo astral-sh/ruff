@@ -3,9 +3,28 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = []
+#
+# [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
+# blanket-ignore-comment = "warn"
+# missing-type-argument = "warn"
+# possibly-unresolved-reference = "warn"
+# unsound-return-statement = "warn"
+# unsound-yield = "warn"
+# unsupported-dynamic-base = "warn"
+# division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
+#
+# [tool.uv]
+# no-build = true
+# exclude-newer = "P7D"
 # ///
 
-"""Collect the exact inputs used by a Ruff ty ecosystem-analyzer run."""
+"""Collect exact ecosystem-run inputs and preserve evidence for runtime inspection."""
 
 from __future__ import annotations
 
@@ -51,23 +70,31 @@ def payloads(log: str) -> list[str]:
     for line in clean_log.splitlines():
         columns = line.split("\t", 2)
         payload = columns[-1]
-        if len(columns) == 3:
-            payload = re.sub(r"^\S+\s+", "", payload, count=1)
+        payload = re.sub(r"^\d{4}-\d{2}-\d{2}T\S+ ?", "", payload, count=1)
         result.append(payload.strip())
     return result
 
 
-def unique_value(log: str, pattern: str, label: str) -> str:
+def optional_value(log: str, pattern: str, label: str) -> str | None:
     regex = re.compile(pattern)
     values = {
         match.group(1) for line in payloads(log) if (match := regex.fullmatch(line))
     }
     if not values:
-        raise MetadataError(f"could not find {label} in the Actions log")
+        return None
     if len(values) > 1:
         rendered = ", ".join(sorted(values))
         raise MetadataError(f"found conflicting {label} values: {rendered}")
-    return values.pop()
+    ret = values.pop()
+    assert isinstance(ret, str)
+    return ret
+
+
+def unique_value(log: str, pattern: str, label: str) -> str:
+    value = optional_value(log, pattern, label)
+    if value is None:
+        raise MetadataError(f"could not find {label} in the Actions log")
+    return value
 
 
 def parse_build_log(log: str) -> tuple[str, str]:
@@ -76,19 +103,38 @@ def parse_build_log(log: str) -> tuple[str, str]:
     return merge_base, pr_revision
 
 
-def parse_shard_log(log: str) -> tuple[str, str, str]:
+def parse_shard_log(log: str) -> tuple[str, str | None, str]:
     exclude_newer = unique_value(
         log,
         r"EXCLUDE_NEWER: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)",
         "EXCLUDE_NEWER",
     )
-    analyzer_revision = unique_value(
+    analyzer_revision = optional_value(
         log,
         rf"ECOSYSTEM_ANALYZER_COMMIT: ({SHA})",
         "ecosystem-analyzer revision",
     )
     merge_base = unique_value(log, rf"MERGE_BASE: ({SHA})", "shard merge base")
     return exclude_newer, analyzer_revision, merge_base
+
+
+def parse_ecosystem_analyzer_revision(lockfile: str) -> str:
+    try:
+        packages = tomllib.loads(lockfile)["package"]
+        package = next(
+            package for package in packages if package["name"] == "ecosystem-analyzer"
+        )
+        source = package["source"]["git"]
+        revision = source.rsplit("#", maxsplit=1)[1]
+    except (IndexError, KeyError, StopIteration, TypeError) as error:
+        raise MetadataError(
+            "could not find ecosystem-analyzer revision in uv.lock"
+        ) from error
+
+    if not isinstance(revision, str) or re.fullmatch(SHA, revision) is None:
+        raise MetadataError("ecosystem-analyzer revision is not a 40-character Git SHA")
+
+    return revision
 
 
 def parse_minimum_python(source: str) -> tuple[int, int]:
@@ -102,12 +148,10 @@ def parse_minimum_python(source: str) -> tuple[int, int]:
         ):
             continue
         value = ast.literal_eval(node.value)
-        if (
-            isinstance(value, tuple)
-            and len(value) == 2
-            and all(isinstance(part, int) for part in value)
-        ):
-            return value
+        if isinstance(value, tuple) and len(value) == 2:
+            major, minor = value
+            if isinstance(major, int) and isinstance(minor, int):
+                return (major, minor)
         break
     raise MetadataError("could not parse ecosystem-analyzer MINIMUM_PYTHON_VERSION")
 
@@ -196,14 +240,14 @@ def build_job(jobs: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return matches[0]
 
 
-def first_shard_job(jobs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+def shard_jobs(jobs: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     matches: list[tuple[int, dict[str, Any]]] = []
     for job in jobs:
         if match := re.fullmatch(r"analyze-shards \((\d+)\)", str(job.get("name"))):
             matches.append((int(match.group(1)), job))
     if not matches:
         raise MetadataError("could not find an analyze-shards job")
-    return min(matches, key=lambda item: item[0])[1]
+    return [job for _, job in sorted(matches, key=lambda item: item[0])]
 
 
 def collect_metadata(
@@ -213,6 +257,7 @@ def collect_metadata(
     repo: str,
     analyzer_repo: str,
     attempt: int | None,
+    evidence_dir: Path | None = None,
     runner: CommandRunner = run_command,
 ) -> dict[str, Any]:
     run_id, url_attempt = parse_run_reference(run)
@@ -244,7 +289,7 @@ def collect_metadata(
     if not isinstance(jobs, list):
         raise MetadataError("the Actions run did not include job metadata")
     selected_build_job = build_job(jobs)
-    shard_job = first_shard_job(jobs)
+    selected_shards = shard_jobs(jobs)
 
     def job_log(job: dict[str, Any]) -> str:
         return runner(
@@ -264,11 +309,39 @@ def collect_metadata(
         )
 
     merge_base, pr_revision = parse_build_log(job_log(selected_build_job))
-    exclude_newer, analyzer_revision, shard_merge_base = parse_shard_log(
-        job_log(shard_job)
-    )
+    shard_logs = [job_log(job) for job in selected_shards]
+    exclude_newer, analyzer_revision, shard_merge_base = parse_shard_log(shard_logs[0])
     if shard_merge_base != merge_base:
         raise MetadataError("build and shard logs disagree on the merge base")
+
+    analysis_jobs = []
+    for job, log in zip(selected_shards, shard_logs, strict=True):
+        if parse_shard_log(log) != (exclude_newer, analyzer_revision, shard_merge_base):
+            raise MetadataError(
+                f"analysis revision or cutoff differs in job {job['name']}"
+            )
+        job_id = int(job["databaseId"])
+        details = json.loads(
+            runner(["gh", "api", f"repos/{repo}/actions/jobs/{job_id}"])
+        )
+        if details["id"] != job_id or details["run_id"] != run_id:
+            raise MetadataError(
+                f"job metadata does not match the selected run: {job_id}"
+            )
+        record = {
+            "id": job_id,
+            "url": details["html_url"],
+            "runner_labels": details["labels"],
+        }
+        if evidence_dir is not None:
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            log_path = evidence_dir / f"analysis-{job_id}.log"
+            metadata_path = evidence_dir / f"analysis-{job_id}.json"
+            log_path.write_text(log)
+            metadata_path.write_text(json.dumps(details, indent=2) + "\n")
+            record["log_path"] = str(log_path.resolve())
+            record["metadata_path"] = str(metadata_path.resolve())
+        analysis_jobs.append(record)
 
     def repository_file(repository: str, path: str, revision: str) -> str:
         return runner(
@@ -283,6 +356,11 @@ def collect_metadata(
                 "-H",
                 "Accept: application/vnd.github.raw+json",
             ]
+        )
+
+    if analyzer_revision is None:
+        analyzer_revision = parse_ecosystem_analyzer_revision(
+            repository_file(repo, "uv.lock", pr_revision)
         )
 
     analyzer_pyproject = repository_file(
@@ -300,6 +378,7 @@ def collect_metadata(
         "mypy_primer/projects.py",
         primer_revision,
     )
+    config = repository_file(repo, ".github/ty-ecosystem.toml", pr_revision)
 
     return {
         "run": {
@@ -321,6 +400,8 @@ def collect_metadata(
         "project_python": parse_project_versions(
             primer_projects, projects, minimum_python
         ),
+        "analysis_jobs": analysis_jobs,
+        "ty_config": config,
     }
 
 
@@ -340,7 +421,11 @@ def main() -> None:
     parser.add_argument("--repo", default="astral-sh/ruff")
     parser.add_argument("--analyzer-repo", default="astral-sh/ecosystem-analyzer")
     parser.add_argument("--attempt", type=int)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write metadata here and analysis evidence to an adjacent .evidence directory",
+    )
     args = parser.parse_args()
 
     try:
@@ -350,8 +435,11 @@ def main() -> None:
             repo=args.repo,
             analyzer_repo=args.analyzer_repo,
             attempt=args.attempt,
+            evidence_dir=args.output.with_name(args.output.name + ".evidence")
+            if args.output
+            else None,
         )
-    except (MetadataError, json.JSONDecodeError, KeyError, TypeError) as error:
+    except (MetadataError, ValueError, SyntaxError, KeyError, TypeError) as error:
         print(f"error: {error}", file=sys.stderr)
         raise SystemExit(1) from error
 

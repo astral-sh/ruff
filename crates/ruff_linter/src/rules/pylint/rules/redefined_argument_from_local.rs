@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for variables defined in `for`, `try`, `with` statements
@@ -33,9 +34,9 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Pylint documentation](https://pylint.readthedocs.io/en/latest/user_guide/messages/refactor/redefined-argument-from-local.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", category = Category::Suspicious)]
 pub(crate) struct RedefinedArgumentFromLocal {
-    pub(crate) name: String,
+    name: String,
 }
 
 impl Violation for RedefinedArgumentFromLocal {

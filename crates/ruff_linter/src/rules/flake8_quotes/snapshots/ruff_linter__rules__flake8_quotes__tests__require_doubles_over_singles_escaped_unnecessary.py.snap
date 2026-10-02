@@ -302,7 +302,6 @@ Q004 [*] Unnecessary escape on inner quote character
 45 | # Invalid escapes in bytestrings are also triggered:
 46 | x = b"\xe7\xeb\x0c\xa1\x1b\x83tN\xce=x\xe9\xbe\x01\xb9\x13B_\xba\xe7\x0c2\xce\'rm\x0e\xcd\xe9.\xf8\xd2"  # Q004
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
 help: Remove backslash
    |
 45 | # Invalid escapes in bytestrings are also triggered:

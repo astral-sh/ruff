@@ -118,6 +118,10 @@ if sys.version_info < (3, 13):
 
 _T = TypeVar("_T")
 
+# Note that this is often the wrong class: it is only useful for sub-classing
+# (e.g. csv.excel). Dialect objects returned at runtime, such as the return
+# value of get_dialect(), are usually _csv.Dialect, which is not a subclass
+# of csv.Dialect.
 class Dialect:
     """Describe a CSV dialect.
 
@@ -244,6 +248,10 @@ class Sniffer:
     def sniff(self, sample: str, delimiters: str | None = None) -> type[Dialect]:
         """
         Returns a dialect (or None) corresponding to the sample
+
+        If several delimiters fit the sample equally well, the
+        delimiters listed in the preferred attribute are preferred, in
+        that order, no matter how many times each of them occurs.
         """
 
     def has_header(self, sample: str) -> bool: ...

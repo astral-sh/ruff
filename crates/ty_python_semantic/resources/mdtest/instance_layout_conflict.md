@@ -64,6 +64,38 @@ class AB(  # error: [instance-layout-conflict]
 ): ...
 ```
 
+## Slot names that are not statically known
+
+A nonempty tuple still creates a distinct instance layout when its individual slot names are not
+known.
+
+```py
+def create(name: str) -> None:
+    class A:
+        __slots__ = (name,)
+
+    class B:
+        __slots__ = ("value",)
+
+    class C(A, B): ...  # error: [instance-layout-conflict]
+```
+
+A variable-length tuple also creates a distinct instance layout when its type guarantees at least
+one slot name.
+
+```py
+from typing_extensions import Unpack
+
+def create_with_variadic_slots(names: tuple[str, Unpack[tuple[str, ...]]]) -> None:
+    class VariadicSlots:
+        __slots__ = names
+
+    class KnownSlots:
+        __slots__ = ("value",)
+
+    class Incompatible(VariadicSlots, KnownSlots): ...  # error: [instance-layout-conflict]
+```
+
 ## Synthesized `__slots__` from dataclasses
 
 ```py
@@ -141,19 +173,20 @@ class E(B, C, A): ...  # fine
 
 ## Post-hoc modifications to `__slots__`
 
+Concatenating slot names preserves the tuple's exact elements, so both bases contribute a nonempty
+instance layout.
+
 ```py
 class A:
     __slots__ = ()
     __slots__ += ("a", "b")
 
-reveal_type(A.__slots__)  # revealed: tuple[Literal["a", "b"], ...]
+reveal_type(A.__slots__)  # revealed: tuple[Literal["a"], Literal["b"]]
 
 class B:
     __slots__ = ("c", "d")
 
-# TODO: ideally this would trigger `[instance-layout-conflict]`
-# (but it's also not high-priority)
-class C(A, B): ...
+class C(A, B): ...  # error: [instance-layout-conflict]
 ```
 
 ## Explicitly annotated `__slots__`
@@ -277,6 +310,20 @@ class Task(asyncio.Task[Any]): ...
 class SubClass(Task, Future): ...  # fine
 ```
 
+## Slot names declared in a list
+
+A list of slot names restricts the instance layout just like a tuple.
+
+```py
+class A:
+    __slots__ = ["a"]
+
+class B:
+    __slots__ = ("b",)
+
+class C(A, B): ...  # error: [instance-layout-conflict]
+```
+
 ## False negatives
 
 ### Possibly unbound `__slots__`
@@ -309,19 +356,6 @@ def _(flag: bool):
 
     # Might or might not be fine at runtime
     class C(A, B): ...
-```
-
-### Non-tuple `__slots__` definitions
-
-```py
-class A:
-    __slots__ = ["a", "b"]  # This is treated as "dynamic"
-
-class B:
-    __slots__ = ("c", "d")
-
-# False negative: [incompatible-slots]
-class C(A, B): ...
 ```
 
 ### Diagnostic if `__slots__` is externally modified

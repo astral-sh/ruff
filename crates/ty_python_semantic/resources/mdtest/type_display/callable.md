@@ -60,6 +60,9 @@ def f(x: Top[Callable[..., str]] | Callable[[int], int]):
 ```toml
 [environment]
 python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
 ```
 
 We wrap the signature of a top ParamSpec with `Top[...]`:
@@ -75,6 +78,29 @@ def _(x: object):
     if callable(x):
         c = C(x)
         reveal_type(c)  # revealed: C[Top[(...)]]
+```
+
+## Unpacked variadic signatures
+
+Display an unpacked variadic as one parameter, including its fixed prefix and required suffix.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def mixed(
+    prefix: bytes,
+    /,
+    label: str,
+    *args: *tuple[bool, *tuple[int, ...], bytes, str],
+    flag: bool = False,
+    **kwargs: bytes,
+) -> None: ...
+
+# revealed: def mixed(prefix: bytes, /, label: str, *args: *tuple[bool, *tuple[int, ...], bytes, str], flag: bool = False, **kwargs: bytes) -> None
+reveal_type(mixed)
 ```
 
 ## Type aliases are not expanded unless necessary
@@ -124,4 +150,20 @@ class Baz:
         pass
 
 reveal_type(Baz().h)  # revealed: bound method Baz.h(x: Scalar | GenericArray1d[Scalar]) -> None
+```
+
+## Deeply nested callables
+
+We display up to four nested callable signatures, then abbreviate further signatures as
+`(...) -> ...`.
+
+```py
+from typing import Callable
+
+def f(
+    at_limit: Callable[[], Callable[[], Callable[[], Callable[[], int]]]],
+    beyond_limit: Callable[[], Callable[[], Callable[[], Callable[[], Callable[[], int]]]]],
+):
+    reveal_type(at_limit)  # revealed: () -> (() -> (() -> (() -> int)))
+    reveal_type(beyond_limit)  # revealed: () -> (() -> (() -> (() -> ((...) -> ...))))
 ```

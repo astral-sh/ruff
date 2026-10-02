@@ -7,7 +7,6 @@ I001 [*] Import block is un-sorted or un-formatted
 1 | / from sklearn.svm import XYZ, func, variable, Const, Klass, constant
 2 | | from subprocess import First, var, func, Class, konst, A_constant, Last, STDOUT
   | |_______________________________________________________________________________^
-  |
 help: Organize imports
   |
   - from sklearn.svm import XYZ, func, variable, Const, Klass, constant

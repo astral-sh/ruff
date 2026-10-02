@@ -9,10 +9,12 @@ use std::sync::LazyLock;
 use colored::Colorize;
 use path_slash::PathExt;
 use ruff_db::Db;
+use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceText, line_index, source_text};
+use ruff_python_ast::PythonVersion;
 use ruff_source_file::{LineIndex, OneIndexed};
 use smallvec::SmallVec;
 
@@ -29,7 +31,7 @@ pub struct FailuresByLine {
 }
 
 impl FailuresByLine {
-    pub fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (OneIndexed, &[Failure])> {
         self.lines.iter().map(|line_failures| {
             (
                 line_failures.line_number,
@@ -93,6 +95,7 @@ struct LineFailures {
 pub fn match_file(
     db: &dyn Db,
     file: File,
+    python_version: PythonVersion,
     diagnostics: &[Diagnostic],
     options: RunOptions,
 ) -> Result<Vec<Diagnostic>, FailuresByLine> {
@@ -108,7 +111,7 @@ pub fn match_file(
         });
         (assertions, diagnostics)
     } else {
-        let parsed = parsed_module(db, file).load(db);
+        let parsed = parsed_module(db, PythonFile::new(db, file, python_version)).load(db);
         let assertions = InlineFileAssertions::from_file(
             source.as_str(),
             AssertionSource::Python(&parsed),
@@ -462,7 +465,7 @@ fn match_reveal_type_diagnostic(
             return false;
         }
 
-        let primary_message = diagnostic.primary_message();
+        let headline_message = diagnostic.headline_message();
         let Some(primary_annotation) =
             (diagnostic.primary_annotation()).and_then(|a| a.get_message())
         else {
@@ -473,7 +476,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_type, reveal_protocol_interface
         if matches!(
-            primary_message,
+            headline_message,
             "Revealed type" | "Revealed protocol interface"
         ) && expected_reveal_type_message.is_none_or(|expected_reveal_type_message| {
             primary_annotation == expected_reveal_type_message
@@ -483,7 +486,7 @@ fn match_reveal_type_diagnostic(
 
         // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
         if matches!(
-            primary_message,
+            headline_message,
             "Assignability holds" | "Subtyping holds" | "Revealed MRO"
         ) && expected_reveal_type
             .is_none_or(|expected_reveal_type| primary_annotation == expected_reveal_type)
@@ -528,6 +531,7 @@ mod tests {
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{File, system_path_to_file};
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -588,7 +592,7 @@ mod tests {
             .into_iter()
             .map(|diagnostic| diagnostic.into_diagnostic(file))
             .collect();
-        super::match_file(&db, file, &diagnostics, options)
+        super::match_file(&db, file, PythonVersion::latest_ty(), &diagnostics, options)
     }
 
     fn assert_fail(result: Result<Vec<Diagnostic>, FailuresByLine>, messages: &[(usize, &[&str])]) {

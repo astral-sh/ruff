@@ -19,16 +19,30 @@ class BaseProcess:
 
     authkey: bytes
     _identity: tuple[int, ...]  # undocumented
-    def __init__(
-        self,
-        group: None = None,
-        target: Callable[..., object] | None = None,
-        name: str | None = None,
-        args: Iterable[Any] = (),
-        kwargs: Mapping[str, Any] = {},
-        *,
-        daemon: bool | None = None,
-    ) -> None: ...
+    if sys.version_info >= (3, 14):
+        # kwargs default changed in Python 3.14.1
+        def __init__(
+            self,
+            group: None = None,
+            target: Callable[..., object] | None = None,
+            name: str | None = None,
+            args: Iterable[Any] = (),
+            kwargs: Mapping[str, Any] | None = None,
+            *,
+            daemon: bool | None = None,
+        ) -> None: ...
+    else:
+        def __init__(
+            self,
+            group: None = None,
+            target: Callable[..., object] | None = None,
+            name: str | None = None,
+            args: Iterable[Any] = (),
+            kwargs: Mapping[str, Any] = {},
+            *,
+            daemon: bool | None = None,
+        ) -> None: ...
+
     def run(self) -> None:
         """
         Method to be run in sub-process; can be overridden in sub-class

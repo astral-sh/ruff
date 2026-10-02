@@ -1,8 +1,7 @@
 ## What it does
 
-Reports runtime checks against `TypedDict` classes.
-This includes explicit calls to `isinstance()`/`issubclass()` and implicit
-checks performed by `match` class patterns.
+Reports runtime checks against `TypedDict` classes. This includes explicit calls to
+`isinstance()`/`issubclass()` and implicit checks performed by `match` class patterns.
 
 ## Why is this bad?
 

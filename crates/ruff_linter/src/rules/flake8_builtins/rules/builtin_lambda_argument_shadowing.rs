@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_builtins::helpers::shadows_builtin;
 
 /// ## What it does
@@ -21,7 +22,7 @@ use crate::rules::flake8_builtins::helpers::shadows_builtin;
 /// ## Options
 /// - `lint.flake8-builtins.ignorelist`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", category = Category::Pedantic)]
 pub(crate) struct BuiltinLambdaArgumentShadowing {
     name: String,
 }

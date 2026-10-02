@@ -18,7 +18,9 @@ mod type_hierarchy;
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
-pub(crate) use diagnostics::publish_settings_diagnostics;
+pub(crate) use diagnostics::{
+    publish_all_document_diagnostics, publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -52,6 +54,11 @@ pub(super) fn request(req: server::Request) -> Task {
         ),
         requests::GotoDeclarationRequestHandler::METHOD => background_document_request_task::<
             requests::GotoDeclarationRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::GotoImplementationRequestHandler::METHOD => background_document_request_task::<
+            requests::GotoImplementationRequestHandler,
         >(
             req, BackgroundSchedule::Worker
         ),
@@ -310,8 +317,8 @@ where
 
         let uri = R::document_uri(&params);
 
-        let Ok(document) = session.snapshot_document(&uri) else {
-            let reason = format!("Document {uri} is not open in the session");
+        let Ok(snapshot) = session.snapshot_document(&uri) else {
+            let reason = format!("Document {uri} is neither open nor a supported closed file");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -329,9 +336,9 @@ where
             });
         };
 
-        let path = document.notebook_or_file_path();
+        let path = snapshot.document().notebook_or_file_path();
         let db = session.project_db(path).clone();
-        let log_guidance = document.client_name().log_guidance();
+        let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = %R::METHOD).entered();
@@ -351,7 +358,7 @@ where
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
                 salsa::attach(&db, || {
-                    R::handle_request(&id, &db, document, client, params);
+                    R::handle_request(&id, &db, snapshot, client, params);
                 });
             }) {
                 panic_response::<R>(&id, client, &error, retry, log_guidance);
@@ -434,7 +441,13 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let uri = N::document_uri(&params);
-        let Ok(snapshot) = session.snapshot_document(&uri) else {
+        // Requiring an open document here assumes the notification is invalid for closed documents.
+        // TODO: Revisit this check before routing a notification that can target closed documents through
+        // `background_notification_thread`. Note that `snapshot_document` can already resolve closed files.
+        let Ok(snapshot) = session
+            .open_document_handle(&uri)
+            .and_then(|_| session.snapshot_document(&uri))
+        else {
             let reason = format!("Document {uri} is not open in the session");
             tracing::warn!(
                 "Ignoring notification id={id} method={} because {reason}",
@@ -488,8 +501,11 @@ where
                 anyhow::anyhow!("JSON parsing failure:\n{json_err}")
             }
             server::ExtractError::MethodMismatch(_) => {
-                unreachable!("A method mismatch should not be possible here unless you've used a different handler (`Req`) \
-                    than the one whose method name was matched against earlier.")
+                unreachable!(
+                    "A method mismatch should not be possible here \
+                    unless you've used a different handler (`Req`) \
+                    than the one whose method name was matched against earlier."
+                )
             }
         })
         .with_failure_code(server::ErrorCode::InvalidParams)
@@ -537,8 +553,11 @@ where
                     anyhow::anyhow!("JSON parsing failure:\n{json_err}")
                 }
                 server::ExtractError::MethodMismatch(_) => {
-                    unreachable!("A method mismatch should not be possible here unless you've used a different handler (`N`) \
-                        than the one whose method name was matched against earlier.")
+                    unreachable!(
+                        "A method mismatch should not be possible here \
+                        unless you've used a different handler (`N`) \
+                        than the one whose method name was matched against earlier."
+                    )
                 }
             })
             .with_failure_code(server::ErrorCode::InvalidParams)?,
@@ -562,7 +581,7 @@ impl<T, E: Into<anyhow::Error>> LSPResult<T> for core::result::Result<T, E> {
 }
 
 impl Error {
-    pub(crate) fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
+    fn new(err: anyhow::Error, code: server::ErrorCode) -> Self {
         Self { code, error: err }
     }
 }

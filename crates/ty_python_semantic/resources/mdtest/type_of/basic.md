@@ -132,6 +132,37 @@ def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Unio
     reveal_type(b)  # revealed: type[BasicUser | ProUser | C | str]
 ```
 
+## Intersection of classes
+
+```pyi
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class A: ...
+class B: ...
+
+static_assert(is_equivalent_to(type[A & B], type[A] & type[B]))
+static_assert(is_equivalent_to(type[A] & type[Any], type[A & Any]))
+```
+
+This equivalence is also true for intersections of disjoint classes. In this case, both sides
+evaluate to `Never`.
+
+```pyi
+from typing_extensions import Never
+
+static_assert(is_equivalent_to(type[bool & str], Never))
+static_assert(is_equivalent_to(type[bool] & type[str], Never))
+static_assert(is_equivalent_to(type[bool & str], type[bool] & type[str]))
+```
+
+This also implies that `type[Never]` is equivalent to `Never`:
+
+```pyi
+static_assert(is_equivalent_to(type[Never], Never))
+```
+
 ## Special case for `None`
 
 The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
@@ -252,6 +283,11 @@ _: type[A, B]
 
 ## Callable types are not valid parameters
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 ```py
 from collections.abc import Callable
 
@@ -266,6 +302,36 @@ def f(
     reveal_type(x)  # revealed: type[Unknown]
     reveal_type(y)  # revealed: type[Unknown]
     reveal_type(z)  # revealed: type[Unknown]
+```
+
+A callable signature is also invalid when it appears inside a union, an intersection or an alias
+used as the argument to `type[...]`:
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+type MyCallable = Callable[[int], str]
+
+def _(
+    union: type[A | Callable[[int], str]],  # error: [invalid-type-form]
+    intersection: type[A & Callable[[int], str]],  # error: [invalid-type-form]
+    intersection_explicit: type[Intersection[A, Callable[[int], str]]],  # error: [invalid-type-form]
+    alias: type[MyCallable],  # error: [invalid-type-form]
+):
+    reveal_type(union)  # revealed: type[Unknown]
+    reveal_type(intersection)  # revealed: type[Unknown]
+    reveal_type(intersection_explicit)  # revealed: type[Unknown]
+    reveal_type(alias)  # revealed: type[Unknown]
+```
+
+`Callable` is still valid when nested in other types, e.g.:
+
+```py
+def _(valid: type[list[Callable[[int], str]]]):
+    reveal_type(valid)  # revealed: type[list[(int, /) -> str]]
 ```
 
 ## As a base class
@@ -319,8 +385,6 @@ from typing import final, Any
 from ty_extensions import static_assert
 from ty_extensions._internal import is_assignable_to, is_subtype_of, is_disjoint_from
 
-class Biv[T]: ...
-
 class Cov[T]:
     def pop(self) -> T:
         raise NotImplementedError
@@ -333,9 +397,6 @@ class Inv[T]:
     x: T
 
 @final
-class BivSub[T](Biv[T]): ...
-
-@final
 class CovSub[T](Cov[T]): ...
 
 @final
@@ -345,9 +406,6 @@ class ContraSub[T](Contra[T]): ...
 class InvSub[T](Inv[T]): ...
 
 def _[T, U]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[U]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[BivSub[T]]))
-
     # `T` and `U` could specialize to the same type.
     static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[U]]))
     static_assert(not is_disjoint_from(type[CovSub[U]], type[CovSub[T]]))
@@ -359,12 +417,6 @@ def _[T, U]():
     static_assert(not is_disjoint_from(type[InvSub[U]], type[InvSub[T]]))
 
 def _():
-    static_assert(is_subtype_of(type[BivSub[bool]], type[BivSub[int]]))
-    static_assert(is_subtype_of(type[BivSub[int]], type[BivSub[bool]]))
-    static_assert(not is_disjoint_from(type[BivSub[bool]], type[BivSub[int]]))
-    # `BivSub[int]` and `BivSub[str]` are mutual subtypes.
-    static_assert(not is_disjoint_from(type[BivSub[int]], type[BivSub[str]]))
-
     static_assert(is_subtype_of(type[CovSub[bool]], type[CovSub[int]]))
     static_assert(not is_subtype_of(type[CovSub[int]], type[CovSub[bool]]))
     static_assert(not is_disjoint_from(type[CovSub[bool]], type[CovSub[int]]))
@@ -383,12 +435,6 @@ def _():
     static_assert(is_disjoint_from(type[InvSub[bool]], type[InvSub[int]]))
 
 def _[T]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[BivSub[Any]]))
-    static_assert(is_subtype_of(type[BivSub[Any]], type[BivSub[T]]))
-    static_assert(is_assignable_to(type[BivSub[T]], type[BivSub[Any]]))
-    static_assert(is_assignable_to(type[BivSub[Any]], type[BivSub[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[BivSub[Any]]))
-
     static_assert(not is_subtype_of(type[CovSub[T]], type[CovSub[Any]]))
     static_assert(not is_subtype_of(type[CovSub[Any]], type[CovSub[T]]))
     static_assert(is_assignable_to(type[CovSub[T]], type[CovSub[Any]]))
@@ -408,12 +454,6 @@ def _[T]():
     static_assert(not is_disjoint_from(type[InvSub[T]], type[InvSub[Any]]))
 
 def _[T, U]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[T]]))
-    static_assert(not is_subtype_of(type[Biv[T]], type[BivSub[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[U]], type[Biv[U]]))
-
     static_assert(is_subtype_of(type[CovSub[T]], type[Cov[T]]))
     static_assert(not is_subtype_of(type[Cov[T]], type[CovSub[T]]))
     static_assert(not is_disjoint_from(type[CovSub[T]], type[Cov[T]]))
@@ -433,11 +473,6 @@ def _[T, U]():
     static_assert(not is_disjoint_from(type[InvSub[U]], type[Inv[U]]))
 
 def _():
-    static_assert(is_subtype_of(type[BivSub[bool]], type[Biv[int]]))
-    static_assert(is_subtype_of(type[BivSub[int]], type[Biv[bool]]))
-    static_assert(not is_disjoint_from(type[BivSub[bool]], type[Biv[int]]))
-    static_assert(not is_disjoint_from(type[BivSub[int]], type[Biv[bool]]))
-
     static_assert(is_subtype_of(type[CovSub[bool]], type[Cov[int]]))
     static_assert(not is_subtype_of(type[CovSub[int]], type[Cov[bool]]))
     static_assert(not is_disjoint_from(type[CovSub[bool]], type[Cov[int]]))
@@ -454,12 +489,6 @@ def _():
     static_assert(is_disjoint_from(type[InvSub[int]], type[Inv[bool]]))
 
 def _[T]():
-    static_assert(is_subtype_of(type[BivSub[T]], type[Biv[Any]]))
-    static_assert(is_subtype_of(type[BivSub[Any]], type[Biv[T]]))
-    static_assert(is_assignable_to(type[BivSub[T]], type[Biv[Any]]))
-    static_assert(is_assignable_to(type[BivSub[Any]], type[Biv[T]]))
-    static_assert(not is_disjoint_from(type[BivSub[T]], type[Biv[Any]]))
-
     static_assert(not is_subtype_of(type[CovSub[T]], type[Cov[Any]]))
     static_assert(not is_subtype_of(type[CovSub[Any]], type[Cov[T]]))
     static_assert(is_assignable_to(type[CovSub[T]], type[Cov[Any]]))

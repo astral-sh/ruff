@@ -7,6 +7,7 @@ use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -59,7 +60,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// [PEP 8: Programming Recommendations](https://peps.python.org/pep-0008/#programming-recommendations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", category = Category::Pedantic)]
 pub(crate) struct LenTest {
     expression: SourceCodeSnippet,
 }

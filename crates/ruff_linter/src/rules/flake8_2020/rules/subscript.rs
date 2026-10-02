@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::registry::Rule;
 use crate::rules::flake8_2020::helpers::is_sys;
 
@@ -38,7 +39,7 @@ use crate::rules::flake8_2020::helpers::is_sys;
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionSlice3;
 
 impl Violation for SysVersionSlice3 {
@@ -79,7 +80,7 @@ impl Violation for SysVersionSlice3 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersion2;
 
 impl Violation for SysVersion2 {
@@ -120,7 +121,7 @@ impl Violation for SysVersion2 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersion0;
 
 impl Violation for SysVersion0 {
@@ -161,7 +162,7 @@ impl Violation for SysVersion0 {
 /// - [Python documentation: `sys.version`](https://docs.python.org/3/library/sys.html#sys.version)
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.113")]
+#[violation_metadata(stable_since = "v0.0.113", category = Category::Suspicious)]
 pub(crate) struct SysVersionSlice1;
 
 impl Violation for SysVersionSlice1 {

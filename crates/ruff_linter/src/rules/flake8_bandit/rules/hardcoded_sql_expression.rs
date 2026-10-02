@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 use crate::Locator;
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -45,7 +46,7 @@ static SQL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 /// - [B608: Test for SQL injection](https://bandit.readthedocs.io/en/latest/plugins/b608_hardcoded_sql_expressions.html)
 /// - [psycopg3: Server-side binding](https://www.psycopg.org/psycopg3/docs/basic/from_pg2.html#server-side-binding)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Security)]
 pub(crate) struct HardcodedSQLExpression;
 
 impl Violation for HardcodedSQLExpression {

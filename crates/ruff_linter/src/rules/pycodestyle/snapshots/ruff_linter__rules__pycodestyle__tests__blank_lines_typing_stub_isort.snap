@@ -10,7 +10,6 @@ I001 [*] Import block is un-sorted or un-formatted
 4 | |
 5 | | from typing import Any, Sequence
   | |________________________________^
-  |
 help: Organize imports
   |
 1 | import json
@@ -27,7 +26,6 @@ E303 [*] Too many blank lines (3)
   |
 5 | from typing import Any, Sequence
   | ^^^^
-  |
 help: Remove extraneous blank line(s)
   |
 2 |
@@ -41,7 +39,6 @@ E303 [*] Too many blank lines (2)
   |
 8 | class MissingCommand(TypeError): ...  # noqa: N818
   | ^^^^^
-  |
 help: Remove extraneous blank line(s)
   |
 6 |
@@ -103,7 +100,6 @@ I001 [*] Import block is un-sorted or un-formatted
 29 | |
 30 | |     from typing_extensions import TypeAlias
    | |___________________________________________^
-   |
 help: Organize imports
    |
 27 |
@@ -117,7 +113,6 @@ E303 [*] Too many blank lines (3)
    |
 30 |     from typing_extensions import TypeAlias
    |     ^^^^
-   |
 help: Remove extraneous blank line(s)
    |
 27 |
@@ -146,7 +141,6 @@ E303 [*] Too many blank lines (2)
    |
 45 | def _exit(self) -> None: ...
    | ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 43 |
@@ -159,7 +153,6 @@ E303 [*] Too many blank lines (2)
    |
 48 | def _optional_commands(self) -> dict[str, bool]: ...
    | ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 46 |
@@ -172,7 +165,6 @@ E303 [*] Too many blank lines (2)
    |
 51 | def run(argv: Sequence[str]) -> int: ...
    | ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 49 |
@@ -185,7 +177,6 @@ E303 [*] Too many blank lines (2)
    |
 54 | def read_line(fd: int = 0) -> bytearray: ...
    | ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 52 |
@@ -198,7 +189,6 @@ E303 [*] Too many blank lines (2)
    |
 57 | def flush() -> None: ...
    | ^^^
-   |
 help: Remove extraneous blank line(s)
    |
 55 |

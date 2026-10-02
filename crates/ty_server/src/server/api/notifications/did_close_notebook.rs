@@ -18,7 +18,7 @@ impl NotificationHandler for DidCloseNotebookHandler {
 impl SyncNotificationHandler for DidCloseNotebookHandler {
     fn run(
         session: &mut Session,
-        _client: &Client,
+        client: &Client,
         params: DidCloseNotebookDocumentParams,
     ) -> Result<()> {
         let DidCloseNotebookDocumentParams {
@@ -27,13 +27,13 @@ impl SyncNotificationHandler for DidCloseNotebookHandler {
         } = params;
 
         let document = session
-            .document_handle(&uri)
+            .open_document_handle(&uri)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         // We don't need to call publish any diagnostics because we clear
         // the diagnostics when closing the corresponding cell documents.
         let _ = document
-            .close(session)
+            .close(session, client)
             .with_failure_code(lsp_server::ErrorCode::InternalError)?;
 
         Ok(())

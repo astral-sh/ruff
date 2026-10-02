@@ -71,3 +71,14 @@ def f():
     # revealed: Literal[2]
     reveal_type(x)
 ```
+
+## Unbound function local named `reveal_type`
+
+The convenience fallback for an unimported `reveal_type` only applies when name resolution does not
+find the name. It does not replace an unbound local.
+
+```py
+def f():
+    reveal_type(1)  # error: [unresolved-reference]
+    reveal_type = lambda value: value
+```

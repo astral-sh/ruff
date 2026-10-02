@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 ## other.py
 
 ```
-1 | def replacement_method() -> None: ...
+1 | def replacement_method(self) -> None: ...
 ```
 
 ## derived.py
@@ -44,7 +44,6 @@ error[override-of-final-method]: Cannot override `Base.method`
   |
 5 |     method = replacement_method  # error: [override-of-final-method]
   |     ^^^^^^ Overrides a definition from superclass `Base`
-  |
 info: `Base.method` is decorated with `@final`, forbidding overrides
  --> src/base.py:4:5
   |
@@ -52,7 +51,6 @@ info: `Base.method` is decorated with `@final`, forbidding overrides
   |     ------
 5 |     def method(self) -> None: ...
   |         ------ `Base.method` defined here
-  |
 help: Remove the override of `method`
 
 ```

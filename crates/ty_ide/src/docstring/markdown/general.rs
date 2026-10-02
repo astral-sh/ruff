@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::debug_assert_matches;
 
 use ruff_text_size::TextSize;
 
@@ -315,7 +316,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
     }
 
     fn finish_rest_literal(&mut self) {
-        debug_assert!(matches!(self.block_state, BlockState::RestLiteral { .. }));
+        debug_assert_matches!(self.block_state, BlockState::RestLiteral { .. });
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(FENCE);
@@ -344,7 +345,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
     }
 
     fn finish_doctest(&mut self) {
-        debug_assert!(matches!(self.block_state, BlockState::Doctest));
+        debug_assert_matches!(self.block_state, BlockState::Doctest);
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(FENCE);
@@ -357,7 +358,7 @@ impl<'source, 'output> Renderer<'source, 'output> {
     }
 
     fn finish_markdown_fence(&mut self, line: &str) {
-        debug_assert!(matches!(self.block_state, BlockState::MarkdownFence(_)));
+        debug_assert_matches!(self.block_state, BlockState::MarkdownFence(_));
         self.flush_pending_line();
         self.block_state = BlockState::Prose;
         self.output.push_str(line);
@@ -461,7 +462,7 @@ impl LinePrefix {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 enum BlockState<'a> {
     #[default]
     Prose,

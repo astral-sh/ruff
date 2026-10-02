@@ -1,13 +1,14 @@
 [project]
 name = "py-fuzzer"
 version = "0.0.0"
+description = "Run Ruff or ty on randomly generated Python source files."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "pysource-codegen>=0.6.0",
     "pysource-minimize>=0.8.0",
     "rich-argparse>=1.7.0",
-    "ruff>=0.11.9",
+    "ruff>=0.16.8",
     "termcolor>=3.1.0",
 ]
 
@@ -15,14 +16,14 @@ dependencies = [
 fuzz = "fuzz:main"
 
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["flit-core>=3.12,<5"]
+build-backend = "flit_core.buildapi"
 
 [dependency-groups]
 dev = ["mypy", "ruff", "ty"]
 
-[tool.hatch.build.targets.wheel]
-include = ["fuzz.py"]
+[tool.flit.module]
+name = "fuzz"
 
 [tool.mypy]
 files = "fuzz.py"
@@ -33,6 +34,18 @@ local_partial_types = true
 enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
 
 [tool.ty.rules]
+blanket-ignore-comment = "error"
+missing-type-argument = "error"
+unsound-return-statement = "error"
+unsound-yield = "error"
+unsupported-dynamic-base = "error"
+division-by-zero = "error"
+dynamic-function-decorator-return = "error"
+unsound-assignment = "error"
+redundant-condition-strict = "error"
+disjoint-cast = "error"
+missing-direct-dependency = "error"
+truthiness-test-of-none-union = "error"
 possibly-unresolved-reference = "error"
 unused-ignore-comment = "error"
 
@@ -46,35 +59,46 @@ skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
 select = [
+    "correctness",
+    "suspicious",
+    "complexity",
+    "performance",
+    "style",
+
     "ARG",
     "E",
     "F",
     "B",
-    "B9",
     "C4",
     "SIM",
     "I",
     "UP",
-    "PIE",
     "PGH",
     "PYI",
     "RUF",
 ]
 ignore = [
     # only relevant if you run a script with `python -0`,
-    "B011",
+    "assert-false",
     # These are enforced by, or incompatible with, the ruff formatter:
-    "E203",
-    "E501",
+    "whitespace-before-punctuation",
+    "line-too-long",
 ]
 unfixable = [
-    "F841",   # unused variable. ruff keeps the call, but mostly it's best to get rid of it all
-    "F601",   # automatic fix might obscure issue
-    "F602",   # automatic fix might obscure issue
-    "B018",   # automatic fix might obscure issue
-    "RUF017", # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
+    "unused-variable",                    # ruff keeps the call, but mostly it's best to get rid of it all
+    "multi-value-repeated-key-literal",   # automatic fix might obscure issue
+    "multi-value-repeated-key-variable",  # automatic fix might obscure issue
+    "useless-expression",                 # automatic fix might obscure issue
+    "quadratic-list-summation",           # Ruff's fix is faster, but I prefer using itertools.chain_from_iterable
 ]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
 split-on-trailing-comma = false
+
+[tool.uv]
+no-build = true
+no-binary-package = ["py-fuzzer"]
+# Pin the isolated build environment for source-build exceptions.
+build-constraint-dependencies = ["flit-core==3.12.0"]
+exclude-newer = "P7D"

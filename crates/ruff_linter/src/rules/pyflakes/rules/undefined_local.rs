@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for undefined local variables.
@@ -33,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///     x += 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.24")]
+#[violation_metadata(stable_since = "v0.0.24", category = Category::Correctness)]
 pub(crate) struct UndefinedLocal {
     name: String,
 }

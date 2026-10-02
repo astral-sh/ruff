@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::ruff::rules::sequence_sorting::{
     CommentComplexity, MultilineStringSequenceValue, SequenceKind, SortClassification,
     SortingStyle, sort_single_line_elements_sequence,
@@ -83,7 +84,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// `__slots__` definition occurs, in which case this rule's fix could
 /// theoretically cause breakage.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.8.0")]
+#[violation_metadata(stable_since = "0.8.0", category = Category::Style)]
 pub(crate) struct UnsortedDunderSlots {
     class_name: ast::name::Name,
 }

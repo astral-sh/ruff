@@ -100,4 +100,3 @@ Module(
 1 | # parse_options: {"target-version": "3.8"}
 2 | {last := x for x in range(3)}
   |  ^^^^^^^^^ Syntax Error: Cannot use unparenthesized assignment expression as an element in a set comprehension on Python 3.8 (syntax was added in Python 3.9)
-  |

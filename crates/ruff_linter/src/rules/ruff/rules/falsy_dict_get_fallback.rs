@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
@@ -38,9 +39,9 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// shown in the [documentation], `dict.get` takes two positional-only arguments, so invalid cases
 /// are identified by the presence of more than two arguments or any keyword arguments.
 ///
-/// [documentation]: https://docs.python.org/3.13/library/stdtypes.html#dict.get
+/// [documentation]: https://docs.python.org/3/library/stdtypes.html#dict.get
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.5")]
+#[violation_metadata(preview_since = "0.8.5", category = Category::Complexity)]
 pub(crate) struct FalsyDictGetFallback;
 
 impl Violation for FalsyDictGetFallback {
@@ -48,7 +49,9 @@ impl Violation for FalsyDictGetFallback {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. The default fallback `None` is already falsy.".to_string()
+        "Avoid providing a falsy fallback to `dict.get()` in boolean test positions. \
+            The default fallback `None` is already falsy."
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {

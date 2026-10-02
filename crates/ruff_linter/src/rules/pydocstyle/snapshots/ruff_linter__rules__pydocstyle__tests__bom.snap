@@ -6,7 +6,6 @@ D300 [*] Use triple double quotes `"""`
   |
 1 | ''' SAM macro definitions '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
 help: Convert to triple double quotes
   |
   - ﻿''' SAM macro definitions '''

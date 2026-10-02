@@ -125,10 +125,12 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                 if parenthesize_value
                     || value.is_call_expr()
                     || value.is_subscript_expr()
-                    // Remember to update the doc-comment above when
-                    // stabilizing this behavior.
-                    || (is_fluent_layout_split_first_call_enabled(f.context())
-                        && call_chain_layout.is_first_call_like())
+                    || (
+                        // Remember to update the doc-comment above when
+                        // stabilizing this behavior.
+                        is_fluent_layout_split_first_call_enabled(f.context())
+                            && call_chain_layout.is_first_call_like()
+                    )
                 {
                     soft_line_break().fmt(f)?;
                 }

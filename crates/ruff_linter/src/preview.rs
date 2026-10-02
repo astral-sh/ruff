@@ -56,6 +56,11 @@ pub(crate) const fn is_fix_f_string_logging_enabled(settings: &LinterSettings) -
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27201
+pub(crate) const fn is_fix_pytest_composite_assertion_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/16719
 pub(crate) const fn is_fix_manual_dict_comprehension_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -185,6 +190,11 @@ pub(crate) const fn is_fix_os_makedirs_enabled(settings: &LinterSettings) -> boo
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/26460
+pub(crate) const fn is_fix_os_stat_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/20009
 pub(crate) const fn is_fix_os_symlink_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -208,11 +218,6 @@ pub(crate) const fn is_undefined_export_in_dunder_init_enabled(settings: &Linter
 
 // https://github.com/astral-sh/ruff/pull/14236
 pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/20659
-pub(crate) const fn is_future_required_preview_generics_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -245,34 +250,8 @@ pub(crate) const fn is_b006_unsafe_fix_preserve_assignment_expr_enabled(
     settings.preview.is_enabled()
 }
 
-pub(crate) const fn is_typing_extensions_str_alias_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/19045
-pub(crate) const fn is_extended_i18n_function_matching_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/21374
-pub(crate) const fn is_extended_snmp_api_path_detection_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/21395
 pub(crate) const fn is_enumerate_for_loop_int_index_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/21469
-pub(crate) const fn is_s310_resolve_string_literal_bindings_enabled(
-    settings: &LinterSettings,
-) -> bool {
-    settings.preview.is_enabled()
-}
-
-// https://github.com/astral-sh/ruff/pull/22057
-pub(crate) const fn is_ble001_exc_info_suppression_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
@@ -340,6 +319,11 @@ pub(crate) const fn is_e402_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/27993
+pub(crate) const fn is_pt020_fix_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/23260
 pub(crate) const fn is_up006_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -356,17 +340,14 @@ pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/23404
-pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
-    settings.preview.is_enabled()
-}
-
 // https://github.com/astral-sh/ruff/pull/23259
 pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
 
 // https://github.com/astral-sh/ruff/pull/25614
+// TODO(brent) Remove ecosystem selector normalization when stabilizing human-readable rule names:
+// https://github.com/astral-sh/ruff/pull/27158
 pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
     preview.is_enabled()
 }
@@ -379,4 +360,14 @@ pub const fn is_warn_on_unknown_selectors_enabled(preview: PreviewMode) -> bool 
 // https://github.com/astral-sh/ruff/pull/27050
 pub(crate) const fn is_b005_precise_diagnostic_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27313
+pub(crate) const fn is_pragma_excluded_from_import_width_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/27666
+pub(crate) const fn is_rule_categories_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
 }

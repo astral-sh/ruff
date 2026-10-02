@@ -5,7 +5,7 @@
 ```py
 def _(x: int):
     if x == 1:
-        reveal_type(x)  # revealed: Literal[1, True]
+        reveal_type(x)  # revealed: Literal[1]
     elif x == 2:
         reveal_type(x)  # revealed: Literal[2]
     elif x != 3:

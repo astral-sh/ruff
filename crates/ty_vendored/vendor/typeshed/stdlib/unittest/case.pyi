@@ -14,7 +14,6 @@ from typing import (
     AnyStr,
     Final,
     Generic,
-    NoReturn,
     ParamSpec,
     Protocol,
     SupportsAbs,
@@ -170,7 +169,7 @@ class TestCase:
 
     def run(self, result: unittest.result.TestResult | None = None) -> unittest.result.TestResult | None: ...
     def __call__(self, result: unittest.result.TestResult | None = ...) -> unittest.result.TestResult | None: ...
-    def skipTest(self, reason: Any) -> NoReturn:
+    def skipTest(self, reason: Any) -> Never:
         """Skip this test."""
 
     def subTest(self, msg: Any = ..., **params: Any) -> AbstractContextManager[None]:
@@ -612,7 +611,7 @@ class TestCase:
     # assertDictEqual accepts only true dict instances. We can't use that here, since that would make
     # assertDictEqual incompatible with TypedDict.
     def assertDictEqual(self, d1: Mapping[Any, object], d2: Mapping[Any, object], msg: Any = None) -> None: ...
-    def fail(self, msg: Any = None) -> NoReturn:
+    def fail(self, msg: Any = None) -> Never:
         """Fail immediately, with the given message."""
 
     def countTestCases(self) -> int: ...

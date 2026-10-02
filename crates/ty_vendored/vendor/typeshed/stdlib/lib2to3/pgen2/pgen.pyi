@@ -1,6 +1,7 @@
 from _typeshed import Incomplete, StrPath
 from collections.abc import Iterable, Iterator
-from typing import IO, ClassVar, NoReturn, overload
+from typing import IO, ClassVar, overload
+from typing_extensions import Never
 
 from . import grammar
 from .tokenize import _TokenInfo
@@ -31,9 +32,9 @@ class ParserGenerator:
     def gettoken(self) -> None: ...
 
     @overload
-    def raise_error(self, msg: object) -> NoReturn: ...
+    def raise_error(self, msg: object) -> Never: ...
     @overload
-    def raise_error(self, msg: str, *args: object) -> NoReturn: ...
+    def raise_error(self, msg: str, *args: object) -> Never: ...
 
 class NFAState:
     arcs: list[tuple[str | None, NFAState]]

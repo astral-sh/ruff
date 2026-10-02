@@ -106,6 +106,50 @@ darwin
 other
 ```
 
+### `sys.platform` membership in inline containers
+
+Membership in an inline list or set of platform names is statically known when the target platform
+is configured. Assignments in matching branches replace the initial value.
+
+```toml
+[environment]
+python-platform = "linux"
+```
+
+```py
+import sys
+
+x = 0
+if sys.platform in {"linux", "windows"}:
+    x = 1
+reveal_type(x)  # revealed: Literal[1]
+
+y = 0
+if sys.platform in ["linux", "windows"]:
+    y = 1
+reveal_type(y)  # revealed: Literal[1]
+```
+
+An absent platform leaves the initial value unchanged. Negating a membership test reverses which
+branch is reachable.
+
+```py
+absent = 0
+if sys.platform in ["darwin", "win32"]:
+    absent = 1
+reveal_type(absent)  # revealed: Literal[0]
+
+excluded = 0
+if sys.platform not in {"darwin", "win32"}:
+    excluded = 1
+reveal_type(excluded)  # revealed: Literal[1]
+
+present = 0
+if sys.platform not in ["linux", "win32"]:
+    present = 1
+reveal_type(present)  # revealed: Literal[0]
+```
+
 ### `typing.TYPE_CHECKING`
 
 ```py
@@ -181,6 +225,7 @@ class AlwaysTrue:
 ```py
 from module import AlwaysTrue
 
+# error: [redundant-condition] "always truthy"
 if AlwaysTrue():
     yes = True
 else:
@@ -1034,7 +1079,7 @@ reveal_type(c)  # revealed: Literal[1]
 python-version = "3.10"
 ```
 
-### Single-valued types, always true
+### Literal subject, always true
 
 ```py
 x = 1
@@ -1048,7 +1093,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with wildcard pattern
+### Literal subject, always true, with wildcard pattern
 
 ```py
 x = 1
@@ -1064,7 +1109,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-### Single-valued types, always true, with guard
+### Literal subject, always true, with guard
 
 Make sure we don't infer a static truthiness in case there is a case guard:
 
@@ -1085,7 +1130,7 @@ match "a":
 reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
-### Single-valued types, always false
+### Literal subject, always false
 
 ```py
 x = 1
@@ -1099,7 +1144,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with wildcard pattern
+### Literal subject, always false, with wildcard pattern
 
 ```py
 x = 1
@@ -1115,7 +1160,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Single-valued types, always false, with guard
+### Literal subject, always false, with guard
 
 For definitely-false cases, the presence of a guard has no influence:
 
@@ -1136,7 +1181,7 @@ match "something else":
 reveal_type(x)  # revealed: Literal[1]
 ```
 
-### Non-single-valued types
+### Broad subject type
 
 ```py
 def _(s: str):

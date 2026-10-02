@@ -7,6 +7,7 @@ use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -29,7 +30,7 @@ use crate::{Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct MultipleStatementsOnOneLineColon;
 
 impl Violation for MultipleStatementsOnOneLineColon {
@@ -60,7 +61,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct MultipleStatementsOnOneLineSemicolon;
 
 impl Violation for MultipleStatementsOnOneLineSemicolon {
@@ -86,7 +87,7 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 /// do_four()
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.245")]
+#[violation_metadata(stable_since = "v0.0.245", category = Category::Formatting)]
 pub(crate) struct UselessSemicolon;
 
 impl AlwaysFixableViolation for UselessSemicolon {

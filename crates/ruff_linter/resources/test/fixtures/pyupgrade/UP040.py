@@ -94,7 +94,7 @@ PositiveList = TypeAliasType(
 T = typing.TypeVar("T", default=Any)
 AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
 
-# unsafe fix if comments within the fix
+# Comments outside the alias value are removed by the fix.
 T = TypeVar("T")
 PositiveList = TypeAliasType(  # eaten comment
     "PositiveList", list[Annotated[T, Gt(0)]], type_params=(T,)
@@ -132,3 +132,20 @@ T: TypeAlias = ( # comment0
 # Test case for TypeVar with default - should be converted when preview mode is enabled
 T_default = TypeVar("T_default", default=int)
 DefaultList: TypeAlias = list[T_default]
+
+# Preserve parentheses around a multiline union in a TypeAliasType call.
+LongAlias = TypeAliasType(
+    "LongAlias",
+    int
+    | str
+    | float
+)
+
+# An already parenthesized value keeps its own parentheses.
+ParenAlias = TypeAliasType(
+    "ParenAlias",
+    (
+        int
+        | str
+    ),
+)

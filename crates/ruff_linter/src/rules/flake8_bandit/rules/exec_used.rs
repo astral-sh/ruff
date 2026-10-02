@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of the builtin `exec` function.
@@ -22,7 +23,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `exec`](https://docs.python.org/3/library/functions.html#exec)
 /// - [Common Weakness Enumeration: CWE-78](https://cwe.mitre.org/data/definitions/78.html)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.116")]
+#[violation_metadata(stable_since = "v0.0.116", category = Category::Security)]
 pub(crate) struct ExecBuiltin;
 
 impl Violation for ExecBuiltin {

@@ -41,14 +41,8 @@ mod tests {
         assert_diagnostics_diff!(
             snapshot,
             Path::new("fastapi").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY313.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY314.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY313),
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY314),
         );
         Ok(())
     }
@@ -62,10 +56,7 @@ mod tests {
         let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("fastapi").join(path).as_path(),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY38.into(),
-                ..LinterSettings::for_rule(rule_code)
-            },
+            &LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY38),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())

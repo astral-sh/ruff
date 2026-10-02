@@ -9,7 +9,6 @@ PT012 `pytest.raises()` block should contain a single simple statement
 43 | |         len([])
 44 | |         [].size
    | |_______________^
-   |
 
 PT012 `pytest.raises()` block should contain a single simple statement
   --> PT012.py:48:5
@@ -72,7 +71,6 @@ PT012 `pytest.raises()` block should contain a single simple statement
 66 | |             if True:
 67 | |                 raise Exception
    | |_______________________________^
-   |
 
 PT012 `pytest.raises()` block should contain a single simple statement
   --> PT012.py:71:5
@@ -84,7 +82,6 @@ PT012 `pytest.raises()` block should contain a single simple statement
 74 | |         except:
 75 | |             raise
    | |_________________^
-   |
 
 PT012 `pytest.raises()` block should contain a single simple statement
   --> PT012.py:83:5
@@ -134,4 +131,3 @@ PT012 `pytest.raises()` block should contain a single simple statement
 96 | |         async for a in b:
 97 | |             assert foo
    | |______________________^
-   |

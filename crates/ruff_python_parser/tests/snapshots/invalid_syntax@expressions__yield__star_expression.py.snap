@@ -123,7 +123,6 @@ Module(
 3 |
 4 | yield *x and y, z
   |        ^^^^^^^ Syntax Error: Boolean expression cannot be used here
-  |
 
 
 ## Semantic Syntax Errors

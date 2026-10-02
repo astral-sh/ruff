@@ -4,6 +4,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -34,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", category = Category::Pedantic)]
 pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {
@@ -50,15 +51,7 @@ impl AlwaysFixableViolation for LiteralMembership {
 
 /// PLR6201
 pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) {
-    let [op] = &*compare.ops else {
-        return;
-    };
-
-    if !matches!(op, CmpOp::In | CmpOp::NotIn) {
-        return;
-    }
-
-    let [right] = &*compare.comparators else {
+    let Some((left, CmpOp::In | CmpOp::NotIn, right)) = compare.as_single() else {
         return;
     };
 
@@ -74,33 +67,30 @@ pub(crate) fn literal_membership(checker: &Checker, compare: &ast::ExprCompare) 
     }
 
     // If `left`, or any of the elements in `right`, are known to _not_ be hashable, return.
-    if std::iter::once(compare.left.as_ref())
-        .chain(elts)
-        .any(|expr| match expr {
-            // Expressions that are known _not_ to be hashable.
-            Expr::List(_)
-            | Expr::Set(_)
-            | Expr::Dict(_)
-            | Expr::ListComp(_)
-            | Expr::SetComp(_)
-            | Expr::DictComp(_)
-            | Expr::Generator(_)
-            | Expr::Await(_)
-            | Expr::Yield(_)
-            | Expr::YieldFrom(_) => true,
-            // Expressions that can be _inferred_ not to be hashable.
-            Expr::Name(name) => {
-                let Some(id) = checker.semantic().resolve_name(name) else {
-                    return false;
-                };
-                let binding = checker.semantic().binding(id);
-                typing::is_list(binding, checker.semantic())
-                    || typing::is_dict(binding, checker.semantic())
-                    || typing::is_set(binding, checker.semantic())
-            }
-            _ => false,
-        })
-    {
+    if std::iter::once(left).chain(elts).any(|expr| match expr {
+        // Expressions that are known _not_ to be hashable.
+        Expr::List(_)
+        | Expr::Set(_)
+        | Expr::Dict(_)
+        | Expr::ListComp(_)
+        | Expr::SetComp(_)
+        | Expr::DictComp(_)
+        | Expr::Generator(_)
+        | Expr::Await(_)
+        | Expr::Yield(_)
+        | Expr::YieldFrom(_) => true,
+        // Expressions that can be _inferred_ not to be hashable.
+        Expr::Name(name) => {
+            let Some(id) = checker.semantic().resolve_name(name) else {
+                return false;
+            };
+            let binding = checker.semantic().binding(id);
+            typing::is_list(binding, checker.semantic())
+                || typing::is_dict(binding, checker.semantic())
+                || typing::is_set(binding, checker.semantic())
+        }
+        _ => false,
+    }) {
         return;
     }
 

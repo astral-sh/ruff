@@ -30,7 +30,6 @@ TC003 [*] Move standard library import `pathlib.Path` into a type-checking block
 5 | from dataclasses import FrozenInstanceError, InitVar, dataclass
 6 | from pathlib import Path
   |                     ^^^^
-  |
 help: Move into type-checking block
    |
 5  | from dataclasses import FrozenInstanceError, InitVar, dataclass

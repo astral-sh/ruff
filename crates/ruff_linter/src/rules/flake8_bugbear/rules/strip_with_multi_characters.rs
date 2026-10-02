@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_b005_precise_diagnostic_enabled;
 use crate::rules::pylint::rules::StripKind;
 
@@ -54,7 +55,7 @@ use crate::rules::pylint::rules::StripKind;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.106")]
+#[violation_metadata(stable_since = "v0.0.106", category = Category::Correctness)]
 pub(crate) struct StripWithMultiCharacters {
     /// The method name is only reflected in the message in preview mode.
     strip: Option<StripKind>,

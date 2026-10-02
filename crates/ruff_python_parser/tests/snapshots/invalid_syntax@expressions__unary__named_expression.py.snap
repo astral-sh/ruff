@@ -99,4 +99,3 @@ Module(
 1 | -x := 1
 2 | not x := 1
   |       ^^ Syntax Error: Expected a statement
-  |

@@ -18,7 +18,7 @@ use ty::{ExitStatus, run};
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-pub fn main() -> ExitStatus {
+fn main() -> ExitStatus {
     run().unwrap_or_else(|error| {
         use io::Write;
 

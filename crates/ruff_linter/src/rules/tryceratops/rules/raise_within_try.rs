@@ -10,6 +10,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `raise` statements within `try` blocks. The only `raise`s
@@ -50,7 +51,7 @@ use crate::checkers::ast::Checker;
 ///         raise
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.233")]
+#[violation_metadata(stable_since = "v0.0.233", category = Category::Pedantic)]
 pub(crate) struct RaiseWithinTry;
 
 impl Violation for RaiseWithinTry {

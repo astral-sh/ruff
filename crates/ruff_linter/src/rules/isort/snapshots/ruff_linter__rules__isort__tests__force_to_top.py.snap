@@ -28,7 +28,6 @@ I001 [*] Import block is un-sorted or un-formatted
 22 | | from lib3.lib4 import foo
 23 | | from lib3.lib4.lib5 import foo
    | |______________________________^
-   |
 help: Organize imports
    |
    - import lib6

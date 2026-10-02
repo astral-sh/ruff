@@ -25,7 +25,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
   |               ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -40,7 +39,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | # ruff:ignore[F401, undefined-name, EXT001, UNKNOWN, F841]
   |                                                      ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -65,7 +63,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 7 | # ruff:ignore[F401, undefined-name, F841]
   |               ^^^^
-  |
 help: Replace rule code with name
   |
 6 | # snapshot: rule-codes-in-suppression-comments
@@ -80,7 +77,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 7 | # ruff:ignore[F401, undefined-name, F841]
   |                                     ^^^^
-  |
 help: Replace rule code with name
   |
 6 | # snapshot: rule-codes-in-suppression-comments
@@ -104,7 +100,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | # ruff:file-ignore[F401, F841]
   |                    ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -118,7 +113,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | # ruff:file-ignore[F401, F841]
   |                          ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -148,7 +142,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
 4 | value = 1
 5 | # ruff:enable[F401, undefined-name, F841]
   |               ----
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -168,7 +161,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
 4 | value = 1
 5 | # ruff:enable[F401, undefined-name, F841]
   |                                     ----
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -196,7 +188,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 2 | # ruff:disable[F401]
   |                ^^^^
-  |
 help: Replace rule code with name
   |
 1 | # snapshot: rule-codes-in-suppression-comments
@@ -229,7 +220,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 2 | # ruff:ignore[PGH001]
   |               ^^^^^^
-  |
 help: Replace rule code with name
   |
 1 | # snapshot: rule-codes-in-suppression-comments
@@ -255,7 +245,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | value = 1  # explanation # ruff:ignore[F401, F841] reason # another
   |                                        ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments
@@ -269,7 +258,6 @@ error[RUF106]: Rule code used instead of name in suppression comment
   |
 3 | value = 1  # explanation # ruff:ignore[F401, F841] reason # another
   |                                              ^^^^
-  |
 help: Replace rule code with name
   |
 2 | # snapshot: rule-codes-in-suppression-comments

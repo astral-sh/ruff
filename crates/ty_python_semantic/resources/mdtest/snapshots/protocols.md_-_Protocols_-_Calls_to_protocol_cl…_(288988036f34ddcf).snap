@@ -48,7 +48,6 @@ error[call-non-callable]: Object of type `<special-form 'typing.Protocol'>` is n
   |
 4 | reveal_type(Protocol())  # revealed: Unknown
   |             ^^^^^^^^^^
-  |
 
 ```
 
@@ -58,13 +57,11 @@ error[call-non-callable]: Cannot instantiate class `MyProtocol`
    |
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
    |             ^^^^^^^^^^^^ This call will raise `TypeError` at runtime
-   |
 info: Protocol classes cannot be instantiated
  --> src/mdtest_snippet.py:6:7
   |
 6 | class MyProtocol(Protocol):
   |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
-  |
 
 ```
 
@@ -74,12 +71,10 @@ error[call-non-callable]: Cannot instantiate class `GenericProtocol`
    |
 16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
    |             ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
-   |
 info: Protocol classes cannot be instantiated
   --> src/mdtest_snippet.py:12:7
    |
 12 | class GenericProtocol[T](Protocol):
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol` declared as a protocol here
-   |
 
 ```

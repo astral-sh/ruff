@@ -129,7 +129,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'C'>, C>` has no att
    |
 20 | super(C, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -139,7 +138,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no att
    |
 23 | super(B, C()).b  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -149,7 +147,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'B'>, C>` has no att
    |
 24 | super(B, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -159,7 +156,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no att
    |
 26 | super(A, C()).a  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -169,7 +165,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no att
    |
 27 | super(A, C()).b  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -179,7 +174,6 @@ error[unresolved-attribute]: Object of type `<super: <class 'A'>, C>` has no att
    |
 28 | super(A, C()).c  # error: [unresolved-attribute]
    | ^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -189,7 +183,6 @@ error[invalid-super-argument]: `<Protocol with members 'bar'>` is an abstract/st
    |
 78 |         reveal_type(super(object, x))
    |                     ^^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -199,7 +192,6 @@ error[invalid-super-argument]: `(int, str, /) -> bool` is an abstract/structural
    |
 82 |     reveal_type(super(object, z))
    |                 ^^^^^^^^^^^^^^^^
-   |
 
 ```
 
@@ -209,6 +201,5 @@ error[invalid-super-argument]: `types.GenericAlias` instance `list[int]` is not 
    |
 98 | reveal_type(super(list[int], []))
    |             ^^^^^^^^^^^^^^^^^^^^
-   |
 
 ```

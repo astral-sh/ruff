@@ -3,7 +3,7 @@
 import bz2
 import io
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath, StrPath, SupportsRead, WriteableBuffer
+from _typeshed import FileDescriptorOrPath, ReadableBuffer, StrOrBytesPath, StrPath, SupportsRead, WriteableBuffer
 from builtins import list as _list  # aliases to avoid name clashes with fields named "type" or "list"
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from gzip import _ReadableFileobj as _GzipReadableFileobj, _WritableFileobj as _GzipWritableFileobj
@@ -445,7 +445,7 @@ class TarFile:
         pax_headers: Mapping[str, str] | None = ...,
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
-        preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
+        preset: int | None = ...,
     ) -> Self: ...
     @overload
     @classmethod
@@ -465,7 +465,7 @@ class TarFile:
         pax_headers: Mapping[str, str] | None = ...,
         debug: Literal[0, 1, 2, 3] | None = None,  # default 0
         errorlevel: Literal[0, 1, 2] | None = None,  # default 1
-        preset: Literal[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] | None = ...,
+        preset: int | None = ...,
     ) -> Self: ...
     if sys.version_info >= (3, 14):
         @overload
@@ -1068,7 +1068,7 @@ mode:
 'w|zst'      open a zstd compressed stream for writing
 """
 
-def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
+def is_tarfile(name: FileDescriptorOrPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
     are able to handle, else return False.
 
@@ -1151,9 +1151,6 @@ class TarInfo:
         "_link_target",
     )
     name: str
-    path: str
-    """In pax headers, "name" is called "path"."""
-
     size: int
     mtime: int | float
     chksum: int
@@ -1176,10 +1173,10 @@ class TarInfo:
         """
 
     @property
-    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    @deprecated("Deprecated; will be removed in Python 3.16.")
     def tarfile(self) -> TarFile | None: ...
     @tarfile.setter
-    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
+    @deprecated("Deprecated; will be removed in Python 3.16.")
     def tarfile(self, tarfile: TarFile | None) -> None: ...
 
     @classmethod
@@ -1195,6 +1192,12 @@ class TarInfo:
         """Return the next TarInfo object from TarFile object
         tarfile.
         """
+
+    @property
+    def path(self) -> str:
+        """In pax headers, "name" is called "path"."""
+    @path.setter
+    def path(self, name: str) -> None: ...
 
     @property
     def linkpath(self) -> str:

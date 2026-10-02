@@ -295,10 +295,14 @@ impl RuffSettingsIndex {
                     return WalkState::Continue;
                 }
 
+                let depth = entry.depth();
                 let directory = entry.into_path();
 
-                // If the directory is excluded from the workspace, skip it.
-                if let Some(file_name) = directory.file_name() {
+                // An explicitly opened workspace root must be indexed even if an ancestor
+                // configuration excludes it. Excluded descendants can still be skipped.
+                if depth > 0
+                    && let Some(file_name) = directory.file_name()
+                {
                     let settings = index
                         .read()
                         .unwrap()
@@ -617,13 +621,13 @@ mod tests {
         let configuration = toml::from_str(
             r#"
             [lint.isort]
-            required-imports = ["from collections.abc import Set"]
+            required-imports = ["import numpy"]
             "#,
         )?;
         let editor_settings = EditorSettings {
             configuration: Some(ResolvedConfiguration::Inline(Box::new(configuration))),
             select: Some(vec![UnresolvedRuleSelector::new(
-                "PYI025",
+                "ICN001",
                 ValueSource::Editor,
             )]),
             ..Default::default()
@@ -636,7 +640,7 @@ mod tests {
             !settings
                 .linter
                 .rules
-                .enabled(Rule::UnaliasedCollectionsAbcSetImport)
+                .enabled(Rule::UnconventionalImportAlias)
         );
         Ok(())
     }

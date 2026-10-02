@@ -12,7 +12,6 @@ use std::fmt::{self, Write};
 use std::str::FromStr;
 use ty_module_resolver::ModuleResolveMode;
 use ty_project::Db as _;
-use ty_python_core::program::Program;
 
 pub(crate) struct ExecuteCommand;
 
@@ -38,7 +37,7 @@ impl SyncRequestHandler for ExecuteCommand {
 }
 
 /// Returns a string with detailed memory usage.
-fn debug_information(session: &Session) -> crate::Result<String> {
+fn debug_information(session: &mut Session) -> crate::Result<String> {
     let mut buffer = String::new();
 
     writeln!(
@@ -65,15 +64,11 @@ fn debug_information(session: &Session) -> crate::Result<String> {
         writeln!(buffer)?;
     }
 
-    for db in session.project_dbs() {
+    for db in session.projects_mut() {
         writeln!(buffer, "Project at {}", db.project().root(db))?;
-        let program = Program::get(db);
+        let program = db.project().program(db);
         writeln!(buffer, "Program:")?;
-        writeln!(
-            buffer,
-            "  python-version: {}",
-            program.python_version_with_source(db).version
-        )?;
+        writeln!(buffer, "  python-version: {}", program.python_version(db))?;
         writeln!(buffer, "  python-platform: {}", program.python_platform(db))?;
         let mut writer = IndentingWriter {
             inner: &mut buffer,
@@ -84,8 +79,8 @@ fn debug_information(session: &Session) -> crate::Result<String> {
             writer,
             "  search-paths: {:#}",
             program
-                .search_paths(db)
-                .display(db, ModuleResolveMode::Typing)
+                .resolver_environment(db)
+                .display_search_paths(db, ModuleResolveMode::Typing)
         )?;
 
         writeln!(buffer, "Settings: {:#?}", db.project().settings(db))?;

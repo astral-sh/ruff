@@ -6,6 +6,7 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::airflow::helpers::is_airflow_builtin_or_provider;
 use crate::{FixAvailability, Violation};
 
@@ -49,7 +50,7 @@ use crate::{FixAvailability, Violation};
 /// The fix is always unsafe because the variable in scope that matches the
 /// task ID may not be the Airflow task object that produced the `XCom` value.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.11")]
+#[violation_metadata(preview_since = "0.15.11", category = Category::Complexity)]
 pub(crate) struct AirflowXcomPullInTemplateString {
     task_id: String,
 }

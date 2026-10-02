@@ -28,7 +28,6 @@ I001 [*] Import block is un-sorted or un-formatted
 5 | /     import sys
 6 | |     import os
   | |_____________^
-  |
 help: Organize imports
   |
 4 | else:

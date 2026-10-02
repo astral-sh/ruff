@@ -3,6 +3,7 @@ use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::fix::edits::{Parentheses, remove_argument};
 use crate::{AlwaysFixableViolation, Fix};
 
@@ -27,7 +28,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.286")]
+#[violation_metadata(stable_since = "v0.0.286", category = Category::Complexity)]
 pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {

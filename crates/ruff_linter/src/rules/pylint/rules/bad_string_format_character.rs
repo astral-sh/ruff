@@ -1,17 +1,14 @@
-use std::str::FromStr;
-
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, ExprStringLiteral, StringFlags, StringLiteral};
 use ruff_python_literal::{
-    cformat::{CFormatErrorType, CFormatString},
     format::FormatPart,
     format::FromTemplate,
     format::{FormatSpec, FormatSpecError, FormatString},
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for unsupported format types in format strings.
@@ -27,9 +24,9 @@ use crate::checkers::ast::Checker;
 /// print("{:z}".format("1"))
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", category = Category::Correctness)]
 pub(crate) struct BadStringFormatCharacter {
-    format_char: char,
+    pub(crate) format_char: char,
 }
 
 impl Violation for BadStringFormatCharacter {
@@ -68,29 +65,6 @@ pub(crate) fn call(checker: &Checker, string: &str, range: TextRange) {
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-/// PLE1300
-/// Ex) `"%z" % "1"`
-pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprStringLiteral) {
-    for StringLiteral {
-        value: _,
-        node_index: _,
-        range,
-        flags,
-    } in &format_string.value
-    {
-        let string = checker.locator().slice(range);
-        let string = &string
-            [usize::from(flags.opener_len())..(string.len() - usize::from(flags.closer_len()))];
-
-        // Parse the format string (e.g. `"%s"`) into a list of `PercentFormat`.
-        if let Err(format_error) = CFormatString::from_str(string) {
-            if let CFormatErrorType::UnsupportedFormatChar(format_char) = format_error.typ {
-                checker.report_diagnostic(BadStringFormatCharacter { format_char }, expr.range());
             }
         }
     }

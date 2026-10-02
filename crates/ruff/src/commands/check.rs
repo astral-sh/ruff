@@ -258,7 +258,7 @@ mod test {
         }
 
         // Configure
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path);
+        let snapshot = format!("{}_{}", rule_code.name(), path);
         // invalid pyproject.toml is not active by default
         let settings = Settings {
             linter: LinterSettings::for_rules(vec![rule_code, Rule::InvalidPyprojectToml]),

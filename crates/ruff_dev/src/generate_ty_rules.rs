@@ -7,11 +7,10 @@ use std::path::PathBuf;
 
 use anyhow::{Result, bail};
 use itertools::Itertools as _;
-use pretty_assertions::StrComparison;
 use regex::{Captures, Regex};
 
 use crate::ROOT_DIR;
-use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
+use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND, generated_file_diff};
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
@@ -34,7 +33,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
             if current == markdown {
                 println!("Up-to-date: {filename}");
             } else {
-                let comparison = StrComparison::new(&current, &markdown);
+                let comparison = generated_file_diff(&current, &markdown);
                 bail!("{filename} changed, please run `{REGENERATE_ALL_COMMAND}`:\n{comparison}");
             }
         }
@@ -105,6 +104,11 @@ fn generate_markdown() -> String {
             .join("\n");
 
         let status_text = match lint.status() {
+            ty_python_semantic::lint::LintStatus::Preview { since } => {
+                format!(
+                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
             ty_python_semantic::lint::LintStatus::Stable { since } => {
                 format!(
                     r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#

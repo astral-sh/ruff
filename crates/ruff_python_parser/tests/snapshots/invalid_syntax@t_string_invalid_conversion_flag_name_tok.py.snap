@@ -65,4 +65,3 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{x!z}"
   |      ^ Syntax Error: t-string: invalid conversion character
-  |

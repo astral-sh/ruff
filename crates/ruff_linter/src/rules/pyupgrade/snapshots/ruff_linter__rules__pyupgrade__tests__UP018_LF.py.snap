@@ -28,7 +28,6 @@ UP018 [*] Unnecessary `int` call (rewrite as a literal)
 6 | / int(+
 7 | |     1)
   | |______^
-  |
 help: Replace with integer literal
   |
 5 |

@@ -33,7 +33,7 @@ mod tests {
     #[test_case(Rule::BlockingInputInAsyncFunction, Path::new("ASYNC250.py"))]
     #[test_case(Rule::BlockingSleepInAsyncFunction, Path::new("ASYNC251.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
+        let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("flake8_async").join(path).as_path(),
             &LinterSettings::for_rule(rule_code),
@@ -47,10 +47,8 @@ mod tests {
     fn async109_python_310_or_older(path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_async").join(path),
-            &LinterSettings {
-                unresolved_target_version: PythonVersion::PY310.into(),
-                ..LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
-            },
+            &LinterSettings::for_rule(Rule::AsyncFunctionWithTimeout)
+                .with_target_version(PythonVersion::PY310),
         )?;
         assert_diagnostics!(path.file_name().unwrap().to_str().unwrap(), diagnostics);
         Ok(())

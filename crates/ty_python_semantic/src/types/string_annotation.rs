@@ -6,6 +6,7 @@ use ruff_text_size::Ranged;
 
 use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
+use crate::types::diagnostic::autofix_with_literal;
 use crate::types::infer::InferenceFlags;
 
 use super::context::InferContext;
@@ -82,7 +83,7 @@ pub(crate) fn parse_string_annotation(
                         let mut diagnostic =
                             builder.into_diagnostic("Syntax error in forward annotation");
 
-                        diagnostic.set_primary_message(&error);
+                        diagnostic.set_primary_annotation_message(&error);
 
                         let possible_secondary = string_literal
                             .range()
@@ -102,6 +103,7 @@ pub(crate) fn parse_string_annotation(
                                 "Did you mean `typing.Literal[\"{}\"]`?",
                                 string_literal.as_str()
                             ));
+                            autofix_with_literal(context, &mut diagnostic, string_expr);
                         }
                     }
                 }

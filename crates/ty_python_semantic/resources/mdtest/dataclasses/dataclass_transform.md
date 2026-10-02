@@ -436,6 +436,193 @@ t = TestMeta(name="test")
 t.name = "new"  # error: [invalid-assignment]
 ```
 
+### `slots_default`
+
+The `slots_default` parameter is a ty extension to `dataclass_transform`; it is not part of the
+typing specification. It describes whether a transformer generates slots when `slots` is omitted.
+
+#### Bare decorators
+
+The default applies when a decorator is used without a call:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(slots_default=True)
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Model:
+    value: int
+
+reveal_type(Model.__slots__)  # revealed: tuple[Literal["value"]]
+reveal_type(Model(1).value)  # revealed: int
+```
+
+#### Decorator factories
+
+The default also applies to decorator factories. An explicit `slots=False` disables it:
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(slots_default=True)
+def model(*, slots: bool = True): ...
+
+@model()
+class WithSlots:
+    value: int
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
+
+@model(slots=False)
+class WithoutSlots:
+    value: int
+
+WithoutSlots.__slots__  # error: [unresolved-attribute]
+```
+
+Conversely, an explicit `slots=True` overrides `slots_default=False`:
+
+```py
+@dataclass_transform(slots_default=False)
+def unslotted_model(*, slots: bool = False): ...
+
+@unslotted_model()
+class WithoutSlots:
+    value: int
+
+WithoutSlots.__slots__  # error: [unresolved-attribute]
+
+@unslotted_model(slots=True)
+class WithSlots:
+    value: int
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
+```
+
+#### Metaclass-based transformers
+
+Classes inherit the transformer's default through their metaclass. Each class can override the
+default independently:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(slots_default=True)
+class ModelMeta(type):
+    def __new__(cls, name, bases, namespace, *, slots: bool = True):
+        return super().__new__(cls, name, bases, namespace)
+
+class ModelBase(metaclass=ModelMeta, slots=False): ...
+
+class WithSlots(ModelBase):
+    value: int
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
+
+class WithoutSlots(ModelBase, slots=False):
+    value: int
+
+WithoutSlots.__slots__  # error: [unresolved-attribute]
+```
+
+#### Base-class-based transformers
+
+The same default and override behavior applies to a transformer on a base class:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(slots_default=True)
+class ModelBase:
+    def __init_subclass__(cls, *, slots: bool = True): ...
+
+class WithSlots(ModelBase):
+    value: int
+
+reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["value"]]
+
+class WithoutSlots(ModelBase, slots=False):
+    value: int
+
+WithoutSlots.__slots__  # error: [unresolved-attribute]
+```
+
+#### Overriding abstract properties
+
+Generated slots override inherited abstract properties, making the decorated class concrete.
+
+```py
+from abc import ABC, abstractmethod
+from typing import dataclass_transform
+
+@dataclass_transform(slots_default=True)
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+class Abstract(ABC):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+@model
+class Concrete(Abstract):
+    value: int
+
+Concrete(1)  # no diagnostic
+```
+
+A transformer on a base class can also generate the slot that implements the property:
+
+```py
+@dataclass_transform(slots_default=True)
+class ModelBase(Abstract):
+    def __init_subclass__(cls, *, slots: bool = True): ...
+
+class ConcreteFromBase(ModelBase):
+    value: int
+
+ConcreteFromBase(1)  # no diagnostic
+```
+
+Disabling slot generation leaves the inherited property abstract:
+
+```py
+class StillAbstract(ModelBase, slots=False):
+    value: int
+
+StillAbstract(1)  # error: [call-non-callable]
+```
+
+#### Before Python 3.10
+
+Custom transformers can generate slots on Python versions before `dataclasses.dataclass` added its
+`slots` parameter:
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T", bound=type)
+
+@dataclass_transform(slots_default=True)
+def model(cls: T) -> T:
+    return cls
+
+@model
+class Model:
+    value: int
+
+reveal_type(Model.__slots__)  # revealed: tuple[Literal["value"]]
+```
+
 ### Transformers using `**kwargs`
 
 Dataclass transform parameters like `frozen` should be recognized even when the transformer doesn't
@@ -714,6 +901,28 @@ class InvalidNonFrozenChild(FrozenParent, frozen=False):
     y: int
 ```
 
+#### Repeated explicit metaclasses
+
+A class that explicitly repeats its base's dataclass-transform metaclass is neither frozen nor
+non-frozen. The base can be defined by a class statement or created dynamically.
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class FrozenMeta(type):
+    def __new__(cls, name, bases, namespace, *, frozen: bool = True): ...
+
+class Root(metaclass=FrozenMeta): ...
+class StaticRoot(Root, metaclass=FrozenMeta): ...
+class StaticMutable(StaticRoot, frozen=False): ...
+
+Dynamic = type("Dynamic", (Root,), {})
+
+class DynamicRoot(Dynamic, metaclass=FrozenMeta): ...
+class DynamicMutable(DynamicRoot, frozen=False): ...
+```
+
 #### Using base-class-based transformers
 
 Similarly, for base-class-based transformers, the class that is decorated with
@@ -845,6 +1054,30 @@ class NotOrderedWithOverrides:
 
     def __ge__(self, other: object) -> bool:
         return False
+```
+
+### Unrecognized parameters
+
+`dataclass_transform` rejects unrecognized parameters:
+
+```py
+from typing import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+```
+
+This also works for the variant from `typing_extensions`:
+
+```py
+from typing_extensions import dataclass_transform
+
+# error: [unknown-argument] "Argument `unsupported` does not match any known parameter"
+@dataclass_transform(unsupported=True)
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
 ```
 
 ## Other `dataclass` parameters
@@ -1200,6 +1433,57 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### Ambiguous field specifiers
+
+Overloads with different return types can still describe the same field. If neither overload
+provides a default, the field remains required:
+
+```py
+from typing import Any, Literal, overload
+from typing_extensions import dataclass_transform
+
+@overload
+def field(value: int) -> int: ...
+@overload
+def field(value: str) -> str: ...
+def field(value: Any) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field,))
+class Model: ...
+
+def _(value: Any):
+    reveal_type(field(value))  # revealed: Unknown
+
+    class Person(Model):
+        id: int = field(value)
+        name: str
+
+    Person(id=1, name="Alice")  # ok
+    Person(name="Alice")  # error: [missing-argument] "No argument provided for required parameter `id`"
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int, name: str) -> None
+```
+
+When matching overloads disagree about field options, we treat the field-specifier as providing a
+default value:
+
+```py
+@overload
+def field_with_init(value: int, *, init: Literal[True] = True) -> int: ...
+@overload
+def field_with_init(value: str, *, init: Literal[False] = False) -> str: ...
+def field_with_init(value: Any, *, init: bool = True) -> Any: ...
+
+@dataclass_transform(field_specifiers=(field_with_init,))
+class ModelWithInit: ...
+
+def _(value: Any):
+    class Person(ModelWithInit):
+        id: int = field_with_init(value)
+
+    Person()  # ok
+    reveal_type(Person.__init__)  # revealed: (self: Person, id: int = ...) -> None
+```
+
 ### Converter field specifier with overloaded callables
 
 ```py
@@ -1387,6 +1671,45 @@ class Outer:
 Field ordering checks apply to classes created via `dataclass_transform`, just like normal
 `dataclass`es.
 
+### Required fields inherited from stub models
+
+An annotation-only field in a stub remains required when its model is generated by a
+`dataclass_transform` base class.
+
+`models.pyi`:
+
+```pyi
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class ModelBase: ...
+
+class RequiredModel(ModelBase):
+    required: int
+```
+
+Adding another required field does not cause an ordering violation, and both constructors reject
+calls that omit their required parameters.
+
+```py
+from models import RequiredModel
+
+class Child(RequiredModel):
+    added: str
+
+reveal_type(RequiredModel.__init__)  # revealed: (self: RequiredModel, required: int) -> None
+reveal_type(Child.__init__)  # revealed: (self: Child, required: int, added: str) -> None
+
+RequiredModel(1)
+Child(1, "value")
+
+# error: [missing-argument] "No argument provided for required parameter `required`"
+RequiredModel()
+
+# error: [missing-argument] "No argument provided for required parameter `added`"
+Child(1)
+```
+
 ### For function-based transformers
 
 ```py
@@ -1418,6 +1741,10 @@ class InvalidModel:
     x: int = 1
     y: str  # error: [dataclass-field-order]
 
+@create_model
+class InvalidInheritedModel(ValidModel):
+    z: bytes  # error: [dataclass-field-order]
+
 @dataclass_transform(field_specifiers=(field,), kw_only_default=True)
 def create_kwonly_default_model[T](cls: type[T]) -> type[T]:
     ...
@@ -1438,6 +1765,48 @@ class InvalidKWOnlyDefaultModel:
     x: int
     y: str = field(kw_only=False, default="default")
     z: bytes = field(kw_only=False)  # error: [dataclass-field-order]
+```
+
+### Keyword-only field specifiers before Python 3.10
+
+Although `dataclasses.field` does not support `kw_only` before Python 3.10, third-party field
+specifiers can support it on earlier Python versions. Inherited keyword-only fields must retain that
+setting so they do not participate in positional field ordering.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import Any, TypeVar
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+
+def custom_field(*, default: Any = ..., kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(custom_field,))
+def custom_dataclass(cls: type[T]) -> type[T]:
+    return cls
+
+@custom_dataclass
+class Base:
+    optional: float = custom_field(default=1.0, kw_only=True)
+
+@custom_dataclass
+class Child(Base):
+    required: str
+
+reveal_type(Child.__init__)  # revealed: (self: Child, required: str, *, optional: float = ...) -> None
+
+Child("value")
+Child("value", optional=2.0)
+Child("value", 2.0)  # error: [too-many-positional-arguments]
+
+@custom_dataclass
+class InvalidChild(Base):
+    positional_default: str = custom_field(default="default", kw_only=False)
+    required: int  # error: [dataclass-field-order]
 ```
 
 ### For metaclass-based transformers
@@ -1562,6 +1931,28 @@ class TemperatureSensor(Sensor):
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
+```
+
+Dataclass-transform defaults remain attached to inherited fields even when a subclass is explicitly
+decorated with `@dataclass`.
+
+```py
+@dataclass_transform(kw_only_default=True)
+class KeywordOnlyModelMeta(type):
+    pass
+
+class RequiredModel(metaclass=KeywordOnlyModelMeta):
+    required: int
+
+class OptionalModel(metaclass=KeywordOnlyModelMeta):
+    optional: int = 1
+
+@dataclass(kw_only=True)
+class Child(RequiredModel, OptionalModel):
+    pass
+
+reveal_type(Child.__init__)  # revealed: (self: Child, *, optional: int = 1, required: int) -> None
+Child(required=1)
 ```
 
 ## `__dataclass_fields__` and `DataclassInstance` protocol
@@ -1835,6 +2226,19 @@ User(id=1, name="Test")
 User()
 ```
 
+The `slots_default` extension is recognized when the compatibility function accepts it through
+`**kwargs`:
+
+```py
+@__dataclass_transform__(slots_default=True)
+class SlottedBase: ...
+
+class Slotted(SlottedBase):
+    value: int
+
+reveal_type(Slotted.__slots__)  # revealed: tuple[Literal["value"]]
+```
+
 ## Legacy `field_descriptors` compatibility
 
 Earlier versions of the dataclass-transform spec used the parameter name `field_descriptors` instead
@@ -2022,7 +2426,7 @@ WithClassConverter("1", "2.5")
 
 with_class_converter = WithClassConverter("1", "2.5")
 reveal_type(with_class_converter.a)  # revealed: PermissiveNumber
-reveal_type(with_class_converter.b)  # revealed: int | float
+reveal_type(with_class_converter.b)  # revealed: float
 
 with_class_converter.a = "2"
 with_class_converter.a = 1.5  # error: [invalid-assignment]
@@ -2196,6 +2600,105 @@ def _(m: ModelA | ModelB):
     m.x = "1"
 
     m.x = b"1"  # error: [invalid-assignment]
+```
+
+## Recursive field specifiers in a transform
+
+The recursive field specifier does not prevent the other specifiers or transform options from being
+used to synthesize a constructor.
+
+```py
+from typing import dataclass_transform
+
+def field(*, default: int) -> int:
+    return default
+
+transform = alias = dataclass_transform(field_specifiers=(lambda: transform, field), kw_only_default=True)
+
+@transform
+def model(cls):
+    return cls
+
+@model
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
+Example(name="ok", value="wrong")  # error: [invalid-argument-type]
+```
+
+## Recursive field specifiers in a loop
+
+```py
+from typing_extensions import dataclass_transform
+
+def repeat(flag: bool):
+    transform = None
+    while flag:
+        transform = dataclass_transform(field_specifiers=(lambda: transform,))
+    reveal_type(transform)  # revealed: None | <decorator produced by typing.dataclass_transform>
+```
+
+## Recursive field specifiers in a decorator factory
+
+```py
+from typing import dataclass_transform
+
+def field(*, default: int) -> int:
+    return default
+
+@dataclass_transform(field_specifiers=(lambda: decorator, field), kw_only_default=True)
+def factory(): ...
+
+decorator = alias = factory()
+
+@decorator
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
+Example(name="ok", value="wrong")  # error: [invalid-argument-type]
+```
+
+## Recursive field specifiers referring to the transformer
+
+```py
+from typing import dataclass_transform
+from ty_extensions import static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+@dataclass_transform(field_specifiers=(lambda: alias,))
+def factory() -> None: ...
+
+alias = other = factory
+static_assert(is_equivalent_to(TypeOf[factory], TypeOf[alias]))
+```
+
+## A recursive field specifier used in a dataclass
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(field_specifiers=(lambda: decorator,))
+def field(*, default: int) -> int:
+    return default
+
+@dataclass_transform(field_specifiers=(field,), kw_only_default=True)
+def factory(): ...
+
+decorator = alias = factory()
+
+@decorator
+class Example:
+    value: int = field(default=1)
+    name: str
+
+reveal_type(Example.__init__)  # revealed: (self: Example, *, value: int = ..., name: str) -> None
+Example(name="ok")
 ```
 
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033

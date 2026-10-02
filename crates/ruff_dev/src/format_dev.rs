@@ -40,7 +40,8 @@ fn parse_cli(dirs: &[PathBuf]) -> anyhow::Result<(FormatArguments, ConfigArgumen
     let args_matches = FormatCommand::command()
         .no_binary_name(true)
         .get_matches_from(dirs);
-    let arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    let mut arguments: FormatCommand = FormatCommand::from_arg_matches(&args_matches)?;
+    arguments.extend_exclude = Some(vec![FilePattern::Builtin("*.md")]);
     let (cli, config_arguments) = arguments.partition(GlobalConfigArgs::default())?;
     Ok((cli, config_arguments))
 }
@@ -961,6 +962,7 @@ impl BlackOptions {
 
 #[cfg(test)]
 mod tests {
+    use std::assert_matches;
     use std::path::Path;
 
     use indoc::indoc;
@@ -981,10 +983,7 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(119).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Respect
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Respect);
     }
 
     #[test]
@@ -1000,9 +999,6 @@ mod tests {
             .unwrap()
             .to_py_format_options(Path::new("code_inline.py"));
         assert_eq!(options.line_width(), LineWidth::try_from(130).unwrap());
-        assert!(matches!(
-            options.magic_trailing_comma(),
-            MagicTrailingComma::Ignore
-        ));
+        assert_matches!(options.magic_trailing_comma(), MagicTrailingComma::Ignore);
     }
 }

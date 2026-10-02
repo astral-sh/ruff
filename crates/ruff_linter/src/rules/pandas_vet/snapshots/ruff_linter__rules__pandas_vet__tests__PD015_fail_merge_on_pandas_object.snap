@@ -8,4 +8,3 @@ PD015 Use `.merge` method instead of `pd.merge` function. They have equivalent f
 4 | y = pd.DataFrame()
 5 | pd.merge(x, y)
   | ^^^^^^^^
-  |

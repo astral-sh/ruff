@@ -29,7 +29,6 @@ I001 [*] Import block is un-sorted or un-formatted
 6 | /         import collections
 7 | |         import abc
   | |__________________^
-  |
 help: Organize imports
   |
 5 |     case 2:

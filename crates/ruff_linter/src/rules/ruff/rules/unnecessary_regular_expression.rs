@@ -6,9 +6,10 @@ use ruff_python_ast::{
 };
 use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::{Modules, SemanticModel};
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -39,13 +40,14 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// - `re.sub`
 /// - `re.match`
+/// - `re.prefixmatch`
 /// - `re.search`
 /// - `re.fullmatch`
 /// - `re.split`
 ///
 /// For `re.sub`, the `repl` (replacement) argument must also be a string literal,
-/// not a function. For `re.match`, `re.search`, and `re.fullmatch`, the return
-/// value must also be used only for its truth value.
+/// not a function. For `re.match`, `re.prefixmatch`, `re.search`, and `re.fullmatch`,
+/// the return value must also be used only for its truth value.
 ///
 /// ## Fix safety
 ///
@@ -55,7 +57,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python Regular Expression HOWTO: Common Problems - Use String Methods](https://docs.python.org/3/howto/regex.html#use-string-methods)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.1")]
+#[violation_metadata(preview_since = "0.8.1", category = Category::Complexity)]
 pub(crate) struct UnnecessaryRegularExpression {
     replacement: Option<String>,
 }
@@ -181,7 +183,7 @@ impl<'a> ReFunc<'a> {
 
         let (comparison_to_none, range) = match comparison_to_none {
             Some((cmp, range)) => (Some(cmp), range),
-            None => (None, call.range),
+            None => (None, call.range()),
         };
 
         match (func_name, call.arguments.len()) {
@@ -251,7 +253,7 @@ impl<'a> ReFunc<'a> {
                     range,
                 })
             }
-            ("match", 2) if in_truthy_context => Some(ReFunc {
+            ("match" | "prefixmatch", 2) if in_truthy_context => Some(ReFunc {
                 kind: ReFuncKind::Match,
                 pattern: call.arguments.find_argument_value("pattern", 0)?,
                 string: call.arguments.find_argument_value("string", 1)?,
@@ -330,9 +332,8 @@ impl<'a> ReFunc<'a> {
     /// Return a new compare expr of the form `left op right`
     fn compare_expr(left: &Expr, op: CmpOp, right: &Expr) -> Expr {
         Expr::Compare(ExprCompare {
-            left: Box::new(left.clone()),
-            ops: Box::new([op]),
-            comparators: Box::new([right.clone()]),
+            ops: [op].into(),
+            operands: Box::new([left.clone(), right.clone()]),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
@@ -351,12 +352,12 @@ impl<'a> ReFunc<'a> {
         Expr::Call(ExprCall {
             func: Box::new(method),
             arguments: Arguments {
-                args: args.into_boxed_slice(),
+                args: args.into(),
                 keywords: std::iter::empty().collect(),
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             },
-            range: TextRange::default(),
+            range_start: ruff_text_size::TextSize::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
     }
@@ -437,25 +438,14 @@ enum ComparisonToNone {
 /// If the regex call is compared to `None`, return the comparison and its range.
 ///    Example: `re.search("abc", s) is None`
 fn get_comparison_to_none(semantic: &SemanticModel) -> Option<(ComparisonToNone, TextRange)> {
-    let parent_expr = semantic.current_expression_parent()?;
-
-    let Expr::Compare(ExprCompare {
-        ops,
-        comparators,
-        range,
-        ..
-    }) = parent_expr
-    else {
+    let compare = semantic.current_expression_parent()?.as_compare_expr()?;
+    let (_, op, Expr::NoneLiteral(_)) = compare.as_single()? else {
         return None;
     };
 
-    let Some(Expr::NoneLiteral(_)) = comparators.first() else {
-        return None;
-    };
-
-    match ops.as_ref() {
-        [CmpOp::Is] => Some((ComparisonToNone::Is, *range)),
-        [CmpOp::IsNot] => Some((ComparisonToNone::IsNot, *range)),
+    match op {
+        CmpOp::Is => Some((ComparisonToNone::Is, compare.range())),
+        CmpOp::IsNot => Some((ComparisonToNone::IsNot, compare.range())),
         _ => None,
     }
 }

@@ -185,7 +185,8 @@ class BaseEventLoop(AbstractEventLoop):
         """Create a Future object attached to the loop."""
 
     # Tasks methods
-    if sys.version_info >= (3, 14):
+    # `eager_start` is supported as an arbitrary kwarg starting in 3.13.3.
+    if sys.version_info >= (3, 13):
         def create_task(
             self,
             coro: _CoroutineLike[_T],
@@ -406,8 +407,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = 0,
             flags: int = 1,
@@ -440,12 +441,50 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = 0,
+            flags: int = 1,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = 0,
+            flags: int = 1,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            keep_alive: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
             host: None = None,
             port: None = None,
             *,
             family: int = 0,
             flags: int = 1,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -460,8 +499,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -493,12 +532,48 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            ssl_shutdown_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
             host: None = None,
             port: None = None,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,
@@ -512,8 +587,8 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
-            host: str | Sequence[str] | None = None,
-            port: int = ...,
+            host: str | Sequence[str] | None,
+            port: int,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
@@ -544,12 +619,46 @@ class BaseEventLoop(AbstractEventLoop):
         async def create_server(
             self,
             protocol_factory: _ProtocolFactory,
+            host: str | Sequence[str],
+            port: int | None = None,
+            *,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
+            host: None = None,
+            *,
+            port: int,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
+            sock: None = None,
+            backlog: int = 100,
+            ssl: _SSLContext = None,
+            reuse_address: bool | None = None,
+            reuse_port: bool | None = None,
+            ssl_handshake_timeout: float | None = None,
+            start_serving: bool = True,
+        ) -> Server: ...
+        @overload
+        async def create_server(
+            self,
+            protocol_factory: _ProtocolFactory,
             host: None = None,
             port: None = None,
             *,
             family: int = AddressFamily.AF_UNSPEC,
             flags: int = AddressInfo.AI_PASSIVE,
-            sock: socket = ...,
+            sock: socket,
             backlog: int = 100,
             ssl: _SSLContext = None,
             reuse_address: bool | None = None,

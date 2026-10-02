@@ -95,19 +95,19 @@ pub struct Settings {
 }
 
 impl Settings {
-    pub fn convention(&self) -> Option<Convention> {
+    pub(crate) fn convention(&self) -> Option<Convention> {
         self.convention
     }
 
-    pub fn ignore_decorators(&self) -> DecoratorIterator<'_> {
+    pub(crate) fn ignore_decorators(&self) -> DecoratorIterator<'_> {
         DecoratorIterator::new(&self.ignore_decorators)
     }
 
-    pub fn property_decorators(&self) -> DecoratorIterator<'_> {
+    pub(crate) fn property_decorators(&self) -> DecoratorIterator<'_> {
         DecoratorIterator::new(&self.property_decorators)
     }
 
-    pub fn ignore_var_parameters(&self) -> bool {
+    pub(crate) fn ignore_var_parameters(&self) -> bool {
         self.ignore_var_parameters
     }
 }

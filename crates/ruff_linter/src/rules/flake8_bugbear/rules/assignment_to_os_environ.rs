@@ -5,6 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for assignments to `os.environ`.
@@ -40,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 /// - [Python documentation: `subprocess.Popen`](https://docs.python.org/3/library/subprocess.html#subprocess.Popen)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.102")]
+#[violation_metadata(stable_since = "v0.0.102", category = Category::Suspicious)]
 pub(crate) struct AssignmentToOsEnviron;
 
 impl Violation for AssignmentToOsEnviron {

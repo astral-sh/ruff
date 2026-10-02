@@ -167,7 +167,6 @@ UP046 [*] Generic class `A` uses `Generic` subclass instead of type parameters
    |
 73 | class A(Generic[T]): ...
    |         ^^^^^^^^^^
-   |
 help: Use type parameters
    |
 72 |

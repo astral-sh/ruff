@@ -159,42 +159,40 @@ impl SemanticModel<'_> {
                 // Allow comprehensions, even though we can't statically analyze them.
                 return (None, DunderAllFlags::empty());
             }
-            Expr::Name(ast::ExprName { id, .. })
-                // Ex) `__all__ = __all__ + multiprocessing.__all__`
-                if id == "__all__" => {
-                    return (None, DunderAllFlags::empty());
-                }
-            Expr::Attribute(ast::ExprAttribute { attr, .. })
-                // Ex) `__all__ = __all__ + multiprocessing.__all__`
-                if attr == "__all__" => {
-                    return (None, DunderAllFlags::empty());
-                }
+            // Ex) `__all__ = __all__ + multiprocessing.__all__`
+            Expr::Name(ast::ExprName { id, .. }) if id == "__all__" => {
+                return (None, DunderAllFlags::empty());
+            }
+            // Ex) `__all__ = __all__ + multiprocessing.__all__`
+            Expr::Attribute(ast::ExprAttribute { attr, .. }) if attr == "__all__" => {
+                return (None, DunderAllFlags::empty());
+            }
+            // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
             Expr::Call(ast::ExprCall {
                 func, arguments, ..
-            })
-                // Allow `tuple()`, `list()`, and their generic forms, like `list[int]()`.
-                if arguments.keywords.is_empty() && arguments.args.len() <= 1
-                    && self
-                        .resolve_builtin_symbol(map_subscript(func))
-                        .is_some_and(|symbol| matches!(symbol, "tuple" | "list"))
-                    => {
-                        let [arg] = arguments.args.as_ref() else {
-                            return (None, DunderAllFlags::empty());
-                        };
-                        match arg {
-                            Expr::List(ast::ExprList { elts, .. })
-                            | Expr::Set(ast::ExprSet { elts, .. })
-                            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                                return (Some(elts), DunderAllFlags::empty());
-                            }
-                            _ => {
-                                // We can't analyze other expressions, but they must be
-                                // valid, since the `list` or `tuple` call will ultimately
-                                // evaluate to a list or tuple.
-                                return (None, DunderAllFlags::empty());
-                            }
-                        }
+            }) if arguments.keywords.is_empty()
+                && arguments.args.len() <= 1
+                && self
+                    .resolve_builtin_symbol(map_subscript(func))
+                    .is_some_and(|symbol| matches!(symbol, "tuple" | "list")) =>
+            {
+                let [arg] = arguments.args.as_ref() else {
+                    return (None, DunderAllFlags::empty());
+                };
+                match arg {
+                    Expr::List(ast::ExprList { elts, .. })
+                    | Expr::Set(ast::ExprSet { elts, .. })
+                    | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        return (Some(elts), DunderAllFlags::empty());
                     }
+                    _ => {
+                        // We can't analyze other expressions, but they must be
+                        // valid, since the `list` or `tuple` call will ultimately
+                        // evaluate to a list or tuple.
+                        return (None, DunderAllFlags::empty());
+                    }
+                }
+            }
             Expr::Named(ast::ExprNamed { value, .. }) => {
                 // Allow, e.g., `__all__ += (value := ["A", "B"])`.
                 return self.extract_dunder_all_elts(value);

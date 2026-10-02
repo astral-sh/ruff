@@ -418,7 +418,7 @@ impl<T> Parsed<T> {
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.
-    pub fn into_errors(self) -> Vec<ParseError> {
+    fn into_errors(self) -> Vec<ParseError> {
         self.errors
     }
 
@@ -474,7 +474,7 @@ impl<T> Parsed<T> {
     ///
     /// Note that any [`unsupported_syntax_errors`](Parsed::unsupported_syntax_errors) will not
     /// cause [`Err`] to be returned.
-    pub(crate) fn into_result(self) -> Result<Parsed<T>, ParseError> {
+    fn into_result(self) -> Result<Parsed<T>, ParseError> {
         if self.has_valid_syntax() {
             Ok(self)
         } else {
@@ -510,7 +510,7 @@ impl Parsed<Mod> {
     /// Otherwise, it returns [`None`].
     ///
     /// [`Some(Parsed<ModExpression>)`]: Some
-    pub fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
+    fn try_into_expression(self) -> Option<Parsed<ModExpression>> {
         match self.syntax {
             Mod::Module(_) => None,
             Mod::Expression(expression) => Some(Parsed {
@@ -542,7 +542,7 @@ impl Parsed<ModExpression> {
     }
 
     /// Returns a mutable reference to the expression contained in this parsed output.
-    pub fn expr_mut(&mut self) -> &mut Expr {
+    fn expr_mut(&mut self) -> &mut Expr {
         &mut self.syntax.body
     }
 

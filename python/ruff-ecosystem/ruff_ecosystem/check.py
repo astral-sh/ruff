@@ -22,6 +22,7 @@ from ruff_ecosystem.markdown import (
     markdown_plus_minus,
     markdown_project_section,
 )
+from ruff_ecosystem.projects import rule_name_to_code
 from ruff_ecosystem.types import (
     Comparison,
     Diff,
@@ -508,7 +509,13 @@ async def compare_check(
     config_overrides: ConfigOverrides,
     cloned_repo: ClonedRepository,
 ) -> Comparison:
-    with config_overrides.patch_config(cloned_repo.path, options.preview):
+    # TODO(brent) Remove this workaround when human-readable rule names are stabilized.
+    rule_names = (
+        rule_name_to_code(ruff_comparison_executable.resolve())
+        if not options.preview
+        else {}
+    )
+    with config_overrides.patch_config(cloned_repo.path, options.preview, rule_names):
         async with asyncio.TaskGroup() as tg:
             baseline_task = tg.create_task(
                 ruff_check(

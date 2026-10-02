@@ -1,12 +1,14 @@
 use bitflags::bitflags;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, Parameters, PythonVersion};
+use ruff_python_ast::{AnyParameterRef, Expr, ExprBinOp, Operator, PythonVersion, StmtFunctionDef};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_resolve_string_annotation_pyi041_enabled;
+use crate::rules::flake8_type_checking::helpers::is_singledispatch_implementation;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
@@ -54,7 +56,7 @@ use super::generate_union_fix;
 ///
 /// [typing specification]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", category = Category::Complexity)]
 pub(crate) struct RedundantNumericUnion {
     redundancy: Redundancy,
 }
@@ -80,8 +82,16 @@ impl Violation for RedundantNumericUnion {
 }
 
 /// PYI041
-pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
-    for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
+pub(crate) fn redundant_numeric_union(checker: &Checker, function_def: &StmtFunctionDef) {
+    let skip_dispatch_annotation =
+        is_singledispatch_implementation(function_def, checker.semantic());
+
+    for annotation in function_def
+        .parameters
+        .iter()
+        .filter_map(AnyParameterRef::annotation)
+        .skip(usize::from(skip_dispatch_annotation))
+    {
         check_annotation(checker, annotation);
     }
 }
@@ -272,7 +282,7 @@ enum Redundancy {
 }
 
 impl Redundancy {
-    pub(super) fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
+    fn from_numeric_flags(numeric_flags: NumericFlags) -> Option<Self> {
         if numeric_flags == NumericFlags::INT | NumericFlags::FLOAT | NumericFlags::COMPLEX {
             Some(Self::IntFloatComplex)
         } else if numeric_flags == NumericFlags::FLOAT | NumericFlags::COMPLEX {
@@ -300,7 +310,7 @@ bitflags! {
 }
 
 impl NumericFlags {
-    pub(super) fn seen_builtin_type(&mut self, name: &str) {
+    fn seen_builtin_type(&mut self, name: &str) {
         let flag: NumericFlags = match name {
             "int" => NumericFlags::INT,
             "float" => NumericFlags::FLOAT,

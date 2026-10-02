@@ -6,9 +6,11 @@ use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, ExprContext, Parameters, Stmt};
 use ruff_python_ast::{ExprLambda, visitor};
 use ruff_python_semantic::SemanticModel;
+use ruff_text_size::Ranged;
 
 use crate::Fix;
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::{FixAvailability, Violation};
 
@@ -40,11 +42,36 @@ use crate::{FixAvailability, Violation};
 /// (x + 1 for x in iterable)
 /// ```
 ///
+/// ## Known problems
+/// A `map` object and a generator expression are not interchangeable when the
+/// mapped expression raises. Once an exception propagates out of a generator,
+/// the generator is closed, so every later `next()` call raises
+/// `StopIteration`. A `map` object is not closed, so iteration can resume after
+/// the error:
+///
+/// ```python
+/// values = ["0", "x", "2"]
+///
+/// m = map(lambda v: int(v), values)
+/// next(m)  # 0
+/// next(m)  # raises ValueError
+/// next(m)  # 2
+///
+/// g = (int(v) for v in values)
+/// next(g)  # 0
+/// next(g)  # raises ValueError
+/// next(g)  # raises StopIteration
+/// ```
+///
+/// Ruff cannot tell whether a caller relies on this difference, so the
+/// diagnostic is still reported in such cases.
+///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as it may occasionally drop comments
-/// when rewriting the call. In most cases, though, comments will be preserved.
+/// This rule's fix is marked as unsafe because it can change how errors propagate
+/// out of the resulting iterator, as described above. It may also drop comments
+/// when rewriting the call.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.74")]
+#[violation_metadata(stable_since = "v0.0.74", category = Category::Complexity)]
 pub(crate) struct UnnecessaryMap {
     object_type: ObjectType,
 }
@@ -146,7 +173,7 @@ pub(crate) fn unnecessary_map(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(UnnecessaryMap { object_type }, call.range);
+    let mut diagnostic = checker.report_diagnostic(UnnecessaryMap { object_type }, call.range());
     diagnostic.try_set_fix(|| {
         fixes::fix_unnecessary_map(
             call,

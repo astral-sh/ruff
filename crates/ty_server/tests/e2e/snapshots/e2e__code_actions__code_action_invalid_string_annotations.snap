@@ -42,7 +42,7 @@ expression: code_actions
                 "character": 12
               }
             },
-            "newText": "  # ty:ignore[unresolved-reference]"
+            "newText": "  # ty: ignore[unresolved-reference]"
           }
         ]
       }

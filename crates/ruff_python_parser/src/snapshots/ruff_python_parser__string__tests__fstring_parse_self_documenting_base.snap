@@ -13,43 +13,41 @@ expression: suite
                     range: 0..10,
                     value: FStringValue {
                         inner: Single(
-                            FString(
-                                FString {
-                                    range: 0..10,
-                                    node_index: NodeIndex(None),
-                                    elements: [
-                                        Interpolation(
-                                            InterpolatedElement {
-                                                range: 2..9,
-                                                node_index: NodeIndex(None),
-                                                expression: Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 3..7,
-                                                        id: Name("user"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                debug_text: Some(
-                                                    DebugText {
-                                                        leading: "",
-                                                        expression: "user",
-                                                        trailing: "=",
-                                                    },
-                                                ),
-                                                conversion: None,
-                                                format_spec: None,
-                                            },
-                                        ),
-                                    ],
-                                    flags: FStringFlags {
-                                        quote_style: Double,
-                                        prefix: Regular,
-                                        triple_quoted: false,
-                                        unclosed: false,
-                                    },
+                            FString {
+                                range: 0..10,
+                                node_index: NodeIndex(None),
+                                elements: [
+                                    Interpolation(
+                                        InterpolatedElement {
+                                            range: 2..9,
+                                            node_index: NodeIndex(None),
+                                            expression: Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 3..7,
+                                                    id: Name("user"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            debug_text: Some(
+                                                DebugText {
+                                                    leading: "",
+                                                    expression: "user",
+                                                    trailing: "=",
+                                                },
+                                            ),
+                                            conversion: None,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                ],
+                                flags: FStringFlags {
+                                    quote_style: Double,
+                                    prefix: Regular,
+                                    triple_quoted: false,
+                                    unclosed: false,
                                 },
-                            ),
+                            },
                         ),
                     },
                 },

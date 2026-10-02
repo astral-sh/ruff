@@ -1,0 +1,72 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: updated
+---
+PublishDiagnosticsParams {
+    uri: Url {
+        scheme: "file",
+        cannot_be_a_base: false,
+        username: "",
+        password: None,
+        host: None,
+        port: None,
+        path: "<temp_dir>/src/script.py",
+        query: None,
+        fragment: None,
+    },
+    version: Some(
+        2,
+    ),
+    diagnostics: [
+        Diagnostic {
+            range: Range {
+                start: Position {
+                    line: 4,
+                    character: 0,
+                },
+                end: Position {
+                    line: 4,
+                    character: 7,
+                },
+            },
+            severity: Some(
+                Error,
+            ),
+            code: Some(
+                String(
+                    "unresolved-reference",
+                ),
+            ),
+            code_description: Some(
+                CodeDescription {
+                    href: Url {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "ty.dev",
+                            ),
+                        ),
+                        port: None,
+                        path: "/rules",
+                        query: None,
+                        fragment: Some(
+                            "unresolved-reference",
+                        ),
+                    },
+                },
+            ),
+            source: Some(
+                "ty",
+            ),
+            message: String(
+                "Name `missing` used when not defined",
+            ),
+            tags: None,
+            related_information: None,
+            data: None,
+        },
+    ],
+}

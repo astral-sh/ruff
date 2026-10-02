@@ -349,39 +349,6 @@ Union: _SpecialForm
 E.g. for int | str
 """
 
-Protocol: _SpecialForm
-"""Base class for protocol classes.
-
-Protocol classes are defined as::
-
-    class Proto(Protocol):
-        def meth(self) -> int:
-            ...
-
-Such classes are primarily used with static type checkers that recognize
-structural subtyping (static duck-typing).
-
-For example::
-
-    class C:
-        def meth(self) -> int:
-            return 0
-
-    def func(x: Proto) -> int:
-        return x.meth()
-
-    func(C())  # Passes static type check
-
-See PEP 544 for details. Protocol classes decorated with
-@typing.runtime_checkable act as simple-minded runtime protocols that check
-only the presence of given attributes, ignoring their type signatures.
-Protocol classes can be generic, they are defined as::
-
-    class GenProto[T](Protocol):
-        def meth(self) -> T:
-            ...
-"""
-
 Callable: _SpecialForm
 """Deprecated alias to collections.abc.Callable.
 
@@ -1172,7 +1139,7 @@ def no_type_check(arg: _F) -> _F:
     """
 
 if sys.version_info < (3, 15):
-    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    @deprecated("Deprecated; removed in Python 3.15.")
     def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
         """Decorator to give another decorator the @no_type_check effect.
 
@@ -1346,6 +1313,42 @@ follows::
             return mapping[key]
         except KeyError:
             return default
+"""
+
+@type_check_only
+class _Protocol: ...
+
+Protocol: type[_Protocol]
+"""Base class for protocol classes.
+
+Protocol classes are defined as::
+
+    class Proto(Protocol):
+        def meth(self) -> int:
+            ...
+
+Such classes are primarily used with static type checkers that recognize
+structural subtyping (static duck-typing).
+
+For example::
+
+    class C:
+        def meth(self) -> int:
+            return 0
+
+    def func(x: Proto) -> int:
+        return x.meth()
+
+    func(C())  # Passes static type check
+
+See PEP 544 for details. Protocol classes decorated with
+@typing.runtime_checkable act as simple-minded runtime protocols that check
+only the presence of given attributes, ignoring their type signatures.
+Protocol classes can be generic, they are defined as::
+
+    class GenProto[T](Protocol):
+        def meth(self) -> T:
+            ...
 """
 
 class _ProtocolMeta(ABCMeta):
@@ -1528,10 +1531,8 @@ class Awaitable(Protocol[_T_co]):
 _SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
 _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 
-class Coroutine(Awaitable[_ReturnT_nd_co], Generic[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
-    __name__: str
-    __qualname__: str
-
+@runtime_checkable
+class Coroutine(Awaitable[_ReturnT_nd_co], Protocol[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
     @abstractmethod
     def send(self, value: _SendT_nd_contra, /) -> _YieldT_co:
         """Send a value into the coroutine.
@@ -1860,7 +1861,7 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     def get(self, key: object, /) -> _VT_co | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
     @overload
-    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter  # pyrefly: ignore [invalid-variance]
     @overload
     def get(self, key: object, default: _T, /) -> _VT_co | _T: ...
 
@@ -2280,8 +2281,8 @@ if sys.version_info >= (3, 11):
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,  # on 3.11, runtime accepts it as part of kwargs
+        slots_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: Any,
     ) -> IdentityFunction:
         """Decorator to mark an object as providing dataclass-like behavior.
 
@@ -2378,21 +2379,24 @@ class NamedTuple(tuple[Any, ...]):
     if sys.version_info >= (3, 12):
         __orig_bases__: ClassVar[tuple[Any, ...]]
 
-    @overload
-    def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
-    @overload
-    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
-    def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
+    if sys.version_info >= (3, 15):
+        def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
+    else:
+        @overload
+        def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
+        @overload
+        @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated; support removed in Python 3.15")
+        def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
 
     @final
     @classmethod
-    def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
+    def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
     @final
     def _asdict(self) -> dict[str, Any]: ...
     @final
-    def _replace(self, **kwargs: Any) -> typing_extensions.Self: ...
+    def _replace(self, **kwargs: Any) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
     if sys.version_info >= (3, 13):
-        def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...
+        def __replace__(self, **kwargs: Any) -> typing_extensions.Self: ...  # ty:ignore[invalid-type-form]
 
 # Internal mypy fallback type for all typed dicts (does not exist at runtime)
 # N.B. Keep this mostly in sync with typing_extensions._TypedDict/mypy_extensions._TypedDict
@@ -2625,7 +2629,15 @@ if sys.version_info >= (3, 12):
         See PEP 695 for more information.
         """
 
-        def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        if sys.version_info >= (3, 15):
+            def __new__(
+                cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = (), qualname: str | None = None
+            ) -> Self: ...
+            @property
+            def __qualname__(self) -> str: ...
+        else:
+            def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+
         @property
         def __value__(self) -> Any: ...  # AnnotationForm
         @property
@@ -2634,9 +2646,6 @@ if sys.version_info >= (3, 12):
         def __parameters__(self) -> tuple[Any, ...]: ...  # AnnotationForm
         @property
         def __name__(self) -> str: ...
-        if sys.version_info >= (3, 15):
-            @property
-            def __qualname__(self) -> str: ...
         # It's writable on types, but not on instances of TypeAliasType.
         @property
         def __module__(self) -> str | None: ...  # type: ignore[override]

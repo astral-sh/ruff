@@ -21,10 +21,6 @@ impl CancellationTokenSource {
         }
     }
 
-    pub fn is_cancellation_requested(&self) -> bool {
-        self.cancelled.load(std::sync::atomic::Ordering::Relaxed)
-    }
-
     /// Creates a new token that uses this source.
     pub fn token(&self) -> CancellationToken {
         CancellationToken {

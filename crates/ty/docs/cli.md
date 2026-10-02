@@ -56,6 +56,7 @@ over all configuration files.</p>
 <p>Cannot be used in combination with <code>--exit-zero</code> or <code>--exit-zero-on-warning</code>.</p>
 </dd><dt id="ty-check--exclude"><a href="#ty-check--exclude"><code>--exclude</code></a> <i>exclude</i></dt><dd><p>Glob patterns for files to exclude from type checking.</p>
 <p>Uses gitignore-style syntax to exclude files and directories from type checking. Supports patterns like <code>tests/</code>, <code>*.tmp</code>, <code>**/__pycache__/**</code>.</p>
+</dd><dt id="ty-check--exclude-scripts"><a href="#ty-check--exclude-scripts"><code>--exclude-scripts</code></a></dt><dd><p>Exclude files containing PEP 723 inline script metadata unless passed explicitly. Use <code>--include-scripts</code> to disable</p>
 </dd><dt id="ty-check--exit-zero"><a href="#ty-check--exit-zero"><code>--exit-zero</code></a></dt><dd><p>Always use exit code 0, even when there are error-level diagnostics.</p>
 <p>Cannot be used in combination with <code>--error-on-warning</code>.</p>
 </dd><dt id="ty-check--exit-zero-on-warning"><a href="#ty-check--exit-zero-on-warning"><code>--exit-zero-on-warning</code></a></dt><dd><p>Use exit code 0 if there are no error-level diagnostics.</p>

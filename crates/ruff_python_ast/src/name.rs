@@ -173,13 +173,8 @@ impl salsa::Lookup<Name> for &str {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&str> for Name {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.as_str().hash(state);
-    }
-
-    #[inline]
     fn eq(&self, data: &&str) -> bool {
-        self.as_str() == *data
+        self == *data
     }
 }
 
@@ -216,11 +211,6 @@ impl salsa::Lookup<compact_str::CompactString> for &Name {
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<Name> for compact_str::CompactString {
     #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
-    #[inline]
     fn eq(&self, data: &Name) -> bool {
         self.as_str() == data.as_str()
     }
@@ -228,11 +218,6 @@ impl salsa::HashEqLike<Name> for compact_str::CompactString {
 
 #[cfg(feature = "salsa")]
 impl salsa::HashEqLike<&Name> for compact_str::CompactString {
-    #[inline]
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        Hash::hash(self, state);
-    }
-
     #[inline]
     fn eq(&self, data: &&Name) -> bool {
         self.as_str() == data.as_str()
@@ -261,7 +246,7 @@ impl std::fmt::Display for Name {
 impl PartialEq<str> for Name {
     #[inline]
     fn eq(&self, other: &str) -> bool {
-        self.as_str() == other
+        self.0 == other
     }
 }
 
@@ -275,7 +260,7 @@ impl PartialEq<Name> for str {
 impl PartialEq<&str> for Name {
     #[inline]
     fn eq(&self, other: &&str) -> bool {
-        self.as_str() == *other
+        self.0 == *other
     }
 }
 
@@ -302,7 +287,7 @@ impl PartialEq<Name> for String {
 impl PartialEq<&String> for Name {
     #[inline]
     fn eq(&self, other: &&String) -> bool {
-        self.as_str() == *other
+        self == other.as_str()
     }
 }
 
@@ -454,7 +439,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.segments.is_empty()
     }
 
@@ -464,7 +449,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn pop(&mut self) {
+    pub(crate) fn pop(&mut self) {
         self.segments.pop();
     }
 
@@ -474,7 +459,7 @@ impl<'a> QualifiedNameBuilder<'a> {
     }
 
     #[inline]
-    pub fn extend_from_slice(&mut self, segments: &[&'a str]) {
+    pub(crate) fn extend_from_slice(&mut self, segments: &[&'a str]) {
         self.segments.extend_from_slice(segments);
     }
 
@@ -638,7 +623,7 @@ impl<'a> UnqualifiedName<'a> {
     }
 
     #[inline]
-    pub fn from_slice(segments: &[&'a str]) -> Self {
+    fn from_slice(segments: &[&'a str]) -> Self {
         Self(SegmentsVec::from_slice(segments))
     }
 
@@ -878,7 +863,7 @@ mod tests {
         let lookup = "member";
 
         let mut name_hasher = DefaultHasher::new();
-        salsa::HashEqLike::<&str>::hash(&name, &mut name_hasher);
+        name.hash(&mut name_hasher);
         let mut lookup_hasher = DefaultHasher::new();
         lookup.hash(&mut lookup_hasher);
 

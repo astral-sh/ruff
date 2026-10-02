@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for uses of `await` outside `async` functions.
@@ -36,7 +37,7 @@ use crate::Violation;
 ///
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.150")]
+#[violation_metadata(stable_since = "v0.0.150", category = Category::Correctness)]
 pub(crate) struct AwaitOutsideAsync;
 
 impl Violation for AwaitOutsideAsync {

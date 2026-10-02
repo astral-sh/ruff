@@ -112,4 +112,3 @@ Module(
 3 |     nonlocal x,
 4 |     nonlocal x, y,
   |                  ^ Syntax Error: Trailing comma not allowed
-  |

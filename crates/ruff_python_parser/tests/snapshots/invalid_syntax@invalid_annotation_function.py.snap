@@ -1805,4 +1805,3 @@ Module(
 19 | def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
 20 | def w[**Ts = (await 1)](): ...   # await in ParamSpec default
    |               ^^^^^^^ Syntax Error: await expression cannot be used within a ParamSpec default
-   |

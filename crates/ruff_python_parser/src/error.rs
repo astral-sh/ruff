@@ -148,9 +148,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A keyword argument was repeated.
-    DuplicateKeywordArgumentError(String),
-
     /// An invalid expression was found in the assignment target.
     InvalidAssignmentTarget,
     /// An invalid expression was found in the named assignment target.
@@ -205,9 +202,6 @@ pub enum ParseErrorType {
     TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
-
-    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
-    RecursionLimitExceeded,
 }
 
 impl ParseErrorType {
@@ -324,9 +318,6 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
-                write!(f, "Duplicate keyword argument {arg_name:?}")
-            }
             ParseErrorType::UnexpectedIpythonEscapeCommand => {
                 f.write_str("IPython escape commands are only allowed in `Mode::Ipython`")
             }
@@ -339,7 +330,6 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
-            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }
@@ -958,6 +948,17 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     /// [PEP 750]: https://peps.python.org/pep-0750/
     TemplateStrings,
+
+    /// Represents the use of a unary plus in a `match` literal pattern before Python 3.15.
+    ///
+    /// Before 3.15, unary minus was allowed but not plus:
+    ///
+    /// ```python
+    /// match foo:
+    ///     case -1: ...  # okay
+    ///     case +1: ...  # error before 3.15
+    /// ```
+    UnaryPlusMatchPattern,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -1055,6 +1056,9 @@ impl Display for UnsupportedSyntaxError {
                 "Multiple exception types must be parenthesized"
             }
             UnsupportedSyntaxErrorKind::TemplateStrings => "Cannot use t-strings",
+            UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern => {
+                "Unary '+' is not allowed in a literal pattern"
+            }
         };
 
         write!(
@@ -1130,6 +1134,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY314)
             }
             UnsupportedSyntaxErrorKind::TemplateStrings => Change::Added(PythonVersion::PY314),
+            UnsupportedSyntaxErrorKind::UnaryPlusMatchPattern => {
+                Change::Added(PythonVersion::PY315)
+            }
         }
     }
 

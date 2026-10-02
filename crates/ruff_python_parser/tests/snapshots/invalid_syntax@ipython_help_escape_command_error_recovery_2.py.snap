@@ -70,11 +70,9 @@ Module(
 2 | with (a, ?b
 3 | ?
   | ^ Syntax Error: Expected `,`, found `?`
-  |
 
 
   |
 2 | with (a, ?b
 3 | ?
   |  ^ Syntax Error: unexpected EOF while parsing
-  |

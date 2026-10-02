@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::Violation;
+use crate::codes::Category;
 
 /// ## What it does
 /// Checks for `nonlocal` names without bindings.
@@ -31,7 +32,7 @@ use crate::Violation;
 /// - [Python documentation: The `nonlocal` statement](https://docs.python.org/3/reference/simple_stmts.html#nonlocal)
 /// - [PEP 3104 – Access to Names in Outer Scopes](https://peps.python.org/pep-3104/)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.174")]
+#[violation_metadata(stable_since = "v0.0.174", category = Category::Correctness)]
 pub(crate) struct NonlocalWithoutBinding {
     pub(crate) name: String,
 }

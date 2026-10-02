@@ -404,8 +404,8 @@ class Button(Widget):
 
         STANDARD OPTIONS
 
-            class, compound, cursor, image, state, style, takefocus,
-            text, textvariable, underline, width
+            class, compound, cursor, image, justify (Tk 9.0+), padding,
+            state, style, takefocus, text, textvariable, underline, width
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -482,8 +482,8 @@ class Checkbutton(Widget):
 
         STANDARD OPTIONS
 
-            class, compound, cursor, image, state, style, takefocus,
-            text, textvariable, underline, width
+            class, compound, cursor, image, justify (Tk 9.0+), padding,
+            state, style, takefocus, text, textvariable, underline, width
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -553,7 +553,7 @@ class Entry(Widget, tkinter.Entry):
         exportselection: bool = True,
         font: _FontDescription = "TkTextFont",
         foreground: str = "",
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = "",
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = "",
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         show: str = "",
@@ -574,8 +574,10 @@ class Entry(Widget, tkinter.Entry):
 
         WIDGET-SPECIFIC OPTIONS
 
-            exportselection, invalidcommand, justify, show, state,
-            textvariable, validate, validatecommand, width
+            background, exportselection, font, foreground, invalidcommand,
+            justify, locale (Tk 9.1+), placeholder (Tk 9.0+),
+            placeholderforeground (Tk 9.0+), show, state, textvariable,
+            validate, validatecommand, width
 
         VALIDATION MODES
 
@@ -592,7 +594,7 @@ class Entry(Widget, tkinter.Entry):
         exportselection: bool = ...,
         font: _FontDescription = ...,
         foreground: str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         show: str = ...,
         state: str = ...,
@@ -630,7 +632,7 @@ class Entry(Widget, tkinter.Entry):
         exportselection: bool = ...,
         font: _FontDescription = ...,
         foreground: str = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         show: str = ...,
         state: str = ...,
@@ -689,7 +691,7 @@ class Combobox(Entry):
         font: _FontDescription = ...,  # undocumented
         foreground: str = ...,  # undocumented
         height: int = 10,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,  # undocumented
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,  # undocumented
         justify: Literal["left", "center", "right"] = "left",
         name: str = ...,
         postcommand: Callable[[], object] | str = "",
@@ -708,12 +710,14 @@ class Combobox(Entry):
 
         STANDARD OPTIONS
 
-            class, cursor, style, takefocus
+            class, cursor, style, takefocus, xscrollcommand
 
         WIDGET-SPECIFIC OPTIONS
 
-            exportselection, justify, height, postcommand, state,
-            textvariable, values, width
+            background, exportselection, font, foreground, height,
+            invalidcommand, justify, locale (Tk 9.1+), placeholder (Tk 9.0+),
+            placeholderforeground (Tk 9.0+), postcommand, show, state,
+            textvariable, validate, validatecommand, values, width
         """
 
     @overload  # type: ignore[override]
@@ -727,7 +731,7 @@ class Combobox(Entry):
         font: _FontDescription = ...,
         foreground: str = ...,
         height: int = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         postcommand: Callable[[], object] | str = ...,
         show=...,
@@ -768,7 +772,7 @@ class Combobox(Entry):
         font: _FontDescription = ...,
         foreground: str = ...,
         height: int = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         postcommand: Callable[[], object] | str = ...,
         show=...,
@@ -907,13 +911,13 @@ class Label(Widget):
 
         STANDARD OPTIONS
 
-            class, compound, cursor, image, style, takefocus, text,
-            textvariable, underline, width
+            class, compound, cursor, image, state, style, takefocus,
+            text, textvariable, underline, width
 
         WIDGET-SPECIFIC OPTIONS
 
-            anchor, background, font, foreground, justify, padding,
-            relief, text, wraplength
+            anchor, background, borderwidth, font, foreground, justify,
+            padding, relief, text, textangle (Tk 9.1+), wraplength
         """
 
     @overload
@@ -992,8 +996,9 @@ class Labelframe(Widget):
             class, cursor, style, takefocus
 
         WIDGET-SPECIFIC OPTIONS
-            labelanchor, text, underline, padding, labelwidget, width,
-            height
+
+            borderwidth, height, labelanchor, labelwidget, padding,
+            relief, text, underline, width
         """
 
     @overload
@@ -1063,8 +1068,8 @@ class Menubutton(Widget):
 
         STANDARD OPTIONS
 
-            class, compound, cursor, image, state, style, takefocus,
-            text, textvariable, underline, width
+            class, compound, cursor, image, justify (Tk 9.0+), padding,
+            state, style, takefocus, text, textvariable, underline, width
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -1431,7 +1436,9 @@ class Progressbar(Widget):
 
         STANDARD OPTIONS
 
-            class, cursor, style, takefocus
+            anchor (Tk 9.0+), class, cursor, font (Tk 9.0+),
+            foreground (Tk 9.0+), justify (Tk 9.0+), style, takefocus,
+            text (Tk 9.0+), wraplength (Tk 9.0+)
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -1518,8 +1525,8 @@ class Radiobutton(Widget):
 
         STANDARD OPTIONS
 
-            class, compound, cursor, image, state, style, takefocus,
-            text, textvariable, underline, width
+            class, compound, cursor, image, justify (Tk 9.0+), padding,
+            state, style, takefocus, text, textvariable, underline, width
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -1598,7 +1605,7 @@ class Scale(Widget, tkinter.Scale):  # type: ignore[misc]
 
         STANDARD OPTIONS
 
-            class, cursor, style, takefocus
+            class, cursor, state, style, takefocus
 
         WIDGET-SPECIFIC OPTIONS
 
@@ -1874,7 +1881,7 @@ class Spinbox(Entry):
         format: str = "",
         from_: float = 0,
         increment: float = 1,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,  # undocumented
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,  # undocumented
         justify: Literal["left", "center", "right"] = ...,  # undocumented
         name: str = ...,
         show=...,  # undocumented
@@ -1899,7 +1906,10 @@ class Spinbox(Entry):
 
         WIDGET-SPECIFIC OPTIONS
 
-            to, from_, increment, values, wrap, format, command
+            background, command, exportselection, font, foreground,
+            format, from_, increment, justify, locale (Tk 9.1+),
+            placeholder (Tk 9.0+), placeholderforeground (Tk 9.0+), show,
+            state, textvariable, to, values, width, wrap
         """
 
     @overload  # type: ignore[override]
@@ -1916,7 +1926,7 @@ class Spinbox(Entry):
         format: str = ...,
         from_: float = ...,
         increment: float = ...,
-        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], bool] = ...,
+        invalidcommand: str | list[str] | tuple[str, ...] | Callable[[], object] = ...,
         justify: Literal["left", "center", "right"] = ...,
         show=...,
         state: str = ...,
@@ -2021,7 +2031,10 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
         WIDGET-SPECIFIC OPTIONS
 
-            columns, displaycolumns, height, padding, selectmode, show
+            columns, displaycolumns, headingheight (Tk 9.1+), height,
+            padding, rowheight (Tk 9.1+), selectmode, selecttype (Tk 9.0+),
+            show, striped (Tk 9.0+), titlecolumns (Tk 9.0+),
+            titleitems (Tk 9.0+)
 
         ITEM OPTIONS
 
@@ -2404,8 +2417,8 @@ class Treeview(Widget, tkinter.XView, tkinter.YView):
 
     @overload
     def tag_has(self, tagname: str, item: None = None) -> tuple[str, ...]:
-        """If item is specified, returns 1 or 0 depending on whether the
-        specified item has the given tagname. Otherwise, returns a list of
+        """If item is specified, returns True if the specified item has the
+        given tagname, False otherwise. Otherwise, returns a list of
         all items which have the specified tag.
 
         * Availability: Tk 8.6

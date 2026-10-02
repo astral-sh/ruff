@@ -4,6 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::codes::Category;
 use crate::{
     FixAvailability, Locator, Violation, checkers::ast::LintContext, codes::Rule, noqa::Directive,
     suppression::Suppressions,
@@ -11,11 +12,11 @@ use crate::{
 
 /// ## What it does
 ///
-/// Checks for the use of `noqa` comments instead of Ruff-specific `ruff:ignore` comments.
+/// Checks for the use of `noqa` comments instead of Ruff-specific `ruff: ignore` comments.
 ///
 /// ## Why is this bad?
 ///
-/// `ruff:ignore` comments allow the use of rule names instead of codes and can be used in more
+/// `ruff: ignore` comments allow the use of rule names instead of codes and can be used in more
 /// places than `noqa` comments.
 ///
 /// Note that this is an opinionated, stylistic rule. `noqa` comments may be needed for backwards
@@ -30,13 +31,13 @@ use crate::{
 ///
 /// Use instead:
 /// ```python
-/// import os  # ruff:ignore[F401]
+/// import os  # ruff: ignore[F401]
 /// ```
 ///
 /// Or if you prefer the own-line form:
 ///
 /// ```python
-/// # ruff:ignore[unused-import]
+/// # ruff: ignore[unused-import]
 /// import os
 /// ```
 ///
@@ -56,9 +57,9 @@ use crate::{
 ///
 /// This rule avoids offering a fix if any of the rule codes in a `noqa` comment are unused. See
 /// `unused-noqa` for a rule that will remove these and allow the remaining codes to be moved into a
-/// `ruff:ignore` comment.
+/// `ruff: ignore` comment.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.15.22")]
+#[violation_metadata(preview_since = "0.15.22", category = Category::Pedantic)]
 pub(crate) struct NoqaComments {
     file_level: bool,
 }
@@ -69,17 +70,17 @@ impl Violation for NoqaComments {
     #[derive_message_formats]
     fn message(&self) -> String {
         if !self.file_level {
-            "`noqa` comment used instead of `ruff:ignore`".to_string()
+            "`noqa` comment used instead of `ruff: ignore`".to_string()
         } else {
-            "`ruff: noqa` comment used instead of `ruff:file-ignore`".to_string()
+            "`ruff: noqa` comment used instead of `ruff: file-ignore`".to_string()
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         Some(if self.file_level {
-            "Use `ruff:file-ignore` instead".to_string()
+            "Use `ruff: file-ignore` instead".to_string()
         } else {
-            "Use `ruff:ignore` instead".to_string()
+            "Use `ruff: ignore` instead".to_string()
         })
     }
 }
@@ -143,14 +144,14 @@ pub(crate) fn noqa_comments(
     // import math
     // ```
     //
-    // by converting it to a valid `ruff:ignore` comment.
+    // by converting it to a valid `ruff: ignore` comment.
     if has_unused_codes {
         return;
     }
 
     let edit = Edit::range_replacement(
         format!(
-            "# ruff:{action}[{codes}]",
+            "# ruff: {action}[{codes}]",
             action = if file_level { "file-ignore" } else { "ignore" },
         ),
         codes.range,
@@ -191,7 +192,9 @@ impl std::fmt::Display for Codes<'_> {
                 "{}",
                 rules
                     .iter()
-                    .map(Rule::noqa_code)
+                    .map(|rule| rule
+                        .noqa_code()
+                        .map_or_else(|| rule.name().to_string(), |code| code.to_string()))
                     .sorted()
                     .dedup()
                     .join(", ")

@@ -220,12 +220,15 @@ if sys.version_info < (3, 15):
         function in @no_type_check.
         """
 
+@type_check_only
+class _Protocol: ...
+
 # Do not import (and re-export) Protocol or runtime_checkable from
 # typing module because type checkers need to be able to distinguish
 # typing.Protocol and typing_extensions.Protocol so they can properly
 # warn users about potential runtime exceptions when using typing.Protocol
 # on older versions of Python.
-Protocol: _SpecialForm
+Protocol: type[_Protocol]
 """Base class for protocol classes.
 
 Protocol classes are defined as::
@@ -804,8 +807,8 @@ else:
         order_default: bool = False,
         kw_only_default: bool = False,
         frozen_default: bool = False,
+        slots_default: bool = False,
         field_specifiers: tuple[type[Any] | Callable[..., Any], ...] = (),
-        **kwargs: object,
     ) -> IdentityFunction:
         """Decorator that marks a function, class, or metaclass as providing
         dataclass-like behavior.
@@ -900,9 +903,9 @@ else:
         def __init__(self, typename: str, fields: None = None, **kwargs: Any) -> None: ...
 
         @classmethod
-        def _make(cls, iterable: Iterable[Any]) -> Self: ...
+        def _make(cls, iterable: Iterable[Any]) -> Self: ...  # ty:ignore[invalid-type-form]
         def _asdict(self) -> dict[str, Any]: ...
-        def _replace(self, **kwargs: Any) -> Self: ...
+        def _replace(self, **kwargs: Any) -> Self: ...  # ty:ignore[invalid-type-form]
 
     class NewType:
         """NewType creates simple unique types with almost zero
@@ -992,7 +995,7 @@ else:
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
     @runtime_checkable
-    class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
+    class Buffer(Protocol, abc.ABC):  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]  # ty:ignore[invalid-protocol]  # pyrefly: ignore [invalid-inheritance]
         """Base class for classes that implement the buffer protocol.
 
         The buffer protocol allows Python objects to expose a low-level
@@ -1453,7 +1456,7 @@ else:
         def __module__(self) -> str | None: ...  # type: ignore[override]
         # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
-        def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
+        def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> Never: ...
         def __or__(self, right: Any, /) -> _SpecialForm: ...
         def __ror__(self, left: Any, /) -> _SpecialForm: ...
 

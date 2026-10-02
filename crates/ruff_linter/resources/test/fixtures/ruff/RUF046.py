@@ -168,6 +168,10 @@ int(round(1,
 int(round
 (1))
 
+# Attribute access within the callee can also rely on the outer parentheses.
+int(math
+.floor(1.5))
+
 int(round # a comment
 # and another comment
 (10)
@@ -203,6 +207,15 @@ int(
 int(
     round(
         42
-    ) 
+    )
 # unsafe fix because of this comment
 )
+
+# Integer attribute access still requires parentheses.
+int(1).real
+
+# Parentheses separate the replacement from adjacent keywords.
+int(1)and True
+
+def parenthesized_callee():
+    return(int)(1)

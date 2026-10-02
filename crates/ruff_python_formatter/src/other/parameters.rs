@@ -1,3 +1,5 @@
+use std::assert_matches;
+
 use ruff_formatter::{FormatRuleWithOptions, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Parameters};
 use ruff_python_trivia::{CommentLinePosition, SimpleToken, SimpleTokenKind, SimpleTokenizer};
@@ -329,11 +331,11 @@ impl Format<PyFormatContext<'_>> for CommentsAroundText<'_> {
 #[derive(Debug)]
 pub(crate) struct ParameterSeparator {
     /// The end of the last node or separator before this separator
-    pub(crate) preceding_end: TextSize,
+    preceding_end: TextSize,
     /// The range of the separator itself
-    pub(crate) separator: TextRange,
+    separator: TextRange,
     /// The start of the first node or separator following this separator
-    pub(crate) following_start: TextSize,
+    following_start: TextSize,
 }
 
 /// Finds slash and star in `f(a, /, b, *, c)` or `lambda a, /, b, *, c: 1`.
@@ -671,27 +673,23 @@ fn has_trailing_comma(
     // The slash lacks its own node
     if ends_with_pos_only_argument_separator {
         let comma = tokens.next();
-        assert!(
-            matches!(
-                comma,
-                Some(SimpleToken {
-                    kind: SimpleTokenKind::Comma,
-                    ..
-                })
-            ),
-            "The last positional only argument must be separated by a `,` from the positional only parameters separator `/` but found '{comma:?}'."
+        assert_matches!(
+            comma,
+            Some(SimpleToken {
+                kind: SimpleTokenKind::Comma,
+                ..
+            }),
+            "The last positional only argument must be separated by a `,` from the positional only parameters separator `/`."
         );
 
         let slash = tokens.next();
-        assert!(
-            matches!(
-                slash,
-                Some(SimpleToken {
-                    kind: SimpleTokenKind::Slash,
-                    ..
-                })
-            ),
-            "The positional argument separator must be present for a function that has positional only parameters but found '{slash:?}'."
+        assert_matches!(
+            slash,
+            Some(SimpleToken {
+                kind: SimpleTokenKind::Slash,
+                ..
+            }),
+            "The positional argument separator must be present for a function that has positional only parameters."
         );
     }
 

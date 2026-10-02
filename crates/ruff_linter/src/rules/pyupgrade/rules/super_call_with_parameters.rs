@@ -6,6 +6,7 @@ use ruff_python_semantic::{Scope, ScopeKind, SemanticModel};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -52,7 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", category = Category::Style)]
 pub(crate) struct SuperCallWithParameters;
 
 impl Violation for SuperCallWithParameters {
@@ -329,12 +330,12 @@ struct ClassCellReferenceFinder {
 }
 
 impl ClassCellReferenceFinder {
-    pub(crate) fn new() -> Self {
+    fn new() -> Self {
         ClassCellReferenceFinder {
             has_class_cell: false,
         }
     }
-    pub(crate) fn found(&self) -> bool {
+    fn found(&self) -> bool {
         self.has_class_cell
     }
 }

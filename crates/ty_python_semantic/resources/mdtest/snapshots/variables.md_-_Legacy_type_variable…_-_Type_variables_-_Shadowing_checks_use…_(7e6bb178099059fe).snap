@@ -37,13 +37,12 @@ warning[mismatched-type-name]: The name passed to `TypeVar` must match the varia
   |
 8 | Q = TypeVar("T")
   |             ^^^ Expected "Q", got "T"
-  |
 
 ```
 
 ```
 error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:10:7
+  --> src/mdtest_snippet.py:14:11
    |
 10 | class Outer(Generic[Q]):
    |       ----------------- Type variable `Q` is bound in this enclosing scope
@@ -52,13 +51,12 @@ error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` alread
 13 |     # error: [shadowed-type-variable]
 14 |     class Bad(Generic[Q]): ...
    |           ^^^^^^^^^^^^^^^ `Q` used in class definition here
-   |
 
 ```
 
 ```
 error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` already bound by an enclosing scope
-  --> src/mdtest_snippet.py:10:7
+  --> src/mdtest_snippet.py:14:11
    |
 10 | class Outer(Generic[Q]):
    |       ----------------- Type variable `Q` is bound in this enclosing scope
@@ -67,6 +65,5 @@ error[shadowed-type-variable]: Generic class `Bad` uses type variable `Q` alread
 13 |     # error: [shadowed-type-variable]
 14 |     class Bad(Generic[Q]): ...
    |           ^^^^^^^^^^^^^^^ `Q` used in class definition here
-   |
 
 ```

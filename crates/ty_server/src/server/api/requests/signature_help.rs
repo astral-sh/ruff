@@ -12,7 +12,7 @@ use lsp_types::{
     SignatureHelpParams, SignatureInformation, Uri,
 };
 use ty_ide::signature_help;
-use ty_project::ProjectDatabase;
+use ty_project::{ProjectDatabase, SemanticDb as _};
 
 pub(crate) struct SignatureHelpRequestHandler;
 
@@ -38,14 +38,14 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_notebook_or_file(db) else {
+        let Some(file) = snapshot.document().to_notebook_or_file(db) else {
             return Ok(None);
         };
 
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.uri(),
+            snapshot.document().uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
@@ -54,7 +54,7 @@ impl BackgroundDocumentRequestHandler for SignatureHelpRequestHandler {
         // Extract signature help capabilities from the client
         let resolved_capabilities = snapshot.resolved_client_capabilities();
 
-        let Some(signature_help_info) = signature_help(db, file, offset) else {
+        let Some(signature_help_info) = signature_help(db, db.program_file(file), offset) else {
             return Ok(None);
         };
 

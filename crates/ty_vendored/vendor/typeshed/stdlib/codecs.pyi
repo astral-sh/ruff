@@ -248,7 +248,7 @@ def getwriter(encoding: str) -> _StreamWriter:
 
     """
 
-@deprecated("Deprecated since Python 3.14. Use `open()` instead.")
+@deprecated("Deprecated. Use `open()` instead.")
 def open(
     filename: str, mode: str = "r", encoding: str | None = None, errors: str = "strict", buffering: int = -1
 ) -> StreamReaderWriter:

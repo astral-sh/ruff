@@ -174,4 +174,3 @@ Module(
 8 | #          vvvvvvvvvvvvv
 9 | yield from (x, *x and y)
   |                 ^^^^^^^ Syntax Error: Boolean expression cannot be used here
-  |

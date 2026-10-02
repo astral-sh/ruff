@@ -30,23 +30,24 @@
 //!     retries: Number of retries.
 //! ```
 
-use indexmap::IndexMap;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::Cursor;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
-    ParsedLine, consume_quoted_string, container_block_end, indentation, is_dotted_identifier,
-    parsed_lines, split_once_at_top_level_colon, split_trailing_parenthetical,
+    InlineMarkupScanner, InlineMarkupToken, ParsedLine, consume_quoted_string, container_block_end,
+    indentation, is_dotted_identifier, parsed_lines, split_once_at_top_level_colon,
+    split_trailing_parenthetical,
 };
 use super::{DescriptionBuilder, HeaderKind, SectionKind};
+use crate::FxIndexMap;
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
 ///
 /// `normalized_source` must have already undergone PEP-257 trimming and universal newline
 /// normalization.
-pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<String, String> {
+pub(super) fn parameter_documentation(normalized_source: &str) -> FxIndexMap<String, String> {
     let mut parameters = Parameters::default();
     for section in sections(normalized_source) {
         let Section {
@@ -184,7 +185,7 @@ impl<'a> ParameterDisplayName<'a> {
 }
 
 #[derive(Default)]
-struct Parameters(IndexMap<String, String>);
+struct Parameters(FxIndexMap<String, String>);
 
 impl Parameters {
     fn extend_fragments(&mut self, fragments: Vec<BodyFragment>) {
@@ -209,7 +210,7 @@ impl Parameters {
         }
     }
 
-    fn into_inner(self) -> IndexMap<String, String> {
+    fn into_inner(self) -> FxIndexMap<String, String> {
         self.0
     }
 }
@@ -685,12 +686,18 @@ impl<'a> ItemLine<'a> {
         item_indent: TextSize,
     ) -> bool {
         // More deeply indented lines are unambiguously part of the current item.
-        line_indent > item_indent
-            // Although the style guide suggests indenting continuation lines,
-            // aligned parameter prose is common in practice.
-            || (line_indent == item_indent && section_kind.is_parameter_section())
-            // Aligned URLs and paths are continuations despite resembling item headers.
-            || (line_indent == item_indent && self.is_item_like_continuation)
+        if line_indent > item_indent {
+            return true;
+        }
+
+        // Although the style guide suggests indenting continuation lines,
+        // aligned parameter prose is common in practice.
+        if line_indent == item_indent && section_kind.is_parameter_section() {
+            return true;
+        }
+
+        // Aligned URLs and paths are continuations despite resembling item headers.
+        line_indent == item_indent && self.is_item_like_continuation
     }
 
     fn classify(
@@ -847,42 +854,14 @@ fn split_once_at_field_delimiter(line: &str) -> Option<(&str, &str)> {
 /// :exc:`ValueError`
 /// ```
 fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
-    let mut role = cursor.clone();
-
-    // First, require the candidate delimiter to be the opening colon of a role.
-    if !role.eat_char(':') {
+    let Some(InlineMarkupToken::RestPrefixRole(role)) =
+        InlineMarkupScanner::new(cursor.as_str()).next()
+    else {
         return false;
-    }
+    };
 
-    // Role names start with a Unicode alphanumeric run. Rejecting punctuation here preserves the
-    // first colon in `value::class:` as the field delimiter.
-    if !role.eat_if(char::is_alphanumeric) {
-        return false;
-    }
-
-    // Next, scan the rest of the role name until its closing colon and the opening content
-    // backtick.
-    loop {
-        role.eat_while(char::is_alphanumeric);
-        if role.eat_char2(':', '`') {
-            break;
-        }
-
-        // `-._+:` separators are allowed, but only internally to alphanumeric characters.
-        if !role.eat_if(|character| matches!(character, '-' | '.' | '_' | '+' | ':'))
-            || !role.eat_if(char::is_alphanumeric)
-        {
-            return false;
-        }
-    }
-
-    // Finally, skip the role content so delimiter scanning resumes after its closing backtick.
-    role.eat_while(|character| character != '`');
-    if !role.eat_char('`') {
-        return false;
-    }
-
-    *cursor = role;
+    // Resume delimiter scanning after the closing backtick in e.g., `` :exc:`ValueError` ``.
+    cursor.skip_bytes(role.span().end().to_usize());
     true
 }
 
@@ -1614,6 +1593,7 @@ Returns:
         for (line, description) in [
             ("value:foo..bar:`X`", "foo..bar:`X`"),
             ("value:foo-:`X`", "foo-:`X`"),
+            ("value:class:``X``", "class:``X``"),
         ] {
             assert_eq!(
                 split_once_at_field_delimiter(line),

@@ -1,6 +1,6 @@
-Scripts with PEP 723 metadata are considered single-file projects. For now, they can configure
-`rules` and `analysis`, but we plan to also support dependencies and changing `environment`
-settings.
+Scripts with PEP 723 metadata are considered single-file projects. They can configure `rules`,
+`analysis`, and their Python environment independently of the enclosing project. Dependencies are
+resolved from existing Python environments; ty does not install them.
 
 ```toml
 [environment]
@@ -15,10 +15,10 @@ respect-type-ignore-comments = false
 
 # Inline settings
 
-A script can change its `rules` and `analysis` settings. In the future, it can also change its
-`environment` settings. A script is standalone, it does not inherit any settings from the project
-(that's not entirely true today, because scripts still inherit `environment` settings but it's our
-end goal).
+A script can change its `rules`, `analysis`, and `environment` settings. A script does not inherit
+the enclosing project's configuration or Python environment, but can use an activated or explicitly
+configured environment. First-party imports require explicitly configured source roots or extra
+search paths.
 
 ```py
 # /// script
@@ -124,5 +124,46 @@ print(missing)
 # ///
 
 # error: [unresolved-reference]
+print(missing)
+```
+
+# Valid blocks after invalid opening tags
+
+Invalid opening tags do not prevent a later valid metadata block from being recognized.
+
+```py
+value = 1  # /// script
+# [tool.ty.rules]
+# unresolved-reference = "error"
+# ///
+
+# /// script invalid
+# [tool.ty.rules]
+# unresolved-reference = "error"
+# ///
+
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "ignore"
+# ///
+
+print(missing)
+```
+
+# Valid blocks after unclosed blocks
+
+An earlier unclosed block does not prevent a later valid metadata block from being recognized.
+
+```py
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "error"
+value = 1
+
+# /// script
+# [tool.ty.rules]
+# unresolved-reference = "ignore"
+# ///
+
 print(missing)
 ```

@@ -365,4 +365,3 @@ Module(
 16 | await ~x
 17 | await not x
    |       ^^^^^ Syntax Error: Boolean 'not' expression cannot be used here
-   |

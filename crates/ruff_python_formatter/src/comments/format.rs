@@ -361,7 +361,7 @@ impl Format<PyFormatContext<'_>> for FormatEmptyLines {
 /// * Black normalization of `SourceComment`.
 /// * Line suffix with reserved width for the final, normalized content.
 /// * Expands parent node.
-pub(crate) const fn trailing_end_of_line_comment(
+const fn trailing_end_of_line_comment(
     comment: &SourceComment,
 ) -> FormatTrailingEndOfLineComment<'_> {
     FormatTrailingEndOfLineComment { comment }
@@ -428,7 +428,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
 ///   unnecessary allocations.
 /// * If the content is modified then make as few allocations as possible and use
 ///   a dynamic text element at the original slice's start position.
-pub(crate) const fn format_normalized_comment(
+const fn format_normalized_comment(
     comment: Cow<'_, str>,
     range: TextRange,
 ) -> FormatNormalizedComment<'_> {

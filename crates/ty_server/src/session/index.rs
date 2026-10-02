@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
 use crate::document::{DocumentKey, LanguageId};
-use crate::session::DocumentHandle;
+use crate::session::OpenDocumentHandle;
 use crate::{
     PositionEncoding, TextDocument,
     document::{DocumentVersion, NotebookDocument},
@@ -43,20 +43,23 @@ impl Index {
         })
     }
 
-    pub(crate) fn document_handle(
+    /// Returns a handle to the open document specified by its URI.
+    ///
+    /// Returns an error if the document is not open in the index.
+    pub(crate) fn open_document_handle(
         &self,
         uri: &lsp_types::Uri,
-    ) -> Result<DocumentHandle, DocumentError> {
+    ) -> Result<OpenDocumentHandle, DocumentError> {
         let key = DocumentKey::from_uri(uri);
         let Some(document) = self.documents.get(&key) else {
             return Err(DocumentError::NotFound(key));
         };
 
-        Ok(DocumentHandle::from_document(document))
+        Ok(OpenDocumentHandle::from_document(document))
     }
 
     #[expect(dead_code)]
-    pub(super) fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
+    fn notebook_document_keys(&self) -> impl Iterator<Item = &DocumentKey> + '_ {
         self.documents
             .iter()
             .filter(|(_, doc)| doc.as_notebook().is_some())
@@ -109,8 +112,8 @@ impl Index {
                 )
             });
 
-        tracing::info!(
-            "version: {}, new_version: {}",
+        tracing::debug!(
+            "Updating notebook document from version {} to version {}",
             notebook.version(),
             new_version
         );
@@ -183,18 +186,21 @@ impl Index {
         Ok(document)
     }
 
-    pub(super) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+    pub(super) fn open_text_document(&mut self, document: TextDocument) -> OpenDocumentHandle {
         let key = DocumentKey::from_uri(document.uri());
 
-        let handle = DocumentHandle::from_text_document(&document);
+        let handle = OpenDocumentHandle::from_text_document(&document);
 
         self.documents.insert(key, Document::new_text(document));
 
         handle
     }
 
-    pub(super) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
-        let handle = DocumentHandle::from_notebook_document(&document);
+    pub(super) fn open_notebook_document(
+        &mut self,
+        document: NotebookDocument,
+    ) -> OpenDocumentHandle {
+        let handle = OpenDocumentHandle::from_notebook_document(&document);
         let notebook_key = DocumentKey::from_uri(document.uri());
 
         self.documents
@@ -230,11 +236,11 @@ pub(crate) enum Document {
 }
 
 impl Document {
-    pub(super) fn new_text(document: TextDocument) -> Self {
+    fn new_text(document: TextDocument) -> Self {
         Self::Text(Arc::new(document))
     }
 
-    pub(super) fn new_notebook(document: NotebookDocument) -> Self {
+    fn new_notebook(document: NotebookDocument) -> Self {
         Self::Notebook(Arc::new(document))
     }
 
@@ -252,7 +258,7 @@ impl Document {
         }
     }
 
-    pub(crate) fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
+    fn as_notebook_mut(&mut self) -> Option<&mut NotebookDocument> {
         Some(match self {
             Self::Notebook(notebook) => Arc::make_mut(notebook),
             Self::Text(_) => return None,

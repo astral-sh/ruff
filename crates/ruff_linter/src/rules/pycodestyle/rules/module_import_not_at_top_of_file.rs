@@ -4,6 +4,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::codes::Category;
 use crate::preview::is_e402_fix_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -48,7 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.28")]
+#[violation_metadata(stable_since = "v0.0.28", category = Category::Pedantic)]
 pub(crate) struct ModuleImportNotAtTopOfFile {
     source_type: PySourceType,
 }
