@@ -579,11 +579,15 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
+        (Some(acc), Some(new_c)) => {
+            Some(new_c.merge_constraint_and_with_simplification(db, env, acc))
+        }
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -1607,20 +1611,24 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, neg_constraint);
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                let true_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, pos_constraint);
                 self.narrow(node.if_true, true_accumulated)
             } else {
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_accumulated =
+                    accumulate_constraint(db, self.env, accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
                 let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
 
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =

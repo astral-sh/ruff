@@ -151,8 +151,9 @@ class _:
         a.b.c1.d = D()
 
         class _3:
+            # The assignment above uses the class-local `a`; this scope sees the outer `a`.
             reveal_type(a)  # revealed: A
-            reveal_type(a.b.c1.d)  # revealed: D
+            reveal_type(a.b.c1.d)  # revealed: D | None
 
 a.b.c1 = C()
 a.b.c1.d = D()

@@ -2346,45 +2346,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.record_narrowing_constraint_node_for_places(atom, places);
     }
 
-    /// Records a narrowing constraint on the current live bindings that were read by the
-    /// corresponding earlier uses.
-    pub(super) fn record_narrowing_constraint_for_bindings_at_use(
-        &mut self,
-        predicate: ScopedPredicateId,
-        place: ScopedPlaceId,
-        use_id: ScopedUseId,
-        polarity: PredicatePolarity,
-    ) {
-        if predicate == ScopedPredicateId::ALWAYS_TRUE
-            || predicate == ScopedPredicateId::ALWAYS_FALSE
-        {
-            return;
-        }
-
-        if polarity.is_positive() {
-            self.predicate_narrowing_targets.push((predicate, place));
-        }
-
-        let constraint = match polarity {
-            PredicatePolarity::Positive => self.narrowing_constraints.add_atom(predicate),
-            PredicatePolarity::Negative => self.narrowing_constraints.add_negated_atom(predicate),
-        };
-        let pending = self.pending_reachability.current;
-        let state =
-            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
-        let state = self.pending_reachability.materialize(
-            state,
-            pending,
-            &mut self.narrowing_constraints,
-            &mut self.reachability_constraints,
-        );
-        state.record_narrowing_constraint_for_bindings_at_use(
-            &mut self.narrowing_constraints,
-            constraint,
-            &self.bindings_by_use[use_id],
-        );
-    }
-
     /// Records a narrowing constraint on the current live bindings selected by definition ID.
     pub(super) fn record_narrowing_constraint_for_bindings(
         &mut self,
@@ -2787,6 +2748,19 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    pub(super) fn preserve_enclosing_bindings(&mut self, place: ScopedPlaceId) {
+        let pending = self.pending_reachability.current;
+        let state =
+            pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
+        let state = self.pending_reachability.materialize(
+            state,
+            pending,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        state.preserve_enclosing_bindings();
+    }
+
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -2957,15 +2931,20 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.symbol_states,
             &mut self.member_states,
         );
-        let bindings = self
-            .pending_reachability
-            .materialize_ref(
-                place_state,
-                pending,
-                &mut self.narrowing_constraints,
-                &mut self.reachability_constraints,
-            )
-            .bindings();
+        let place_state = self.pending_reachability.materialize_ref(
+            place_state,
+            pending,
+            &mut self.narrowing_constraints,
+            &mut self.reachability_constraints,
+        );
+        let bindings = if enclosing_scope.is_class()
+            && !enclosing_place.is_symbol()
+            && !is_parent_of_annotation_scope
+        {
+            place_state.enclosing_bindings()
+        } else {
+            place_state.bindings()
+        };
 
         let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
         let is_forwarding_symbol = enclosing_place_expr

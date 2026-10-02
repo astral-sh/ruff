@@ -1334,6 +1334,77 @@ impl<'db> NarrowingConstraint<'db> {
         *self = Self::from_disjuncts(intersection_disjuncts, replacement_disjuncts);
     }
 
+    /// Combine a disjunction of intersections into one intersection constraint.
+    ///
+    /// This avoids multiplying the disjuncts when successive predicates are combined. Replacement
+    /// constraints cannot become intersections because they discard the subject's previous type.
+    /// Generic filtering must remain an operation so it can preserve type arguments from the
+    /// subject's previous type.
+    fn collapse_intersection_disjunction(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        let should_collapse = match &self.0 {
+            NarrowingConstraintKind::Combined(combined) => {
+                combined.replacement_disjuncts.is_empty()
+                    && combined.intersection_disjuncts.len() > 1
+                    && combined.intersection_disjuncts.iter().all(|conjunction| {
+                        conjunction.conjuncts.iter().all(|operation| {
+                            matches!(operation, NarrowingOperation::Intersection(_))
+                        })
+                    })
+            }
+            NarrowingConstraintKind::Empty
+            | NarrowingConstraintKind::Intersection(_)
+            | NarrowingConstraintKind::Replacement(_) => false,
+        };
+
+        if should_collapse {
+            Self::intersection(self.evaluate_constraint_type(db, env))
+        } else {
+            self
+        }
+    }
+
+    fn disjunct_count(&self) -> usize {
+        match &self.0 {
+            NarrowingConstraintKind::Empty => 0,
+            NarrowingConstraintKind::Intersection(_) | NarrowingConstraintKind::Replacement(_) => 1,
+            NarrowingConstraintKind::Combined(combined) => {
+                combined.intersection_disjuncts.len() + combined.replacement_disjuncts.len()
+            }
+        }
+    }
+
+    /// Combine constraints with AND semantics, with replacement disjuncts in `other` overriding
+    /// earlier constraints.
+    ///
+    /// Merging distributes conjunction over disjunction, so repeatedly combining alternatives can
+    /// otherwise produce exponentially many conjunctions. When the product of the two disjunct
+    /// counts is large, first simplify disjunctions containing only ordinary intersection
+    /// operations. Smaller products retain the original constraints to avoid constructing types
+    /// unnecessarily.
+    pub(crate) fn merge_constraint_and_with_simplification(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Self,
+    ) -> Self {
+        const MAX_DISTRIBUTED_DISJUNCTS: usize = 32;
+
+        if other.has_intersection_disjuncts()
+            && self.disjunct_count().saturating_mul(other.disjunct_count())
+                > MAX_DISTRIBUTED_DISJUNCTS
+        {
+            let left = self.collapse_intersection_disjunction(db, env);
+            let right = other.collapse_intersection_disjunction(db, env);
+            left.merge_constraint_and(right)
+        } else {
+            self.merge_constraint_and(other)
+        }
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -2199,13 +2270,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
     ) -> PatternNarrowingResult<'db> {
-        let db = self.db;
         // A mapping pattern like `case {"value": int()}` can add a constraint on
         // `subject["value"]` for a TypedDict; class patterns can constrain attributes. An `or` or
         // `as` pattern can contain either. The caller also handles the subject's own constraint
         // separately.
         match pattern {
-            PatternPredicateKind::Class(_) => {
+            PatternPredicateKind::Class(kind) => {
                 // For example:
                 //
                 // ```python
@@ -2217,9 +2287,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case Box(value=int()):
                 //         pass
                 // ```
+                self.evaluate_related_pattern_union(
+                    pattern,
+                    subject_type,
+                    subject,
+                    polarity,
+                    |builder, subject_type| {
+                        builder.evaluate_class_pattern_places(kind, subject_type, subject, polarity)
+                    },
+                )
             }
 
-            PatternPredicateKind::Mapping(_) => {
+            PatternPredicateKind::Mapping(kind) => {
                 // For example:
                 //
                 // ```python
@@ -2233,9 +2312,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case {"value": int()}:
                 //         pass
                 // ```
+                self.evaluate_related_pattern_union(
+                    pattern,
+                    subject_type,
+                    subject,
+                    polarity,
+                    |builder, subject_type| {
+                        builder.evaluate_mapping_pattern_places(
+                            kind,
+                            subject_type,
+                            subject,
+                            polarity,
+                        )
+                    },
+                )
             }
 
-            PatternPredicateKind::Or(_) => {
+            PatternPredicateKind::Or(patterns) => {
                 // For example:
                 //
                 // ```python
@@ -2247,9 +2340,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case Box(value=int()) | Box(value=None):
                 //         pass
                 // ```
+                self.evaluate_related_pattern_union(
+                    pattern,
+                    subject_type,
+                    subject,
+                    polarity,
+                    |builder, subject_type| {
+                        let results = patterns.iter().map(|pattern| {
+                            builder.evaluate_pattern_for_place(
+                                pattern,
+                                subject_type,
+                                subject,
+                                polarity,
+                            )
+                        });
+
+                        if polarity.is_positive() {
+                            PatternNarrowingResult::merge_alternatives(
+                                results,
+                                Self::merge_optional_constraints_or,
+                            )
+                        } else {
+                            PatternNarrowingResult::merge_requirements(
+                                results,
+                                Self::merge_optional_constraints_and,
+                            )
+                        }
+                    },
+                )
             }
 
-            PatternPredicateKind::As(Some(_), _) => {
+            PatternPredicateKind::As(Some(nested), _) => {
                 // For `case {"value": int()} as whole`, analyze the pattern before `as`.
                 //
                 // For example:
@@ -2265,11 +2386,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case {"value": int()} as whole:
                 //         pass
                 // ```
+                self.evaluate_related_pattern_union(
+                    pattern,
+                    subject_type,
+                    subject,
+                    polarity,
+                    |builder, subject_type| {
+                        builder.evaluate_related_pattern_places(
+                            nested,
+                            subject_type,
+                            subject,
+                            polarity,
+                        )
+                    },
+                )
             }
 
             PatternPredicateKind::Sequence(_) => {
                 // TODO: This helper does not add constraints to individual sequence elements,
                 // such as `subject[0]` after `case [int()]`. Consider adding support for this.
+                // Elements of a sequence display subject, such as `value` in `match (value,)`,
+                // are handled separately by `evaluate_match_pattern_for_subject_element`.
                 //
                 // For example:
                 //
@@ -2279,7 +2416,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case [int()]:
                 //         pass
                 // ```
-                return PatternNarrowingResult::Possible(None);
+                PatternNarrowingResult::Possible(None)
             }
 
             PatternPredicateKind::As(None, _) => {
@@ -2297,7 +2434,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case _:
                 //         pass
                 // ```
-                return PatternNarrowingResult::Possible(None);
+                PatternNarrowingResult::Possible(None)
             }
 
             PatternPredicateKind::Star(_) => {
@@ -2312,7 +2449,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case [*rest]:
                 //         pass
                 // ```
-                return PatternNarrowingResult::Possible(None);
+                PatternNarrowingResult::Possible(None)
             }
 
             PatternPredicateKind::Singleton(_) => {
@@ -2324,7 +2461,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case None:
                 //         pass
                 // ```
-                return PatternNarrowingResult::Possible(None);
+                PatternNarrowingResult::Possible(None)
             }
 
             PatternPredicateKind::Value(_) => {
@@ -2336,55 +2473,28 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 //     case 42:
                 //         pass
                 // ```
-                return PatternNarrowingResult::Possible(None);
+                PatternNarrowingResult::Possible(None)
             }
         }
+    }
 
-        if let Type::Union(union) = subject_type.resolve_type_alias(db) {
-            return PatternNarrowingResult::merge_alternatives(
-                union.elements(db).iter().map(|element| {
+    fn evaluate_related_pattern_union(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_type: Type<'db>,
+        subject: &PlaceExpr,
+        polarity: PredicatePolarity,
+        evaluate: impl FnOnce(&mut Self, Type<'db>) -> PatternNarrowingResult<'db>,
+    ) -> PatternNarrowingResult<'db> {
+        if let Type::Union(union) = subject_type.resolve_type_alias(self.db) {
+            PatternNarrowingResult::merge_alternatives(
+                union.elements(self.db).iter().map(|element| {
                     self.evaluate_pattern_for_place(pattern, *element, subject, polarity)
                 }),
                 Self::merge_optional_constraints_or,
-            );
-        }
-
-        match pattern {
-            PatternPredicateKind::Class(kind) => {
-                self.evaluate_class_pattern_places(kind, subject_type, subject, polarity)
-            }
-
-            PatternPredicateKind::Mapping(kind) => {
-                self.evaluate_mapping_pattern_places(kind, subject_type, subject, polarity)
-            }
-
-            PatternPredicateKind::As(Some(pattern), _) => {
-                self.evaluate_related_pattern_places(pattern, subject_type, subject, polarity)
-            }
-
-            PatternPredicateKind::Or(patterns) => {
-                let results = patterns.iter().map(|pattern| {
-                    self.evaluate_pattern_for_place(pattern, subject_type, subject, polarity)
-                });
-
-                if polarity.is_positive() {
-                    PatternNarrowingResult::merge_alternatives(
-                        results,
-                        Self::merge_optional_constraints_or,
-                    )
-                } else {
-                    PatternNarrowingResult::merge_requirements(
-                        results,
-                        Self::merge_optional_constraints_and,
-                    )
-                }
-            }
-
-            PatternPredicateKind::Singleton(_)
-            | PatternPredicateKind::Value(_)
-            | PatternPredicateKind::Sequence(_)
-            | PatternPredicateKind::As(None, _)
-            | PatternPredicateKind::Star(_) => PatternNarrowingResult::Possible(None),
+            )
+        } else {
+            evaluate(self, subject_type)
         }
     }
 

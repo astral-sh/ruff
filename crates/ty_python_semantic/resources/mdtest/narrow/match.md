@@ -2504,6 +2504,74 @@ def nested_mapping_narrows_sequence_subject(
             reveal_type(value)  # revealed: tuple[IntPayload]
 ```
 
+## Successive class patterns with a union subject
+
+Later cases narrow the subject after several earlier class patterns have failed. The repeated cases
+exercise a path that can cause combinatorial growth when combining narrowing constraints.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import assert_never
+
+@dataclass
+class A:
+    ident: str
+
+@dataclass
+class B:
+    ident: str
+
+@dataclass
+class C:
+    ident: str
+    name: str
+
+@dataclass
+class D:
+    ident: str
+    name: str
+
+@dataclass
+class E:
+    ident: str
+    name: str
+
+@dataclass
+class F:
+    ident: str
+    name: str
+
+@dataclass
+class G:
+    ident: str
+
+@dataclass
+class H:
+    signature: int
+
+def many_class_patterns(ref: A | B | C | D | E | F | G | H) -> int:
+    match ref:
+        case A(_):
+            return 0
+        case B(_):
+            return 0
+        case C(_, _):
+            return 0
+        case D(_, _):
+            return 0
+        case E(_, _):
+            return 0
+        case F(_, _):
+            return 0
+        case G(_):
+            return 0
+        case H():
+            reveal_type(ref)  # revealed: H & ~A & ~B & ~C & ~D & ~E & ~F & ~G
+            return ref.signature
+
+    assert_never(ref)  # no diagnostic
+```
+
 ## Exhaustive positional patterns for built-in classes
 
 Python defines a fixed set of built-in classes whose single positional subpattern receives the
@@ -3253,6 +3321,239 @@ def rebind_intermediate(value: Record, other: Data) -> None:
 def after_match(value: Record) -> None:
     match value:
         case Record(item=int()):
+            pass
+        case _:
+            pass
+    reveal_type(value.item)  # revealed: int | str
+```
+
+## Positional class patterns narrow attributes
+
+Positional patterns narrow the attributes named by `__match_args__`, including in later cases.
+
+```py
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+
+class SubBox(Box): ...
+
+def positional(value: Box) -> None:
+    match value:
+        case Box(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def inherited(value: SubBox) -> None:
+    match value:
+        case SubBox(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def nested_scope(value: Box) -> None:
+    match value:
+        case Box(int()):
+            class Inner:
+                reveal_type(value.item)  # revealed: int
+
+def nested_function(value: Box) -> None:
+    match value:
+        case Box(int()):
+            def inner() -> None:
+                # `value.item` may change before this function is called.
+                reveal_type(value.item)  # revealed: int | str
+
+def rebound(value: Box, other: Box) -> None:
+    match value:
+        case Box(int()):
+            value = other
+            reveal_type(value.item)  # revealed: int | str
+
+def named_expression(value: Box) -> None:
+    match subject := value:
+        case Box(int()):
+            reveal_type(subject.item)  # revealed: int
+```
+
+## Class-body subjects and nested scopes
+
+A match in a class body can narrow a member of a class-local subject. Rebinding the subject
+invalidates that narrowing. A nested class resolves the same name from the enclosing non-class
+scope, so it keeps constraints on the outer value rather than those on the class-local value.
+
+```py
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+
+def class_scope(other: Box) -> None:
+    class Namespace:
+        value = Box()
+        match value:
+            case Box(int()):
+                value = other
+                reveal_type(value.item)  # revealed: int | str
+
+global_box = Box()
+
+class Outer:
+    if isinstance(global_box.item, int):
+        global_box = Box()
+        global_box.item = "local"
+        reveal_type(global_box.item)  # revealed: Literal["local"]
+
+        class Inner:
+            reveal_type(global_box.item)  # revealed: int
+
+class LocalSubject:
+    global_box = Box()
+    match global_box:
+        case Box(int()):
+            reveal_type(global_box.item)  # revealed: int
+
+            class Inner:
+                reveal_type(global_box.item)  # revealed: int | str
+
+flag: bool = bool()
+
+class ConditionalSubject:
+    if flag:
+        global_box = Box()
+    match global_box:
+        case Box(int()):
+            reveal_type(global_box.item)  # revealed: int
+
+            class Inner:
+                reveal_type(global_box.item)  # revealed: int | str
+
+            global_box = Box()
+            reveal_type(global_box.item)  # revealed: int | str
+```
+
+## Mapping patterns with named keys
+
+A mapping pattern can use a named constant as its key. A match narrows the corresponding literal
+subscript on the subject.
+
+```py
+from typing import Final, TypedDict
+
+class Keys:
+    ITEM: Final = "item"
+
+class Data(TypedDict):
+    item: int | str
+
+def named_key(value: Data) -> None:
+    match value:
+        case {Keys.ITEM: int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+```
+
+## Patterns on elements of sequence displays
+
+A pattern for a display element also narrows attributes and keys of that element.
+
+```py
+from typing import Final, TypedDict
+
+class Keys:
+    ITEM: Final = "item"
+
+class Data(TypedDict):
+    item: int | str
+
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+    data: Data
+
+class Container:
+    box: Box
+
+class MaybeBox:
+    __match_args__ = ("item",)
+    item: int | str | None
+
+def class_element(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def alternative(value: MaybeBox) -> None:
+    match (value,):
+        case (MaybeBox(int() | None),):
+            reveal_type(value.item)  # revealed: int | None
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def multiple_elements(value: Box, other: int | str) -> None:
+    match value, other:
+        case Box(int()), int():
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def nested_scope(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
+            class Inner:
+                reveal_type(value.item)  # revealed: int
+
+def nested_element(value: Box) -> None:
+    match [[value]]:
+        case [[Box(data={Keys.ITEM: int()})]]:
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
+
+def mapping_element(value: Data) -> None:
+    match [value]:
+        case [{Keys.ITEM: int()}]:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+def member_element(container: Container) -> None:
+    match (container.box,):
+        case (Box(int()),):
+            reveal_type(container.box.item)  # revealed: int
+        case _:
+            reveal_type(container.box.item)  # revealed: str
+
+def guarded(value: Box, flag: bool) -> None:
+    match (value,):
+        case (Box(int()),) if flag:
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_element(value: Box, other: Box) -> None:
+    # The first element reads the old value; the second rebinds `value` before matching starts.
+    match value, (value := other):
+        case Box(int()), _:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_guard(value: Box, other: Box) -> None:
+    match (value,):
+        case (Box(int()),) if value := other:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_intermediate(value: Box, other: Data) -> None:
+    match (value,):
+        case (Box(data={Keys.ITEM: int()}),):
+            value.data = other
+            reveal_type(value.data["item"])  # revealed: int | str
+
+def after_match(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
             pass
         case _:
             pass

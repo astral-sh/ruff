@@ -28,8 +28,8 @@ use ty_module_resolver::{
 
 use crate::HasTrackedScope;
 use crate::ProgramFile;
+use crate::ast_ids::AstIdsBuilder;
 use crate::ast_ids::node_key::ExpressionNodeKey;
-use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef, BindingsOwner,
@@ -104,6 +104,8 @@ struct NarrowingAlias<'ast> {
 
 struct ScopeInfo<'ast> {
     file_scope_id: FileScopeId,
+    body: Option<&'ast [ast::Stmt]>,
+    match_places: Option<FxHashMap<Name, Vec<PlaceExpr>>>,
     /// Current loop state; None if we are not currently visiting a loop
     current_loop: Option<Loop>,
     /// Saved narrowing aliases from the enclosing scope, restored on `pop_scope`.
@@ -248,6 +250,10 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
+    /// Member places to snapshot when a match subject or display element is read or bound.
+    match_subject_places: FxHashMap<ExpressionNodeKey, Vec<ScopedPlaceId>>,
+    /// Member bindings already recorded for those expressions.
+    match_subject_bindings: FxHashMap<ExpressionNodeKey, Vec<PatternSubjectTarget>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
 
@@ -331,6 +337,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             current_assignments: Vec::new(),
             current_statements: Vec::new(),
             current_match_case: None,
+            match_subject_places: FxHashMap::default(),
+            match_subject_bindings: FxHashMap::default(),
             current_first_parameter_name: None,
             active_boolean_test_scope: None,
             exception_context_stack_manager: ExceptionContextStackManager::default(),
@@ -515,11 +523,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info_mut().current_loop.as_mut()
     }
 
-    fn push_scope(&mut self, node: NodeWithScopeRef) {
+    fn push_scope(&mut self, node: NodeWithScopeRef<'ast>) {
         self.push_scope_with_parent(node, Some(self.current_scope()));
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef<'ast>,
+        parent: Option<FileScopeId>,
+    ) {
         let children_start = self.scopes.next_index() + 1;
 
         // Note `node` is guaranteed to be a child of `self.module`
@@ -548,6 +560,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_aliases = std::mem::take(&mut self.narrowing_aliases);
         self.scope_stack.push(ScopeInfo {
             file_scope_id,
+            body: match node {
+                NodeWithScopeRef::Module => Some(self.module.suite()),
+                NodeWithScopeRef::Class(class) => Some(&class.body),
+                NodeWithScopeRef::Function(function) => Some(&function.body),
+                NodeWithScopeRef::Lambda(_)
+                | NodeWithScopeRef::FunctionTypeParameters(_)
+                | NodeWithScopeRef::ClassTypeParameters(_)
+                | NodeWithScopeRef::TypeAlias(_)
+                | NodeWithScopeRef::TypeAliasTypeParameters(_)
+                | NodeWithScopeRef::ListComprehension(_)
+                | NodeWithScopeRef::SetComprehension(_)
+                | NodeWithScopeRef::DictComprehension(_)
+                | NodeWithScopeRef::GeneratorExpression(_) => None,
+            },
+            match_places: None,
             current_loop: None,
             narrowing_aliases: saved_aliases,
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
@@ -1401,9 +1428,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Add a place to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the place in both.
     fn add_place(&mut self, place_expr: PlaceExpr) -> ScopedPlaceId {
+        let class_root = if self.scopes[self.current_scope()].kind().is_class()
+            && let PlaceExpr::Member(member) = &place_expr
+            && let Some(root) = self
+                .current_place_table()
+                .symbol_id(member.expression().as_ref().symbol_name())
+            && !self.current_place_table().symbol(root).is_global()
+            && !self.current_place_table().symbol(root).is_nonlocal()
+        {
+            Some(ScopedPlaceId::from(root))
+        } else {
+            None
+        };
         let (place_id, added) = self.current_place_table_mut().add_place(place_expr);
         if added {
             self.current_use_def_map_mut().add_place(place_id);
+            // If the class-local root is already bound, this new member's initial state is also
+            // the state visible through the outer name in nested scopes.
+            if let Some(root) = class_root
+                && self
+                    .current_use_def_map_mut()
+                    .current_bindings(root)
+                    .any(|binding| !binding.binding().is_unbound())
+            {
+                self.current_use_def_map_mut()
+                    .preserve_enclosing_bindings(place_id);
+            }
         }
         place_id
     }
@@ -1429,6 +1479,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
+
+        let key = ExpressionNodeKey::from(expr);
+        if let Some(places) = self.match_subject_places.remove(&key) {
+            let bindings = self.snapshot_pattern_subject_places(places);
+            self.match_subject_bindings.insert(key, bindings);
+        }
+    }
+
+    fn snapshot_pattern_subject_places(
+        &mut self,
+        places: impl IntoIterator<Item = ScopedPlaceId>,
+    ) -> Vec<PatternSubjectTarget> {
+        places
+            .into_iter()
+            .map(|place| PatternSubjectTarget {
+                place,
+                bindings: self
+                    .current_use_def_map_mut()
+                    .current_bindings(place)
+                    .map(|binding| binding.binding())
+                    .collect(),
+            })
+            .collect()
     }
 
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
@@ -1561,15 +1634,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
         let scope = self.current_scope();
-        // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
-        if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
-            return;
-        }
+        // Nested scopes normally do not see a class-local name; an immediately nested annotation
+        // scope is an exception. Preserve the outer view of its members before invalidating the
+        // members of the newly bound class-local value.
+        let preserve_enclosing = if let ScopedPlaceId::Symbol(symbol) = place
+            && self.scopes[scope].kind().is_class()
+        {
+            let symbol = self.place_tables[scope].symbol(symbol);
+            !symbol.is_global() && !symbol.is_nonlocal()
+        } else {
+            false
+        };
         for associated_place in self.place_tables[scope]
             .associated_place_ids(place)
             .iter()
             .copied()
         {
+            if preserve_enclosing {
+                self.use_def_maps[scope].preserve_enclosing_bindings(associated_place.into());
+            }
             self.use_def_maps[scope].delete_binding(associated_place.into());
         }
     }
@@ -2851,8 +2934,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_pattern_narrowing_constraint(
         &mut self,
         pattern_predicate: PatternPredicate<'db>,
-        subject_targets: &[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>)],
-        sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
+        subject_targets: &[PatternSubjectTarget],
+        sequence_subject_targets: &[SequenceSubjectTarget],
         is_catchall: bool,
     ) -> PatternNarrowing<'db> {
         let predicate = PredicateOrLiteral::Predicate(Predicate {
@@ -2873,7 +2956,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_narrowing_constraint(predicate)
         } else {
             let predicate_id = self.add_predicate(predicate);
-            for (place, bindings) in subject_targets {
+            for PatternSubjectTarget { place, bindings } in subject_targets {
                 self.current_use_def_map_mut()
                     .record_narrowing_constraint_for_bindings(
                         predicate_id,
@@ -2883,28 +2966,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     );
             }
 
-            for &(place, use_id, target) in sequence_subject_targets {
+            for target in sequence_subject_targets {
                 let subject_element_id =
                     self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
                         node: PredicateNode::SubjectElementPattern(
                             SubjectElementPatternPredicate {
                                 pattern: pattern_predicate,
-                                target,
+                                target: target.expression,
                             },
                         ),
                         is_positive: true,
                     }));
-                self.current_use_def_map_mut()
-                    .record_narrowing_constraint_for_bindings_at_use(
-                        subject_element_id,
-                        place,
-                        use_id,
-                        PredicatePolarity::Positive,
-                    );
+                for PatternSubjectTarget { place, bindings } in &target.places {
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_bindings(
+                            subject_element_id,
+                            *place,
+                            bindings,
+                            PredicatePolarity::Positive,
+                        );
+                }
                 element_predicates.push(SubjectElementNarrowing {
                     predicate_id: subject_element_id,
-                    place,
-                    use_id,
+                    places: target.places.clone(),
                 });
             }
 
@@ -2917,46 +3001,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn add_pattern_subject_places(
-        &mut self,
-        subject: &PlaceExpr,
-        pattern: &ast::Pattern,
-        places: &mut FxHashSet<ScopedPlaceId>,
-    ) {
-        match pattern {
-            ast::Pattern::MatchClass(class) => {
-                for keyword in &class.arguments.keywords {
-                    let place = subject.with_attribute(keyword.attr.id.as_str());
-                    let id = self.add_place(place.clone());
-                    places.insert(id);
-                    self.add_pattern_subject_places(&place, &keyword.pattern, places);
-                }
+    fn prepare_match_subject_places(&mut self, expressions: &[&'ast ast::Expr]) {
+        let scope = self.current_scope_info_mut();
+        if scope.match_places.is_none() {
+            let mut visitor = MatchPlaceVisitor::default();
+            if let Some(body) = scope.body {
+                visitor.visit_body(body);
             }
+            scope.match_places = Some(visitor.places);
+        }
 
-            ast::Pattern::MatchMapping(mapping) => {
-                for (key, pattern) in mapping.keys.iter().zip(&mapping.patterns) {
-                    if let ast::Expr::StringLiteral(key) = key {
-                        let place = subject.with_string_subscript(key.value.to_str());
-                        let id = self.add_place(place.clone());
-                        places.insert(id);
-                        self.add_pattern_subject_places(&place, pattern, places);
+        let mut roots = Vec::new();
+        for expression in expressions {
+            if let Some(place) = PlaceExpr::try_from_expr(*expression) {
+                let root = match &place {
+                    PlaceExpr::Symbol(symbol) => symbol.name().clone(),
+                    PlaceExpr::Member(member) => {
+                        Name::new(member.expression().as_ref().symbol_name())
                     }
+                };
+                if !roots.contains(&root) {
+                    roots.push(root);
                 }
             }
+        }
 
-            ast::Pattern::MatchOr(or) => {
-                for pattern in &or.patterns {
-                    self.add_pattern_subject_places(subject, pattern, places);
-                }
+        // The index cannot resolve `__match_args__` or constant mapping keys. Register the member
+        // places used in this scope or a nested scope before evaluating the subject, and let
+        // semantic analysis decide which of them each pattern constrains. Creating parent places
+        // first (such as `value.data` before `value.data["item"]`) also ensures that rebinding a
+        // subject invalidates its member places.
+        for root in roots {
+            self.add_place(PlaceExpr::Symbol(Symbol::new(root.clone())));
+            let places = self
+                .current_scope_info()
+                .match_places
+                .as_ref()
+                .and_then(|places| places.get(&root))
+                .cloned()
+                .unwrap_or_default();
+            for place in places {
+                self.add_place(place);
             }
+        }
 
-            ast::Pattern::MatchAs(as_pattern) => {
-                if let Some(pattern) = &as_pattern.pattern {
-                    self.add_pattern_subject_places(subject, pattern, places);
-                }
-            }
-
-            _ => {}
+        for expression in expressions {
+            let Some(place) = PlaceExpr::try_from_expr(*expression) else {
+                continue;
+            };
+            let place = self.add_place(place);
+            let associated = self
+                .current_place_table()
+                .associated_place_ids(place)
+                .iter()
+                .copied()
+                .map(ScopedPlaceId::from)
+                .collect();
+            self.match_subject_places
+                .insert(ExpressionNodeKey::from(*expression), associated);
         }
     }
 
@@ -3056,7 +3158,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn with_type_params<T>(
         &mut self,
-        with_scope: NodeWithScopeRef,
+        with_scope: NodeWithScopeRef<'ast>,
         type_params: Option<&'ast ast::TypeParams>,
         nested: impl FnOnce(&mut Self) -> T,
     ) -> T {
@@ -3125,7 +3227,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// [`Comprehension`]: ast::Comprehension
     fn with_generators_scope(
         &mut self,
-        scope: NodeWithScopeRef,
+        scope: NodeWithScopeRef<'ast>,
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
     ) -> FileScopeId {
@@ -4945,10 +5047,47 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 debug_assert_eq!(self.current_match_case, None);
 
                 let subject_expr = self.add_standalone_expression(subject);
-                self.visit_expr(subject);
                 if cases.is_empty() {
+                    self.visit_expr(subject);
                     return;
                 }
+
+                let mut subject_elements = Vec::new();
+                let mut pending_elements: Vec<&ast::Expr> = match subject.as_ref() {
+                    ast::Expr::List(list) => list.elts.iter().collect(),
+                    ast::Expr::Tuple(tuple) => tuple.elts.iter().collect(),
+                    _ => Vec::new(),
+                };
+                while let Some(element) = pending_elements.pop() {
+                    match element {
+                        ast::Expr::List(list) => pending_elements.extend(&list.elts),
+                        ast::Expr::Tuple(tuple) => pending_elements.extend(&tuple.elts),
+                        _ => subject_elements.push(element),
+                    }
+                }
+
+                let mut subject_expressions = match_subject_place_expressions(subject).to_vec();
+                subject_expressions.extend(subject_elements.iter().copied());
+                if cases
+                    .iter()
+                    .any(|case| pattern_can_narrow_members(&case.pattern))
+                {
+                    self.prepare_match_subject_places(&subject_expressions);
+                }
+
+                self.visit_expr(subject);
+
+                // Named-expression subjects bind their target instead of reading it. Capture any
+                // remaining member states after the subject has finished evaluating.
+                for expression in subject_expressions {
+                    let key = ExpressionNodeKey::from(expression);
+                    if let Some(places) = self.match_subject_places.remove(&key) {
+                        let bindings = self.snapshot_pattern_subject_places(places);
+                        self.match_subject_bindings.insert(key, bindings);
+                    }
+                }
+                debug_assert!(self.match_subject_places.is_empty());
+                let mut related_bindings = std::mem::take(&mut self.match_subject_bindings);
 
                 // A match subject is evaluated once. Retain the bindings read by each place so
                 // that case predicates constrain those values rather than later rebindings.
@@ -4961,8 +5100,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         Some((place, self.current_ast_ids().try_use_id(expression)))
                     })
                     .collect::<SmallVec<[_; 2]>>();
-                let mut subject_targets =
-                    SmallVec::<[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>); 2]>::new();
+                let mut subject_targets = SmallVec::<[PatternSubjectTarget; 2]>::new();
                 for &(place, use_id) in &subject_places {
                     let bindings = if let Some(use_id) = use_id {
                         self.current_use_def_map()
@@ -4977,68 +5115,34 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .map(|binding| LiveBinding::binding(&binding))
                             .collect()
                     };
-                    subject_targets.push((place, bindings));
+                    subject_targets.push(PatternSubjectTarget { place, bindings });
                 }
-                // A pattern can inspect an attribute or key before it appears as an expression
-                // elsewhere in the scope. Create its place now so both successful and failed
-                // matches can constrain the inspected attribute or key of this subject.
-                let subject_place = PlaceExpr::try_from_expr(subject);
-                let mut derived_targets = Vec::with_capacity(cases.len());
-
-                for case in cases {
-                    let mut derived_places = FxHashSet::default();
-
-                    if let Some(subject_place) = &subject_place {
-                        self.add_pattern_subject_places(
-                            subject_place,
-                            &case.pattern,
-                            &mut derived_places,
-                        );
-                    }
-
-                    let targets: Vec<_> = derived_places
-                        .into_iter()
-                        .sorted_unstable()
-                        .map(|place| {
-                            let bindings: SmallVec<[ScopedDefinitionId; 2]> = self
-                                .current_use_def_map_mut()
-                                .current_bindings(place)
-                                .map(|binding| LiveBinding::binding(&binding))
-                                .collect();
-                            (place, bindings)
-                        })
-                        .collect();
-
-                    derived_targets.push(targets);
-                }
+                let derived_targets = related_bindings
+                    .remove(&ExpressionNodeKey::from(subject.as_ref()))
+                    .unwrap_or_default();
 
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
-                let mut sequence_subject_targets =
-                    SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
-                let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
-                    ast::Expr::List(list) => list.elts.iter().collect(),
-                    ast::Expr::Tuple(tuple) => tuple.elts.iter().collect(),
-                    _ => Vec::new(),
-                };
-                while let Some(element) = subject_elements.pop() {
-                    match element {
-                        ast::Expr::List(list) => subject_elements.extend(&list.elts),
-                        ast::Expr::Tuple(tuple) => subject_elements.extend(&tuple.elts),
-                        _ => {
-                            let Some(target) = PlaceExpr::try_from_expr(element)
-                                .and_then(|place| places.place_id((&place).into()))
-                                .zip(ast_ids.try_use_id(element))
-                            else {
-                                continue;
-                            };
-                            sequence_subject_targets.push((
-                                target.0,
-                                target.1,
-                                ExpressionNodeKey::from(element),
-                            ));
-                        }
-                    }
+                let mut sequence_subject_targets = SmallVec::<[SequenceSubjectTarget; 2]>::new();
+                for element in subject_elements {
+                    let Some((place, use_id)) = PlaceExpr::try_from_expr(element)
+                        .and_then(|place| places.place_id((&place).into()))
+                        .zip(ast_ids.try_use_id(element))
+                    else {
+                        continue;
+                    };
+                    let expression = ExpressionNodeKey::from(element);
+                    let mut targets = related_bindings.remove(&expression).unwrap_or_default();
+                    let bindings = self
+                        .current_use_def_map()
+                        .bindings_at_use(use_id)
+                        .map(LiveBinding::binding)
+                        .collect();
+                    targets.push(PatternSubjectTarget { place, bindings });
+                    sequence_subject_targets.push(SequenceSubjectTarget {
+                        expression,
+                        places: targets,
+                    });
                 }
 
                 let mut no_case_matched = self.flow_snapshot();
@@ -5070,7 +5174,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // actually matches
                     let is_catchall = has_catchall && i == cases.len() - 1;
                     let mut case_subject_targets = subject_targets.clone();
-                    case_subject_targets.extend(derived_targets[i].iter().cloned());
+                    case_subject_targets.extend(derived_targets.iter().cloned());
                     let PatternNarrowing {
                         predicate: match_predicate,
                         predicate_id: match_narrowing_id,
@@ -5130,7 +5234,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             match_narrowing_id,
                         );
 
-                        for (place, bindings) in &derived_targets[i] {
+                        for PatternSubjectTarget { place, bindings } in &derived_targets {
                             self.current_use_def_map_mut()
                                 .record_narrowing_constraint_for_bindings(
                                     match_narrowing_id,
@@ -5142,17 +5246,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         for SubjectElementNarrowing {
                             predicate_id,
-                            place,
-                            use_id,
+                            places,
                         } in element_predicates
                         {
-                            self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_bindings_at_use(
-                                    predicate_id,
-                                    place,
-                                    use_id,
-                                    PredicatePolarity::Negative,
-                                );
+                            for PatternSubjectTarget { place, bindings } in places {
+                                self.current_use_def_map_mut()
+                                    .record_narrowing_constraint_for_bindings(
+                                        predicate_id,
+                                        place,
+                                        &bindings,
+                                        PredicatePolarity::Negative,
+                                    );
+                            }
                         }
 
                         self.record_negated_reachability_constraint(reachability_constraint);
@@ -6176,11 +6281,64 @@ struct PatternNarrowing<'db> {
     element_predicates: Vec<SubjectElementNarrowing>,
 }
 
+#[derive(Clone, Debug)]
+struct PatternSubjectTarget {
+    place: ScopedPlaceId,
+    bindings: SmallVec<[ScopedDefinitionId; 2]>,
+}
+
+#[derive(Debug)]
+struct SequenceSubjectTarget {
+    expression: ExpressionNodeKey,
+    places: Vec<PatternSubjectTarget>,
+}
+
 #[derive(Debug)]
 struct SubjectElementNarrowing {
     predicate_id: ScopedPredicateId,
-    place: ScopedPlaceId,
-    use_id: ScopedUseId,
+    places: Vec<PatternSubjectTarget>,
+}
+
+fn pattern_can_narrow_members(pattern: &ast::Pattern) -> bool {
+    match pattern {
+        ast::Pattern::MatchClass(class) => {
+            !class.arguments.patterns.is_empty() || !class.arguments.keywords.is_empty()
+        }
+
+        ast::Pattern::MatchMapping(mapping) => !mapping.patterns.is_empty(),
+
+        ast::Pattern::MatchSequence(sequence) => {
+            sequence.patterns.iter().any(pattern_can_narrow_members)
+        }
+
+        ast::Pattern::MatchOr(or) => or.patterns.iter().any(pattern_can_narrow_members),
+
+        ast::Pattern::MatchAs(as_pattern) => as_pattern
+            .pattern
+            .as_deref()
+            .is_some_and(pattern_can_narrow_members),
+
+        ast::Pattern::MatchSingleton(_)
+        | ast::Pattern::MatchValue(_)
+        | ast::Pattern::MatchStar(_) => false,
+    }
+}
+
+#[derive(Default)]
+struct MatchPlaceVisitor {
+    places: FxHashMap<Name, Vec<PlaceExpr>>,
+}
+
+impl<'ast> Visitor<'ast> for MatchPlaceVisitor {
+    fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        walk_expr(self, expr);
+        if let Some(place @ PlaceExpr::Member(_)) = PlaceExpr::try_from_expr(expr)
+            && let PlaceExpr::Member(member) = &place
+        {
+            let root = Name::new(member.expression().as_ref().symbol_name());
+            self.places.entry(root).or_default().push(place);
+        }
+    }
 }
 
 enum Unpackable<'ast> {
