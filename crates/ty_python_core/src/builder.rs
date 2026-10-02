@@ -243,7 +243,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// The assignments we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
-    /// The independently inferable statements or expressions we're currently visiting, with
+    /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
     /// The match case we're currently visiting.
@@ -4760,13 +4760,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     optional_vars,
                 } in items
                 {
-                    if optional_vars.as_deref().is_none_or(ast::Expr::is_name_expr) {
-                        self.visit_expression_statement(context_expr, ExpressionContext::Value);
-                    } else {
-                        // Attribute and subscript targets can supply type context. Name targets
-                        // use default context in `infer_with_item_definition`.
-                        self.visit_expr(context_expr);
-                    }
+                    self.visit_expr(context_expr);
                     self.record_exception_checkpoint();
 
                     self.exception_context_stack_manager
@@ -4851,13 +4845,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 let iter_expr = self.add_standalone_expression(iter);
-                if target.is_name_expr() {
-                    self.visit_expression_statement(iter, ExpressionContext::Value);
-                } else {
-                    // Attribute and subscript targets can supply type context, while
-                    // `infer_for_statement_definition` uses default context for names.
-                    self.visit_expr(iter);
-                }
+                self.visit_expr(iter);
                 let iteration_can_raise = *is_async || !Self::iteration_is_known_safe(iter);
                 self.record_exception_checkpoint_if(iteration_can_raise);
 
