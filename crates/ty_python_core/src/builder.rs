@@ -1666,6 +1666,35 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     fn delete_binding(&mut self, place: ScopedPlaceId) {
         self.current_use_def_map_mut().delete_binding(place);
+        if place.is_member() {
+            self.delete_associated_bindings(place);
+            self.update_enclosing_bindings_after_member_write(place);
+        }
+    }
+
+    /// After a class-body member write, update the bindings visible to nested scopes that resolve
+    /// the member's root name outside the class.
+    fn update_enclosing_bindings_after_member_write(&mut self, place: ScopedPlaceId) {
+        let scope = self.current_scope();
+        let ScopedPlaceId::Member(member) = place else {
+            return;
+        };
+        if !self.scopes[scope].kind().is_class() {
+            return;
+        }
+        let table = &self.place_tables[scope];
+        let root_name = table.member(member).expression().as_ref().symbol_name();
+        let Some(root) = table.symbol_id(root_name) else {
+            return;
+        };
+        let symbol = table.symbol(root);
+        if symbol.is_global() || symbol.is_nonlocal() {
+            return;
+        }
+
+        let members =
+            std::iter::once(member).chain(table.associated_place_ids(place).iter().copied());
+        self.use_def_maps[scope].update_enclosing_bindings_after_member_write(root, members);
     }
 
     /// Push a new [`Definition`] onto the list of definitions
@@ -1834,6 +1863,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if !is_loop_header {
             self.delete_associated_bindings(place);
+            self.update_enclosing_bindings_after_member_write(place);
         }
 
         if let Some(id) = place.as_symbol() {

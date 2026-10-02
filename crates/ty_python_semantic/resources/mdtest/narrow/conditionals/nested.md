@@ -599,3 +599,187 @@ def conditional(flag: bool):
             class Inner:
                 reveal_type(value.item)  # revealed: str
 ```
+
+### Member assignments after a conditional class-local binding
+
+An assignment can update the outer object when the class-local name is not bound. Nested classes
+must account for that possibility, while retaining the outer value on paths where the local name is
+bound.
+
+```py
+class Box:
+    item: int | str = "initial"
+
+flag: bool = bool(input())
+conditional_value = Box()
+bound_value = Box()
+unbound_value = Box()
+false_value = Box()
+written_value = Box()
+
+class Conditional:
+    if isinstance(conditional_value.item, str):
+        if flag:
+            conditional_value = Box()
+        conditional_value.item = 1
+
+        class Inner:
+            reveal_type(conditional_value.item)  # revealed: str | Literal[1]
+            # error: [unresolved-attribute]
+            conditional_value.item.upper()
+
+class Bound:
+    if isinstance(bound_value.item, str):
+        bound_value = Box()
+        bound_value.item = 1
+
+        class Inner:
+            reveal_type(bound_value.item)  # revealed: str
+
+class Unbound:
+    if isinstance(unbound_value.item, str):
+        unbound_value.item = 1
+
+        class Inner:
+            reveal_type(unbound_value.item)  # revealed: Literal[1]
+
+class OnlyOuter:
+    if isinstance(false_value.item, str):
+        if False:
+            false_value = Box()
+        false_value.item = 1
+
+        class Inner:
+            reveal_type(false_value.item)  # revealed: Literal[1]
+
+class PreviousWrite:
+    written_value.item = "initial"
+    if flag:
+        written_value = Box()
+    written_value.item = 1
+
+    class Inner:
+        reveal_type(written_value.item)  # revealed: Literal["initial", 1]
+```
+
+The same applies to a subscript of a `TypedDict` and when deletion makes a class-local name unbound.
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    item: int | str
+
+def get_data() -> Data:
+    return {"item": "outer"}
+
+data = get_data()
+deleted_value = Box()
+
+class ConditionalSubscript:
+    if isinstance(data["item"], str):
+        if flag:
+            data = Data(item="local")
+        data["item"] = 1
+
+        class Inner:
+            reveal_type(data["item"])  # revealed: str | Literal[1]
+
+class ConditionalDeletion:
+    if isinstance(deleted_value.item, str):
+        deleted_value = Box()
+        if flag:
+            del deleted_value
+        deleted_value.item = 1
+
+        class Inner:
+            reveal_type(deleted_value.item)  # revealed: str | Literal[1]
+```
+
+### Replacing an ancestor of a narrowed member
+
+Replacing an attribute can invalidate a constraint on one of its descendants, including when the
+attribute is accessed through a possibly unbound class-local name.
+
+```py
+class Child:
+    def __init__(self, item: int | str):
+        self.item = item
+
+class Parent:
+    def __init__(self):
+        self.child = Child("initial")
+
+flag: bool = bool(input())
+parent = Parent()
+local_parent = Parent()
+
+class Outer:
+    if isinstance(parent.child.item, str):
+        if flag:
+            parent = Parent()
+        parent.child = Child(1)
+
+        class Inner:
+            reveal_type(parent.child.item)  # revealed: int | str
+
+class Local:
+    if isinstance(local_parent.child.item, str):
+        local_parent = Parent()
+        local_parent.child = Child(1)
+
+        class Inner:
+            reveal_type(local_parent.child.item)  # revealed: str
+```
+
+### Deleting a member
+
+Deleting an attribute through a name that is unbound in the class body can change the outer object.
+In these examples, deleting an instance attribute exposes a class attribute, so the earlier
+narrowing may no longer apply.
+
+```py
+class Box:
+    item: int | str = 1
+
+    def __init__(self, item: int | str = "initial"):
+        self.item = item
+
+flag: bool = bool(input())
+value = Box()
+
+class Outer:
+    if isinstance(value.item, str):
+        if flag:
+            value = Box()
+        del value.item
+
+        class Inner:
+            reveal_type(value.item)  # revealed: int | str
+
+class Parent:
+    child: Box = Box(1)
+
+    def __init__(self):
+        self.child = Box()
+
+parent = Parent()
+
+class DeleteAncestor:
+    if isinstance(parent.child.item, str):
+        if flag:
+            parent = Parent()
+        del parent.child
+
+        class Inner:
+            reveal_type(parent.child.item)  # revealed: int | str
+```
+
+Member deletion also invalidates descendant narrowing in a function.
+
+```py
+def delete_in_function(parent: Parent):
+    if isinstance(parent.child.item, str):
+        del parent.child
+        reveal_type(parent.child.item)  # revealed: int | str
+```

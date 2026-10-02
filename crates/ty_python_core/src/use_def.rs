@@ -2798,6 +2798,63 @@ impl<'db> UseDefMapBuilder<'db> {
         state.restore_enclosing_bindings();
     }
 
+    /// Update preserved member bindings visible through an enclosing name after a class-body write.
+    ///
+    /// The root is the name at the base of the member expression. When it is unbound in the class,
+    /// the write uses the enclosing name; when it is bound, the previous outer bindings remain.
+    /// `members` includes the written place and any descendants invalidated by the write.
+    pub(super) fn update_enclosing_bindings_after_member_write(
+        &mut self,
+        root: ScopedSymbolId,
+        members: impl Iterator<Item = ScopedMemberId> + Clone,
+    ) {
+        if !members
+            .clone()
+            .any(|member| self.member_states[member].state.has_enclosing_bindings())
+        {
+            return;
+        }
+
+        let bindings: SmallVec<[_; 2]> = self.current_bindings(root.into()).collect();
+        let mut local_root_reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+        let mut outer_root_reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+        for binding in bindings {
+            let reachability = match self.all_definitions[binding.binding()] {
+                DefinitionEntry::Undefined | DefinitionEntry::Deleted => {
+                    &mut outer_root_reachability
+                }
+                DefinitionEntry::DeclarationPart(_)
+                | DefinitionEntry::Unused(_)
+                | DefinitionEntry::Used(_) => &mut local_root_reachability,
+            };
+            *reachability = self
+                .reachability_constraints
+                .add_or_constraint(*reachability, binding.reachability_constraint());
+        }
+        if outer_root_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return;
+        }
+
+        let pending = self.pending_reachability.current;
+        for member in members {
+            if !self.member_states[member].state.has_enclosing_bindings() {
+                continue;
+            }
+            let state = self.pending_reachability.materialize(
+                &mut self.member_states[member],
+                pending,
+                &mut self.narrowing_constraints,
+                &mut self.reachability_constraints,
+            );
+            state.update_enclosing_bindings_after_write(
+                local_root_reachability,
+                outer_root_reachability,
+                &mut self.narrowing_constraints,
+                &mut self.reachability_constraints,
+            );
+        }
+    }
+
     pub(super) fn record_use(&mut self, place: ScopedPlaceId, use_id: ScopedUseId) {
         if let Some(snapshot) = &mut self.if_chain_start {
             let state = match place {
@@ -3003,9 +3060,13 @@ impl<'db> UseDefMapBuilder<'db> {
             || !enclosing_place_expr.is_bound()
             || (is_forwarding_symbol && !stores_visible_bindings)
         {
-            self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
-                bindings.unbound_narrowing_constraint(),
-            ))
+            let constraint = if !enclosing_place.is_symbol() && !enclosing_place_expr.is_bound() {
+                bindings.unbound_member_narrowing_constraint(&mut self.narrowing_constraints)
+            } else {
+                bindings.unbound_narrowing_constraint()
+            };
+            self.enclosing_snapshots
+                .push(EnclosingSnapshot::Constraint(constraint))
         } else {
             self.enclosing_snapshots
                 .push(EnclosingSnapshot::Bindings(bindings.clone()))

@@ -338,6 +338,23 @@ impl Bindings {
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 
+    /// Combine with OR the constraints on an unbound member across its control-flow paths.
+    ///
+    /// A member can be initially unbound on one path, while a deletion or ancestor write
+    /// invalidates its narrowing on another. Either path can reach a nested scope, so both
+    /// constraints must be considered there.
+    pub(super) fn unbound_member_narrowing_constraint(
+        &self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) -> ScopedNarrowingConstraint {
+        self.live_bindings.iter().fold(
+            ScopedNarrowingConstraint::ALWAYS_FALSE,
+            |combined, binding| {
+                narrowing_constraints.add_or_constraint(combined, binding.narrowing_constraint)
+            },
+        )
+    }
+
     pub(super) fn finish(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -714,6 +731,35 @@ impl PlaceState {
         if let Some(bindings) = self.enclosing_bindings.take() {
             self.bindings = *bindings;
         }
+    }
+
+    pub(super) fn has_enclosing_bindings(&self) -> bool {
+        self.enclosing_bindings.is_some()
+    }
+
+    /// Update member bindings visible through an enclosing name after a class-body write.
+    ///
+    /// The root is the name at the base of the member expression. When it is unbound in the class,
+    /// the write uses the enclosing name, so use the current member bindings. When it is bound,
+    /// retain the previous bindings visible through the enclosing name.
+    pub(super) fn update_enclosing_bindings_after_write(
+        &mut self,
+        local_root_reachability: ScopedReachabilityConstraintId,
+        outer_root_reachability: ScopedReachabilityConstraintId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        let Some(enclosing) = &mut self.enclosing_bindings else {
+            return;
+        };
+        if outer_root_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return;
+        }
+
+        enclosing.record_reachability_constraint(reachability_constraints, local_root_reachability);
+        let mut current = self.bindings.clone();
+        current.record_reachability_constraint(reachability_constraints, outer_root_reachability);
+        enclosing.merge(current, narrowing_constraints, reachability_constraints);
     }
 
     pub(super) fn enclosing_bindings(&self) -> &Bindings {
