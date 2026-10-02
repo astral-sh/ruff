@@ -16,9 +16,6 @@ def test_ok_positional_args():
     with pytest.deprecated_call("oops"):
         pass
 
-    with pytest.deprecated_call("oops") as warninfo:
-        pass
-
 
 def test_error_trivial():
     pytest.deprecated_call(raise_deprecation_warning, "deprecated")

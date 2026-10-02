@@ -2,50 +2,50 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
 RUF061 [*] Use context-manager form of `pytest.warns()`
-  --> RUF061_warns.py:24:5
+  --> RUF061_warns.py:21:5
    |
-23 | def test_error_trivial():
-24 |     pytest.warns(UserWarning, raise_user_warning, "warning")
+20 | def test_error_trivial():
+21 |     pytest.warns(UserWarning, raise_user_warning, "warning")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.warns()` as a context-manager
    |
-23 | def test_error_trivial():
+20 | def test_error_trivial():
    -     pytest.warns(UserWarning, raise_user_warning, "warning")
-24 +     with pytest.warns(UserWarning):
-25 +         raise_user_warning("warning")
-26 |
+21 +     with pytest.warns(UserWarning):
+22 +         raise_user_warning("warning")
+23 |
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.warns()`
-  --> RUF061_warns.py:28:9
+  --> RUF061_warns.py:25:9
    |
-27 | def test_error_assign():
-28 |     s = pytest.warns(UserWarning, raise_user_warning, "warning")
+24 | def test_error_assign():
+25 |     s = pytest.warns(UserWarning, raise_user_warning, "warning")
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-29 |     print(s)
+26 |     print(s)
    |
 help: Use `pytest.warns()` as a context-manager
    |
-27 | def test_error_assign():
+24 | def test_error_assign():
    -     s = pytest.warns(UserWarning, raise_user_warning, "warning")
-28 +     with pytest.warns(UserWarning):
-29 +         s = raise_user_warning("warning")
-30 |     print(s)
+25 +     with pytest.warns(UserWarning):
+26 +         s = raise_user_warning("warning")
+27 |     print(s)
    |
 note: This is an unsafe fix and may change runtime behavior
 
 RUF061 [*] Use context-manager form of `pytest.warns()`
-  --> RUF061_warns.py:33:5
+  --> RUF061_warns.py:30:5
    |
-32 | def test_error_lambda():
-33 |     pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
+29 | def test_error_lambda():
+30 |     pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 help: Use `pytest.warns()` as a context-manager
    |
-32 | def test_error_lambda():
+29 | def test_error_lambda():
    -     pytest.warns(UserWarning, lambda: warnings.warn("", UserWarning))
-33 +     with pytest.warns(UserWarning):
-34 +         (lambda: warnings.warn("", UserWarning))()
+30 +     with pytest.warns(UserWarning):
+31 +         (lambda: warnings.warn("", UserWarning))()
    |
 note: This is an unsafe fix and may change runtime behavior
