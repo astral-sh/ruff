@@ -214,6 +214,37 @@ pub(super) struct MemberExprBuilder {
 }
 
 impl MemberExprBuilder {
+    pub(super) fn from_symbol(name: &str) -> Self {
+        Self {
+            path: CharStr::from(name),
+            segments: SmallVec::new_const(),
+        }
+    }
+
+    pub(super) fn from_member(expression: &MemberExpr) -> Self {
+        Self {
+            path: expression.path.clone(),
+            segments: expression.segment_infos().collect(),
+        }
+    }
+
+    pub(super) fn with_attribute(&self, name: &str) -> MemberExpr {
+        self.with_segment(SegmentKind::Attribute, name)
+    }
+
+    pub(super) fn with_string_subscript(&self, key: &str) -> MemberExpr {
+        self.with_segment(SegmentKind::StringSubscript, key)
+    }
+
+    fn with_segment(&self, kind: SegmentKind, text: &str) -> MemberExpr {
+        let mut segments = self.segments.clone();
+        segments.push(SegmentInfo::new(kind, self.path.text_len()));
+        MemberExpr {
+            path: CharStr::concat(&[self.path.as_str(), text]),
+            segments: Segments::from_vec(segments),
+        }
+    }
+
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
         match expr {
             ast::ExprRef::Name(name) => {

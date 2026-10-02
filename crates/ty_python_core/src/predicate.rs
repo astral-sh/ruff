@@ -82,6 +82,29 @@ pub struct Predicate<'db> {
     pub is_positive: bool,
 }
 
+/// Whether a predicate is applied as written or negated.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum PredicatePolarity {
+    Positive,
+    Negative,
+}
+
+impl PredicatePolarity {
+    pub const fn is_positive(self) -> bool {
+        matches!(self, Self::Positive)
+    }
+}
+
+impl From<bool> for PredicatePolarity {
+    fn from(is_positive: bool) -> Self {
+        if is_positive {
+            Self::Positive
+        } else {
+            Self::Negative
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(crate) enum PredicateOrLiteral<'db> {
     Literal(bool),

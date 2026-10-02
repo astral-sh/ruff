@@ -51,8 +51,8 @@ use crate::place::{
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
     MappingPatternEntryPredicateKind, MappingPatternPredicateKind, PatternPredicate,
-    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, ScopedPredicateId,
-    SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
+    PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral, PredicatePolarity,
+    ScopedPredicateId, SequencePatternPredicateKind, StarImportPlaceholderPredicate, StatementCall,
     SubjectElementPatternPredicate,
 };
 use crate::re_exports::exported_names;
@@ -2854,7 +2854,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         subject_targets: &[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>)],
         sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         is_catchall: bool,
-    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
+    ) -> PatternNarrowing<'db> {
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
@@ -2866,6 +2866,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // `P1 OR (~P1 AND P2) OR (~P1 AND ~P2)` simplifies to ALWAYS_TRUE, preserving
         // the original type after an exhaustive match. The reachability and pattern
         // predicates are still created normally for proper control flow tracking.
+        let mut element_predicates = Vec::new();
         let predicate_id = if is_catchall {
             ScopedPredicateId::ALWAYS_TRUE
         } else if subject_targets.is_empty() && sequence_subject_targets.is_empty() {
@@ -2874,8 +2875,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let predicate_id = self.add_predicate(predicate);
             for (place, bindings) in subject_targets {
                 self.current_use_def_map_mut()
-                    .record_narrowing_constraint_for_bindings(predicate_id, *place, bindings);
+                    .record_narrowing_constraint_for_bindings(
+                        predicate_id,
+                        *place,
+                        bindings,
+                        PredicatePolarity::Positive,
+                    );
             }
+
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
                     self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
@@ -2892,11 +2899,65 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         subject_element_id,
                         place,
                         use_id,
+                        PredicatePolarity::Positive,
                     );
+                element_predicates.push(SubjectElementNarrowing {
+                    predicate_id: subject_element_id,
+                    place,
+                    use_id,
+                });
             }
+
             predicate_id
         };
-        (predicate, predicate_id)
+        PatternNarrowing {
+            predicate,
+            predicate_id,
+            element_predicates,
+        }
+    }
+
+    fn add_pattern_subject_places(
+        &mut self,
+        subject: &PlaceExpr,
+        pattern: &ast::Pattern,
+        places: &mut FxHashSet<ScopedPlaceId>,
+    ) {
+        match pattern {
+            ast::Pattern::MatchClass(class) => {
+                for keyword in &class.arguments.keywords {
+                    let place = subject.with_attribute(keyword.attr.id.as_str());
+                    let id = self.add_place(place.clone());
+                    places.insert(id);
+                    self.add_pattern_subject_places(&place, &keyword.pattern, places);
+                }
+            }
+
+            ast::Pattern::MatchMapping(mapping) => {
+                for (key, pattern) in mapping.keys.iter().zip(&mapping.patterns) {
+                    if let ast::Expr::StringLiteral(key) = key {
+                        let place = subject.with_string_subscript(key.value.to_str());
+                        let id = self.add_place(place.clone());
+                        places.insert(id);
+                        self.add_pattern_subject_places(&place, pattern, places);
+                    }
+                }
+            }
+
+            ast::Pattern::MatchOr(or) => {
+                for pattern in &or.patterns {
+                    self.add_pattern_subject_places(subject, pattern, places);
+                }
+            }
+
+            ast::Pattern::MatchAs(as_pattern) => {
+                if let Some(pattern) = &as_pattern.pattern {
+                    self.add_pattern_subject_places(subject, pattern, places);
+                }
+            }
+
+            _ => {}
+        }
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -4918,6 +4979,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     };
                     subject_targets.push((place, bindings));
                 }
+                // A pattern can inspect an attribute or key before it appears as an expression
+                // elsewhere in the scope. Create its place now so both successful and failed
+                // matches can constrain the inspected attribute or key of this subject.
+                let subject_place = PlaceExpr::try_from_expr(subject);
+                let mut derived_targets = Vec::with_capacity(cases.len());
+
+                for case in cases {
+                    let mut derived_places = FxHashSet::default();
+
+                    if let Some(subject_place) = &subject_place {
+                        self.add_pattern_subject_places(
+                            subject_place,
+                            &case.pattern,
+                            &mut derived_places,
+                        );
+                    }
+
+                    let targets: Vec<_> = derived_places
+                        .into_iter()
+                        .sorted_unstable()
+                        .map(|place| {
+                            let bindings: SmallVec<[ScopedDefinitionId; 2]> = self
+                                .current_use_def_map_mut()
+                                .current_bindings(place)
+                                .map(|binding| LiveBinding::binding(&binding))
+                                .collect();
+                            (place, bindings)
+                        })
+                        .collect();
+
+                    derived_targets.push(targets);
+                }
+
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
                 let mut sequence_subject_targets =
@@ -4975,13 +5069,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
                     let is_catchall = has_catchall && i == cases.len() - 1;
-                    let (match_predicate, match_narrowing_id) = self
-                        .add_pattern_narrowing_constraint(
-                            match_pattern_predicate,
-                            &subject_targets,
-                            &sequence_subject_targets,
-                            is_catchall,
-                        );
+                    let mut case_subject_targets = subject_targets.clone();
+                    case_subject_targets.extend(derived_targets[i].iter().cloned());
+                    let PatternNarrowing {
+                        predicate: match_predicate,
+                        predicate_id: match_narrowing_id,
+                        element_predicates,
+                    } = self.add_pattern_narrowing_constraint(
+                        match_pattern_predicate,
+                        &case_subject_targets,
+                        &sequence_subject_targets,
+                        is_catchall,
+                    );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
                         self.record_reachability_constraint_id(match_narrowing_id);
@@ -5030,6 +5129,32 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             match_predicate,
                             match_narrowing_id,
                         );
+
+                        for (place, bindings) in &derived_targets[i] {
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_bindings(
+                                    match_narrowing_id,
+                                    *place,
+                                    bindings,
+                                    PredicatePolarity::Negative,
+                                );
+                        }
+
+                        for SubjectElementNarrowing {
+                            predicate_id,
+                            place,
+                            use_id,
+                        } in element_predicates
+                        {
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_bindings_at_use(
+                                    predicate_id,
+                                    place,
+                                    use_id,
+                                    PredicatePolarity::Negative,
+                                );
+                        }
+
                         self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
@@ -6042,6 +6167,20 @@ impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
     fn new(pattern: &'ast ast::Pattern, predicate: PatternPredicate<'db>) -> Self {
         Self { pattern, predicate }
     }
+}
+
+#[derive(Debug)]
+struct PatternNarrowing<'db> {
+    predicate: PredicateOrLiteral<'db>,
+    predicate_id: ScopedPredicateId,
+    element_predicates: Vec<SubjectElementNarrowing>,
+}
+
+#[derive(Debug)]
+struct SubjectElementNarrowing {
+    predicate_id: ScopedPredicateId,
+    place: ScopedPlaceId,
+    use_id: ScopedUseId,
 }
 
 enum Unpackable<'ast> {

@@ -2304,9 +2304,11 @@ The class check in a `Box` pattern matches boxes regardless of their type argume
 `Top[Box[Unknown]]` represents all such specializations. A wildcard matches every attribute value,
 so the fallback excludes all boxes. An `int()` attribute pattern can fail, so the fallback retains
 `Base`. When the subject is a union of known specializations, ty can exclude those whose attribute
-types the pattern fully matches.
+types the pattern fully matches. The attribute itself can also be narrowed by the subpattern.
 
 ```py
+from typing import Any
+
 class Base: ...
 
 class Box[T](Base):
@@ -2332,6 +2334,20 @@ def specialized(value: Box[int] | Box[str] | None) -> None:
             pass
         case _:
             reveal_type(value)  # revealed: Box[str] | None
+
+def attribute(value: Box[int | str]) -> None:
+    match value:
+        case Box(value=int()):
+            reveal_type(value.value)  # revealed: int
+        case _:
+            reveal_type(value.value)  # revealed: str
+
+def dynamic_attribute(value: Box[Any]) -> None:
+    match value:
+        case Box(value=int()):
+            reveal_type(value.value)  # revealed: Any & int
+        case _:
+            reveal_type(value.value)  # revealed: Any & ~int
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

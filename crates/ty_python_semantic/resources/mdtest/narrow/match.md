@@ -3115,6 +3115,150 @@ def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
             return 1
 ```
 
+## Narrowing attributes and `TypedDict` fields
+
+Patterns can narrow the attributes and required fields they inspect. On pattern failure, an
+attribute or field can be narrowed when the other checks in the pattern are guaranteed to match. A
+guard can also fail after the pattern matches.
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class Data(TypedDict):
+    item: int | str
+
+class OptionalData(TypedDict):
+    item: int | str
+    other: NotRequired[int]
+
+class Record:
+    item: int | str
+    other: int | str
+    fixed: int
+    data: Data
+
+class SpecialRecord(Record): ...
+
+def class_pattern(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def mapping_pattern(value: Data) -> None:
+    match value:
+        case {"item": int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+def nested_pattern(value: Record) -> None:
+    match value:
+        case Record(data={"item": int()}):
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
+
+def alternative_patterns(value: Record) -> None:
+    match value:
+        case Record(item=int()) | Record(item=bytes()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def alternative_subpatterns(value: Record) -> None:
+    match value:
+        case Record(item=int() | bytes()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def repeated_pattern(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            pass
+        case Record(item=int() as item):
+            reveal_type(value.item)  # revealed: Never
+            reveal_type(item)  # revealed: Never
+
+def two_attributes(value: Record) -> None:
+    match value:
+        case Record(item=int(), other=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+            reveal_type(value.other)  # revealed: int | str
+
+def one_attribute_can_fail(value: Record) -> None:
+    match value:
+        case Record(item=int(), fixed=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def class_check_can_fail(value: Record) -> None:
+    match value:
+        case SpecialRecord(item=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def key_can_be_missing(value: OptionalData) -> None:
+    match value:
+        case {"item": int(), "other": _}:
+            pass
+        case _:
+            reveal_type(value["item"])  # revealed: int | str
+
+def guard_can_fail(value: Record, flag: bool) -> None:
+    match value:
+        case Record(item=int()) if flag:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def guard_rebinds_subject(value: Record, other: Record, flag: bool) -> None:
+    match value:
+        case Record(item=int()) if (value := other) and flag:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str | int
+
+def reassign_attribute(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            value.item = "updated"
+            reveal_type(value.item)  # revealed: Literal["updated"]
+
+def reassign_field(value: Data) -> None:
+    match value:
+        case {"item": int()}:
+            value["item"] = "updated"
+            reveal_type(value["item"])  # revealed: Literal["updated"]
+
+def rebind_subject(value: Record, other: Record) -> None:
+    match value:
+        case Record(item=int()):
+            value = other
+            reveal_type(value.item)  # revealed: int | str
+
+def rebind_intermediate(value: Record, other: Data) -> None:
+    match value:
+        case Record(data={"item": int()}):
+            value.data = other
+            reveal_type(value.data["item"])  # revealed: int | str
+
+def after_match(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            pass
+        case _:
+            pass
+    reveal_type(value.item)  # revealed: int | str
+```
+
 ## Missing class-pattern attributes
 
 A class pattern can fail after its `isinstance` check if a requested attribute is missing or only
@@ -3347,6 +3491,48 @@ def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
             reveal_type(value)  # revealed: Pair
 ```
 
+## Nested class patterns in variable-length tuples
+
+The tuple need not be exhausted as a whole for a sequence pattern containing a nested class pattern
+to exclude the tuple shapes that the sequence pattern definitely matches.
+
+```py
+class Base: ...
+
+class Child(Base):
+    item: int
+
+def fixed_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=_)]:
+            pass
+        case [Child()]:
+            reveal_type(value)  # revealed: Never
+
+def starred_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=_), *_]:
+            pass
+        case _:
+            # revealed: tuple[Base, ...] & ~tuple[Child, *tuple[object, ...]]
+            reveal_type(value)
+
+def suffix_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [*_, Child(item=_)]:
+            pass
+        case _:
+            # revealed: tuple[Base, ...] & ~tuple[*tuple[object, ...], Child]
+            reveal_type(value)
+
+def refutable_element(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=0)]:
+            pass
+        case [Child() as child]:
+            reveal_type(child)  # revealed: Child
+```
+
 ## Nested sequence patterns
 
 Nested patterns narrow values captured from the positions they inspect. For subjects without a known
@@ -3417,8 +3603,8 @@ def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
 ## Sequence display subjects
 
 A tuple or list display has no place of its own to narrow. A successful sequence pattern instead
-narrows the corresponding narrowable elements. If a multi-element pattern fails, we do not know
-which element failed to match.
+narrows the corresponding narrowable elements. If a multi-element pattern fails and more than one
+element pattern could fail, we do not know which element failed to match.
 
 ```py
 from typing import Generic, Literal, TypeVar
@@ -3460,6 +3646,82 @@ def match_tuple_expression_class_pattern(
     match (value,):
         case (DisplayTaggedPayload("int", _),):
             reveal_type(value)  # revealed: DisplayTaggedPayload[Literal["int"], int]
+```
+
+## Failed sequence patterns on display subjects
+
+When a sequence display is matched against a pattern of the same fixed length, failure can narrow an
+element if every other element pattern is guaranteed to match. If more than one element can fail,
+failure alone need not narrow either element.
+
+A guard can fail after the pattern succeeds. Rebinding while evaluating the display can also change
+the value available in the next case.
+
+```py
+def single_tuple(value: int | str) -> None:
+    match (value,):
+        case (int(),):
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def single_list(value: int | str) -> None:
+    match [value]:
+        case [int()]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def only_one_element_can_fail(value: int | str, number: int) -> None:
+    match value, number:
+        case int(), int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def either_element_can_fail(first: int | str, second: int | str) -> None:
+    match first, second:
+        case int(), int():
+            pass
+        case _:
+            reveal_type(first)  # revealed: int | str
+            reveal_type(second)  # revealed: int | str
+
+def nested(value: int | str) -> None:
+    match [[value]]:
+        case [[int()]]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def alternative(value: int | str | bytes) -> None:
+    match (value,):
+        case (int(),) | (str(),):
+            pass
+        case _:
+            reveal_type(value)  # revealed: bytes
+
+def guarded(value: int | str, condition: bool) -> None:
+    match (value,):
+        case (int(),) if condition:
+            pass
+        case _:
+            reveal_type(value)  # revealed: int | str
+
+def rebound(value: int | str) -> None:
+    match value, (value := 0):
+        case int(), _:
+            pass
+        case _:
+            reveal_type(value)  # revealed: Literal[0]
+
+def after_match(value: int | str) -> None:
+    match (value,):
+        case (int(),):
+            pass
+        case _:
+            pass
+    reveal_type(value)  # revealed: int | str
 ```
 
 ## Nested sequence display subjects

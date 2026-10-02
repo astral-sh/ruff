@@ -17,7 +17,7 @@ use crate::types::equality::{
     ComparisonSoundnessPolicy, evaluate_type_equality, is_same_enum_domain,
 };
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleElement, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass,
@@ -660,6 +660,65 @@ fn sequence_pattern_is_exhaustive_for_subject<'pattern, 'db>(
         })
 }
 
+/// Approximate values guaranteed to match a sequence pattern using an exact tuple subject.
+///
+/// Returns `Never` when no useful guarantee can be established.
+fn definite_match_tuple_sequence_type<'pattern, 'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    kind: &'pattern SequencePatternPredicateKind<'db>,
+    subject_type: Type<'db>,
+    cache: &mut PatternTypeCache<'pattern, 'db>,
+) -> Type<'db> {
+    let Some(tuple) = subject_type.exact_tuple_instance_spec(db) else {
+        return Type::Never;
+    };
+    let target_len = kind
+        .split_around_star()
+        .map(|(prefix, suffix)| TupleLength::Variable(prefix.len(), suffix.len()))
+        .unwrap_or(TupleLength::Fixed(kind.patterns.len()));
+
+    let Ok(unpacked) = tuple.unpack(
+        target_len,
+        |segment| vec![segment.element_type(db)],
+        |elements| UnionType::from_elements_leave_aliases(db, env, elements.iter().copied()),
+    ) else {
+        return Type::Never;
+    };
+
+    let mut element_types = Vec::new();
+
+    for (pattern, element) in kind
+        .patterns
+        .iter()
+        .zip(unpacked.into_all_elements_with_kind())
+    {
+        let element_type = match element {
+            TupleElement::Variable(_) => continue,
+            TupleElement::Fixed(element_type)
+            | TupleElement::Prefix(element_type)
+            | TupleElement::Suffix(element_type) => element_type,
+        };
+
+        let definite =
+            definite_match_pattern_type_for_subject_cached(db, env, pattern, element_type, cache);
+        let matched = IntersectionBuilder::new(db, env)
+            .add_positive(element_type)
+            .add_positive(definite)
+            .build();
+
+        if matched.is_never() {
+            return Type::Never;
+        }
+
+        element_types.push(matched);
+    }
+
+    let mut element_types = element_types.into_iter();
+    build_definite_sequence_pattern_type(db, env, kind, |_| element_types.next())
+        .unwrap_or(Type::Never)
+}
+
 /// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
 /// answer depends on the subject.
 ///
@@ -803,28 +862,36 @@ fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
                     } else {
                         // The pattern may exhaust only the values that pass its class check.
                         // Check that part of the subject so it can be excluded from later cases.
-                        let class_subject_ty = IntersectionBuilder::new(db, env)
+                        let class_subject_type = IntersectionBuilder::new(db, env)
                             .add_positive(resolved_subject_ty)
                             .add_positive(Type::instance(db, env, class.top_materialization(db)))
                             .build();
-                        (class_subject_ty != resolved_subject_ty
+
+                        (class_subject_type != resolved_subject_ty
                             && class_pattern_is_exhaustive(
                                 db,
                                 env,
                                 class,
-                                class_subject_ty,
+                                class_subject_type,
                                 kind,
                                 cache,
                             ))
-                        .then_some((class_subject_ty, class_subject_ty))
+                        .then_some((class_subject_type, class_subject_type))
                     };
-                    if let Some((matching_subject_ty, definite_match_ty)) = matching_subject {
-                        let top_subject_ty = matching_subject_ty.top_materialization(db, env);
-                        if !class_pattern_is_exhaustive(db, env, class, top_subject_ty, kind, cache)
-                        {
-                            return definite_match_ty;
+
+                    if let Some((matching_subject_type, definite_match_type)) = matching_subject {
+                        let top_subject_type = matching_subject_type.top_materialization(db, env);
+                        if !class_pattern_is_exhaustive(
+                            db,
+                            env,
+                            class,
+                            top_subject_type,
+                            kind,
+                            cache,
+                        ) {
+                            return definite_match_type;
                         }
-                        return top_subject_ty;
+                        return top_subject_type;
                     }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
@@ -845,10 +912,13 @@ fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
                 resolved_subject_ty,
                 cache,
             ) {
-                // A nested subject-dependent pattern rejected the context-free approximation.
-                // Reusing that approximation for the surrounding sequence would reintroduce the
-                // values that the recursive analysis deliberately excluded.
-                return Type::Never;
+                return definite_match_tuple_sequence_type(
+                    db,
+                    env,
+                    kind,
+                    resolved_subject_ty,
+                    cache,
+                );
             }
             let top_subject_ty = resolved_subject_ty.top_materialization(db, env);
             return if sequence_pattern_is_exhaustive_for_subject(

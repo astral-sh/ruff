@@ -35,7 +35,7 @@ pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, PartialEq, Debug, get_size2::GetSize)]
 pub enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
@@ -45,6 +45,27 @@ pub enum PlaceExpr {
 }
 
 impl PlaceExpr {
+    fn member_builder(&self) -> MemberExprBuilder {
+        match self {
+            Self::Symbol(symbol) => MemberExprBuilder::from_symbol(symbol.name()),
+            Self::Member(member) => MemberExprBuilder::from_member(member.expression()),
+        }
+    }
+
+    /// Return the place for an attribute of this place.
+    #[must_use]
+    pub fn with_attribute(&self, name: &str) -> Self {
+        Self::Member(Member::new(self.member_builder().with_attribute(name)))
+    }
+
+    /// Return the place for a string-literal subscript of this place.
+    #[must_use]
+    pub fn with_string_subscript(&self, key: &str) -> Self {
+        Self::Member(Member::new(
+            self.member_builder().with_string_subscript(key),
+        ))
+    }
+
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.

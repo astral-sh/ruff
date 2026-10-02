@@ -267,7 +267,9 @@ use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
 };
 use crate::place::{PlaceExprRef, ScopedPlaceId};
-use crate::predicate::{PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId};
+use crate::predicate::{
+    PredicateOrLiteral, PredicatePolarity, Predicates, PredicatesBuilder, ScopedPredicateId,
+};
 use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
@@ -2351,6 +2353,7 @@ impl<'db> UseDefMapBuilder<'db> {
         predicate: ScopedPredicateId,
         place: ScopedPlaceId,
         use_id: ScopedUseId,
+        polarity: PredicatePolarity,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -2358,9 +2361,14 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        self.predicate_narrowing_targets.push((predicate, place));
+        if polarity.is_positive() {
+            self.predicate_narrowing_targets.push((predicate, place));
+        }
 
-        let constraint = self.narrowing_constraints.add_atom(predicate);
+        let constraint = match polarity {
+            PredicatePolarity::Positive => self.narrowing_constraints.add_atom(predicate),
+            PredicatePolarity::Negative => self.narrowing_constraints.add_negated_atom(predicate),
+        };
         let pending = self.pending_reachability.current;
         let state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
@@ -2383,6 +2391,7 @@ impl<'db> UseDefMapBuilder<'db> {
         predicate: ScopedPredicateId,
         place: ScopedPlaceId,
         bindings: &[ScopedDefinitionId],
+        polarity: PredicatePolarity,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -2390,9 +2399,14 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        self.predicate_narrowing_targets.push((predicate, place));
+        if polarity.is_positive() {
+            self.predicate_narrowing_targets.push((predicate, place));
+        }
 
-        let constraint = self.narrowing_constraints.add_atom(predicate);
+        let constraint = match polarity {
+            PredicatePolarity::Positive => self.narrowing_constraints.add_atom(predicate),
+            PredicatePolarity::Negative => self.narrowing_constraints.add_negated_atom(predicate),
+        };
         let pending = self.pending_reachability.current;
         let state =
             pending_place_state_mut(place, &mut self.symbol_states, &mut self.member_states);
