@@ -87,10 +87,6 @@ class Amet:
         instance._value = 1  # fine
 
     def __new__(cls):
-        instance = object.__new__(Lorem)
-        instance._value = 1  # error (instance of another class)
-
-    def __new__(cls):
         instance = object(1).__new__(cls)
         instance._value = 1  # error (not a bare `object()`)
 

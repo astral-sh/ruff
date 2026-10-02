@@ -295,7 +295,7 @@ impl TypeChecker for SameClassInstanceChecker {
         Self::is_current_class_name(class_name, semantic)
     }
 
-    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__(cls)`, `self`
+    /// `cls()`, `C()`, `C[T]()`, `super().__new__()`, `object.__new__()`, `self`
     fn match_initializer(initializer: &Expr, semantic: &SemanticModel) -> bool {
         // `this = self` — a direct assignment from `self`, but only when
         // `self` is actually a function parameter (not a local rebinding).
@@ -324,29 +324,17 @@ impl TypeChecker for SameClassInstanceChecker {
                     return false;
                 }
 
-                if let Expr::Call(ast::ExprCall { func, .. }) = &**value
-                    && let Expr::Name(ast::ExprName { id: func, .. }) = &**func
-                    && func == "super"
-                {
-                    return true;
-                }
-
-                // `object.__new__(cls)`, `object().__new__(cls)`: only when the
-                // instance is created for the current class.
-                let is_object = match &**value {
+                match &**value {
+                    // `super().__new__()`, `object().__new__()`
                     Expr::Call(ast::ExprCall {
                         func, arguments, ..
-                    }) => arguments.is_empty() && semantic.match_builtin_expr(func, "object"),
+                    }) => {
+                        matches!(&**func, Expr::Name(ast::ExprName { id, .. }) if id == "super")
+                            || (arguments.is_empty() && semantic.match_builtin_expr(func, "object"))
+                    }
+                    // `object.__new__()`
                     value => semantic.match_builtin_expr(value, "object"),
-                };
-
-                is_object
-                    && call.arguments.args.first().is_some_and(|arg| {
-                        arg.as_name_expr().is_some_and(|name| {
-                            matches!(&*name.id, "cls" | "mcs")
-                                || Self::is_current_class_name(name, semantic)
-                        })
-                    })
+                }
             }
 
             _ => false,
