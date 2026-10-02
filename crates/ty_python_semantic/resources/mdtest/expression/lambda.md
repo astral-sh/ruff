@@ -97,6 +97,34 @@ expression.
 reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 ```
 
+## Type variables in defaults of immediately called lambdas
+
+An immediately called lambda does not introduce bindings for type variables in its defaults:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+# error: [unbound-type-variable]
+def generic(value: T, callback=(lambda item=list[T]: item)()) -> T:
+    return value
+```
+
+## Defaults in annotation metadata
+
+Defaults in `Annotated` metadata retain the annotation's type-variable context. A generic `Callable`
+can bind type variables that would be unbound in an ordinary annotation:
+
+```py
+from typing import Annotated, Callable, TypeVar
+
+T = TypeVar("T")
+
+plain: Annotated[int, lambda value=list[T]: value]  # error: [unbound-type-variable]
+callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]
+```
+
 ## Defaults in string annotations
 
 `Annotated` metadata can contain lambdas. Names in their default values must still be resolved in
@@ -191,6 +219,21 @@ reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
 node()[1](0)  # error: [too-many-positional-arguments]
 ```
 
+## Recursive lambdas with default parameters
+
+A recursive lambda can use a default argument while taking its parameter and return types from a
+callable annotation:
+
+```py
+from typing import Callable
+
+recursive: Callable[[int], int] = lambda value=0: value if value == 0 else recursive(value - 1)
+
+reveal_type(recursive)  # revealed: (value: int = 0) -> int
+reveal_type(recursive())  # revealed: int
+recursive("no")  # error: [invalid-argument-type]
+```
+
 ## Mutually recursive return types
 
 The return types remain distinct when two lambdas refer to each other:
@@ -249,6 +292,24 @@ class C:
     method = lambda self: (1, C().method)
 
 reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
+```
+
+## Recursive decorators with an unresolved default
+
+An unresolved default does not prevent us from reporting an invalid decorator call or inferring the
+dictionary returned by the inner decorator. This is a regression test for
+<https://github.com/astral-sh/ty/issues/4613>.
+
+```py
+while previous := Decorated:  # error: [possibly-unresolved-reference]
+    @lambda value=missing: value  # error: [unresolved-reference]
+    @lambda: {key: 0}  # error: [too-many-positional-arguments]
+    class Decorated:
+        pass
+
+    reveal_type(Decorated)  # revealed: dict[Divergent, int]
+
+key = previous
 ```
 
 ## Displaying growing recursive lambdas
