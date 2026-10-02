@@ -135,7 +135,7 @@ impl fmt::Display for BlockVariableKind {
     }
 }
 
-/// RUF079
+/// block-variable-shadows-local
 pub(crate) fn block_variable_shadows_local(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let semantic = checker.semantic();
 
