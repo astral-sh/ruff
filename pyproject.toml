@@ -107,6 +107,9 @@ no-build = true
 # https://docs.astral.sh/uv/concepts/preview/#missing-exclude-newer-package-lock
 preview-features = ["missing-exclude-newer-package-lock"]
 # The `missing-exclude-newer-package-lock` preview feature requires uv 0.12.10 or later.
+# Before uv 0.12.10, adding an unrelated `exclude-newer-package` exemption could
+# also cause uv to update a script's lockfile the next time the script was run,
+# leading to unexpected lockfile changes in PRs.
 required-version = ">=0.12.10"
 # CI installs the local ecosystem runner and tools pinned to Git revisions.
 no-binary-package = [
