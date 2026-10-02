@@ -4938,6 +4938,7 @@ dependencies = [
  "schemars",
  "serde",
  "smallvec",
+ "stacker",
  "static_assertions",
  "strum",
  "strum_macros",
