@@ -791,12 +791,38 @@ fn definite_match_pattern_type_for_subject_impl<'pattern, 'db>(
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
                 Type::ClassLiteral(class) => {
-                    if class_pattern_is_exhaustive(db, env, class, resolved_subject_ty, kind, cache)
-                    {
-                        let top_subject_ty = resolved_subject_ty.top_materialization(db, env);
+                    let matching_subject = if class_pattern_is_exhaustive(
+                        db,
+                        env,
+                        class,
+                        resolved_subject_ty,
+                        kind,
+                        cache,
+                    ) {
+                        Some((resolved_subject_ty, subject_ty))
+                    } else {
+                        // The pattern may exhaust only the values that pass its class check.
+                        // Check that part of the subject so it can be excluded from later cases.
+                        let class_subject_ty = IntersectionBuilder::new(db, env)
+                            .add_positive(resolved_subject_ty)
+                            .add_positive(Type::instance(db, env, class.top_materialization(db)))
+                            .build();
+                        (class_subject_ty != resolved_subject_ty
+                            && class_pattern_is_exhaustive(
+                                db,
+                                env,
+                                class,
+                                class_subject_ty,
+                                kind,
+                                cache,
+                            ))
+                        .then_some((class_subject_ty, class_subject_ty))
+                    };
+                    if let Some((matching_subject_ty, definite_match_ty)) = matching_subject {
+                        let top_subject_ty = matching_subject_ty.top_materialization(db, env);
                         if !class_pattern_is_exhaustive(db, env, class, top_subject_ty, kind, cache)
                         {
-                            return subject_ty;
+                            return definite_match_ty;
                         }
                         return top_subject_ty;
                     }

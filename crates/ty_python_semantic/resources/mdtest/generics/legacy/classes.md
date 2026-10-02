@@ -2820,5 +2820,45 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Generic subclass patterns
+
+The class check in a `Box` pattern matches boxes regardless of their type argument.
+`Top[Box[Unknown]]` represents all such specializations. A wildcard matches every attribute value,
+so the fallback excludes all boxes. An `int()` attribute pattern can fail, so the fallback retains
+`Base`. When the subject is a union of known specializations, ty can exclude those whose attribute
+types the pattern fully matches.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base: ...
+
+class Box(Base, Generic[T]):
+    value: T
+
+def wildcard(value: Base) -> None:
+    match value:
+        case Box(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base & ~Top[Box[Unknown]]
+
+def refutable(value: Base) -> None:
+    match value:
+        case Box(value=int()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def specialized(value: Box[int] | Box[str] | None) -> None:
+    match value:
+        case Box(value=int()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Box[str] | None
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

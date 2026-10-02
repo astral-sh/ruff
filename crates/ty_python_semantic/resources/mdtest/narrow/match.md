@@ -1915,7 +1915,8 @@ def test_match_ordered_class_alternatives_remove_later_bindings(
 An argumentless class pattern cannot fail after its class check. If it matches the entire subject
 type, a later alternative cannot contribute to the binding. When the argumentless pattern comes
 second, an earlier class pattern can still contribute if the subject class is not final because a
-subclass could match both classes. A final subject class rules out that overlap:
+subclass could match both classes. For the unrelated classes below, a final subject class rules out
+that overlap:
 
 ```py
 from typing import final
@@ -1938,7 +1939,7 @@ def test_later_non_final_class_alternative_preserves_earlier_bindings(
 ) -> None:
     match value:
         case UnreachableLater(payload=item) | (DefiniteFirst() as item):
-            reveal_type(item)  # revealed: str | DefiniteFirst
+            reveal_type(item)  # revealed: str | (DefiniteFirst & ~UnreachableLater)
 
 def test_later_final_class_alternative_removes_earlier_bindings(
     value: FinalDefiniteFirst,
@@ -2950,6 +2951,132 @@ def subclass_member_is_exhaustive(value: ChildWithX) -> int:
     match value:
         case BaseWithoutX(x=_):
             return 1
+```
+
+## Negative narrowing for subclass patterns
+
+When a subclass pattern consumes every instance of that subclass, the fallback excludes the subclass
+even if the subject is annotated with its superclass.
+
+```py
+class Base: ...
+
+class Child(Base):
+    __match_args__ = ("value",)
+    value: int
+
+def positional_capture(value: Base) -> None:
+    match value:
+        case Child(captured):
+            reveal_type(captured)  # revealed: int
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child
+
+def keyword_capture(value: Base) -> None:
+    match value:
+        case Child(value=captured):
+            reveal_type(captured)  # revealed: int
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child
+
+def nested_capture(value: tuple[Base]) -> None:
+    match value:
+        case [Child(value=_)]:
+            pass
+        case [remaining]:
+            reveal_type(remaining)  # revealed: Base & ~Child
+
+class OtherChild(Base):
+    name: str
+
+def alternatives(value: Base) -> None:
+    match value:
+        case Child(value=_) | OtherChild(name=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child & ~OtherChild
+```
+
+## Negative narrowing for overlapping class patterns
+
+A subclass can inherit from both `HasValue` and `Marker`. Its `value` attribute comes from
+`HasValue`, so the `Marker` pattern consumes the overlap and the fallback excludes it.
+
+```py
+class HasValue:
+    value: int
+
+class Marker: ...
+
+def overlapping_classes(value: HasValue) -> None:
+    match value:
+        case Marker(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: HasValue & ~Marker
+```
+
+## Refutable subclass patterns
+
+The fallback retains the subclass when an attribute might be missing, its subpattern can fail, or a
+guard can fail.
+
+```py
+class Base: ...
+
+class Child(Base):
+    __match_args__ = ("value", "missing")
+    value: int
+
+def missing_attribute(value: Base) -> None:
+    match value:
+        case Child(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def missing_positional_attribute(value: Base) -> None:
+    match value:
+        case Child(_, _):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def refutable_attribute(value: Base) -> None:
+    match value:
+        case Child(value=1):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def guarded_capture(value: Base, flag: bool) -> None:
+    match value:
+        case Child(value=_) if flag:
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+class UnknownMatchArgs(Base):
+    __match_args__: tuple[str, ...] = ("value",)
+    value: int
+
+def unknown_positional_attribute(value: Base) -> None:
+    match value:
+        case UnknownMatchArgs(_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+class ConditionalAttribute(Base):
+    if bool():
+        value: int = 0
+
+def possibly_missing_attribute(value: Base) -> None:
+    match value:
+        case ConditionalAttribute(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
 ```
 
 ## Positional behavior comes from the pattern class
