@@ -27,7 +27,7 @@ use crate::types::{
 };
 
 /// Identifies a pattern by its address and subject type without hashing the pattern subtree.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(super) struct PatternCacheKey<'pattern, 'db> {
     pub(super) pattern: &'pattern PatternPredicateKind<'db>,
     pub(super) subject_ty: Type<'db>,

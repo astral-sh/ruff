@@ -69,7 +69,7 @@ use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, ImportedQualifierAction, LiveBinding,
     LiveBindingStatus, PreviousDefinitions, ScopedDefinitionId, ScopedEnclosingSnapshotId,
-    UseDefMapBuilder, UseDefMapInterner,
+    ScopedPatternBindingsId, UseDefMapBuilder, UseDefMapInterner,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -1501,6 +1501,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .collect()
     }
 
+    /// Return whether the subject place still has the same binding identifiers as when the match
+    /// subject was evaluated. This prevents applying constraints from a later binding to the
+    /// original subject.
+    fn pattern_subject_binding_is_unchanged(&mut self, target: &PatternSubjectTarget) -> bool {
+        self.current_use_def_map_mut()
+            .current_bindings(target.place)
+            .map(|binding| binding.binding())
+            .eq(target.bindings.iter().copied())
+    }
+
     fn record_place_definition(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
         match self.current_assignment() {
             Some(CurrentAssignment::Assign {
@@ -2902,6 +2912,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
+        bindings_before_pattern: Option<ScopedPatternBindingsId>,
     ) -> PatternPredicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
@@ -2922,6 +2933,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.file,
             self.current_scope(),
             subject,
+            bindings_before_pattern,
             kind,
             guard,
             previous_pattern.map(Box::new),
@@ -5304,32 +5316,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
-                    let match_pattern_predicate = self.create_pattern_predicate(
-                        subject_expr,
-                        &case.pattern,
-                        case.guard.as_deref(),
-                        previous_pattern,
-                    );
-                    self.current_match_case = Some(CurrentMatchCase::new(
-                        &case.pattern,
-                        match_pattern_predicate,
-                    ));
-                    self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
-                    self.visit_pattern(&case.pattern);
-                    self.current_match_case = None;
-                    // unlike in [Stmt::If], we don't reset [no_case_matched]
-                    // here because the effects of visiting a pattern is binding
-                    // symbols, and this doesn't occur unless the pattern
-                    // actually matches
-                    let is_catchall = has_catchall && i == cases.len() - 1;
-                    let mut case_subject_targets = subject_targets.clone();
                     let case_derived_targets = places_by_case
                         .for_case(ExpressionNodeKey::from(subject.as_ref()), i)
                         .iter()
                         .filter_map(|place| derived_targets.get(place))
                         .cloned()
                         .collect::<Vec<_>>();
-                    case_subject_targets.extend(case_derived_targets.iter().cloned());
                     let sequence_subject_targets: Vec<_> = sequence_subject_bindings
                         .iter()
                         .map(|subject| {
@@ -5347,6 +5339,53 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             }
                         })
                         .collect();
+
+                    // A previous guard can rebind the subject's name. Only use member constraints
+                    // when the place still refers to the value evaluated for this match.
+                    let mut input_targets = Vec::new();
+                    if !case_derived_targets.is_empty()
+                        && let Some(root) = subject_targets.first()
+                        && self.pattern_subject_binding_is_unchanged(root)
+                    {
+                        input_targets.extend(case_derived_targets.iter());
+                    }
+                    for target in &sequence_subject_targets {
+                        if let Some((root, related)) = target.places.split_first()
+                            && !related.is_empty()
+                            && self.pattern_subject_binding_is_unchanged(root)
+                        {
+                            input_targets.extend(related);
+                        }
+                    }
+                    let bindings_before_pattern = self
+                        .current_use_def_map_mut()
+                        .record_pattern_entry_bindings(
+                            input_targets
+                                .into_iter()
+                                .map(|target| (target.place, target.bindings.as_slice())),
+                        );
+
+                    let match_pattern_predicate = self.create_pattern_predicate(
+                        subject_expr,
+                        &case.pattern,
+                        case.guard.as_deref(),
+                        previous_pattern,
+                        bindings_before_pattern,
+                    );
+                    self.current_match_case = Some(CurrentMatchCase::new(
+                        &case.pattern,
+                        match_pattern_predicate,
+                    ));
+                    self.record_exception_checkpoint_if(Self::pattern_can_raise(&case.pattern));
+                    self.visit_pattern(&case.pattern);
+                    self.current_match_case = None;
+                    // unlike in [Stmt::If], we don't reset [no_case_matched]
+                    // here because the effects of visiting a pattern is binding
+                    // symbols, and this doesn't occur unless the pattern
+                    // actually matches
+                    let is_catchall = has_catchall && i == cases.len() - 1;
+                    let mut case_subject_targets = subject_targets.clone();
+                    case_subject_targets.extend(case_derived_targets.iter().cloned());
                     let PatternNarrowing {
                         predicate: match_predicate,
                         predicate_id: match_narrowing_id,
@@ -6490,7 +6529,7 @@ struct SequenceSubjectBindings {
     related: FxHashMap<ScopedPlaceId, PatternSubjectTarget>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct PatternPlacesByCase(FxHashMap<ExpressionNodeKey, Vec<Vec<ScopedPlaceId>>>);
 
 impl PatternPlacesByCase {
@@ -6503,7 +6542,7 @@ impl PatternPlacesByCase {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum PatternPlaceRegistration {
     Create,
     ExistingOnly,
@@ -6515,13 +6554,21 @@ struct SubjectElementNarrowing {
     places: Vec<PatternSubjectTarget>,
 }
 
+/// Return whether the pattern could constrain attributes or mapping entries of a subject or a
+/// sequence display element. For example, a `(value,)` subject and `(Box(x=int()),)` pattern can
+/// constrain `value.x`.
 fn pattern_can_narrow_members(pattern: &ast::Pattern) -> bool {
     match pattern {
         ast::Pattern::MatchClass(class) => {
-            !class.arguments.patterns.is_empty() || !class.arguments.keywords.is_empty()
+            class.arguments.patterns.iter().any(pattern_tests_value)
+                || class
+                    .arguments
+                    .keywords
+                    .iter()
+                    .any(|keyword| pattern_tests_value(&keyword.pattern))
         }
 
-        ast::Pattern::MatchMapping(mapping) => !mapping.patterns.is_empty(),
+        ast::Pattern::MatchMapping(mapping) => mapping.patterns.iter().any(pattern_tests_value),
 
         ast::Pattern::MatchSequence(sequence) => {
             sequence.patterns.iter().any(pattern_can_narrow_members)
@@ -6537,6 +6584,26 @@ fn pattern_can_narrow_members(pattern: &ast::Pattern) -> bool {
         ast::Pattern::MatchSingleton(_)
         | ast::Pattern::MatchValue(_)
         | ast::Pattern::MatchStar(_) => false,
+    }
+}
+
+/// Return whether the pattern could test the value it receives.
+///
+/// Captures, wildcards, and starred captures do not test their input; an `as` pattern follows its
+/// inner pattern. Other patterns are conservatively treated as tests.
+fn pattern_tests_value(pattern: &ast::Pattern) -> bool {
+    match pattern {
+        ast::Pattern::MatchAs(as_pattern) => as_pattern
+            .pattern
+            .as_deref()
+            .is_some_and(pattern_tests_value),
+        ast::Pattern::MatchStar(_) => false,
+        ast::Pattern::MatchClass(_)
+        | ast::Pattern::MatchMapping(_)
+        | ast::Pattern::MatchOr(_)
+        | ast::Pattern::MatchSequence(_)
+        | ast::Pattern::MatchSingleton(_)
+        | ast::Pattern::MatchValue(_) => true,
     }
 }
 
@@ -6576,7 +6643,7 @@ fn pattern_has_unknown_member(pattern: &ast::Pattern) -> bool {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct MatchPlaceVisitor {
     places: FxHashMap<Name, Vec<PlaceExpr>>,
 }

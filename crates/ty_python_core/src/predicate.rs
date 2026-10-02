@@ -21,6 +21,7 @@ use crate::global_scope;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
+use crate::use_def::ScopedPatternBindingsId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -341,6 +342,9 @@ pub struct PatternPredicate<'db> {
 
     #[returns(copy)]
     pub subject: Expression<'db>,
+
+    #[returns(copy)]
+    pub bindings_before_pattern: Option<ScopedPatternBindingsId>,
 
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,

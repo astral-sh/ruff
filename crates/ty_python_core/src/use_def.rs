@@ -328,6 +328,11 @@ struct InternedBindingsId;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BindingsSnapshotId(InternedBindingsId);
 
+/// Identifies the member bindings retained before one match case.
+#[newtype_index]
+#[derive(get_size2::GetSize, salsa::SalsaValue)]
+pub struct ScopedPatternBindingsId;
+
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
@@ -698,6 +703,10 @@ struct UseDefMapExtra {
     /// is empty.
     multi_bindings_by_use: MultiBindingsByUse,
 
+    /// Bindings retained for selected members before match cases.
+    pattern_entry_bindings:
+        FrozenIndexVec<ScopedPatternBindingsId, FrozenMap<ScopedPlaceId, Box<[LiveBinding]>>>,
+
     /// Retained [`PlaceState`] values for each member.
     member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>,
 
@@ -1043,6 +1052,17 @@ impl<'db> UseDefMap<'db> {
             })
             .into_iter()
             .flatten()
+    }
+
+    /// Return the retained bindings of a member immediately before a match case, or `None` if no
+    /// bindings were retained for the place.
+    pub fn pattern_input_bindings(
+        &self,
+        input: ScopedPatternBindingsId,
+        place: ScopedPlaceId,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        let bindings = self.extra().pattern_entry_bindings[input].get(&place)?;
+        Some(self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility))
     }
 
     pub fn applicable_constraints(
@@ -2081,6 +2101,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// entry is empty.
     multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
 
+    pattern_entry_bindings:
+        IndexVec<ScopedPatternBindingsId, FrozenMap<ScopedPlaceId, Box<[LiveBinding]>>>,
+
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
     pub(super) reachability: ScopedReachabilityConstraintId,
@@ -2149,6 +2172,7 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: NarrowingConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
             multi_bindings_by_use: FxHashMap::default(),
+            pattern_entry_bindings: IndexVec::new(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             range_reachability: Vec::new(),
             boolean_test_roots: Vec::new(),
@@ -3068,6 +3092,31 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings.iter().copied()
     }
 
+    /// For each supplied member whose bindings have not changed since subject evaluation, retain
+    /// its bindings at case entry if at least one has a narrowing constraint. Each target pairs a
+    /// member with its bindings at subject evaluation. Return an identifier for the retained
+    /// bindings, or `None` if no bindings were retained.
+    pub(super) fn record_pattern_entry_bindings<'a>(
+        &mut self,
+        targets: impl IntoIterator<Item = (ScopedPlaceId, &'a [ScopedDefinitionId])>,
+    ) -> Option<ScopedPatternBindingsId> {
+        let mut entries = FxHashMap::default();
+        for (place, original_bindings) in targets {
+            let bindings: Vec<_> = self.current_bindings(place).collect();
+            if bindings
+                .iter()
+                .map(LiveBinding::binding)
+                .eq(original_bindings.iter().copied())
+                && bindings.iter().any(|binding| {
+                    binding.narrowing_constraint() != ScopedNarrowingConstraint::ALWAYS_TRUE
+                })
+            {
+                entries.insert(place, bindings.into_boxed_slice());
+            }
+        }
+        (!entries.is_empty()).then(|| self.pattern_entry_bindings.push(FrozenMap::from(entries)))
+    }
+
     pub(super) fn has_live_value_binding(&mut self, place: ScopedPlaceId) -> bool {
         let bindings: SmallVec<[_; 2]> = self
             .current_bindings(place)
@@ -3267,6 +3316,16 @@ impl<'db> UseDefMapBuilder<'db> {
                 &mut self.reachability_constraints,
             );
         }
+        for (_, inputs) in self.pattern_entry_bindings.iter_enumerated() {
+            for bindings in inputs.values() {
+                for binding in bindings {
+                    self.reachability_constraints
+                        .mark_used(binding.reachability_constraint());
+                    self.narrowing_constraints
+                        .mark_used(binding.narrowing_constraint());
+                }
+            }
+        }
         // Keep default entries while building so they remain barriers between non-contiguous
         // ranges with the same metadata. Once construction is complete, absence represents the
         // default of reachable code outside a `TYPE_CHECKING` block.
@@ -3283,6 +3342,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
         self.reachability_constraints.mark_used(self.reachability);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
+        let pattern_entry_bindings = self.pattern_entry_bindings;
         let loop_headers = self.loop_headers;
         let mut boolean_test_roots = self.boolean_test_roots;
         // In `body if test else other`, we visit `test` before `body`, but node indices follow
@@ -3291,6 +3351,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let extra = (!bindings_by_use.is_empty()
             || !member_states.is_empty()
             || !enclosing_snapshots.is_empty()
+            || !pattern_entry_bindings.is_empty()
             || !loop_headers.is_empty()
             || !boolean_test_roots.is_empty())
         .then(|| {
@@ -3298,6 +3359,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 bindings_by_use: bindings_by_use.into(),
                 if_chain_start_by_use,
                 multi_bindings_by_use,
+                pattern_entry_bindings: pattern_entry_bindings.into(),
                 member_states,
                 enclosing_snapshots: enclosing_snapshots.into(),
                 loop_headers: loop_headers.into(),

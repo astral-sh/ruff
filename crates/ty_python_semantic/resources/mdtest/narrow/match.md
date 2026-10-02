@@ -3490,6 +3490,167 @@ def different_attributes(value: Pair) -> None:
             reveal_type(value.second)  # revealed: str
 ```
 
+An earlier check can make one subpattern certain to match. If the compound pattern then fails, the
+other subpattern must have failed.
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    first: int | str
+    second: int | str
+
+class PositionalPair(Pair):
+    __match_args__ = ("first", "second")
+
+def earlier_case(value: Pair) -> None:
+    match value:
+        case Pair(first=int()):
+            pass
+        case Pair(first=str(), second=int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+def earlier_condition(value: Pair) -> None:
+    if isinstance(value.first, str):
+        match value:
+            case Pair(first=str(), second=int()):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: str
+
+def mapping(value: Data) -> None:
+    match value:
+        case {"first": int()}:
+            pass
+        case {"first": str(), "second": int()}:
+            pass
+        case _:
+            reveal_type(value["second"])  # revealed: str
+
+def earlier_mapping_condition(value: Data) -> None:
+    if isinstance(value["first"], str):
+        match value:
+            case {"first": str(), "second": int()}:
+                pass
+            case _:
+                reveal_type(value["second"])  # revealed: str
+
+def positional(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            reveal_type(value.first)  # revealed: int
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+def sequence_display(value: Pair) -> None:
+    match (value,):
+        case (Pair(first=int()),):
+            pass
+        case (Pair(first=str(), second=int()),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+```
+
+When a member is matched only through positional patterns and never referenced as an expression, ty
+does not yet carry its narrowing to a later case.
+
+```py
+def positional_without_first_use(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+```
+
+A guard can fail even when its case's pattern matches, and it can rebind the subject's name before a
+later case is tried.
+
+```py
+def guarded_compound(value: Pair, flag: bool) -> None:
+    match value:
+        case Pair(first=int()) if flag:
+            pass
+        case Pair(first=str(), second=int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+
+def rebound_subject(value: Pair, other: Pair, flag: bool) -> None:
+    if isinstance(value.first, str):
+        match value:
+            case Pair() if (value := other) and flag:
+                pass
+            case Pair(first=str(), second=int()):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: int | str
+```
+
+## Nested mapping patterns over recursive unions
+
+Each recursive step can encounter either `A` or `B`. Matching a nested `child` rules out `None` for
+`value["child"]`. The depth exercises repeated analysis of nested patterns over unions.
+
+```py
+from __future__ import annotations
+from typing import Literal, TypeAlias, TypedDict
+
+class A(TypedDict):
+    child: Node
+    tag: Literal[0]
+
+class B(TypedDict):
+    child: Node
+    tag: Literal[1]
+
+Node: TypeAlias = A | B | None
+
+def nested(value: Node) -> None:
+    match value:
+        case {
+            "child": {
+                "child": {
+                    "child": {
+                        "child": {
+                            "child": {
+                                "child": {
+                                    "child": {
+                                        "child": {
+                                            "child": {
+                                                "child": {
+                                                    "child": {
+                                                        "child": {
+                                                            "child": {
+                                                                "child": {
+                                                                    "child": {
+                                                                        "child": {"child": {"child": {"child": {"child": _}}}}
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }:
+            reveal_type(value["child"])  # revealed: A | B
+```
+
 ## Class-body subjects and nested scopes
 
 A match in a class body can narrow a member of a class-local subject. Rebinding the subject

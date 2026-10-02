@@ -1458,6 +1458,7 @@ type MergePatternConstraints<'db> = fn(
 ///
 /// An impossible outcome contributes no alternative. A possible outcome with no constraints
 /// prevents the merged alternatives from narrowing.
+#[derive(Clone, Debug)]
 enum PatternNarrowingResult<'db> {
     Impossible,
     Possible(Option<NarrowingConstraints<'db>>),
@@ -1508,6 +1509,13 @@ impl<'db> PatternNarrowingResult<'db> {
 
         Self::Possible(constraints)
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct PatternPlaceCacheKey<'pattern, 'db> {
+    pattern: PatternCacheKey<'pattern, 'db>,
+    place: ScopedPlaceId,
+    polarity: PredicatePolarity,
 }
 
 #[derive(PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -1817,6 +1825,9 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     predicate: PredicateNode<'db>,
     is_positive: bool,
     is_provisional: bool,
+    // Multiple union arms can reach the same nested pattern, subject type, place, and polarity.
+    // Reuse its constraints within this analysis instead of repeating the work for each arm.
+    pattern_place_cache: FxHashMap<PatternPlaceCacheKey<'db, 'db>, PatternNarrowingResult<'db>>,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
@@ -1834,6 +1845,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             predicate,
             is_positive,
             is_provisional: false,
+            pattern_place_cache: FxHashMap::default(),
         }
     }
 
@@ -2093,7 +2105,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_negative_pattern_predicate_kind(
         &mut self,
-        pattern_predicate_kind: &PatternPredicateKind<'db>,
+        pattern_predicate_kind: &'db PatternPredicateKind<'db>,
         subject: Expression<'db>,
     ) -> PatternNarrowingResult<'db> {
         match pattern_predicate_kind {
@@ -2137,12 +2149,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject_node = subject.node_ref(db).node(self.module);
         let subject_place = PlaceExpr::try_from_expr(subject_node);
         let subject_type = infer_same_file_expression_type(db, subject, TypeContext::default());
-        let related_constraints = subject_place.as_ref().and_then(|place| {
-            let incoming_type =
-                type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
-            self.evaluate_related_pattern_places(kind, incoming_type, place, is_positive.into())
-                .into_constraints()
-        });
+        let related_constraints = subject_place
+            .as_ref()
+            .filter(|_| Self::pattern_can_narrow_members(kind))
+            .and_then(|place| {
+                let incoming_type =
+                    type_narrowed_by_previous_patterns(db, pattern, PatternSubjectExpansion::Raw);
+                self.evaluate_related_pattern_places(kind, incoming_type, place, is_positive.into())
+                    .into_constraints()
+            });
 
         if !is_positive {
             let subject_constraints = self
@@ -2169,9 +2184,54 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         (!constraints.is_empty()).then_some(constraints)
     }
 
+    /// Return whether the pattern could constrain an attribute or mapping entry of its subject.
+    ///
+    /// This is a conservative filter for member analysis: a class or mapping pattern can only add
+    /// such a constraint if a subpattern tests that member's value. Sequence display elements are
+    /// analyzed separately.
+    fn pattern_can_narrow_members(pattern: &PatternPredicateKind<'db>) -> bool {
+        match pattern {
+            PatternPredicateKind::Class(kind) => kind
+                .positional
+                .iter()
+                .chain(kind.keywords.iter().map(|keyword| &keyword.pattern))
+                .any(Self::pattern_tests_value),
+            PatternPredicateKind::Mapping(kind) => kind
+                .entries
+                .iter()
+                .any(|entry| Self::pattern_tests_value(&entry.pattern)),
+            PatternPredicateKind::Or(patterns) => {
+                patterns.iter().any(Self::pattern_can_narrow_members)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => Self::pattern_can_narrow_members(pattern),
+            PatternPredicateKind::As(None, _)
+            | PatternPredicateKind::Sequence(_)
+            | PatternPredicateKind::Singleton(_)
+            | PatternPredicateKind::Star(_)
+            | PatternPredicateKind::Value(_) => false,
+        }
+    }
+
+    /// Return whether the pattern could test the value it receives.
+    ///
+    /// Captures, wildcards, and starred captures do not test their input; an `as` pattern follows
+    /// its inner pattern. Other patterns are conservatively treated as tests.
+    fn pattern_tests_value(pattern: &PatternPredicateKind<'db>) -> bool {
+        match pattern {
+            PatternPredicateKind::As(Some(pattern), _) => Self::pattern_tests_value(pattern),
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => false,
+            PatternPredicateKind::Class(_)
+            | PatternPredicateKind::Mapping(_)
+            | PatternPredicateKind::Or(_)
+            | PatternPredicateKind::Sequence(_)
+            | PatternPredicateKind::Singleton(_)
+            | PatternPredicateKind::Value(_) => true,
+        }
+    }
+
     fn evaluate_positive_pattern_related_expressions(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         subject: Expression<'db>,
         subject_node: &ast::Expr,
     ) -> PatternNarrowingResult<'db> {
@@ -2223,7 +2283,89 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     /// possible failure constrains it; impossible failures are omitted.
     fn evaluate_pattern_for_place(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
+        subject_type: Type<'db>,
+        subject: &PlaceExpr,
+        polarity: PredicatePolarity,
+    ) -> PatternNarrowingResult<'db> {
+        // Success constraints are combined with the constraints from before this case later. If
+        // success were analyzed against the narrowed input here, an incompatible pattern could
+        // produce `Impossible`, which `into_constraints` would discard instead of recording the
+        // conflict. The narrowed input is needed for failure to determine which subpatterns can
+        // fail.
+        let subject_type = if polarity.is_positive() {
+            subject_type
+        } else {
+            self.pattern_input_type(subject, subject_type)
+        };
+        let key = self
+            .places()
+            .place_id(subject)
+            .map(|place| PatternPlaceCacheKey {
+                pattern: PatternCacheKey {
+                    pattern,
+                    subject_ty: subject_type,
+                },
+                place,
+                polarity,
+            });
+        if let Some(key) = key
+            && let Some(result) = self.pattern_place_cache.get(&key)
+        {
+            return result.clone();
+        }
+
+        let result =
+            self.evaluate_pattern_for_place_uncached(pattern, subject_type, subject, polarity);
+        if let Some(key) = key {
+            self.pattern_place_cache.insert(key, result.clone());
+        }
+        result
+    }
+
+    /// Apply constraints retained from before the current match case to `subject_type`.
+    ///
+    /// Each retained binding's constraints narrow the input independently; the results are unioned.
+    /// If none were retained for the subject, return `subject_type` unchanged.
+    fn pattern_input_type(&self, subject: &PlaceExpr, subject_type: Type<'db>) -> Type<'db> {
+        let db = self.db;
+        let pattern = match self.predicate {
+            PredicateNode::Pattern(pattern) => pattern,
+            PredicateNode::SubjectElementPattern(element) => element.pattern,
+            _ => return subject_type,
+        };
+        let Some(input) = pattern.bindings_before_pattern(db) else {
+            return subject_type;
+        };
+        let Some(place) = self.places().place_id(subject) else {
+            return subject_type;
+        };
+        let index = semantic_index(db, pattern.program_file(db));
+        let use_def = index.use_def_map(pattern.file_scope(db));
+        let Some(bindings) = use_def.pattern_input_bindings(input, place) else {
+            return subject_type;
+        };
+
+        let mut result = UnionBuilder::new(db, &self.env);
+        for binding in bindings {
+            result.add_in_place(binding.narrowing_constraint.narrow(
+                db,
+                &self.env,
+                subject_type,
+                place,
+            ));
+        }
+        result.build()
+    }
+
+    /// Determine whether a pattern can match (`Positive`) or fail (`Negative`), according to
+    /// `polarity`, and the resulting constraints on a place and its nested places.
+    ///
+    /// The caller prepares the subject type and caches this result; recursive evaluations can still
+    /// use the cache.
+    fn evaluate_pattern_for_place_uncached(
+        &mut self,
+        pattern: &'db PatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
@@ -2267,7 +2409,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_related_pattern_places(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
@@ -2482,7 +2624,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_related_pattern_union(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
@@ -2502,7 +2644,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_class_pattern_places(
         &mut self,
-        kind: &ClassPatternPredicateKind<'db>,
+        kind: &'db ClassPatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
@@ -2591,7 +2733,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_class_pattern_attribute(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         name: &str,
@@ -2611,7 +2753,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn evaluate_mapping_pattern_places(
         &mut self,
-        kind: &MappingPatternPredicateKind<'db>,
+        kind: &'db MappingPatternPredicateKind<'db>,
         subject_type: Type<'db>,
         subject: &PlaceExpr,
         polarity: PredicatePolarity,
@@ -5330,7 +5472,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_negative_match_pattern_sequence(
         &mut self,
         subject: Expression<'db>,
-        kind: &SequencePatternPredicateKind<'db>,
+        kind: &'db SequencePatternPredicateKind<'db>,
         pattern: &PatternPredicateKind<'db>,
     ) -> PatternNarrowingResult<'db> {
         let db = self.db;
@@ -5382,7 +5524,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject_expression: Expression<'db>,
         elements: &[ast::Expr],
-        kind: &SequencePatternPredicateKind<'db>,
+        kind: &'db SequencePatternPredicateKind<'db>,
         polarity: PredicatePolarity,
         target: Option<SubjectElementPatternPredicate<'db>>,
     ) -> PatternNarrowingResult<'db> {
@@ -5443,7 +5585,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject_expression: Expression<'db>,
         subject: &ast::Expr,
-        pattern: &PatternPredicateKind<'db>,
+        pattern: &'db PatternPredicateKind<'db>,
         polarity: PredicatePolarity,
         target: Option<SubjectElementPatternPredicate<'db>>,
     ) -> PatternNarrowingResult<'db> {
