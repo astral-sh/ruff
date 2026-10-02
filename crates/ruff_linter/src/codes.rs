@@ -109,9 +109,9 @@ impl serde::Serialize for NoqaCode {
 /// ALL < category < linter group < linter prefix < rule
 /// ```
 ///
-/// The ordering of variants isn't currently used anywhere, but they should be kept in descending
-/// order of severity, with error categories first, followed by warning, and then by off-by-default
-/// categories.
+/// Variants are ordered by descending severity, with error categories first, followed by warning,
+/// and then by off-by-default categories. The rule documentation lists category filter options
+/// in this order.
 ///
 /// See our [rule categorization guidelines] for more information on assigning categories.
 ///
@@ -159,7 +159,7 @@ pub enum Category {
     /// Rules that are highly opinionated or prone to false positives
     Pedantic,
 
-    /// Rules that restrict the use of basic language features
+    /// Rules that restrict the use of certain features
     Restriction,
 
     /// Internal testing rules that shouldn't be exposed to users.
@@ -221,6 +221,17 @@ pub enum RuleStatus {
     Deprecated { since: &'static str },
     /// The rule was removed in the provided Ruff version, and errors will be displayed on use.
     Removed { since: &'static str },
+}
+
+impl std::fmt::Display for RuleStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            RuleStatus::Stable { .. } => "stable",
+            RuleStatus::Preview { .. } => "preview",
+            RuleStatus::Deprecated { .. } => "deprecated",
+            RuleStatus::Removed { .. } => "removed",
+        })
+    }
 }
 
 #[ruff_macros::map_codes]
@@ -723,6 +734,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Pyupgrade, "049") => rules::pyupgrade::rules::PrivateTypeParameter,
         (Pyupgrade, "050") => rules::pyupgrade::rules::UselessClassMetaclassType,
         (Pyupgrade, "051") => rules::pyupgrade::rules::DeprecatedAbcDecorator,
+        (Pyupgrade, "052") => rules::pyupgrade::rules::ContextManagerIterator,
 
         // pydocstyle
         (Pydocstyle, "100") => rules::pydocstyle::rules::UndocumentedPublicModule,
@@ -1213,6 +1225,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleStatus, Rule)> {
         (Ruff, "073") => rules::ruff::rules::FStringPercentFormat,
         (Ruff, "074") => rules::ruff::rules::IncorrectDecoratorOrder,
         (Ruff, "075") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "077") => rules::ruff::rules::MethodReceiverDefault,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1412,7 +1425,7 @@ mod tests {
         security: Rules that flag potential security vulnerabilities but may be prone to false positives
         formatting: Rules that flag formatting issues that do not affect semantics
         pedantic: Rules that are highly opinionated or prone to false positives
-        restriction: Rules that restrict the use of basic language features
+        restriction: Rules that restrict the use of certain features
         ");
     }
 }

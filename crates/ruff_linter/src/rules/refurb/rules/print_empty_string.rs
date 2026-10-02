@@ -244,8 +244,7 @@ impl EmptyStringFix {
             .iter()
             .filter(|arg| !is_empty_string(arg))
             .cloned()
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+            .collect();
 
         // Remove the `sep` keyword argument if it exists.
         if separator == Separator::Remove {

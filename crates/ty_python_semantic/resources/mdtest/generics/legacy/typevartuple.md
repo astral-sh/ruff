@@ -666,6 +666,118 @@ class WithBackportedDefault(Generic[Unpack[Ts]]):
 reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```
 
+### Gradual specializations
+
+A type variable tuple remains assignable to an explicitly gradual specialization of its generic
+class, or its top materialization.
+
+```py
+from typing import Any, Generic, TypeVarTuple
+from ty_extensions import Bottom, Top
+
+Ts = TypeVarTuple("Ts")
+
+class Array(Generic[*Ts]):
+    values: tuple[*Ts]
+
+    def erase_shape(self) -> "Array[*tuple[Any, ...]]":
+        return self
+
+    def erase_shape_top(self) -> "Top[Array[*tuple[Any, ...]]]":
+        return self
+
+    def erase_shape_bottom(self) -> "Bottom[Array[*tuple[Any, ...]]]":
+        return self  # error: [invalid-return-type]
+
+    def fixed_shape(self) -> "Top[Array[Any]]":
+        return self  # error: [invalid-return-type]
+```
+
+## Functions
+
+### Partials with bound variadic arguments
+
+Binding positional arguments infers a fixed-length type variable tuple. The resulting partial
+accepts a call with no additional arguments because the bound values already fill those positions.
+
+```py
+from functools import partial
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def accept(*args: *Ts) -> None: ...
+
+one = partial(accept, 1)
+reveal_type(one)  # revealed: partial[() -> None]
+one()
+
+two = partial(accept, 1, "x")
+reveal_type(two)  # revealed: partial[() -> None]
+two()
+```
+
+### Partials with inferred variadic arguments
+
+A bound tuple determines the number and types of remaining positional parameters. A bound keyword
+after the variadic parameter retains its name and default, including when the tuple is empty.
+
+```py
+from functools import partial
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def repeat(values: tuple[*Ts], *args: *Ts, kw: int) -> tuple[*Ts]:
+    return values
+
+def check(i: int, s: str) -> None:
+    empty = partial(repeat, (), kw=1)
+    reveal_type(empty())  # revealed: tuple[()]
+
+    one = partial(repeat, (i,), kw=1)
+    reveal_type(one(i, kw=2))  # revealed: tuple[int]
+    one()  # error: [missing-argument]
+
+    two = partial(repeat, (i, s), kw=1)
+    reveal_type(two(i, s))  # revealed: tuple[int, str]
+    two(i, i)  # error: [invalid-argument-type]
+```
+
+### Forwarding dictionaries containing callable unions
+
+A dictionary whose values accept either a specific variadic parameter list or arbitrary arguments
+can be forwarded to another function with the same annotation. The callable union does not widen the
+tuple used for the dictionary's keys.
+
+```py
+from collections.abc import Callable
+from typing import TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+
+def accept(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None: ...
+def forward(callbacks: dict[tuple[*Ts], Callable[[*Ts], None] | Callable[..., None]]) -> None:
+    accept(callbacks)
+```
+
+## Tuple concatenation with type variables
+
+Concatenation preserves type variables in fixed positions and an unpacked type variable tuple
+between them. The inferred result satisfies the corresponding generic return annotation.
+
+```py
+from typing import TypeVar, TypeVarTuple
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+def enclose(edge: tuple[T], middle: tuple[*Ts]) -> tuple[T, *Ts, T]:
+    result = edge + middle + edge
+    reveal_type(result)  # revealed: tuple[T@enclose, *Ts@enclose, T@enclose]
+    return result
+```
+
 ## Type Aliases
 
 ### Legacy generic aliases

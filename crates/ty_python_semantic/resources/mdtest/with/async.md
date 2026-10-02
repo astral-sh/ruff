@@ -731,11 +731,12 @@ async def main():
         reveal_type(session)  # revealed: Session
 ```
 
-This also works with `AsyncIterator` return types:
+An `AsyncIterator` return annotation is deprecated for `@asynccontextmanager` but remains supported:
 
 ```py
 from typing import AsyncIterator
 
+# error: [deprecated] "Annotating the return type as `-> AsyncIterator[Foo]`"
 @asynccontextmanager
 async def connect_iterator() -> AsyncIterator[Session]:
     yield Session()

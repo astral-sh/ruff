@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 ## other.py
 
 ```
-1 | def replacement_method() -> None: ...
+1 | def replacement_method(self) -> None: ...
 ```
 
 ## derived.py

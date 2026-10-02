@@ -115,6 +115,7 @@ pub struct Workspace {
 
 #[wasm_bindgen]
 impl Workspace {
+    /// Creates a workspace with options that take precedence over configuration files.
     #[wasm_bindgen(constructor)]
     pub fn new(
         root: &str,
@@ -127,15 +128,11 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let system = WasmSystem::new(SystemPath::new(root));
-
-        let project = ProjectMetadata::from_options(
-            options,
-            SystemPathBuf::from(root),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let root = SystemPath::new(root);
+        let system = WasmSystem::new(root);
+        let mut project =
+            ProjectMetadata::new(root.file_name().unwrap_or("root"), root.to_path_buf());
+        project.set_override_options(options);
 
         let mut db = ProjectDatabase::fallible(project, system.clone()).map_err(into_error)?;
 
@@ -150,6 +147,7 @@ impl Workspace {
         })
     }
 
+    /// Replaces the options set at construction, taking precedence over configuration files.
     #[wasm_bindgen(js_name = "updateOptions")]
     pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
         let options = Options::deserialize_with(
@@ -158,13 +156,8 @@ impl Workspace {
         )
         .map_err(into_error)?;
 
-        let project = ProjectMetadata::from_options(
-            options,
-            self.db.project().root(&self.db).to_path_buf(),
-            None,
-            &FallibleStrategy,
-        )
-        .map_err(into_error)?;
+        let mut project = self.db.project().metadata(&self.db).clone();
+        project.set_override_options(options);
 
         let merged_options = project.to_merged_options();
         let (program_settings, program_settings_diagnostics) = merged_options

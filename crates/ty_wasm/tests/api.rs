@@ -63,6 +63,142 @@ fn check() {
 }
 
 #[wasm_bindgen_test]
+fn configuration_files_and_json_options() {
+    ty_wasm::before_main();
+
+    for (name, original, edited) in [
+        (
+            "pyproject.toml",
+            r#"[project]
+requires-python = '>=3.11'
+[tool.ty.rules]
+undefined-reveal = 'ignore'
+"#,
+            r#"[project]
+requires-python = '>=3.10'
+[tool.ty.rules]
+undefined-reveal = 'ignore'
+"#,
+        ),
+        (
+            "ty.toml",
+            r#"[environment]
+python-version = '3.11'
+[rules]
+undefined-reveal = 'ignore'
+"#,
+            r#"[environment]
+python-version = '3.10'
+[rules]
+undefined-reveal = 'ignore'
+"#,
+        ),
+    ] {
+        let mut workspace =
+            Workspace::new("/", PositionEncoding::Utf32, python_version_options(14))
+                .expect("Workspace to be created");
+        let file = workspace
+            .open_file(
+                "main.py",
+                "import sys\nreveal_type(sys.version_info.minor)\n",
+            )
+            .expect("Python file to be opened");
+        assert_python_version(&workspace, &file, 14);
+
+        let configuration = workspace
+            .open_file(name, original)
+            .expect("Configuration file to be opened");
+        assert_python_version(&workspace, &file, 14);
+
+        workspace
+            .update_options(python_version_options(12))
+            .expect("JSON options to be updated");
+        assert_python_version(&workspace, &file, 12);
+
+        workspace
+            .update_file(&configuration, edited)
+            .expect("Configuration file to be updated");
+        assert_python_version(&workspace, &file, 12);
+
+        workspace
+            .update_options(js_sys::JSON::parse("{}").unwrap())
+            .expect("Explicit options to be cleared");
+        assert_python_version(&workspace, &file, 10);
+
+        workspace
+            .close_file(configuration)
+            .expect("Configuration file to be closed");
+
+        workspace
+            .update_options(python_version_options(14))
+            .expect("Explicit options to be restored");
+        assert_python_version(&workspace, &file, 14);
+    }
+}
+
+#[wasm_bindgen_test]
+fn updated_options_loaded_before_configuration_file() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new("/", PositionEncoding::Utf32, python_version_options(14))
+        .expect("Workspace to be created");
+    workspace
+        .update_options(python_version_options(12))
+        .expect("JSON options to be updated");
+    let file = workspace
+        .open_file(
+            "main.py",
+            "import sys\nreveal_type(sys.version_info.minor)\n",
+        )
+        .expect("Python file to be opened");
+    assert_python_version(&workspace, &file, 12);
+
+    let configuration = workspace
+        .open_file(
+            "pyproject.toml",
+            r#"[project]
+requires-python = '>=3.11'
+[tool.ty.rules]
+undefined-reveal = 'ignore'
+"#,
+        )
+        .expect("Configuration file to be opened");
+    assert_python_version(&workspace, &file, 12);
+
+    workspace
+        .update_options(js_sys::JSON::parse("{}").unwrap())
+        .expect("Explicit options to be cleared");
+    assert_python_version(&workspace, &file, 11);
+
+    workspace
+        .close_file(configuration)
+        .expect("Configuration file to be closed");
+
+    workspace
+        .update_options(python_version_options(14))
+        .expect("Explicit options to be restored");
+    assert_python_version(&workspace, &file, 14);
+}
+
+fn python_version_options(minor: u8) -> wasm_bindgen::JsValue {
+    js_sys::JSON::parse(&format!(
+        r#"{{"environment":{{"python-version":"3.{minor}"}},"rules":{{"undefined-reveal":"ignore"}}}}"#
+    ))
+    .unwrap()
+}
+
+#[track_caller]
+fn assert_python_version(workspace: &Workspace, file: &ty_wasm::FileHandle, minor: u8) {
+    let diagnostics = workspace.check_file(file).expect("Check to succeed");
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].id(), "revealed-type");
+    assert_eq!(
+        diagnostics[0].message(),
+        format!("Revealed type: `Literal[{minor}]`").as_str()
+    );
+}
+
+#[wasm_bindgen_test]
 fn diagnostic_tags() {
     ty_wasm::before_main();
 

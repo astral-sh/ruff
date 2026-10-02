@@ -201,14 +201,17 @@ impl ProjectFilesWalker {
                                 return WalkState::Skip;
                             }
 
-                            // Skip excluded directories unless they were explicitly passed to the walker
-                            // (which is the case passed to `ty check <paths>`).
+                            let match_mode = if entry.depth() == 0 && force_exclude {
+                                GlobFilterCheckMode::Adhoc
+                            } else {
+                                GlobFilterCheckMode::TopDown
+                            };
+
+                            // Skip excluded directories, including explicitly passed ones with `--force-exclude`.
                             if entry.file_type().is_directory() {
                                 if entry.depth() > 0 || force_exclude {
-                                    let directory_included = filter.is_directory_included(
-                                        entry.path(),
-                                        GlobFilterCheckMode::TopDown,
-                                    );
+                                    let directory_included =
+                                        filter.is_directory_included(entry.path(), match_mode);
                                     return match directory_included {
                                         IncludeResult::Included { .. } => WalkState::Continue,
                                         IncludeResult::Excluded => {
@@ -233,11 +236,6 @@ impl ProjectFilesWalker {
                                 // For all files, except the ones that were explicitly passed to the walker (CLI),
                                 // check if they're included in the project.
                                 if entry.depth() > 0 || force_exclude {
-                                    let match_mode = if entry.depth() == 0 && force_exclude {
-                                        GlobFilterCheckMode::Adhoc
-                                    } else {
-                                        GlobFilterCheckMode::TopDown
-                                    };
                                     match filter.is_file_included(entry.path(), match_mode) {
                                         include_result @ IncludeResult::Included { .. } => {
                                             // Ignore any non python files to avoid creating too many entries in `Files`.

@@ -13,9 +13,17 @@ resolution-markers = [
 exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for backwards compatibility when using relative exclude-newer values.
 exclude-newer-span = "P7D"
 
+[options.exclude-newer-package]
+astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-deny = "2026-09-15T19:10:00Z"
+astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
+astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
+
 [manifest]
 build-constraints = [
-    { name = "flit-core", specifier = "==4.0.2" },
     { name = "hatch-fancy-pypi-readme", specifier = "==25.1.0" },
     { name = "hatch-vcs", specifier = "==0.5.0" },
     { name = "hatchling", specifier = "==1.32.0" },
@@ -77,6 +85,97 @@ wheels = [
 ]
 
 [[package]]
+name = "astral-dev-toolchain-cargo-codspeed"
+version = "5.0.1"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/69/0e/a7d82d3b80efb376676ad9e08b8d5b397fd2993fe436a012d116480edfe0/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:dd304fbc053073e6e8e1b68283d36731788908ce49599e7680582cd87864f11b", size = 962023, upload-time = "2026-08-25T22:20:29.839Z" },
+    { url = "https://files.pythonhosted.org/packages/18/1c/a972d08a06e2646a3642a398a607608510a1ca8e3fae8c609806d783dbd7/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:4e04158926ee6c6ff6cdaaa6df46c05d7855e00b5b0c1550a747772cdcdc60c2", size = 941050, upload-time = "2026-08-25T22:20:31.607Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/86/e803608dbe08ba83a2361dc21fa4f97c7c6b5e84a478637ddd9269aacb2d/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:6e7196c632bb0103ebbf60a75ab076677ad03038fe92a88cbe27b1eb56e63d2b", size = 871539, upload-time = "2026-08-25T22:20:33.397Z" },
+    { url = "https://files.pythonhosted.org/packages/23/11/fb3246e194a1699f2a4493ba9501da8d65d3f49074330cce4244e3ded8c7/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:15e1005b0a7e4eb750172f2d3d7c6ccb3e78e9b55fa4bcd62f54350181dca6a1", size = 922701, upload-time = "2026-08-25T22:20:34.902Z" },
+    { url = "https://files.pythonhosted.org/packages/c1/d9/bfb2f45e36c1525f0c9810405f605f39d7c8b4dcf250629b141b89eb89e6/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-win_amd64.whl", hash = "sha256:ac995814067402b6604c6d8d9ab76700288f015494c53c4e75da09d5bc2ee5f7", size = 824114, upload-time = "2026-08-25T22:20:36.338Z" },
+    { url = "https://files.pythonhosted.org/packages/ce/34/cc139216c71c1bcb67c1623420843646a36748b7ab13d3ae502b5fdbb84d/astral_dev_toolchain_cargo_codspeed-5.0.1-py3-none-win_arm64.whl", hash = "sha256:4bb1b696762454f924a85e0949ab8da1e788124683b644d3b997115d61455700", size = 783231, upload-time = "2026-08-25T22:20:37.889Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-deny"
+version = "0.20.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5d/3b/a6f62f063d65f5470f8867ed2d701398f3e4f69257403290d9f8a6e8b84e/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:985935f3757bbe9a0267c94b6e0813fc80c9ba13ba55b207525ee86b05618357", size = 4812491, upload-time = "2026-09-15T18:54:16.415Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/51/ec56268418cf3a002822b47351dc3f15b89b7300706f6a70b6c46ffdf50f/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:8741971eda68ec4018b891bf4eb97e4e53a16974bf43b7fe9903048919592bb7", size = 4642505, upload-time = "2026-09-15T18:54:18.759Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/2a/79d869d8d22a5812028d90369ce6c4735dd47cfe3e5de321aa869c32fae8/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0e42259c537b2432f5655b3413940e899906033354c5838e367c6837b467a141", size = 4730326, upload-time = "2026-09-15T18:54:20.853Z" },
+    { url = "https://files.pythonhosted.org/packages/09/40/7f110ab4ca7b05f2ea91bf55a2642353f9dcb780a567e5ccd030a219f55e/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ae708f458c23ce1eecfd8f169befbb47424bdc21ecf0965e36db3b1d98400fee", size = 4947048, upload-time = "2026-09-15T18:54:23.462Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/d0/68c33ddc7424e43187836b1a924d1895a1f89d3a438a4dd28c2ed92cc40b/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-win_amd64.whl", hash = "sha256:fa38a4783426db539c456db9319911d81418bbe0e5d1c8da757c4965b9fab44e", size = 4948035, upload-time = "2026-09-15T18:54:26.551Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/80/9362dbb0c9b0ab998c0beac2bace6c9463a3de637108fbc466c0cac67738/astral_dev_toolchain_cargo_deny-0.20.2-py3-none-win_arm64.whl", hash = "sha256:8cb16bf1ce1039f1c2cd4693cbba0e716b269270355261195b7b5af4b23f9e04", size = 4726694, upload-time = "2026-09-15T18:54:28.717Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-fuzz"
+version = "0.13.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/37/1a/64ee8361d5f96236a8b9e91e42745529c1585d2049f221416085b0d0840c/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:ae22e17a288f4b815e509095cc15f3bacd42b3342f50106f85bbdff87f651cd4", size = 918577, upload-time = "2026-08-31T16:45:34.845Z" },
+    { url = "https://files.pythonhosted.org/packages/2f/84/673b1cd197cbff3de46eb8950bd4504f31c11059bf00f64e6ccd5d529cd9/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:802ad95a41270a09fb6285889bedd132590a21512547b89f3a1c82a6918797e1", size = 894396, upload-time = "2026-08-31T16:45:36.308Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/40/cf98874e2b0614da6fe3cb4eeff9f4520ce149036398798bb9c8d7ed7c79/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:25b65340d3f18c4b18b8f7e54855b64c53e6526864b192d32a189b59ded41198", size = 835209, upload-time = "2026-08-31T16:45:37.689Z" },
+    { url = "https://files.pythonhosted.org/packages/37/b6/1ab2d25e68fe1d743adbbd6ec1e20af7411ec8b18dcd7fbce16a61ef3f31/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:612108f626b6ee0e5d63b1a0e257c89c13abffbd8fff539ccbffb7205b33093f", size = 882948, upload-time = "2026-08-31T16:45:38.972Z" },
+    { url = "https://files.pythonhosted.org/packages/78/d2/a2a182b716dd695d138945446b03bfcd0378928f246f514afceac676d5a4/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-win_amd64.whl", hash = "sha256:8c617c6162bea2c77fcce21c07279bd2f2a93e1b5243dabdc5e85c61f66a45fe", size = 763904, upload-time = "2026-08-31T16:45:40.552Z" },
+    { url = "https://files.pythonhosted.org/packages/19/9d/e823bd76ae1ae5dd69c4a77c45fbc01c9745a49075a19bb3aa97b75e2652/astral_dev_toolchain_cargo_fuzz-0.13.2-py3-none-win_arm64.whl", hash = "sha256:efda924de1a449026d6b6baa7a52c92638f539965951db86a71b3e79804afae5", size = 732469, upload-time = "2026-08-31T16:45:42.026Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-insta"
+version = "1.48.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fd/80/ab2d6d0093b478b06707ae9511df0ccc933c704102f691a320d5f4b9c5d6/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:b1f56e9f74edaebca156f448fc1d4d7923c1812a5cac40ae13ccdcd0136a83c8", size = 2264457, upload-time = "2026-08-25T20:54:10.226Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/3c/f18198513bd8c2b44ee0cbf85e27952c43150ca02d32e84369125bc31e2c/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d92eedb58b69b8c55f576967e089cd80dc6e7482cf925c694f5373f16c647055", size = 2148611, upload-time = "2026-08-25T20:54:11.705Z" },
+    { url = "https://files.pythonhosted.org/packages/f8/67/fac1dc449054ca3ed39609ff71e919696cc96ee3d35988111159c8a86465/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:94745ceb0da64d14fc71dabe34febb84a27f321bf1f9bae5064fa8364a1fee2f", size = 1987021, upload-time = "2026-08-25T20:54:13.304Z" },
+    { url = "https://files.pythonhosted.org/packages/1f/11/d931a49ec49080630a800be4e4a58a8498041b64728a9ee1f6da853f1c38/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:317f5a40d4a074e5dbc6b77203b390120f1a72c226edbf52319d339287ae096f", size = 2145780, upload-time = "2026-08-25T20:54:14.893Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/1a/e37987fb11c7382e417a7de6f2b0a7f6451a94f0b2c45eb89561dc56c14d/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-win_amd64.whl", hash = "sha256:314b2d7e01e281f065d27ef9e311072cfe9dfd6e23eebb1cc36f1cd76ca12b0f", size = 2155460, upload-time = "2026-08-25T20:54:16.34Z" },
+    { url = "https://files.pythonhosted.org/packages/85/df/2de935d19813fef6ce4bb9112912600d8ffe57ad15f849057f0b096d272c/astral_dev_toolchain_cargo_insta-1.48.0-py3-none-win_arm64.whl", hash = "sha256:1fae5bb442cead7d5f125e6f5019d3f4c817d129690439c824851449fc636ff2", size = 1996852, upload-time = "2026-08-25T20:54:17.731Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-nextest"
+version = "0.9.143"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/2e/6091f2ecc6936499edfd82628bc7f6f512d47ad292ed37b2f782f12f7ab9/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:2a5b4b8629bc71595e6c57bce2463fc0ad98efd2676ae4c2c0aebebe72142b90", size = 7314765, upload-time = "2026-08-26T15:28:18.223Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/a7/edfe750a7e9732a232b4e4ba30b847f067de957966f181d0665f6d46c224/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-macosx_11_0_arm64.whl", hash = "sha256:d152cb4ce165452a30cc63d92046847210102f9231300d86b4aaf1cfe4f839ad", size = 6995862, upload-time = "2026-08-26T15:28:20.258Z" },
+    { url = "https://files.pythonhosted.org/packages/52/9a/67141069cee76d531d3887e27210c0b16a568585afdd11baf8965cd6b857/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:f6501029b9f9597a720a496997da1aad8e31069a352a80415441eff15d15637d", size = 9880036, upload-time = "2026-08-26T15:28:22.33Z" },
+    { url = "https://files.pythonhosted.org/packages/74/1d/8636da96addb470098a120b55d275d05e8d57925a760515a710d9c2a8245/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a58a0dafb1d6a54b4e80b837a7cbcf2999b2dfd133eb6261b3d61c714b295c81", size = 10068151, upload-time = "2026-08-26T15:28:24.628Z" },
+    { url = "https://files.pythonhosted.org/packages/9c/68/7b73566785938b8d09d28ce170c77ed6fbe1d3f5790c481324417b5bf4d7/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-win_amd64.whl", hash = "sha256:824aec957bf38828671f22e70354b21e95c4a4a1aa8fbaef04f98ae3bee5fe09", size = 6689195, upload-time = "2026-08-26T15:28:26.859Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/30/f2b26fa3111bfac4a5ab59957a431c95a97dba900f894fcf9cbd01299928/astral_dev_toolchain_cargo_nextest-0.9.143-py3-none-win_arm64.whl", hash = "sha256:efdda891201e148c0da299a4f8f26c8a7c7ca510c12d96112ae4d51b1b203ef6", size = 6245567, upload-time = "2026-08-26T15:28:28.754Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-cargo-shear"
+version = "1.13.4"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b3/7d/6f44e9e1d0e29b9cd2903eeee8e9cc7612241cd195c7628841f3f9034409/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:2142f359d3aa21a1e996ca6f89683f5b990fa568ec24e60036761c225300c35d", size = 1480556, upload-time = "2026-08-25T21:13:01.403Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/da/cbf7407c2c9391a986ebd8a05fe2c4aa72c0228723650062928e68f376e9/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-macosx_11_0_arm64.whl", hash = "sha256:359e17bbfb1b388633dc87277dd6ed13f99d987923c40a574377e44b7449b3d7", size = 1342579, upload-time = "2026-08-25T21:13:02.992Z" },
+    { url = "https://files.pythonhosted.org/packages/63/7d/1b7e465833026658ffad9f7a504b5f2d6e2b0977000f06faa14192acce3d/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:97e9e5ca2854a3b12e511e4f30f47c49fa36aafae79c65c2badf14c4caf47998", size = 1466122, upload-time = "2026-08-25T21:13:04.441Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/4f/bc9865a14140f5a990f9bbb7ff5b36e2e0f9151d819570fedb516c26fdd6/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bb239c6e9f4abe609b02dbf2933113378bdce845bcaa5ee0000bc7d04750a5ad", size = 1572315, upload-time = "2026-08-25T21:13:05.851Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/f5/db879c8c71810df57b290af915fd4e4cd588d4b8161267d593d45100d7a1/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-win_amd64.whl", hash = "sha256:b682608009b22130ff3b99ab782ce7ee3555711989c2a84ed627be1a016643d6", size = 1476915, upload-time = "2026-08-25T21:13:07.366Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/7e/62dc9d09eec545a555030fbe8fdb117006ad5684ebe8da4dad8c81a6a251/astral_dev_toolchain_cargo_shear-1.13.4-py3-none-win_arm64.whl", hash = "sha256:91874654b0dcb2b0333a615f81e3cde3f9c10d3148b180254764fce606930af0", size = 1370034, upload-time = "2026-08-25T21:13:08.764Z" },
+]
+
+[[package]]
+name = "astral-dev-toolchain-hyperfine"
+version = "1.20.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5e/82/0109da6323b34d69d48df702438c0f3df4c22513e95154c26b6c7d266a13/astral_dev_toolchain_hyperfine-1.20.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:31b43291b77e9c583c3abebcc65995978cdad75195eb8182ce7eefc96f7dc53d", size = 609130, upload-time = "2026-08-26T16:09:29.018Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/c2/bade068349c37f8c40ee1da1ab2853cb3a10ba51898e19bc6bfbbfa9933b/astral_dev_toolchain_hyperfine-1.20.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:828d4b33fa0d2ddb9c74fd8559e1359e74007ed71148e06ddafe0cbee0219c1b", size = 582152, upload-time = "2026-08-26T16:09:30.369Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/54/0bb44acfe37a4a278023592fc703a1f7a7402f76635ba4dcdb14a6075e86/astral_dev_toolchain_hyperfine-1.20.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aafd0ca4620b89685bdec078657567833b462a8dceba930f3ac395d81a8dde17", size = 622444, upload-time = "2026-08-26T16:09:31.669Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/1e/1ff7bb5b38fd7059577ec6fab9405a09b126b8775f73cad144bc43048499/astral_dev_toolchain_hyperfine-1.20.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a90dcfd64798ce5f82b62b4a05ea923fe76407abcc5b49ffaef30b902d1e3e70", size = 656263, upload-time = "2026-08-26T16:09:32.942Z" },
+    { url = "https://files.pythonhosted.org/packages/49/9e/036f671adf8dd42ca949f6358afe31f93490294f167d51d592362f2789c4/astral_dev_toolchain_hyperfine-1.20.0-py3-none-win_amd64.whl", hash = "sha256:c6e1667d641a06554a0d984b0b372dfecec833db1c4c6e84b56c6d56194ac45d", size = 588524, upload-time = "2026-08-26T16:09:34.192Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/c2/eea4375484705603b7f83f97d2ea7f7f30b8e6ffa55fb4ec81dcd8a3b0a6/astral_dev_toolchain_hyperfine-1.20.0-py3-none-win_arm64.whl", hash = "sha256:2995536b8fa75c3137b8b74a728fe3ae4dc93dcbda226989355bfc3921ac6d55", size = 555078, upload-time = "2026-08-26T16:09:36.041Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -125,7 +224,8 @@ name = "black"
 version = "26.5.2.dev21+ge34bb1bef"
 source = { git = "https://github.com/psf/black.git#e34bb1bef70e83410c2816dfd07485ec026959aa" }
 dependencies = [
-    { name = "click" },
+    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
+    { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "mypy-extensions" },
     { name = "packaging" },
     { name = "pathspec" },
@@ -354,12 +454,28 @@ wheels = [
 name = "click"
 version = "8.4.2"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version == '3.12.*'",
+    "python_full_version >= '3.10' and python_full_version < '3.12'",
+]
 dependencies = [
     { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/d4/81420972a676e8ffea40450d8c8c92943e7218a78fe9b64359836cc9876b/click-8.4.2.tar.gz", hash = "sha256:9a6cea6e60b17ebe0a44c5cc636d94f09bd66142c1cd7d8b4cd731c4917a15f6", size = 338000, upload-time = "2026-06-24T17:45:15.148Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/e2/79c688af8b210d232694e31e59da9f6ec747bae31c3f5946e4e9b98860d5/click-8.4.2-py3-none-any.whl", hash = "sha256:e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76", size = 119243, upload-time = "2026-06-24T17:45:13.73Z" },
+]
+
+[[package]]
+name = "click"
+version = "8.5.0"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.13'",
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c7/0e/7fa0ef50764b67090eca4114772a2abf8b6148198475e54c660b97caeee6/click-8.5.0.tar.gz", hash = "sha256:ba0d2089de75ea0310e2dde03160e6ca10009947fb95a182f9b54021bb272e34", size = 382235, upload-time = "2026-08-26T13:33:14.56Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/50/6c0d534c5f134586a8e1ba4e330569e32f057e33372ae556463212fb4cd3/click-8.5.0-py3-none-any.whl", hash = "sha256:255bc9599cf7748b4b1a446ccc735421bd08a2ae529a8b88597d3de5664ee360", size = 125251, upload-time = "2026-08-26T13:33:12.928Z" },
 ]
 
 [[package]]
@@ -374,7 +490,7 @@ wheels = [
 [[package]]
 name = "docstring-adder"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/docstring-adder.git#86fa6dd7681b9bb712084e1f6117410bc39928bf" }
+source = { git = "https://github.com/astral-sh/docstring-adder.git#a2c7f662beaa33867d6e9120bcb68858d571d882" }
 dependencies = [
     { name = "rich-argparse" },
     { name = "termcolor" },
@@ -387,9 +503,9 @@ dependencies = [
 [[package]]
 name = "ecosystem-analyzer"
 version = "0.1.0"
-source = { git = "https://github.com/astral-sh/ecosystem-analyzer#a31ef389f3cc304b59623df7fe4b068419a323a4" }
+source = { git = "https://github.com/astral-sh/ecosystem-analyzer#ebec9bd301f36aa1308fc2e0c743129ff23581fc" }
 dependencies = [
-    { name = "click" },
+    { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" } },
     { name = "jinja2" },
     { name = "mypy-primer" },
     { name = "typing-extensions" },
@@ -705,7 +821,8 @@ name = "mkdocs"
 version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click" },
+    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
+    { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "ghp-import" },
     { name = "jinja2" },
@@ -893,7 +1010,10 @@ wheels = [
 [[package]]
 name = "mypy-primer"
 version = "0.1.0"
-source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=3058720299b812c393ad926bcca96eede20fa683#3058720299b812c393ad926bcca96eede20fa683" }
+source = { git = "https://github.com/hauntsaninja/mypy_primer?rev=e1f6fe93da5de0cbaf0ab00341d05968a0331fae#e1f6fe93da5de0cbaf0ab00341d05968a0331fae" }
+dependencies = [
+    { name = "tomlkit" },
+]
 
 [[package]]
 name = "packaging"
@@ -942,26 +1062,26 @@ wheels = [
 
 [[package]]
 name = "prek"
-version = "0.4.12"
+version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fc/5c/cb6e63f7e5a58a5313ddb70409174f4dc004e4b0910b8a8d3f59b2225a95/prek-0.4.12.tar.gz", hash = "sha256:04beeba7f40437cd2f36804b84101bd7f3c9fb40b52da46a25604642ab2bfb09", size = 519080, upload-time = "2026-08-03T11:28:33.147Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ed/c8/ad3efcaf7007e4796f9a7482b4a3d84402c1535109695cba76fcb87cb03d/prek-0.5.0.tar.gz", hash = "sha256:8df015db60c1e9a30b4a266e65fa14c4d41d2b2b3b90879d76a5d8970dcce64d", size = 544033, upload-time = "2026-08-27T03:50:33.079Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/23/5811a3161e072e5f93e4da01af611ee30c32922507b8ab4d9873df6affd3/prek-0.4.12-py3-none-linux_armv6l.whl", hash = "sha256:cd92000b051e433f26340821cf1cc8e6e3960f1275f3d516ca01f05905abba64", size = 5793226, upload-time = "2026-08-03T11:28:09.534Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/88/8607845d94eb1482e1bd335dadf098618f077a15775f7e98de99669052b4/prek-0.4.12-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:5904fe6c6ab26e7d8792a3c7f1e3fc8d94fcfb63ad33b247c35f004b62cb6275", size = 6132269, upload-time = "2026-08-03T11:28:11.147Z" },
-    { url = "https://files.pythonhosted.org/packages/ac/28/571d79ba457fbd9ecf40ae879c91952e12f5fa475306218c91139b86db7a/prek-0.4.12-py3-none-macosx_11_0_arm64.whl", hash = "sha256:df3eff1db9c24dc293010a07bc7a0ae0c541d55af828f5586405dedc28c4920d", size = 5614964, upload-time = "2026-08-03T11:28:12.983Z" },
-    { url = "https://files.pythonhosted.org/packages/b0/a9/3f5cb79a73c764a8ac38d5bcd51e0df57239856eca7949b09bdac4338bf3/prek-0.4.12-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:c7733b44ca772ea32ec6a8bee669d0358bdf45873e79767afed196065084f31c", size = 5941047, upload-time = "2026-08-03T11:28:14.45Z" },
-    { url = "https://files.pythonhosted.org/packages/8c/00/1dfed0ef8af10c5c32aa903486dccd33d2df171f3d945a037c5692f10760/prek-0.4.12-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:87f170cf1ffd6e3a196f947b83dff1f6c2cd68635f8d49740278bebe7b682262", size = 5707994, upload-time = "2026-08-03T11:28:15.914Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/bd/5f388f6cbdc0445b850e7c1a160d0be67fcef8bf221e3c8141a1feccef17/prek-0.4.12-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:57dad513831f060cf73808df8edec29d46ec311435aa69f21c80edebf23dc5e1", size = 6133784, upload-time = "2026-08-03T11:28:17.184Z" },
-    { url = "https://files.pythonhosted.org/packages/ba/47/342091a987bf68a74acec6d226a40ce7d51faf0019aa4126cc7bc952f8a7/prek-0.4.12-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:b204844abc7ded983471f576ae8dc13b99e9b8d022e4d4b46176c6654769c9d8", size = 6901589, upload-time = "2026-08-03T11:28:18.545Z" },
-    { url = "https://files.pythonhosted.org/packages/5b/8a/3ef7bdc3c3441649ebc040b9e164a13163e1e5fabae23e7bbb901992f3de/prek-0.4.12-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:43b0a5a9d3f2f77871fdcb7893bfc5c8fe7e44f4e603ce6e4712bfec96b2d6f2", size = 6342189, upload-time = "2026-08-03T11:28:20Z" },
-    { url = "https://files.pythonhosted.org/packages/c4/da/6277908442301b1b92a2879f6b04aaa03accb900f80e42776fc28b8197ef/prek-0.4.12-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:0d188e572c306cc44b96e1bae5647e25b7bd311113f3f3f4a67320c257ee64a3", size = 5951250, upload-time = "2026-08-03T11:28:21.339Z" },
-    { url = "https://files.pythonhosted.org/packages/a3/68/bff51a7332837edb1ecbe017325adb7fafd69b9c7828ddc81a1334b884af/prek-0.4.12-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:986f52d104b7066190f0f32aebe3467710356de265e9bfd892101ba99371db4d", size = 5804147, upload-time = "2026-08-03T11:28:22.656Z" },
-    { url = "https://files.pythonhosted.org/packages/aa/de/b7f544971072ed7814125145dfeb1f7c15cce6b78ccea65a96298ff37838/prek-0.4.12-py3-none-musllinux_1_1_armv7l.whl", hash = "sha256:13e34d9e09bafcbf1f25a01cf86985e2c5e486591d3f45b2786ba3de82e5153a", size = 5680104, upload-time = "2026-08-03T11:28:24.271Z" },
-    { url = "https://files.pythonhosted.org/packages/68/94/95942bcc20a6a91ec2989aa30fdeb00ad095be736ec48b4bbcf0376166b1/prek-0.4.12-py3-none-musllinux_1_1_i686.whl", hash = "sha256:3d0208370da73e8b5bc97f2492dc3975f8dd2c22f4bf6e1f2cf3342503764b52", size = 5975030, upload-time = "2026-08-03T11:28:25.683Z" },
-    { url = "https://files.pythonhosted.org/packages/ef/6d/26e6497198d81cf9aa82495400aef46adea8df3e4a4efc5f00e3b6ab3292/prek-0.4.12-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:b1005f42920111bec1403c25e8f2f12ec7af0be06686cc3b8dcf85429af908a8", size = 6458532, upload-time = "2026-08-03T11:28:27.121Z" },
-    { url = "https://files.pythonhosted.org/packages/44/02/ee140c2eb4701bd194db429d84630733492be94897d5f72b61d6f11e6619/prek-0.4.12-py3-none-win32.whl", hash = "sha256:afee229488dcceaea282288e4d7096a93da5a8b85649d9ef506dbdbcd78f38a7", size = 5502213, upload-time = "2026-08-03T11:28:28.691Z" },
-    { url = "https://files.pythonhosted.org/packages/e5/7b/744cff84def48c1ce38c0b4f643a3553c66976c5bb7869ab7317044870e4/prek-0.4.12-py3-none-win_amd64.whl", hash = "sha256:fdd27bad8adafea8fe77606950ca09200d59296a47ab131cfb88718d460949d7", size = 5868065, upload-time = "2026-08-03T11:28:30.377Z" },
-    { url = "https://files.pythonhosted.org/packages/46/1d/e2c0fc222904ef73df1739b11a83edc29e38bc4bc61259f2ca6d2f15abb0/prek-0.4.12-py3-none-win_arm64.whl", hash = "sha256:45e34a24fba4a4e4568682477158591698efc2375b8d1d418ae424691c4bd01b", size = 5632819, upload-time = "2026-08-03T11:28:31.743Z" },
+    { url = "https://files.pythonhosted.org/packages/89/83/a5b36db04d5ed8c461b9fec216193a52eee5be37170a9387022f832312b6/prek-0.5.0-py3-none-linux_armv6l.whl", hash = "sha256:df794a883e347ef78cb74522a143dbd8cc2a66e765ef328f48b615f37098015e", size = 5593469, upload-time = "2026-08-27T03:50:00.402Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/b5/cd6cab203693a1c45d5a3bae3b8eb56174d595da8af6d6e1595c795f909a/prek-0.5.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:19d6fd892e112cf7dc300735a7ac8e596813ff1c11649ba2d2b9dd6fdfd6c96e", size = 5980270, upload-time = "2026-08-27T03:50:02.675Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/b6/bbf5134c7b1360aad3f62c0f0391a7c6403b3500d16df25848089ad957c3/prek-0.5.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:313e2535483c37bba884ab034f478c174de7d3b9627081f2eedd16ac2c03bcc3", size = 5521835, upload-time = "2026-08-27T03:50:04.609Z" },
+    { url = "https://files.pythonhosted.org/packages/78/72/7c79e9de5603fdc54d2101f0982f1af5e5ffa1a45c0bcbdbe5f985ed6b90/prek-0.5.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.musllinux_1_1_aarch64.whl", hash = "sha256:1e9b34caeb465f1fa7cbb5d872d4611560eaff877162c4ad80a608838b0819a3", size = 5822039, upload-time = "2026-08-27T03:50:07.281Z" },
+    { url = "https://files.pythonhosted.org/packages/dc/d2/68c21ec26f773b2370b132d69fe325589db08865fbe8b3df7d8ea8d8fc49/prek-0.5.0-py3-none-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:561c2d028c7679fe8969937aa9ab74d96d6f7c748b8abf98edf6dc031dfbbdc9", size = 5510802, upload-time = "2026-08-27T03:50:09.2Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/9e/ce6db8d998cb3e48bf747b7390e1ec87bb817ec500cfa5791af3a0d2eded/prek-0.5.0-py3-none-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:310579ceb4acbc5646df9d663ec38a57b47258a903780089cfacfbf0dc9d49f1", size = 5969141, upload-time = "2026-08-27T03:50:11.211Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/10/35e4c8fc4534d3b98c1bef2bfd559ba2aeedc9e540fcd4091fd4d91543b6/prek-0.5.0-py3-none-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:da38e9c1d227773728c05d2f644704f3d3ace67f6ea58e41d406ebb596c3a135", size = 6731634, upload-time = "2026-08-27T03:50:13.244Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/fc/433b55d10e928de8ab2a9b83dfdbe8cba936fafc6e0a5c65b85f4007a8ea/prek-0.5.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b845f25f481a7df56f39dddcba35576a10d78aa71e09e4f88bcccce0729ebfb2", size = 6203980, upload-time = "2026-08-27T03:50:15.158Z" },
+    { url = "https://files.pythonhosted.org/packages/7b/b8/b5cdd27d6da0d754abcf9cc06a092f476bd9242f0e8e19e3dfd1a2d1b315/prek-0.5.0-py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:93b4086a1b69c24a967b5c80608cfc4a111cc2b0f69bc1d1f278eb4c23ad430c", size = 5827384, upload-time = "2026-08-27T03:50:16.898Z" },
+    { url = "https://files.pythonhosted.org/packages/18/e5/1d8fd614dfe04aa9378b33fb23f7285da582ca090c321973da8466a754d5/prek-0.5.0-py3-none-manylinux_2_31_riscv64.whl", hash = "sha256:3299eca7269582665255f4c8f3ab38bc64e4d16ab2e9ce5e3d20cf65bc9f40ee", size = 5589195, upload-time = "2026-08-27T03:50:18.857Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/89/e758cefe423cd1422e882325baef65af2bf2b6a903c32d657323a993d394/prek-0.5.0-py3-none-musllinux_1_1_armv7l.whl", hash = "sha256:005c20b3df988f240bfa50518777d5babeab50cf774a8917dba1705567e1f561", size = 5491009, upload-time = "2026-08-27T03:50:20.836Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/90/6b30d898a2610113378b78b82f1d700bcdb79993ba92b85f492a02859f53/prek-0.5.0-py3-none-musllinux_1_1_i686.whl", hash = "sha256:a1a46d8de94d7c7c58b027a3622763861f1c76b01bafe9dc6d8b408713ad3946", size = 5826007, upload-time = "2026-08-27T03:50:23.1Z" },
+    { url = "https://files.pythonhosted.org/packages/48/23/3fd00ff6d844b1756b95fc913730c6ec2f772f36558693ff3c4cfb2d3071/prek-0.5.0-py3-none-musllinux_1_1_x86_64.whl", hash = "sha256:e2aad66e0111cab24a03af2f67fca737c3d8f7b1188cf9b8994bbbf7b52f53b8", size = 6319092, upload-time = "2026-08-27T03:50:25.41Z" },
+    { url = "https://files.pythonhosted.org/packages/ca/10/5d99bdfc77b51ab427a139e0b9f2dd5eacc74fe02fd1228c7be1a8ede6ad/prek-0.5.0-py3-none-win32.whl", hash = "sha256:d4970878d5032ad101b4ec5662f3848a70f80c0295ed5a1fea0aed82979c1251", size = 5340535, upload-time = "2026-08-27T03:50:27.452Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/2a/835019081b3a09acefc6e28a6dd561a45c8270f8a84e85fa00d6f2be0300/prek-0.5.0-py3-none-win_amd64.whl", hash = "sha256:7bf2df923ba48ec72af7dc69033d613f4775eb301cdf975e19e749ecda2a28c4", size = 5725188, upload-time = "2026-08-27T03:50:29.492Z" },
+    { url = "https://files.pythonhosted.org/packages/55/dc/a634d4c5951bd899526c6d8f2a4776bc42af1df4b01951e4f90412909cfc/prek-0.5.0-py3-none-win_arm64.whl", hash = "sha256:43e9d2d727435b0be28fe2195a6a22b0e5e0d937270ae0c88edfc42b71db8fab", size = 5492540, upload-time = "2026-08-27T03:50:31.49Z" },
 ]
 
 [[package]]
@@ -969,7 +1089,8 @@ name = "properdocs"
 version = "1.6.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click" },
+    { name = "click", version = "8.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
+    { name = "click", version = "8.5.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "ghp-import" },
     { name = "jinja2" },
@@ -1496,11 +1617,18 @@ wheels = [
 
 [[package]]
 name = "ruff"
-version = "0.16.5"
+version = "0.16.10"
 source = { editable = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "astral-dev-toolchain-cargo-codspeed", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-deny", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-fuzz", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-insta", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-nextest", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-cargo-shear", marker = "python_full_version >= '3.12'" },
+    { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'" },
     { name = "prek", marker = "python_full_version >= '3.12'" },
 ]
 docs = [
@@ -1536,7 +1664,16 @@ typeshed-formatting = [
 [package.metadata]
 
 [package.metadata.requires-dev]
-dev = [{ name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.4.12" }]
+dev = [
+    { name = "astral-dev-toolchain-cargo-codspeed", marker = "python_full_version >= '3.12'", specifier = ">=5.0.1" },
+    { name = "astral-dev-toolchain-cargo-deny", marker = "python_full_version >= '3.12'", specifier = ">=0.20.2" },
+    { name = "astral-dev-toolchain-cargo-fuzz", marker = "python_full_version >= '3.12'", specifier = ">=0.13.2" },
+    { name = "astral-dev-toolchain-cargo-insta", marker = "python_full_version >= '3.12'", specifier = ">=1.48.0" },
+    { name = "astral-dev-toolchain-cargo-nextest", marker = "python_full_version >= '3.12'", specifier = ">=0.9.143" },
+    { name = "astral-dev-toolchain-cargo-shear", marker = "python_full_version >= '3.12'", specifier = ">=1.13.4" },
+    { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'", specifier = ">=1.20.0" },
+    { name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.5.0" },
+]
 docs = [
     { name = "mkdocs", marker = "python_full_version >= '3.12'", specifier = ">=1.6.1" },
     { name = "mkdocs-github-admonitions-plugin", marker = "python_full_version >= '3.12'", specifier = ">=0.1.1" },
@@ -1647,6 +1784,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/12/64/da524626d3b9cc40c168a13da8335fe1c51be12c0a63685cc6db7308daae/tomli-2.4.1-cp314-cp314t-win_amd64.whl", hash = "sha256:2c1c351919aca02858f740c6d33adea0c5deea37f9ecca1cc1ef9e884a619d26", size = 121196, upload-time = "2026-03-25T20:22:01.169Z" },
     { url = "https://files.pythonhosted.org/packages/5a/cd/e80b62269fc78fc36c9af5a6b89c835baa8af28ff5ad28c7028d60860320/tomli-2.4.1-cp314-cp314t-win_arm64.whl", hash = "sha256:eab21f45c7f66c13f2a9e0e1535309cee140182a9cdae1e041d02e47291e8396", size = 100393, upload-time = "2026-03-25T20:22:02.137Z" },
     { url = "https://files.pythonhosted.org/packages/7b/61/cceae43728b7de99d9b847560c262873a1f6c98202171fd5ed62640b494b/tomli-2.4.1-py3-none-any.whl", hash = "sha256:0d85819802132122da43cb86656f8d1f8c6587d54ae7dcaf30e90533028b49fe", size = 14583, upload-time = "2026-03-25T20:22:03.012Z" },
+]
+
+[[package]]
+name = "tomlkit"
+version = "0.15.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz", hash = "sha256:e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97", size = 180129, upload-time = "2026-07-17T01:48:04.562Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/13/bc/8c13eb66537dce1d2bd3a57132902f38d0e7f5bb46fa9f4daed9fe9d76ee/tomlkit-0.15.1-py3-none-any.whl", hash = "sha256:177a05aece5a8ca5266fd3c448abb47b8d352f09d477d3ca8332db4d89b24304", size = 49449, upload-time = "2026-07-17T01:48:05.728Z" },
 ]
 
 [[package]]

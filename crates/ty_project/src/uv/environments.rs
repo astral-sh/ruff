@@ -75,14 +75,15 @@ use parking_lot::Mutex;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::FxDashMap;
 use ruff_db::cancellation::CancellationTokenSource;
-use ruff_db::files::{File, Files};
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::diagnostic::{Diagnostic, Severity};
+use ruff_db::files::File;
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use salsa::Setter;
 
 use crate::script::script_tag;
 use crate::uv::{
-    ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataResult, UvMetadataService,
-    UvSyncTask,
+    MetadataTarget, ScriptSyncRequest, ScriptSyncTask, Uv, UvMetadata, UvMetadataError,
+    UvMetadataResult, UvMetadataService, UvSyncTask, uv_executable_error,
 };
 use crate::{Db, ProjectReloadResult, ProjectSyncProgressFactory, UseUv, UvSyncProgress};
 
@@ -355,19 +356,17 @@ impl UvEnvironments {
                     };
                     drop(project_sync);
                     let project = db.project();
-                    let environment = match Uv::parse_metadata_output(db.system(), output) {
-                        Ok(metadata) => ProjectEnvironment {
-                            metadata: Some(metadata),
-                            error: None,
-                        },
+                    let mut workspace = UvWorkspace::from_metadata_result(
+                        Uv::parse_metadata_output(db.system(), output),
+                    );
+                    if workspace.error.is_some() {
                         // Keep the last working uv metadata so a failed refresh does not change
                         // the environment used for checking. Report the new error instead.
-                        Err(error) => ProjectEnvironment {
-                            error: Some(error.to_string().into_boxed_str()),
-                            ..project.metadata(db).environment().clone()
-                        },
-                    };
-                    changes.project = Some(match project.rediscover(db, &path, environment) {
+                        workspace
+                            .metadata
+                            .clone_from(&project.metadata(db).uv_workspace().metadata);
+                    }
+                    changes.project = Some(match project.rediscover(db, &path, workspace) {
                         Ok(result) => result,
                         Err(error) => {
                             let error = anyhow::Error::new(error);
@@ -526,9 +525,36 @@ impl UvSyncChanges {
 /// Applied workspace metadata and the error from its latest request.
 /// Both fields are absent when no workspace metadata has been requested.
 #[derive(Debug, Default, Clone, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) struct ProjectEnvironment {
+pub struct UvWorkspace {
     pub(crate) metadata: Option<UvMetadata>,
-    pub(crate) error: Option<Box<str>>,
+    pub(crate) error: Option<Diagnostic>,
+}
+
+impl UvWorkspace {
+    /// Obtains uv workspace metadata for `path`.
+    ///
+    /// Failures are retained as diagnostics for the project to report.
+    pub fn discover(path: &SystemPath, system: &dyn System) -> Self {
+        let metadata = Uv::new(system)
+            .map_err(uv_executable_error)
+            .map_err(UvMetadataError::Invocation)
+            .and_then(|uv| uv.metadata(system, &MetadataTarget::Workspace(path)));
+
+        Self::from_metadata_result(metadata)
+    }
+
+    fn from_metadata_result(metadata: Result<UvMetadata, UvMetadataError>) -> Self {
+        match metadata {
+            Ok(metadata) => Self {
+                metadata: Some(metadata),
+                error: None,
+            },
+            Err(error) => Self {
+                metadata: None,
+                error: Some(error.to_diagnostic(Severity::Warning)),
+            },
+        }
+    }
 }
 
 /// Whether a script environment is suitable for operations that depend on its dependencies.
@@ -586,8 +612,8 @@ pub(crate) struct ScriptEnvironment {
     /// The error from the most recent synchronization.
     ///
     /// `None` if synchronization has not completed or completed successfully.
-    #[returns(as_deref)]
-    pub(crate) initialization_error: Option<Box<str>>,
+    #[returns(as_ref)]
+    pub(crate) initialization_error: Option<Diagnostic>,
 }
 
 struct UvEnvironmentsInner {
@@ -710,40 +736,18 @@ fn apply_sync_result(
     db: &mut dyn Db,
     environment: ScriptEnvironment,
     request: &ScriptSyncRequest,
-    output: std::io::Result<std::process::Output>,
+    output: Result<std::process::Output, UvMetadataError>,
 ) {
-    let previous_root = environment
-        .uv_metadata(db)
-        .and_then(UvMetadata::environment)
-        .map(ToOwned::to_owned);
-    let recovering_from_error = environment.initialization_error(db).is_some();
     let (uv_metadata, initialization_error) = match Uv::parse_metadata_output(db.system(), output) {
         Ok(metadata) => (Some(metadata), None),
-        Err(error) => (None, Some(error.to_string().into_boxed_str())),
+        Err(error) => (None, Some(error.to_diagnostic(Severity::Error))),
     };
-    let current_root = uv_metadata.as_ref().and_then(UvMetadata::environment);
-
-    if let Some(root) = previous_root
-        .as_deref()
-        .or_else(|| current_root.filter(|_| recovering_from_error))
-    {
-        // uv can install, update, or remove packages without changing the virtual-environment path.
-        // Refresh files under that path so semantic queries see the updated package contents.
-        // After a failed synchronization, recover the path from the new metadata because the
-        // previous metadata was cleared along with its virtual-environment path.
-        //
-        // FIXME: This is overbroad. A file watcher can tell us precisely what changed.
-        // Changes inside virtual environments should instead be watched and processed through `ProjectDatabase::apply_changes`.
-        // Using a file watcher also ensures that virtual environment changes in
-        // scripts without using uv are detected.
-        Files::sync_all_recursive(db, [root]);
-    }
 
     if environment.uv_metadata(db) != uv_metadata.as_ref() {
         environment.set_uv_metadata(db).to(uv_metadata);
     }
 
-    if environment.initialization_error(db) != initialization_error.as_deref() {
+    if environment.initialization_error(db) != initialization_error.as_ref() {
         environment
             .set_initialization_error(db)
             .to(initialization_error);
@@ -960,7 +964,7 @@ mod tests {
 
         use super::super::{ScriptEnvironmentAvailability, UvSyncChanges, script_environment};
         use crate::db::testing::TestDb;
-        use crate::{Db as _, ProjectMetadata, UseUv};
+        use crate::{Db as _, ProjectMetadata, UseUv, uv_test_env_vars};
 
         #[test]
         fn newer_project_refresh_discards_old_metadata() -> anyhow::Result<()> {
@@ -1013,10 +1017,10 @@ mod tests {
             assert!(changes.project.is_some());
             assert!(!environments.has_pending_synchronizations());
 
-            let environment = case.db.project().metadata(&case.db).environment();
-            assert_eq!(environment.error, None);
+            let workspace = case.db.project().metadata(&case.db).uv_workspace();
+            assert_eq!(workspace.error, None);
             assert_eq!(
-                environment
+                workspace
                     .metadata
                     .as_ref()
                     .context("missing uv metadata")?
@@ -1248,6 +1252,8 @@ mod tests {
 
             fn sync_workspace(&self) -> anyhow::Result<()> {
                 let output = Command::new(self.db.test_system().env_var(EnvVars::UV)?)
+                    .env_clear()
+                    .envs(uv_test_env_vars())
                     .current_dir(self.db.project().root(&self.db))
                     .args(["sync", "--offline"])
                     .output()?;
@@ -1277,6 +1283,8 @@ mod tests {
                     root.join("bin/python")
                 };
                 let output = Command::new(python.as_std_path())
+                    .env_clear()
+                    .envs(uv_test_env_vars())
                     .args(["-c", &format!("import {module}")])
                     .output()?;
 
@@ -1298,18 +1306,11 @@ mod tests {
                 let metadata = ProjectMetadata::new("test", root.clone()).with_use_uv(use_uv);
                 let mut db = TestDb::new(metadata);
                 db.use_system(OsSystem::new(&root));
+                db.test_system().clear_env_vars();
+                db.test_system().set_env_vars(uv_test_env_vars());
 
                 let uv = OsSystem::default().which("uv")?;
                 db.test_system().set_env_var(EnvVars::UV, uv.as_str());
-                for name in [
-                    EnvVars::VIRTUAL_ENV,
-                    EnvVars::CONDA_PREFIX,
-                    EnvVars::CONDA_DEFAULT_ENV,
-                    EnvVars::CONDA_ROOT,
-                    EnvVars::PYTHONPATH,
-                ] {
-                    db.test_system().remove_env_var(name);
-                }
 
                 let path = root.join(file_name);
                 db.write_dedented(path.as_str(), source)?;

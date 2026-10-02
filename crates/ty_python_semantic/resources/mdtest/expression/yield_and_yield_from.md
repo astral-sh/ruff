@@ -464,6 +464,86 @@ def outer_aliased_generator() -> FullGeneratorAlias[int, bytes, None]:
     reveal_type(result)  # revealed: str
 ```
 
+## Recursive generator type aliases
+
+A recursive generator alias still specifies the types of values yielded, sent, and returned. Here
+the generator yields integers, receives bytes, and can return another generator of the same type or
+`None`.
+
+```py
+from collections.abc import Generator
+
+RecursiveGenerator = Generator[int, bytes, "RecursiveGenerator | None"]
+
+def recursive_generator(inner: Generator[str, bytes, None]) -> RecursiveGenerator:
+    sent = yield 1
+    reveal_type(sent)  # revealed: bytes
+    # snapshot: invalid-yield
+    yield "bad"
+    yield from inner  # error: [invalid-yield]
+    return 42  # error: [invalid-return-type]
+```
+
+```snapshot
+error[invalid-yield]: Yield expression type does not match annotation
+ --> src/mdtest_snippet.py:9:11
+  |
+5 | def recursive_generator(inner: Generator[str, bytes, None]) -> RecursiveGenerator:
+  |                                                                ------------------ Function annotated with yield type `int` here
+6 |     sent = yield 1
+7 |     reveal_type(sent)  # revealed: bytes
+8 |     # snapshot: invalid-yield
+9 |     yield "bad"
+  |           ^^^^^ expression of type `Literal["bad"]`, expected `int`
+```
+
+A union containing a recursive generator alias combines the yield and send types of its
+alternatives.
+
+```py
+def union_generator() -> RecursiveGenerator | Generator[str, bytes, None]:
+    sent = yield 1.0  # error: [invalid-yield]
+    reveal_type(sent)  # revealed: bytes
+```
+
+## Recursive asynchronous generator type aliases
+
+An asynchronous generator can receive another generator of its own type. Its recursive annotation
+still constrains the values it yields.
+
+```py
+from collections.abc import AsyncGenerator
+
+RecursiveAsyncGenerator = AsyncGenerator[int, "RecursiveAsyncGenerator | None"]
+
+async def recursive_generator() -> RecursiveAsyncGenerator:
+    sent = yield 1
+    reveal_type(sent)  # revealed: RecursiveAsyncGenerator | None
+    yield "bad"  # error: [invalid-yield]
+```
+
+## Recursive iterator type aliases
+
+Recursive iterator annotations constrain the yielded values and give `yield` expressions a send type
+of `None`, just like other iterator annotations.
+
+```py
+from collections.abc import AsyncIterator, Iterator
+
+RecursiveIterator = Iterator["RecursiveIterator"]
+RecursiveAsyncIterator = AsyncIterator["RecursiveAsyncIterator"]
+
+def recursive_iterator(child: RecursiveIterator) -> RecursiveIterator:
+    sent = yield child
+    reveal_type(sent)  # revealed: None
+    yield 1  # error: [invalid-yield]
+
+async def recursive_async_iterator(child: RecursiveAsyncIterator) -> RecursiveAsyncIterator:
+    sent = yield child
+    reveal_type(sent)  # revealed: None
+    yield 1  # error: [invalid-yield]
+```
+
 ## Error cases
 
 ### Non-iterable type

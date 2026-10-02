@@ -1086,8 +1086,6 @@ pub(super) fn typed_dict_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let self_class = class.class_literal(db);
-
     typed_dict_inherited_class_member(
         db,
         env,
@@ -1095,7 +1093,7 @@ pub(super) fn typed_dict_class_member<'db>(
         module,
         lookup_policy,
         name,
-        || determine_upper_bound(db, env, self_class, ClassBase::is_typed_dict),
+        || determine_upper_bound(db, env, class, ClassBase::is_typed_dict),
     )
 }
 

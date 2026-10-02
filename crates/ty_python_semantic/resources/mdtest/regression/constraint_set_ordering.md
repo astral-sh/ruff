@@ -207,7 +207,7 @@ def chain_stu[S, T, U]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_stu | T@chain_stu]]
-    # revealed: tuple[Solution[S=int | T@chain_stu | U@chain_stu]]
+    # revealed: tuple[Solution[S=T@chain_stu | U@chain_stu | int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_stu | int | U@chain_stu]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -223,7 +223,7 @@ def chain_uts[U, T, S]() -> None:
     constraints = chain & ConstraintSet.lower_bound(int, S) & ConstraintSet.upper_bound(U, int)
     # TODO: inferable typevars should not remain in these concrete solutions.
     # TODO: sometimes: revealed tuple[Solution[S=int | U@chain_uts | T@chain_uts]]
-    # revealed: tuple[Solution[S=int | T@chain_uts | U@chain_uts]]
+    # revealed: tuple[Solution[S=T@chain_uts | U@chain_uts | int]]
     reveal_type(constraints.solutions_for(S, inferable=tuple[S, T, U]))
     # revealed: tuple[Solution[T=S@chain_uts | int | U@chain_uts]]
     reveal_type(constraints.solutions_for(T, inferable=tuple[S, T, U]))
@@ -342,9 +342,6 @@ def listify[T](value: T) -> list[T]:
 
 def invariant_callable[U, V]() -> None:
     constraints = ConstraintSet.range(bool, U, int) & ConstraintSet.equality(V, int)
-    # TODO: no error. Existential reduction of the callable's fresh typevar is currently lossy.
-    # TODO: sometimes: no error
-    # error: [static-assert-error]
     static_assert(constraints.implies_subtype_of(TypeOf[listify], Callable[[U], list[V]]))
 
 ConstrainedValue = TypeVar("ConstrainedValue", int, object, covariant=True)
@@ -362,8 +359,8 @@ def get_value(value: GetValue[ConstrainedValue]) -> ConstrainedValue:
     raise NotImplementedError
 
 def typed_dict_union(value: ValueA | ValueB) -> None:
-    # TODO: sometimes: revealed object
-    # revealed: int
+    # TODO: revealed int
+    # revealed: object
     reveal_type(get_value(value))
 ```
 
@@ -393,7 +390,7 @@ class Concrete[T]:
         return ""
 
 def convert[T](value: Concrete[T]) -> Array:
-    return cast(Array, value)
+    return cast(Array, value)  # error: [disjoint-cast]
 
 # error: [invalid-assignment]
 invalid: Array = Concrete[int]()

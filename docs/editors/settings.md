@@ -981,6 +981,10 @@ The backend to use for formatting files. Following options are available:
 For `internal`, the formatter version will match the selected Ruff version while for `uv`, the
 formatter version may differ.
 
+Starting the server with `ruff server --untrusted-workspace` disables the uv backend. With this flag,
+the server always uses the internal formatter, regardless of this setting. This prevents workspace
+configuration from causing uv to execute untrusted code.
+
 **Default value**: `"internal"`
 
 **Type**: `"internal" | "uv"`

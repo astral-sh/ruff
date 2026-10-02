@@ -4,8 +4,11 @@
 # Enable off-by-default rules.
 [rules]
 blanket-ignore-comment = "warn"
+disjoint-cast = "warn"
 division-by-zero = "warn"
 dynamic-function-decorator-return = "warn"
+truthiness-test-of-none-union = "warn"
+invalid-legacy-positional-parameter = "warn"
 missing-type-argument = "warn"
 possibly-missing-attribute = "warn"
 possibly-missing-import = "warn"
@@ -14,3 +17,4 @@ unsound-assignment = "warn"
 unsound-return-statement = "warn"
 unsound-yield = "warn"
 unsupported-dynamic-base = "warn"
+redundant-condition-strict = "warn"

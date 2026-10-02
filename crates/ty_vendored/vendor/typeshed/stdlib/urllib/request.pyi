@@ -69,7 +69,7 @@ f = urllib.request.urlopen('https://www.python.org/')
 
 import ssl
 import sys
-from _typeshed import ReadableBuffer, StrOrBytesPath, SupportsRead
+from _typeshed import ReadableBuffer, StrOrBytesPath, SupportsItems, SupportsRead
 from collections.abc import Callable, Iterable, Mapping, MutableMapping, Sequence
 from email.message import Message
 from http.client import HTTPConnection, HTTPMessage, HTTPResponse
@@ -281,7 +281,18 @@ if sys.version_info >= (3, 14):
 
 else:
     if sys.platform == "win32":
-        from nturl2path import pathname2url as pathname2url, url2pathname as url2pathname
+        # These functions are implemented in the deprecated ``nturl2path`` module,
+        # but remain part of the public ``urllib.request`` API.
+        def url2pathname(url: str) -> str:
+            """OS-specific conversion from a relative URL of the 'file' scheme
+            to a file system path; not recommended for general use.
+            """
+
+        def pathname2url(p: str) -> str:
+            """OS-specific conversion from a file system path to a relative URL
+            of the 'file' scheme; not recommended for general use.
+            """
+
     else:
         def url2pathname(pathname: str) -> str:
             """OS-specific conversion from a relative URL of the 'file' scheme
@@ -360,7 +371,7 @@ class Request:
         self,
         url: str,
         data: _DataType = None,
-        headers: MutableMapping[str, str] = {},
+        headers: SupportsItems[str, str] = {},
         origin_req_host: str | None = None,
         unverifiable: bool = False,
         method: str | None = None,

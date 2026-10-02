@@ -13,9 +13,10 @@ use crate::{
     },
     reachability::DeclarationsIteratorExtension,
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, IntersectionType, KnownClass,
-        LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
-        Type, UnionType, binding_type,
+        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, DynamicType, EnumLiteralType,
+        IntersectionType, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
+        NegativeIntersectionElements, StaticClassLiteral, Type, TypeContext, TypeMapping,
+        UnionType, binding_type,
         function::FunctionType,
         set_theoretic::{
             RecursivelyDefined,
@@ -527,6 +528,11 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Return whether `name` is an enum member, including aliases.
+    pub(super) fn contains_member(&self, name: &str) -> bool {
+        self.members.contains_key(name) || self.aliases.contains_key(name)
+    }
+
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// A user-defined `_value_` annotation takes priority. Otherwise, values transformed by
@@ -888,6 +894,30 @@ impl<'db> EnumComplementType<'db> {
         self.rest(db).is_empty()
     }
 
+    /// Map the complement's remaining components without expanding open recursive bodies.
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if type_mapping.is_structural() {
+            Type::EnumComplement(EnumComplementType::new(
+                db,
+                self.enum_class_literal(db),
+                self.excluded_names(db).clone(),
+                self.rest(db)
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                    .collect::<FxOrderSet<_>>(),
+            ))
+        } else {
+            self.to_intersection(db, visitor.env)
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+        }
+    }
+
     /// Reconstruct the equivalent set-theoretic intersection.
     pub(crate) fn to_intersection(
         self,
@@ -1040,14 +1070,17 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
+    let scope_id = class.body_scope(db);
+    let use_def_map = use_def_map(db, scope_id);
+    // As a fast path, avoid looking up base classes if the class body is empty
+    use_def_map.all_end_of_scope_symbol_bindings().next()?;
+
     let env = ProgramEnvironment::from_file(class.program_file(db));
 
     if !is_enum_class_by_inheritance(db, &env, class) {
         return None;
     }
 
-    let scope_id = class.body_scope(db);
-    let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();

@@ -45,10 +45,7 @@ impl super::BackgroundDocumentRequestHandler for Format {
 pub(super) fn format_full_document(snapshot: &DocumentSnapshot) -> Result<Fixes> {
     let mut fixes = Fixes::default();
     let query = snapshot.query();
-    let backend = snapshot
-        .client_settings()
-        .editor_settings()
-        .format_backend();
+    let backend = snapshot.format_backend();
 
     match snapshot.query() {
         DocumentQuery::Notebook { notebook, .. } => {
@@ -84,10 +81,7 @@ fn format_document(snapshot: &DocumentSnapshot) -> Result<super::FormatResponse>
         .context("Failed to get text document for the format request")
         .unwrap();
     let query = snapshot.query();
-    let backend = snapshot
-        .client_settings()
-        .editor_settings()
-        .format_backend();
+    let backend = snapshot.format_backend();
     format_text_document(
         text_document,
         query,

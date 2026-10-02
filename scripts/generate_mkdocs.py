@@ -7,6 +7,7 @@
 # ]
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -14,6 +15,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -100,7 +106,6 @@ LINK_REWRITES: dict[str, str] = {
     "https://docs.astral.sh/ruff/rules/": "rules.md",
     "https://docs.astral.sh/ruff/default-rules/": "default-rules.md",
     "https://docs.astral.sh/ruff/settings/": "settings.md",
-    "#whos-using-ruff": "https://github.com/astral-sh/ruff#whos-using-ruff",
     "https://docs.astral.sh/ruff/preview/": "preview.md",
 }
 
@@ -170,10 +175,10 @@ def generate_rule_metadata(rule_doc: Path) -> None:
             what_it_does_found = True
             continue  # Skip the '## What it does' line
 
-        if what_it_does_found and not description:
+        if what_it_does_found and description is None:
             description = line.removesuffix("\n")
 
-        if title_found and description:
+        if title_found and description is not None:
             break
     else:
         if not title_found:

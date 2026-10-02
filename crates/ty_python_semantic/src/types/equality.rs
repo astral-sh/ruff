@@ -232,6 +232,13 @@ fn evaluate_type_comparison<'db>(
             .is_some_and(|narrowed| {
                 equality_truthiness(db, env, narrowed, *constraint, soundness_policy)
                     == Truthiness::AlwaysTrue
+                    // Equal values need not have the same type: `False == 0` does not make
+                    // `Literal[False]` a valid specialization of a `Literal[0]` constraint.
+                    && IntersectionBuilder::new(db, env)
+                        .add_positive(left)
+                        .add_positive(narrowed)
+                        .build()
+                        .is_subtype_of(db, env, *constraint)
             })
         })
     {
@@ -289,14 +296,15 @@ pub(super) fn inequality_truthiness<'db>(
     )
 }
 
-/// Evaluates tuple-element equality while reusing the active-comparison-set allocation across a
-/// tuple walk. The set only detects recursive comparisons; results are not cached between
-/// elements.
-pub(super) struct TupleEqualityEvaluator<'db> {
+/// Evaluates container elements using identity or equality.
+///
+/// Reuses the active-comparison set across element comparisons. The set only detects recursive
+/// comparisons; results are not cached between elements.
+pub(super) struct ContainerElementEqualityEvaluator<'db> {
     evaluator: ComparisonEvaluator<'db>,
 }
 
-impl<'db> TupleEqualityEvaluator<'db> {
+impl<'db> ContainerElementEqualityEvaluator<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -313,7 +321,7 @@ impl<'db> TupleEqualityEvaluator<'db> {
         right: Type<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let db = self.evaluator.db;
-        let truthiness = evaluate_tuple_element_equality(&mut self.evaluator, left, right);
+        let truthiness = evaluate_container_element_equality(&mut self.evaluator, left, right);
         if !truthiness.is_ambiguous() {
             return Ok(truthiness);
         }
@@ -394,7 +402,7 @@ pub(crate) struct ComparisonSoundnessPolicy {
 }
 
 impl ComparisonSoundnessPolicy {
-    const CONSERVATIVE: Self = Self {
+    pub(super) const CONSERVATIVE: Self = Self {
         allow_unsafe_equality: false,
     };
 
@@ -782,9 +790,11 @@ fn evaluate_structural_comparison<'db>(
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
         )
         | (
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
-        ) if left_function == right_function => operator.result_from_equality(true),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(left_function)),
+            Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(right_function)),
+        ) if left_function.inner(db).is_function_literal() && left_function == right_function => {
+            operator.result_from_equality(true)
+        }
         (left, right)
             if has_known_identity_comparison_semantics(db, env, left, operator)
                 && has_known_identity_comparison_semantics(db, env, right, operator) =>
@@ -1664,7 +1674,7 @@ fn compare_nominal_instances<'db>(
 
         let mut all_equal = true;
         for (&left, &right) in left_elements.iter().zip(right_elements) {
-            match evaluate_tuple_element_equality(evaluator, left, right) {
+            match evaluate_container_element_equality(evaluator, left, right) {
                 Truthiness::AlwaysTrue => {}
                 Truthiness::AlwaysFalse => return operator.result_from_equality(false),
                 Truthiness::Ambiguous => all_equal = false,
@@ -1681,7 +1691,7 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-fn evaluate_tuple_element_equality<'db>(
+fn evaluate_container_element_equality<'db>(
     evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     right: Type<'db>,
@@ -1921,6 +1931,16 @@ fn has_reflexive_equality_semantics<'db>(
     evaluator: &ComparisonEvaluator<'db>,
     ty: Type<'db>,
 ) -> bool {
+    // `comparison_semantics` identifies a single builtin comparison implementation. The evaluator
+    // normally distributes unions before that lookup, but this check receives the original operands.
+    // A union such as `Literal[1, "a"]` has reflexive equality in every alternative without sharing
+    // one comparison implementation, so check each alternative here.
+    if let Type::Union(union) = ty.resolve_type_alias(evaluator.db) {
+        return union
+            .elements(evaluator.db)
+            .iter()
+            .all(|element| has_reflexive_equality_semantics(evaluator, *element));
+    }
     evaluator
         .comparison_semantics(ty, ComparisonOperator::Equality)
         .is_some()

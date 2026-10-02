@@ -5,7 +5,6 @@ use ruff_text_size::TextRange;
 
 use crate::Db;
 use crate::place::{Place, PlaceAndQualifiers};
-use crate::types::Type;
 use crate::types::class::known::KnownClass;
 use crate::types::class::{
     ClassLiteral, ClassType, DynamicClassHeaderAnchor, DynamicClassScopeOffset, MemberLookupPolicy,
@@ -14,6 +13,7 @@ use crate::types::class::{
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
+use crate::types::{Type, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -242,7 +242,10 @@ impl<'db> DynamicEnumLiteral<'db> {
         {
             let enum_lit =
                 crate::types::literal::EnumLiteralType::new(db, enum_class, canonical_name);
-            return Member::definitely_declared(Type::enum_literal(enum_lit));
+            return Member {
+                inner: Place::declared(Type::enum_literal(enum_lit))
+                    .with_qualifiers(TypeQualifiers::READ_ONLY),
+            };
         }
         Member::unbound()
     }

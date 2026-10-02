@@ -1,0 +1,194 @@
+.md-typeset .rule-filters {
+  margin: 1em 0;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.rule-filters__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.rule-filters__search,
+.rule-filters fieldset {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.rule-filters fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.rule-filters legend {
+  margin-bottom: 0.3rem;
+}
+
+.rule-filters [popovertarget] {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  anchor-name: var(--rule-filter-anchor);
+}
+
+.rule-filters [popovertarget] span:first-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rule-filters__options {
+  width: 14rem;
+  max-width: calc(100vw - 2rem);
+  max-height: min(16rem, calc(50dvh - 2rem));
+  padding: 0.3rem;
+  overflow-y: auto;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  box-shadow: 0 0.2rem 0.5rem #0002;
+  position-anchor: var(--rule-filter-anchor);
+}
+
+/* Browsers without anchor positioning keep the popover centered. */
+@supports (top: anchor(bottom)) {
+  .rule-filters__options {
+    inset: auto;
+    top: anchor(bottom);
+    left: anchor(left);
+    width: anchor-size(width);
+    margin: 0.25rem 0 0;
+    position-try-fallbacks: flip-block;
+  }
+}
+
+.rule-filters__options label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.rule-filters__options label:hover,
+.rule-filters__actions button:hover {
+  background: var(--md-code-bg-color);
+}
+
+.rule-filters__options input {
+  flex: none;
+  width: 0.8rem;
+  height: 0.8rem;
+  accent-color: var(--md-typeset-a-color);
+}
+
+.rule-filters__actions {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.3rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.rule-filters .rule-filters__actions button {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  text-align: center;
+}
+
+.rule-filters__search {
+  flex: 2 1 12rem;
+}
+
+.rule-filters__category {
+  --rule-filter-anchor: --rule-category;
+  flex: 1 1 8rem;
+}
+
+.rule-filters__linter {
+  --rule-filter-anchor: --rule-linter;
+  flex: 1 1 10rem;
+}
+
+.rule-filters__status {
+  --rule-filter-anchor: --rule-status;
+  flex: 1 1 7rem;
+}
+
+.rule-filters input[type="search"],
+.rule-filters button {
+  min-width: 0;
+  min-height: 2.1rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.2rem;
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  font: inherit;
+  font-weight: 400;
+}
+
+.rule-filters input::placeholder {
+  color: var(--md-default-fg-color--light);
+}
+
+.rule-filters button {
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.rule-filters button:hover {
+  border-color: var(--md-typeset-a-color);
+  color: var(--md-typeset-a-color);
+}
+
+.rule-filters :is(input, button):focus-visible,
+.rule-catalog-scroll:focus-visible {
+  outline: 2px solid var(--md-typeset-a-color);
+  outline-offset: 2px;
+}
+
+.rule-filters__actions button:focus-visible {
+  outline-offset: -2px;
+}
+
+.md-typeset .rule-filters__count {
+  margin: 0.5rem 0 0;
+  color: var(--md-default-fg-color--light);
+  font-size: 0.65rem;
+}
+
+#rule-catalog [hidden],
+.rule-catalog-scroll[hidden],
+.rule-filters [hidden],
+.rule-index-nav > label[for="__toc"],
+.md-nav--secondary[hidden] {
+  display: none !important;
+}
+
+.rule-index-nav > a.md-nav__link {
+  display: flex !important;
+}
+
+@media (max-width: 59.999em) {
+  .rule-filters__search {
+    flex-basis: 100%;
+  }
+
+  .rule-filters__linter {
+    flex-basis: 8rem;
+  }
+}

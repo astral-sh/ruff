@@ -2761,6 +2761,47 @@ DC(f=1)
     }
 
     #[test]
+    fn multi_file_attribute_rename_updates_slots() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+class Box:
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value = 42
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import Box
+
+print(Box().<CURSOR>value)
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("count"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:4:13
+          |
+        4 | print(Box().value)
+          |             ^^^^^
+          |
+         ::: lib.py:3:19
+          |
+        3 |     __slots__ = ("value",)
+          |                   -----
+        4 |
+        5 |     def __init__(self) -> None:
+        6 |         self.value = 42
+          |              -----
+        "#);
+    }
+
+    #[test]
     fn rename_attribute_updates_slots_tuple() {
         let test = cursor_test(
             r#"

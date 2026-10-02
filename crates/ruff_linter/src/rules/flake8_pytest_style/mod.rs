@@ -226,6 +226,18 @@ mod tests {
         "PT020"
     )]
     #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_1.py"),
+        Settings::default(),
+        "PT020_1"
+    )]
+    #[test_case(
+        Rule::PytestDeprecatedYieldFixture,
+        Path::new("PT020_2.py"),
+        Settings::default(),
+        "PT020_2"
+    )]
+    #[test_case(
         Rule::PytestFixtureFinalizerCallback,
         Path::new("PT021.py"),
         Settings::default(),
@@ -380,6 +392,9 @@ mod tests {
 
     #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"))]
     #[test_case(Rule::PytestCompositeAssertion, Path::new("PT018.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020_1.py"))]
+    #[test_case(Rule::PytestDeprecatedYieldFixture, Path::new("PT020_2.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         assert_diagnostics_diff!(

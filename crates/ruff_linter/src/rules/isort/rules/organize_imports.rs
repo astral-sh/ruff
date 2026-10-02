@@ -170,6 +170,7 @@ pub(crate) fn organize_imports(
         source_type,
         target_version,
         &settings.isort,
+        settings.preview,
         tokens,
     );
 

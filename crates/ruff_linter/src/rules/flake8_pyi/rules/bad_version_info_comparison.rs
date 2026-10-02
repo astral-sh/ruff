@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, CmpOp, Expr};
+use ruff_python_ast::{CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -116,17 +116,11 @@ impl Violation for BadVersionInfoOrder {
 
 /// PYI006, PYI066
 pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_else_clause: bool) {
-    let Expr::Compare(ast::ExprCompare {
-        left,
-        ops,
-        comparators,
-        ..
-    }) = test
-    else {
+    let Expr::Compare(compare) = test else {
         return;
     };
 
-    let ([op], [_right]) = (&**ops, &**comparators) else {
+    let Some((left, op, _right)) = compare.as_single() else {
         return;
     };
 

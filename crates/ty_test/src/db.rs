@@ -205,9 +205,8 @@ impl TestProgramDb for Db {
 impl salsa::Database for Db {}
 
 impl DbWithWritableSystem for Db {
-    type System = MdtestSystem;
-    fn writable_system(&self) -> &Self::System {
-        &self.system
+    fn writable_system(&self) -> ruff_db::system::Result<&dyn WritableSystem> {
+        Ok(&self.system)
     }
 }
 
@@ -354,12 +353,13 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         // `experimental-syntax` is also an exception: we make use of `&` and `~` for intersection and
         // negation types in our tests for better readability.
         "experimental-syntax",
-        // The `unsound-*` rules are also exceptions because they are very strict, would
-        // result in lots of additional diagnostics in mdtests, and are not the default behaviour
-        // we'll show to our users.
+        // The `unsound-*` rules and `redundant-condition-strict` are also exceptions because they
+        // are very strict, would result in lots of additional diagnostics in mdtests, and are not
+        // the default behaviour we'll show to our users.
         "unsound-assignment",
         "unsound-return-statement",
         "unsound-yield",
+        "redundant-condition-strict",
     ];
 
     let registry = default_lint_registry();
@@ -590,6 +590,10 @@ impl WritableSystem for MdtestSystem {
     fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
             .write_file_bytes(&self.normalize_path(path), content)
+    }
+
+    fn remove_file(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
+        self.as_system().remove_file(&self.normalize_path(path))
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {

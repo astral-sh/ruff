@@ -2,7 +2,7 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 use ruff_python_ast::{
-    self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, InterpolatedStringElement,
+    self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPartRef, InterpolatedStringElement,
     InterpolatedStringLiteralElement, Stmt, StringFlags,
 };
 use ruff_python_ast::{AtomicNodeIndex, visitor::transformer::Transformer};
@@ -91,10 +91,10 @@ impl Transformer for Normalizer {
 
             Expr::FString(fstring) if fstring.value.is_implicit_concatenated() => {
                 let can_join = fstring.value.iter().all(|part| match part {
-                    FStringPart::Literal(literal) => {
+                    FStringPartRef::Literal(literal) => {
                         !literal.flags.is_triple_quoted() && !literal.flags.prefix().is_raw()
                     }
-                    FStringPart::FString(string) => {
+                    FStringPartRef::FString(string) => {
                         !string.flags.is_triple_quoted() && !string.flags.prefix().is_raw()
                     }
                 });
@@ -142,10 +142,10 @@ impl Transformer for Normalizer {
 
                     for part in &fstring.value {
                         match part {
-                            ast::FStringPart::Literal(string_literal) => {
+                            ast::FStringPartRef::Literal(string_literal) => {
                                 collector.push_literal(&string_literal.value, string_literal.range);
                             }
-                            ast::FStringPart::FString(fstring) => {
+                            ast::FStringPartRef::FString(fstring) => {
                                 for element in &fstring.elements {
                                     match element {
                                         ast::InterpolatedStringElement::Literal(literal) => {

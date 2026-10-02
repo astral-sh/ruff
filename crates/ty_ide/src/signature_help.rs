@@ -133,7 +133,7 @@ fn get_call_expr<'ast>(
         .tokens()
         .at_offset(token_offset)
         .max_by_key(|token| match token.kind() {
-            TokenKind::Name
+            TokenKind::Identifier
             | TokenKind::String
             | TokenKind::Complex
             | TokenKind::Float

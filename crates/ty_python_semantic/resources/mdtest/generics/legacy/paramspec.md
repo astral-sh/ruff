@@ -800,7 +800,7 @@ reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 def func(c: Callable[P2, None]):
     reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
@@ -845,7 +845,7 @@ reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 reveal_type(ParamSpecAndTypeVar[[int, str], str]().attr)  # revealed: (int, str, /) -> str
 
-# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+# error: [unbound-type-variable] "Type variable `P2` is not bound to any outer generic context"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
@@ -935,6 +935,27 @@ takes_int_job(defaulted_job)
 takes_int_job(wrong_job)  # error: [invalid-argument-type]
 ```
 
+A fixed `ParamSpec` can contain required parameters. A wrapper around such a callback cannot be used
+as a wrapper around a callback that accepts no arguments.
+
+```py
+def erase_parameters(job: Job[P]) -> Job[[]]:
+    return job  # error: [invalid-return-type]
+```
+
+The same restriction applies in the other direction when a class consumes callbacks. A consumer of
+callbacks with no parameters cannot accept a callback with arbitrary required parameters.
+
+```py
+P_co = ParamSpec("P_co", covariant=True)
+
+class CallbackConsumer(Generic[P_co]):
+    def consume(self, callback: Callable[P_co, None]) -> None: ...
+
+def broaden_parameters(consumer: CallbackConsumer[[]]) -> CallbackConsumer[P_co]:
+    return consumer  # error: [invalid-return-type]
+```
+
 ## Inferring an invariant `ParamSpec` through `Concatenate`
 
 A `Concatenate` prefix is positional-only, so a callback whose first parameter also accepts a
@@ -954,7 +975,17 @@ def without_first(callback: Callback[Concatenate[object, P]]) -> Callable[P, Non
 
 def original(first: object, value: str) -> None: ...
 
-remaining = without_first(Callback(original))  # error: [invalid-argument-type]
+wrapped = Callback(original)
+remaining = without_first(wrapped)  # error: [invalid-argument-type]
+reveal_type(remaining)  # revealed: (value: str) -> None
+remaining(1)  # error: [invalid-argument-type]
+```
+
+When constructed inline, `Callback` infers the positional-only prefix based on the outer type
+context:
+
+```py
+remaining = without_first(Callback(original))
 reveal_type(remaining)  # revealed: (value: str) -> None
 remaining(1)  # error: [invalid-argument-type]
 ```
@@ -1217,9 +1248,8 @@ class ParamSpecWithDefault6(Generic[PAnother]):
 
 ## Semantics
 
-The semantics of `ParamSpec` are described in
-[the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) to avoid duplication unless there are
-any behavior specific to the legacy `ParamSpec` implementation.
+See [the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) for corresponding examples using
+type parameter lists.
 
 ### Binding contexts
 
@@ -1242,4 +1272,84 @@ def outer(_: Callable[P, None]):
     def inner(_: Callable[P, None]): ...
 
     reveal_type(generic_context(inner))  # revealed: None
+```
+
+### Constructor overrides with receiver-inferred parameters
+
+In the below example, `Base.__new__` takes the same arguments as the class's `build` method. Binding
+its `cls` receiver infers an `int` parameter from `Base.build`, so an override accepting only `str`
+is incompatible.
+
+```py
+from __future__ import annotations
+from typing import ParamSpec, Protocol
+from typing_extensions import Self, override
+
+P = ParamSpec("P")
+
+class Builder(Protocol[P]):
+    def build(self, *args: P.args, **kwargs: P.kwargs) -> object: ...
+
+class Base:
+    @staticmethod
+    def build(value: int) -> object:
+        return object()
+
+    def __new__(cls: Builder[P], *args: P.args, **kwargs: P.kwargs) -> Base:
+        raise NotImplementedError
+
+class Invalid(Base):
+    @override
+    def __new__(cls, value: str) -> Self:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
+### Wrapped classmethod factories passed to callbacks
+
+A classmethod can use a callable instance to forward arguments to the class constructor. Passing
+this factory to `asyncio.to_thread` infers the constructor's parameters and its instance type from
+the captured class. The `to_thread` definition below is based on typeshed's stub.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+async def to_thread(func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    raise NotImplementedError
+
+class Factory:
+    def __call__(self, cls: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+        return cls(*args, **kwargs)
+
+class C:
+    def __init__(self, value: int, *, label: str = "") -> None: ...
+    make = classmethod(Factory())
+
+async def check():
+    reveal_type(await to_thread(C.make, 1, label="label"))  # revealed: C
+    await to_thread(C.make)  # error: [missing-argument] "No argument provided for required parameter `value`"
+    await to_thread(C.make, "wrong")  # error: [invalid-argument-type] "Expected `int`"
+    await to_thread(C.make, 1, label=2)  # error: [invalid-argument-type] "Expected `str`"
+```
+
+### Forwarded arguments with type-variable bounds
+
+When a type variable is bounded by `LiteralString`, string literals are not promoted to `str` when
+providing context for other arguments. This applies to ordinary calls and calls forwarded through a
+`ParamSpec`.
+
+```py
+from typing import Any, Callable, ParamSpec, TypeVar
+from typing_extensions import LiteralString
+
+P = ParamSpec("P")
+T = TypeVar("T", bound=LiteralString)
+
+def forward(function: Callable[P, Any], /, *args: P.args, **kwargs: P.kwargs): ...
+def target(first: T, values: list[T]) -> None: ...
+
+target("a", ["a"])
+forward(target, "a", ["a"])
 ```

@@ -499,6 +499,21 @@ def test2(val: tuple[str, None] | list[int | float]):
     reveal_type(val[0])  # revealed: str | float
 ```
 
+## Repeated indexing with a union of indices
+
+An index can select either zero or the value from the previous iteration. Repeatedly adding one can
+produce arbitrarily large integers, so the result has type `int`.
+
+```py
+from typing import Literal
+
+def count(n: int, index: Literal[0, 1]):
+    value = 0
+    for _ in range(n):
+        value = (0, value)[index] + 1
+    reveal_type(value)  # revealed: int
+```
+
 ## Union subscript access with non-indexable type
 
 ```py

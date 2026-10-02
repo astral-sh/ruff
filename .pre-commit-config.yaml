@@ -33,13 +33,13 @@ repos:
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: 4b2e70d08cb2ccd26d1fba73588de41c7a5d50b7 # frozen: v0.25
+    rev: 17e12779811926f000bdfa1795f9e3735dd71ac3 # frozen: 0.26
     hooks:
       - id: validate-pyproject
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: 8a48f81b6c64dcfea44b3633223084c4be58ac5f # frozen: v1.49.0
+    rev: 4d9c206a77c041268485162b8e2579ad7a5cb9a3 # frozen: v1.50.0
     hooks:
       - id: typos
         priority: 0
@@ -63,15 +63,20 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: 451b56af716f9f0d0c2b816503a3fd0cf8b036fa # frozen: v1.29.0
+    rev: cef8b8350da46d8114c7e6b7272aebdccdf193ce # frozen: v1.30.0
     hooks:
       - id: zizmor
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 6b63472e72e1a91ed8a2f6d483790dfb644fa1d3 # frozen: 0.37.4
+    rev: 12e63946db2c5cfcc9030fac21c3883ba88c6ed8 # frozen: 0.38.0
     hooks:
       - id: check-github-workflows
+        # The bundled schema predates GitHub's cache-mode feature. Use a pinned
+        # upstream schema until check-jsonschema includes it in a release.
+        entry: >-
+          check-jsonschema --schemafile
+          https://raw.githubusercontent.com/SchemaStore/schemastore/a1bfb2b17627062b6a938153c065cb58baef6fe7/src/schemas/json/github-workflow.json
         priority: 0
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.
@@ -113,14 +118,14 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 856f55170f70dc7523c45a215ecdedc44709e2a6 # frozen: 0.12.6
+    rev: 5403c16080c62d2568b9adab14249214641a9d1a # frozen: 0.12.21
     hooks:
       - id: uv-lock
         priority: 0
         args: [--default-index=https://pypi.org/simple, --check, --refresh]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 1f1e8bf348ff38fc88619a38d3ca4d9c56abea49 # frozen: v0.16.5
+    rev: a56c0b927e6465d37cae3e97d35d4d18ab2b96cd # frozen: v0.16.9
     hooks:
       - id: ruff-format
         types_or: [python, pyi, jupyter]
@@ -129,7 +134,7 @@ repos:
 
   # Priority 1: Second-pass fixers (e.g., markdownlint-fix runs after mdformat).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 1f1e8bf348ff38fc88619a38d3ca4d9c56abea49 # frozen: v0.16.5
+    rev: a56c0b927e6465d37cae3e97d35d4d18ab2b96cd # frozen: v0.16.9
     hooks:
       - id: ruff-check
         args: [--fix, --exit-non-zero-on-fix]
@@ -152,7 +157,7 @@ repos:
 
   # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: 1f1e8bf348ff38fc88619a38d3ca4d9c56abea49 # frozen: v0.16.5
+    rev: a56c0b927e6465d37cae3e97d35d4d18ab2b96cd # frozen: v0.16.9
     hooks:
       - id: ruff-format
         name: mdtest format

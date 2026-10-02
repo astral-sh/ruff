@@ -530,6 +530,11 @@ path/to/code1/
 path/to/code2/
 ```
 
+If a path including the leading `@` exists, Ruff treats it as a literal path instead.
+For example, `ruff check @list.py` checks `@list.py` if it exists, even if `list.py`
+also exists. Otherwise, Ruff reads arguments from `list.py`. This applies to files
+and directories, including arguments after `--` and arguments inside response files.
+
 ### Full command-line interface
 
 See `ruff help` for the full list of Ruff's top-level commands:
@@ -568,7 +573,7 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option (e.g., `--config "lint.line-length = 100"` or
+          configuration option (e.g., `--config "line-length = 100"` or
           `--config "format.quote-style = 'single'"`). Overrides of individual
           settings using this option always take precedence over all
           configuration files, including configuration files that were also
@@ -715,7 +720,7 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option (e.g., `--config "lint.line-length = 100"` or
+          configuration option (e.g., `--config "line-length = 100"` or
           `--config "format.quote-style = 'single'"`). Overrides of individual
           settings using this option always take precedence over all
           configuration files, including configuration files that were also
@@ -814,7 +819,7 @@ Global options:
           Either a path to a TOML configuration file (`pyproject.toml` or
           `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
           find in a `ruff.toml` configuration file) overriding a specific
-          configuration option (e.g., `--config "lint.line-length = 100"` or
+          configuration option (e.g., `--config "line-length = 100"` or
           `--config "format.quote-style = 'single'"`). Overrides of individual
           settings using this option always take precedence over all
           configuration files, including configuration files that were also

@@ -15,9 +15,9 @@ use salsa::plumbing::{AsId, FromId, Id};
 use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
+use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -203,6 +203,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.module
     }
 
+    /// Constructs an importer using the file's cached imports and source style.
+    pub(crate) fn importer(&self) -> Importer<'_> {
+        Importer::new(self.db, self.program_file, self.module)
+    }
+
     pub(crate) fn scope(&self) -> ScopeId<'db> {
         self.scope
     }
@@ -232,6 +237,13 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.get_mut().extend(other);
+    }
+
+    /// Whether diagnostics inferred separately for a referenced alias should be collected.
+    pub(super) fn should_collect_diagnostics(&self) -> bool {
+        !self.diagnostics_suppressed
+            && self.db().should_check_file(self.file())
+            && !self.is_in_no_type_check()
     }
 
     pub(super) fn has_diagnostics(&self) -> bool {
@@ -342,7 +354,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     ///
     /// This checks both whether the scope itself is reachable and whether the
     /// specific statement or expression containing this range is reachable.
-    fn is_range_reachable(&self, range: TextRange) -> bool {
+    pub(super) fn is_range_reachable(&self, range: TextRange) -> bool {
         let db = self.db;
         let index = semantic_index(self.db(), self.program_file);
         let scope_id = self.scope.file_scope_id(self.db());
@@ -619,18 +631,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
-
-        // Suppress all `invalid-type-form` errors during the first pass of
-        // inferring a PEP-613 type alias. These errors are emitted during the
-        // second pass, post-inference.
-        if (lint_id == LintId::of(&INVALID_TYPE_FORM)
-            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
-            && ctx
-                .inference_flags
-                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-        {
-            return None;
-        }
 
         let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 

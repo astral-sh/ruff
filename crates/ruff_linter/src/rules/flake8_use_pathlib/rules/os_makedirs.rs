@@ -84,19 +84,23 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
-    // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.makedirs)
+    // Signature as of Python 3.15 (https://docs.python.org/3/library/os.html#os.makedirs)
     // ```text
     //               0      1            2
-    //  os.makedirs(name, mode=0o777, exist_ok=False)
+    //  os.makedirs(name, mode=0o777, exist_ok=False, *, parent_mode=None)
     // ```
     // We should not offer autofixes if there are more arguments
     // than in the original signature
-    if call.arguments.len() > 3 {
+    let parent_mode = call.arguments.find_keyword("parent_mode");
+    if call.arguments.len() > 3 + usize::from(parent_mode.is_some()) {
         return;
     }
     // We should not offer autofixes if there are keyword arguments
     // that don't match the original function signature
-    if has_unknown_keywords_or_starred_expr(&call.arguments, &["name", "mode", "exist_ok"]) {
+    if has_unknown_keywords_or_starred_expr(
+        &call.arguments,
+        &["name", "mode", "exist_ok", "parent_mode"],
+    ) {
         return;
     }
 
@@ -120,7 +124,7 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         let mode = call.arguments.find_argument("mode", 1);
         let exist_ok = call.arguments.find_argument("exist_ok", 2);
 
-        let mkdir_args = match (mode, exist_ok) {
+        let mut mkdir_args = match (mode, exist_ok) {
             // Default to a keyword argument when alone.
             (None, None) => "parents=True".to_string(),
             // If either argument is missing, it's safe to add `parents` at the end.
@@ -138,6 +142,10 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
                 locator.slice(exist_ok)
             ),
         };
+        if let Some(parent_mode) = parent_mode {
+            mkdir_args.push_str(", ");
+            mkdir_args.push_str(locator.slice(parent_mode));
+        }
 
         let replacement = if is_pathlib_path_call(checker, name) {
             format!("{name_code}.mkdir({mkdir_args})")

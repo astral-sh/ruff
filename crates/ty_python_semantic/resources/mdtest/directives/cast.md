@@ -2,6 +2,16 @@
 
 ## Behavior
 
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+# Disabled by default in production, but enabled by default in mdtests.
+# Tests for this rule are lower down in the file; for this section, we disable the rule.
+disjoint-cast = "ignore"
+```
+
 `cast()` takes two arguments, one type and one value, and returns a value of the given type.
 
 The (inferred) type of the value and the given type do not need to have any correlation.
@@ -81,12 +91,7 @@ def f(x: Any, y: Unknown, z: Any | str | int):
     e = cast(str | int | Any, z)  # error: [redundant-cast]
 ```
 
-Recursive aliases that fall back to `Divergent` should not trigger `redundant-cast`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
+A cast to the same fully static recursive alias is redundant.
 
 ```py
 from typing import cast
@@ -94,7 +99,115 @@ from typing import cast
 RecursiveAlias = list["RecursiveAlias | None"]
 
 def f(x: RecursiveAlias):
-    cast(RecursiveAlias, x)
+    cast(RecursiveAlias, x)  # error: [redundant-cast]
+```
+
+## Outer type context
+
+The outer type context of the cast() call passes through to the casted value argument. A list
+literal therefore retains its literal element type when passed to a parameter that expects it, even
+through an intervening cast. The cast is redundant in this case.
+
+```py
+from typing import Literal, cast
+from typing_extensions import cast as extension_cast
+
+def f(x: list[Literal["foo"]]) -> None: ...
+
+f(["foo"])  # no diagnostic
+f(cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+f(cast(val=["foo"], typ=list[Literal["foo"]]))  # error: [redundant-cast]
+f(extension_cast(list[Literal["foo"]], ["foo"]))  # error: [redundant-cast]
+```
+
+Annotated assignments and return types also supply type context through a cast:
+
+```py
+items: list[Literal["foo"]] = cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+
+def make_items() -> list[Literal["foo"]]:
+    return cast(list[Literal["foo"]], ["foo"])  # error: [redundant-cast]
+```
+
+A value incompatible with the outer context still produces a disjoint-cast diagnostic:
+
+```py
+f(cast(list[Literal["foo"]], [42]))  # error: [disjoint-cast]
+```
+
+The outer context can also provide the `TypedDict` type of a dictionary literal:
+
+```py
+from typing import TypedDict
+
+class Item(TypedDict):
+    name: str
+
+def accept_item(item: Item) -> None: ...
+
+accept_item(cast(Item, {"name": "foo"}))  # error: [redundant-cast]
+```
+
+## Outer type context with diagnostics
+
+The outer context is an inference hint for the value passed to `cast()`. If inference with that
+context produces diagnostics, we discard the attempt and infer the value without the outer context.
+(In the common case, the first attempt will *usually* be discarded: most casts are not redundant!)
+Casts of incomplete or incompatible `TypedDict` literals therefore do not cause us to emit
+`redundant-cast`.
+
+We do not yet detect disjointness between `dict` and `TypedDict` types. Adding that support may
+cause some of these casts to emit `disjoint-cast` in the future:
+
+```py
+from typing import TypedDict, cast
+from typing_extensions import cast as extension_cast
+
+class Item(TypedDict):
+    name: str
+    count: int
+
+empty: Item = cast(Item, {})  # no redundant-cast diagnostic
+partial: Item = cast(Item, {"name": "foo"})  # no redundant-cast diagnostic
+extra: Item = cast(Item, {"name": "foo", "count": 1, "extra": True})  # no redundant-cast diagnostic
+incompatible: Item = cast(Item, {"name": "foo", "count": "one"})  # no redundant-cast diagnostic
+unpacked: Item = cast(Item, {**{"name": "foo", "count": 1}})  # no redundant-cast diagnostic
+
+def accept_item(item: Item) -> None: ...
+
+accept_item(cast(val={}, typ=Item))  # no redundant-cast diagnostic
+accept_item(extension_cast(Item, {}))  # no redundant-cast diagnostic
+
+def make_item() -> Item:
+    return cast(Item, {})  # no redundant-cast diagnostic
+```
+
+Type context can also introduce diagnostics in lambda bodies. Here, using the outer context would
+make the lambda parameter an `int` and report `call-non-callable`. We therefore fall back to the
+inference attempt that does not use the type context, and emit neither `redundant-cast` nor
+`call-non-callable`:
+
+```py
+from typing import Callable
+
+def callback() -> Callable[[int], str]:
+    return cast(Callable[[int], str], lambda value: value())  # no diagnostic
+```
+
+Diagnostics that occur without the outer context are still reported, once:
+
+```py
+# error: [unresolved-reference]
+item: Item = cast(Item, {"name": undefined, "count": 1})
+
+def make_item_with_error(name: str) -> Item:
+    return cast(  # no diagnostic
+        Item,
+        {
+            "name": cast(str, name),  # error: [redundant-cast]
+            "count": undefined,  # error: [unresolved-reference]
+        },
+    )
 ```
 
 ## Redundant casts of tuple classes with unknown elements
@@ -109,6 +222,710 @@ from ty_extensions._internal import Unknown
 
 def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
     cast(type[tuple[object, Unknown]], value)
+```
+
+## Disjoint casts
+
+### Basics
+
+Casting between disjoint types often indicates a mistake in the user's code. When enabled,
+`disjoint-cast` reports casts whose source and destination types have no overlap.
+
+```py
+from typing import cast
+from typing_extensions import cast as extension_cast
+
+def incompatible_casts(integer: int, string: str) -> None:
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
+    cast(str, integer)
+
+    # error: [disjoint-cast] "Cast from `str` to disjoint type `int`"
+    cast(int, string)
+
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
+    cast(val=integer, typ=str)
+
+    # error: [disjoint-cast] "Cast from `int` to disjoint type `str`"
+    extension_cast(str, integer)
+```
+
+### Disjoint casts involving literals and unions
+
+Literal types and unions are rejected only when none of their possible values overlaps with the
+destination type.
+
+```py
+from typing import Literal, cast
+
+# error: [disjoint-cast] "Cast from `Literal[1]` to disjoint type `str`"
+cast(str, 1)
+
+# error: [disjoint-cast] "Cast from `Literal["left"]` to disjoint type `Literal["right"]`"
+cast(Literal["right"], "left")
+
+def cast_union(value: int | str) -> None:
+    # error: [disjoint-cast] "Cast from `int | str` to disjoint type `bytes`"
+    cast(bytes, value)
+
+    cast(str, value)
+    cast(int | bytes, value)
+```
+
+### Disjoint casts with unpacked arguments
+
+Argument unpacking does not prevent us from reporting disjoint casts:
+
+```py
+from typing import cast
+
+cast(str, *(1,))  # error: [disjoint-cast]
+cast(*(str, 1))  # error: [disjoint-cast]
+cast(*(), str, 1)  # error: [disjoint-cast]
+cast(str, **{"val": 1})  # error: [disjoint-cast]
+```
+
+### Disjoint casts involving generic types
+
+Incompatible generic specializations are rejected:
+
+```py
+from typing import Any, cast
+from ty_extensions import Intersection
+
+def cast_generic(
+    list_of_integers: list[int],
+    list_of_integers_or_any: list[int | Any],
+    dynamic_list_of_integers: Intersection[list[int], Any],
+    list_of_dynamic_integers: list[Intersection[int, Any]],
+) -> None:
+    # error: [disjoint-cast] "Cast from `list[int]` to disjoint type `list[str]`"
+    cast(list[str], list_of_integers)
+    # error: [disjoint-cast]
+    cast(list[str], list_of_integers_or_any)
+    # error: [disjoint-cast]
+    cast(list[str], dynamic_list_of_integers)
+    # error: [disjoint-cast]
+    cast(list[str], list_of_dynamic_integers)
+```
+
+But `cast`s are permitted between two different specializations of the same invariant generic type
+when those two different specializations overlap. This can occur with certain dynamic
+specializations of invariant generics:
+
+```py
+def cast_generic_invalid(
+    list_of_integers: list[int],
+    dynamic_list_of_integers: Intersection[list[int], Any],
+    list_of_dynamic_integers: list[Intersection[int, Any]],
+    list_of_integers_or_any: list[int | Any],
+    any_or_list_of_integers: list[int] | Any,
+    any_or_list_of_integers_or_any: list[int | Any] | Any,
+    list_of_any: list[Any],
+    just_any: Any,
+):
+    cast(Any, list_of_integers)  # no diagnostic
+    cast(list[str], list_of_any)  # no diagnostic
+    cast(str, just_any)  # no diagnostic
+    cast(list[Intersection[int, Any]], list_of_integers)  # no diagnostic
+    cast(list[int], dynamic_list_of_integers)  # no diagnostic
+    cast(list[int], list_of_dynamic_integers)  # no diagnostic
+    cast(list[int], list_of_integers_or_any)  # no diagnostic
+    cast(list[int], any_or_list_of_integers)  # no diagnostic
+
+    # `Any | list[int]` could materialize to `list[str] | list[int]`,
+    # which is not disjoint from `list[str]`
+    cast(list[str], any_or_list_of_integers)  # no diagnostic
+
+    # similarly `Any | list[int | Any]` could also materialize to `list[str] | list[int]`
+    cast(list[str], any_or_list_of_integers_or_any)  # no diagnostic
+```
+
+### Disjoint casts between identically named types
+
+Disjoint types with the same display name are qualified so the diagnostic identifies which type
+comes from each module.
+
+```py
+from typing import cast
+
+import first
+import second
+
+def cast_identically_named(value: first.Value) -> None:
+    # error: [disjoint-cast] "Cast from `first.Value` to disjoint type `second.Value`"
+    cast(second.Value, value)
+```
+
+`first.py`:
+
+```py
+from typing import final
+
+@final
+class Value:
+    pass
+```
+
+`second.py`:
+
+```py
+from typing import final
+
+@final
+class Value:
+    pass
+```
+
+### Invariant type arguments in disjoint-cast explanations
+
+Distinct specializations of an invariant container are disjoint even when their element types
+overlap. The explanation identifies the invariant parameter and the failed subtype check.
+
+```py
+from typing import cast
+
+def narrow_elements(values: list[int | str]) -> None:
+    # snapshot: disjoint-cast
+    cast(list[int], values)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+    --> src/mdtest_snippet.py:5:5
+     |
+   5 |     cast(list[int], values)
+     |     ^^^^^---------^^------^
+     |          |          |
+     |          |          Inferred as `list[int | str]`
+     |          Disjoint from the inferred type
+     |
+    ::: stdlib/builtins.pyi:2965:7
+     |
+2965 | class list(MutableSequence[_T]):
+     |       ---- `list` defined here
+info: `list[int]` is disjoint from `list[int | str]`
+info: `int | str` and `int` are not mutual subtypes of each other, but must be due to invariance
+info: └── element `str` of union `int | str` is not a subtype of `int`
+```
+
+### Nominal subclasses of protocols
+
+Inheriting from a protocol does not make a class a protocol. A final class can satisfy the protocol
+structurally, but cannot also be an instance of its unrelated nominal subclass.
+
+```py
+from typing import Protocol, cast, final
+
+class HasName(Protocol):
+    name: str
+
+class Named(HasName):
+    pass
+
+@final
+class Function:
+    name: str
+
+def cast_function(function: Function) -> None:
+    cast(HasName, function)
+
+    # snapshot: disjoint-cast
+    cast(Named, function)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:17:5
+   |
+17 |       cast(Named, function)
+   |       ^^^^^-----^^--------^
+   |            |      |
+   |            |      Inferred as `Function`
+   |            Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:6:7
+   |
+ 6 |   class Named(HasName):
+   |         ----- `Named` defined here
+ 7 |       pass
+ 8 |
+ 9 | / @final
+10 | | class Function:
+   | |______________- `Function` defined here
+info: `Named` is disjoint from `Function`
+info: `Function` is `@final` and not a subclass of `Named`
+```
+
+### Explaining every disjoint union element
+
+A union is disjoint from the destination only when every element is disjoint. Each element
+contributes its own explanation.
+
+```py
+from typing import cast
+
+def cast_union(value: list[str] | list[bytes]) -> None:
+    # snapshot: disjoint-cast
+    cast(list[int], value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+    --> src/mdtest_snippet.py:5:5
+     |
+   5 |     cast(list[int], value)
+     |     ^^^^^---------^^-----^
+     |          |          |
+     |          |          Inferred as `list[str] | list[bytes]`
+     |          Disjoint from the inferred type
+     |
+    ::: stdlib/builtins.pyi:2965:7
+     |
+2965 | class list(MutableSequence[_T]):
+     |       ---- `list` defined here
+info: `list[int]` is disjoint from `list[str] | list[bytes]`
+info: every element of union `list[str] | list[bytes]` is disjoint from `list[int]`
+info: ├── `str` and `int` are not mutual subtypes of each other, but must be due to invariance
+info: └── `bytes` and `int` are not mutual subtypes of each other, but must be due to invariance
+```
+
+### Disjoint tuple elements
+
+Two tuples of the same length are disjoint when a required element has disjoint types. The
+explanation identifies the position of that element.
+
+```py
+from typing import cast
+
+def cast_tuple(value: tuple[int, str]) -> None:
+    # snapshot: disjoint-cast
+    cast(tuple[int, int], value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+    --> src/mdtest_snippet.py:5:5
+     |
+   5 |     cast(tuple[int, int], value)
+     |     ^^^^^---------------^^-----^
+     |          |                |
+     |          |                Inferred as `tuple[int, str]`
+     |          Disjoint from the inferred type
+     |
+    ::: stdlib/builtins.pyi:2850:7
+     |
+2850 | class tuple(Sequence[_T_co]):
+     |       ----- `tuple` defined here
+info: `tuple[int, int]` is disjoint from `tuple[int, str]`
+info: tuple element 2 has disjoint types `str` and `int`
+info: └── `str` and `int` are disjoint due to incompatible instance layouts
+```
+
+### Disjoint tuple lengths
+
+A fixed-length tuple cannot overlap with a tuple that requires more elements.
+
+```py
+from typing import cast
+
+def cast_tuple(value: tuple[int]) -> None:
+    # snapshot: disjoint-cast
+    cast(tuple[int, int], value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+    --> src/mdtest_snippet.py:5:5
+     |
+   5 |     cast(tuple[int, int], value)
+     |     ^^^^^---------------^^-----^
+     |          |                |
+     |          |                Inferred as `tuple[int]`
+     |          Disjoint from the inferred type
+     |
+    ::: stdlib/builtins.pyi:2850:7
+     |
+2850 | class tuple(Sequence[_T_co]):
+     |       ----- `tuple` defined here
+info: `tuple[int, int]` is disjoint from `tuple[int]`
+info: the tuples have incompatible lengths: 1 and 2
+```
+
+### Missing protocol members
+
+A missing member makes a final class disjoint from a protocol. The explanation does not retain
+unsuccessful attempts to prove that an earlier, compatible member is disjoint.
+
+```py
+from typing import Protocol, cast, final
+
+class Target(Protocol):
+    compatible: int | str
+    missing: str
+
+@final
+class Source:
+    compatible: int
+
+def cast_protocol(value: Source) -> None:
+    # snapshot: disjoint-cast
+    cast(Target, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:13:5
+   |
+13 |       cast(Target, value)
+   |       ^^^^^------^^-----^
+   |            |       |
+   |            |       Inferred as `Source`
+   |            Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:3:7
+   |
+ 3 |   class Target(Protocol):
+   |         ------ `Target` defined here
+ 4 |       compatible: int | str
+ 5 |       missing: str
+ 6 |
+ 7 | / @final
+ 8 | | class Source:
+   | |____________- `Source` defined here
+info: protocol `Target` is disjoint from `Source`
+info: `@final` type `Source` does not provide all members of protocol `Target`
+info: └── protocol member `missing` is not defined on type `Source`
+```
+
+The same explanation applies when casting from the protocol to the final class.
+
+```py
+def cast_final(value: Target) -> None:
+    # snapshot: disjoint-cast
+    cast(Source, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:16:5
+   |
+16 |       cast(Source, value)
+   |       ^^^^^------^^-----^
+   |            |       |
+   |            |       Inferred as `Target`
+   |            Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:3:7
+   |
+ 3 |   class Target(Protocol):
+   |         ------ `Target` defined here
+ 4 |       compatible: int | str
+ 5 |       missing: str
+ 6 |
+ 7 | / @final
+ 8 | | class Source:
+   | |____________- `Source` defined here
+info: `Source` is disjoint from protocol `Target`
+info: `@final` type `Source` does not provide all members of protocol `Target`
+info: └── protocol member `missing` is not defined on type `Source`
+```
+
+### Disjoint protocol method returns
+
+The explanation follows the protocol member's return type into its incompatible generic
+specialization.
+
+```py
+from typing import Protocol, cast, final
+
+class Target(Protocol):
+    def values(self) -> list[int]: ...
+
+@final
+class Source:
+    def values(self) -> list[str]:
+        return []
+
+def cast_protocol(value: Source) -> None:
+    # snapshot: disjoint-cast
+    cast(Target, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:13:5
+   |
+13 |       cast(Target, value)
+   |       ^^^^^------^^-----^
+   |            |       |
+   |            |       Inferred as `Source`
+   |            Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:3:7
+   |
+ 3 |   class Target(Protocol):
+   |         ------ `Target` defined here
+ 4 |       def values(self) -> list[int]: ...
+ 5 |
+ 6 | / @final
+ 7 | | class Source:
+   | |____________- `Source` defined here
+info: protocol `Target` is disjoint from `Source`
+info: protocol member `values` is incompatible
+info: └── return types `list[int]` and `list[str]` are disjoint
+info:     └── `int` and `str` are not mutual subtypes of each other, but must be due to invariance
+```
+
+### Disjoint mutable TypedDict fields
+
+Mutable fields must accept assignments in both directions. The explanation identifies the field and
+the failed assignability check, rather than a subtype check.
+
+```py
+from typing import TypedDict, cast
+
+class Source(TypedDict):
+    value: int | str
+
+class Target(TypedDict):
+    value: int
+
+def cast_fields(value: Source) -> None:
+    # snapshot: disjoint-cast
+    cast(Target, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:11:5
+   |
+11 |     cast(Target, value)
+   |     ^^^^^------^^-----^
+   |          |       |
+   |          |       Inferred as `Source`
+   |          Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:3:7
+   |
+ 3 | class Source(TypedDict):
+   |       ------ `Source` defined here
+ 4 |     value: int | str
+ 5 |
+ 6 | class Target(TypedDict):
+   |       ------ `Target` defined here
+info: `Target` is disjoint from `Source`
+info: field `value` has incompatible types `int | str` and `int`
+info: └── element `str` of union `int | str` is not assignable to `int`
+```
+
+### Conflicting TypedDict requiredness
+
+A required field cannot also be a mutable optional field: the optional declaration permits deleting
+it.
+
+```py
+from typing import TypedDict, cast
+from typing_extensions import NotRequired
+
+class Source(TypedDict):
+    value: int
+
+class Target(TypedDict):
+    value: NotRequired[int]
+
+def cast_fields(value: Source) -> None:
+    # snapshot: disjoint-cast
+    cast(Target, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:12:5
+   |
+12 |     cast(Target, value)
+   |     ^^^^^------^^-----^
+   |          |       |
+   |          |       Inferred as `Source`
+   |          Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:4:7
+   |
+ 4 | class Source(TypedDict):
+   |       ------ `Source` defined here
+ 5 |     value: int
+ 6 |
+ 7 | class Target(TypedDict):
+   |       ------ `Target` defined here
+info: `Target` is disjoint from `Source`
+info: field `value` is required in `Source` but mutable and not-required in `Target`
+```
+
+Reversing the cast does not change which TypedDict requires the field.
+
+```py
+def cast_required(value: Target) -> None:
+    # snapshot: disjoint-cast
+    cast(Source, value)
+```
+
+```snapshot
+info[disjoint-cast]: Cast to a disjoint type
+  --> src/mdtest_snippet.py:15:5
+   |
+15 |     cast(Source, value)
+   |     ^^^^^------^^-----^
+   |          |       |
+   |          |       Inferred as `Target`
+   |          Disjoint from the inferred type
+   |
+  ::: src/mdtest_snippet.py:4:7
+   |
+ 4 | class Source(TypedDict):
+   |       ------ `Source` defined here
+ 5 |     value: int
+ 6 |
+ 7 | class Target(TypedDict):
+   |       ------ `Target` defined here
+info: `Source` is disjoint from `Target`
+info: field `value` is required in `Source` but mutable and not-required in `Target`
+```
+
+### Casts to `Never`
+
+`Never` is disjoint from every type, but excluded from `disjoint-cast`. It is assumed that the user
+knows what they're doing if they cast to `Never` explicitly:
+
+```py
+from typing_extensions import Never, cast
+
+x = cast(Never, 0)  # no diagnostic
+```
+
+Upcasts from a `Never`-inferred type to a supertype are also permitted without the rule being
+triggered:
+
+```py
+from typing_extensions import Never, cast
+
+def test(x: Never):
+    y = cast(str, x)  # no diagnostic
+```
+
+The reason why casting to or from `Never` is allowed is that the normal rationale for this rule does
+not apply to either case.
+
+This rule seeks to prevent you from `cast`ing from a type `X` to a type `Y` if ty would never
+provide any way for you to soundly narrow a type `X` to a type `Y`. Casting from `Never` to any
+other type, however, poses no soundness issues: all types are supertypes of `Never`, so this can
+never be unsound. Meanwhile, casting from `int` to `Never` is unsound, of course, but not really in
+a different category than casting from `int` to `bool` (which would still be allowed under this
+rule). `Never` is a subtype of `int` just the same way that `bool` is a subtype of `int`, and there
+are lots of mechanisms ty provides that would let you soundly narrow a type from `int` to `Never`
+without using a `cast`.
+
+### Casts in stub files
+
+`disjoint-cast` is not applied to stub files:
+
+`stub.pyi`:
+
+```pyi
+from typing import cast
+
+x = cast(int, ...)  # no diagnostic
+```
+
+This is partly to accommodate the fact that the typing spec
+[recommends](https://typing.python.org/en/latest/spec/enums.html#defining-members) using
+`cast(<value type>, ...)` to declare enum members in stub files in cases where the type of the
+member's value cannot be unambiguously expressed as a static assignment. Without a special case for
+stubs, we would emit a false-positive diagnostic on this example from the spec. This is due to the
+fact that `EllipsisType` (the type of `...`) is disjoint from almost every other type, since it is
+`@final`:
+
+`stub2.pyi`:
+
+```pyi
+from enum import Enum
+from typing import cast
+
+class Pet(Enum):
+    genus: str  # Non-member attribute
+    species: str  # Non-member attribute
+
+    CAT = 1  # Member attribute with known value and type
+    DOG = cast(int, ...)  # Member attribute with unknown value and known type
+    BIRD = ...  # Member attribute with unknown value and type
+```
+
+But the rule would also serve little purpose in stub files. Since stub files are never executed at
+runtime, the only possible useful applications of `cast` in a stub file are special cases like the
+enum one above. There are no soundness implications to using `cast` in a stub file.
+
+For similar reasons, we also do not apply the rule in `if TYPE_CHECKING` blocks, which are also not
+executed at runtime:
+
+`regular_py_file.py`:
+
+```py
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    x = cast(int, ...)  # no diagnostic
+```
+
+### Casts involving collection literals that are inferred as having a disjoint type due to no type context
+
+The target type of a cast does not provide type context for its value. In the following example,
+inferring `[42]` using the cast's target, `list[object]`, would make the cast appear redundant.
+However, removing the cast changes the loop variable's type from `object` to `Literal[42]`, so
+reporting `redundant-cast` would be incorrect here:
+
+```py
+from typing import cast
+
+# revealed: list[int]
+for x in cast(list[object], reveal_type([42])):  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+
+for x in [42]:
+    reveal_type(x)  # revealed: Literal[42]
+```
+
+As a result of not using the casted type as type context, however, we infer the list literal as
+`list[int]`, which is disjoint from the casted type (`list[object]`). Nonetheless, we recover from
+this at the point where we might otherwise emit a `disjoint-cast` diagnostic by detecting that
+`[42]` could equally well have been inferred as `list[object]` if it had been inferred with the
+right type context.
+
+The same principle is applied to other collection literals:
+
+```py
+# revealed: set[str]
+for x in cast(set[object], reveal_type({"foo", "bar"})):  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+
+# revealed: dict[str, int]
+for x, y in cast(dict[object, object], reveal_type({"foo": 42})).items():  # no redundant-cast or disjoint-cast diagnostic
+    reveal_type(x)  # revealed: object
+    reveal_type(y)  # revealed: object
+```
+
+In situations where reinferring the type with type context would still lead to a disjoint type for
+the collection literal, we continue to report `disjoint-cast`:
+
+```py
+# revealed: set[int]
+for x in cast(set[str], reveal_type({1, 2, 3})):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
+
+# revealed: list[int]
+for x in cast(list[str], reveal_type([1, 2, 3])):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
+
+# revealed: dict[int, int]
+for x in cast(dict[str, str], reveal_type({1: 2, 3: 4})):  # error: [disjoint-cast]
+    reveal_type(x)  # revealed: str
 ```
 
 ## Diagnostic snapshots

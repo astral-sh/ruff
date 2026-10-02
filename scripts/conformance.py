@@ -3,6 +3,7 @@
 # dependencies = []
 #
 # [tool.ty.rules]
+# truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
 # possibly-unresolved-reference = "warn"
@@ -10,6 +11,11 @@
 # unsound-yield = "warn"
 # unsupported-dynamic-base = "warn"
 # division-by-zero = "warn"
+# dynamic-function-decorator-return = "warn"
+# unsound-assignment = "warn"
+# redundant-condition-strict = "warn"
+# disjoint-cast = "warn"
+# missing-direct-dependency = "warn"
 #
 # [tool.uv]
 # no-build = true
@@ -632,6 +638,8 @@ def collect_diagnostic_entries(test_cases: list[TestCase]) -> list[DiagnosticEnt
                         title=Change.CHANGED.into_title(), test_case=tc, source=None
                     )
                 )
+            else:
+                assert_never(change)
         else:
             if change == Change.ADDED:
                 new_class = tc.classify(Source.NEW)
@@ -679,6 +687,8 @@ def collect_diagnostic_entries(test_cases: list[TestCase]) -> list[DiagnosticEnt
                             source=Source.NEW,
                         )
                     )
+            else:
+                assert_never(change)
 
     entries.sort(
         key=lambda e: (TITLE_PRIORITY.get(e.title, 99), e.title, e.test_case.key)

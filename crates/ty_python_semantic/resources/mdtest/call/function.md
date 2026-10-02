@@ -269,8 +269,8 @@ f(1)
 f(__x=1)
 ```
 
-But not if they follow a non-positional-only parameter. This is flagged with a different error code
-since (per the typing spec), this is likely a mistake from the user:
+But not if they follow a non-positional-only parameter. When enabled,
+`invalid-legacy-positional-parameter` flags this as an incorrect use of the legacy convention:
 
 ```py
 from typing import overload

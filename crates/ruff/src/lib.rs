@@ -231,7 +231,7 @@ fn analyze_graph(
 }
 
 fn server(args: ServerCommand) -> Result<ExitStatus> {
-    commands::server::run_server(args.resolve_preview())
+    commands::server::run_server(args.resolve_preview(), args.resolve_workspace_trust())
 }
 
 pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
@@ -430,96 +430,95 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             )?;
             printer.write_continuously(&mut writer, &diagnostics, preview, prefer_rule_codes)?;
         }
+    }
+    // Generate lint violations.
+    let diagnostics = if is_stdin {
+        commands::check_stdin::check_stdin(
+            cli.stdin_filename.map(fs::normalize_path).as_deref(),
+            &pyproject_config,
+            &config_arguments,
+            noqa.into(),
+            fix_mode,
+        )?
     } else {
-        // Generate lint violations.
-        let diagnostics = if is_stdin {
-            commands::check_stdin::check_stdin(
-                cli.stdin_filename.map(fs::normalize_path).as_deref(),
-                &pyproject_config,
-                &config_arguments,
-                noqa.into(),
-                fix_mode,
-            )?
-        } else {
-            commands::check::check(
-                &files,
-                &pyproject_config,
-                &config_arguments,
-                cache.into(),
-                noqa.into(),
-                fix_mode,
-                unsafe_fixes,
-            )?
-        };
+        commands::check::check(
+            &files,
+            &pyproject_config,
+            &config_arguments,
+            cache.into(),
+            noqa.into(),
+            fix_mode,
+            unsafe_fixes,
+        )?
+    };
 
-        // Always try to print violations (though the printer itself may suppress output)
-        // If we're writing fixes via stdin, the transformed source code goes to the writer
-        // so send the summary to stderr instead
-        let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
-            stderr_writer
-        } else {
-            writer
-        };
-        if cli.statistics {
-            printer.write_statistics(&diagnostics, &mut summary_writer)?;
-        } else {
-            printer.write_once(
-                &diagnostics,
-                &mut summary_writer,
-                preview,
-                prefer_rule_codes,
-            )?;
-        }
+    // Always try to print violations (though the printer itself may suppress output)
+    // If we're writing fixes via stdin, the transformed source code goes to the writer
+    // so send the summary to stderr instead
+    let mut summary_writer = if is_stdin && matches!(fix_mode, FixMode::Apply | FixMode::Diff) {
+        stderr_writer
+    } else {
+        writer
+    };
+    if cli.statistics {
+        printer.write_statistics(&diagnostics, &mut summary_writer)?;
+    } else {
+        printer.write_once(
+            &diagnostics,
+            &mut summary_writer,
+            preview,
+            prefer_rule_codes,
+        )?;
+    }
 
-        if !cli.exit_zero {
-            let max_severity = diagnostics
-                .inner
-                .iter()
-                .map(Diagnostic::severity)
-                .max()
-                .unwrap_or(Severity::Info);
-            if max_severity.is_fatal() {
-                // When a panic/fatal error is reported, prompt the user to open an issue on github.
-                // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
-                // message here instead of attaching it to the diagnostic ensures that we only print
-                // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
-                // the message from being captured by tools parsing the normal output.
-                let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
+    if !cli.exit_zero {
+        let max_severity = diagnostics
+            .inner
+            .iter()
+            .map(Diagnostic::severity)
+            .max()
+            .unwrap_or(Severity::Info);
+        if max_severity.is_fatal() {
+            // When a panic/fatal error is reported, prompt the user to open an issue on github.
+            // Diagnostics with severity `fatal` will be sorted to the bottom, and printing the
+            // message here instead of attaching it to the diagnostic ensures that we only print
+            // it once instead of repeating it for each diagnostic. Prints to stderr to prevent
+            // the message from being captured by tools parsing the normal output.
+            let message = "Panic during linting indicates a bug in Ruff. If you could open an issue at:
 
 https://github.com/astral-sh/ruff/issues/new?title=%5BLinter%20panic%5D
 
 ...with the relevant file contents, the `pyproject.toml` settings, and the stack trace above, we'd be very appreciative!
 ";
-                error!("{message}");
-                return Ok(ExitStatus::Error);
+            error!("{message}");
+            return Ok(ExitStatus::Error);
+        }
+        if cli.diff {
+            // If we're printing a diff, we always want to exit non-zero if there are
+            // any fixable violations (since we've printed the diff, but not applied the
+            // fixes).
+            if !diagnostics.fixed.is_empty() {
+                return Ok(ExitStatus::Failure);
             }
-            if cli.diff {
-                // If we're printing a diff, we always want to exit non-zero if there are
-                // any fixable violations (since we've printed the diff, but not applied the
-                // fixes).
+        } else if fix_only {
+            // If we're only fixing, we want to exit zero (since we've fixed all fixable
+            // violations), unless we're explicitly asked to exit non-zero on fix.
+            if cli.exit_non_zero_on_fix {
                 if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
-            } else if fix_only {
-                // If we're only fixing, we want to exit zero (since we've fixed all fixable
-                // violations), unless we're explicitly asked to exit non-zero on fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+            }
+        } else {
+            // If we're running the linter (not just fixing), we want to exit non-zero if
+            // there are any violations, unless we're explicitly asked to exit zero on
+            // fix.
+            if cli.exit_non_zero_on_fix {
+                if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             } else {
-                // If we're running the linter (not just fixing), we want to exit non-zero if
-                // there are any violations, unless we're explicitly asked to exit zero on
-                // fix.
-                if cli.exit_non_zero_on_fix {
-                    if !diagnostics.fixed.is_empty() || !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
-                } else {
-                    if !diagnostics.inner.is_empty() {
-                        return Ok(ExitStatus::Failure);
-                    }
+                if !diagnostics.inner.is_empty() {
+                    return Ok(ExitStatus::Failure);
                 }
             }
         }
