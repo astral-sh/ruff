@@ -1,3 +1,4 @@
+use crate::ast_ids::ExpressionNodeKey;
 use crate::expression::Expression;
 use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
@@ -212,6 +213,18 @@ impl std::fmt::Display for PlaceExprRef<'_> {
 pub enum ScopedPlaceId {
     Symbol(ScopedSymbolId),
     Member(ScopedMemberId),
+}
+
+/// Identifies a place and, for a sequence display, the particular subject element occurrence it
+/// belongs to.
+///
+/// Two reads of the same place in a display can refer to different bindings.
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub struct PatternSubjectPlace {
+    pub subject_element: Option<ExpressionNodeKey>,
+    pub place: ScopedPlaceId,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]

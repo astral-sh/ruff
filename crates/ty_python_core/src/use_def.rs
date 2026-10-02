@@ -266,7 +266,7 @@ use crate::member::ScopedMemberId;
 use crate::narrowing_constraints::{
     ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, ScopedNarrowingConstraint,
 };
-use crate::place::{PlaceExprRef, ScopedPlaceId};
+use crate::place::{PatternSubjectPlace, PlaceExprRef, ScopedPlaceId};
 use crate::predicate::{
     Predicate, PredicateNode, PredicateOrLiteral, PredicatePolarity, Predicates, PredicatesBuilder,
     ScopedPredicateId,
@@ -329,7 +329,7 @@ struct InternedBindingsId;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BindingsSnapshotId(InternedBindingsId);
 
-/// Identifies the member bindings retained before one match case.
+/// Identifies the place bindings retained before one match case.
 #[newtype_index]
 #[derive(get_size2::GetSize, salsa::SalsaValue)]
 pub struct ScopedPatternBindingsId;
@@ -704,9 +704,9 @@ struct UseDefMapExtra {
     /// is empty.
     multi_bindings_by_use: MultiBindingsByUse,
 
-    /// Bindings retained for selected members before match cases.
+    /// Bindings retained for selected places before match cases.
     pattern_entry_bindings:
-        FrozenIndexVec<ScopedPatternBindingsId, FrozenMap<ScopedPlaceId, Box<[LiveBinding]>>>,
+        FrozenIndexVec<ScopedPatternBindingsId, FrozenMap<PatternSubjectPlace, Box<[LiveBinding]>>>,
 
     /// Retained [`PlaceState`] values for each member.
     member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates>,
@@ -1055,12 +1055,12 @@ impl<'db> UseDefMap<'db> {
             .flatten()
     }
 
-    /// Return the retained bindings of a member immediately before a match case, or `None` if no
+    /// Return the retained bindings of a place immediately before a match case, or `None` if no
     /// bindings were retained for the place.
     pub fn pattern_input_bindings(
         &self,
         input: ScopedPatternBindingsId,
-        place: ScopedPlaceId,
+        place: PatternSubjectPlace,
     ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
         let bindings = self.extra().pattern_entry_bindings[input].get(&place)?;
         Some(self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility))
@@ -2103,7 +2103,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
 
     pattern_entry_bindings:
-        IndexVec<ScopedPatternBindingsId, FrozenMap<ScopedPlaceId, Box<[LiveBinding]>>>,
+        IndexVec<ScopedPatternBindingsId, FrozenMap<PatternSubjectPlace, Box<[LiveBinding]>>>,
 
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
@@ -3173,17 +3173,17 @@ impl<'db> UseDefMapBuilder<'db> {
         bindings.iter().copied()
     }
 
-    /// For each supplied member whose bindings have not changed since subject evaluation, retain
-    /// its bindings at case entry if at least one has a narrowing constraint. Each target pairs a
-    /// member with its bindings at subject evaluation. Return an identifier for the retained
-    /// bindings, or `None` if no bindings were retained.
+    /// For each supplied place whose binding definitions have not changed since subject evaluation,
+    /// retain its bindings at case entry if at least one has a narrowing constraint. Each target
+    /// pairs a place with its binding definitions at subject evaluation. Return an identifier for
+    /// the retained bindings, or `None` if no bindings were retained.
     pub(super) fn record_pattern_entry_bindings<'a>(
         &mut self,
-        targets: impl IntoIterator<Item = (ScopedPlaceId, &'a [ScopedDefinitionId])>,
+        targets: impl IntoIterator<Item = (PatternSubjectPlace, &'a [ScopedDefinitionId])>,
     ) -> Option<ScopedPatternBindingsId> {
         let mut entries = FxHashMap::default();
         for (place, original_bindings) in targets {
-            let bindings: Vec<_> = self.current_bindings(place).collect();
+            let bindings: Vec<_> = self.current_bindings(place.place).collect();
             if bindings
                 .iter()
                 .map(LiveBinding::binding)

@@ -46,8 +46,8 @@ use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::node_key::NodeKey;
 use crate::place::{
-    PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
-    match_subject_place_expressions,
+    PatternSubjectPlace, PlaceExpr, PlaceTable, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder,
+    ScopedPlaceId, match_subject_place_expressions,
 };
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternPredicateKind,
@@ -2946,8 +2946,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
-        bindings_before_pattern: Option<ScopedPatternBindingsId>,
-        subject_binding_unchanged: bool,
+        entry: PatternCaseEntry,
     ) -> PatternPredicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
@@ -2968,8 +2967,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.file,
             self.current_scope(),
             subject,
-            bindings_before_pattern,
-            subject_binding_unchanged,
+            entry.bindings_before_pattern,
+            entry.subject_binding_unchanged,
+            entry.unchanged_subject_elements,
             kind,
             guard,
             previous_pattern.map(Box::new),
@@ -5322,10 +5322,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 let mut subject_expressions = match_subject_place_expressions(subject).to_vec();
                 subject_expressions.extend(subject_elements.iter().copied());
-                let places_by_case = if cases
+                let has_member_patterns = cases
                     .iter()
-                    .any(|case| pattern_can_narrow_members(&case.pattern))
-                {
+                    .any(|case| pattern_can_narrow_members(&case.pattern));
+                let places_by_case = if has_member_patterns {
                     self.prepare_match_subject_places(&subject_expressions, cases)
                 } else {
                     PatternPlacesByCase::default()
@@ -5456,31 +5456,52 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .all(|target| self.pattern_subject_binding_is_unchanged(target));
                     let mut input_targets = Vec::new();
                     if !case_derived_targets.is_empty() && subject_binding_unchanged {
-                        input_targets.extend(case_derived_targets.iter());
+                        input_targets.extend(case_derived_targets.iter().map(|target| {
+                            (
+                                PatternSubjectPlace {
+                                    subject_element: None,
+                                    place: target.place,
+                                },
+                                target.bindings.as_slice(),
+                            )
+                        }));
                     }
+
+                    let mut unchanged_subject_elements = Vec::new();
                     for target in &sequence_subject_targets {
-                        if let Some((root, related)) = target.places.split_first()
-                            && !related.is_empty()
+                        if (has_member_patterns || previous_pattern.is_some())
+                            && let Some(root) = target.places.first()
                             && self.pattern_subject_binding_is_unchanged(root)
                         {
-                            input_targets.extend(related);
+                            unchanged_subject_elements.push(target.expression);
+                            input_targets.extend(target.places.iter().map(|place| {
+                                (
+                                    PatternSubjectPlace {
+                                        subject_element: Some(target.expression),
+                                        place: place.place,
+                                    },
+                                    place.bindings.as_slice(),
+                                )
+                            }));
                         }
                     }
+
+                    unchanged_subject_elements.sort_unstable();
                     let bindings_before_pattern = self
                         .current_use_def_map_mut()
-                        .record_pattern_entry_bindings(
-                            input_targets
-                                .into_iter()
-                                .map(|target| (target.place, target.bindings.as_slice())),
-                        );
+                        .record_pattern_entry_bindings(input_targets);
 
                     let match_pattern_predicate = self.create_pattern_predicate(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                         previous_pattern,
-                        bindings_before_pattern,
-                        subject_binding_unchanged,
+                        PatternCaseEntry {
+                            bindings_before_pattern,
+                            subject_binding_unchanged,
+                            unchanged_subject_elements: unchanged_subject_elements
+                                .into_boxed_slice(),
+                        },
                     );
                     self.current_match_case = Some(CurrentMatchCase::new(
                         &case.pattern,
@@ -6624,6 +6645,13 @@ struct PatternNarrowing<'db> {
 struct PatternSubjectTarget {
     place: ScopedPlaceId,
     bindings: SmallVec<[ScopedDefinitionId; 2]>,
+}
+
+#[derive(Debug)]
+struct PatternCaseEntry {
+    bindings_before_pattern: Option<ScopedPatternBindingsId>,
+    subject_binding_unchanged: bool,
+    unchanged_subject_elements: Box<[ExpressionNodeKey]>,
 }
 
 #[derive(Debug)]

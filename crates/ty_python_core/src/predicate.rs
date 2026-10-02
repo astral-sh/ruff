@@ -355,6 +355,13 @@ pub struct PatternPredicate<'db> {
     #[returns(copy)]
     pub subject_binding_unchanged: bool,
 
+    /// Sequence display element occurrences whose bindings at this case are known to match those
+    /// read when the same occurrence was evaluated as part of the subject.
+    /// An element may be absent when this information was not needed or recorded.
+    /// The keys are sorted for binary search.
+    #[returns(ref)]
+    pub unchanged_subject_elements: Box<[ExpressionNodeKey]>,
+
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,
 

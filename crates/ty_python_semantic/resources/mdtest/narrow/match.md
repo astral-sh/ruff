@@ -3944,6 +3944,174 @@ def nested_unknown_members(value: Container) -> None:
             reveal_type(value.data["item"])  # revealed: str
 ```
 
+## Earlier positional patterns on sequence display elements
+
+An earlier case can constrain an attribute used by a later positional pattern, even when that
+attribute is not referenced by name. In the following examples, failure of `Pair(True, _)` means
+`first` is `False`. If `Pair(False, True)` also fails, `second` is `False`.
+
+```py
+class Pair:
+    __match_args__ = ("first", "second")
+    first: bool
+    second: bool
+
+def tuple_display(value: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),):
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def list_display(value: Pair) -> None:
+    match [value]:
+        case [Pair(True, _)]:
+            pass
+        case [Pair(False, True)]:
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def nested_display(value: Pair) -> None:
+    match ((value,),):
+        case ((Pair(True, _),),):
+            pass
+        case ((Pair(False, True),),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+class Container:
+    __match_args__ = ("inner",)
+    inner: Pair
+
+def nested_member(value: Container) -> None:
+    match (value,):
+        case (Container(Pair(True, _)),):
+            pass
+        case (Container(Pair(False, True)),):
+            pass
+        case _:
+            reveal_type(value.inner.second)  # revealed: Literal[False]
+
+def enclosing_scope(value: Pair) -> None:
+    class Inner:
+        match (value,):
+            case (Pair(True, _),):
+                pass
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: Literal[False]
+
+def alternative_and_capture(value: Pair) -> None:
+    match (value,):
+        case ((Pair(True, _) | Pair(True, True)) as matched,):
+            pass
+        case (Pair(False, True) as matched,):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+```
+
+Earlier cases also constrain sibling elements. Those constraints determine which subpatterns can
+still fail.
+
+```py
+def sibling(value: Pair, flag: bool) -> None:
+    match (value, flag):
+        case (_, True):
+            pass
+        case (Pair(True, _), False):
+            pass
+        case (Pair(False, True), False):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def sibling_member(value: Pair, other: Pair) -> None:
+    match (value, other):
+        case (_, Pair(True, _)):
+            pass
+        case (Pair(True, _), Pair(False, _)):
+            pass
+        case (Pair(False, True), Pair(False, _)):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+```
+
+Conditions before the match can also constrain a positional attribute.
+
+```py
+def earlier_condition(value: Pair) -> None:
+    if value.first is False:
+        match (value,):
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: Literal[False]
+```
+
+A guard that can fail prevents later cases from assuming the pattern failed. A guard known to always
+pass does not. A guard can also rebind the subject's name, so the new binding cannot use constraints
+on the original value.
+
+```py
+def conditional_guard(value: Pair, flag: bool) -> None:
+    match (value,):
+        case (Pair(True, _),) if flag:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+
+def true_guard(value: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),) if True:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def rebound_by_guard(value: Pair, replacement: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),) if (value := replacement) is None:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+
+class_value = Pair()
+
+def rebound_in_class(replacement: Pair) -> None:
+    class Inner:
+        match (class_value,):
+            case (Pair(True, _),) if (class_value := replacement) is None:
+                pass
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(class_value.second)  # revealed: bool
+```
+
+When a display repeats a place, failure analysis treats each occurrence independently. It does not
+currently infer that the two reads of `value` below have the same value.
+
+```py
+def repeated_element(value: Pair) -> None:
+    match (value, value):
+        case (Pair(True, _), Pair(False, True)):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+```
+
 ## Patterns on elements of sequence displays
 
 A pattern for a display element also narrows attributes and keys of that element.
