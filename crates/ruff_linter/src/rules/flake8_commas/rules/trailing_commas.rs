@@ -6,6 +6,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::codes::Category;
+use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
 
@@ -112,15 +113,18 @@ enum ContextType {
 struct Context {
     ty: ContextType,
     num_commas: u32,
+    /// Whether the opening bracket is directly followed by a newline, such
+    /// that the context's elements start on a new line.
+    newline_after_open: bool,
 }
 
 impl Context {
     const fn new(ty: ContextType) -> Self {
-        Self { ty, num_commas: 0 }
-    }
-
-    fn inc(&mut self) {
-        self.num_commas += 1;
+        Self {
+            ty,
+            num_commas: 0,
+            newline_after_open: false,
+        }
     }
 }
 
@@ -158,6 +162,60 @@ impl Context {
 pub(crate) struct MissingTrailingComma;
 
 impl AlwaysFixableViolation for MissingTrailingComma {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Trailing comma missing".to_string()
+    }
+
+    fn fix_title(&self) -> String {
+        "Add trailing comma".to_string()
+    }
+}
+
+/// ## What it does
+/// Checks for the absence of a trailing comma in a comma-separated list whose
+/// elements start on a new line after the opening bracket.
+///
+/// ## Why is this bad?
+/// The presence of a trailing comma can reduce diff size when parameters or
+/// elements are added or removed from function calls, function definitions,
+/// literals, etc.
+///
+/// Unlike [`missing-trailing-comma`][COM812], this rule is compatible with the
+/// formatter: it only reports layouts where the elements start on their own
+/// line, and the fix results in the same expanded layout the formatter
+/// produces for a magic trailing comma. In particular, it reports the
+/// "hugged" layout the formatter produces for sequences that don't fit on a
+/// single line, which [`missing-trailing-comma`][COM812] users frequently
+/// want to deny:
+///
+/// ```python
+/// def func(
+///     foo, bar, baz
+/// ):
+/// ```
+///
+/// ## Example
+/// ```python
+/// foo = [
+///     bar, baz
+/// ]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = [
+///     bar,
+///     baz,
+/// ]
+/// ```
+///
+/// [COM812]: https://docs.astral.sh/ruff/rules/missing-trailing-comma/
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION", category = Category::Formatting)]
+pub(crate) struct MissingTrailingCommaInMultilineList;
+
+impl AlwaysFixableViolation for MissingTrailingCommaInMultilineList {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Trailing comma missing".to_string()
@@ -250,7 +308,7 @@ impl AlwaysFixableViolation for ProhibitedTrailingComma {
     }
 }
 
-/// COM812, COM818, COM819
+/// COM812, COM817, COM818, COM819
 pub(crate) fn trailing_commas(
     lint_context: &LintContext,
     tokens: &Tokens,
@@ -400,9 +458,22 @@ fn check_token(
                 | TokenType::OpeningCurlyBracket
         );
     if comma_required {
-        if let Some(mut diagnostic) = lint_context
-            .report_diagnostic_if_enabled(MissingTrailingComma, TextRange::empty(prev_prev.end()))
-        {
+        // `COM812` takes precedence: when both rules are enabled, the hugged
+        // layout is already covered by `missing-trailing-comma`.
+        let diagnostic = if lint_context.is_rule_enabled(Rule::MissingTrailingComma) {
+            lint_context.report_diagnostic_if_enabled(
+                MissingTrailingComma,
+                TextRange::empty(prev_prev.end()),
+            )
+        } else if context.newline_after_open {
+            lint_context.report_diagnostic_if_enabled(
+                MissingTrailingCommaInMultilineList,
+                TextRange::empty(prev_prev.end()),
+            )
+        } else {
+            None
+        };
+        if let Some(mut diagnostic) = diagnostic {
             // Create a replacement that includes the final bracket (or other token),
             // rather than just inserting a comma at the end. This prevents the UP034 fix
             // removing any brackets in the same linter pass - doing both at the same time could
@@ -448,7 +519,19 @@ fn update_context(
         }
         TokenType::Comma => {
             let last = stack.last_mut().expect("Stack to never be empty");
-            last.inc();
+            last.num_commas += 1;
+            return *last;
+        }
+        TokenType::NonLogicalNewline => {
+            let last = stack.last_mut().expect("Stack to never be empty");
+            if matches!(
+                prev.ty,
+                TokenType::OpeningBracket
+                    | TokenType::OpeningSquareBracket
+                    | TokenType::OpeningCurlyBracket
+            ) {
+                last.newline_after_open = true;
+            }
             return *last;
         }
         _ => return stack.last().copied().expect("Stack to never be empty"),
