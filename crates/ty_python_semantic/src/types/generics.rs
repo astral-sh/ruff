@@ -1717,9 +1717,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Assignability and pure redundancy must retain the source's gradual semantics.
         if matches!(
             self.relation,
-            TypeRelation::Subtyping
-                | TypeRelation::SubtypingAssuming
-                | TypeRelation::Redundancy { pure: false }
+            TypeRelation::Subtyping | TypeRelation::Redundancy { pure: false }
         ) && (
             // Explicitly materialized sources are already static and cannot advance further.
             source.materialization_kind(db).is_none()
@@ -1995,32 +1993,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
             // For gradual types, A <: B (subtyping) is defined as Top[A] <: Bottom[B]
-            (
-                None,
-                Some(target_mat),
-                TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
-                | TypeRelation::SubtypingAssuming,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Top,
-                target_type,
-                target_mat,
-            ),
-            (
-                Some(source_mat),
-                None,
-                TypeRelation::Subtyping
-                | TypeRelation::Redundancy { .. }
-                | TypeRelation::SubtypingAssuming,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Bottom,
-            ),
+            (None, Some(target_mat), TypeRelation::Subtyping | TypeRelation::Redundancy { .. }) => {
+                self.check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    MaterializationKind::Top,
+                    target_type,
+                    target_mat,
+                )
+            }
+            (Some(source_mat), None, TypeRelation::Subtyping | TypeRelation::Redundancy { .. }) => {
+                self.check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    source_mat,
+                    target_type,
+                    MaterializationKind::Bottom,
+                )
+            }
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
             (None, Some(target_mat), TypeRelation::Assignability) => self
                 .check_subtyping_in_invariant_position(

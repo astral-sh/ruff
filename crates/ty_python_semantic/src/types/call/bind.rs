@@ -3077,14 +3077,9 @@ impl<'db> Bindings<'db> {
 
                         let constraints = ConstraintSetBuilder::new();
                         let result = constraints.into_owned(|constraints| {
-                            ty_a.when_subtype_of_assuming(
-                                db,
-                                env,
-                                ty_b,
-                                constraints.load(db, env, tracked.constraints(db)),
-                                constraints,
-                                TypeVarSet::None,
-                            )
+                            constraints
+                                .load(db, env, tracked.constraints(db))
+                                .implies_subtype_of(db, env, constraints, ty_a, ty_b)
                         });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
