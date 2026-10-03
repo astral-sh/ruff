@@ -1,3 +1,4 @@
+use icu_properties::{CodePointSetData, props::DefaultIgnorableCodePoint};
 use ruff_python_ast::{
     BytesLiteralFlags, StringFlags, StringLiteralFlags,
     str::{Quote, TripleQuotes},
@@ -50,18 +51,52 @@ pub(crate) const fn choose_quote(
 pub struct UnicodeEscape<'a> {
     source: &'a str,
     layout: EscapeLayout,
+    escape_for_display: bool,
 }
 
 impl<'a> UnicodeEscape<'a> {
     #[inline]
     pub fn with_preferred_quote(source: &'a str, quote: Quote) -> Self {
         let layout = Self::repr_layout(source, quote);
-        Self { source, layout }
+        Self {
+            source,
+            layout,
+            escape_for_display: false,
+        }
     }
+
+    /// Configures the representation to escape [default-ignorable characters]. It also escapes
+    /// combining marks that would otherwise attach to the opening quote or an escape sequence in
+    /// the output.
+    ///
+    /// [default-ignorable characters]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[must_use]
+    pub fn escape_for_display(mut self) -> Self {
+        if self.escape_for_display {
+            return self;
+        }
+        self.escape_for_display = true;
+        let mut follows_syntax = true;
+        for ch in self.source.chars() {
+            let escape = self.display_escape(ch, follows_syntax);
+            follows_syntax = escape.next_follows_syntax;
+            if escape.should_escape {
+                let extra = Self::escaped_codepoint_len(ch) - ch.len_utf8();
+                self.layout.len = self
+                    .layout
+                    .len
+                    .and_then(|len| len.checked_add(extra))
+                    .filter(|&len| len <= isize::MAX as usize - Self::REPR_RESERVED_LEN);
+            }
+        }
+        self
+    }
+
     #[inline]
     pub fn new_repr(source: &'a str) -> Self {
         Self::with_preferred_quote(source, Quote::Single)
     }
+
     #[inline]
     pub fn str_repr<'r>(&'a self, triple_quotes: TripleQuotes) -> StrRepr<'r, 'a> {
         StrRepr {
@@ -98,6 +133,14 @@ impl std::fmt::Display for StrRepr<'_, '_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.write(formatter)
     }
+}
+
+/// Whether to apply additional escaping to the current character, and, when display escaping is
+/// enabled, whether the next character would immediately follow an escape sequence in the output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DisplayEscape {
+    should_escape: bool,
+    next_follows_syntax: bool,
 }
 
 impl UnicodeEscape<'_> {
@@ -169,15 +212,47 @@ impl UnicodeEscape<'_> {
                 // max = std::cmp::max(ch, max);
                 ch.len_utf8()
             }
-            ch if (ch as u32) < 0x100 => 4,   // \xHH
-            ch if (ch as u32) < 0x10000 => 6, // \uHHHH
-            _ => 10,                          // \uHHHHHHHH
+            ch => Self::escaped_codepoint_len(ch),
+        }
+    }
+
+    /// Returns the length of a hexadecimal Python escape for the character.
+    const fn escaped_codepoint_len(ch: char) -> usize {
+        match ch as u32 {
+            0..=0xff => 4,       // \xHH
+            0x100..=0xffff => 6, // \uHHHH
+            _ => 10,             // \UHHHHHHHH
+        }
+    }
+
+    /// Returns whether `ch` needs additional escaping and the state to use for the next character.
+    ///
+    /// When display escaping is enabled, printable default-ignorable characters are escaped.
+    /// `follows_syntax` is true if `ch` would immediately follow the opening quote or an escape
+    /// sequence; in that case, combining marks are also escaped.
+    fn display_escape(&self, ch: char, follows_syntax: bool) -> DisplayEscape {
+        if !self.escape_for_display {
+            return DisplayEscape {
+                should_escape: false,
+                next_follows_syntax: follows_syntax,
+            };
+        }
+        let should_escape = !ch.is_ascii()
+            && ((follows_syntax && crate::char::is_combining_mark(ch))
+                || (CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(ch)
+                    && crate::char::is_printable(ch)));
+        DisplayEscape {
+            should_escape,
+            next_follows_syntax: should_escape
+                || ch == self.layout.quote.as_char()
+                || Self::escaped_char_len(ch) != ch.len_utf8(),
         }
     }
 
     fn write_char(
         ch: char,
         quote: Quote,
+        force_escape: bool,
         formatter: &mut impl std::fmt::Write,
     ) -> std::fmt::Result {
         match ch {
@@ -196,7 +271,7 @@ impl UnicodeEscape<'_> {
             ch if ch.is_ascii() => {
                 write!(formatter, "\\x{:02x}", ch as u8)
             }
-            ch if crate::char::is_printable(ch) => formatter.write_char(ch),
+            ch if !force_escape && crate::char::is_printable(ch) => formatter.write_char(ch),
             '\0'..='\u{ff}' => {
                 write!(formatter, "\\x{:02x}", ch as u32)
             }
@@ -225,8 +300,16 @@ impl Escape for UnicodeEscape<'_> {
 
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
+        let mut follows_syntax = true;
         for ch in self.source.chars() {
-            Self::write_char(ch, self.layout().quote, formatter)?;
+            let display_escape = self.display_escape(ch, follows_syntax);
+            follows_syntax = display_escape.next_follows_syntax;
+            Self::write_char(
+                ch,
+                self.layout.quote,
+                display_escape.should_escape,
+                formatter,
+            )?;
         }
         Ok(())
     }
@@ -413,5 +496,46 @@ mod unicode_escape_tests {
 
         assert!(test("'\"hello"));
         assert!(test("hello\n"));
+    }
+
+    #[test]
+    fn unattached_combining_marks() {
+        let source = "\u{0301}e\u{0301}";
+        let original = UnicodeEscape::new_repr(source);
+        assert!(!original.changed());
+        assert_eq!(
+            original.str_repr(TripleQuotes::No).to_string().as_deref(),
+            Some("'\u{0301}e\u{0301}'")
+        );
+
+        let escaped = UnicodeEscape::new_repr(source).escape_for_display();
+        assert!(escaped.changed());
+        assert_eq!(escaped.layout().len, Some("\\u0301e\u{0301}".len()));
+        assert_eq!(
+            escaped.str_repr(TripleQuotes::No).to_string().as_deref(),
+            Some("'\\u0301e\u{0301}'")
+        );
+    }
+
+    #[test]
+    fn default_ignorable_characters() {
+        let source = "a\u{034f}\u{0301}\u{115f}\u{200b}";
+        let original = UnicodeEscape::new_repr(source);
+        assert_eq!(
+            original.str_repr(TripleQuotes::No).to_string().as_deref(),
+            Some("'a\u{034f}\u{0301}\u{115f}\\u200b'")
+        );
+
+        let escaped = UnicodeEscape::new_repr(source)
+            .escape_for_display()
+            .escape_for_display();
+        assert_eq!(
+            escaped.layout().len,
+            Some("a\\u034f\\u0301\\u115f\\u200b".len())
+        );
+        assert_eq!(
+            escaped.str_repr(TripleQuotes::No).to_string().as_deref(),
+            Some("'a\\u034f\\u0301\\u115f\\u200b'")
+        );
     }
 }
