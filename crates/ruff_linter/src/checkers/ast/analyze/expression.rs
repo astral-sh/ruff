@@ -1705,6 +1705,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::SingleItemMembershipTest) {
                 refurb::rules::single_item_membership_test(checker, compare);
             }
+            if checker.is_rule_enabled(Rule::OutdatedVersionBlock) {
+                pyupgrade::rules::outdated_version_block(checker, expr, compare);
+            }
         }
         Expr::NumberLiteral(number_literal @ ast::ExprNumberLiteral { .. }) => {
             if checker.source_type.is_stub() && checker.is_rule_enabled(Rule::NumericLiteralTooLong)
