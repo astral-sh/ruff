@@ -3078,3 +3078,309 @@ def check(setter: ConstrainedSetter) -> None:
     setter.value = b"wrong"  # error: [invalid-assignment]
     writable: HasValue = setter  # error: [invalid-assignment]
 ```
+
+## Unresolved arguments in recursive generic calls
+
+An argument that depends entirely on the call's own result provides no initial type arguments.
+Inference keeps a finite approximation of recurring type arguments, preserving known containers
+without adding another layer on each iteration. The undefined reference is still reported.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+def grow(value: tuple[A, B]) -> tuple[list[A], tuple[A, B]]:
+    raise NotImplementedError
+
+def repeat(flag: bool):
+    while flag:
+        value = grow(value)  # error: [possibly-unresolved-reference]
+```
+
+## Recursive calls retain known return structure
+
+An unresolved element type does not erase the return type's outer container. A function returning a
+list still cannot accept that list as a tuple argument on the next iteration.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A")
+
+def to_list(value: tuple[A]) -> list[A]:
+    return [value[0]]
+
+def repeat(flag: bool):
+    while flag:
+        # error: [invalid-argument-type]
+        # error: [possibly-unresolved-reference]
+        value = to_list(value)
+```
+
+Another argument can supply the type parameter independently, even when the recursive argument is
+unresolved.
+
+```py
+def to_list_with_default(value: tuple[A], default: A) -> list[A]:
+    return [default]
+
+def repeat_with_default(flag: bool):
+    while flag:
+        # error: [invalid-argument-type]
+        # error: [possibly-unresolved-reference]
+        value = to_list_with_default(value, 1)
+```
+
+## Recursive calls with unused alias parameters
+
+`Constant[T]` is always `int`. Its unused argument does not make the inferred element type depend on
+itself, so the second tuple element also converges to `int`.
+
+```py
+from typing_extensions import assert_type
+
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Constant = TypeAliasType("Constant", int, type_params=(T,))
+
+def advance(value: tuple[T, object]) -> tuple[Constant[T], T]:
+    return (1, value[0])
+
+def repeat(flag: bool):
+    while flag:
+        value = advance(value)  # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    assert_type(value[1], int)
+    # error: [possibly-unresolved-reference]
+    wrong: str = value[1]  # error: [invalid-assignment]
+```
+
+## Recursive calls with nested constant aliases
+
+An unused parameter remains irrelevant when its alias is nested inside another alias and a
+container.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Constant = TypeAliasType("Constant", int, type_params=(T,))
+Nested = TypeAliasType("Nested", list[Constant[T]], type_params=(T,))
+
+def advance(value: tuple[T, object]) -> tuple[Nested[T], T]:
+    return ([1], value[0])
+
+def repeat(flag: bool):
+    while flag:
+        value = advance(value)  # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    reveal_type(value[1][0])  # revealed: int
+    # error: [possibly-unresolved-reference]
+    wrong: str = value[1]  # error: [invalid-assignment]
+```
+
+## Recursive calls with simplified alias values
+
+Specialization can remove a dependency even when the alias uses both parameters. `Either[object, T]`
+is `object`, regardless of the unresolved `T`.
+
+```py
+from typing_extensions import assert_type
+
+from typing_extensions import TypeAliasType, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+T = TypeVar("T")
+Either = TypeAliasType("Either", A | B, type_params=(A, B))
+
+def advance(value: tuple[T, object]) -> tuple[Either[object, T], T]:
+    return (1, value[0])
+
+def repeat(flag: bool):
+    while flag:
+        value = advance(value)  # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    assert_type(value[1], object)
+    # error: [possibly-unresolved-reference]
+    wrong: str = value[1]  # error: [invalid-assignment]
+```
+
+## Recursive calls with aliases inside union members
+
+Normalizing `Identity[T]` also simplifies the enclosing tuple union to `tuple[object]`. The erased
+argument does not make the list provisional.
+
+```py
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T")
+Identity = TypeAliasType("Identity", T, type_params=(T,))
+
+def advance(value: tuple[T, object]) -> tuple[list[tuple[object] | tuple[Identity[T]]], T]:
+    raise NotImplementedError
+
+def repeat(flag: bool):
+    while flag:
+        value = advance(value)  # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    known: list[tuple[object]] = value[1]
+    # error: [possibly-unresolved-reference]
+    wrong: str = value[1]  # error: [invalid-assignment]
+```
+
+## Recursive calls with type parameter defaults
+
+A declared default remains available when the recursive argument provides no binding. The default
+also determines the return type used to check the next iteration.
+
+```py
+from typing_extensions import TypeVar
+
+A = TypeVar("A", default=int)
+
+def first(value: tuple[A]) -> A:
+    return value[0]
+
+def repeat(flag: bool):
+    while flag:
+        # error: [invalid-argument-type] "Expected `tuple[int]`, found `int`"
+        # error: [possibly-unresolved-reference]
+        value = first(value)
+```
+
+## Finite mutually dependent generic calls
+
+Wrapping and unwrapping an element preserves its type. Initializers supply the element type even
+when the two calls depend on each other through separate loop variables.
+
+```py
+from typing import Literal, TypeVar
+
+A = TypeVar("A")
+
+def wrap(value: tuple[A]) -> tuple[list[A]]:
+    return ([value[0]],)
+
+def unwrap(value: tuple[list[A]]) -> tuple[A]:
+    return (value[0][0],)
+
+def repeat(flag: bool):
+    value = (1,)
+    other = ([1],)
+    while flag:
+        value = unwrap(other)
+        other = wrap(value)
+    reveal_type(value)  # revealed: tuple[int]
+    reveal_type(other)  # revealed: tuple[list[int]]
+    bad: tuple[Literal[1]] = value  # error: [invalid-assignment]
+
+def nested(flag: bool):
+    value = (1,)
+    while flag:
+        value = unwrap(unwrap(wrap(wrap(value))))
+    reveal_type(value)  # revealed: tuple[int]
+    bad: tuple[Literal[1]] = value  # error: [invalid-assignment]
+```
+
+## Unresolved callable arguments in recursive generic calls
+
+The unresolved binding can occur inside a callable's narrowing target or a generic TypedDict.
+
+```py
+from collections.abc import Callable
+from typing_extensions import Generic, TypeGuard, TypeIs, TypedDict
+from typing import TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+class Payload(TypedDict, Generic[A]):
+    value: A
+
+def grow_guard(
+    value: tuple[Callable[[], TypeGuard[A]], B],
+) -> tuple[Callable[[], TypeGuard[list[A]]], tuple[Callable[[], TypeGuard[A]], B]]:
+    raise NotImplementedError
+
+def grow_is(value: tuple[Callable[[], TypeIs[A]], B]) -> tuple[Callable[[], TypeIs[list[A]]], tuple[Callable[[], TypeIs[A]], B]]:
+    raise NotImplementedError
+
+def grow_dict(
+    value: tuple[Callable[[], Payload[A]], B],
+) -> tuple[Callable[[], Payload[list[A]]], tuple[Callable[[], Payload[A]], B]]:
+    raise NotImplementedError
+
+def repeat_guard(flag: bool):
+    while flag:
+        value = grow_guard(value)  # error: [possibly-unresolved-reference]
+
+def repeat_is(flag: bool):
+    while flag:
+        value = grow_is(value)  # error: [possibly-unresolved-reference]
+
+def repeat_dict(flag: bool):
+    while flag:
+        value = grow_dict(value)  # error: [possibly-unresolved-reference]
+```
+
+## Recursive calls retain type parameter bounds
+
+The return type has a known list element even while its contents are unresolved. Passing that result
+back to a function whose element type is bounded by `int` violates the bound.
+
+```py
+from typing import TypeVar
+
+A = TypeVar("A", bound=int)
+
+def grow(value: tuple[A]) -> tuple[list[A]]:
+    return ([value[0]],)
+
+def repeat(flag: bool):
+    while flag:
+        # error: [invalid-argument-type]
+        # error: [possibly-unresolved-reference]
+        value = grow(value)
+```
+
+## Recursive calls retain class-object return types
+
+An unavailable type argument does not erase the `type` wrapper around it. The result is still a
+class object, so assigning it to `str` is invalid.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def advance(value: tuple[T, object]) -> tuple[type[T], T]:
+    raise NotImplementedError
+
+def repeat(flag: bool):
+    while flag:
+        value = advance(value)  # error: [possibly-unresolved-reference]
+    # error: [possibly-unresolved-reference]
+    wrong: str = value[0]  # error: [invalid-assignment]
+```
+
+## Unresolved arguments through generic aliases
+
+Wrapping the tuple in a type alias preserves the same recursive dependency.
+
+```py
+from typing import TypeAlias, TypeVar
+
+A = TypeVar("A")
+Box: TypeAlias = tuple[A]
+
+def grow(value: Box[A]) -> Box[list[A]]:
+    return ([value[0]],)
+
+def repeat(flag: bool):
+    while flag:
+        value = grow(value)  # error: [possibly-unresolved-reference]
+```

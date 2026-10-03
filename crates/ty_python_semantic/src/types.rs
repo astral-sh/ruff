@@ -2,6 +2,7 @@ use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::{AsId, FromId};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -2280,6 +2281,52 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Retains an unavailable type argument without identifying it with its enclosing value.
+    /// A later call can forward this dependency to another type variable while keeping the same
+    /// originating query. This bounds the identities we create when inference revisits a call.
+    fn pending_inference(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        call_site: call::CallSite<'db>,
+    ) -> Option<Self> {
+        let Type::Divergent(divergent) = self else {
+            return None;
+        };
+        let root = match divergent.origin {
+            DivergentOrigin::Recursive(id) => {
+                if divergent.flags.contains(DivergentFlags::PENDING_INFERENCE) {
+                    PendingInference::from_id(id).root(db)
+                } else {
+                    id
+                }
+            }
+            DivergentOrigin::PendingNarrowing => return None,
+        };
+        Some(Self::Divergent(DivergentType {
+            origin: DivergentOrigin::Recursive(
+                PendingInference::new(db, root, typevar, call_site).as_id(),
+            ),
+            flags: DivergentFlags::PENDING_INFERENCE,
+            materialization: None,
+        }))
+    }
+
+    /// Returns the identity of an unavailable type argument.
+    fn as_pending_inference(self) -> Option<PendingInference<'db>> {
+        let Type::Divergent(DivergentType {
+            origin: DivergentOrigin::Recursive(id),
+            flags,
+            ..
+        }) = self
+        else {
+            return None;
+        };
+        flags
+            .contains(DivergentFlags::PENDING_INFERENCE)
+            .then(|| PendingInference::from_id(id))
+    }
+
     /// Returns a divergent marker for a cycle in type alias inference.
     fn divergent_alias(id: salsa::Id) -> Self {
         Self::Divergent(DivergentType {
@@ -2311,8 +2358,9 @@ impl<'db> Type<'db> {
             self,
             Self::Divergent(DivergentType {
                 origin: DivergentOrigin::Recursive(_),
+                flags,
                 ..
-            })
+            }) if !flags.contains(DivergentFlags::PENDING_INFERENCE)
         )
     }
 
@@ -9096,6 +9144,11 @@ impl<'db> Type<'db> {
                 Type::Dynamic(dynamic) => {
                     SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
                 }
+                Type::Divergent(_) if ty.as_pending_inference().is_some() => {
+                    // An unavailable instance type still has a class-object type. The pending
+                    // binding cannot be represented inside `type[]`, so approximate its contents.
+                    SubclassOfType::subclass_of_unknown()
+                }
                 Type::Divergent(_) => ty,
                 Type::Intersection(intersection) => {
                     if let Some(alternatives) = intersection.finite_alternative_union(db, env) {
@@ -11206,6 +11259,8 @@ bitflags! {
         /// The cycle comes from type alias inference. Value inference can also diverge,
         /// for example when an assignment feeds into the next iteration of a loop.
         const FROM_TYPE_ALIAS = 1 << 0;
+        /// The marker identifies an unavailable generic binding, rather than the whole query.
+        const PENDING_INFERENCE = 1 << 1;
     }
 }
 
@@ -11219,11 +11274,27 @@ enum DivergentOrigin {
     PendingNarrowing,
 }
 
+/// Stable identity for an unavailable generic argument. Revisiting the same call's type variable
+/// can add arbitrarily many containers without providing a concrete binding. A separate call to
+/// the same function must still preserve those containers.
+#[salsa::interned(debug)]
+struct PendingInference<'db> {
+    #[returns(copy)]
+    root: salsa::Id,
+    #[returns(copy)]
+    typevar: BoundTypeVarInstance<'db>,
+    #[returns(copy)]
+    call_site: call::CallSite<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for PendingInference<'_> {}
+
 /// An internal marker used while resolving cyclic type inference.
 ///
 /// Recursive markers identify a query whose result is needed to infer its own inputs. Pending
-/// narrowing instead records that a predicate's constraints are not yet available; it does not
-/// reference a recursive type. Both must survive dynamic type reduction
+/// narrowing and type arguments instead record unavailable information; they do not reference
+/// the query's recursive type. All markers must survive dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reduced to `@Todo`).
 /// Otherwise, type inference cannot converge properly.
 /// For detailed properties of this type, see the unit test at the end of the file.
@@ -11250,6 +11321,8 @@ impl DivergentType {
 
     fn same_marker(self, other: Self) -> bool {
         self.origin == other.origin
+            && self.flags.contains(DivergentFlags::PENDING_INFERENCE)
+                == other.flags.contains(DivergentFlags::PENDING_INFERENCE)
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {

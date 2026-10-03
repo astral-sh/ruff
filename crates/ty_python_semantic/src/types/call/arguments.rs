@@ -5,7 +5,9 @@ use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
+use ty_python_core::ProgramFile;
 
 use crate::ProgramEnvironment;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
@@ -37,6 +39,14 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct CallArguments<'a, 'db> {
     items: Vec<CallArgument<'a, 'db>>,
+    call_site: Option<CallSite<'db>>,
+}
+
+/// Identifies a source call independently of its inferred argument types.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::SalsaValue)]
+pub(crate) struct CallSite<'db> {
+    file: ProgramFile<'db>,
+    arguments: TextRange,
 }
 
 #[derive(Clone, Debug)]
@@ -119,11 +129,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized.
     pub(crate) fn from_arguments(
+        file: ProgramFile<'db>,
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
         let mut call_arguments = Self {
             items: Vec::with_capacity(arguments.len()),
+            call_site: Some(CallSite {
+                file,
+                arguments: arguments.range(),
+            }),
         };
 
         for arg_or_keyword in arguments.iter_source_order() {
@@ -153,15 +168,21 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         call_arguments
     }
 
+    /// Returns the source call whose arguments are being checked, when available.
+    pub(super) fn call_site(&self) -> Option<CallSite<'db>> {
+        self.call_site
+    }
+
     /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
     ///
     /// This currently only exists for the LSP usecase, and shouldn't be used in normal
     /// typechecking.
     pub(crate) fn from_arguments_typed(
+        file: ProgramFile<'db>,
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
     ) -> Self {
-        arguments
+        let mut call_arguments: Self = arguments
             .iter_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
@@ -183,7 +204,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     }
                 }
             })
-            .collect()
+            .collect();
+        call_arguments.call_site = Some(CallSite {
+            file,
+            arguments: arguments.range(),
+        });
+        call_arguments
     }
 
     /// Create a [`CallArguments`] with no arguments.
@@ -256,7 +282,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 types: CallArgumentTypes::new(bound_self),
             });
             items.extend(self.items.iter().cloned());
-            Cow::Owned(CallArguments { items })
+            Cow::Owned(CallArguments {
+                items,
+                call_site: self.call_site,
+            })
         } else {
             Cow::Borrowed(self)
         }
@@ -272,6 +301,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     fn start_from(&self, index: usize) -> Self {
         Self {
             items: self.items[index..].to_vec(),
+            call_site: self.call_site,
         }
     }
 
@@ -291,6 +321,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 .iter()
                 .map(|index| self.items[*index].clone())
                 .collect(),
+            call_site: self.call_site,
         }
     }
 
@@ -568,6 +599,9 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
             });
         }
 
-        Self { items }
+        Self {
+            items,
+            call_site: None,
+        }
     }
 }

@@ -66,8 +66,8 @@ use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_fr
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
-    TypeCollector, TypeKind, TypeVisitor, any_over_type, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    TypeCollector, TypeKind, TypeVisitor, any_over_type, any_over_type_including_alias_arguments,
+    walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
@@ -5677,6 +5677,9 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// Type arguments inferred before argument validation begins.
     inference: Option<TypeVarInference<'db>>,
 
+    /// A return type whose uninferred type variables preserve their recursive argument.
+    pending_return: Option<Type<'db>>,
+
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
     /// avoid duplicate diagnostics.
@@ -5787,6 +5790,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let InferredCall {
             inferable_typevars,
             inference,
+            pending_return,
             errors: inference_errors,
             constraint_set_errors,
         } = inferred;
@@ -5806,6 +5810,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars,
             inference,
+            pending_return,
             constraint_set_errors,
         }
     }
@@ -5852,6 +5857,7 @@ struct InferredCall<'db> {
     inferable_typevars: TypeVarSet<'db>,
     /// Inferred type arguments, or `None` when the signature is not generic.
     inference: Option<TypeVarInference<'db>>,
+    pending_return: Option<Type<'db>>,
     /// Inference errors retained after any retry without the expected return type.
     errors: Vec<BindingError<'db>>,
     /// Flags indexed by call argument, including synthetic receivers, to suppress duplicate errors.
@@ -6093,6 +6099,7 @@ impl<'db> CallInference<'_, 'db> {
             return InferredCall {
                 inferable_typevars: self.inferable_typevars,
                 inference: None,
+                pending_return: None,
                 errors: Vec::new(),
                 constraint_set_errors,
             };
@@ -6298,9 +6305,117 @@ impl<'db> CallInference<'_, 'db> {
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
+            pending_return: self.pending_return(inference),
             errors: specialization_errors,
             constraint_set_errors,
         }
+    }
+
+    /// Preserve unavailable type arguments without discarding the return type's known structure.
+    ///
+    /// For `grow[T](x: tuple[T]) -> tuple[list[T]]`, an initially divergent `x` does not supply a
+    /// binding for `T`. Defaulting to `Unknown` loses the recursive dependency and lets the result
+    /// grow indefinitely. Instead, give this binding its own marker. Reusing `x`'s marker would
+    /// incorrectly identify `T` with the entire tuple and collapse known containers too early.
+    /// Argument validation uses the ordinary inference result, independently of this projection.
+    fn pending_return(&self, inference: TypeVarInference<'db>) -> Option<Type<'db>> {
+        let db = self.db;
+        let call_site = self.arguments.call_site()?;
+        let pending: Vec<_> = self
+            .argument_relations()
+            .filter_map(|relation| {
+                let markers = RefCell::new(FxOrderSet::default());
+                any_over_type_including_alias_arguments(
+                    db,
+                    self.env,
+                    relation.argument_type,
+                    |ty| {
+                        if (ty == relation.argument_type && ty.is_recursive_divergent())
+                            || ty.as_pending_inference().is_some()
+                        {
+                            markers.borrow_mut().insert(ty);
+                        }
+                        false
+                    },
+                );
+                let markers = markers.into_inner();
+                (!markers.is_empty()).then_some((relation.declared_type, markers))
+            })
+            .collect();
+        if pending.is_empty() {
+            return None;
+        }
+        let specialization = inference.merged_specialization_with(db, |typevar, inferred| {
+            if let Some(inferred) = inferred {
+                if !any_over_type_including_alias_arguments(db, self.env, inferred, |ty| {
+                    ty.as_pending_inference().is_some_and(|pending| {
+                        pending.typevar(db) == typevar && pending.call_site(db) == call_site
+                    })
+                }) {
+                    return None;
+                }
+                // Inspect the specialized alias value, rather than its stored arguments, which
+                // can include parameters that the value does not use.
+                let inferred = inferred.resolve_type_alias(db);
+                let elements = inferred
+                    .as_union()
+                    .map_or(std::slice::from_ref(&inferred), |union| union.elements(db));
+                let normalized = UnionType::from_elements_cycle_recovery(
+                    db,
+                    self.env,
+                    elements.iter().copied().map(|element| {
+                        let markers = RefCell::new(FxOrderSet::default());
+                        any_over_type_including_alias_arguments(db, self.env, element, |ty| {
+                            if let Some(pending) = ty.as_pending_inference()
+                                && pending.typevar(db) == typevar
+                                && pending.call_site(db) == call_site
+                            {
+                                markers.borrow_mut().insert(ty);
+                            }
+                            false
+                        });
+                        let markers = markers.into_inner();
+                        if markers.is_empty() {
+                            element
+                        } else {
+                            markers.into_iter().fold(element, |ty, marker| {
+                                ty.recursive_type_normalized_impl(db, self.env, marker, false)
+                                    .unwrap_or(marker)
+                            })
+                        }
+                    }),
+                );
+                // A binding that still contains its own unavailable input supplies no new
+                // evidence. Concrete alternatives, including those supplied by initializers or
+                // another argument, supersede bare pending bindings.
+                let concrete = normalized.filter_union(db, self.env, |ty| !ty.is_divergent());
+                return Some(if concrete.is_never() {
+                    normalized
+                } else {
+                    concrete
+                });
+            }
+            if typevar.default_type(db).is_some() {
+                return None;
+            }
+            let arguments: Vec<_> = pending
+                .iter()
+                .filter(|(declared_type, _)| {
+                    declared_type
+                        .variance_of(db, self.env, typevar.identity(db))
+                        .evaluate(db)
+                        != TypeVarVariance::Bivariant
+                })
+                .flat_map(|(_, markers)| {
+                    markers
+                        .iter()
+                        .filter_map(|marker| marker.pending_inference(db, typevar, call_site))
+                })
+                .collect();
+            (!arguments.is_empty())
+                .then(|| UnionType::from_elements_cycle_recovery(db, self.env, arguments))
+        });
+        Some(self.return_ty.apply_specialization(db, specialization))
     }
 
     /// Solve the collected constraints, consuming the builder before argument validation.
@@ -7385,11 +7500,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             }
         }
 
-        let return_ty = self.return_ty.apply_optional_specialization(
-            self.db,
-            self.inference
-                .map(|inference| inference.merged_specialization(self.db)),
-        );
+        let return_ty = self.pending_return.unwrap_or_else(|| {
+            self.return_ty.apply_optional_specialization(
+                self.db,
+                self.inference
+                    .map(|inference| inference.merged_specialization(self.db)),
+            )
+        });
         (self.inferable_typevars, self.inference, return_ty)
     }
 }
