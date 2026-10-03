@@ -37,6 +37,40 @@ pub trait Db: PythonCoreDb {
     fn dyn_clone(&self) -> Box<dyn Db>;
 }
 
+/// Sets whether inference records reaching definitions throughout the database.
+///
+/// Call once when constructing a database, before running inference or creating snapshots.
+/// The setting cannot change during the database's lifetime.
+pub fn initialize_reaching_definitions_recording(
+    db: &dyn Db,
+    mode: ReachingDefinitionsRecordingMode,
+) {
+    let _ = ReachingDefinitionsRecording::builder(mode)
+        .mode_durability(salsa::Durability::NEVER_CHANGE)
+        .new(db);
+}
+
+/// Whether inference retains reaching definitions and resolution flags for each name expression.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+pub enum ReachingDefinitionsRecordingMode {
+    /// Do not record reaching definitions.
+    #[default]
+    Disabled,
+    /// Record reaching definitions whenever inference runs.
+    Enabled,
+}
+
+#[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
+struct ReachingDefinitionsRecording {
+    #[returns(copy)]
+    mode: ReachingDefinitionsRecordingMode,
+}
+
+/// Returns whether inference retains reaching definitions in this database.
+pub(crate) fn should_record_reaching_definitions(db: &dyn Db) -> bool {
+    ReachingDefinitionsRecording::get(db).mode(db) == ReachingDefinitionsRecordingMode::Enabled
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -76,11 +110,11 @@ pub(crate) mod tests {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        fn new(recording_mode: ReachingDefinitionsRecordingMode) -> Self {
             let events = Events::default();
             let vendored = ty_vendored::file_system().clone();
             let program_settings = ProgramSettings::empty(&vendored);
-            Self {
+            let db = Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
@@ -97,7 +131,9 @@ pub(crate) mod tests {
                 analysis_settings: AnalysisSettings::default().into(),
                 open_files: rustc_hash::FxHashSet::default(),
                 program_settings,
-            }
+            };
+            initialize_reaching_definitions_recording(&db, recording_mode);
+            db
         }
 
         pub(crate) fn python_version(&self) -> PythonVersion {
@@ -235,6 +271,7 @@ pub(crate) mod tests {
         /// Whether module resolution should include packages from the synthetic virtual environment.
         third_party_packages: bool,
         rule_selection: Option<RuleSelection>,
+        recording_mode: ReachingDefinitionsRecordingMode,
     }
 
     impl<'a> TestDbBuilder<'a> {
@@ -246,11 +283,20 @@ pub(crate) mod tests {
                 files: vec![],
                 third_party_packages: false,
                 rule_selection: None,
+                recording_mode: ReachingDefinitionsRecordingMode::default(),
             }
         }
 
         pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
+            self
+        }
+
+        pub(crate) fn with_reaching_definitions_recording_mode(
+            mut self,
+            mode: ReachingDefinitionsRecordingMode,
+        ) -> Self {
+            self.recording_mode = mode;
             self
         }
 
@@ -288,7 +334,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
-            let mut db = TestDb::new();
+            let mut db = TestDb::new(self.recording_mode);
 
             if let Some(selection) = self.rule_selection {
                 db.rule_selection = Arc::new(selection);

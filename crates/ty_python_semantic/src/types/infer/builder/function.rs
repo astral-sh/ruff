@@ -449,6 +449,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let decorator_inference =
             (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
+            if let Some(reaching_definitions) = &decorator_inference.reaching_definitions {
+                self.reaching_definitions
+                    .extend(reaching_definitions.iter().cloned());
+            }
             self.context.extend(decorator_inference.diagnostics());
             self.expressions
                 .extend(decorator_inference.expression_types());
