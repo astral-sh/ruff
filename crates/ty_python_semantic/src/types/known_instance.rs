@@ -12,7 +12,7 @@ use crate::{
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
-        dedicated::pydantic::ConfigBoolean,
+        dedicated::{pydantic::ConfigBoolean, re::RegexInstance},
         function::FunctionDecorators,
         generics::{Specialization, walk_generic_context},
         newtype::NewType,
@@ -293,6 +293,9 @@ pub enum KnownInstanceType<'db> {
     /// A `range(...)` call result where we could determine whether it is non-empty.
     Range { is_non_empty: bool },
 
+    /// A regular expression pattern or match with known capture groups.
+    Regex(RegexInstance<'db>),
+
     /// The bound `__call__` attribute of a precise `functools.partial(...)` result.
     FunctoolsPartialCall(FunctoolsPartialInstance<'db>),
 
@@ -318,6 +321,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         }
         KnownInstanceType::Deprecated(_)
         | KnownInstanceType::Range { .. }
+        | KnownInstanceType::Regex(_)
         | KnownInstanceType::ConstraintSet(_)
         | KnownInstanceType::GenericContext(_)
         | KnownInstanceType::Specialization(_) => {
@@ -405,6 +409,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedGeneric(context) => Some(Self::SubscriptedGeneric(context)),
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::Range { is_non_empty } => Some(Self::Range { is_non_empty }),
+            Self::Regex(regex) => Some(Self::Regex(regex)),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::ConstraintSetSolution(solution) => Some(Self::ConstraintSetSolution(solution)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
@@ -487,13 +492,17 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
             Self::Range { .. } => KnownClass::Range,
+            Self::Regex(regex) => regex.class(db),
             Self::FunctoolsPartialCall(_) => KnownClass::MethodWrapperType,
             Self::MethodWrapper(wrapper) => wrapper.class(db),
         }
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        self.class(db).to_class_literal(db, env)
+        match self {
+            Self::Regex(regex) => regex.instance_fallback(db, env).to_meta_type(db, env),
+            _ => self.class(db).to_class_literal(db, env),
+        }
     }
 
     /// Return the instance type which this type is a subtype of.
@@ -506,10 +515,10 @@ impl<'db> KnownInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        if let Self::MethodWrapper(wrapper) = self {
-            wrapper.instance_fallback(db, env)
-        } else {
-            self.class(db).to_instance(db, env)
+        match self {
+            Self::MethodWrapper(wrapper) => wrapper.instance_fallback(db, env),
+            Self::Regex(regex) => regex.instance_fallback(db, env),
+            _ => self.class(db).to_instance(db, env),
         }
     }
 
@@ -630,7 +639,7 @@ impl<'db> KnownInstanceType<'db> {
                     partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
-            KnownInstanceType::Range { .. } => match type_mapping {
+            KnownInstanceType::Range { .. } | KnownInstanceType::Regex(_) => match type_mapping {
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
                     self.instance_fallback(db, visitor.env)
                 }

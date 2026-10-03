@@ -1,0 +1,38 @@
+--- a/stdlib/re.pyi
++++ b/stdlib/re.pyi
+@@ -230,14 +230,14 @@ class Match(Generic[AnyStr]):
+         For 0 returns the entire match.
+         """
+     @overload
+-    def group(self, group: str | int, /) -> AnyStr | MaybeNone: ...
++    def group(self, group: str | int, /) -> AnyStr | None: ...
+     @overload
+-    def group(self, group1: str | int, group2: str | int, /, *groups: str | int) -> tuple[AnyStr | MaybeNone, ...]: ...
++    def group(self, group1: str | int, group2: str | int, /, *groups: str | int) -> tuple[AnyStr | None, ...]: ...
+
+     # Each item of groups()'s return tuple is either "AnyStr" or
+     # "AnyStr | None", depending on the pattern.
+     @overload
+-    def groups(self) -> tuple[AnyStr | MaybeNone, ...]:
++    def groups(self) -> tuple[AnyStr | None, ...]:
+         """Return a tuple containing all the subgroups of the match, from 1.
+
+         default
+@@ -249,7 +249,7 @@ class Match(Generic[AnyStr]):
+     # Each value in groupdict()'s return dict is either "AnyStr" or
+     # "AnyStr | None", depending on the pattern.
+     @overload
+-    def groupdict(self) -> dict[str, AnyStr | MaybeNone]:
++    def groupdict(self) -> dict[str, AnyStr | None]:
+         """Return a dictionary containing all the named subgroups of the match, keyed by the subgroup name.
+
+         default
+@@ -275,7 +275,7 @@ class Match(Generic[AnyStr]):
+     def __getitem__(self, key: Literal[0], /) -> AnyStr:
+         """Return self[key]."""
+     @overload
+-    def __getitem__(self, key: int | str, /) -> AnyStr | MaybeNone: ...
++    def __getitem__(self, key: int | str, /) -> AnyStr | None: ...
+
+     def __copy__(self) -> Match[AnyStr]: ...
+     def __deepcopy__(self, memo: Any, /) -> Match[AnyStr]: ...
