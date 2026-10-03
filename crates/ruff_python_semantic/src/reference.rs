@@ -87,6 +87,16 @@ impl ResolvedReference {
             .intersects(SemanticModelFlags::DUNDER_ALL_DEFINITION)
     }
 
+    /// Return `true` if the context is in a [PEP 695]/[PEP 696] type parameter
+    /// bound/constraint/default.
+    ///
+    /// [PEP 695]: https://peps.python.org/pep-0695/#type-parameter-declarations
+    /// [PEP 696]: https://peps.python.org/pep-0696/#grammar-changes
+    pub const fn in_type_param_definition(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::TYPE_PARAM_DEFINITION)
+    }
+
     /// Return `true` if the context is in the r.h.s. of a [PEP 613] type alias.
     ///
     /// [PEP 613]: https://peps.python.org/pep-0613/
