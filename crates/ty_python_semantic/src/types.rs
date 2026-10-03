@@ -3135,11 +3135,15 @@ impl<'db> Type<'db> {
         self.as_bool_literal().is_some()
     }
 
-    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
             Type::LiteralValue(literal) => literal.as_enum(),
             _ => None,
         }
+    }
+
+    const fn is_enum_literal(&self) -> bool {
+        self.as_enum_literal().is_some()
     }
 
     #[cfg(test)]

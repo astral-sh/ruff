@@ -745,6 +745,28 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Display the value of a literal without the surrounding `Literal[...]`.
+    pub(crate) fn display_literal_value<'env>(
+        self,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+    ) -> impl Display + 'env {
+        self.display_literal_value_with(
+            db,
+            env,
+            DisplaySettings::from_possibly_ambiguous_types(db, env, [self]),
+        )
+    }
+
+    pub(crate) fn display_literal_value_with<'env>(
+        self,
+        db: &'db dyn Db,
+        env: &'env ProgramEnvironment<'db>,
+        settings: DisplaySettings<'db>,
+    ) -> impl Display + 'env {
+        self.representation(db, env, settings)
+    }
+
     fn representation<'env>(
         self,
         db: &'db dyn Db,

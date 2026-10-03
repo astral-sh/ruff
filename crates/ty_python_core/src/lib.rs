@@ -27,6 +27,7 @@ use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
+use predicate::PatternPredicate;
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
@@ -298,6 +299,9 @@ pub struct SemanticIndex<'db> {
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+
+    /// Map from a match subject to the predicate for its last case.
+    match_patterns_by_subject: FrozenMap<ExpressionNodeKey, PatternPredicate<'db>>,
 
     /// Map from an unpacking target to its [`unpack::Unpack`] ingredient.
     unpacks_by_target: FrozenMap<ExpressionNodeKey, unpack::Unpack<'db>>,
@@ -737,6 +741,14 @@ impl<'db> SemanticIndex<'db> {
         self.expressions_by_node
             .get(&expression_key.into())
             .copied()
+    }
+
+    /// Returns the last case predicate for a match subject, if the match has any cases.
+    pub fn last_match_pattern(
+        &self,
+        subject: impl Into<ExpressionNodeKey>,
+    ) -> Option<PatternPredicate<'db>> {
+        self.match_patterns_by_subject.get(&subject.into()).copied()
     }
 
     /// Returns the [`unpack::Unpack`] ingredient for an unpacking target, if any.

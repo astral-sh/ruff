@@ -35,6 +35,7 @@ enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
 
 [tool.ty.rules]
 blanket-ignore-comment = "error"
+non-exhaustive-match = "error"
 missing-type-argument = "error"
 unsound-return-statement = "error"
 unsound-yield = "error"
