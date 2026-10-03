@@ -3,12 +3,14 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
+use ruff_python_stdlib::builtins;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::edits::pad;
+use crate::preview::is_b014_builtin_exception_hierarchy_enabled;
 use crate::registry::Rule;
 use crate::{AlwaysFixableViolation, Violation};
 use crate::{Edit, Fix};
@@ -65,6 +67,11 @@ impl Violation for DuplicateTryBlockException {
 /// ## What it does
 /// Checks for exception handlers that catch duplicate exceptions.
 ///
+/// In [preview], also checks for redundant built-in exception subclasses, such
+/// as `TimeoutError` in `except (OSError, TimeoutError)`.
+/// Hierarchy checks exclude exception groups and tuples containing expressions
+/// other than names and attribute accesses.
+///
 /// ## Why is this bad?
 /// Including the same exception multiple times in the same handler is redundant,
 /// as the first exception will catch the exception, making the second exception
@@ -76,7 +83,7 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except (Exception, ValueError):  # `Exception` includes `ValueError`.
+/// except (ValueError, ValueError):
 ///     ...
 /// ```
 ///
@@ -84,13 +91,15 @@ impl Violation for DuplicateTryBlockException {
 /// ```python
 /// try:
 ///     ...
-/// except Exception:
+/// except ValueError:
 ///     ...
 /// ```
 ///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.67", category = Category::Correctness)]
 pub(crate) struct DuplicateHandlerException {
@@ -146,7 +155,32 @@ fn duplicate_handler_exceptions<'a>(
     }
 
     if checker.is_rule_enabled(Rule::DuplicateHandlerException) {
-        // TODO(charlie): Handle "BaseException" and redundant exception aliases.
+        // TODO(charlie): Handle "BaseException" with custom exceptions and redundant exception aliases.
+        // The existing fix only retains expressions that have syntactic names.
+        // Do not introduce hierarchy fixes that would drop other expressions.
+        if is_b014_builtin_exception_hierarchy_enabled(checker.settings())
+            && elts
+                .iter()
+                .all(|elt| UnqualifiedName::from_expr(elt).is_some())
+        {
+            let builtin_exceptions: Vec<_> = unique_elts
+                .iter()
+                .filter_map(|elt| builtin_exception_name(checker, elt))
+                .collect();
+            unique_elts.retain(|elt| {
+                if let Some(child) = builtin_exception_name(checker, elt)
+                    && builtin_exceptions
+                        .iter()
+                        .any(|parent| is_exception_subclass(child, parent))
+                    && let Some(name) = UnqualifiedName::from_expr(elt)
+                {
+                    duplicates.insert(name);
+                    false
+                } else {
+                    true
+                }
+            });
+        }
         if !duplicates.is_empty() {
             let mut diagnostic = checker.report_diagnostic(
                 DuplicateHandlerException {
@@ -188,6 +222,97 @@ fn duplicate_handler_exceptions<'a>(
     }
 
     seen
+}
+
+fn builtin_exception_name<'a>(checker: &'a Checker, expr: &'a Expr) -> Option<&'a str> {
+    let semantic = checker.semantic();
+    let mut head = expr;
+    while let Expr::Attribute(attribute) = head {
+        head = &attribute.value;
+    }
+    let Expr::Name(head) = head else {
+        return None;
+    };
+    // Resolution is cached before later function-local assignments are known, including
+    // those in functions enclosing a class body. Stop at the resolved binding's scope:
+    // an import initialized before this reference remains valid even if rebound later.
+    let resolved_id = semantic.resolve_name(head)?;
+    let resolved_scope = semantic.binding(resolved_id).scope;
+    for scope_id in semantic.current_scope_ids() {
+        if scope_id == resolved_scope {
+            break;
+        }
+        let scope = &semantic.scopes[scope_id];
+        if let Some(local_id) = scope.get(&head.id) {
+            let local = semantic.binding(local_id);
+            if local.is_global() {
+                break;
+            }
+            if scope.kind.is_function() && !local.is_nonlocal() {
+                return None;
+            }
+        }
+    }
+    let qualified_name = semantic.resolve_qualified_name(expr)?;
+    match qualified_name.segments() {
+        ["" | "builtins", name]
+            if builtins::is_exception(name, checker.target_version().minor)
+                && !matches!(*name, "BaseExceptionGroup" | "ExceptionGroup") =>
+        {
+            Some(*name)
+        }
+        _ => None,
+    }
+}
+
+fn is_exception_subclass(mut child: &str, parent: &str) -> bool {
+    while let Some(base) = exception_base(child) {
+        if base == parent {
+            return true;
+        }
+        child = base;
+    }
+    false
+}
+
+/// Direct bases of built-in exceptions, excluding exception groups and aliases.
+/// See <https://docs.python.org/3/library/exceptions.html#exception-hierarchy>.
+fn exception_base(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "Exception" | "GeneratorExit" | "KeyboardInterrupt" | "SystemExit" => "BaseException",
+        "ArithmeticError" | "AssertionError" | "AttributeError" | "BufferError" | "EOFError"
+        | "ImportError" | "LookupError" | "MemoryError" | "NameError" | "OSError"
+        | "ReferenceError" | "RuntimeError" | "StopAsyncIteration" | "StopIteration"
+        | "SyntaxError" | "SystemError" | "TypeError" | "ValueError" | "Warning" => "Exception",
+        "FloatingPointError" | "OverflowError" | "ZeroDivisionError" => "ArithmeticError",
+        "ModuleNotFoundError" | "ImportCycleError" => "ImportError",
+        "IndexError" | "KeyError" => "LookupError",
+        "UnboundLocalError" => "NameError",
+        "BlockingIOError" | "ChildProcessError" | "ConnectionError" | "FileExistsError"
+        | "FileNotFoundError" | "InterruptedError" | "IsADirectoryError" | "NotADirectoryError"
+        | "PermissionError" | "ProcessLookupError" | "TimeoutError" => "OSError",
+        "BrokenPipeError"
+        | "ConnectionAbortedError"
+        | "ConnectionRefusedError"
+        | "ConnectionResetError" => "ConnectionError",
+        "NotImplementedError" | "PythonFinalizationError" | "RecursionError" => "RuntimeError",
+        "IndentationError" => "SyntaxError",
+        "TabError" => "IndentationError",
+        "UnicodeError" => "ValueError",
+        "UnicodeDecodeError" | "UnicodeEncodeError" | "UnicodeTranslateError" => "UnicodeError",
+        "BytesWarning"
+        | "DeprecationWarning"
+        | "EncodingWarning"
+        | "FutureWarning"
+        | "ImportWarning"
+        | "PendingDeprecationWarning"
+        | "ResourceWarning"
+        | "RuntimeWarning"
+        | "SyntaxWarning"
+        | "UnicodeWarning"
+        | "UserWarning" => "Warning",
+        _ => return None,
+    })
 }
 
 /// B025

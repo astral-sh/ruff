@@ -117,3 +117,20 @@ help: De-duplicate exceptions
 96 |     pass
    |
 note: This is an unsafe fix and may change runtime behavior
+
+B014 [*] Exception handler with duplicate exceptions: `OSError`, `TimeoutError`
+   --> B014.py:165:8
+    |
+163 | try:
+164 |     pass
+165 | except (TimeoutError, OSError, TimeoutError, OSError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+166 |     pass
+    |
+help: De-duplicate exceptions
+    |
+164 |     pass
+    - except (TimeoutError, OSError, TimeoutError, OSError):
+165 + except (TimeoutError, OSError):
+166 |     pass
+    |

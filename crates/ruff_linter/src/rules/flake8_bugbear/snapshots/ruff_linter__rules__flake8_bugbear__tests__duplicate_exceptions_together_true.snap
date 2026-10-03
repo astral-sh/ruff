@@ -83,6 +83,24 @@ B025 try-except* block with duplicate exception `TypeError`
 63 |     a = 2
    |
 
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+  --> B025.py:69:8
+   |
+67 | try:
+68 |     pass
+69 | except (OSError, TimeoutError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^
+70 |     pass
+71 | except TimeoutError:
+   |
+help: De-duplicate exceptions
+   |
+68 |     pass
+   - except (OSError, TimeoutError):
+69 + except OSError:
+70 |     pass
+   |
+
 B025 try-except block with duplicate exception `TimeoutError`
   --> B025.py:71:8
    |
@@ -91,6 +109,24 @@ B025 try-except block with duplicate exception `TimeoutError`
 71 | except TimeoutError:
    |        ^^^^^^^^^^^^
 72 |     pass
+   |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+  --> B025.py:84:9
+   |
+82 | try:
+83 |     pass
+84 | except* (TimeoutError, OSError):
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+85 |     pass
+86 | except* TimeoutError:
+   |
+help: De-duplicate exceptions
+   |
+83 |     pass
+   - except* (TimeoutError, OSError):
+84 + except* OSError:
+85 |     pass
    |
 
 B025 try-except* block with duplicate exception `TimeoutError`
