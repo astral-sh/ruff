@@ -5049,7 +5049,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 if let Some(last_pattern) = previous_pattern {
                     self.match_patterns_by_subject
-                        .insert(ExpressionNodeKey::from(subject.as_ref()), last_pattern);
+                        .insert(ExpressionNodeKey::from(subject), last_pattern);
                 }
 
                 for post_clause_state in post_case_snapshots {

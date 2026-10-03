@@ -50,10 +50,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return;
         };
 
-        let missing = is_finite_match_subject(db, env, subject_type)
-            .then(|| finite_values(db, env, remaining))
-            .flatten();
-
+        let missing = finite_values(db, env, remaining);
         let limit = if db.verbose() { usize::MAX } else { 3 };
 
         let message = if let Some(missing_values) = missing.as_ref()
@@ -396,47 +393,6 @@ fn is_literal_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | LiteralValueTypeKind::Bytes(_)
         | LiteralValueTypeKind::Enum(_) => true,
         LiteralValueTypeKind::LiteralString => false,
-    }
-}
-
-/// Return whether the subject is recognized as finite by the non-exhaustive-match diagnostic.
-///
-/// This determines whether the diagnostic attempts to list individual uncovered values. Literal
-/// values, unions of recognized finite types, enum instances whose members cover all their possible
-/// values, and enum complements are recognized. An intersection is finite when any of its positive
-/// components is finite. Type variables are recognized when their bounds or constraints can be
-/// enumerated, and `NewType` instances are recognized when their bases can be enumerated.
-fn is_finite_match_subject<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    ty: Type<'db>,
-) -> bool {
-    let ty = ty.expand_top_level_aliases(db, env);
-
-    if is_literal_value(db, ty) {
-        return true;
-    }
-
-    match ty {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_finite_match_subject(db, env, *element)),
-
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| is_finite_match_subject(db, env, *element)),
-
-        Type::NominalInstance(instance) => {
-            enum_member_literals(db, instance.class_literal(db, env), None).is_some()
-        }
-
-        Type::EnumComplement(_) => true,
-
-        Type::TypeVar(_) | Type::NewTypeInstance(_) => finite_values(db, env, ty).is_some(),
-
-        _ => false,
     }
 }
 
