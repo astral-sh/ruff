@@ -278,6 +278,61 @@ def __(t: HeterogeneousTupleSubclass, m: int, n: int):
     reveal_type(tuple_slice)  # revealed: tuple[I0 | I1 | I2 | I3, ...]
 ```
 
+## Slices into `NewType`s
+
+Slicing a tuple-based `NewType` produces a plain tuple with the sliced element types. The result can
+be unpacked to construct another instance of the `NewType`.
+
+```py
+from typing import NewType
+
+MyTuple = NewType("MyTuple", tuple[int, str, None])
+
+def _(t: MyTuple, end: int):
+    reveal_type(t[:2])  # revealed: tuple[int, str]
+    reveal_type(t[1:])  # revealed: tuple[str, None]
+    reveal_type(t[::-1])  # revealed: tuple[None, str, int]
+    reveal_type(t[::2])  # revealed: tuple[int, None]
+    reveal_type(t[:0])  # revealed: tuple[()]
+    reveal_type(t[:])  # revealed: tuple[int, str, None]
+    reveal_type(t[:end])  # revealed: tuple[int | str | None, ...]
+    t[::0]  # error: [zero-stepsize-in-slice]
+
+    prefix: tuple[int, str] = t[:2]
+    replaced = MyTuple((*t[:1], "replacement", *t[2:]))
+    reveal_type(replaced)  # revealed: MyTuple
+```
+
+This also works through multiple layers of `NewType`.
+
+```py
+Nested = NewType("Nested", MyTuple)
+
+def _(t: Nested):
+    reveal_type(t[:2])  # revealed: tuple[int, str]
+```
+
+## Slices into variable-length `NewType`s
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import NewType
+
+Homogeneous = NewType("Homogeneous", tuple[int, ...])
+Mixed = NewType("Mixed", tuple[int, *tuple[str, ...], bool])
+
+def _(homogeneous: Homogeneous, mixed: Mixed):
+    reveal_type(homogeneous[:0])  # revealed: tuple[()]
+    reveal_type(homogeneous[1:])  # revealed: tuple[int, ...]
+    reveal_type(mixed[:1])  # revealed: tuple[int]
+    reveal_type(mixed[1:-1])  # revealed: tuple[str, ...]
+    reveal_type(mixed[::-1])  # revealed: tuple[bool, *tuple[str, ...], int]
+```
+
 ## Slices into mixed tuples
 
 ```toml
