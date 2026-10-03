@@ -1004,6 +1004,26 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .expect("no binding found")
 }
 
+fn function_parameter_definition<'db>(
+    db: &'db TestDb,
+    file: File,
+    function_name: &str,
+    parameter_name: &str,
+) -> anyhow::Result<Definition<'db>> {
+    let definition = first_public_binding(db, file, function_name);
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        anyhow::bail!("expected a function definition");
+    };
+    let file = program_file(db, file);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let Some(parameter) = function.node(&module).parameters.find(parameter_name) else {
+        anyhow::bail!("expected parameter {parameter_name}");
+    };
+    semantic_index(db, file)
+        .try_definition(&parameter.parameter)
+        .ok_or_else(|| anyhow::anyhow!("expected a parameter definition"))
+}
+
 #[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();
@@ -1172,14 +1192,14 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
     assert_function_query_was_run(
         &db,
-        infer_function_default_types,
-        first_public_binding(&db, file, "f"),
+        infer_parameter_default_types,
+        InferParameterDefault::Bare(function_parameter_definition(&db, file, "f", "x")?),
         &events,
     );
     assert_function_query_was_not_run(
         &db,
-        infer_function_default_types,
-        first_public_binding(&db, file, "annotated"),
+        infer_parameter_default_types,
+        InferParameterDefault::Bare(function_parameter_definition(&db, file, "annotated", "x")?),
         &events,
     );
     assert_function_query_was_not_run(
@@ -1204,7 +1224,9 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     let annotations = infer_deferred_types(&db, definition);
     assert!(annotations.try_expression_type(annotation).is_some());
     assert!(annotations.try_expression_type(default).is_none());
-    let defaults = infer_function_default_types(&db, definition);
+    let parameter_definition = function_parameter_definition(&db, file, "f", "x")?;
+    let defaults =
+        infer_parameter_default_types(&db, InferParameterDefault::Bare(parameter_definition));
     assert!(defaults.try_expression_type(default).is_some());
     assert!(defaults.try_expression_type(annotation).is_none());
     assert_eq!(
@@ -1232,8 +1254,8 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
     assert_function_query_was_not_run(
         &db,
-        infer_function_default_types,
-        first_public_binding(&db, source, "f"),
+        infer_parameter_default_types,
+        InferParameterDefault::Bare(function_parameter_definition(&db, source, "f", "x")?),
         &events,
     );
 
@@ -1246,8 +1268,8 @@ fn lazy_parameter_defaults() -> anyhow::Result<()> {
     let events = db.take_salsa_events();
     assert_function_query_was_run(
         &db,
-        infer_function_default_types,
-        first_public_binding(&db, source, "f"),
+        infer_parameter_default_types,
+        InferParameterDefault::Bare(function_parameter_definition(&db, source, "f", "x")?),
         &events,
     );
 

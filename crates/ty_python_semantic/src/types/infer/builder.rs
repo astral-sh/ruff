@@ -29,10 +29,10 @@ use ty_python_core::statement::StatementInner;
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferParameterDefault,
+    InferenceRegion, OtherDefinitionInferenceExtra, ParameterDefaultContext, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_parameter_default_types, infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -561,11 +561,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn recursive_type_expression_definition(&self) -> Option<Definition<'db>> {
         self.typevar_binding_context.or(match self.region {
-            InferenceRegion::Definition(definition)
-            | InferenceRegion::FunctionDefaults(definition)
-            | InferenceRegion::Deferred(definition) => Some(definition),
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
+                Some(definition)
+            }
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
+            | InferenceRegion::ParameterDefault(..)
             | InferenceRegion::FunctionDecorators(_)
             | InferenceRegion::Scope(_, _) => None,
         })
@@ -1111,10 +1112,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::FunctionDecorators(definition) => {
                 self.infer_region_function_decorators(definition);
             }
-            InferenceRegion::FunctionDefaults(definition) => {
-                if let DefinitionKind::Function(function) = definition.kind(self.db()) {
-                    self.infer_function_defaults(definition, function.node(self.module()));
-                }
+            InferenceRegion::ParameterDefault(input) => {
+                self.apply_parameter_default_context(input.context(self.db()));
+                self.infer_parameter_default(input.parameter(self.db()));
             }
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
             InferenceRegion::Expression(expression, tcx) => {
@@ -8734,16 +8734,84 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(&lambda_expression.body, tcx);
     }
 
+    /// Capture the evaluation context inherited by a parameter default's inference region.
+    fn parameter_default_context(&self) -> ParameterDefaultContext<'db> {
+        // Keep this exhaustive so new builder state requires an explicit decision about
+        // whether it affects defaults. Only stable source identities and flags belong in
+        // the query input; field-specifier types are reconstructed in the new region.
+        let Self {
+            ref context,
+            typevar_binding_context,
+            ref dataclass_field_specifiers,
+
+            // The default's source determines its scope and deferred lookup mode. Its query
+            // owns separate inference results, caches, and cycle recovery.
+            index: _,
+            region: _,
+            scope: _,
+            deferred_state: _,
+            cycle_recovery: _,
+            expression_cache: _,
+            reachability_cache: _,
+            expressions: _,
+            comparison_truthiness: _,
+            qualifiers: _,
+            type_expression_flags: _,
+            collection_use_constraints: _,
+            string_annotations: _,
+            expected_types: _,
+            bindings: _,
+            declarations: _,
+            deferred: _,
+            return_types_and_ranges: _,
+            called_functions: _,
+            implicit_aliases: _,
+            undecorated_type: _,
+            deferred_decorator_calls: _,
+            discards_dict_key_assignments: _,
+        } = *self;
+
+        ParameterDefaultContext {
+            binding_context: typevar_binding_context,
+            flags: context.parameter_default_flags(),
+            has_field_specifiers: !dataclass_field_specifiers.is_empty(),
+        }
+    }
+
+    /// Restore a default's evaluation context without inheriting the caller's inferred types.
+    fn apply_parameter_default_context(&mut self, context: ParameterDefaultContext<'db>) {
+        let ParameterDefaultContext {
+            binding_context,
+            flags,
+            has_field_specifiers,
+        } = context;
+
+        self.typevar_binding_context = binding_context;
+        self.context.inference_flags = flags;
+        self.dataclass_field_specifiers.clear();
+        if has_field_specifiers {
+            self.setup_dataclass_field_specifiers();
+        }
+    }
+
     /// Infer a lambda default for diagnostics and retain its source when available.
     fn infer_lambda_parameter_default(
         &mut self,
         parameter: &ast::ParameterWithDefault,
     ) -> Option<ParameterDefault<'db>> {
-        let default_ty = self.infer_expression(parameter.default()?, TypeContext::default());
-        Some(self.index.try_definition(&parameter.parameter).map_or(
-            ParameterDefault::Inferred(default_ty),
-            ParameterDefault::Deferred,
-        ))
+        let default = parameter.default()?;
+        if let Some(definition) = self.index.try_definition(&parameter.parameter) {
+            let input =
+                InferParameterDefault::new(self.db(), definition, self.parameter_default_context());
+            let inference = infer_parameter_default_types(self.db(), input);
+            self.extend_expression(inference);
+            Some(ParameterDefault::Deferred(input))
+        } else {
+            // Lambdas parsed from string annotations have no indexed parameter definitions.
+            Some(ParameterDefault::Inferred(
+                self.infer_expression(default, TypeContext::default()),
+            ))
+        }
     }
 
     fn infer_lambda_expression(

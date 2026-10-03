@@ -83,6 +83,14 @@ def test() -> int:
     return a + 5
 ```
 
+Defaults of lambdas used as decorators follow the same rule:
+
+```py
+@no_type_check
+@lambda value=missing: value
+def test(): ...
+```
+
 ## Error in preceding decorator expression
 
 We don't suppress diagnostics for decorator expressions appearing before the `no_type_check`
@@ -97,6 +105,14 @@ def test() -> int:
     return a + 5
 ```
 
+The default of a lambda used as an earlier decorator still reports errors:
+
+```py
+@lambda value=missing: value  # error: [unresolved-reference]
+@no_type_check
+def test(): ...
+```
+
 ## Error in default value
 
 ```py
@@ -105,6 +121,25 @@ from typing import no_type_check
 @no_type_check
 def test(a: int = "test"):
     return x + 5
+```
+
+## Errors in lambda defaults
+
+Errors in a function's default values remain suppressed when those values contain lambdas with their
+own defaults:
+
+```py
+from typing import no_type_check
+
+@no_type_check
+def nested(callback=lambda outer=(lambda inner=missing: inner): outer): ...
+```
+
+Type reveals are still reported:
+
+```py
+@no_type_check
+def revealed(callback=lambda value=reveal_type(1): None): ...  # revealed: Literal[1]
 ```
 
 ## Error in return value position
@@ -156,4 +191,12 @@ from typing import no_type_check
 def test():
     # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
     return x + 5  # ty: ignore[unresolved-reference]
+```
+
+An ignore comment on a suppressed lambda default is also unused:
+
+```py
+@no_type_check
+# error: [unused-ignore-comment] "Unused `ty: ignore` directive"
+def default(callback=lambda value=missing: None): ...  # ty: ignore[unresolved-reference]
 ```

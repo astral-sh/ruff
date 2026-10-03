@@ -2321,5 +2321,16 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Lambda defaults in generic base metadata
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the subclass's type parameters:
+
+```py
+from typing import Annotated, cast
+
+class Base[T]: ...
+class Derived[T](Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

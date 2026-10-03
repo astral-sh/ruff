@@ -32,7 +32,8 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::infer::{
-    TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
+    InferParameterDefault, ParameterDefaultContext, TypeExpressionFlags, infer_deferred_types,
+    infer_parameter_default_types, parameter_with_default,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -52,9 +53,7 @@ use crate::types::{
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
-use ty_python_core::definition::{
-    Definition, DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
-};
+use ty_python_core::definition::Definition;
 
 /// Selects which binding context to use for type variables that only appear in a return-position
 /// `Callable`.
@@ -5151,7 +5150,11 @@ impl<'db> Parameters<'db> {
         let index = semantic_index(db, definition.program_file(db));
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+                ParameterDefault::Deferred(InferParameterDefault::new(
+                    db,
+                    index.expect_single_definition(&param.parameter),
+                    ParameterDefaultContext::default(),
+                ))
             })
         };
 
@@ -6076,6 +6079,14 @@ impl<'db> Parameter<'db> {
         self.default().map(|default| default.ty(db))
     }
 
+    /// Infer the default without stripping defaults from nested callable types.
+    pub(crate) fn default_type_for_inference(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.default().map(|default| match default {
+            ParameterDefault::Inferred(ty) => ty,
+            ParameterDefault::Deferred(input) => raw_parameter_default_type(db, input),
+        })
+    }
+
     /// Returns a default type stored directly in the signature, without running inference.
     /// Deferred source defaults return `None`, even if their type is already cached. Use
     /// [`Self::default_type`] when the actual default type is needed.
@@ -6098,21 +6109,21 @@ impl<'db> Parameter<'db> {
 
 /// A parameter default whose presence is known without evaluating its type.
 ///
-/// Defaults on function definitions retain the parameter's stable definition identity. Synthesized
+/// Source defaults retain the parameter's stable identity and evaluation context. Synthesized
 /// signatures, including partially applied callables, can instead supply an already inferred type.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub enum ParameterDefault<'db> {
     /// An already inferred default.
     Inferred(Type<'db>),
     /// A source parameter whose default is inferred on demand.
-    Deferred(Definition<'db>),
+    Deferred(InferParameterDefault<'db>),
 }
 
 impl<'db> ParameterDefault<'db> {
     fn ty(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Inferred(ty) => ty,
-            Self::Deferred(parameter) => parameter_default_type(db, parameter),
+            Self::Deferred(input) => parameter_default_type(db, input),
         }
     }
 
@@ -6136,47 +6147,32 @@ impl<'db> ParameterDefault<'db> {
 #[salsa::tracked(
     returns(copy),
     cycle_initial=|_, id, _| Type::divergent(id),
-    cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
-        ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
+    cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, input: InferParameterDefault<'db>| {
+        ty.cycle_normalized(db, &ProgramEnvironment::from_definition(input.parameter(db)), *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> Type<'db> {
-    match parameter.kind(db) {
-        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
-            let Some(function) = parameter.scope(db).node(db).as_function() else {
-                return Type::unknown();
-            };
-            let program_file = parameter.program_file(db);
-            let function = semantic_index(db, program_file).expect_single_definition(function);
-            let module = parsed_module(db, program_file.python_file(db)).load(db);
-            let Some(default) = node.node(&module).default() else {
-                return Type::unknown();
-            };
-            // Use the function's default inference so the default retains its annotation context.
-            // Nested callable defaults still need the existing cycle-breaking normalization.
-            infer_function_default_types(db, function)
-                .expression_type(default)
-                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
-        }
-        DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
-            parameter: ParameterDefinitionNodeKind::Parameter(node),
-            ..
-        }) => {
-            let file = parameter.program_file(db);
-            let module = parsed_module(db, file.python_file(db)).load(db);
-            let Some(default) = node.node(&module).default() else {
-                return Type::unknown();
-            };
-            let scope = semantic_index(db, file)
-                .expression_scope_id(default)
-                .to_scope_id(db, file);
-            infer_complete_scope_types(db, scope)
-                .expression_type(default)
-                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
-        }
-        _ => Type::unknown(),
-    }
+fn parameter_default_type<'db>(db: &'db dyn Db, input: InferParameterDefault<'db>) -> Type<'db> {
+    raw_parameter_default_type(db, input).replace_parameter_defaults(
+        db,
+        &ProgramEnvironment::from_definition(input.parameter(db)),
+    )
+}
+
+/// Read the source default before normalization for signature display and comparison.
+fn raw_parameter_default_type<'db>(
+    db: &'db dyn Db,
+    input: InferParameterDefault<'db>,
+) -> Type<'db> {
+    let parameter = input.parameter(db);
+    let file = parameter.program_file(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let Some(default) =
+        parameter_with_default(db, parameter, &module).and_then(ast::ParameterWithDefault::default)
+    else {
+        return Type::unknown();
+    };
+    infer_parameter_default_types(db, input).expression_type(default)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]

@@ -45,7 +45,7 @@
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
@@ -66,7 +66,9 @@ use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{
+    Definition, DefinitionKind, LambdaParameterDefinitionNodeKind, ParameterDefinitionNodeKind,
+};
 use ty_python_core::expression::Expression;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::statement::StatementInner;
@@ -396,7 +398,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 ///
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
-/// Function parameter defaults are inferred separately by [`infer_function_default_types`].
+/// Parameter defaults are inferred separately by [`infer_parameter_default_types`].
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
@@ -438,26 +440,28 @@ pub(crate) fn infer_deferred_types<'db>(
     .finish_definition(definition)
 }
 
-/// Infer a function's parameter defaults without retaining its annotation types.
+/// Infer a parameter's default in its own inference region.
 ///
 /// Callable signature checking only needs to know which parameters are optional. Inferring their
 /// default values while inferring annotations can re-enter the decorated function's own signature.
-/// Keeping the results separate also avoids caching annotation expressions twice.
+/// Lambda parameter types also depend on their defaults, so looking up a default must not infer
+/// the enclosing scope, which may itself depend on the lambda's return type.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    cycle_initial=|db, id, input: InferParameterDefault<'db>| {
+        ExpressionInference::cycle_initial(parameter_default_scope(db, input.parameter(db)), Type::divergent(id))
     },
-    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        inference.cycle_normalized(db, previous, cycle, definition)
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferParameterDefault<'db>| {
+        inference.cycle_normalized(db, &ProgramEnvironment::from_definition(input.parameter(db)), previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn infer_function_default_types<'db>(
+pub(crate) fn infer_parameter_default_types<'db>(
     db: &'db dyn Db,
-    definition: Definition<'db>,
-) -> DefinitionInference<'db> {
-    let program_file = definition.program_file(db);
+    input: InferParameterDefault<'db>,
+) -> ExpressionInference<'db> {
+    let parameter = input.parameter(db);
+    let program_file = parameter.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
     let index = semantic_index(db, program_file);
@@ -466,13 +470,112 @@ pub(crate) fn infer_function_default_types<'db>(
     TypeInferenceBuilder::new(
         db,
         &env,
-        InferenceRegion::FunctionDefaults(definition),
+        InferenceRegion::ParameterDefault(input),
         python_file.file(db),
         program_file,
         index,
         &module,
     )
-    .finish_definition(definition)
+    .finish_expression()
+}
+
+/// A source parameter default together with the context chosen by its enclosing inference.
+///
+/// Defaults without inherited context use the parameter's existing identity directly.
+/// The context contains source identities and flags, so recursive types cannot create a new
+/// query input on every cycle iteration.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, salsa::SalsaValue, salsa::Supertype)]
+pub enum InferParameterDefault<'db> {
+    Bare(Definition<'db>),
+    WithContext(ParameterDefaultWithContext<'db>),
+}
+
+impl<'db> InferParameterDefault<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        parameter: Definition<'db>,
+        context: ParameterDefaultContext<'db>,
+    ) -> Self {
+        if context == ParameterDefaultContext::default() {
+            Self::Bare(parameter)
+        } else {
+            Self::WithContext(ParameterDefaultWithContext::new(db, parameter, context))
+        }
+    }
+
+    pub(crate) fn parameter(self, db: &'db dyn Db) -> Definition<'db> {
+        match self {
+            Self::Bare(parameter) => parameter,
+            Self::WithContext(input) => input.parameter(db),
+        }
+    }
+
+    fn context(self, db: &'db dyn Db) -> ParameterDefaultContext<'db> {
+        match self {
+            Self::Bare(_) => ParameterDefaultContext::default(),
+            Self::WithContext(input) => input.context(db),
+        }
+    }
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InferParameterDefault<'_> {}
+
+/// A default whose inherited context cannot be recovered from its parameter alone.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct ParameterDefaultWithContext<'db> {
+    #[returns(copy)]
+    parameter: Definition<'db>,
+    #[returns(copy)]
+    context: ParameterDefaultContext<'db>,
+}
+
+/// The inference context in which a source parameter default is evaluated.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct ParameterDefaultContext<'db> {
+    binding_context: Option<Definition<'db>>,
+    flags: InferenceFlags,
+    has_field_specifiers: bool,
+}
+
+impl Default for ParameterDefaultContext<'_> {
+    fn default() -> Self {
+        Self {
+            binding_context: None,
+            flags: InferenceFlags::empty(),
+            has_field_specifiers: false,
+        }
+    }
+}
+
+/// Return the source parameter for either a function or a lambda default.
+pub(super) fn parameter_with_default<'ast>(
+    db: &dyn Db,
+    parameter: Definition,
+    module: &'ast ParsedModuleRef,
+) -> Option<&'ast ast::ParameterWithDefault> {
+    match parameter.kind(db) {
+        DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node))
+        | DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
+            parameter: ParameterDefinitionNodeKind::Parameter(node),
+            ..
+        }) => Some(node.node(module)),
+        _ => None,
+    }
+}
+
+/// Defaults are evaluated outside the callable's body and type-parameter scopes.
+fn parameter_default_scope<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> ScopeId<'db> {
+    let file = parameter.program_file(db);
+    let module = parsed_module(db, file.python_file(db)).load(db);
+    let Some(default) =
+        parameter_with_default(db, parameter, &module).and_then(ast::ParameterWithDefault::default)
+    else {
+        return parameter.scope(db);
+    };
+    semantic_index(db, file)
+        .expression_scope_id(default)
+        .to_scope_id(db, file)
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -994,8 +1097,8 @@ pub(crate) enum InferenceRegion<'db> {
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
     FunctionDecorators(Definition<'db>),
-    /// Infer a function's parameter default values, but not its annotations.
-    FunctionDefaults(Definition<'db>),
+    /// Infer one function or lambda parameter's default, but not its annotation.
+    ParameterDefault(InferParameterDefault<'db>),
     /// infer deferred types for a [`Definition`]
     Deferred(Definition<'db>),
     /// infer types for an entire [`ScopeId`]
@@ -1009,8 +1112,10 @@ impl<'db> InferenceRegion<'db> {
             InferenceRegion::Expression(expression, _) => expression.scope(db),
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
-            | InferenceRegion::FunctionDefaults(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),
+            InferenceRegion::ParameterDefault(input) => {
+                parameter_default_scope(db, input.parameter(db))
+            }
             InferenceRegion::Scope(scope, _) => scope,
         }
     }
