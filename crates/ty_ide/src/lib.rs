@@ -22,7 +22,6 @@ mod hover;
 mod importer;
 mod inlay_hints;
 mod markup;
-#[cfg(test)]
 mod pytest_test_discovery;
 mod references;
 mod rename;
@@ -55,6 +54,9 @@ pub use inlay_hints::{
     InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
 };
 pub use markup::MarkupKind;
+pub use pytest_test_discovery::{
+    DiscoveredPytestTest, DiscoveredPytestTestKind, discover_pytest_tests,
+};
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
 pub use selection_range::selection_range;
