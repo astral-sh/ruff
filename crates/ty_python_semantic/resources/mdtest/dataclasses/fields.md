@@ -48,6 +48,23 @@ class AnyInitFalseField:
 reveal_type(AnyInitFalseField.__init__)  # revealed: (self: AnyInitFalseField, key: str | None) -> None
 ```
 
+## Field specifiers assigned by unpacking
+
+A field specifier assigned through unpacking still controls the generated `__init__` method. The
+field is excluded when `init=False`, even though its annotation and default are supplied by separate
+statements.
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Example:
+    value: int
+    value, other = field(default=1, init=False), 0
+
+reveal_type(Example.__init__)  # revealed: (self: Example) -> None
+```
+
 ## Inheritance with defaults
 
 ```py

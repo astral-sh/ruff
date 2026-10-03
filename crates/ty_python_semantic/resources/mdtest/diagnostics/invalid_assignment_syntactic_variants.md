@@ -196,6 +196,53 @@ error[invalid-assignment]: Object of type `Literal[b"three"]` is not assignable 
   |     Declared type `int | str`
 ```
 
+## Conflicting declarations on unpacked targets
+
+An unpacked name can have different declarations on separate branches. The assignment reports one
+conflicting-declarations diagnostic for that target, as well as an invalid assignment if the value
+is incompatible with both types.
+
+```py
+def assign(flag: bool) -> None:
+    if flag:
+        x: int
+    else:
+        x: str
+
+    # error: [conflicting-declarations]
+    # error: [invalid-assignment]
+    x, other = (b"three", 0)
+```
+
+A starred target with conflicting element types likewise reports the conflict only once.
+
+```py
+def capture(flag: bool) -> None:
+    if flag:
+        rest: list[int]
+    else:
+        rest: list[str]
+
+    # error: [conflicting-declarations]
+    (*rest,) = (1,)
+```
+
+## Implicit class and function bindings through unpacking
+
+A class or function supplies an implicit type for its name.
+
+```py
+class Item: ...
+
+def operation() -> None: ...
+
+# error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `<class 'Item'>` (declared type of variable `Item`)"
+Item, other = (1, 0)
+
+# error: [invalid-assignment] "Object of type `Literal[2]` is not assignable to `def operation() -> None` (declared type of variable `operation`)"
+operation, other = (2, 0)
+```
+
 ## Equivalent declarations
 
 When distinct branches declare the same type, neither annotation is the unique source of the
@@ -502,8 +549,9 @@ error[invalid-assignment]: Object of type `Literal["wrong"]` is not assignable t
 
 ## Values assigned to starred unpacking targets
 
-A starred target collects a slice of values into a new list. Incompatible elements in that slice can
-still be identified individually.
+A starred target collects a slice of values into a new list. The headline compares that list's
+inferred type with the annotated target type. The primary annotation uses the captured values'
+source types, even when contextual inference widens the collected list's element type.
 
 ```py
 middle: list[int]
@@ -511,21 +559,21 @@ first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `list[str]` is not assignable to `list[int]`
+error[invalid-assignment]: Object of type `list[int | str]` is not assignable to `list[int]`
  --> src/mdtest_snippet.py:2:28
   |
 1 | middle: list[int]
   |         --------- Declared type
 2 | first, *middle, last = (1, "wrong", 2)  # snapshot: invalid-assignment
-  |         ------             ^^^^^^^ Incompatible iterable element of type `str` (expected `int`)
+  |         ------             ^^^^^^^ Incompatible iterable element of type `Literal["wrong"]` (expected `int`)
   |         |
   |         Assigned to this variable
 ```
 
 ## Multiple values assigned to starred unpacking targets
 
-When a starred target collects several values, the diagnostic highlights the entire collected slice
-without including values assigned to the surrounding targets.
+When a starred target collects several values, the primary annotation highlights the whole capture
+and reports the union of its source types. Values assigned to the surrounding targets are excluded.
 
 ```py
 middle: list[int]
@@ -539,10 +587,113 @@ error[invalid-assignment]: Object of type `list[int | str]` is not assignable to
 1 | middle: list[int]
   |         --------- Declared type
 2 | first, *middle, last = 1, 2, 3, "wrong", 4  # snapshot: invalid-assignment
-  |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `int | str` (expected `int`)
+  |         ------            ^^^^^^^^^^^^^ Incompatible iterable element of type `Literal[2, 3, "wrong"]` (expected `int`)
   |         |
   |         Assigned to this variable
-info: element `str` of union `int | str` is not assignable to `int`
+info: element `Literal["wrong"]` of union `Literal[2, 3, "wrong"]` is not assignable to `int`
+```
+
+Concise output compares the inferred list type with the annotated target type and names the target
+variable, since it does not include the secondary annotation pointing to that target:
+
+```py
+# error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]` (declared type of variable `middle`)"
+first, *middle, last = [1, 2, "wrong", 3]
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[3]
+```
+
+## Multiple incompatible captured elements
+
+When several captured values are incompatible, the primary annotation includes all their types and
+highlights the full capture.
+
+```py
+middle: list[int]
+first, *middle, last = [1, "wrong", b"also wrong", 2]  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[1]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[2]
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `list[int | str | bytes]` is not assignable to `list[int]`
+ --> src/mdtest_snippet.py:2:28
+  |
+1 | middle: list[int]
+  |         --------- Declared type
+2 | first, *middle, last = [1, "wrong", b"also wrong", 2]  # snapshot: invalid-assignment
+  |         ------             ^^^^^^^^^^^^^^^^^^^^^^ Incompatible iterable element of type `Literal["wrong", b"also wrong"]` (expected `int`)
+  |         |
+  |         Assigned to this variable
+info: element `Literal["wrong"]` of union `Literal["wrong", b"also wrong"]` is not assignable to `int`
+```
+
+Concise diagnostics name the target variable when unpacking a tuple:
+
+```py
+# error: [invalid-assignment] "Object of type `list[int | str | bytes]` is not assignable to `list[int]` (declared type of variable `middle`)"
+first, *middle, last = (0, 1, "wrong", 2, b"also wrong", 3, 4)
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int]
+reveal_type(last)  # revealed: Literal[4]
+```
+
+## Captured elements with incompatible mutable types
+
+An explicitly annotated mutable value retains its declared type. The diagnostic explains why the
+collected element type is incompatible with the annotated element type.
+
+```py
+values: list[int] = [1]
+middle: list[list[object]]
+first, *middle, last = (0, [], values, 1)  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[list[object]]
+reveal_type(last)  # revealed: Literal[1]
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `list[list[object] | list[int]]` is not assignable to `list[list[object]]`
+ --> src/mdtest_snippet.py:3:28
+  |
+2 | middle: list[list[object]]
+  |         ------------------ Declared type
+3 | first, *middle, last = (0, [], values, 1)  # snapshot: invalid-assignment
+  |         ------             ^^^^^^^^^^ Incompatible iterable element of type `list[object] | list[int]` (expected `list[object]`)
+  |         |
+  |         Assigned to this variable
+info: element `list[int]` of union `list[object] | list[int]` is not assignable to `list[object]`
+```
+
+## Incompatible captured collection
+
+`middle` is declared as either a list of integers or a list of strings. A capture containing both is
+incompatible with that declaration, so the diagnostic highlights the captured values and reports the
+list's type.
+
+```py
+middle: list[int] | list[str]
+first, *middle, last = (0, 1, "wrong", 2)  # snapshot: invalid-assignment
+reveal_type(first)  # revealed: Literal[0]
+reveal_type(middle)  # revealed: list[int] | list[str]
+reveal_type(last)  # revealed: Literal[2]
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `list[int | str]` is not assignable to `list[int] | list[str]`
+ --> src/mdtest_snippet.py:2:28
+  |
+1 | middle: list[int] | list[str]
+  |         --------------------- Declared type
+2 | first, *middle, last = (0, 1, "wrong", 2)  # snapshot: invalid-assignment
+  |         ------             ^^^^^^^^^^ Incompatible value of type `list[int | str]`
+  |         |
+  |         Assigned to this variable
+info: type `list[int | str]` is not assignable to any element of the union `list[int] | list[str]`
+info: ├── element `str` of union `int | str` is not assignable to `int`
+info: └── element `int` of union `int | str` is not assignable to `str`
 ```
 
 ## Opaque unpacking values
