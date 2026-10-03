@@ -2702,3 +2702,407 @@ class ConcreteStatus(Generic[T], TaskStatus[T]):
     def started(self: "ConcreteStatus[T]", value: T) -> None: ...
     def started(self, value: T | None = None) -> None: ...
 ```
+
+## Explicit staticmethod wrappers
+
+Assigning `staticmethod(function)` exposes the function's signature. An override can wrap a
+different function with a compatible signature, just as an `@staticmethod` definition can.
+
+```py
+def first(value: int) -> int:
+    return value
+
+def second(value: int) -> int:
+    return value + 1
+
+def incompatible(value: str) -> str:
+    return value
+
+class Base:
+    method = staticmethod(first)
+
+class Compatible(Base):
+    method = staticmethod(second)
+
+class Incompatible(Base):
+    method = staticmethod(incompatible)  # error: [invalid-attribute-override]
+
+Base.method = staticmethod(second)
+reveal_type(Compatible().method(1))  # revealed: int
+```
+
+## Attribute value types
+
+An overriding attribute must expose a value compatible with the superclass annotation. Mutable
+narrowing is allowed by default, but incompatible readable types are rejected.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```py
+class AttributeBase:
+    value: int
+
+class IncompatibleAttribute(AttributeBase):
+    value: str  # snapshot: invalid-attribute-override
+
+class InitializedAttribute(AttributeBase):
+    value = 1
+
+class NarrowedAttribute(AttributeBase):
+    value: bool  # Mutable narrowing is allowed by default.
+```
+
+```snapshot
+error[invalid-attribute-override]: Invalid override of attribute `value`
+ --> src/mdtest_snippet.py:5:5
+  |
+2 |     value: int
+  |     ----- `AttributeBase.value` declared here
+3 |
+4 | class IncompatibleAttribute(AttributeBase):
+5 |     value: str  # snapshot: invalid-attribute-override
+  |     ^^^^^ Type `str` is not assignable to inherited type `int`
+```
+
+## Mutable attribute narrowing
+
+When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
+superclass. An `Any` annotation remains gradually compatible in either direction.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    value: int
+    shared: ClassVar[int]
+
+class Narrow(Base):
+    value: bool  # error: [invalid-mutable-override]
+    shared: ClassVar[bool]  # error: [invalid-mutable-override]
+
+class Gradual(Base):
+    value: Any
+    shared: ClassVar[Any]
+
+class Same(Base):
+    value: int
+    shared: ClassVar[int]
+```
+
+## Property value types
+
+Read-only properties may narrow their result types. They cannot return an unrelated type, even when
+the declarations are in a stub file.
+
+```pyi
+class Base:
+    @property
+    def value(self) -> int: ...
+
+class Narrow(Base):
+    @property
+    def value(self) -> bool: ...
+
+class Incompatible(Base):
+    @property
+    def value(self) -> str: ...  # snapshot: invalid-property-type-override
+```
+
+```snapshot
+error[invalid-property-type-override]: Invalid override of attribute `value`
+  --> src/mdtest_snippet.pyi:11:9
+   |
+11 |     def value(self) -> str: ...  # snapshot: invalid-property-type-override
+   |         ^^^^^ Type `str` is not assignable to inherited type `int`
+   |
+  ::: src/mdtest_snippet.pyi:3:9
+   |
+ 3 |     def value(self) -> int: ...
+   |         ----- `Base.value` declared here
+```
+
+## Property setters
+
+An override can widen a setter's accepted type, but it cannot narrow that type or remove the setter.
+The getter and setter are checked independently.
+
+```py
+class Base:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+
+class Wider(Base):
+    @property
+    def value(self) -> bool:
+        return True
+
+    @value.setter
+    def value(self, value: object) -> None: ...
+
+class Narrower(Base):
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: bool) -> None: ...  # error: [invalid-property-type-override]
+
+class ReadOnly(Base):
+    @property
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
+```
+
+## Removing attribute writes
+
+Replacing a mutable attribute with a read-only property or a final attribute removes an operation
+promised by the superclass. A property with a compatible setter preserves it.
+
+```py
+from typing import Final
+
+class Base:
+    value: int
+
+class ReadOnly(Base):
+    @property
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
+
+class FinalOverride(Base):
+    value: Final[int] = 0  # error: [invalid-attribute-override]
+
+class Writable(Base):
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None: ...
+```
+
+## Frozen fields overriding neutral dataclass-transform bases
+
+A base decorated with `dataclass_transform`, or explicitly using its metaclass, permits frozen
+subclasses. Those subclasses can make inherited fields read-only, but must preserve their read
+types. An ordinary base does not grant this exception.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class Neutral(metaclass=ModelMeta):
+    value: int
+
+class Frozen(Neutral):
+    value: int
+
+class Incompatible(Neutral):
+    value: str  # error: [invalid-attribute-override]
+
+@dataclass_transform(frozen_default=True)
+class NeutralBase:
+    value: int
+
+class FrozenChild(NeutralBase):
+    value: int
+
+class Ordinary:
+    value: int
+
+@dataclass(frozen=True)
+class Invalid(Ordinary):
+    value: int  # error: [invalid-attribute-override]
+
+def check(base: Neutral, child: Frozen) -> None:
+    base.value = 1
+    child.value = 1  # error: [invalid-assignment]
+```
+
+## Descriptors preserving instance access
+
+A descriptor may replace an ordinary attribute when its instance reads and writes preserve the
+inherited types. Class access can expose the descriptor itself; we allow that difference for
+attributes that are not explicitly declared as `ClassVar`. The subclass explicitly annotates the
+descriptor to introduce its own contract; an unannotated default would retain the inherited value
+annotation.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> str:
+        return ""
+
+    def __set__(self, instance: object, value: str) -> None: ...
+
+class Base:
+    value: str
+
+class Child(Base):
+    value: Descriptor = Descriptor()
+```
+
+## Slot and descriptor read contracts
+
+A slot exposes its stored value through an instance. Its class-level descriptor is not the
+attribute's value type, including when another base supplies a declaration or property.
+
+```py
+class Slots:
+    __slots__ = ("value",)
+
+class Declared:
+    value: int
+
+class Combined(Declared, Slots): ...
+
+class Readable:
+    @property
+    def value(self) -> int:
+        return 0
+
+class SlotProperty(Slots, Readable): ...
+
+class ReceiverDeclaration(Slots):
+    def __init__(self, value: int) -> None:
+        self.value: int = value
+
+def check(slot: Slots, child: ReceiverDeclaration) -> None:
+    slot.value = 1
+    reveal_type(child.value)  # revealed: int
+```
+
+An annotation whose type implements `__get__` can also describe an instance-stored descriptor
+object. Ordinary reads include that object alongside its getter result. Replacing this storage with
+a slot preserves those possible reads.
+
+```py
+from dataclasses import dataclass
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+
+class Base:
+    value: Descriptor
+
+class Slotted(Base):
+    __slots__ = ("value",)
+    value: Descriptor
+
+@dataclass(slots=True)
+class Generated(Base):
+    value: Descriptor = Descriptor()
+
+class Incompatible(Base):
+    __slots__ = ("value",)
+    value: str  # error: [invalid-attribute-override]
+
+def read(base: Base, slot: Slotted, generated: Generated) -> None:
+    reveal_type(base.value)  # revealed: int | Descriptor
+    reveal_type(slot.value)  # revealed: Descriptor
+    reveal_type(generated.value)  # revealed: Descriptor
+```
+
+## Descriptor setters cannot narrow accepted writes
+
+An explicit descriptor annotation establishes its own write type. Its setter must accept every value
+that the inherited attribute accepts. The same restriction applies when assigning the subclass to a
+protocol with that writable attribute.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+from typing import Protocol
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 0
+
+    def __set__(self, instance: object, value: bool) -> None: ...
+
+class Base:
+    value: int
+
+class Child(Base):
+    value: Descriptor = Descriptor()  # error: [invalid-mutable-override]
+
+class HasValue(Protocol):
+    value: int
+
+def check(child: Child) -> None:
+    child.value = True
+    child.value = 1  # error: [invalid-assignment]
+    value: HasValue = child  # error: [invalid-assignment]
+```
+
+## Descriptor decorators
+
+A decorator can turn a function into an attribute descriptor. Its getter result must preserve the
+inherited read type, just as for a descriptor assigned directly in the class body. A
+`cached_property` can also be shadowed by an instance assignment of the same type.
+
+```py
+from functools import cached_property
+from typing import Protocol
+
+class Base:
+    value: int
+
+class Compatible(Base):
+    @cached_property
+    def value(self) -> int:
+        return 0
+
+class Incompatible(Base):
+    @cached_property
+    def value(self) -> str:  # error: [invalid-attribute-override]
+        return ""
+
+class HasValue(Protocol):
+    value: int
+
+def check(good: Compatible, bad: Incompatible) -> None:
+    good.value = 1
+    value: HasValue = good
+    value = bad  # error: [invalid-assignment]
+```
+
+## Independent attribute override rules
+
+Property checking still applies when the method and ordinary attribute rules are disabled.
+
+```toml
+[rules]
+invalid-method-override = "ignore"
+invalid-attribute-override = "ignore"
+invalid-mutable-override = "ignore"
+invalid-property-type-override = "error"
+```
+
+```pyi
+class Base:
+    @property
+    def value(self) -> int: ...
+
+class Child(Base):
+    @property
+    def value(self) -> str: ...  # error: [invalid-property-type-override]
+```

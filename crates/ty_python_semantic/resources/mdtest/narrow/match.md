@@ -1262,10 +1262,10 @@ class Holder:
     value: object
 
 class IntHolder(Holder):
-    value: int
+    value: int  # error: [invalid-mutable-override]
 
 class StrHolder(Holder):
-    value: str
+    value: str  # error: [invalid-mutable-override]
 
 def filter_holders(holder: IntHolder | StrHolder) -> None:
     match holder:
@@ -2069,7 +2069,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str
+    member: str  # error: [invalid-attribute-override]
 
 class GenericListOverlapA: ...
 
