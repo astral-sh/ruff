@@ -4,6 +4,7 @@ use rustc_hash::FxHashSet;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::context_manager::may_suppress_exceptions;
 use ruff_text_size::{Ranged, TextRange};
 
 #[derive(Default)]
@@ -232,19 +233,5 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
 ///     return data
 /// ```
 pub(crate) fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
-    with.items.iter().any(|item| {
-        let ast::WithItem {
-            context_expr: Expr::Call(ast::ExprCall { func, .. }),
-            ..
-        } = item
-        else {
-            return false;
-        };
-        if let Some(qualified_name) = semantic.resolve_qualified_name(func) {
-            if qualified_name.segments() == ["contextlib", "suppress"] {
-                return true;
-            }
-        }
-        false
-    })
+    may_suppress_exceptions(with, semantic)
 }
