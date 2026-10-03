@@ -7199,6 +7199,106 @@ def valid(value: Chain[Iterable[int]]) -> None:
     reveal_type(value.flatten())  # revealed: Chain[int]
 ```
 
+### Structurally equivalent recursive protocol specializations as receivers
+
+The type parameter appears only in a recursive reference to `Node`, so `Node[str]` satisfies the
+`Node[int]` receiver of `read` structurally. This holds for both type parameter syntaxes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+
+class Node[T](Protocol):
+    def child(self) -> Node[T]: ...
+    def read(self: Node[int]) -> int: ...
+
+class Readable(Protocol):
+    def read(self) -> int: ...
+
+def check(node: Node[str]) -> Readable:
+    return node  # no diagnostic
+
+T = TypeVar("T", covariant=True)
+
+class LegacyNode(Protocol[T]):
+    def child(self) -> LegacyNode[T]: ...
+    def read(self: LegacyNode[int]) -> int: ...
+
+def check_legacy(node: LegacyNode[str]) -> Readable:
+    return node  # no diagnostic
+```
+
+Matching receiver annotations do not make specializations equivalent if neither specialization
+satisfies the receiver type:
+
+```py
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class InvalidReceiver[T](Protocol):
+    def child(self) -> InvalidReceiver[T]: ...
+    def read(self: str) -> int: ...
+
+static_assert(not is_subtype_of(InvalidReceiver[str], InvalidReceiver[int]))
+static_assert(not is_subtype_of(Top[InvalidReceiver[int]], InvalidReceiver[int]))
+
+class LegacyInvalidReceiver(Protocol[T]):
+    def child(self) -> LegacyInvalidReceiver[T]: ...
+    def read(self: str) -> int: ...
+
+static_assert(not is_subtype_of(LegacyInvalidReceiver[str], LegacyInvalidReceiver[int]))
+static_assert(not is_subtype_of(Top[LegacyInvalidReceiver[int]], LegacyInvalidReceiver[int]))
+```
+
+The receiver must satisfy the whole annotation, even when it contains a recursive reference:
+
+```py
+class WrappedReceiver[T](Protocol):
+    def child(self) -> WrappedReceiver[T]: ...
+    def read(self: tuple[WrappedReceiver[int], int]) -> int: ...
+
+static_assert(not is_subtype_of(WrappedReceiver[str], WrappedReceiver[int]))
+static_assert(not is_subtype_of(Top[WrappedReceiver[int]], WrappedReceiver[int]))
+
+class LegacyWrappedReceiver(Protocol[T]):
+    def child(self) -> LegacyWrappedReceiver[T]: ...
+    def read(self: tuple[LegacyWrappedReceiver[int], int]) -> int: ...
+
+static_assert(not is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[int]))
+static_assert(not is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
+```
+
+### Materialized protocol receivers
+
+Materialization of a protocol receiver changes the type of its gradual members. A top-materialized
+receiver cannot satisfy the bottom-materialized requirement.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_assignable_to, is_subtype_of
+
+class Source(Protocol):
+    def value(self) -> Any: ...
+    def read(self) -> int: ...
+
+class Target(Protocol):
+    def read(self: Source) -> int: ...
+
+static_assert(not is_assignable_to(Top[Source], Bottom[Source]))
+static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
+static_assert(is_subtype_of(Bottom[Source], Top[Target]))
+
+def invalid(source: Top[Source]) -> Bottom[Target]:
+    return source  # error: [invalid-return-type]
+```
+
 ### Explicit receivers on overloaded recursive protocol methods
 
 An overloaded method can constrain its receiver to a tuple specialization of the same recursive

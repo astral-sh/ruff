@@ -22,11 +22,11 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
-        GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction, KnownInstanceType,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, ProtocolInstanceType,
-        SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
-        TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
+        CallableType, ClassBase, ClassLiteral, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
+        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -468,6 +468,58 @@ impl<'db> ProtocolInterfaceView<'db> {
 
     pub(super) fn member_count(self, db: &'db dyn Db) -> usize {
         self.interface.member_count(db)
+    }
+
+    pub(super) fn has_only_implicitly_bound_instance_methods(self, db: &'db dyn Db) -> bool {
+        self.members(db).all(|member| {
+            let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+                member.data.kind
+            else {
+                return false;
+            };
+            callable
+                .signatures(db)
+                .iter()
+                .all(Signature::has_implicit_positional_receiver_annotation)
+        })
+    }
+
+    pub(super) fn has_only_instance_methods_with_positional_receivers(
+        self,
+        db: &'db dyn Db,
+        class_context: Option<GenericContext<'db>>,
+        class_origin: ClassLiteral<'db>,
+    ) -> bool {
+        self.members(db).all(|member| {
+            let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+                member.data.kind
+            else {
+                return false;
+            };
+            callable.signatures(db).iter().next().is_some()
+                && callable.signatures(db).iter().all(|signature| {
+                    signature.generic_context.is_none_or(|context| {
+                        context.variables(db).all(|variable| {
+                            variable.typevar(db).is_self(db)
+                                || class_context.is_some_and(|class_context| {
+                                    class_context.contains(db, variable.identity(db))
+                                })
+                        })
+                    }) && (signature.has_implicit_positional_receiver_annotation()
+                        || (signature.has_explicit_positional_receiver_annotation()
+                            && signature.parameters().get(0).is_some_and(|parameter| {
+                                parameter
+                                    .annotated_type()
+                                    .as_protocol_instance()
+                                    .is_some_and(|protocol| {
+                                        protocol.materialization_kind(db).is_none()
+                                            && protocol.class_origin(db).is_some_and(|class| {
+                                                class.class_literal(db) == class_origin
+                                            })
+                                    })
+                            })))
+                })
+        })
     }
 
     /// Returns whether structural comparison can avoid recursive member expansion.
