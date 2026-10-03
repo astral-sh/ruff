@@ -274,9 +274,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         None => Some(Either::Right(value.display_literal_value(db, env))),
                     })
                     .collect::<Option<Vec<_>>>()
-                    .map(|patterns| patterns.into_iter().join(" | "))
+                    .map(|patterns| Cow::Owned(patterns.into_iter().join(" | ")))
             })
-            .unwrap_or_else(|| "_".to_string());
+            .unwrap_or(Cow::Borrowed("_"));
 
         let insertion = format!(
             "{leading_newline}{case_indent}case {pattern}:{line_ending}\
