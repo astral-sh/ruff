@@ -1246,6 +1246,44 @@ class ParamSpecWithDefault6(Generic[PAnother]):
     attr: Callable[PAnother, None]
 ```
 
+## Unresolved parameters in recursive calls
+
+An unresolved recursive argument does not supply a callable's parameters. Calls to the returned
+callable accept any arguments until a signature is known.
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+
+def identity(callbacks: tuple[Callable[P, None]]) -> tuple[Callable[P, None]]:
+    return callbacks
+
+def repeat(flag: bool):
+    while flag:
+        callbacks = identity(callbacks)  # error: [possibly-unresolved-reference]
+        reveal_type(callbacks[0])  # revealed: (...) -> None
+        callbacks[0]()  # no diagnostic
+        callbacks[0](count=1)  # no diagnostic
+```
+
+Another argument can supply a concrete signature even when the recursive argument is unresolved. The
+returned callable retains that signature's argument checks.
+
+```py
+def with_signature(callbacks: tuple[Callable[P, None]], signature: Callable[P, None]) -> tuple[Callable[P, None]]:
+    return callbacks
+
+def callback(*, count: int) -> None: ...
+def repeat_known(flag: bool):
+    while flag:
+        callbacks = with_signature(callbacks, callback)  # error: [possibly-unresolved-reference]
+        reveal_type(callbacks[0])  # revealed: (*, count: int) -> None
+        callbacks[0](count=1)  # no diagnostic
+        callbacks[0]()  # error: [missing-argument] "No argument provided for required parameter `count`"
+        callbacks[0](count="wrong")  # error: [invalid-argument-type] "Expected `int`"
+```
+
 ## Semantics
 
 See [the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) for corresponding examples using

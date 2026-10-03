@@ -6398,6 +6398,12 @@ impl<'db> CallInference<'_, 'db> {
             if typevar.default_type(db).is_some() {
                 return None;
             }
+            if typevar.is_paramspec(db) {
+                // A ParamSpec specialization must describe a parameter list. A value-type marker
+                // cannot replace it, so retain the usual unknown parameters until inference has
+                // evidence for a concrete signature.
+                return None;
+            }
             let arguments: Vec<_> = pending
                 .iter()
                 .filter(|(declared_type, _)| {

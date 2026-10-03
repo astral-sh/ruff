@@ -646,6 +646,65 @@ fn divergent_type() {
 }
 
 #[test]
+fn pending_inference_intersections() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/pending.py",
+        r#"
+        from typing import TypeVar
+
+        T = TypeVar("T")
+
+        def identity(value: tuple[T]) -> tuple[T]:
+            return value
+
+        flag: bool
+        while flag:
+            value = identity(value)
+        pending = value[0]
+        "#,
+    )?;
+    let file = system_path_to_file(&db, "/src/pending.py")?;
+    let env = db.program_environment();
+    let file = ProgramFile::new(&db, file, env.program(&db));
+    let pending = global_symbol(&db, file, "pending").place.expect_type();
+    assert!(pending.as_pending_inference().is_some());
+
+    let int = KnownClass::Int.to_instance(&db, &env);
+    for factors in [[pending, int], [int, pending]] {
+        let intersection = IntersectionType::from_elements(&db, &env, factors);
+        assert!(intersection.is_subtype_of(&db, &env, int));
+        assert!(any_over_type_including_alias_arguments(
+            &db,
+            &env,
+            intersection,
+            |ty| ty.same_divergent_marker(pending)
+        ));
+    }
+
+    // Negation retains the binding's identity, including when materialization exchanges its
+    // upper and lower approximations. Cycle recovery can still recognize the same dependency.
+    let visitor = ApplyTypeMappingVisitor::new(&env);
+    let top = pending.materialize(&db, MaterializationKind::Top, &visitor);
+    let bottom = pending.materialize(&db, MaterializationKind::Bottom, &visitor);
+    assert_eq!(top.negate(&db, &env), bottom);
+    assert_eq!(bottom.negate(&db, &env), top);
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(top)
+            .build(),
+        bottom,
+    );
+    assert_eq!(
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(bottom)
+            .build(),
+        top,
+    );
+    Ok(())
+}
+
+#[test]
 fn pending_narrowing_intersections_are_order_independent() {
     let db = setup_db();
     let env = db.program_environment();

@@ -4000,5 +4000,36 @@ def repeat(flag: bool):
         value = grow(value)  # error: [possibly-unresolved-reference]
 ```
 
+## Narrowing unresolved recursive arguments
+
+A runtime check establishes a type even when a recursive generic call has not inferred its type
+argument. The unresolved argument retains both positive and negative narrowing facts.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+unsound-return-statement = "error"
+```
+
+```py
+def identity[T](value: tuple[T]) -> tuple[T]:
+    return value
+
+def check(flag: bool) -> int:
+    while flag:
+        value = identity(value)  # error: [possibly-unresolved-reference]
+    item = value[0]  # error: [possibly-unresolved-reference]
+    if isinstance(item, int):
+        reveal_type(item)  # revealed: Divergent & int
+        if isinstance(item, str):
+            reveal_type(item)  # revealed: Never
+        return item  # no diagnostic
+    else:
+        reveal_type(item)  # revealed: Divergent & ~int
+    return 1
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

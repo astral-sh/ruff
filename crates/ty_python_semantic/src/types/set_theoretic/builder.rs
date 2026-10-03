@@ -1846,22 +1846,29 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
-        // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
+        // `T & Divergent` -> `Divergent`. A recursive query marker behaves like `Never` here and
         // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
         // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
         // `Divergent` also gets a lot of special handling in cycle recovery.
         // Pending narrowing takes precedence over recursive markers: the predicate must be
         // resolved before its intersection can contribute to the inferred type.
+        // An unavailable generic binding instead retains both its marker and the narrowing facts.
+        // For example, `isinstance(value, int)` establishes an `int` even if the generic call that
+        // supplies `value` has not inferred its type argument yet.
         if self.positive.iter().any(Type::is_pending_narrowing) {
             return;
         }
-        if new_positive.is_divergent() {
+        if new_positive.is_divergent() && new_positive.as_pending_inference().is_none() {
             *self = Self::default();
             self.positive.insert(new_positive);
             return;
         }
         // `Divergent & T` -> `Divergent`
-        if self.positive.iter().any(Type::is_divergent) {
+        if self
+            .positive
+            .iter()
+            .any(|ty| ty.is_divergent() && ty.as_pending_inference().is_none())
+        {
             return;
         }
 
@@ -2092,13 +2099,20 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // `Divergent & ~T` -> `Divergent`.
-        if self.positive.iter().any(Type::is_divergent) && !new_negative.is_pending_narrowing() {
+        if self
+            .positive
+            .iter()
+            .any(|ty| ty.is_divergent() && ty.as_pending_inference().is_none())
+            && !new_negative.is_pending_narrowing()
+        {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
             return;
         }
 
         if let Some(negated_divergent) = new_negative.negated_divergent() {
-            *self = Self::default();
+            if negated_divergent.as_pending_inference().is_none() {
+                *self = Self::default();
+            }
             self.positive.insert(negated_divergent);
             return;
         }
