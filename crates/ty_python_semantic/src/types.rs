@@ -2280,7 +2280,7 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
-    /// A decorated binding whose recursive structure is normalized by its defining query.
+    /// A decorated binding that retains its recursive marker through dynamic alternatives.
     fn divergent_decorator(id: salsa::Id) -> Self {
         Self::Divergent(DivergentType {
             flags: DivergentFlags::FROM_DECORATOR,
@@ -3664,12 +3664,23 @@ impl<'db> Type<'db> {
             });
         // A decorator can wrap its own binding in a container. An intermediate query may see
         // only `Unknown | binding`; dropping the binding's marker there loses the recursion
-        // before the defining query sees the enclosing container. Normalize these markers only
-        // at their owner, while retaining the usual recovery for the other heads in the cycle.
+        // before the defining query sees the enclosing container. Keep these markers until their
+        // owner recovers, unless a union has a concrete alternative that anchors inference. For
+        // example, retaining the marker in `Literal[2] | binding` would discard the initializer
+        // when the defining query subsequently wraps that union in a tuple.
+        let has_concrete_alternative = matches!(normalized, Type::Union(union) if union
+            .elements(db)
+            .iter()
+            .any(|ty| !ty.is_dynamic() && !ty.is_divergent()));
         cycle
             .head_ids()
             .map(Type::divergent)
-            .chain(std::iter::once(Type::divergent_decorator(cycle.id())))
+            .chain(
+                cycle
+                    .head_ids()
+                    .filter(|id| has_concrete_alternative || *id == cycle.id())
+                    .map(Type::divergent_decorator),
+            )
             .fold(normalized, |ty, divergent| {
                 ty.recursive_type_normalized_impl(db, env, divergent, false)
                     .unwrap_or(divergent)
@@ -11222,7 +11233,7 @@ bitflags! {
         /// The cycle comes from type alias inference. Value inference can also diverge,
         /// for example when an assignment feeds into the next iteration of a loop.
         const FROM_TYPE_ALIAS = 1 << 0;
-        /// Only the defining query can normalize this decorated binding's recursive marker.
+        /// Preserve this decorated binding through intermediate queries without concrete alternatives.
         const FROM_DECORATOR = 1 << 2;
     }
 }

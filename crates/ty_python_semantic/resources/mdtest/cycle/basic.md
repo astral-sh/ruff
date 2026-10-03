@@ -502,6 +502,50 @@ finally:
     from unknown_module import member as result  # error: [unresolved-import]
 ```
 
+## Recursive decorator recovery preserves concrete initializers
+
+The class decorator returns the existing value, so its binding retains the initializer's type. The
+later incompatible assignment does not erase that type from the other decorator's tuple result.
+
+```py
+def check():
+    value = 2
+
+    @lambda function: (value,)
+    def result(): ...
+
+    @lambda cls: value
+    class value: ...
+
+    value = result  # error: [invalid-assignment]
+    reveal_type(result)  # revealed: tuple[Literal[2]]
+    reveal_type(result[0])  # revealed: Literal[2]
+    invalid: str = result[0]  # error: [invalid-assignment]
+```
+
+## Recursive decorator recovery with dynamic initializers
+
+When the initializer is dynamic, the recursive entry is approximated, while the other tuple entry
+retains its type.
+
+```py
+from typing import Any
+
+def check(seed: Any):
+    value = seed
+
+    @lambda function: (1, value)
+    def result(): ...
+
+    @lambda cls: value
+    class value: ...
+
+    value = result
+    reveal_type(result)  # revealed: tuple[Literal[1], Divergent]
+    reveal_type(result[0])  # revealed: Literal[1]
+    invalid: str = result[0]  # error: [invalid-assignment]
+```
+
 ## Recursive class decorator error recovery
 
 The decorator returns a container of the class's eventual binding. An invalid decorator on another
