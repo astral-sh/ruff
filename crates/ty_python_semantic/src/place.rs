@@ -2,7 +2,6 @@ pub(crate) mod definitions;
 
 use crate::ProgramEnvironment;
 use itertools::Either;
-use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
@@ -23,7 +22,7 @@ use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
 use ty_python_core::place::ScopedPlaceId;
-use ty_python_core::predicate::{Predicate, ScopedPredicateId};
+use ty_python_core::predicate::Predicates;
 use ty_python_core::reachability_constraints::{
     ReachabilityConstraints, ScopedReachabilityConstraintId,
 };
@@ -1512,7 +1511,7 @@ enum DeclarationsBoundnessEvaluator<'map, 'db> {
         reachability_cache: Option<&'map ReachabilityEvaluationCache<'db>>,
         unbound_visibility: Option<DeclarationWithConstraint<'db>>,
         reachability_constraints: &'map ReachabilityConstraints,
-        predicates: &'map IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        predicates: &'map Predicates<'db>,
         requires_explicit_reexport: RequiresExplicitReExport,
     },
 }
