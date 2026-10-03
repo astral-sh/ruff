@@ -916,6 +916,31 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Returns whether a direct positive or negative element is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.positive(db)
+            .iter()
+            .chain(self.negative(db))
+            .copied()
+            .any(Type::is_alias_like)
+    }
+
+    /// Normalize direct aliases without expanding aliases nested inside containers.
+    pub(crate) fn expand_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db, env);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.resolve_type_alias(db));
+        }
+        for negative in self.negative(db) {
+            builder.add_negative_in_place(negative.resolve_type_alias(db));
+        }
+        builder.build()
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1093,13 +1118,17 @@ impl<'db> IntersectionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            let positive = self
-                .positive(db)
-                .iter()
-                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<FxOrderSet<_>>();
-            let mut negative = NegativeIntersectionElements::default();
+        let positive = self
+            .positive(db)
+            .iter()
+            .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            .collect::<FxOrderSet<_>>();
+        let mut negative = NegativeIntersectionElements::default();
+        // Regular promotion removes negative contributions from intersections.
+        if !matches!(
+            type_mapping,
+            TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
+        ) {
             for element in self.negative(db) {
                 negative.insert(element.apply_type_mapping_impl(
                     db,
@@ -1108,33 +1137,38 @@ impl<'db> IntersectionType<'db> {
                     visitor,
                 ));
             }
-            Type::Intersection(IntersectionType::new(db, positive, negative))
+        }
+        if type_mapping.is_structural() {
+            return Type::Intersection(IntersectionType::new(db, positive, negative));
+        }
+        let negative_alias = if positive.is_empty()
+            && let NegativeIntersectionElements::Single(ty @ Type::TypeAlias(_)) = &negative
+        {
+            Some(*ty)
         } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
-            for positive in self.positive(db) {
-                builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ));
-            }
-            // Regular promotion should remove negative contributions from intersections,
-            // so we don't preserve them here when regular promotion is enabled.
-            if !matches!(
-                type_mapping,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-            ) {
-                for negative in self.negative(db) {
-                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                        db,
-                        &type_mapping.flip(),
-                        tcx,
-                        visitor,
-                    ));
-                }
-            }
-            builder.build()
+            None
+        };
+        let mut builder = IntersectionBuilder::new(db, visitor.env);
+        for positive in positive {
+            builder.add_positive_in_place(positive);
+        }
+        for negative in &negative {
+            builder.add_negative_in_place(*negative);
+        }
+        let mapped = builder.build();
+
+        // Normalize before preserving an alias: its body can expose `object`, a union, or
+        // another negation. If normalization only expands the single excluded type, keep
+        // its alias so mappings of `type A = list[Not[A]]` do not unfold it repeatedly.
+        if let Some(alias) = negative_alias
+            && let Type::Intersection(intersection) = mapped
+            && intersection.positive(db).is_empty()
+            && intersection.negative(db)
+                == &NegativeIntersectionElements::Single(alias.resolve_type_alias(db))
+        {
+            alias.negate(db, visitor.env)
+        } else {
+            mapped
         }
     }
 

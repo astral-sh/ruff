@@ -474,6 +474,33 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## Negated recursive alias specializations
+
+A recursive alias can specialize to `object`, whose negation is `Never`.
+
+```py
+from typing import Never, assert_type
+from ty_extensions import Not
+
+type A[T] = T | list[A[T]]
+
+def f(x: Not[A[object]]):
+    assert_type(x, Never)
+```
+
+Specialization also preserves double-negation elimination when the alias body is recursive.
+
+```py
+type B[T] = Not[list[B[T]] | T]
+
+def identity[T](x: T) -> T:
+    return x
+
+def g(x: Not[B[int]]) -> list[B[int]] | int:
+    assert_type(x, list[B[int]] | int)
+    return identity(x)  # no diagnostic
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable
