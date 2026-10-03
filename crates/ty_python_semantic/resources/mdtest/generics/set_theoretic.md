@@ -879,3 +879,31 @@ def _(
     reveal_type(first)  # revealed: Co[AnyFirst[int]] & Child[object]
     reveal_type(last)  # revealed: Co[AnyLast[int]] & Child[object]
 ```
+
+### Complex inherited specializations
+
+```pyi
+from typing import Any
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Base[T]:
+    item: T
+
+class Nested[T, U](Base[list[T]]):
+    value: T
+    extra: U
+
+static_assert(is_equivalent_to(Base[list[int]] & Top[Nested[Any, Any]], Top[Nested[int, Any]]))
+static_assert(is_equivalent_to(Top[Nested[Any, Any]] & Base[list[int]], Top[Nested[int, Any]]))
+
+class Mixed[T, U]:
+    def get(self) -> T: ...
+    def push(self, value: U) -> None: ...
+
+class Repeated[T](Mixed[T, T]):
+    item: T
+
+static_assert(is_equivalent_to(Mixed[str, str] & Top[Repeated[Any]], Repeated[str]))
+static_assert(not is_equivalent_to(Mixed[object, str] & Top[Repeated[Any]], Repeated[object]))
+```
