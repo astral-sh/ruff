@@ -2,7 +2,10 @@ use crate::Db;
 use crate::diagnostic::format_enumeration;
 use crate::reachability::ReachabilityConstraintsExtension;
 use itertools::{Either, Itertools};
-use ruff_db::{diagnostic::Annotation, source::source_text};
+use ruff_db::{
+    diagnostic::{Annotation, Span},
+    source::source_text,
+};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -199,7 +202,8 @@ fn method_is_bound_at_class_exit<'db>(
 /// Reports a conflict if the declared types of attribute `name` are not all equivalent.
 ///
 /// The first declaration's type is the reference type, and the diagnostic points at the first
-/// declaration that disagrees with it.
+/// declaration that disagrees with it. Every other declaration is marked with a secondary
+/// annotation, since the conflict can only be resolved by looking at all of them together.
 fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
     context: &InferContext<'db, '_>,
     name: &str,
@@ -207,31 +211,45 @@ fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let mut declarations = declarations.into_iter();
-    let Some((_, first_type)) = declarations.next() else {
+    let declarations: Vec<_> = declarations.into_iter().collect();
+    let Some(((_, first_type), rest)) = declarations.split_first() else {
         return;
     };
     let mut conflicting_types = FxOrderSet::default();
-    let mut conflicting_definition = None;
-    for (definition, ty) in declarations {
+    let mut conflicting_declaration = None;
+    for declaration @ (_, ty) in rest {
         if !first_type.is_equivalent_to(db, env, *ty) {
             conflicting_types.insert(*ty);
-            conflicting_definition.get_or_insert(*definition);
+            conflicting_declaration.get_or_insert(*declaration);
         }
     }
-    let Some(conflicting_definition) = conflicting_definition else {
+    let Some(&(conflicting_definition, conflicting_type)) = conflicting_declaration else {
         return;
     };
     conflicting_types.insert_before(0, *first_type);
 
-    if let Some(builder) = context.report_lint(
+    let Some(builder) = context.report_lint(
         &CONFLICTING_DECLARATIONS,
         conflicting_definition.focus_range(db, context.module()),
-    ) {
-        builder.into_diagnostic(format_args!(
-            "Conflicting declared types for `{name}`: {}",
-            format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
-        ));
+    ) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Conflicting declared types for `{name}`: {}",
+        format_enumeration(conflicting_types.iter().map(|ty| ty.display(db, env)))
+    ));
+    diagnostic.set_primary_annotation_message(format_args!(
+        "declared as `{}` here",
+        conflicting_type.display(db, env)
+    ));
+    for (definition, ty) in declarations {
+        if *definition == conflicting_definition {
+            continue;
+        }
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, context.module())))
+                .message(format_args!("declared as `{}` here", ty.display(db, env))),
+        );
     }
 }
 

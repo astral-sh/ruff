@@ -242,6 +242,38 @@ reveal_type(c_instance.y)  # revealed: int
 reveal_type(c_instance.z)  # revealed: int
 ```
 
+#### Diagnostic for conflicting attribute declarations
+
+The diagnostic points at the first declaration that disagrees with the earliest one and marks every
+other declaration involved in the conflict.
+
+```py
+class C:
+    x: int
+
+    def __init__(self) -> None:
+        self.x: str = ""  # snapshot: conflicting-declarations
+
+    def reset(self) -> None:
+        self.x: bytes = b""
+```
+
+```snapshot
+error[conflicting-declarations]: Conflicting declared types for `x`: `int`, `str` and `bytes`
+ --> src/mdtest_snippet.py:5:9
+  |
+2 |     x: int
+  |     - declared as `int` here
+3 |
+4 |     def __init__(self) -> None:
+5 |         self.x: str = ""  # snapshot: conflicting-declarations
+  |         ^^^^^^ declared as `str` here
+6 |
+7 |     def reset(self) -> None:
+8 |         self.x: bytes = b""
+  |         ------ declared as `bytes` here
+```
+
 #### Sequential declarations in one method
 
 Conflict checking uses the declarations active at method exit. A later declaration in the same
