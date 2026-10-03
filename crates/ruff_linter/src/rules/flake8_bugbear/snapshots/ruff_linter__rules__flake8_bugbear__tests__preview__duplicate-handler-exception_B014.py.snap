@@ -1,0 +1,485 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B014 [*] Exception handler with duplicate exception: `TypeError`
+  --> B014.py:11:8
+   |
+ 9 | try:
+10 |     pass
+11 | except (Exception, TypeError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^
+12 |     # TypeError is a subclass of Exception, so it doesn't add anything
+13 |     pass
+   |
+help: De-duplicate exceptions
+   |
+10 |     pass
+   - except (Exception, TypeError):
+11 + except Exception:
+12 |     # TypeError is a subclass of Exception, so it doesn't add anything
+   |
+
+B014 [*] Exception handler with duplicate exception: `OSError`
+  --> B014.py:17:8
+   |
+15 | try:
+16 |     pass
+17 | except (OSError, OSError) as err:
+   |        ^^^^^^^^^^^^^^^^^^
+18 |     # Duplicate exception types are useless
+19 |     pass
+   |
+help: De-duplicate exceptions
+   |
+16 |     pass
+   - except (OSError, OSError) as err:
+17 + except OSError as err:
+18 |     # Duplicate exception types are useless
+   |
+
+B014 [*] Exception handler with duplicate exception: `MyError`
+  --> B014.py:28:8
+   |
+26 | try:
+27 |     pass
+28 | except (MyError, MyError):
+   |        ^^^^^^^^^^^^^^^^^^
+29 |     # Detect duplicate non-builtin errors
+30 |     pass
+   |
+help: De-duplicate exceptions
+   |
+27 |     pass
+   - except (MyError, MyError):
+28 + except MyError:
+29 |     # Detect duplicate non-builtin errors
+   |
+
+B014 [*] Exception handler with duplicate exception: `re.error`
+  --> B014.py:49:8
+   |
+47 | try:
+48 |     pass
+49 | except (re.error, re.error):
+   |        ^^^^^^^^^^^^^^^^^^^^
+50 |     # Duplicate exception types as attributes
+51 |     pass
+   |
+help: De-duplicate exceptions
+   |
+48 |     pass
+   - except (re.error, re.error):
+49 + except re.error:
+50 |     # Duplicate exception types as attributes
+   |
+
+B014 [*] Exception handler with duplicate exception: `ValueError`
+  --> B014.py:82:8
+   |
+80 | try:
+81 |     pass
+82 | except (ValueError, ValueError, TypeError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+83 |     pass
+   |
+help: De-duplicate exceptions
+   |
+81 |     pass
+   - except (ValueError, ValueError, TypeError):
+82 + except (ValueError, TypeError):
+83 |     pass
+   |
+
+B014 [*] Exception handler with duplicate exception: `re.error`
+  --> B014.py:89:7
+   |
+87 | try:
+88 |     pas
+89 | except(re.error, re.error):
+   |       ^^^^^^^^^^^^^^^^^^^^
+90 |     p
+   |
+help: De-duplicate exceptions
+   |
+88 |     pas
+   - except(re.error, re.error):
+89 + except re.error:
+90 |     p
+   |
+
+B014 [*] Exception handler with duplicate exception: `ValueError`
+   --> B014.py:95:8
+    |
+ 93 |   try:
+ 94 |       pass
+ 95 |   except (
+    |  ________^
+ 96 | |     ValueError,
+ 97 | |     ValueError,
+ 98 | |     # text
+ 99 | |     TypeError,
+100 | | ):
+    | |_^
+101 |       pass
+    |
+help: De-duplicate exceptions
+   |
+94 |     pass
+   - except (
+   -     ValueError,
+   -     ValueError,
+   -     # text
+   -     TypeError,
+   - ):
+95 + except (ValueError, TypeError):
+96 |     pass
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:107:8
+    |
+105 | try:
+106 |     pass
+107 | except (OSError, TimeoutError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+108 |     pass
+    |
+help: De-duplicate exceptions
+    |
+106 |     pass
+    - except (OSError, TimeoutError):
+107 + except OSError:
+108 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:112:8
+    |
+110 | try:
+111 |     pass
+112 | except (TimeoutError, OSError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+113 |     pass
+    |
+help: De-duplicate exceptions
+    |
+111 |     pass
+    - except (TimeoutError, OSError):
+112 + except OSError:
+113 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `UnicodeDecodeError`
+   --> B014.py:117:8
+    |
+115 | try:
+116 |     pass
+117 | except (ValueError, UnicodeDecodeError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+118 |     pass
+    |
+help: De-duplicate exceptions
+    |
+116 |     pass
+    - except (ValueError, UnicodeDecodeError):
+117 + except ValueError:
+118 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `UnicodeDecodeError`
+   --> B014.py:122:8
+    |
+120 | try:
+121 |     pass
+122 | except (UnicodeDecodeError, ValueError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+123 |     pass
+    |
+help: De-duplicate exceptions
+    |
+121 |     pass
+    - except (UnicodeDecodeError, ValueError):
+122 + except ValueError:
+123 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exceptions: `UnicodeDecodeError`, `UnicodeError`
+   --> B014.py:128:8
+    |
+126 | try:
+127 |     pass
+128 | except (UnicodeDecodeError, UnicodeError, ValueError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+129 |     pass
+    |
+help: De-duplicate exceptions
+    |
+127 |     pass
+    - except (UnicodeDecodeError, UnicodeError, ValueError):
+128 + except ValueError:
+129 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exceptions: `FileNotFoundError`, `TimeoutError`
+   --> B014.py:133:8
+    |
+131 | try:
+132 |     pass
+133 | except (OSError, TimeoutError, FileNotFoundError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+134 |     pass
+    |
+help: De-duplicate exceptions
+    |
+132 |     pass
+    - except (OSError, TimeoutError, FileNotFoundError):
+133 + except OSError:
+134 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:139:8
+    |
+137 | try:
+138 |     pass
+139 | except (TypeError, TimeoutError, OSError, ValueError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+140 |     pass
+    |
+help: De-duplicate exceptions
+    |
+138 |     pass
+    - except (TypeError, TimeoutError, OSError, ValueError):
+139 + except (TypeError, OSError, ValueError):
+140 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `ValueError`
+   --> B014.py:149:8
+    |
+147 | try:
+148 |     pass
+149 | except (Exception, ValueError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+150 |     pass
+    |
+help: De-duplicate exceptions
+    |
+148 |     pass
+    - except (Exception, ValueError):
+149 + except Exception:
+150 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `KeyboardInterrupt`
+   --> B014.py:159:8
+    |
+157 | try:
+158 |     pass
+159 | except (KeyboardInterrupt, BaseException):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+160 |     pass
+    |
+help: De-duplicate exceptions
+    |
+158 |     pass
+    - except (KeyboardInterrupt, BaseException):
+159 + except BaseException:
+160 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exceptions: `OSError`, `TimeoutError`
+   --> B014.py:165:8
+    |
+163 | try:
+164 |     pass
+165 | except (TimeoutError, OSError, TimeoutError, OSError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+166 |     pass
+    |
+help: De-duplicate exceptions
+    |
+164 |     pass
+    - except (TimeoutError, OSError, TimeoutError, OSError):
+165 + except OSError:
+166 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exceptions: `IndentationError`, `TabError`
+   --> B014.py:171:8
+    |
+169 | try:
+170 |     pass
+171 | except (TabError, SyntaxError, IndentationError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+172 |     pass
+    |
+help: De-duplicate exceptions
+    |
+170 |     pass
+    - except (TabError, SyntaxError, IndentationError):
+171 + except SyntaxError:
+172 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `BrokenPipeError`
+   --> B014.py:176:8
+    |
+174 | try:
+175 |     pass
+176 | except (BrokenPipeError, OSError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+177 |     pass
+    |
+help: De-duplicate exceptions
+    |
+175 |     pass
+    - except (BrokenPipeError, OSError):
+176 + except OSError:
+177 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `UserWarning`
+   --> B014.py:181:8
+    |
+179 | try:
+180 |     pass
+181 | except (UserWarning, Warning):
+    |        ^^^^^^^^^^^^^^^^^^^^^^
+182 |     pass
+    |
+help: De-duplicate exceptions
+    |
+180 |     pass
+    - except (UserWarning, Warning):
+181 + except Warning:
+182 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:215:12
+    |
+213 |     try:
+214 |         pass
+215 |     except (OSError, TimeoutError):
+    |            ^^^^^^^^^^^^^^^^^^^^^^^
+216 |         TimeoutError = MyError
+    |
+help: De-duplicate exceptions
+    |
+214 |         pass
+    -     except (OSError, TimeoutError):
+215 +     except OSError:
+216 |         TimeoutError = MyError
+    |
+
+B014 [*] Exception handler with duplicate exception: `builtins.TimeoutError`
+   --> B014.py:225:8
+    |
+223 | try:
+224 |     pass
+225 | except (builtins.TimeoutError, builtins.OSError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+226 |     pass
+    |
+help: De-duplicate exceptions
+    |
+224 |     pass
+    - except (builtins.TimeoutError, builtins.OSError):
+225 + except builtins.OSError:
+226 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `b.TimeoutError`
+   --> B014.py:230:8
+    |
+228 | try:
+229 |     pass
+230 | except (b.OSError, b.TimeoutError):
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+231 |     pass
+    |
+help: De-duplicate exceptions
+    |
+229 |     pass
+    - except (b.OSError, b.TimeoutError):
+230 + except b.OSError:
+231 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `Timeout`
+   --> B014.py:235:8
+    |
+233 | try:
+234 |     pass
+235 | except (Timeout, OS):
+    |        ^^^^^^^^^^^^^
+236 |     pass
+    |
+help: De-duplicate exceptions
+    |
+234 |     pass
+    - except (Timeout, OS):
+235 + except OS:
+236 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:291:8
+    |
+289 |   try:
+290 |       pass
+291 |   except (
+    |  ________^
+292 | |     TimeoutError,  # A narrower exception.
+293 | |     OSError,
+294 | | ):
+    | |_^
+295 |       pass
+    |
+help: De-duplicate exceptions
+    |
+290 |     pass
+    - except (
+    -     TimeoutError,  # A narrower exception.
+    -     OSError,
+    - ):
+291 + except OSError:
+292 |     pass
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:300:8
+    |
+298 | try:
+299 |     pass
+300 | except (TimeoutError, OSError):  # Keep this comment.
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+301 |     pass
+    |
+help: De-duplicate exceptions
+    |
+299 |     pass
+    - except (TimeoutError, OSError):  # Keep this comment.
+300 + except OSError:  # Keep this comment.
+301 |     pass
+    |
+
+B014 [*] Exception handler with duplicate exception: `TimeoutError`
+   --> B014.py:306:9
+    |
+304 | try:
+305 |     pass
+306 | except* (TimeoutError, OSError):
+    |         ^^^^^^^^^^^^^^^^^^^^^^^
+307 |     pass
+    |
+help: De-duplicate exceptions
+    |
+305 |     pass
+    - except* (TimeoutError, OSError):
+306 + except* OSError:
+307 |     pass
+    |

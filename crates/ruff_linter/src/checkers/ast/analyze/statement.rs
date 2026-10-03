@@ -4,7 +4,9 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_standalone_mock_non_existent_enabled;
+use crate::preview::{
+    is_b014_builtin_exception_hierarchy_enabled, is_standalone_mock_non_existent_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::{
     airflow, fastapi, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -1372,7 +1374,21 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 Rule::DuplicateHandlerException,
                 Rule::DuplicateTryBlockException,
             ]) {
-                flake8_bugbear::rules::duplicate_exceptions(checker, handlers);
+                if checker.is_rule_enabled(Rule::DuplicateHandlerException)
+                    && is_b014_builtin_exception_hierarchy_enabled(checker.settings())
+                    && checker
+                        .semantic()
+                        .current_scopes()
+                        .any(|scope| scope.kind.is_function())
+                {
+                    // Function-local bindings can shadow builtins before their assignments.
+                    checker
+                        .analyze
+                        .duplicate_exceptions
+                        .push(checker.semantic.snapshot());
+                } else {
+                    flake8_bugbear::rules::duplicate_exceptions(checker, handlers);
+                }
             }
             if checker.is_rule_enabled(Rule::RedundantTupleInExceptionHandler) {
                 flake8_bugbear::rules::redundant_tuple_in_exception_handler(checker, handlers);

@@ -36,4 +36,5 @@ pub(crate) struct Analyze {
     pub(crate) for_loops: Vec<Snapshot>,
     pub(crate) with_statements: Vec<Snapshot>,
     pub(crate) comprehensions: Vec<Snapshot>,
+    pub(crate) duplicate_exceptions: Vec<Snapshot>,
 }

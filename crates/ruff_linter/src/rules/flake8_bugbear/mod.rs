@@ -97,6 +97,8 @@ mod tests {
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"))]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_1.pyi"))]
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"))]
+    #[test_case(Rule::DuplicateHandlerException, Path::new("B014.py"))]
+    #[test_case(Rule::DuplicateTryBlockException, Path::new("B025.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -107,6 +109,248 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
+    }
+
+    #[test_case(false)]
+    #[test_case(true)]
+    fn duplicate_exceptions_together(preview: bool) -> Result<()> {
+        let mut settings = LinterSettings::for_rules([
+            Rule::DuplicateHandlerException,
+            Rule::DuplicateTryBlockException,
+        ]);
+        if preview {
+            settings = settings.with_preview_mode();
+        }
+        let diagnostics = test_path(Path::new("flake8_bugbear/B025.py"), &settings)?;
+        assert_diagnostics!(
+            format!("duplicate_exceptions_together_{preview}"),
+            diagnostics
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_exceptions_together_deferred() {
+        let source = r"
+def handle():
+    try:
+        ...
+    except (OSError, TimeoutError):
+        pass
+    except TimeoutError:
+        pass
+";
+        let baseline = test_snippet(
+            source,
+            &LinterSettings::for_rule(Rule::DuplicateTryBlockException).with_preview_mode(),
+        );
+        let diagnostics = test_snippet(
+            source,
+            &LinterSettings::for_rules([
+                Rule::DuplicateHandlerException,
+                Rule::DuplicateTryBlockException,
+            ])
+            .with_preview_mode(),
+        );
+        assert_eq!(baseline.len(), 1);
+        assert_eq!(diagnostics.len(), 2);
+        let expected: Vec<_> = baseline
+            .iter()
+            .map(|diagnostic| (diagnostic.headline_message(), diagnostic.range()))
+            .collect();
+        let actual: Vec<_> = diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.secondary_code_or_id() == "B025")
+            .map(|diagnostic| (diagnostic.headline_message(), diagnostic.range()))
+            .collect();
+        assert_eq!(actual, expected);
+    }
+
+    #[test_case(PythonVersion::PY39, 0)]
+    #[test_case(PythonVersion::PY310, 1)]
+    #[test_case(PythonVersion::PY313, 2)]
+    #[test_case(PythonVersion::PY315, 3)]
+    fn duplicate_handler_exception_target_version(version: PythonVersion, expected: usize) {
+        let settings = LinterSettings::for_rule(Rule::DuplicateHandlerException)
+            .with_preview_mode()
+            .with_target_version(version);
+        let diagnostics = test_snippet(
+            r"
+from builtins import EncodingWarning, ImportCycleError, PythonFinalizationError
+
+try:
+    pass
+except (Warning, EncodingWarning):
+    pass
+
+try:
+    pass
+except (RuntimeError, PythonFinalizationError):
+    pass
+
+try:
+    pass
+except (ImportError, ImportCycleError):
+    pass
+",
+            &settings,
+        );
+        assert_eq!(diagnostics.len(), expected);
+    }
+
+    #[test_case("TimeoutError")]
+    #[test_case("OSError")]
+    fn duplicate_handler_exception_shadowed_later(name: &str) {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            &format!(
+                r"
+class MyError(Exception):
+    pass
+
+def shadowed_later():
+    try:
+        pass
+    except (OSError, TimeoutError):
+        pass
+
+    {name} = MyError
+"
+            ),
+            &settings,
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test_case("TimeoutError")]
+    #[test_case("OSError")]
+    fn duplicate_handler_exception_rebound_after_handler(name: &str) {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            &format!(
+                r"
+class MyError(Exception):
+    pass
+
+def rebound_after_handler():
+    from builtins import {name}
+
+    try:
+        pass
+    except (OSError, TimeoutError):
+        {name} = MyError
+"
+            ),
+            &settings,
+        );
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test_case("", "", "TimeoutError")]
+    #[test_case("", "", "OSError")]
+    #[test_case("class ShadowedLater:", "    ", "TimeoutError")]
+    #[test_case("class ShadowedLater:", "    ", "OSError")]
+    fn duplicate_handler_exception_shadowed_later_sequential_scope(
+        scope: &str,
+        indent: &str,
+        name: &str,
+    ) {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            &format!(
+                r"
+class MyError(Exception):
+    pass
+
+{scope}
+{indent}try:
+{indent}    pass
+{indent}except (OSError, TimeoutError):
+{indent}    pass
+
+{indent}{name} = MyError
+"
+            ),
+            &settings,
+        );
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test_case("TimeoutError")]
+    #[test_case("OSError")]
+    fn duplicate_handler_exception_nested_class_shadowed_later(name: &str) {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            &format!(
+                r"
+class MyError(Exception):
+    pass
+
+def outer():
+    class Inner:
+        try:
+            ...
+        except (OSError, TimeoutError):
+            pass
+
+    {name} = MyError
+"
+            ),
+            &settings,
+        );
+        assert!(diagnostics.is_empty());
+    }
+
+    #[test]
+    fn duplicate_handler_exception_nested_class_sequential_scope() {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            r"
+class MyError(Exception):
+    pass
+
+def outer():
+    class Inner:
+        try:
+            ...
+        except (OSError, TimeoutError):
+            pass
+
+        TimeoutError = MyError
+",
+            &settings,
+        );
+        assert_eq!(diagnostics.len(), 1);
+    }
+
+    #[test]
+    fn duplicate_handler_exception_nested_class_initialized_import() {
+        let settings =
+            LinterSettings::for_rule(Rule::DuplicateHandlerException).with_preview_mode();
+        let diagnostics = test_snippet(
+            r"
+class MyError(Exception):
+    pass
+
+def outer():
+    from builtins import TimeoutError
+
+    class Inner:
+        try:
+            ...
+        except (OSError, TimeoutError):
+            pass
+
+    TimeoutError = MyError
+",
+            &settings,
+        );
+        assert_eq!(diagnostics.len(), 1);
     }
 
     #[test_case(

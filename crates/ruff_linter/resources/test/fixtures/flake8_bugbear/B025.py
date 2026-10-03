@@ -61,3 +61,27 @@ except* ValueError:
     a = 2
 except* (OSError, TypeError):
     a = 2
+
+# Hierarchy redundancy within a tuple does not change syntactic duplicate
+# detection across handlers.
+try:
+    pass
+except (OSError, TimeoutError):
+    pass
+except TimeoutError:
+    pass
+
+# B025 does not infer subclass relationships between separate handlers.
+try:
+    pass
+except OSError:
+    pass
+except TimeoutError:
+    pass
+
+try:
+    pass
+except* (TimeoutError, OSError):
+    pass
+except* TimeoutError:
+    pass
