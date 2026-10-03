@@ -1,5 +1,7 @@
 use ruff_python_ast::helpers::{Truthiness, map_callable, map_subscript};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::{self as ast, Expr, ExprCall, Stmt};
+use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_semantic::{BindingKind, Modules, SemanticModel, analyze};
 
 /// Return `true` if the given [`Expr`] is a special class attribute, like `__slots__`.
@@ -57,7 +59,7 @@ pub(super) fn is_dataclass_field(
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
-pub(super) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
+pub(crate) fn is_class_var_annotation(annotation: &Expr, semantic: &SemanticModel) -> bool {
     if !semantic.seen_typing() {
         return false;
     }
@@ -82,7 +84,7 @@ pub(super) fn is_final_annotation(annotation: &Expr, semantic: &SemanticModel) -
 ///
 /// [1]: https://www.attrs.org/en/stable/api.html#attrs.define
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum AttrsAutoAttribs {
+pub(crate) enum AttrsAutoAttribs {
     /// `a: str = ...` are automatically converted to fields.
     True,
     /// Only `attrs.field()`/`attr.ib()` calls are considered fields.
@@ -96,7 +98,7 @@ pub(super) enum AttrsAutoAttribs {
 
 /// Enumeration of various kinds of dataclasses recognised by Ruff
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(super) enum DataclassKind {
+pub(crate) enum DataclassKind {
     /// dataclasses created by the stdlib `dataclasses` module
     Stdlib,
     /// dataclasses created by the third-party `attrs` library
@@ -105,7 +107,7 @@ pub(super) enum DataclassKind {
 
 /// Return the kind of dataclass this class definition is (stdlib or `attrs`),
 /// or `None` if the class is not a dataclass.
-pub(super) fn dataclass_kind<'a>(
+pub(crate) fn dataclass_kind<'a>(
     class_def: &'a ast::StmtClassDef,
     semantic: &SemanticModel,
 ) -> Option<(DataclassKind, &'a ast::Decorator)> {
@@ -168,7 +170,7 @@ pub(super) fn dataclass_kind<'a>(
 }
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen
-pub(super) fn is_frozen_dataclass(
+pub(crate) fn is_frozen_dataclass(
     dataclass_decorator: &ast::Decorator,
     semantic: &SemanticModel,
 ) -> bool {
@@ -194,6 +196,56 @@ pub(super) fn is_frozen_dataclass(
         ["attrs" | "attr", "frozen"] => true,
         _ => false,
     }
+}
+
+/// Returns `true` if `func` is an instantiation of a frozen dataclass whose fields are all
+/// immutable, in which case instances can be safely shared as default arguments.
+pub(crate) fn is_immutable_dataclass_instantiation(
+    func: &Expr,
+    semantic: &SemanticModel,
+    extend_immutable_calls: &[QualifiedName],
+) -> bool {
+    let Some(binding_id) = semantic.lookup_attribute(map_subscript(func)) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+        return false;
+    };
+
+    let Some((dataclass_kind, decorator)) = dataclass_kind(class_def, semantic) else {
+        return false;
+    };
+    if !matches!(dataclass_kind, DataclassKind::Stdlib) || !is_frozen_dataclass(decorator, semantic)
+    {
+        return false;
+    }
+
+    // A frozen dataclass is only safely shareable if every field is immutable.
+    for statement in &class_def.body {
+        let Stmt::AnnAssign(ast::StmtAnnAssign {
+            annotation, value, ..
+        }) = statement
+        else {
+            continue;
+        };
+
+        if is_class_var_annotation(annotation, semantic) {
+            continue;
+        }
+
+        if !is_immutable_annotation(annotation, semantic, extend_immutable_calls) {
+            return false;
+        }
+
+        if let Some(value) = value {
+            if is_mutable_expr(value, semantic) {
+                return false;
+            }
+        }
+    }
+
+    true
 }
 
 /// Returns `true` if the given class has "default copy" semantics.

@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::rules::ruff::helpers::is_immutable_dataclass_instantiation;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -117,6 +118,11 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
                             self.extend_immutable_calls,
                         )
                     })
+                    && !is_immutable_dataclass_instantiation(
+                        func,
+                        self.checker.semantic(),
+                        self.extend_immutable_calls,
+                    )
                 {
                     self.checker.report_diagnostic(
                         FunctionCallInDefaultArgument {
