@@ -1,0 +1,52 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/aug_assign_debug_attribute_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..61,
+        body: [
+            AugAssign(
+                StmtAugAssign {
+                    node_index: NodeIndex(None),
+                    range: 44..60,
+                    target: Attribute(
+                        ExprAttribute {
+                            node_index: NodeIndex(None),
+                            range: 44..55,
+                            value: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            attr: Identifier {
+                                id: Name("__debug__"),
+                                range: 46..55,
+                                node_index: NodeIndex(None),
+                            },
+                            ctx: Store,
+                        },
+                    ),
+                    op: Add,
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 59..60,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
