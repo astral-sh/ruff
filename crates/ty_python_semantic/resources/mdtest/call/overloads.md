@@ -488,6 +488,39 @@ def _(x: tuple[A | B, int], y: tuple[int, bool]):
     reveal_type(f(*(x, y)))  # revealed: A | B | C | D
 ```
 
+### Expanding tuple subclasses
+
+Expanding a tuple subclass preserves its class identity while specializing its element types.
+Overloads accepting either the subclass or its tuple base remain applicable after expansion.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Literal, NamedTuple, overload
+
+class Point(NamedTuple):
+    x: bool
+
+@overload
+def by_class(value: Point, flag: Literal[True]) -> int: ...
+@overload
+def by_class(value: Point, flag: Literal[False]) -> str: ...
+@overload
+def by_element(value: tuple[Literal[True]]) -> int: ...
+@overload
+def by_element(value: tuple[Literal[False]]) -> str: ...
+```
+
+```py
+from overloaded import Point, by_class, by_element
+
+def _(value: Point, flag: bool):
+    reveal_type(by_class(value, flag))  # revealed: int | str
+    reveal_type(by_class(*(value, flag)))  # revealed: int | str
+    reveal_type(by_element(value))  # revealed: int | str
+    reveal_type(by_element(*(value,)))  # revealed: int | str
+```
+
 ### Expanding `type`
 
 There's no special handling for expanding `type[A | B]` type because ty stores this type in it's

@@ -4,7 +4,7 @@ use itertools::Itertools;
 use crate::ProgramEnvironment;
 use crate::types::enums::enum_member_literals;
 use crate::types::tuple::Tuple;
-use crate::types::{CycleDetector, KnownClass, Type};
+use crate::types::{CycleDetector, IntersectionType, KnownClass, Type};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
 /// Cartesian product in [`expand_type`].
@@ -78,7 +78,18 @@ impl<'db> TypeExpander<'_, 'db> {
                                 let expanded = per_element
                                     .into_iter()
                                     .multi_cartesian_product()
-                                    .map(|types| Type::heterogeneous_tuple(db, env, types))
+                                    .map(|types| {
+                                        let expanded = Type::heterogeneous_tuple(db, env, types);
+                                        if instance.own_tuple_spec(db).is_some() {
+                                            expanded
+                                        } else {
+                                            // The element types describe only the tuple base. Keep
+                                            // the subclass identity in every expanded alternative.
+                                            IntersectionType::from_two_elements(
+                                                db, env, ty, expanded,
+                                            )
+                                        }
+                                    })
                                     .collect::<Vec<_>>();
                                 Some(expanded)
                             }
