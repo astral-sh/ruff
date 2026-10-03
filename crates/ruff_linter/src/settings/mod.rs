@@ -998,6 +998,7 @@ mod tests {
         	django-model-without-dunder-str (DJ008),
         	django-unordered-body-content-in-model (DJ012),
         	django-non-leading-receiver-decorator (DJ013),
+        	unnecessary-literal-unpacking (PIE811),
         	pytest-patch-with-lambda (PT008),
         	pytest-raises-with-multiple-statements (PT012),
         	pytest-unnecessary-asyncio-mark-on-fixture (PT024),
