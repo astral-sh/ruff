@@ -144,47 +144,6 @@ pub(super) enum Sequent<C, FuelCost = ()> {
     },
 }
 
-impl<C, FuelCost> Sequent<C, FuelCost> {
-    fn map_constraints<D>(self, mut f: impl FnMut(C) -> D) -> Sequent<D, FuelCost> {
-        match self {
-            Self::SingleTautology { ante } => Sequent::SingleTautology { ante: f(ante) },
-            Self::PairImpossibility { ante1, ante2 } => Sequent::PairImpossibility {
-                ante1: f(ante1),
-                ante2: f(ante2),
-            },
-            Self::TripleImpossibility {
-                ante1,
-                ante2,
-                ante3,
-            } => Sequent::TripleImpossibility {
-                ante1: f(ante1),
-                ante2: f(ante2),
-                ante3: f(ante3),
-            },
-            Self::SingleImplication {
-                ante,
-                post,
-                fuel_cost,
-            } => Sequent::SingleImplication {
-                ante: f(ante),
-                post: f(post),
-                fuel_cost,
-            },
-            Self::PairImplication {
-                ante1,
-                ante2,
-                post,
-                fuel_cost,
-            } => Sequent::PairImplication {
-                ante1: f(ante1),
-                ante2: f(ante2),
-                post: f(post),
-                fuel_cost,
-            },
-        }
-    }
-}
-
 impl<'db> SequentMap<'db> {
     #[expect(dead_code)] // Keep this around for debugging purposes
     fn display<'a>(
@@ -204,7 +163,7 @@ impl<'db> SequentMap<'db> {
                 }
             };
 
-            for sequent in self.all_sequents(db) {
+            for sequent in self.all_sequents() {
                 match sequent {
                     Sequent::SingleTautology { .. } => {}
 
@@ -213,8 +172,8 @@ impl<'db> SequentMap<'db> {
                         write!(
                             f,
                             "{} ∧ {} → false",
-                            ante1.display(db, env, Some(true)),
-                            ante2.display(db, env, Some(true)),
+                            ante1.constraint(db).display(db, env, Some(true)),
+                            ante2.constraint(db).display(db, env, Some(true)),
                         )?;
                     }
 
@@ -227,9 +186,9 @@ impl<'db> SequentMap<'db> {
                         write!(
                             f,
                             "{} ∧ {} ∧ {} → false",
-                            ante1.display(db, env, Some(true)),
-                            ante2.display(db, env, Some(true)),
-                            ante3.display(db, env, Some(true)),
+                            ante1.constraint(db).display(db, env, Some(true)),
+                            ante2.constraint(db).display(db, env, Some(true)),
+                            ante3.constraint(db).display(db, env, Some(true)),
                         )?;
                     }
 
@@ -240,9 +199,9 @@ impl<'db> SequentMap<'db> {
                         write!(
                             f,
                             "{} ∧ {} → {}",
-                            ante1.display(db, env, Some(true)),
-                            ante2.display(db, env, Some(true)),
-                            post.display(db, env, Some(true)),
+                            ante1.constraint(db).display(db, env, Some(true)),
+                            ante2.constraint(db).display(db, env, Some(true)),
+                            post.constraint(db).display(db, env, Some(true)),
                         )?;
                     }
 
@@ -251,8 +210,8 @@ impl<'db> SequentMap<'db> {
                         write!(
                             f,
                             "{} → {}",
-                            ante.display(db, env, Some(true)),
-                            post.display(db, env, Some(true))
+                            ante.constraint(db).display(db, env, Some(true)),
+                            post.constraint(db).display(db, env, Some(true))
                         )?;
                     }
                 }
@@ -265,24 +224,21 @@ impl<'db> SequentMap<'db> {
         })
     }
 
-    fn all_sequents(&self, db: &'db dyn Db) -> impl Iterator<Item = Sequent<Constraint<'db>>> + '_ {
-        self.sequents
-            .iter()
-            .flat_map(|group| match group {
-                SequentGroup::Ungrouped(ungrouped) => Either::Left(ungrouped.iter().copied()),
-                SequentGroup::Grouped(grouped) => {
-                    let GroupedSequents {
-                        leftwards,
-                        rightwards,
-                        ..
-                    } = grouped.as_ref();
-                    Either::Right(std::iter::chain(
-                        leftwards.iter().copied(),
-                        rightwards.iter().copied(),
-                    ))
-                }
-            })
-            .map(|sequent| sequent.map_constraints(|constraint| constraint.constraint(db)))
+    fn all_sequents(&self) -> impl Iterator<Item = Sequent<InternedSequentConstraint<'db>>> + '_ {
+        self.sequents.iter().flat_map(|group| match group {
+            SequentGroup::Ungrouped(ungrouped) => Either::Left(ungrouped.iter().copied()),
+            SequentGroup::Grouped(grouped) => {
+                let GroupedSequents {
+                    leftwards,
+                    rightwards,
+                    ..
+                } = grouped.as_ref();
+                Either::Right(std::iter::chain(
+                    leftwards.iter().copied(),
+                    rightwards.iter().copied(),
+                ))
+            }
+        })
     }
 }
 
@@ -2151,8 +2107,10 @@ mod tests {
         });
         builder.add_single_tautology(first);
 
+        let first = InternedSequentConstraint::new(db, first);
+        let second = InternedSequentConstraint::new(db, second);
         assert_eq!(
-            builder.finish().all_sequents(db).collect::<Vec<_>>(),
+            builder.finish().all_sequents().collect::<Vec<_>>(),
             vec![
                 Sequent::SingleTautology { ante: first },
                 Sequent::PairImpossibility {
@@ -2209,7 +2167,7 @@ mod tests {
 
             assert!(sequents.is_some_and(|sequents| {
                 sequents
-                    .all_sequents(db)
+                    .all_sequents()
                     .any(|sequent| matches!(sequent, Sequent::SingleImplication { .. }))
             }));
         }
