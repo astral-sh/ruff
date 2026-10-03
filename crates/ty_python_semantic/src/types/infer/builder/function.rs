@@ -1537,12 +1537,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
         let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
-        let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
+        let Some(parameters) = callable.single_parameters(self.db()) else {
             // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
+        let parameter_type = parameters.as_slice()[index as usize].annotated_type();
         (!parameter_type.has_provisional_marker(db, self.program_environment()))
             .then_some(parameter_type)
     }

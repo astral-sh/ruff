@@ -9447,6 +9447,20 @@ impl<'db> Type<'db> {
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {
+            // A lambda's parameters are available without evaluating its return query.
+            // Inspecting that query here would expand recursive signatures before the
+            // specialization can create a stable reference to the transformed lambda.
+            let callable_parameters = match self {
+                Type::Callable(callable) => callable.single_parameters(db),
+                Type::BoundMethod(method)
+                | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                    method
+                        .func(db)
+                        .as_callable()
+                        .and_then(|callable| callable.single_parameters(db))
+                }
+                _ => None,
+            };
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
@@ -9456,6 +9470,7 @@ impl<'db> Type<'db> {
             };
 
             let signatures = match self {
+                _ if callable_parameters.is_some() => None,
                 Type::FunctionLiteral(function) => function_signatures(function),
                 Type::BoundMethod(method)
                 | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
@@ -9472,11 +9487,15 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let union_paramspecs = signatures
+            let union_paramspecs = callable_parameters
                 .into_iter()
-                .flat_map(|signatures| signatures.iter())
-                .filter_map(|signature| {
-                    let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
+                .chain(
+                    signatures
+                        .into_iter()
+                        .flat_map(|signatures| signatures.iter().map(Signature::parameters)),
+                )
+                .filter_map(|parameters| {
+                    let (_, typevar) = parameters.as_paramspec_with_prefix()?;
                     let Type::Union(union) = specialization.get(db, typevar)? else {
                         return None;
                     };
@@ -10817,9 +10836,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 nominal_instance_type.variance_of(db, env, typevar)
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar),
-            Type::Callable(callable_type) => {
-                callable_type.signatures(db).variance_of(db, env, typevar)
-            }
+            Type::Callable(callable_type) => callable_type.variance_of(db, env, typevar),
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
@@ -10927,7 +10944,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
@@ -10967,7 +10984,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
 /// is in the MRO of the self type's class.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,

@@ -132,12 +132,12 @@ use crate::types::{
     ClassType, DynamicType, GeneratorTypeMode, InferenceFlags, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
-    Parameter, Parameters, ProgramEnvironment, PropertyDeprecations, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypingModule,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
-    is_discarded_dict_key_assignment, todo_type,
+    Parameter, ParameterDefault, Parameters, ProgramEnvironment, PropertyDeprecations,
+    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
+    binding_type, extract_fixed_length_iterable_element_types, infer_complete_scope_types,
+    infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
 use ty_python_core::definition::{
@@ -7957,6 +7957,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Combine equivalent element types before creating constraints. Otherwise a collection
+        // of distinct lambdas with the same signature makes the solver compare every pair.
+        let mut inferred_types: [Option<UnionAccumulator<'db>>; N] = std::array::from_fn(|_| None);
+        let mut add_inferred_type = |index: usize, typevar: BoundTypeVarInstance<'db>, ty| {
+            // Custom typesheds can constrain collection type variables. Preserve the individual
+            // bound checks and their early return so callers can retry failed inference.
+            if typevar.typevar(db).bound_or_constraints(db, env).is_some() {
+                return builder.infer(Type::TypeVar(typevar), ty).ok();
+            }
+            match &mut inferred_types[index] {
+                Some(accumulator) => accumulator.add(db, env, ty),
+                inferred => *inferred = Some(UnionAccumulator::new(ty)),
+            }
+            Some(())
+        };
+
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
@@ -7995,11 +8011,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         unpacked_value_ty.promote(db, env),
                     );
 
-                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
-
-                    builder
-                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
-                        .ok()?;
+                    add_inferred_type(0, key_ty, unpacked_key_ty)?;
+                    add_inferred_type(1, value_ty, unpacked_value_ty)?;
                 }
 
                 continue;
@@ -8074,8 +8087,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     inferred_type_for_typevar,
                 );
 
+                add_inferred_type(i, elt_ty, inferred_type_for_typevar)?;
+            }
+        }
+
+        for (elt_ty, inferred_ty) in elt_tys.zip(inferred_types) {
+            if let Some(inferred_ty) = inferred_ty {
                 builder
-                    .infer(Type::TypeVar(elt_ty), inferred_type_for_typevar)
+                    .infer(Type::TypeVar(elt_ty), inferred_ty.into_type(db, env))
                     .ok()?;
             }
         }
@@ -8715,6 +8734,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_expression(&lambda_expression.body, tcx);
     }
 
+    /// Infer a lambda default for diagnostics and retain its source when available.
+    fn infer_lambda_parameter_default(
+        &mut self,
+        parameter: &ast::ParameterWithDefault,
+    ) -> Option<ParameterDefault<'db>> {
+        let default_ty = self.infer_expression(parameter.default()?, TypeContext::default());
+        Some(self.index.try_definition(&parameter.parameter).map_or(
+            ParameterDefault::Inferred(default_ty),
+            ParameterDefault::Deferred,
+        ))
+    }
+
     fn infer_lambda_expression(
         &mut self,
         lambda_expression: &ast::ExprLambda,
@@ -8765,10 +8796,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_only(Some(param.name().id.clone()))
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
+                        .with_optional_default(self.infer_lambda_parameter_default(param));
 
                     if let Some(annotated_type) = parameter_types.next() {
                         parameter.with_annotated_type(annotated_type)
@@ -8783,10 +8811,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     let parameter = Parameter::positional_or_keyword(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }));
+                        .with_optional_default(self.infer_lambda_parameter_default(param));
 
                     if let Some(annotated_type) = parameter_types.next() {
                         parameter.with_annotated_type(annotated_type)
@@ -8805,10 +8830,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|param| {
                     Parameter::keyword_only(param.name().id.clone())
                         .with_inferred_type(Type::Dynamic(DynamicType::UnknownLambdaParameter))
-                        .with_optional_default_type(param.default().map(|default_expr| {
-                            self.infer_expression(default_expr, TypeContext::default())
-                                .replace_parameter_defaults(db, env)
-                        }))
+                        .with_optional_default(self.infer_lambda_parameter_default(param))
                 })
                 .collect::<Vec<_>>();
             let keyword_variadic = parameters.kwarg.as_ref().map(|param| {
@@ -8856,11 +8878,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
-        Type::Callable(CallableType::new(
+        Type::Callable(CallableType::lambda(
             self.db(),
-            CallableSignature::single(Signature::new(parameters, return_ty)),
-            CallableTypeKind::FunctionLike,
+            parameters,
+            scope,
+            lambda_expression.body.as_ref().into(),
+            return_tcx,
         ))
     }
 

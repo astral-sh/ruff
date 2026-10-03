@@ -2101,6 +2101,87 @@ static_assert(not is_assignable_to(GoodInferredInvariant[B], GoodInferredInvaria
 static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvariant[B]))
 ```
 
+## Inferred variance for recursive lambdas
+
+A read-only recursive lambda that produces `T` preserves covariance:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Callable, Final, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Producer(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, self.node)
+
+static_assert(is_subtype_of(Producer[int], Producer[object]))
+static_assert(not is_subtype_of(Producer[object], Producer[int]))
+
+node = Producer(1).node
+reveal_type(node()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
+```
+
+Returning a consumer of `T` makes the recursive lambda contravariant:
+
+```py
+class Consumer(Generic[T]):
+    def __init__(self, consume: Callable[[T], None]):
+        self.node: Final = lambda: (consume, self.node)
+
+static_assert(is_subtype_of(Consumer[object], Consumer[int]))
+static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
+Returning a callable that both accepts and returns `T` makes it invariant:
+
+```py
+class Transformer(Generic[T]):
+    def __init__(self, transform: Callable[[T], T]):
+        self.node: Final = lambda: (transform, self.node)
+
+static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
+static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Inferred variance for writable recursive lambda attributes
+
+A writable lambda attribute makes the class invariant, even when the lambda only produces `T`.
+Accessing the lambda through a specialized instance substitutes the class's type argument.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.node = lambda: (value, self.node)
+
+static_assert(not is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+
+box = Box(1)
+reveal_type(box.node()[0])  # revealed: int
+reveal_type(box.node()[1]()[0])  # revealed: int
+reveal_type(box.node()[1]()[1]()[0])  # revealed: int
+```
+
 ## Inferred variance for classmethod wrappers
 
 A classmethod exposes its wrapped callable through `__func__`, including any mutable attributes. In
