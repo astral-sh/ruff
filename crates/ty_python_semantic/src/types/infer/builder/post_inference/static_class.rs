@@ -218,11 +218,6 @@ fn method_exit_declarations<'db>(
     .collect()
 }
 
-/// Returns whether the `def` statement of the method in `method_scope_id` is reachable in the
-/// class body.
-///
-/// Declarations in a method defined under a statically false condition, such as a
-/// `sys.version_info` check for another Python version, never take effect.
 fn method_definition_is_reachable<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
