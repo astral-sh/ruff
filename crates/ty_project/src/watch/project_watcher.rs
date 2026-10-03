@@ -261,7 +261,7 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
     let included_paths = ruff_db::system::deduplicate_nested_paths(
         std::iter::once(project_path).chain(workspace_root).chain(
             project
-                .included_paths_list(db)
+                .included_paths_or_root(db)
                 .iter()
                 .map(SystemPathBuf::as_path),
         ),
