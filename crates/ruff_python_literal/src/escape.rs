@@ -85,7 +85,9 @@ impl<'a> UnicodeEscape<'a> {
     /// [`NfcInert`]: https://docs.rs/icu_properties/latest/icu_properties/props/struct.NfcInert.html
     #[must_use]
     pub fn escape_for_display(mut self) -> Self {
-        if self.escape_for_display {
+        // ASCII is already NFC and has no combining marks or default-ignorable characters, so it
+        // needs no additional escaping for display.
+        if self.escape_for_display || self.source.is_ascii() {
             return self;
         }
         self.escape_for_display = true;
