@@ -1,9 +1,10 @@
 use crate::Db;
 use crate::diagnostic::format_enumeration;
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{ReachabilityConstraintsExtension, is_range_reachable};
 use itertools::{Either, Itertools};
 use ruff_db::{
     diagnostic::{Annotation, Span},
+    parsed::ParsedModuleRef,
     source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
@@ -188,8 +189,7 @@ fn annotated_declarations<'map, 'db>(
 ///
 /// The declarations at the end of the method's scope tell us which ones were not replaced.
 /// Their reachability is not used, because a trailing `return` makes the end of the scope
-/// unreachable. Declarations in a branch that ends in `return` are not tracked at the end of the
-/// scope either, so they are not checked for conflicts.
+/// unreachable.
 fn method_exit_declarations<'db>(
     context: &InferContext<'db, '_>,
     index: &SemanticIndex<'db>,
@@ -218,51 +218,24 @@ fn method_exit_declarations<'db>(
     .collect()
 }
 
-/// Returns whether the method defined in `method_scope_id` is still bound to its name when the
-/// class body finishes executing.
+/// Returns whether the `def` statement of the method in `method_scope_id` is reachable in the
+/// class body.
 ///
-/// A later method with the same name, a `del` statement, or a statically false condition can
-/// remove a method from the class. Declarations in such a method usually never take effect, so
-/// they do not take part in conflict checking:
-///
-/// ```python
-/// class C:
-///     def set_value(self) -> None:
-///         self.x: int = 1  # never runs
-///
-///     def set_value(self) -> None:
-///         self.x: str = ""
-/// ```
-///
-/// A method that is no longer bound to its name can still run if something else kept a reference
-/// to it, such as the `@p.setter` decorator of a property `p`, which keeps the getter, or an
-/// assignment like `__init__ = _init`. Declarations in such methods are not checked for conflicts.
-fn method_is_bound_at_class_exit<'db>(
+/// Declarations in a method defined under a statically false condition, such as a
+/// `sys.version_info` check for another Python version, never take effect.
+fn method_definition_is_reachable<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
+    module: &ParsedModuleRef,
     class_scope_id: FileScopeId,
     method_scope_id: FileScopeId,
 ) -> bool {
-    let Some(function) = index.scope(method_scope_id).node().as_function() else {
-        return false;
-    };
-    let Some(definition) = index.try_definition(function) else {
-        return false;
-    };
-    let Some(symbol_id) = definition.place(db).as_symbol() else {
-        return false;
-    };
-    let use_def = index.use_def_map(class_scope_id);
-    use_def
-        .end_of_scope_symbol_bindings(symbol_id)
-        .any(|binding| {
-            binding
-                .binding
-                .is_defined_and(|binding| binding == definition)
-                && !use_def
-                    .reachability_constraints()
-                    .evaluate(db, use_def.predicates(), binding.reachability_constraint)
-                    .is_always_false()
+    index
+        .scope(method_scope_id)
+        .node()
+        .as_function()
+        .is_some_and(|function| {
+            is_range_reachable(db, index, class_scope_id, function.node(module).range())
         })
 }
 
@@ -389,7 +362,13 @@ fn check_conflicting_attribute_declarations<'db>(
         let mut classmethod_declarations = Vec::new();
         for scope_id in attribute_scopes(db, class_body_scope) {
             let method_kind = *method_kinds.entry(scope_id).or_insert_with(|| {
-                if method_is_bound_at_class_exit(db, index, class_scope_id, scope_id) {
+                if method_definition_is_reachable(
+                    db,
+                    index,
+                    context.module(),
+                    class_scope_id,
+                    scope_id,
+                ) {
                     classify_method(db, index, context.module(), index.scope(scope_id))
                 } else {
                     None

@@ -458,7 +458,7 @@ class C:
         if flag:
             self.x: int = 1
             return
-        self.x: str = "a"  # TODO: should be an error
+        self.x: str = "a"  # TODO: error: [conflicting-declarations]
 
     def reset_value(self, flag: bool) -> None:
         if flag:
@@ -466,7 +466,7 @@ class C:
             return
 
     def clear_value(self) -> None:
-        self.y: str = ""  # TODO: should be an error
+        self.y: str = ""  # TODO: error: [conflicting-declarations]
 ```
 
 When every branch returns, only the declarations from the last branch are compared, so a conflict
@@ -479,7 +479,7 @@ class C:
             self.x: int = 1
             return 1
         else:
-            self.x: str = "a"  # TODO: should be an error
+            self.x: str = "a"  # TODO: error: [conflicting-declarations]
             return 2
 ```
 
@@ -493,7 +493,7 @@ class C:
         self.x: str = "a"
 ```
 
-#### Method definitions active at class scope exit
+#### Replaced and unreachable methods
 
 Declarations in a statically unreachable method definition do not participate in conflict checking.
 
@@ -504,68 +504,12 @@ class C:
             self.x: int = 1
 
     def reset_value(self) -> None:
-        self.x: str = "a"
+        self.x: str = "a"  # no diagnostic
 ```
 
-A later method definition replaces an earlier method with the same name, so declarations in the
-replaced method do not participate in conflict checking.
-
-```py
-class C:
-    def set_value(self) -> None:
-        self.x: int = 1
-
-    def set_value(self) -> None:
-        self.x: str = "a"
-```
-
-A replaced method is also ignored when the class body declares the attribute.
-
-```py
-class C:
-    x: str
-
-    def set_value(self) -> None:
-        self.x: int = 1
-
-    def set_value(self) -> None:
-        self.x: str = "a"
-```
-
-Deleting a method name removes its declarations from conflict checking when no method binding
-remains at class scope exit.
-
-```py
-class C:
-    def set_value(self) -> None:
-        self.x: int = 1
-
-    del set_value
-
-    def reset_value(self) -> None:
-        self.x: str = "a"
-```
-
-When a condition is not statically known, either method definition can remain bound at class scope
-exit. Their declarations can therefore conflict.
-
-```py
-def flag() -> bool:
-    return True
-
-class C:
-    if flag():
-        def set_value(self) -> None:
-            self.x: int = 1
-
-    else:
-        def set_value(self) -> None:
-            self.x: str = "a"  # error: [conflicting-declarations]
-```
-
-A method that is no longer bound to its own name at class scope exit can still run if something else
-kept a reference to it. We do not detect this, so declarations in such a method are not checked for
-conflicts. One example is the getter of a property, whose name the setter rebinds:
+A method can still run after a later binding replaces its name. For example, the getter of a
+property still runs when `value` is read, even though the setter rebinds `value`. Declarations in
+such methods are therefore compared like any other.
 
 ```py
 class C:
@@ -576,11 +520,10 @@ class C:
 
     @value.setter
     def value(self, new_value: int) -> None:
-        # TODO: should be an error, since the getter still runs when `value` is read
-        self._cache: str = ""
+        self._cache: str = ""  # error: [conflicting-declarations]
 ```
 
-Another example is a method that is assigned to another name before its own name is deleted:
+The same holds for a method that is assigned to another name before its own name is deleted.
 
 ```py
 class C:
@@ -591,8 +534,18 @@ class C:
     del _init
 
     def reset_value(self) -> None:
-        # TODO: should be an error, since `_init` still runs as `__init__`
-        self.x: str = ""
+        self.x: str = ""  # error: [conflicting-declarations]
+```
+
+A method that is redefined with the same name is compared as well.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+
+    def set_value(self) -> None:
+        self.x: str = "a"  # error: [conflicting-declarations]
 ```
 
 #### Class-method declaration conflicts
