@@ -28,10 +28,6 @@ class Foo:
     def this_is_bad_too(__x: int) -> None: ...  # PYI063
     @classmethod
     def not_good(cls, __foo: int) -> None: ...  # PYI063
-    def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
-
-    @staticmethod
-    def __new__(__cls, __name: str, __later: str) -> Self: ...  # PYI063
 
     # The first non-self argument isn't positional-only, so logically the second can't be either:
     def okay1(self, x: int, __y: int) -> None: ...
@@ -66,3 +62,6 @@ class GoodMetaclass(type):
 class GoodMetaclass2(type):
     @classmethod
     def __new__(metacls, name: str, bases: tuple[type, ...], namespace: dict, /, **kwds) -> Self: ...
+
+class NewMethod:
+    def __new__(cls, __name: str, __later: str) -> Self: ...  # PYI063
