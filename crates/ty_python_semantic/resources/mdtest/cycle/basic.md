@@ -502,6 +502,54 @@ finally:
     from unknown_module import member as result  # error: [unresolved-import]
 ```
 
+## Recursive class decorator error recovery
+
+The decorator returns a container of the class's eventual binding. An invalid decorator on another
+definition introduces an unknown alternative, but does not prevent recursive inference from
+converging or suppress the decorator errors.
+
+```py
+def check(condition: bool):
+    @lambda cls: {value}
+    class Result: ...
+
+    if condition:
+        raise
+
+    # error: [call-non-callable]
+    # error: [invalid-argument-type]
+    @{**(lambda: value)}
+    def value(): ...
+
+    value = Result
+    reveal_type(Result)  # revealed: set[Divergent]
+    invalid: int = Result  # error: [invalid-assignment]
+```
+
+## Recursive function decorator recovery preserves tuple entries
+
+Only the recursive part is approximated. Other tuple entries retain their types and still produce
+ordinary assignment errors.
+
+```py
+def check(condition: bool):
+    @lambda function: (1, value)
+    def result(): ...
+
+    if condition:
+        raise
+
+    # error: [call-non-callable]
+    # error: [invalid-argument-type]
+    @{**(lambda: value)}
+    def value(): ...
+
+    value = result
+    reveal_type(result)  # revealed: tuple[Literal[1], Divergent]
+    reveal_type(result[0])  # revealed: Literal[1]
+    invalid: str = result[0]  # error: [invalid-assignment]
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.

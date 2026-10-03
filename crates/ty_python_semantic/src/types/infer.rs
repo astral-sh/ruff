@@ -234,7 +234,12 @@ fn normalize_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        let marker = if has_decorators(db, definition) {
+            Type::divergent_decorator(id)
+        } else {
+            Type::divergent(id)
+        };
+        DefinitionInference::cycle_initial(db, definition, marker)
     },
     cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
         inference.cycle_normalized(db, previous, cycle, definition)
@@ -269,6 +274,19 @@ pub(crate) fn infer_definition_types<'db>(
         &module,
     )
     .finish_definition(definition)
+}
+
+/// Whether decorators can replace the type of this definition's binding.
+#[salsa::tracked(returns(copy))]
+fn has_decorators<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    match definition.kind(db) {
+        DefinitionKind::Function(function) => function.has_decorators(),
+        DefinitionKind::Class(class) => {
+            let module = parsed_module(db, definition.python_file(db)).load(db);
+            !class.node(&module).decorator_list.is_empty()
+        }
+        _ => false,
+    }
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

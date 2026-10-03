@@ -2280,6 +2280,14 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// A decorated binding whose recursive structure is normalized by its defining query.
+    fn divergent_decorator(id: salsa::Id) -> Self {
+        Self::Divergent(DivergentType {
+            flags: DivergentFlags::FROM_DECORATOR,
+            ..DivergentType::new(id)
+        })
+    }
+
     /// Returns a divergent marker for a cycle in type alias inference.
     fn divergent_alias(id: salsa::Id) -> Self {
         Self::Divergent(DivergentType {
@@ -2327,7 +2335,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns `true` if both types reference the same recursive query, or both represent
+    /// Returns `true` if both types reference the same recursive approximation, or both represent
     /// pending narrowing, regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
         match (self, other) {
@@ -3654,10 +3662,18 @@ impl<'db> Type<'db> {
                     .head_ids()
                     .any(|id| ty.same_divergent_marker(Type::divergent(id)))
             });
-        cycle.head_ids().fold(normalized, |ty, id| {
-            ty.recursive_type_normalized_impl(db, env, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
-        })
+        // A decorator can wrap its own binding in a container. An intermediate query may see
+        // only `Unknown | binding`; dropping the binding's marker there loses the recursion
+        // before the defining query sees the enclosing container. Normalize these markers only
+        // at their owner, while retaining the usual recovery for the other heads in the cycle.
+        cycle
+            .head_ids()
+            .map(Type::divergent)
+            .chain(std::iter::once(Type::divergent_decorator(cycle.id())))
+            .fold(normalized, |ty, divergent| {
+                ty.recursive_type_normalized_impl(db, env, divergent, false)
+                    .unwrap_or(divergent)
+            })
     }
 
     /// Discard unresolved narrowing while preserving recursive structure around it. A bare
@@ -11206,6 +11222,8 @@ bitflags! {
         /// The cycle comes from type alias inference. Value inference can also diverge,
         /// for example when an assignment feeds into the next iteration of a loop.
         const FROM_TYPE_ALIAS = 1 << 0;
+        /// Only the defining query can normalize this decorated binding's recursive marker.
+        const FROM_DECORATOR = 1 << 2;
     }
 }
 
@@ -11250,6 +11268,8 @@ impl DivergentType {
 
     fn same_marker(self, other: Self) -> bool {
         self.origin == other.origin
+            && self.flags.contains(DivergentFlags::FROM_DECORATOR)
+                == other.flags.contains(DivergentFlags::FROM_DECORATOR)
     }
 
     const fn materialized(self, kind: MaterializationKind) -> Self {

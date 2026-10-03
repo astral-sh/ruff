@@ -3731,5 +3731,29 @@ def check(setter: ConstrainedSetter) -> None:
     writable: HasValue = setter  # error: [invalid-assignment]
 ```
 
+## Recursive decorator recovery preserves enclosing type variables
+
+A recursive decorator result retains the enclosing function's type variable in its nonrecursive
+entries, even when another decorator is invalid.
+
+```py
+def check[T](payload: T, condition: bool):
+    @lambda cls: (payload, value)
+    class Result: ...
+
+    if condition:
+        raise
+
+    # error: [call-non-callable]
+    # error: [invalid-argument-type]
+    @{**(lambda: value)}
+    def value(): ...
+
+    value = Result
+    reveal_type(Result)  # revealed: tuple[T@check, Divergent]
+    reveal_type(Result[0])  # revealed: T@check
+    retained: T = Result[0]
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
