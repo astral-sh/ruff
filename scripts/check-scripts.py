@@ -7,6 +7,7 @@
 # ]
 #
 # [tool.ty.rules]
+# non-exhaustive-match = "warn"
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"
@@ -83,6 +84,8 @@ def scripts() -> Iterator[Path]:
             match full_path.relative_to(ROOT).parts:
                 case ("crates", _, "resources", *_):
                     continue
+                case _:
+                    pass
 
             if (
                 full_path.is_symlink()

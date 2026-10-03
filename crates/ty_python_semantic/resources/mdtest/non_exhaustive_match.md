@@ -908,6 +908,15 @@ note: This is a display-only fix and is likely to be incorrect
 from typing import Literal
 
 def describe(value: Literal["handled", "\x1b", "\u200b", "\U000e0001"]) -> None:
+    # A snapshot would also check the suggested `case` for these escaped values.
+    # However, mdtest normalizes Windows path separators (`\`) to `/` in rendered
+    # snapshots so the same snapshots work on all platforms. Its filter acts on
+    # the entire diagnostic and matches a backslash followed by two word
+    # characters, among other patterns. It therefore rewrites `\x1b` as
+    # `/x1b`, including in the suggested `case`; `\n` below is not affected.
+    # We therefore use an error assertion to check the diagnostic message without
+    # this filter until snapshots can preserve these escapes.
+    #
     # error: [non-exhaustive-match] "Match is not exhaustive: values `"\x1b"`, `"\u200b"` and `"\U000e0001"` are not covered"
     match value:
         case "handled":
@@ -923,17 +932,17 @@ def line_break(value: Literal["handled", "\n"]) -> None:
 
 ```snapshot
 error[non-exhaustive-match]: Match is not exhaustive: value `"\n"` is not covered
- --> src/mdtest_snippet.py:9:11
-  |
-9 |     match value:  # snapshot: non-exhaustive-match
-  |           ^^^^^ Subject has type `Literal["handled", "\n"]`
+  --> src/mdtest_snippet.py:18:11
+   |
+18 |     match value:  # snapshot: non-exhaustive-match
+   |           ^^^^^ Subject has type `Literal["handled", "\n"]`
 help: Add a `case` branch for the remaining values
    |
-10 |         case "handled":
+19 |         case "handled":
    -             pass
-11 +             pass
-12 +         case "\n":
-13 +             raise NotImplementedError("TODO")
+20 +             pass
+21 +         case "\n":
+22 +             raise NotImplementedError("TODO")
    |
 note: This is a display-only fix and is likely to be incorrect
 ```
@@ -1242,7 +1251,7 @@ help: Add a `case` branch for the remaining values
 note: This is a display-only fix and is likely to be incorrect
 ```
 
-## A missing `None` case
+## A missing `case None`
 
 ```py
 from typing import Literal
@@ -1315,7 +1324,7 @@ help: Add a `case` branch for the remaining values
 note: This is a display-only fix and is likely to be incorrect
 ```
 
-## An enum import alias without an enum case
+## An enum import alias without an enum `case`
 
 `colors.py`:
 
@@ -1361,7 +1370,7 @@ help: Add a `case` branch for the remaining values
 note: This is a display-only fix and is likely to be incorrect
 ```
 
-## A module import alias without an enum case
+## A module import alias without an enum `case`
 
 `colors.py`:
 
@@ -2061,13 +2070,13 @@ help: Add a `case` branch for the remaining values
 note: This is a display-only fix and is likely to be incorrect
 ```
 
-## Suggested wildcard case
+## Suggested wildcard `case`
 
 ```py
 def describe(value: int | str) -> None:
     match value:  # snapshot: non-exhaustive-match
         case int():
-            pass  # Kept with the existing case.
+            pass  # Kept with the existing `case`.
 ```
 
 ```snapshot
@@ -2079,8 +2088,8 @@ error[non-exhaustive-match]: Match is not exhaustive: objects of type `str` are 
 help: Add a `case` branch for the remaining values
   |
 3 |         case int():
-  -             pass  # Kept with the existing case.
-4 +             pass  # Kept with the existing case.
+  -             pass  # Kept with the existing `case`.
+4 +             pass  # Kept with the existing `case`.
 5 +         case _:
 6 +             raise NotImplementedError("TODO")
   |
@@ -2097,7 +2106,7 @@ def describe(value: Literal[1, 2], enabled: bool) -> None:
         match value:  # snapshot: non-exhaustive-match
             case 1:
                 pass
-                # This comment belongs to the existing case.
+                # This comment belongs to the existing `case`.
 ```
 
 ```snapshot
@@ -2109,15 +2118,15 @@ error[non-exhaustive-match]: Match is not exhaustive: value `2` is not covered
 help: Add a `case` branch for the remaining values
    |
 7  |                 pass
-   -                 # This comment belongs to the existing case.
-8  +                 # This comment belongs to the existing case.
+   -                 # This comment belongs to the existing `case`.
+8  +                 # This comment belongs to the existing `case`.
 9  +             case 2:
 10 +                 raise NotImplementedError("TODO")
    |
 note: This is a display-only fix and is likely to be incorrect
 ```
 
-## Single-line case body
+## Single-line `case` body
 
 ```py
 from typing import Literal
@@ -2125,7 +2134,7 @@ from typing import Literal
 def describe(value: Literal["red", "green"]) -> None:
     # fmt: off
     match value:  # snapshot: non-exhaustive-match
-        case "red": pass  # Kept with the existing case.
+        case "red": pass  # Kept with the existing `case`.
     # fmt: on
 ```
 
@@ -2137,7 +2146,7 @@ error[non-exhaustive-match]: Match is not exhaustive: value `"green"` is not cov
   |           ^^^^^ Subject has type `Literal["red", "green"]`
 help: Add a `case` branch for the remaining values
   |
-6 |         case "red": pass  # Kept with the existing case.
+6 |         case "red": pass  # Kept with the existing `case`.
 7 +         case "green":
 8 +             raise NotImplementedError("TODO")
 9 |     # fmt: on
@@ -2326,8 +2335,8 @@ note: This is a display-only fix and is likely to be incorrect
 
 ## Guards
 
-An enum reference such as `Color` can be rebound by a guard before the suggested case is reached,
-causing that case to refer to a different object. Ty therefore suggests a wildcard even when the
+An enum reference such as `Color` can be rebound by a guard before the suggested `case` is reached,
+causing that `case` to refer to a different object. Ty therefore suggests a wildcard even when the
 guard shown does not rebind `Color`. Non-enum literal patterns do not resolve such a name.
 
 ```py

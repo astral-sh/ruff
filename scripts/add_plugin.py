@@ -5,6 +5,7 @@
 # dependencies = []
 #
 # [tool.ty.rules]
+# non-exhaustive-match = "warn"
 # truthiness-test-of-none-union = "warn"
 # blanket-ignore-comment = "warn"
 # missing-type-argument = "warn"

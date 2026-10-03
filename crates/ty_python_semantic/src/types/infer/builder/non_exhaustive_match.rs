@@ -32,8 +32,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// Report values left uncovered by a `match` statement.
     ///
     /// `subject_type` is the type at the start of the match; `remaining` is the type left after
-    /// all cases have been considered. The diagnostic identifies individual missing values when
-    /// possible and may provide a display-only fix.
+    /// all `case` branches have been considered. The diagnostic identifies individual missing
+    /// values when possible and may provide a display-only fix.
     pub(super) fn report_non_exhaustive_match(
         &self,
         match_statement: &ast::StmtMatch,
@@ -204,12 +204,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Suggest a display-only case for the remaining values at the end of the match.
+    /// Suggest a display-only `case` for the remaining values at the end of the match.
     ///
     /// List the remaining values as alternatives when all can be enumerated and there are one to
     /// five of them. If any is an enum member, the match must also have no guards and every enum
     /// class must have an existing, unshadowed runtime reference. Otherwise, use a wildcard. The
-    /// case body raises `NotImplementedError` as a placeholder.
+    /// `case` body raises `NotImplementedError` as a placeholder.
     fn non_exhaustive_match_fix(
         &self,
         match_statement: &ast::StmtMatch,
@@ -257,7 +257,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             line_ending
         };
 
-        // A guard can change an enum reference before the suggested case is reached.
+        // A guard can change an enum reference before the suggested `case` is reached.
         let has_guard = match_statement
             .cases
             .iter()
@@ -289,7 +289,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         Some(Fix::display_only_edit(Edit::insertion(insertion, end)))
     }
 
-    /// Find an in-scope reference to the enum class for a suggested case.
+    /// Find an in-scope reference to the enum class for a suggested `case`.
     ///
     /// Reuse a local definition or an existing runtime import, including an import alias. Return
     /// `None` if the reference has a visible shadowing or reassignment, or needs a new import.
