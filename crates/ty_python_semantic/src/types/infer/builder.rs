@@ -6470,7 +6470,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Use `self.infer_standalone_expression` instead."
         );
 
-        self.infer_expression_impl(expression, tcx)
+        // Long expression chains can exhaust the worker stack even when their source has no
+        // nested parentheses. Grow on demand while preserving contextual inference and caching
+        // for each child expression.
+        stacker::maybe_grow(100 * 1024, 1024 * 1024, || {
+            self.infer_expression_impl(expression, tcx)
+        })
     }
 
     fn infer_expression_with_state(

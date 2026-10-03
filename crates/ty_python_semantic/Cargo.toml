@@ -46,6 +46,7 @@ salsa = { workspace = true, features = ["compact_str", "ordermap"] }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 smallvec = { workspace = true }
+stacker = { workspace = true }
 static_assertions = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
