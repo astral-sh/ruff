@@ -1,0 +1,26 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B008 Do not perform function call `FrozenMutableField` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:23:33
+   |
+23 | def baz(x: FrozenMutableField = FrozenMutableField()) -> None:
+   |                                 ^^^^^^^^^^^^^^^^^^^^
+24 |     ...
+   |
+
+B008 Do not perform function call `NotFrozen` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:32:24
+   |
+32 | def qux(x: NotFrozen = NotFrozen()) -> None:
+   |                        ^^^^^^^^^^^
+33 |     ...
+   |
+
+B008 Do not perform function call `WithMutableDefault` in argument defaults; instead, perform the call within the function, or read the default from a module-level singleton variable
+  --> B008_frozen_dataclass.py:60:50
+   |
+60 | def with_mutable_default(x: WithMutableDefault = WithMutableDefault()) -> None:
+   |                                                  ^^^^^^^^^^^^^^^^^^^^
+61 |     ...
+   |

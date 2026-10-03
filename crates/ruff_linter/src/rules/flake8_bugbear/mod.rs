@@ -35,6 +35,10 @@ mod tests {
     #[test_case(Rule::ExceptWithNonExceptionClasses, Path::new("B030.py"))]
     #[test_case(Rule::FStringDocstring, Path::new("B021.py"))]
     #[test_case(Rule::FunctionCallInDefaultArgument, Path::new("B006_B008.py"))]
+    #[test_case(
+        Rule::FunctionCallInDefaultArgument,
+        Path::new("B008_frozen_dataclass.py")
+    )]
     #[test_case(Rule::FunctionUsesLoopVariable, Path::new("B023.py"))]
     #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"))]
     #[test_case(Rule::JumpStatementInFinally, Path::new("B012.py"))]
