@@ -1975,6 +1975,116 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+### Recursive protocol intersections
+
+Specializing a recursive protocol method preserves the nested intersection through repeated calls.
+Regression test for <https://github.com/astral-sh/ty/issues/4099>.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+from ty_extensions import Intersection, Not
+
+class A[T](Protocol):
+    def make_invariant(self, value: T) -> T: ...
+    def cause_problems(self) -> A[Intersection[Not[A[T]], A[str]]]: ...
+
+def foo[T](x: A[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[T@foo]]
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[A[str] & ~A[A[str] & ~A[T@foo]]]
+```
+
+Inherited methods also preserve the specialization supplied by their generic base.
+
+```py
+class Nested[T](A[list[T]], Protocol): ...
+
+def inherited[T](x: Nested[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
+```
+
+## Specializing descriptor overloads on protocols
+
+A descriptor can select different overloads for different protocol specializations. We specialize
+its declaration before resolving the member type required by the protocol.
+
+```py
+from __future__ import annotations
+from typing import Callable, Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Descriptor[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> str: ...
+    @overload
+    def __get__(self: Descriptor[str], instance: object, owner: type | None = None) -> bytes: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str | bytes:
+        raise NotImplementedError
+
+class HasValue[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+class BytesValue:
+    @property
+    def value(self) -> bytes:
+        return b"value"
+
+static_assert(is_assignable_to(BytesValue, HasValue[str]))
+static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
+## Specializing protocol attributes to methods
+
+An attribute specialized to a function is checked as a method. The bound signatures match even
+though their unbound receivers have different types.
+
+```py
+from typing import Protocol, cast
+
+def method(self: object) -> int:
+    return 1
+
+class HasMethod[T](Protocol):
+    method: T = cast(T, method)
+
+class Concrete:
+    def method(self) -> int:
+        return 1
+
+def preserve[T](value: HasMethod[T], signature: T) -> HasMethod[T]:
+    return value
+
+reveal_type(preserve(Concrete(), method).method())  # revealed: int
+```
+
+## Specializing protocol attributes to callbacks
+
+A member specialized to an ordinary `__call__` method describes the candidate's call signature. A
+class's `__call__` attribute does not determine what constructing that class returns.
+
+```py
+from typing import Protocol, cast
+
+def call(self: object) -> int:
+    return 1
+
+class Callback[T](Protocol):
+    __call__: T = cast(T, call)
+
+class Concrete:
+    @staticmethod
+    def __call__() -> int:
+        return 1
+
+def preserve[T](value: Callback[T], signature: T) -> Callback[T]:
+    return value
+
+result: int = preserve(Concrete, call)()  # error: [invalid-argument-type]
+```
+
 ## Subscripting non-generic classes
 
 Subscripting a non-generic class in a type expression is an error. The invalid type expression

@@ -924,10 +924,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             db,
             ty,
             source_interface,
-            ProtocolInterfaceView::new(
-                target_non_recursive,
-                target_interface.materialization_kind(),
-            ),
+            target_interface.with_interface(target_non_recursive),
         );
 
         // A skipped member can be the only source of information about a type variable. In this
@@ -1698,7 +1695,7 @@ impl<'db> ProtocolInstanceType<'db> {
             origin,
             Type::ProtocolInstance(target),
         );
-        let target = ProtocolInterfaceView::new(non_recursive, interface.materialization_kind());
+        let target = interface.with_interface(non_recursive);
         if target.member_count(db) == 0 {
             return None;
         }
@@ -1742,14 +1739,14 @@ impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
     fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         match self {
-            Self::FromClass(class) => ProtocolInterfaceView::new(class.interface(db), None),
+            Self::FromClass(class) => class.interface_view(db),
             Self::Synthesized(synthesized) => {
                 ProtocolInterfaceView::new(synthesized.interface(), None)
             }
-            Self::Materialized(materialized) => ProtocolInterfaceView::new(
-                materialized.origin(db).unmaterialized_interface(db),
-                Some(materialized.materialization_kind(db)),
-            ),
+            Self::Materialized(materialized) => materialized
+                .origin(db)
+                .unmaterialized_interface(db)
+                .with_materialization(Some(materialized.materialization_kind(db))),
         }
     }
 
