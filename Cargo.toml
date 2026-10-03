@@ -124,6 +124,7 @@ hashbrown = { version = "0.17.0", default-features = false, features = [
     "inline-more",
 ] }
 heck = { version = "0.5.0", default-features = false }
+icu_normalizer = { version = "2.1.2", default-features = false, features = ["compiled_data"] }
 icu_properties = { version = "2.1.2", default-features = false, features = ["compiled_data"] }
 ignore = { version = "0.4.30", default-features = false }
 imara-diff = { version = "0.2.0", default-features = false }

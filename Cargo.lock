@@ -3626,6 +3626,7 @@ name = "ruff_python_literal"
 version = "0.0.16"
 dependencies = [
  "bitflags 2.13.1",
+ "icu_normalizer",
  "icu_properties",
  "itertools 0.15.0",
  "ruff_python_ast",

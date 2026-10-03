@@ -11,7 +11,7 @@ use ruff_db::files::FilePath;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
-use ruff_python_literal::escape::AsciiEscape;
+use ruff_python_literal::escape::{AsciiEscape, UnicodeEscape};
 use ruff_source_file::LineColumn;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -34,9 +34,9 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
-    PropertyInstanceType, Protocol, SpecialFormType, StringLiteralType, SubclassOfInner,
-    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType,
-    WrapperDescriptorKind, visitor,
+    PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
+    visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -1659,7 +1659,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         .write_str(if boolean { "True" } else { "False" })
                 }
                 LiteralValueTypeKind::String(string) => {
-                    write!(f.with_type(self.ty), "{}", string.display(db))
+                    let escape =
+                        UnicodeEscape::with_preferred_quote(string.value(db), Quote::Double)
+                            .escape_for_display();
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        escape.str_repr(TripleQuotes::No)
+                    )
                 }
                 // We used to return `str` as the type here because that feels generally more useful.
                 // However, the inconsistency between the type shown in the inlay hint and its hover, and the
@@ -3816,23 +3823,6 @@ impl Display for DisplayTypeArray<'_, '_> {
     }
 }
 
-impl<'db> StringLiteralType<'db> {
-    fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
-        std::fmt::from_fn(move |f| {
-            f.write_char('"')?;
-            for ch in self.value(db).chars() {
-                match ch {
-                    // `escape_debug` will escape even single quotes, which is not necessary for our
-                    // use case as we are already using double quotes to wrap the string.
-                    '\'' => f.write_char('\''),
-                    _ => ch.escape_debug().fmt(f),
-                }?;
-            }
-            f.write_char('"')
-        })
-    }
-}
-
 pub(crate) struct DisplayKnownInstanceRepr<'env, 'db> {
     known_instance: KnownInstanceType<'db>,
     db: &'db dyn Db,
@@ -4092,7 +4082,7 @@ mod tests {
             Type::string_literal(&db, r#"""#)
                 .display(&db, &db.program_environment())
                 .to_string(),
-            r#"Literal["\""]"#
+            r#"Literal['"']"#
         );
     }
 
