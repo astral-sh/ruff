@@ -1857,7 +1857,7 @@ impl<'db> UpperBound<'db> {
     }
 
     fn has_inference(&self) -> bool {
-        !self.evidence.is_empty() || !self.mixed.is_empty()
+        self.has_evidence() || !self.mixed.is_empty()
     }
 
     /// Returns an existing upper-bound clause if every other clause is redundant with it.
@@ -3318,6 +3318,30 @@ impl<'db> CandidateTypeVarSolution<'db> {
         )
     }
 
+    /// Selects a lower-bound solution without introducing gradual types from validity bounds.
+    fn lower_solution(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.with_validity_lower(
+            db,
+            env,
+            self.inference_lower(db, env).unwrap_or(Type::Never),
+        )
+    }
+
+    fn with_validity_lower(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        solution: Type<'db>,
+    ) -> Type<'db> {
+        let lower = self.validity_lower.bottom_materialization(db, env);
+        if lower.is_never() {
+            // Avoid expanding aliases when there is no additional lower bound.
+            solution
+        } else {
+            UnionType::from_two_elements(db, env, solution, lower)
+        }
+    }
+
     fn variance(&self) -> TypeVarVariance {
         match (self.has_lower_inference(), self.has_upper_inference()) {
             (false, true) => TypeVarVariance::Covariant,
@@ -3335,7 +3359,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         self.upper.has_inference()
     }
 
-    /// Restricts the range of a gradual solution by the upper bounds inferred for this constraint.
+    /// Restricts the range of a gradual solution by its inferred and declared upper bounds.
     /// Returns `None` if constructing an intersection exceeds the solution budget.
     fn restrict_gradual_solution(
         &self,
@@ -3345,8 +3369,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
     ) -> Option<Type<'db>> {
         if self.selected_declared_constraint.is_some()
             || !self.has_lower_inference()
-            || self.effective_lower(db, env) != solution
-            || !self.upper.has_evidence()
+            || self.lower_solution(db, env) != solution
             || solution.bottom_materialization(db, env) == solution.top_materialization(db, env)
         {
             return Some(solution);
@@ -3354,13 +3377,6 @@ impl<'db> CandidateTypeVarSolution<'db> {
 
         // Unresolved type-variable relationships must not escape into the specialization.
         if solution.has_typevar(db, env) || solution.has_unspecialized_type_var(db, env) {
-            return Some(solution);
-        }
-
-        // `Divergent` is not safely reflexive, so we cannot intersect identical bounds.
-        if UpperBound::single_bound_from_iterator(db, env, self.upper.iter_evidence())
-            == Some(solution)
-        {
             return Some(solution);
         }
 
@@ -3374,11 +3390,22 @@ impl<'db> CandidateTypeVarSolution<'db> {
         let declared_upper = match self.bound_typevar.typevar(db).bound_or_constraints(db, env) {
             // Constrained type variables select solutions from their own set of constraints.
             Some(TypeVarBoundOrConstraints::Constraints(_)) => return Some(solution),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => materialize_upper(bound),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(bound),
             _ => None,
         };
 
-        let mut upper_bounds = self.upper.iter_evidence().filter_map(materialize_upper);
+        // `Divergent` is not safely reflexive. Equal evidence bounds need no further
+        // intersection, but an independent declared bound can still restrict the solution.
+        let evidence_matches_solution =
+            UpperBound::single_bound_from_iterator(db, env, self.upper.iter_evidence())
+                == Some(solution);
+        let mut upper_bounds = self
+            .upper
+            .iter_evidence()
+            .filter(|_| !evidence_matches_solution)
+            .chain(declared_upper)
+            .filter(|bound| *bound != solution)
+            .filter_map(materialize_upper);
         let Some(first_upper) = upper_bounds.next() else {
             return Some(solution);
         };
@@ -3386,9 +3413,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
         let upper_bound = IntersectionType::bounded_from_elements(
             db,
             env,
-            iter::once(first_upper)
-                .chain(upper_bounds)
-                .chain(declared_upper),
+            iter::once(first_upper).chain(upper_bounds),
         )?;
 
         // Restrict the range of each gradual solution by the upper bound of this constraint.
@@ -3983,13 +4008,14 @@ impl<'db> CandidateSolutions<'db> {
                 }
             }
 
-            return PathBoundSolution::Solved(lower);
+            return PathBoundSolution::Solved(path_bound.lower_solution(db, env));
         }
 
         if path_bound.has_upper_inference() {
             // Evidence determines whether to infer a solution, while validity restricts
             // which evidence-compatible solution is permitted. Top-materialize validity
-            // bounds so that their gradual elements do not become part of the result.
+            // upper bounds and bottom-materialize validity lower bounds so that their
+            // gradual elements do not become part of the result.
             let upper_bounds = (path_bound.upper.iter_evidence())
                 .chain(path_bound.upper.iter_mixed())
                 .chain(
@@ -4001,12 +4027,14 @@ impl<'db> CandidateSolutions<'db> {
             if let Some(upper) =
                 UpperBound::single_bound_from_iterator(db, env, upper_bounds.clone())
             {
-                return PathBoundSolution::Solved(upper);
+                return PathBoundSolution::Solved(path_bound.with_validity_lower(db, env, upper));
             }
-            return IntersectionType::bounded_from_elements(db, env, upper_bounds).map_or(
-                PathBoundSolution::BudgetExceeded { fallback: None },
-                PathBoundSolution::Solved,
-            );
+            return IntersectionType::bounded_from_elements(db, env, upper_bounds)
+                .map(|upper| path_bound.with_validity_lower(db, env, upper))
+                .map_or(
+                    PathBoundSolution::BudgetExceeded { fallback: None },
+                    PathBoundSolution::Solved,
+                );
         }
 
         PathBoundSolution::Unsolved

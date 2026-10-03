@@ -425,6 +425,255 @@ def consume_comparable(values: Iterable[ComparableT]) -> None: ...
 consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
+## Declared upper bounds restrict gradual solutions
+
+A declared upper bound restricts the materializations of an inferred gradual type without losing its
+gradual component. Fully static arguments retain their inferred types.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T", bound=int)
+
+def bounded(value: T) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded(any_value))  # revealed: int & Any
+    reveal_type(bounded(unknown_value))  # revealed: int & Unknown
+
+reveal_type(bounded(1))  # revealed: Literal[1]
+reveal_type(bounded(True))  # revealed: Literal[True]
+```
+
+A union bound distributes across the gradual type:
+
+```py
+UnionT = TypeVar("UnionT", bound=int | str)
+
+def bounded_union(value: UnionT) -> UnionT:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded_union(any_value))  # revealed: (int & Any) | (str & Any)
+    reveal_type(bounded_union(unknown_value))  # revealed: (int & Unknown) | (str & Unknown)
+```
+
+Inference through an invariant container preserves the declared bound as well:
+
+```py
+def bounded_element(values: list[T]) -> T:
+    return values[0]
+
+def _(any_values: list[Any], unknown_values: list[Unknown]):
+    reveal_type(bounded_element(any_values))  # revealed: int & Any
+    reveal_type(bounded_element(unknown_values))  # revealed: int & Unknown
+```
+
+A gradual declared bound contributes its top materialization:
+
+```py
+ListT = TypeVar("ListT", bound=list[Any])
+
+def bounded_list(value: ListT) -> ListT:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded_list(any_value))  # revealed: Top[list[Any]] & Any
+    reveal_type(bounded_list(unknown_value))  # revealed: Top[list[Any]] & Unknown
+```
+
+The declared bound alone does not provide evidence for inferring a type:
+
+```py
+def without_input() -> T:
+    raise NotImplementedError
+
+reveal_type(without_input())  # revealed: Unknown
+```
+
+Separate argument evidence can determine a static solution. An incompatible static union arm still
+violates the declared bound.
+
+```py
+def combine(left: T, right: T) -> T:
+    return left
+
+def _(value: int, gradual: Any, invalid: Any | str):
+    reveal_type(combine(value, gradual))  # revealed: int
+    reveal_type(combine(gradual, value))  # revealed: int
+    bounded(invalid)  # error: [invalid-argument-type]
+```
+
+## Overload coverage with bounded invariant arguments
+
+Every valid materialization of `Box[Any]` has a type argument within the class's `int` bound. The
+first overload covers all of them, so the later overload does not make the result ambiguous.
+
+```py
+from typing import Any, Generic, TypeVar, overload
+from typing_extensions import assert_type
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T", bound=int)
+
+class Box(Generic[T]):
+    value: T
+
+@overload
+def choose(value: Box[T]) -> Box[Any]: ...
+@overload
+def choose(value: Box[bool]) -> Box[bool]: ...
+def choose(value: object) -> object:
+    raise NotImplementedError
+
+def _(any_value: Box[Any], unknown_value: Box[Unknown], static_value: Box[int]):
+    assert_type(choose(any_value), Box[Any])
+    assert_type(choose(unknown_value), Box[Any])
+    assert_type(choose(static_value), Box[Any])
+```
+
+A narrower function bound does not cover every materialization allowed by the class. Both overloads
+can then match a gradual argument, and their distinct return types leave the result ambiguous.
+
+```py
+BoolT = TypeVar("BoolT", bound=bool)
+
+@overload
+def narrow(value: Box[BoolT]) -> bool: ...
+@overload
+def narrow(value: Box[Any]) -> int: ...
+def narrow(value: object) -> int:
+    raise NotImplementedError
+
+def _(value: Box[Any]):
+    reveal_type(narrow(value))  # revealed: Unknown
+```
+
+## Gradual declared bounds preserve concrete inference
+
+An `Any` or `Unknown` bound does not add a gradual component to a concrete type inferred from an
+argument:
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions._internal import Unknown
+
+AnyT = TypeVar("AnyT", bound=Any)
+UnknownT = TypeVar("UnknownT", bound=Unknown)
+
+def infer_any(value: AnyT) -> AnyT:
+    return value
+
+def infer_unknown(value: UnknownT) -> UnknownT:
+    return value
+
+def _(value: int):
+    reveal_type(infer_any(value))  # revealed: int
+    reveal_type(infer_unknown(value))  # revealed: int
+```
+
+The same applies when the argument provides only an upper bound through a callback parameter:
+
+```py
+def infer_any_upper(sink: Callable[[AnyT], None]) -> AnyT:
+    raise NotImplementedError
+
+def infer_unknown_upper(sink: Callable[[UnknownT], None]) -> UnknownT:
+    raise NotImplementedError
+
+def _(sink: Callable[[int], None]):
+    reveal_type(infer_any_upper(sink))  # revealed: int
+    reveal_type(infer_unknown_upper(sink))  # revealed: int
+```
+
+A contravariant generic class also provides an upper bound:
+
+```py
+from typing import Generic
+
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Consumer(Generic[T_contra]):
+    def put(self, value: T_contra) -> None: ...
+
+def infer_any_consumer(sink: Consumer[AnyT]) -> AnyT:
+    raise NotImplementedError
+
+def infer_unknown_consumer(sink: Consumer[UnknownT]) -> UnknownT:
+    raise NotImplementedError
+
+def _(sink: Consumer[int]):
+    reveal_type(infer_any_consumer(sink))  # revealed: int
+    reveal_type(infer_unknown_consumer(sink))  # revealed: int
+
+def _(sink: Consumer[Unknown]):
+    reveal_type(infer_any_consumer(sink))  # revealed: Unknown
+    reveal_type(infer_unknown_consumer(sink))  # revealed: Unknown
+```
+
+Nested gradual declared bounds likewise preserve a concrete inferred type:
+
+```py
+AnyTupleT = TypeVar("AnyTupleT", bound=tuple[Any])
+UnknownTupleT = TypeVar("UnknownTupleT", bound=tuple[Unknown])
+
+def infer_any_tuple_consumer(sink: Consumer[AnyTupleT]) -> AnyTupleT:
+    raise NotImplementedError
+
+def infer_unknown_tuple_consumer(sink: Consumer[UnknownTupleT]) -> UnknownTupleT:
+    raise NotImplementedError
+
+def _(sink: Consumer[tuple[int]]):
+    reveal_type(infer_any_tuple_consumer(sink))  # revealed: tuple[int]
+    reveal_type(infer_unknown_tuple_consumer(sink))  # revealed: tuple[int]
+```
+
+An invariant container provides both bounds and also retains its concrete element type:
+
+```py
+def infer_any_element(values: list[AnyT]) -> AnyT:
+    return values[0]
+
+def infer_unknown_element(values: list[UnknownT]) -> UnknownT:
+    return values[0]
+
+def _(values: list[int]):
+    reveal_type(infer_any_element(values))  # revealed: int
+    reveal_type(infer_unknown_element(values))  # revealed: int
+```
+
+## Lower bounds restrict gradual solutions
+
+A gradual upper bound does not erase a static lower bound:
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions._internal import Unknown
+
+T = TypeVar("T")
+
+def infer(value: T, sink: Callable[[T], None]) -> T:
+    return value
+
+def _(value: int, any_sink: Callable[[Any], None], unknown_sink: Callable[[Unknown], None]):
+    reveal_type(infer(value, any_sink))  # revealed: int
+    reveal_type(infer(value, unknown_sink))  # revealed: int
+```
+
+When an invariant argument contributes a gradual lower bound as well, the inferred type retains both
+lower bounds:
+
+```py
+def infer_invariant(value: T, items: list[T]) -> T:
+    return value
+
+def _(value: int, any_items: list[Any], unknown_items: list[Unknown]):
+    reveal_type(infer_invariant(value, any_items))  # revealed: int | Any
+    reveal_type(infer_invariant(value, unknown_items))  # revealed: int | Unknown
+```
+
 ## Inferring a constrained typevar
 
 ```py

@@ -824,7 +824,8 @@ def _(cls: type[Any]):
 ## Inferring gradual tuple returns with concrete bounds
 
 A callback returning `tuple[Any, ...]` satisfies a fixed-length tuple bound because both its
-elements and its length are gradual. Inference preserves the callback's return type.
+elements and its length are gradual. Inference intersects the callback's return type with the
+declared bound, restricting its possible materializations.
 
 ```py
 from typing import Any, Callable
@@ -835,10 +836,11 @@ def get_tuple() -> tuple[Any, ...]:
 def infer_fixed[T: tuple[int]](callback: Callable[[], T]) -> T:
     return callback()
 
-reveal_type(infer_fixed(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_fixed(get_tuple))  # revealed: tuple[int] & tuple[Any, ...]
 ```
 
-The gradual length can also supply required elements at either end of a variable-length bound.
+The gradual length can also supply required elements at either end of a variable-length bound. The
+inferred type retains these required elements and the bound on the remaining elements.
 
 ```py
 def infer_prefix[T: tuple[int, *tuple[int, ...]]](callback: Callable[[], T]) -> T:
@@ -847,8 +849,8 @@ def infer_prefix[T: tuple[int, *tuple[int, ...]]](callback: Callable[[], T]) -> 
 def infer_suffix[T: tuple[*tuple[int, ...], int]](callback: Callable[[], T]) -> T:
     return callback()
 
-reveal_type(infer_prefix(get_tuple))  # revealed: tuple[Any, ...]
-reveal_type(infer_suffix(get_tuple))  # revealed: tuple[Any, ...]
+reveal_type(infer_prefix(get_tuple))  # revealed: tuple[int, *tuple[int, ...]] & tuple[Any, ...]
+reveal_type(infer_suffix(get_tuple))  # revealed: tuple[*tuple[int, ...], int] & tuple[Any, ...]
 ```
 
 Fixed elements still have to satisfy the bound, and an ordinary homogeneous tuple does not have a

@@ -1612,8 +1612,23 @@ impl<'db> Specialization<'db> {
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= has_dynamic_type;
-                    vartype
+                    let restricted = if has_dynamic_type {
+                        bound_typevar.restrict_gradual_argument(db, vartype, visitor)
+                    } else {
+                        vartype
+                    };
+                    // A bound can leave only one static argument, as with `Any | int` bounded
+                    // by `int`. Only retain the materialization marker if graduality remains.
+                    has_unsimplified_dynamic_typevar |= if restricted == vartype {
+                        has_dynamic_type
+                    } else {
+                        !visitor.is_equivalent_to_materialization(
+                            db,
+                            restricted,
+                            restricted.materialize(db, MaterializationKind::Top, visitor),
+                        )
+                    };
+                    restricted
                 }
             }
         });
@@ -1769,6 +1784,27 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.constraints,
             |(bound_typevar, source_type, target_type)| {
                 let variance = specialization_variance(db, bound_typevar);
+                // Equivalence compares the gradual arguments relative to their declaration.
+                // For `C[T: int]`, `C[Any]` and `C[Any & int]` have the same valid
+                // specializations. Comparing only the arguments' top materializations would
+                // erase the distinction between these gradual types and `C[int]`.
+                let (source_type, target_type) =
+                    if matches!(self.relation, TypeRelation::Redundancy { pure: true }) {
+                        (
+                            bound_typevar.restrict_gradual_argument(
+                                db,
+                                *source_type,
+                                self.materialization_visitor,
+                            ),
+                            bound_typevar.restrict_gradual_argument(
+                                db,
+                                *target_type,
+                                self.materialization_visitor,
+                            ),
+                        )
+                    } else {
+                        (*source_type, *target_type)
+                    };
 
                 // Subtyping/assignability of each type in the specialization depends on the variance
                 // of the corresponding typevar:
@@ -1779,9 +1815,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 match variance {
                     TypeVarVariance::Invariant => self.check_relation_in_invariant_position(
                         db,
-                        *source_type,
+                        source_type,
                         source_materialization_kind,
-                        *target_type,
+                        target_type,
                         target_materialization_kind,
                     ),
                     TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
@@ -1792,16 +1828,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_materialization,
                         ) = if variance.is_covariant() {
                             (
-                                *source_type,
+                                source_type,
                                 source_materialization_kind,
-                                *target_type,
+                                target_type,
                                 target_materialization_kind,
                             )
                         } else {
                             (
-                                *target_type,
+                                target_type,
                                 target_materialization_kind.map(MaterializationKind::flip),
-                                *source_type,
+                                source_type,
                                 source_materialization_kind.map(MaterializationKind::flip),
                             )
                         };
@@ -4270,6 +4306,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             // of `ty` and `bound` is non-empty. Since `Never` is always a valid
                             // intersection if the types are disjoint, we don't need to perform any
                             // check here.
+                            // Top-materialize the declared bound so that an `Any` bound does not
+                            // introduce a gradual component into concrete inference evidence.
+                            let bound = bound.top_materialization(db, self.env);
                             self.add_type_mapping(
                                 bound_typevar,
                                 IntersectionType::from_two_elements(db, self.env, bound, ty),
