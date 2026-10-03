@@ -2355,5 +2355,28 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Unannotated defaults inherit instance annotations
+
+An instance annotation from a generic base is specialized before it provides context for a subclass
+default.
+
+```py
+class Base[T]:
+    def __init__(self) -> None:
+        self.items: list[T] = []
+
+class Child(Base[int]):
+    items = []
+
+reveal_type(Child.items)  # revealed: list[int]
+```
+
+The default must match the specialized annotation:
+
+```py
+class Invalid(Base[int]):
+    items = ["wrong"]  # error: [invalid-assignment]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
