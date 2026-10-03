@@ -2794,7 +2794,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if self.context.is_lint_enabled(&NON_EXHAUSTIVE_MATCH)
-            && let Some(last_pattern) = self.index.last_match_pattern(subject.as_ref())
+            && let Some(last_pattern) = self.index.last_match_pattern(subject)
         {
             let remaining =
                 type_narrowed_after_pattern(db, last_pattern, PatternSubjectExpansion::Expanded);

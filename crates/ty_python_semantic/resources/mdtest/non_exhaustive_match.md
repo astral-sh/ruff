@@ -994,7 +994,7 @@ def describe(value: Literal[True, False]) -> None:
 ```
 
 ```snapshot
-error[non-exhaustive-match]: Match is not exhaustive: objects of type `Literal[False]` are not covered
+error[non-exhaustive-match]: Match is not exhaustive: value `False` is not covered
  --> src/mdtest_snippet.py:4:11
   |
 4 |     match value:  # snapshot: non-exhaustive-match
@@ -1274,12 +1274,37 @@ error[non-exhaustive-match]: Match is not exhaustive: `None` is not covered
   |           ^^^^^ Subject has type `Literal["red"] | None`
 help: Add a `case` branch for the remaining values
   |
-5 |         case "red":
-  -             pass
-6 +             pass
+6 |             pass
 7 +         case None:
 8 +             raise NotImplementedError("TODO")
+9 | def describe(value: int | None):
   |
+note: This is a display-only fix and is likely to be incorrect
+```
+
+Same example, but in a union with a non-`Literal` type:
+
+```py
+def describe(value: int | None):
+    match value:  # snapshot: non-exhaustive-match
+        case int():
+            pass
+```
+
+```snapshot
+error[non-exhaustive-match]: Match is not exhaustive: `None` is not covered
+ --> src/mdtest_snippet.py:8:11
+  |
+8 |     match value:  # snapshot: non-exhaustive-match
+  |           ^^^^^ Subject has type `int | None`
+help: Add a `case` branch for the remaining values
+   |
+9  |         case int():
+   -             pass
+10 +             pass
+11 +         case None:
+12 +             raise NotImplementedError("TODO")
+   |
 note: This is a display-only fix and is likely to be incorrect
 ```
 
