@@ -17,7 +17,7 @@ const LINEAR_SEARCH_THRESHOLD: usize = 16;
 pub struct ScopedSymbolId;
 
 /// A symbol in a given scope.
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub struct Symbol {
     name: Name,
     flags: SymbolFlags,
@@ -34,7 +34,7 @@ bitflags! {
     ///
     /// See the doc-comment at the top of [`super::use_def`] for explanations of what it
     /// means for a symbol to be *bound* as opposed to *declared*.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq)]
+    #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, salsa::SalsaValue)]
     struct SymbolFlags: u8 {
         const IS_USED               = 1 << 0;
         const IS_BOUND              = 1 << 1;

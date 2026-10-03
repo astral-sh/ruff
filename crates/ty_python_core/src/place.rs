@@ -1,3 +1,4 @@
+use crate::ast_ids::ExpressionNodeKey;
 use crate::expression::Expression;
 use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
@@ -9,6 +10,8 @@ use crate::{Db, PossiblyNarrowedPlaces};
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_index::IndexVec;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
@@ -35,7 +38,7 @@ pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[
 }
 
 /// An expression that can be the target of a `Definition`.
-#[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
+#[derive(Clone, Eq, Hash, PartialEq, Debug, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PlaceExpr {
     /// A simple symbol, e.g. `x`.
     Symbol(Symbol),
@@ -45,6 +48,27 @@ pub enum PlaceExpr {
 }
 
 impl PlaceExpr {
+    fn member_builder(&self) -> MemberExprBuilder {
+        match self {
+            Self::Symbol(symbol) => MemberExprBuilder::from_symbol(symbol.name()),
+            Self::Member(member) => MemberExprBuilder::from_member(member.expression()),
+        }
+    }
+
+    /// Return the place for an attribute of this place.
+    #[must_use]
+    pub fn with_attribute(&self, name: &str) -> Self {
+        Self::Member(Member::new(self.member_builder().with_attribute(name)))
+    }
+
+    /// Return the place for a string-literal subscript of this place.
+    #[must_use]
+    pub fn with_string_subscript(&self, key: &str) -> Self {
+        Self::Member(Member::new(
+            self.member_builder().with_string_subscript(key),
+        ))
+    }
+
     /// Create a new `PlaceExpr` from a name.
     ///
     /// This always returns a `PlaceExpr::Symbol` with empty flags and `name`.
@@ -108,6 +132,14 @@ pub enum PlaceExprRef<'a> {
 }
 
 impl<'a> PlaceExprRef<'a> {
+    /// Return the name at the root of this place, such as `x` for `x.y[0]`.
+    pub fn root_name(self) -> &'a str {
+        match self {
+            Self::Symbol(symbol) => symbol.name(),
+            Self::Member(member) => member.expression().as_ref().symbol_name(),
+        }
+    }
+
     /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
     pub const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
@@ -181,6 +213,18 @@ impl std::fmt::Display for PlaceExprRef<'_> {
 pub enum ScopedPlaceId {
     Symbol(ScopedSymbolId),
     Member(ScopedMemberId),
+}
+
+/// Identifies a place and, for a sequence display, the particular subject element occurrence it
+/// belongs to.
+///
+/// Two reads of the same place in a display can refer to different bindings.
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub struct PatternSubjectPlace {
+    pub subject_element: Option<ExpressionNodeKey>,
+    pub place: ScopedPlaceId,
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
@@ -302,6 +346,11 @@ pub struct PlaceTableBuilder {
 
     associated_symbol_members: IndexVec<ScopedSymbolId, SmallVec<[ScopedMemberId; 4]>>,
     associated_sub_members: IndexVec<ScopedMemberId, SmallVec<[ScopedMemberId; 4]>>,
+
+    // Descendants can be registered before their ancestors. Associate them when an ancestor is
+    // registered so that rebinding it invalidates the descendants' bindings and narrowing.
+    pending_symbol_members: FxHashMap<Name, SmallVec<[ScopedMemberId; 4]>>,
+    pending_sub_members: FxHashMap<MemberExpr, SmallVec<[ScopedMemberId; 4]>>,
 }
 
 impl PlaceTableBuilder {
@@ -368,7 +417,11 @@ impl PlaceTableBuilder {
         let (id, is_new) = self.symbols.add(symbol);
 
         if is_new {
-            let new_id = self.associated_symbol_members.push(SmallVec::new_const());
+            let descendants = self
+                .pending_symbol_members
+                .remove(self.symbols.symbol(id).name())
+                .unwrap_or_default();
+            let new_id = self.associated_symbol_members.push(descendants);
             debug_assert_eq!(new_id, id);
         }
 
@@ -379,23 +432,34 @@ impl PlaceTableBuilder {
         let (id, is_new) = self.member.add(member);
 
         if is_new {
-            let new_id = self.associated_sub_members.push(SmallVec::new_const());
+            let member = self.member.member(id);
+            let descendants = self
+                .pending_sub_members
+                .remove(member.expression())
+                .unwrap_or_default();
+            let new_id = self.associated_sub_members.push(descendants);
             debug_assert_eq!(new_id, id);
 
-            let member = self.member.member(id);
-
-            // iterate over parents
-            for parent_id in
-                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
-            {
-                match parent_id {
-                    ScopedPlaceId::Symbol(scoped_symbol_id) => {
-                        self.associated_symbol_members[scoped_symbol_id].push(id);
-                    }
-                    ScopedPlaceId::Member(scoped_member_id) => {
-                        self.associated_sub_members[scoped_member_id].push(id);
-                    }
+            let mut expression = member.expression().as_ref();
+            while let Some(parent) = expression.parent() {
+                if let Some(parent_id) = self.member.member_id(parent.clone()) {
+                    self.associated_sub_members[parent_id].push(id);
+                } else {
+                    self.pending_sub_members
+                        .entry(parent.clone().into_owned())
+                        .or_default()
+                        .push(id);
                 }
+                expression = parent;
+            }
+            let root = expression.symbol_name();
+            if let Some(symbol_id) = self.symbols.symbol_id(root) {
+                self.associated_symbol_members[symbol_id].push(id);
+            } else {
+                self.pending_symbol_members
+                    .entry(Name::new(root))
+                    .or_default()
+                    .push(id);
             }
         }
 

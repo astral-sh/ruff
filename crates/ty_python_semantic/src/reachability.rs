@@ -310,7 +310,10 @@ fn type_narrowed_after_pattern<'db>(
 }
 
 /// Whether the guard cannot reject a value matched by the pattern.
-fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>) -> bool {
+pub(crate) fn pattern_guard_allows_all_matches(
+    db: &dyn Db,
+    predicate: PatternPredicate<'_>,
+) -> bool {
     // Condition analysis recovers cycles as ambiguous, so an unresolved guard cannot exclude values.
     predicate
         .guard(db)
@@ -579,11 +582,15 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
+        (Some(acc), Some(new_c)) => {
+            Some(new_c.merge_constraint_and_with_simplification(db, env, acc))
+        }
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -603,7 +610,9 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
         PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
-        PredicateNode::OrPatternAlternative(scope) => scope,
+        PredicateNode::OrPatternAlternative(scope) | PredicateNode::ClassMemberMayAlias(scope) => {
+            scope
+        }
         PredicateNode::SubjectElementPattern(subject_element) => subject_element.pattern.scope(db),
         PredicateNode::IsNonEmptyIterable(expression) => expression.scope(db),
         PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
@@ -1607,20 +1616,24 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, neg_constraint);
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
                 && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
             {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                let true_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, pos_constraint);
                 self.narrow(node.if_true, true_accumulated)
             } else {
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_accumulated =
+                    accumulate_constraint(db, self.env, accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
                 let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
 
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated =
+                    accumulate_constraint(db, self.env, accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
                 let true_or_uncertain =
@@ -2023,7 +2036,9 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
             analyze_non_terminal_call(db, call).negate_if(!predicate.is_positive)
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
-        PredicateNode::OrPatternAlternative(_) => Truthiness::Ambiguous,
+        PredicateNode::OrPatternAlternative(_) | PredicateNode::ClassMemberMayAlias(_) => {
+            Truthiness::Ambiguous
+        }
         PredicateNode::SubjectElementPattern(subject_element) => {
             analyze_pattern_predicate(db, subject_element.pattern)
         }

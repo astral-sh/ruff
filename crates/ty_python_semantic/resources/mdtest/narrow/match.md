@@ -1915,7 +1915,8 @@ def test_match_ordered_class_alternatives_remove_later_bindings(
 An argumentless class pattern cannot fail after its class check. If it matches the entire subject
 type, a later alternative cannot contribute to the binding. When the argumentless pattern comes
 second, an earlier class pattern can still contribute if the subject class is not final because a
-subclass could match both classes. A final subject class rules out that overlap:
+subclass could match both classes. For the unrelated classes below, a final subject class rules out
+that overlap:
 
 ```py
 from typing import final
@@ -1938,7 +1939,7 @@ def test_later_non_final_class_alternative_preserves_earlier_bindings(
 ) -> None:
     match value:
         case UnreachableLater(payload=item) | (DefiniteFirst() as item):
-            reveal_type(item)  # revealed: str | DefiniteFirst
+            reveal_type(item)  # revealed: str | (DefiniteFirst & ~UnreachableLater)
 
 def test_later_final_class_alternative_removes_earlier_bindings(
     value: FinalDefiniteFirst,
@@ -2503,6 +2504,74 @@ def nested_mapping_narrows_sequence_subject(
             reveal_type(value)  # revealed: tuple[IntPayload]
 ```
 
+## Successive class patterns with a union subject
+
+Later cases narrow the subject after several earlier class patterns have failed. The repeated cases
+exercise a path that can cause combinatorial growth when combining narrowing constraints.
+
+```py
+from dataclasses import dataclass
+from typing_extensions import assert_never
+
+@dataclass
+class A:
+    ident: str
+
+@dataclass
+class B:
+    ident: str
+
+@dataclass
+class C:
+    ident: str
+    name: str
+
+@dataclass
+class D:
+    ident: str
+    name: str
+
+@dataclass
+class E:
+    ident: str
+    name: str
+
+@dataclass
+class F:
+    ident: str
+    name: str
+
+@dataclass
+class G:
+    ident: str
+
+@dataclass
+class H:
+    signature: int
+
+def many_class_patterns(ref: A | B | C | D | E | F | G | H) -> int:
+    match ref:
+        case A(_):
+            return 0
+        case B(_):
+            return 0
+        case C(_, _):
+            return 0
+        case D(_, _):
+            return 0
+        case E(_, _):
+            return 0
+        case F(_, _):
+            return 0
+        case G(_):
+            return 0
+        case H():
+            reveal_type(ref)  # revealed: H & ~A & ~B & ~C & ~D & ~E & ~F & ~G
+            return ref.signature
+
+    assert_never(ref)  # no diagnostic
+```
+
 ## Exhaustive positional patterns for built-in classes
 
 Python defines a fixed set of built-in classes whose single positional subpattern receives the
@@ -2952,6 +3021,132 @@ def subclass_member_is_exhaustive(value: ChildWithX) -> int:
             return 1
 ```
 
+## Negative narrowing for subclass patterns
+
+When a subclass pattern consumes every instance of that subclass, the fallback excludes the subclass
+even if the subject is annotated with its superclass.
+
+```py
+class Base: ...
+
+class Child(Base):
+    __match_args__ = ("value",)
+    value: int
+
+def positional_capture(value: Base) -> None:
+    match value:
+        case Child(captured):
+            reveal_type(captured)  # revealed: int
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child
+
+def keyword_capture(value: Base) -> None:
+    match value:
+        case Child(value=captured):
+            reveal_type(captured)  # revealed: int
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child
+
+def nested_capture(value: tuple[Base]) -> None:
+    match value:
+        case [Child(value=_)]:
+            pass
+        case [remaining]:
+            reveal_type(remaining)  # revealed: Base & ~Child
+
+class OtherChild(Base):
+    name: str
+
+def alternatives(value: Base) -> None:
+    match value:
+        case Child(value=_) | OtherChild(name=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base & ~Child & ~OtherChild
+```
+
+## Negative narrowing for overlapping class patterns
+
+A subclass can inherit from both `HasValue` and `Marker`. Its `value` attribute comes from
+`HasValue`, so the `Marker` pattern consumes the overlap and the fallback excludes it.
+
+```py
+class HasValue:
+    value: int
+
+class Marker: ...
+
+def overlapping_classes(value: HasValue) -> None:
+    match value:
+        case Marker(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: HasValue & ~Marker
+```
+
+## Refutable subclass patterns
+
+The fallback retains the subclass when an attribute might be missing, its subpattern can fail, or a
+guard can fail.
+
+```py
+class Base: ...
+
+class Child(Base):
+    __match_args__ = ("value", "missing")
+    value: int
+
+def missing_attribute(value: Base) -> None:
+    match value:
+        case Child(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def missing_positional_attribute(value: Base) -> None:
+    match value:
+        case Child(_, _):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def refutable_attribute(value: Base) -> None:
+    match value:
+        case Child(value=1):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+def guarded_capture(value: Base, flag: bool) -> None:
+    match value:
+        case Child(value=_) if flag:
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+class UnknownMatchArgs(Base):
+    __match_args__: tuple[str, ...] = ("value",)
+    value: int
+
+def unknown_positional_attribute(value: Base) -> None:
+    match value:
+        case UnknownMatchArgs(_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+
+class ConditionalAttribute(Base):
+    if bool():
+        value: int = 0
+
+def possibly_missing_attribute(value: Base) -> None:
+    match value:
+        case ConditionalAttribute(value=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: Base
+```
+
 ## Positional behavior comes from the pattern class
 
 Only the class named in the pattern determines what a positional subpattern receives. Although
@@ -2986,6 +3181,1041 @@ def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
     match value:
         case [Outer(inner=Inner(x=_))]:
             return 1
+```
+
+## Narrowing attributes and `TypedDict` fields
+
+Patterns can narrow the attributes and required fields they inspect. On pattern failure, an
+attribute or field can be narrowed when the other checks in the pattern are guaranteed to match. A
+guard can also fail after the pattern matches.
+
+```py
+from typing import TypedDict
+from typing_extensions import NotRequired
+
+class Data(TypedDict):
+    item: int | str
+
+class OptionalData(TypedDict):
+    item: int | str
+    other: NotRequired[int]
+
+class Record:
+    item: int | str
+    other: int | str
+    fixed: int
+    data: Data
+
+class SpecialRecord(Record): ...
+
+def class_pattern(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def mapping_pattern(value: Data) -> None:
+    match value:
+        case {"item": int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+def nested_pattern(value: Record) -> None:
+    match value:
+        case Record(data={"item": int()}):
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
+
+def alternative_patterns(value: Record) -> None:
+    match value:
+        case Record(item=int()) | Record(item=bytes()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def alternative_subpatterns(value: Record) -> None:
+    match value:
+        case Record(item=int() | bytes()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def repeated_pattern(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            pass
+        case Record(item=int() as item):
+            reveal_type(value.item)  # revealed: Never
+            reveal_type(item)  # revealed: Never
+
+def two_attributes(value: Record) -> None:
+    match value:
+        case Record(item=int(), other=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+            reveal_type(value.other)  # revealed: int | str
+
+def one_attribute_can_fail(value: Record) -> None:
+    match value:
+        case Record(item=int(), fixed=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def class_check_can_fail(value: Record) -> None:
+    match value:
+        case SpecialRecord(item=int()):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def key_can_be_missing(value: OptionalData) -> None:
+    match value:
+        case {"item": int(), "other": _}:
+            pass
+        case _:
+            reveal_type(value["item"])  # revealed: int | str
+
+def guard_can_fail(value: Record, flag: bool) -> None:
+    match value:
+        case Record(item=int()) if flag:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def guard_rebinds_subject(value: Record, other: Record, flag: bool) -> None:
+    match value:
+        case Record(item=int()) if (value := other) and flag:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str | int
+
+def reassign_attribute(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            value.item = "updated"
+            reveal_type(value.item)  # revealed: Literal["updated"]
+
+def reassign_field(value: Data) -> None:
+    match value:
+        case {"item": int()}:
+            value["item"] = "updated"
+            reveal_type(value["item"])  # revealed: Literal["updated"]
+
+def rebind_subject(value: Record, other: Record) -> None:
+    match value:
+        case Record(item=int()):
+            value = other
+            reveal_type(value.item)  # revealed: int | str
+
+def rebind_intermediate(value: Record, other: Data) -> None:
+    match value:
+        case Record(data={"item": int()}):
+            value.data = other
+            reveal_type(value.data["item"])  # revealed: int | str
+
+def after_match(value: Record) -> None:
+    match value:
+        case Record(item=int()):
+            pass
+        case _:
+            pass
+    reveal_type(value.item)  # revealed: int | str
+```
+
+## Rebinding parents of a match subject
+
+Rebinding a parent of a nested match subject or a sequence-display element invalidates narrowing of
+the subject's or element's members.
+
+```py
+from typing import TypedDict
+
+class Box:
+    item: int | str
+
+class Data(TypedDict):
+    box: Box
+    item: int | str
+
+class Inner:
+    box: Box
+    data: Data
+
+class Outer:
+    inner: Inner
+
+class Holder:
+    outer: Outer
+
+def immediate_parent(value: Outer, replacement: Inner) -> None:
+    match value.inner.box:
+        case Box(item=int()):
+            reveal_type(value.inner.box.item)  # revealed: int
+            value.inner = replacement
+            reveal_type(value.inner.box.item)  # revealed: int | str
+            value.inner.box.item.bit_length()  # error: [unresolved-attribute]
+
+def distant_parent(value: Holder, replacement: Outer) -> None:
+    match value.outer.inner.box:
+        case Box(item=int()):
+            value.outer = replacement
+            reveal_type(value.outer.inner.box.item)  # revealed: int | str
+
+def subscript_subject(value: Outer, replacement: Inner) -> None:
+    match value.inner.data["box"]:
+        case Box(item=int()):
+            value.inner = replacement
+            reveal_type(value.inner.data["box"].item)  # revealed: int | str
+
+def mapping_pattern(value: Outer, replacement: Inner) -> None:
+    match value.inner.data:
+        case {"item": int()}:
+            value.inner = replacement
+            reveal_type(value.inner.data["item"])  # revealed: int | str
+
+def sequence_display(value: Outer, replacement: Inner) -> None:
+    match (value.inner.box,):
+        case (Box(item=int()),):
+            value.inner = replacement
+            reveal_type(value.inner.box.item)  # revealed: int | str
+```
+
+When constructing a loop header, ty registers assignment targets in the loop body before analyzing
+the body itself. This can register `value.outer.inner.box.item` before the match registers its
+ancestors. Rebinding an ancestor still invalidates the descendant's narrowing.
+
+```py
+def loop(value: Holder, replacement: Outer, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.outer.inner.box.item = 1
+        match value.outer.inner.box:
+            case Box(item=int()):
+                value.outer = replacement
+                reveal_type(value.outer.inner.box.item)  # revealed: int | str
+```
+
+An attribute and a string-key subscript with the same name are distinct places. Rebinding one does
+not invalidate narrowing of the other's members.
+
+```py
+class AttributeAndSubscript:
+    box: Box
+
+    def __getitem__(self, key: str) -> Box:
+        raise NotImplementedError
+
+    def __setitem__(self, key: str, value: Box) -> None:
+        raise NotImplementedError
+
+def distinct_places(value: AttributeAndSubscript, replacement: Box, item: int | str, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.box.item = item
+            value["box"].item = item
+        match value.box, value["box"]:
+            case Box(item=int()), Box(item=int()):
+                value.box = replacement
+                reveal_type(value.box.item)  # revealed: int | str
+                reveal_type(value["box"].item)  # revealed: int
+                value["box"] = replacement
+                reveal_type(value["box"].item)  # revealed: int | str
+```
+
+Long member paths use a different internal representation, but rebinding an ancestor still
+invalidates their narrowing.
+
+```py
+class Link:
+    child: "Link"
+    box: Box
+
+def deep_path(value: Link, replacement: Link, flag: bool) -> None:
+    while flag:
+        if flag:
+            value.child.child.child.child.child.child.child.child.box.item = 1
+        match value.child.child.child.child.child.child.child.child.box:
+            case Box(item=int()):
+                value.child.child.child.child.child.child.child = replacement
+                reveal_type(value.child.child.child.child.child.child.child.child.box.item)  # revealed: int | str
+```
+
+## Positional class patterns narrow attributes
+
+Positional patterns narrow the attributes named by `__match_args__`, including in later cases.
+
+```py
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+
+class SubBox(Box): ...
+
+def positional(value: Box) -> None:
+    match value:
+        case Box(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def inherited(value: SubBox) -> None:
+    match value:
+        case SubBox(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def nested_scope(value: Box) -> None:
+    match value:
+        case Box(int()):
+            class Inner:
+                reveal_type(value.item)  # revealed: int
+
+def nested_function(value: Box) -> None:
+    match value:
+        case Box(int()):
+            def inner() -> None:
+                # `value.item` may change before this function is called.
+                reveal_type(value.item)  # revealed: int | str
+
+def rebound(value: Box, other: Box) -> None:
+    match value:
+        case Box(int()):
+            value = other
+            reveal_type(value.item)  # revealed: int | str
+
+def named_expression(value: Box) -> None:
+    match subject := value:
+        case Box(int()):
+            reveal_type(subject.item)  # revealed: int
+
+def after_keyword_pattern(value: Box) -> None:
+    # The earlier keyword pattern must not prevent the positional pattern from narrowing `item`.
+    match value:
+        case Box(item=int()):
+            pass
+    match value:
+        case Box(int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+```
+
+## Member narrowing after earlier cases
+
+Earlier cases can exclude union members or constrain one attribute before a later pattern narrows
+another attribute.
+
+```py
+from typing import final
+
+@final
+class A:
+    item: int | str
+
+@final
+class B:
+    item: int | str
+
+@final
+class C:
+    item: int | str
+
+def f(value: A | B) -> None:
+    match value:
+        case A():
+            pass
+        case B(item=int()):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def guarded(value: A | B, flag: bool) -> None:
+    match value:
+        case A() if flag:
+            pass
+        case B(item=int()):
+            pass
+        case _:
+            reveal_type(value)  # revealed: A | B
+            reveal_type(value.item)  # revealed: int | str
+
+def display(value: A | B) -> None:
+    match (value,):
+        case (A(),):
+            pass
+        case (B(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def list_display(value: A | B) -> None:
+    match [value]:
+        case [A()]:
+            pass
+        case [B(item=int())]:
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def guarded_display(value: A | B, flag: bool) -> None:
+    match (value,):
+        case (A(),) if flag:
+            pass
+        case (B(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def multiple_earlier_cases(value: A | B | C) -> None:
+    match (value,):
+        case (A(),):
+            pass
+        case (B(),):
+            pass
+        case (C(item=int()),):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def another_element_can_fail(value: A | B, flag: bool) -> None:
+    match (value, flag):
+        case (A(), True):
+            pass
+        case (B(item=int()), _):
+            pass
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+class Pair:
+    first: int | str
+    second: int | str
+
+def different_attributes(value: Pair) -> None:
+    match value:
+        case Pair(first=int()):
+            reveal_type(value.first)  # revealed: int
+        case Pair(second=int()):
+            reveal_type(value.first)  # revealed: str
+            reveal_type(value.second)  # revealed: int
+        case _:
+            reveal_type(value.first)  # revealed: str
+            reveal_type(value.second)  # revealed: str
+```
+
+An earlier check can make one subpattern certain to match. If the compound pattern then fails, the
+other subpattern must have failed.
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    first: int | str
+    second: int | str
+
+class PositionalPair(Pair):
+    __match_args__ = ("first", "second")
+
+def earlier_case(value: Pair) -> None:
+    match value:
+        case Pair(first=int()):
+            pass
+        case Pair(first=str(), second=int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+def earlier_condition(value: Pair) -> None:
+    if isinstance(value.first, str):
+        match value:
+            case Pair(first=str(), second=int()):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: str
+
+def mapping(value: Data) -> None:
+    match value:
+        case {"first": int()}:
+            pass
+        case {"first": str(), "second": int()}:
+            pass
+        case _:
+            reveal_type(value["second"])  # revealed: str
+
+def earlier_mapping_condition(value: Data) -> None:
+    if isinstance(value["first"], str):
+        match value:
+            case {"first": str(), "second": int()}:
+                pass
+            case _:
+                reveal_type(value["second"])  # revealed: str
+
+def positional(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            reveal_type(value.first)  # revealed: int
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+def sequence_display(value: Pair) -> None:
+    match (value,):
+        case (Pair(first=int()),):
+            pass
+        case (Pair(first=str(), second=int()),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+```
+
+An earlier positional pattern or named mapping key narrows a later case even when the member is not
+referenced as an expression.
+
+```py
+def positional_without_first_use(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+def intervening_case(value: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _):
+            pass
+        case PositionalPair(_, 0):
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+class NullablePair:
+    __match_args__ = ("first", "second")
+    first: int | str | None
+    second: int | str
+
+def alternative(value: NullablePair) -> None:
+    match value:
+        case NullablePair(int() | None, _):
+            pass
+        case NullablePair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: str
+
+class Container:
+    __match_args__ = ("pair",)
+    pair: PositionalPair
+
+def nested_positional(value: Container) -> None:
+    match value:
+        case Container(PositionalPair(int(), _)):
+            pass
+        case Container(PositionalPair(str(), int())):
+            pass
+        case _:
+            reveal_type(value.pair.second)  # revealed: str
+
+from typing import Final
+
+class Keys:
+    FIRST: Final = "first"
+
+def named_key_without_first_use(value: Data) -> None:
+    match value:
+        case {Keys.FIRST: int()}:
+            pass
+        case {Keys.FIRST: str(), "second": int()}:
+            pass
+        case _:
+            reveal_type(value["second"])  # revealed: str
+```
+
+A guard can fail even when its case's pattern matches, and it can rebind the subject's name before a
+later case is tried.
+
+```py
+def guarded_compound(value: Pair, flag: bool) -> None:
+    match value:
+        case Pair(first=int()) if flag:
+            pass
+        case Pair(first=str(), second=int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+
+def rebound_subject(value: Pair, other: Pair, flag: bool) -> None:
+    if isinstance(value.first, str):
+        match value:
+            case Pair() if (value := other) and flag:
+                pass
+            case Pair(first=str(), second=int()):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: int | str
+
+def guarded_positional(value: PositionalPair, flag: bool) -> None:
+    match value:
+        case PositionalPair(int(), _) if flag:
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+
+def rebound_positional(value: PositionalPair, other: PositionalPair) -> None:
+    match value:
+        case PositionalPair(int(), _) if (value := other) is None:
+            pass
+        case PositionalPair(str(), int()):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: int | str
+```
+
+## Nested mapping patterns over recursive unions
+
+Each recursive step can encounter either `A` or `B`. Matching a nested `child` rules out `None` for
+`value["child"]`. The depth exercises repeated analysis of nested patterns over unions.
+
+```py
+from __future__ import annotations
+from typing import Literal, TypeAlias, TypedDict
+
+class A(TypedDict):
+    child: Node
+    tag: Literal[0]
+
+class B(TypedDict):
+    child: Node
+    tag: Literal[1]
+
+Node: TypeAlias = A | B | None
+
+def nested(value: Node) -> None:
+    match value:
+        case {
+            "child": {
+                "child": {
+                    "child": {
+                        "child": {
+                            "child": {
+                                "child": {
+                                    "child": {
+                                        "child": {
+                                            "child": {
+                                                "child": {
+                                                    "child": {
+                                                        "child": {
+                                                            "child": {
+                                                                "child": {
+                                                                    "child": {
+                                                                        "child": {"child": {"child": {"child": {"child": _}}}}
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }:
+            reveal_type(value["child"])  # revealed: A | B
+```
+
+## Class-body subjects and nested scopes
+
+A match in a class body can narrow a member of a class-local subject. Rebinding the subject
+invalidates that narrowing. A nested class resolves the same name from the enclosing non-class
+scope. A write through the class-local name can also affect the outer value if they refer to the
+same object. Here ty conservatively allows that possibility even after a `Box()` call.
+
+```py
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+
+def class_scope(other: Box) -> None:
+    class Namespace:
+        value = Box()
+        match value:
+            case Box(int()):
+                value = other
+                reveal_type(value.item)  # revealed: int | str
+
+global_box = Box()
+
+class Outer:
+    if isinstance(global_box.item, int):
+        global_box = Box()
+        global_box.item = "local"
+        reveal_type(global_box.item)  # revealed: Literal["local"]
+
+        class Inner:
+            reveal_type(global_box.item)  # revealed: int | Literal["local"]
+
+class LocalSubject:
+    global_box = Box()
+    match global_box:
+        case Box(int()):
+            reveal_type(global_box.item)  # revealed: int
+
+            class Inner:
+                reveal_type(global_box.item)  # revealed: int | str
+
+flag: bool = bool()
+
+class ConditionalSubject:
+    if flag:
+        global_box = Box()
+    match global_box:
+        case Box(int()):
+            reveal_type(global_box.item)  # revealed: int
+
+            class Inner:
+                reveal_type(global_box.item)  # revealed: int | str
+
+            global_box = Box()
+            reveal_type(global_box.item)  # revealed: int | str
+```
+
+## Mapping patterns with named keys
+
+A mapping pattern can use a named constant as its key. A match narrows the corresponding literal
+subscript on the subject.
+
+```py
+from typing import Final, TypedDict
+
+class Keys:
+    ITEM: Final = "item"
+
+class Data(TypedDict):
+    item: int | str
+
+def named_key(value: Data) -> None:
+    match value:
+        case {Keys.ITEM: int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+def after_literal_key(value: Data) -> None:
+    # The earlier literal key must not prevent the named key from narrowing the same item.
+    match value:
+        case {"item": int()}:
+            pass
+    match value:
+        case {Keys.ITEM: int()}:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+class Container:
+    __match_args__ = ("data",)
+    data: Data
+
+def nested_unknown_members(value: Container) -> None:
+    # A keyword and literal key must not prevent a later positional pattern and named key from
+    # narrowing the same item.
+    match value:
+        case Container(data={"item": int()}):
+            pass
+    match value:
+        case Container({Keys.ITEM: int()}):
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
+```
+
+## Earlier positional patterns on sequence display elements
+
+An earlier case can constrain an attribute used by a later positional pattern, even when that
+attribute is not referenced by name. In the following examples, failure of `Pair(True, _)` means
+`first` is `False`. If `Pair(False, True)` also fails, `second` is `False`.
+
+```py
+class Pair:
+    __match_args__ = ("first", "second")
+    first: bool
+    second: bool
+
+def tuple_display(value: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),):
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def list_display(value: Pair) -> None:
+    match [value]:
+        case [Pair(True, _)]:
+            pass
+        case [Pair(False, True)]:
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def nested_display(value: Pair) -> None:
+    match ((value,),):
+        case ((Pair(True, _),),):
+            pass
+        case ((Pair(False, True),),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+class Container:
+    __match_args__ = ("inner",)
+    inner: Pair
+
+def nested_member(value: Container) -> None:
+    match (value,):
+        case (Container(Pair(True, _)),):
+            pass
+        case (Container(Pair(False, True)),):
+            pass
+        case _:
+            reveal_type(value.inner.second)  # revealed: Literal[False]
+
+def enclosing_scope(value: Pair) -> None:
+    class Inner:
+        match (value,):
+            case (Pair(True, _),):
+                pass
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: Literal[False]
+
+def alternative_and_capture(value: Pair) -> None:
+    match (value,):
+        case ((Pair(True, _) | Pair(True, True)) as matched,):
+            pass
+        case (Pair(False, True) as matched,):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+```
+
+Earlier cases also constrain sibling elements. Those constraints determine which subpatterns can
+still fail.
+
+```py
+def sibling(value: Pair, flag: bool) -> None:
+    match (value, flag):
+        case (_, True):
+            pass
+        case (Pair(True, _), False):
+            pass
+        case (Pair(False, True), False):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def sibling_member(value: Pair, other: Pair) -> None:
+    match (value, other):
+        case (_, Pair(True, _)):
+            pass
+        case (Pair(True, _), Pair(False, _)):
+            pass
+        case (Pair(False, True), Pair(False, _)):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+```
+
+Conditions before the match can also constrain a positional attribute.
+
+```py
+def earlier_condition(value: Pair) -> None:
+    if value.first is False:
+        match (value,):
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(value.second)  # revealed: Literal[False]
+```
+
+A guard that can fail prevents later cases from assuming the pattern failed. A guard known to always
+pass does not. A guard can also rebind the subject's name, so the new binding cannot use constraints
+on the original value.
+
+```py
+def conditional_guard(value: Pair, flag: bool) -> None:
+    match (value,):
+        case (Pair(True, _),) if flag:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+
+def true_guard(value: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),) if True:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: Literal[False]
+
+def rebound_by_guard(value: Pair, replacement: Pair) -> None:
+    match (value,):
+        case (Pair(True, _),) if (value := replacement) is None:
+            pass
+        case (Pair(False, True),):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+
+class_value = Pair()
+
+def rebound_in_class(replacement: Pair) -> None:
+    class Inner:
+        match (class_value,):
+            case (Pair(True, _),) if (class_value := replacement) is None:
+                pass
+            case (Pair(False, True),):
+                pass
+            case _:
+                reveal_type(class_value.second)  # revealed: bool
+```
+
+When a display repeats a place, failure analysis treats each occurrence independently. It does not
+currently infer that the two reads of `value` below have the same value.
+
+```py
+def repeated_element(value: Pair) -> None:
+    match (value, value):
+        case (Pair(True, _), Pair(False, True)):
+            pass
+        case _:
+            reveal_type(value.second)  # revealed: bool
+```
+
+## Patterns on elements of sequence displays
+
+A pattern for a display element also narrows attributes and keys of that element.
+
+```py
+from typing import Final, TypedDict
+
+class Keys:
+    ITEM: Final = "item"
+
+class Data(TypedDict):
+    item: int | str
+
+class Box:
+    __match_args__ = ("item",)
+    item: int | str
+    data: Data
+
+class Container:
+    box: Box
+
+class MaybeBox:
+    __match_args__ = ("item",)
+    item: int | str | None
+
+def class_element(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def alternative(value: MaybeBox) -> None:
+    match (value,):
+        case (MaybeBox(int() | None),):
+            reveal_type(value.item)  # revealed: int | None
+        case _:
+            reveal_type(value.item)  # revealed: str
+
+def multiple_elements(value: Box, other: int | str) -> None:
+    match value, other:
+        case Box(int()), int():
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def nested_scope(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
+            class Inner:
+                reveal_type(value.item)  # revealed: int
+
+def nested_element(value: Box) -> None:
+    match [[value]]:
+        case [[Box(data={Keys.ITEM: int()})]]:
+            reveal_type(value.data["item"])  # revealed: int
+        case _:
+            reveal_type(value.data["item"])  # revealed: str
+
+def mapping_element(value: Data) -> None:
+    match [value]:
+        case [{Keys.ITEM: int()}]:
+            reveal_type(value["item"])  # revealed: int
+        case _:
+            reveal_type(value["item"])  # revealed: str
+
+def member_element(container: Container) -> None:
+    match (container.box,):
+        case (Box(int()),):
+            reveal_type(container.box.item)  # revealed: int
+        case _:
+            reveal_type(container.box.item)  # revealed: str
+
+def guarded(value: Box, flag: bool) -> None:
+    match (value,):
+        case (Box(int()),) if flag:
+            reveal_type(value.item)  # revealed: int
+        case _:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_element(value: Box, other: Box) -> None:
+    # The first element reads the old value; the second rebinds `value` before matching starts.
+    match value, (value := other):
+        case Box(int()), _:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_guard(value: Box, other: Box) -> None:
+    match (value,):
+        case (Box(int()),) if value := other:
+            reveal_type(value.item)  # revealed: int | str
+
+def rebound_intermediate(value: Box, other: Data) -> None:
+    match (value,):
+        case (Box(data={Keys.ITEM: int()}),):
+            value.data = other
+            reveal_type(value.data["item"])  # revealed: int | str
+
+def after_match(value: Box) -> None:
+    match (value,):
+        case (Box(int()),):
+            pass
+        case _:
+            pass
+    reveal_type(value.item)  # revealed: int | str
 ```
 
 ## Missing class-pattern attributes
@@ -3220,6 +4450,48 @@ def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
             reveal_type(value)  # revealed: Pair
 ```
 
+## Nested class patterns in variable-length tuples
+
+The tuple need not be exhausted as a whole for a sequence pattern containing a nested class pattern
+to exclude the tuple shapes that the sequence pattern definitely matches.
+
+```py
+class Base: ...
+
+class Child(Base):
+    item: int
+
+def fixed_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=_)]:
+            pass
+        case [Child()]:
+            reveal_type(value)  # revealed: Never
+
+def starred_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=_), *_]:
+            pass
+        case _:
+            # revealed: tuple[Base, ...] & ~tuple[Child, *tuple[object, ...]]
+            reveal_type(value)
+
+def suffix_pattern(value: tuple[Base, ...]) -> None:
+    match value:
+        case [*_, Child(item=_)]:
+            pass
+        case _:
+            # revealed: tuple[Base, ...] & ~tuple[*tuple[object, ...], Child]
+            reveal_type(value)
+
+def refutable_element(value: tuple[Base, ...]) -> None:
+    match value:
+        case [Child(item=0)]:
+            pass
+        case [Child() as child]:
+            reveal_type(child)  # revealed: Child
+```
+
 ## Nested sequence patterns
 
 Nested patterns narrow values captured from the positions they inspect. For subjects without a known
@@ -3290,8 +4562,8 @@ def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
 ## Sequence display subjects
 
 A tuple or list display has no place of its own to narrow. A successful sequence pattern instead
-narrows the corresponding narrowable elements. If a multi-element pattern fails, we do not know
-which element failed to match.
+narrows the corresponding narrowable elements. If a multi-element pattern fails and more than one
+element pattern could fail, we do not know which element failed to match.
 
 ```py
 from typing import Generic, Literal, TypeVar
@@ -3333,6 +4605,82 @@ def match_tuple_expression_class_pattern(
     match (value,):
         case (DisplayTaggedPayload("int", _),):
             reveal_type(value)  # revealed: DisplayTaggedPayload[Literal["int"], int]
+```
+
+## Failed sequence patterns on display subjects
+
+When a sequence display is matched against a pattern of the same fixed length, failure can narrow an
+element if every other element pattern is guaranteed to match. If more than one element can fail,
+failure alone need not narrow either element.
+
+A guard can fail after the pattern succeeds. Rebinding while evaluating the display can also change
+the value available in the next case.
+
+```py
+def single_tuple(value: int | str) -> None:
+    match (value,):
+        case (int(),):
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def single_list(value: int | str) -> None:
+    match [value]:
+        case [int()]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def only_one_element_can_fail(value: int | str, number: int) -> None:
+    match value, number:
+        case int(), int():
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def either_element_can_fail(first: int | str, second: int | str) -> None:
+    match first, second:
+        case int(), int():
+            pass
+        case _:
+            reveal_type(first)  # revealed: int | str
+            reveal_type(second)  # revealed: int | str
+
+def nested(value: int | str) -> None:
+    match [[value]]:
+        case [[int()]]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: str
+
+def alternative(value: int | str | bytes) -> None:
+    match (value,):
+        case (int(),) | (str(),):
+            pass
+        case _:
+            reveal_type(value)  # revealed: bytes
+
+def guarded(value: int | str, condition: bool) -> None:
+    match (value,):
+        case (int(),) if condition:
+            pass
+        case _:
+            reveal_type(value)  # revealed: int | str
+
+def rebound(value: int | str) -> None:
+    match value, (value := 0):
+        case int(), _:
+            pass
+        case _:
+            reveal_type(value)  # revealed: Literal[0]
+
+def after_match(value: int | str) -> None:
+    match (value,):
+        case (int(),):
+            pass
+        case _:
+            pass
+    reveal_type(value)  # revealed: int | str
 ```
 
 ## Nested sequence display subjects

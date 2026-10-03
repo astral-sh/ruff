@@ -21,6 +21,7 @@ use crate::global_scope;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 use crate::scope::{FileScopeId, ScopeId};
 use crate::symbol::ScopedSymbolId;
+use crate::use_def::ScopedPatternBindingsId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -80,6 +81,29 @@ impl<'db> PredicatesBuilder<'db> {
 pub struct Predicate<'db> {
     pub node: PredicateNode<'db>,
     pub is_positive: bool,
+}
+
+/// Whether a predicate is applied as written or negated.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub enum PredicatePolarity {
+    Positive,
+    Negative,
+}
+
+impl PredicatePolarity {
+    pub const fn is_positive(self) -> bool {
+        matches!(self, Self::Positive)
+    }
+}
+
+impl From<bool> for PredicatePolarity {
+    fn from(is_positive: bool) -> Self {
+        if is_positive {
+            Self::Positive
+        } else {
+            Self::Negative
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize)]
@@ -215,6 +239,10 @@ pub enum PredicateNode<'db> {
     /// alternatives. The selected branch is unknown, but recording a predicate and its negation
     /// preserves the fact that exactly one branch is taken.
     OrPatternAlternative(ScopeId<'db>),
+    /// Whether a class-local root and an enclosing root refer to the same object.
+    /// The identity is unknown during analysis; its two outcomes distinguish a possible member
+    /// write from the path on which the enclosing object is unchanged.
+    ClassMemberMayAlias(ScopeId<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
@@ -318,6 +346,21 @@ pub struct PatternPredicate<'db> {
 
     #[returns(copy)]
     pub subject: Expression<'db>,
+
+    #[returns(copy)]
+    pub bindings_before_pattern: Option<ScopedPatternBindingsId>,
+
+    /// Whether the subject's bindings at this case are known to match those at subject evaluation.
+    /// False also covers cases where this information is not needed or was not recorded.
+    #[returns(copy)]
+    pub subject_binding_unchanged: bool,
+
+    /// Sequence display element occurrences whose bindings at this case are known to match those
+    /// read when the same occurrence was evaluated as part of the subject.
+    /// An element may be absent when this information was not needed or recorded.
+    /// The keys are sorted for binary search.
+    #[returns(ref)]
+    pub unchanged_subject_elements: Box<[ExpressionNodeKey]>,
 
     #[returns(ref)]
     pub kind: PatternPredicateKind<'db>,

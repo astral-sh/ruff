@@ -151,8 +151,9 @@ class _:
         a.b.c1.d = D()
 
         class _3:
+            # The assignment above uses the class-local `a`; this scope sees the outer `a`.
             reveal_type(a)  # revealed: A
-            reveal_type(a.b.c1.d)  # revealed: D
+            reveal_type(a.b.c1.d)  # revealed: D | None
 
 a.b.c1 = C()
 a.b.c1.d = D()
@@ -553,4 +554,342 @@ def f(flag: bool):
             if g is None:
                 class E:
                     reveal_type(g)  # revealed: str | Literal[1]
+```
+
+### Deleting a class-local name
+
+A constraint on an outer member survives a class-local binding and deletion unless a write through
+the class-local name may have changed it. After deletion, a new constraint on the outer member is
+visible to nested classes when both scopes resolve the name to the same outer binding, but a
+constraint on a later class-local value is not. In `conditional`, the class body resolves `value` to
+the module, while the nested class resolves it to the function.
+
+```py
+class Box:
+    item: int | str
+
+value = Box()
+
+class Outer:
+    if isinstance(value.item, int):
+        value = Box()
+        value.item = "local"
+        del value
+
+        class AfterDeletion:
+            reveal_type(value.item)  # revealed: int | Literal["local"]
+
+    value = Box()
+    del value
+    if isinstance(value.item, str):
+        class Inner:
+            reveal_type(value.item)  # revealed: str
+
+        value = Box()
+        if isinstance(value.item, int):
+            class AfterRebinding:
+                reveal_type(value.item)  # revealed: str
+
+def conditional(flag: bool):
+    value = Box()
+
+    class Outer:
+        if flag:
+            value = Box()
+            del value
+        if isinstance(value.item, str):
+            class Inner:
+                reveal_type(value.item)  # revealed: int | str
+```
+
+### Member assignments after a conditional class-local binding
+
+An assignment can update the outer object when the class-local name is not bound or when the
+class-local and outer names refer to the same object. Nested classes must account for both
+possibilities. Here ty conservatively allows the names to refer to the same object even after a
+`Box()` call.
+
+```py
+class Box:
+    item: int | str = "initial"
+
+flag: bool = bool(input())
+conditional_value = Box()
+bound_value = Box()
+unbound_value = Box()
+false_value = Box()
+written_value = Box()
+
+class Conditional:
+    if isinstance(conditional_value.item, str):
+        if flag:
+            conditional_value = Box()
+        conditional_value.item = 1
+
+        class Inner:
+            reveal_type(conditional_value.item)  # revealed: str | Literal[1]
+            # error: [unresolved-attribute]
+            conditional_value.item.upper()
+
+class Bound:
+    if isinstance(bound_value.item, str):
+        bound_value = Box()
+        bound_value.item = 1
+
+        class Inner:
+            reveal_type(bound_value.item)  # revealed: str | Literal[1]
+
+class Unbound:
+    if isinstance(unbound_value.item, str):
+        unbound_value.item = 1
+
+        class Inner:
+            reveal_type(unbound_value.item)  # revealed: Literal[1]
+
+class OnlyOuter:
+    if isinstance(false_value.item, str):
+        if False:
+            false_value = Box()
+        false_value.item = 1
+
+        class Inner:
+            reveal_type(false_value.item)  # revealed: Literal[1]
+
+class PreviousWrite:
+    written_value.item = "initial"
+    if flag:
+        written_value = Box()
+    written_value.item = 1
+
+    class Inner:
+        reveal_type(written_value.item)  # revealed: Literal["initial", 1]
+```
+
+The same applies to a subscript of a `TypedDict` and when deletion makes a class-local name unbound.
+
+```py
+from typing import TypedDict
+
+class Data(TypedDict):
+    item: int | str
+
+def get_data() -> Data:
+    return {"item": "outer"}
+
+data = get_data()
+deleted_value = Box()
+
+class ConditionalSubscript:
+    if isinstance(data["item"], str):
+        if flag:
+            data = Data(item="local")
+        data["item"] = 1
+
+        class Inner:
+            reveal_type(data["item"])  # revealed: str | Literal[1]
+
+class ConditionalDeletion:
+    if isinstance(deleted_value.item, str):
+        deleted_value = Box()
+        if flag:
+            del deleted_value
+        deleted_value.item = 1
+
+        class Inner:
+            reveal_type(deleted_value.item)  # revealed: str | Literal[1]
+```
+
+### Replacing an ancestor of a narrowed member
+
+Replacing an attribute can invalidate a constraint on one of its descendants, including when the
+attribute is accessed through a possibly unbound class-local name.
+
+```py
+class Child:
+    def __init__(self, item: int | str):
+        self.item = item
+
+class Parent:
+    def __init__(self):
+        self.child = Child("initial")
+
+flag: bool = bool(input())
+parent = Parent()
+local_parent = Parent()
+
+class Outer:
+    if isinstance(parent.child.item, str):
+        if flag:
+            parent = Parent()
+        parent.child = Child(1)
+
+        class Inner:
+            reveal_type(parent.child.item)  # revealed: int | str
+
+class Local:
+    if isinstance(local_parent.child.item, str):
+        local_parent = Parent()
+        local_parent.child = Child(1)
+
+        class Inner:
+            reveal_type(local_parent.child.item)  # revealed: int | str
+```
+
+### Deleting a member
+
+Deleting an attribute through a name that is unbound in the class body can change the outer object.
+In these examples, deleting an instance attribute exposes a class attribute, so the earlier
+narrowing may no longer apply.
+
+```py
+class Box:
+    item: int | str = 1
+
+    def __init__(self, item: int | str = "initial"):
+        self.item = item
+
+flag: bool = bool(input())
+value = Box()
+
+class Outer:
+    if isinstance(value.item, str):
+        if flag:
+            value = Box()
+        del value.item
+
+        class Inner:
+            reveal_type(value.item)  # revealed: int | str
+
+class Parent:
+    child: Box = Box(1)
+
+    def __init__(self):
+        self.child = Box()
+
+parent = Parent()
+
+class DeleteAncestor:
+    if isinstance(parent.child.item, str):
+        if flag:
+            parent = Parent()
+        del parent.child
+
+        class Inner:
+            reveal_type(parent.child.item)  # revealed: int | str
+```
+
+Member deletion also invalidates descendant narrowing in a function.
+
+```py
+def delete_in_function(parent: Parent):
+    if isinstance(parent.child.item, str):
+        del parent.child
+        reveal_type(parent.child.item)  # revealed: int | str
+```
+
+### Class-local names that alias an enclosing object
+
+A class-local name and the name visible in a nested class may refer to the same object. Writes and
+deletions through the class-local name can therefore change the value seen by the nested class.
+
+```py
+from typing import TypedDict
+
+class Box:
+    item: int | str = 1
+
+    def __init__(self, item: int | str):
+        self.item = item
+
+class Data(TypedDict):
+    item: int | str
+
+value = Box("outer")
+data: Data = {"item": "outer"}
+
+class Assignment:
+    if isinstance(value.item, str):
+        value = value
+        value.item = 1
+
+        class Inner:
+            reveal_type(value.item)  # revealed: str | Literal[1]
+            # error: [unresolved-attribute]
+            value.item.upper()
+
+class SubscriptAssignment:
+    if isinstance(data["item"], str):
+        data = data
+        data["item"] = 1
+
+        class Inner:
+            reveal_type(data["item"])  # revealed: str | Literal[1]
+
+class Deletion:
+    if isinstance(value.item, str):
+        value = value
+        del value.item
+
+        class Inner:
+            reveal_type(value.item)  # revealed: int | str
+```
+
+### Class-body and nested-class names can resolve to different scopes
+
+When a class binds a name, an earlier unbound use in that class falls back to the module. A nested
+class can instead resolve the name to an enclosing function. Constraints on the module value do not
+narrow the function's value.
+
+```py
+class Box:
+    item: int | str
+
+    def __init__(self, item: int | str):
+        self.item = item
+
+value = Box("module")
+
+def local(value: Box) -> None:
+    class Outer:
+        if isinstance(value.item, str):
+            value = value
+            value.item = "changed"
+
+            class Inner:
+                reveal_type(value.item)  # revealed: int | str
+                # error: [unresolved-attribute]
+                value.item.upper()
+
+            items = [value.item for _ in range(1)]
+            reveal_type(items)  # revealed: list[int | str]
+
+            def later() -> None:
+                reveal_type(value.item)  # revealed: int | str
+
+def global_declaration(value: Box) -> None:
+    class Outer:
+        global value
+        value.item = 1
+
+        class Inner:
+            reveal_type(value.item)  # revealed: int | str
+            # error: [unresolved-attribute]
+            value.item.bit_length()
+
+def intermediate_class(value: Box) -> None:
+    class Outer:
+        if isinstance(value.item, str):
+            value = value
+
+            class Middle:
+                if isinstance(value.item, int):
+                    class Inner:
+                        reveal_type(value.item)  # revealed: int
+
+def nonlocal_declaration(value: Box) -> None:
+    class Outer:
+        nonlocal value
+        if isinstance(value.item, str):
+            class Inner:
+                reveal_type(value.item)  # revealed: str
 ```
