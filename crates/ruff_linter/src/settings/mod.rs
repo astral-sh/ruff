@@ -1066,6 +1066,7 @@ mod tests {
         	invalid-suppression-comment (RUF103),
         	unmatched-suppression-comment (RUF104),
         	rule-codes-in-suppression-comments (RUF106),
+        	shared-clock-mock,
         ]
 
         Removed in preview:

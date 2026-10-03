@@ -5254,6 +5254,7 @@
         "self-or-cls-assignment",
         "set-attr-with-constant",
         "shallow-copy-environ",
+        "shared-clock-mock",
         "shebang-leading-whitespace",
         "shebang-missing-executable-file",
         "shebang-missing-python",
