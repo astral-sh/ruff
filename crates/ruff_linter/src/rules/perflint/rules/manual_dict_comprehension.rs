@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
-    self as ast, Expr, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
+    self as ast, Expr, PythonVersion, Stmt, comparable::ComparableExpr, helpers::any_over_expr,
 };
 use ruff_python_semantic::{Binding, analyze::typing::is_dict};
 use ruff_source_file::LineRanges;
@@ -9,7 +9,9 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::is_fix_manual_dict_comprehension_enabled;
-use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+use crate::rules::perflint::helpers::{
+    comment_strings_in_range, references_zero_arg_super, statement_deletion_range,
+};
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -208,6 +210,15 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         })
     }) {
         return;
+    }
+
+    if checker.target_version() < PythonVersion::PY312 {
+        if references_zero_arg_super(key, checker.semantic())
+            || references_zero_arg_super(value, checker.semantic())
+            || if_test.is_some_and(|test| references_zero_arg_super(test, checker.semantic()))
+        {
+            return;
+        }
     }
 
     if is_fix_manual_dict_comprehension_enabled(checker.settings()) {

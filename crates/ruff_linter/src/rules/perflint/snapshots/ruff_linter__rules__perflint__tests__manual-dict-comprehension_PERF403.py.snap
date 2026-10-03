@@ -215,3 +215,12 @@ PERF403 Use a dictionary comprehension instead of a for-loop
 233 |         result[k] = k
     |         ^^^^^^^^^^^^^
 help: Replace for loop with dict comprehension
+
+PERF403 Use a dictionary comprehension instead of a for-loop
+   --> PERF403.py:253:17
+    |
+251 |         for idx, name in enumerate(fruit):
+252 |             if super(TestDictSuper, self).filter(idx):
+253 |                 result[idx] = name  # PERF403
+    |                 ^^^^^^^^^^^^^^^^^^
+help: Replace for loop with dict comprehension
