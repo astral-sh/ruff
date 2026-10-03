@@ -4,8 +4,8 @@ Detects `match` statements that may not cover every possible subject value.
 
 ## Why is this bad?
 
-If no case matches, none of the case bodies runs, and execution continues after the `match`
-statement. Missing a case can therefore leave a value unhandled, especially when a new member is
+If no `case` matches, none of the `case` bodies runs, and execution continues after the `match`
+statement. Missing a `case` can therefore leave a value unhandled, especially when a new member is
 added to an enum or a union.
 
 ## Rule status
@@ -31,7 +31,7 @@ def describe(direction: Direction) -> None:
             print("north")
 ```
 
-Handle the missing case:
+Handle the missing `case`:
 
 ```py
 def describe_complete(direction: Direction) -> None:
@@ -42,7 +42,7 @@ def describe_complete(direction: Direction) -> None:
             print("south")
 ```
 
-If the other values are intentionally ignored, use a wildcard case to make that explicit:
+If the other values are intentionally ignored, use a wildcard `case` to make that explicit:
 
 ```py
 def describe_north(direction: Direction) -> None:
