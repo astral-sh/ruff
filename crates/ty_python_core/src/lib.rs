@@ -44,6 +44,7 @@ pub mod ast_node_ref;
 mod builder;
 mod db;
 pub mod definition;
+pub mod dunder_all;
 pub mod expression;
 pub mod frozen;
 mod interned_nodes;
