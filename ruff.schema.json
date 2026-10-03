@@ -4661,6 +4661,7 @@
         "blanket-noqa",
         "blanket-type-ignore",
         "blind-except",
+        "block-variable-shadows-local",
         "blocking-http-call-httpx-in-async-function",
         "blocking-http-call-in-async-function",
         "blocking-input-in-async-function",
