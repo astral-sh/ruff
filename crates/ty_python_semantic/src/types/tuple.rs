@@ -39,6 +39,14 @@ use ty_python_core::definition::Definition;
 
 pub(crate) mod promotion;
 
+impl<'db> Type<'db> {
+    /// Return whether this is exactly `tuple[()]`, excluding tuple subclasses and unions.
+    pub(crate) fn is_empty_tuple(self, db: &'db dyn Db) -> bool {
+        self.exact_tuple_instance_spec(db)
+            .is_some_and(|spec| spec.len() == TupleLength::Fixed(0))
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
     Fixed(usize),
