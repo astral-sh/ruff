@@ -456,7 +456,7 @@ impl Workspace {
                         .source_location(range.end(), self.position_encoding)
                         .into(),
                     fix: msg.fix().map(|fix| ExpandedFix {
-                        message: msg.first_help_text().map(ToString::to_string),
+                        message: msg.fix_title().map(ToString::to_string),
                         edits: fix
                             .edits()
                             .iter()
