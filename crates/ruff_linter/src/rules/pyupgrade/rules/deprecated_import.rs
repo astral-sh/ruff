@@ -415,6 +415,11 @@ const TYPING_EXTENSIONS_TO_TYPES_313: &[&str] = &["CapsuleType"];
 // Members of typing_extensions that were moved to `warnings`
 const TYPING_EXTENSIONS_TO_WARNINGS_313: &[&str] = &["deprecated"];
 
+// Python 3.15+
+
+// Members of `typing_extensions` that were moved to `typing`.
+const TYPING_EXTENSIONS_TO_TYPING_315: &[&str] = &["TypeForm"];
+
 struct ImportReplacer<'a> {
     import_from_stmt: &'a StmtImportFrom,
     module: &'a str,
@@ -550,6 +555,9 @@ impl<'a> ImportReplacer<'a> {
                 }
                 if self.version >= PythonVersion::PY313 {
                     typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_313);
+                }
+                if self.version >= PythonVersion::PY315 {
+                    typing_extensions_to_typing.extend(TYPING_EXTENSIONS_TO_TYPING_315);
                 }
                 if let Some(operation) = self.try_replace(&typing_extensions_to_typing, "typing") {
                     operations.push(operation);
