@@ -86,6 +86,28 @@ impl QueryPattern {
         }
     }
 
+    pub(crate) fn source_filter_key(&self) -> Option<&str> {
+        let original = &self.original;
+        (self.re.is_some()
+            && original.len() > 1
+            && original
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'.'))
+        .then_some(original)
+    }
+
+    pub(crate) fn may_match_source(&self, source: &str) -> bool {
+        // Non-ASCII names can normalize, and `__all__` can export dotted imports written with whitespace.
+        if !source.is_ascii() || source.contains("__all__") {
+            return true;
+        }
+        source
+            .split(|character: char| {
+                !character.is_ascii_alphanumeric() && character != '_' && character != '.'
+            })
+            .any(|word| self.is_match_symbol_name(word))
+    }
+
     /// Returns true when it is known that this pattern will return `true` for
     /// all inputs given to `QueryPattern::is_match_symbol_name`.
     ///
@@ -1677,6 +1699,11 @@ mod tests {
 
     #[test]
     fn various_yes() {
+        let query = super::QueryPattern::fuzzy("needle");
+        assert!(query.may_match_source("N_e_e_d_l_e = 1"));
+        assert!(query.may_match_source("x = '\u{212a}'"));
+        let exact = super::QueryPattern::exactly("xy");
+        assert!(exact.source_filter_key().is_none());
         assert!(matches("", ""));
         assert!(matches("", "a"));
         assert!(matches("", "abc"));
@@ -1700,6 +1727,8 @@ mod tests {
 
     #[test]
     fn various_no() {
+        let query = super::QueryPattern::fuzzy("needle");
+        assert!(!query.may_match_source("value = 1"));
         assert!(!matches("a", ""));
         assert!(!matches("abc", "bac"));
         assert!(!matches("abcd", "abc"));

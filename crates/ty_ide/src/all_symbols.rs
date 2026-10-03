@@ -1,6 +1,11 @@
+use std::sync::{Arc, Mutex};
+
 use compact_str::CompactString;
 use rayon::prelude::*;
 use ruff_db::files::File;
+use ruff_db::source::{SourceText, source_text};
+use ruff_python_ast::token::{TokenFlags, TokenKind};
+use ruff_python_parser::{Mode, lexer::lex};
 use ty_module_resolver::{Module, all_modules};
 use ty_project::{Db, parallel::ParallelIteratorExt};
 use ty_python_core::ProgramFile;
@@ -29,6 +34,7 @@ pub fn all_symbols<'db>(
 
     let program = importing_from.program(db);
     let resolver_environment = importing_from.resolver_environment(db);
+    let filter_key = query.source_filter_key().map(Arc::<str>::from);
 
     let results = all_modules(db, resolver_environment)
         .into_par_iter()
@@ -48,6 +54,15 @@ pub fn all_symbols<'db>(
             let Some(file) = module.file(db) else {
                 return Vec::new();
             };
+            let mut symbols = vec![];
+            if query.is_match_symbol_name(module.name(db)) {
+                symbols.push(AllSymbolInfo::from_module(db, module, file));
+            }
+            if let Some(key) = &filter_key
+                && !source_may_match(db, file, query, key)
+            {
+                return symbols;
+            }
             let program_file = ProgramFile::new(db, file, program);
 
             let symbols_for_file_span = tracing::debug_span!(
@@ -57,10 +72,6 @@ pub fn all_symbols<'db>(
             );
             let _entered = symbols_for_file_span.entered();
 
-            let mut symbols = vec![];
-            if query.is_match_symbol_name(module.name(db)) {
-                symbols.push(AllSymbolInfo::from_module(db, module, file));
-            }
             for (_, symbol) in symbols_for_file_global_only(db, program_file).search(query) {
                 // Test functions (starting with `test_`) in third-party
                 // packages are almost never useful to import.
@@ -80,6 +91,50 @@ pub fn all_symbols<'db>(
         .collect();
 
     merge::merge(db, results)
+}
+
+// Cache one query per file and invalidate it when the source changes.
+#[salsa::tracked(returns(ref), no_eq)]
+fn source_filter_cache(db: &dyn Db, file: File) -> Mutex<Option<(Arc<str>, bool)>> {
+    let _ = source_text(db, file);
+    Mutex::new(None)
+}
+
+fn source_may_match(db: &dyn Db, file: File, query: &QueryPattern, key: &Arc<str>) -> bool {
+    let mut cached = source_filter_cache(db, file).lock().ok();
+    // Prefix results remain conservative for longer fuzzy queries.
+    if let Some((previous, result)) = cached.as_deref().and_then(Option::as_ref)
+        && key.starts_with(previous.as_ref())
+    {
+        return *result;
+    }
+    let source = source_text(db, file);
+    let result = query.may_match_source(source.as_str())
+        || source.contains('*') && source_may_import_wildcard(&source);
+    if let Some(cache) = cached.as_deref_mut() {
+        *cache = Some((Arc::clone(key), result));
+    }
+    result
+}
+
+fn source_may_import_wildcard(source: &SourceText) -> bool {
+    // A wildcard import can introduce names absent from the source text.
+    if source.as_notebook().is_some() {
+        return true;
+    }
+    let mut lexer = lex(source.as_str(), Mode::Module);
+    let mut from = false;
+    loop {
+        match lexer.next_token() {
+            _ if lexer.current_flags().contains(TokenFlags::UNCLOSED_STRING) => return true,
+            TokenKind::From => from = true,
+            TokenKind::Star if from => return true,
+            TokenKind::Newline => from = false,
+            TokenKind::Unknown => return true,
+            TokenKind::EndOfFile => return false,
+            _ => {}
+        }
+    }
 }
 
 /// A symbol found in the workspace and dependencies, including the
@@ -560,6 +615,22 @@ mod tests {
         SubDiagnosticSeverity,
     };
 
+    #[test]
+    fn source_filter_updates_after_edit() {
+        let mut test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("other.py", "def unrelated(): pass")
+            .build();
+
+        assert_eq!(test.all_symbols("zqzq"), "No symbols found");
+        assert_eq!(test.all_symbols("zqzqzq"), "No symbols found");
+
+        test.write_file("other.py", "def zqzqzq(): pass")
+            .expect("edit other.py");
+        assert!(test.all_symbols("zqzq").contains("Function zqzqzq"));
+        assert!(test.all_symbols("zqzqzq").contains("Function zqzqzq"));
+    }
+
     /// Tests that we merge redundant re-exports in a real world use case.
     ///
     /// This mimics how pandas exports `read_csv` in its top-level module
@@ -655,8 +726,7 @@ def zqzqzq():
         ");
     }
 
-    /// Like `pandas_read_csv_merged_all`, but is a sanity
-    /// check that re-exports via a wild card work too.
+    /// Like `pandas_read_csv_merged_all`, but with a multiline wildcard re-export.
     #[test]
     fn pandas_read_csv_merged_wildcard() {
         let test = CursorTest::builder()
@@ -671,7 +741,8 @@ from pandas.io.api import *
             .source(
                 "pandas/io/api.py",
                 "
-from pandas.io.parsers import *
+from pandas.io.parsers import (
+    *)
 ",
             )
             .source(
