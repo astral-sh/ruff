@@ -664,6 +664,15 @@ impl ImportAction {
     pub fn symbol_text(&self) -> &str {
         &self.symbol_text
     }
+
+    /// Consumes `self` and returns the symbol text that should be used.
+    ///
+    /// Usually this is identical to the symbol text given to the corresponding
+    /// [`ImportRequest`], but this may sometimes be fully qualified based on
+    /// existing imports or import preferences.
+    pub(crate) fn into_symbol_text(self) -> Box<str> {
+        self.symbol_text
+    }
 }
 
 /// A borrowed AST of a Python import statement.

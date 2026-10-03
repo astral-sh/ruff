@@ -288,7 +288,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_after_pattern<'db>(
+pub(crate) fn type_narrowed_after_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     expansion: PatternSubjectExpansion,

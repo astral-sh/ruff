@@ -360,6 +360,8 @@ fn mdtest_rule_selection(rules: Option<&Rules>, required_rule: Option<&str>) -> 
         "unsound-return-statement",
         "unsound-yield",
         "redundant-condition-strict",
+        // This opt-in rule would report diagnostics on many unrelated match tests.
+        "non-exhaustive-match",
     ];
 
     let registry = default_lint_registry();

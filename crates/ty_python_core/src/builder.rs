@@ -284,6 +284,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     scopes_by_expression: ExpressionsScopeMapBuilder,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
+    match_patterns_by_subject: FxHashMap<ExpressionNodeKey, PatternPredicate<'db>>,
     unpacks_by_target: FxHashMap<ExpressionNodeKey, Unpack<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
@@ -348,6 +349,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            match_patterns_by_subject: FxHashMap::default(),
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
@@ -3415,6 +3417,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),
             expressions_by_node: self.expressions_by_node,
+            match_patterns_by_subject: FrozenMap::from(self.match_patterns_by_subject),
             unpacks_by_target: FrozenMap::from(self.unpacks_by_target),
             statements_by_node: self.statements_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope.into(),
@@ -5042,6 +5045,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     }
 
                     no_case_matched = self.flow_snapshot();
+                }
+
+                if let Some(last_pattern) = previous_pattern {
+                    self.match_patterns_by_subject
+                        .insert(ExpressionNodeKey::from(subject.as_ref()), last_pattern);
                 }
 
                 for post_clause_state in post_case_snapshots {
