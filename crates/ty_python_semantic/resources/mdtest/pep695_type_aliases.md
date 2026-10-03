@@ -1073,15 +1073,15 @@ cycle.
 type ThroughIdentity = Identity[ThroughIdentity]
 ```
 
-Subsequent operations recover from these cycles. Repeated applications of the helper have the same
-result.
+Subsequent operations recover from these cycles as `Unknown`. Repeated applications of the helper
+have the same result.
 
 ```py
 type RepeatedIdentity = Identity[Identity[RepeatedIdentity]]  # error: [cyclic-type-alias-definition]
 
 def inspect_identity(direct: ThroughIdentity, repeated: RepeatedIdentity):
-    reveal_type(direct)  # revealed: Divergent
-    reveal_type(repeated)  # revealed: Divergent
+    reveal_type(direct)  # revealed: Unknown
+    reveal_type(repeated)  # revealed: Unknown
     direct[0]
     repeated[0]
 ```

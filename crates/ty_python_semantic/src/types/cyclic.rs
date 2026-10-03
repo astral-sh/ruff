@@ -345,9 +345,12 @@ impl<'db> RecursiveDefinition<'db> {
     }
 
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        // A flow graph built during an inference cycle may not yet contain every recursive
+        // reference. Until inference is complete, assume that specializations can grow so that
+        // recursive visitors do not rely on an incomplete graph to terminate.
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_result=|_, _, _, ()| true,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn may_have_unbounded_specialization_inner<'db>(

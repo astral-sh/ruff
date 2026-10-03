@@ -20,6 +20,122 @@ use insta_cmd::assert_cmd_snapshot;
 use common::{CliTest, user_config_directory_env_var};
 
 #[test]
+fn mutually_recursive_aliases_in_parallel() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("pkg/__init__.py", ""),
+        (
+            "pkg/a.py",
+            r#"
+            from .b import B
+
+            type A = B | int
+
+            def use(value: A):
+                value.missing
+                value()
+            "#,
+        ),
+        ("pkg/b.py", "from .a import A\ntype B = A | str\n"),
+        (
+            "pkg/c.py",
+            "from .d import D\ntype C = D | int\ndef use(value: C): return value\n",
+        ),
+        ("pkg/d.py", "from .c import C\ntype D = list[C]\n"),
+    ])?;
+
+    // The cyclic query can be discovered by either file's worker.
+    for _ in 0..20 {
+        let output = case
+            .command()
+            .env("RAYON_NUM_THREADS", "2")
+            .args([
+                "--python-version",
+                "3.13",
+                "--output-format",
+                "concise",
+                "pkg/a.py",
+                "pkg/b.py",
+            ])
+            .output()?;
+        let stdout = String::from_utf8(output.stdout)?;
+        let stderr = String::from_utf8(output.stderr)?;
+        assert_eq!(output.status.code(), Some(1), "{stdout}\n{stderr}");
+        assert_eq!(
+            stdout.matches("cyclic-type-alias-definition").count(),
+            2,
+            "{stdout}\n{stderr}"
+        );
+        assert!(
+            stdout.contains("unresolved-attribute"),
+            "{stdout}\n{stderr}"
+        );
+        assert!(stdout.contains("call-non-callable"), "{stdout}\n{stderr}");
+
+        let output = case
+            .command()
+            .env("RAYON_NUM_THREADS", "2")
+            .args(["--python-version", "3.13", "pkg/c.py", "pkg/d.py"])
+            .output()?;
+        assert!(output.status.success(), "{output:?}");
+    }
+    Ok(())
+}
+
+#[test]
+fn recursive_aliases_with_recursive_type_parameter_bound() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("pkg/__init__.py", ""),
+        (
+            "pkg/a.py",
+            "from .b import B, F\ntype A[T] = F[B[T]]\ndef use(value: A[int]): return value\n",
+        ),
+        (
+            "pkg/b.py",
+            "from .a import A\ntype F[T: A] = T | bytes\ntype B[T] = A[list[T]]\n",
+        ),
+        (
+            "pkg/c.py",
+            "from typing import assert_type\nfrom .d import B, F\ntype A[T] = F[B[T]]\ndef use(value: A[int]): assert_type(value, list[int] | bytes)\n",
+        ),
+        (
+            "pkg/d.py",
+            "from .c import A\ntype F[T: A] = T | bytes\ntype B[T] = list[T]\n",
+        ),
+    ])?;
+
+    for workers in ["1", "2", "4"] {
+        let output = case
+            .command()
+            .env("RAYON_NUM_THREADS", workers)
+            .args([
+                "--python-version",
+                "3.13",
+                "--output-format",
+                "concise",
+                "pkg/a.py",
+                "pkg/b.py",
+            ])
+            .output()?;
+        let stdout = String::from_utf8(output.stdout)?;
+        let stderr = String::from_utf8(output.stderr)?;
+        assert_eq!(output.status.code(), Some(1), "{stdout}\n{stderr}");
+        assert_eq!(
+            stdout.matches("cyclic-type-alias-definition").count(),
+            2,
+            "{stdout}\n{stderr}"
+        );
+
+        let output = case
+            .command()
+            .env("RAYON_NUM_THREADS", workers)
+            .args(["--python-version", "3.13", "pkg/c.py", "pkg/d.py"])
+            .output()?;
+        assert!(output.status.success(), "{output:?}");
+    }
+    Ok(())
+}
+
+#[test]
 fn test_quiet_output() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "x: int = 1")?;
 

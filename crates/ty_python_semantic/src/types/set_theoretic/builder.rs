@@ -565,6 +565,35 @@ const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
+/// Retain both union elements if their redundancy check depends on unfinished inference.
+///
+/// For example, simplifying `T | bytes` using the bound of `T` is circular when the bound is
+/// an alias that expands to the union itself. Removing `T` can hide an unguarded alias cycle.
+fn union_element_is_redundant<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+) -> bool {
+    if first == second {
+        return true;
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_result=|_, _, _| false,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn union_element_is_redundant_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
+        let env = ProgramEnvironment::from_program(types.program(db));
+        types
+            .first(db)
+            .is_redundant_with(db, &env, types.second(db))
+    }
+
+    union_element_is_redundant_impl(db, TypePair::new(db, env.program(db), first, second))
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -798,10 +827,10 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(db, &self.env, ty, *existing) {
                                         return;
                                     }
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(db, &self.env, *existing, ty) {
                                         to_remove = Some(index);
                                         continue;
                                     }
@@ -851,12 +880,12 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(db, &self.env, ty, *existing) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[b""] & Any`,
                                     // and `ty` could be `Literal[b""]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(db, &self.env, *existing, ty) {
                                         to_remove = Some(index);
                                         continue;
                                     }
@@ -908,12 +937,12 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(db, &self.env, ty, *existing) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[1] & Any`,
                                     // and `ty` could be `Literal[1]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(db, &self.env, *existing, ty) {
                                         to_remove = Some(index);
                                         continue;
                                     }
@@ -985,12 +1014,12 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(db, &self.env, ty, *existing) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[Foo.X] & Any`,
                                     // and `ty` could be `Literal[Foo.X]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(db, &self.env, *existing, ty) {
                                         to_remove = Some(index);
                                         continue;
                                     }
@@ -1157,11 +1186,11 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
                 }
-                if ty.is_redundant_with(db, &self.env, element_type) {
+                if union_element_is_redundant(db, &self.env, ty, element_type) {
                     return;
                 }
 
-                if element_type.is_redundant_with(db, &self.env, ty) {
+                if union_element_is_redundant(db, &self.env, element_type, ty) {
                     to_remove.push(i);
                     continue;
                 }

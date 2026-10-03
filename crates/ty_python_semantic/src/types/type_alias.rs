@@ -5,8 +5,9 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        RecursiveType, Type, TypeContext, TypeMapping, TypeRecursionContext, TypingModule,
+        UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -24,6 +25,7 @@ use ty_python_core::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
+use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
     /// Returns whether expanding aliases, unions, and intersections can return to the same alias
@@ -38,18 +40,141 @@ impl<'db> Type<'db> {
 /// Only arguments substituted for these variables can introduce an unguarded cycle.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
 pub(super) struct AliasCycleSummary<'db> {
-    /// The divergent marker or unbound reference that closes an unguarded cycle.
-    pub(super) cycle: Option<Type<'db>>,
+    /// The point at which an unguarded cycle was detected.
+    pub(super) cycle: Option<AliasCycle<'db>>,
     typevars: Box<[BoundTypeVarInstance<'db>]>,
+    /// This summary may be incomplete: its Salsa query was reentered, or the walk encountered
+    /// a divergent type.
+    ///
+    /// During Salsa cycle iteration, even a result with no cycle is provisional: the queries
+    /// read by the walk register dependencies, keeping the caller's result provisional as well.
+    /// A later walk must recompute the summary because those dependencies may have changed.
+    pending: bool,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::SalsaValue, get_size2::GetSize)]
+pub(super) enum AliasCycle<'db> {
+    /// A provisional marker or an unbound recursive variable.
+    Marker(Type<'db>),
+    /// The definition walk reached a constructor that is already on its path.
+    RepeatedConstructor,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum AliasConstructor<'db> {
+    Alias(TypeAliasType<'db>),
+    Recursive(RecursiveType<'db>),
+}
+
+enum ConstructorState<'db> {
+    Active,
+    Complete(AliasCycleSummary<'db>),
+}
+
+/// State shared by one walk of the unguarded alias graph.
+#[derive(Default)]
+pub(super) struct AliasCycleAnalysis<'db> {
+    // A cyclic summary depends on the active path, and a pending summary can change later.
+    // Reuse only complete, acyclic summaries within this walk.
+    constructors: FxHashMap<AliasConstructor<'db>, ConstructorState<'db>>,
+    active: usize,
 }
 
 impl<'db> AliasCycleSummary<'db> {
-    pub(super) fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+    pub(super) fn pending() -> Self {
+        Self {
+            pending: true,
+            ..Self::default()
+        }
+    }
+
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        Self::from_type_inner(db, ty, &mut AliasCycleAnalysis::default())
+    }
+
+    pub(super) fn from_type_inner(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> Self {
         let mut typevars = FxOrderSet::default();
-        let cycle = Self::collect(db, ty, &mut typevars);
+        let mut pending = false;
+        let cycle = Self::collect(db, ty, &mut typevars, analysis, &mut pending);
         Self {
             cycle,
             typevars: typevars.into_iter().collect(),
+            pending,
+        }
+    }
+
+    fn from_alias(
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> Self {
+        Self::from_constructor(db, AliasConstructor::Alias(alias), analysis)
+    }
+
+    pub(super) fn from_recursive(
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> Self {
+        Self::from_constructor(db, AliasConstructor::Recursive(recursive), analysis)
+    }
+
+    fn from_constructor(
+        db: &'db dyn Db,
+        constructor: AliasConstructor<'db>,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> Self {
+        match analysis.constructors.get(&constructor) {
+            Some(ConstructorState::Active) => {
+                return Self {
+                    cycle: Some(AliasCycle::RepeatedConstructor),
+                    ..Self::default()
+                };
+            }
+            Some(ConstructorState::Complete(summary)) => return summary.clone(),
+            None => {}
+        }
+        analysis
+            .constructors
+            .insert(constructor, ConstructorState::Active);
+        analysis.active += 1;
+        let summary = match constructor {
+            AliasConstructor::Alias(alias) => {
+                Self::from_type_inner(db, alias.raw_value_type(db), analysis)
+            }
+            AliasConstructor::Recursive(recursive) => recursive.cycle_summary_body(db, analysis),
+        };
+        analysis.active -= 1;
+        if summary.cycle.is_none() && !summary.pending {
+            analysis
+                .constructors
+                .insert(constructor, ConstructorState::Complete(summary.clone()));
+        } else {
+            analysis.constructors.remove(&constructor);
+        }
+        summary
+    }
+
+    fn constructor_summary(
+        db: &'db dyn Db,
+        constructor: AliasConstructor<'db>,
+        analysis: &mut AliasCycleAnalysis<'db>,
+    ) -> Self {
+        // Only reuse a globally cached summary at the root of a walk. Otherwise two
+        // mutually recursive aliases can each inherit an incomplete summary from the
+        // other and incorrectly appear acyclic.
+        let cached = (analysis.active == 0).then(|| match constructor {
+            AliasConstructor::Alias(alias) => alias.cycle_summary(db),
+            AliasConstructor::Recursive(recursive) => recursive.cycle_summary(db),
+        });
+        if let Some(summary) = cached.filter(|summary| !summary.pending) {
+            summary.clone()
+        } else {
+            Self::from_constructor(db, constructor, analysis)
         }
     }
 
@@ -57,15 +182,19 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
+        analysis: &mut AliasCycleAnalysis<'db>,
+        pending: &mut bool,
+    ) -> Option<AliasCycle<'db>> {
         match ty {
             // A bare reference is unguarded: recursive binders do not introduce a container.
-            Type::RecursiveVar(_) => Some(ty),
+            Type::RecursiveVar(_) => Some(AliasCycle::Marker(ty)),
             Type::TypeAlias(alias) => {
                 // Inspect the definition independently of its arguments. Nested applications like
                 // `Recursive[Recursive[int]]` can be finite even when `Recursive` has growing
                 // recursive references beneath a container.
-                let summary = alias.cycle_summary(db);
+                let constructor = AliasConstructor::Alias(alias.unspecialized(db));
+                let summary = Self::constructor_summary(db, constructor, analysis);
+                *pending |= summary.pending;
                 if summary.cycle.is_some() {
                     return summary.cycle;
                 }
@@ -75,14 +204,22 @@ impl<'db> AliasCycleSummary<'db> {
                         .map(|context| context.default_specialization(db, None))
                 });
 
-                summary.collect_exposed_arguments(db, specialization, typevars)
+                summary.collect_exposed_arguments(db, specialization, typevars, analysis, pending)
             }
             Type::Recursive(recursive) => {
-                let summary = recursive.cycle_summary(db);
+                let constructor = AliasConstructor::Recursive(recursive.constructor(db));
+                let summary = Self::constructor_summary(db, constructor, analysis);
+                *pending |= summary.pending;
                 if summary.cycle.is_some() {
                     return summary.cycle;
                 }
-                summary.collect_exposed_arguments(db, recursive.arguments(db), typevars)
+                summary.collect_exposed_arguments(
+                    db,
+                    recursive.arguments(db),
+                    typevars,
+                    analysis,
+                    pending,
+                )
             }
             Type::TypeVar(typevar) => {
                 typevars.insert(typevar);
@@ -91,16 +228,21 @@ impl<'db> AliasCycleSummary<'db> {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, analysis, pending)),
             Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
                 .chain(intersection.negative(db))
-                .find_map(|&element| Self::collect(db, element, typevars)),
+                .find_map(|&element| Self::collect(db, element, typevars, analysis, pending)),
             Type::Divergent(divergent)
                 if divergent.flags.contains(DivergentFlags::FROM_TYPE_ALIAS) =>
             {
-                Some(ty)
+                *pending = true;
+                Some(AliasCycle::Marker(ty))
+            }
+            Type::Divergent(_) => {
+                *pending = true;
+                None
             }
             _ => None,
         }
@@ -112,13 +254,15 @@ impl<'db> AliasCycleSummary<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-    ) -> Option<Type<'db>> {
+        analysis: &mut AliasCycleAnalysis<'db>,
+        pending: &mut bool,
+    ) -> Option<AliasCycle<'db>> {
         self.typevars.iter().find_map(|&typevar| {
             if let Some(argument) =
                 specialization.and_then(|specialization| specialization.get(db, typevar))
                 && argument != Type::TypeVar(typevar)
             {
-                Self::collect(db, argument, typevars)
+                Self::collect(db, argument, typevars, analysis, pending)
             } else {
                 typevars.insert(typevar);
                 None
@@ -131,13 +275,13 @@ impl<'db> AliasCycleSummary<'db> {
 struct AliasCycleRecovery<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     context: Option<&'a TypeRecursionContext<'db>>,
-    cycle: Type<'db>,
+    cycle: AliasCycle<'db>,
     visitor: CycleDetector<'db, AliasCycleSummary<'db>, Type<'db>, Option<Type<'db>>, 1>,
 }
 
 impl<'db> AliasCycleRecovery<'_, 'db> {
     fn recover(&self, db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        if ty == self.cycle {
+        if self.cycle == AliasCycle::Marker(ty) {
             return None;
         }
         match ty {
@@ -466,12 +610,12 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
-    /// Summarize an alias's raw definition once, sharing the result across references.
-    /// Specializations reuse this summary and check their exposed arguments separately.
+    /// Summarize the unguarded aliases reachable from this constructor.
+    /// Specializations reuse the result and check their exposed arguments separately.
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
             returns(ref),
-            cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
+            cycle_initial=|_, _, _, ()| AliasCycleSummary::pending(),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn cycle_summary<'db>(
@@ -479,9 +623,8 @@ impl<'db> TypeAliasType<'db> {
             alias: TypeAliasType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            AliasCycleSummary::from_type(db, alias.raw_value_type(db))
+            AliasCycleSummary::from_alias(db, alias, &mut AliasCycleAnalysis::default())
         }
-
         cycle_summary(db, self.unspecialized(db), ())
     }
 
@@ -519,7 +662,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    /// Resolve this specialization while preserving the marker of an unguarded cycle.
+    /// Resolve this specialization while removing unguarded recursive edges.
     fn specialized_value_type(
         self,
         db: &'db dyn Db,
@@ -534,7 +677,12 @@ impl<'db> TypeAliasType<'db> {
                 visitor: CycleDetector::new(None),
             }
             .recover(db, Type::TypeAlias(self))
-            .unwrap_or(cycle);
+            .unwrap_or_else(|| match cycle {
+                AliasCycle::Marker(ty) => ty,
+                // A structural cycle has no Salsa query marker. If nothing remains after
+                // removing its recursive edges, recover the invalid alias as `Unknown`.
+                AliasCycle::RepeatedConstructor => Type::unknown(),
+            });
         }
         apply_type_alias_specialization(
             db,
