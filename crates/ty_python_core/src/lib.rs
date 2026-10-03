@@ -27,6 +27,7 @@ use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
 use narrowing_constraints::ScopedNarrowingConstraint;
 pub use place::{PlaceExprRef, PlaceTable};
+pub use re_exports::{dunder_all_element_name, is_dunder_all};
 pub use reachability_constraints::ReachabilityConstraintsBuilder;
 pub use scope::FileScopeId;
 use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness};
