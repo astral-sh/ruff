@@ -23,7 +23,7 @@ use crate::{
         call::Argument,
         class::{
             CodeGeneratorKind, Field, FieldKind, MetaclassErrorKind, MethodDecorator,
-            expanded_class_base_entries, implicit_attribute_names, method_decorator,
+            classify_method, expanded_class_base_entries, implicit_attribute_names,
         },
         context::InferContext,
         definition_expression_type,
@@ -63,7 +63,6 @@ use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
     DeclarationsIterator, FileScopeId, SemanticIndex, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState},
-    place::ScopedPlaceId,
     scope::ScopeId,
     semantic_index,
 };
@@ -135,41 +134,52 @@ fn check_class_slots<'db>(
     }
 }
 
-/// Appends the reachable annotated assignments among `declarations`, such as `x: int` in a class
+/// Returns the reachable annotated assignments among `declarations`, such as `x: int` in a class
 /// body or `self.x: int = 1` in a method, together with their declared types.
-fn add_annotated_declarations<'db>(
+fn annotated_declarations<'map, 'db>(
     db: &'db dyn Db,
-    declarations: DeclarationsIterator<'_, 'db>,
-    annotated: &mut Vec<(Definition<'db>, Type<'db>)>,
-) {
+    declarations: DeclarationsIterator<'map, 'db>,
+) -> impl Iterator<Item = (Definition<'db>, Type<'db>)> + use<'map, 'db> {
     let predicates = declarations.predicates();
     let reachability_constraints = declarations.reachability_constraints();
 
-    for declaration in declarations {
+    declarations.filter_map(move |declaration| {
         let DefinitionState::Defined(definition) = declaration.declaration else {
-            continue;
+            return None;
         };
         if !matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(_)) {
-            continue;
+            return None;
         }
         if reachability_constraints
             .evaluate(db, predicates, declaration.reachability_constraint)
             .is_always_false()
         {
-            continue;
+            return None;
         }
-        if let Some(declared) = inferred_declaration(db, definition).declared() {
-            annotated.push((definition, declared.inner_type()));
-        }
-    }
+        let declared = inferred_declaration(db, definition).declared()?;
+        Some((definition, declared.inner_type()))
+    })
 }
 
 /// Returns whether the method defined in `method_scope_id` is still bound to its name when the
 /// class body finishes executing.
 ///
 /// A later method with the same name, a `del` statement, or a statically false condition can
-/// remove a method from the class. Declarations in such a method never take effect, so they do not
-/// take part in conflict checking.
+/// remove a method from the class. Declarations in such a method usually never take effect, so
+/// they do not take part in conflict checking:
+///
+/// ```python
+/// class C:
+///     def set_value(self) -> None:
+///         self.x: int = 1  # never runs
+///
+///     def set_value(self) -> None:
+///         self.x: str = ""
+/// ```
+///
+/// A method that is no longer bound to its name can still run if something else kept a reference
+/// to it, such as the `@p.setter` decorator of a property `p`, which keeps the getter, or an
+/// assignment like `__init__ = _init`. Declarations in such methods are not checked for conflicts.
 fn method_is_bound_at_class_exit<'db>(
     db: &'db dyn Db,
     index: &SemanticIndex<'db>,
@@ -201,32 +211,47 @@ fn method_is_bound_at_class_exit<'db>(
 
 /// Reports a conflict if the declared types of attribute `name` are not all equivalent.
 ///
-/// The first declaration's type is the reference type, and the diagnostic points at the first
-/// declaration that disagrees with it. Every other declaration is marked with a secondary
-/// annotation, since the conflict can only be resolved by looking at all of them together.
-fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
+/// The earliest declaration's type is the reference type. The diagnostic points at the first
+/// method declaration that disagrees with it, and every other declaration is marked with a
+/// secondary annotation, since the conflict can only be resolved by looking at all of them
+/// together.
+///
+/// When only class-body declarations disagree with the reference type, nothing is reported here.
+/// Those conflicts are reported by the checks for declarations of class-body symbols, and
+/// reporting them here would duplicate those diagnostics.
+fn report_conflicting_attribute_declarations<'db>(
     context: &InferContext<'db, '_>,
     name: &str,
-    declarations: impl IntoIterator<Item = &'a (Definition<'db>, Type<'db>)>,
+    class_body_declarations: &[(Definition<'db>, Type<'db>)],
+    method_declarations: &[(Definition<'db>, Type<'db>)],
 ) {
     let db = context.db();
     let env = context.program_environment();
-    let declarations: Vec<_> = declarations.into_iter().collect();
-    let Some(((_, first_type), rest)) = declarations.split_first() else {
+    let Some(&(_, reference_type)) = class_body_declarations
+        .iter()
+        .chain(method_declarations)
+        .next()
+    else {
         return;
     };
+
     let mut conflicting_types = FxOrderSet::default();
-    let mut conflicting_declaration = None;
-    for declaration @ (_, ty) in rest {
-        if !first_type.is_equivalent_to(db, env, *ty) {
-            conflicting_types.insert(*ty);
-            conflicting_declaration.get_or_insert(*declaration);
+    for &(_, ty) in class_body_declarations {
+        if !reference_type.is_equivalent_to(db, env, ty) {
+            conflicting_types.insert(ty);
         }
     }
-    let Some(&(conflicting_definition, conflicting_type)) = conflicting_declaration else {
+    let mut conflicting_method_declaration = None;
+    for declaration @ &(_, ty) in method_declarations {
+        if !reference_type.is_equivalent_to(db, env, ty) {
+            conflicting_types.insert(ty);
+            conflicting_method_declaration.get_or_insert(declaration);
+        }
+    }
+    let Some(&(conflicting_definition, conflicting_type)) = conflicting_method_declaration else {
         return;
     };
-    conflicting_types.insert_before(0, *first_type);
+    conflicting_types.insert_before(0, reference_type);
 
     let Some(builder) = context.report_lint(
         &CONFLICTING_DECLARATIONS,
@@ -242,8 +267,8 @@ fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
         "declared as `{}` here",
         conflicting_type.display(db, env)
     ));
-    for (definition, ty) in declarations {
-        if *definition == conflicting_definition {
+    for &(definition, ty) in class_body_declarations.iter().chain(method_declarations) {
+        if definition == conflicting_definition {
             continue;
         }
         diagnostic.annotate(
@@ -263,6 +288,10 @@ fn report_conflicting_attribute_declarations<'a, 'db: 'a>(
 ///         self.x: str = ""  # error: [conflicting-declarations]
 /// ```
 ///
+/// Every reachable declaration in a method is compared, including one that a later declaration in
+/// the same method replaces. A method can return before reaching the later declaration, so both
+/// can be in effect when the method returns.
+///
 /// Instance methods (`self.x: int`) and classmethods (`cls.x: int`) declare different attributes,
 /// so they are checked separately. A class-body declaration applies to both and is compared with
 /// each.
@@ -273,66 +302,56 @@ fn check_conflicting_attribute_declarations<'db>(
 ) {
     let db = context.db();
     let class_body_scope = class.body_scope(db);
+    let attribute_names = implicit_attribute_names(db, class_body_scope);
+    if attribute_names.is_empty() {
+        return;
+    }
+
     let class_scope_id = class_body_scope.file_scope_id(db);
     let class_table = index.place_table(class_scope_id);
     let class_use_def = index.use_def_map(class_scope_id);
 
-    let method_kinds: FxHashMap<FileScopeId, MethodDecorator> =
-        attribute_scopes(db, class_body_scope)
-            .filter(|&scope_id| method_is_bound_at_class_exit(db, index, class_scope_id, scope_id))
-            .filter_map(|scope_id| {
-                let kind = method_decorator(db, index, context.module(), index.scope(scope_id))?;
-                Some((scope_id, kind))
-            })
-            .collect();
+    // Classifying a method infers its decorators, so it is only done for methods that declare an
+    // attribute, and at most once per method. `None` marks a method that is skipped entirely.
+    let mut method_kinds: FxHashMap<FileScopeId, Option<MethodDecorator>> = FxHashMap::default();
 
-    for name in implicit_attribute_names(db, class_body_scope) {
-        let mut class_body_declarations = Vec::new();
-        if let Some(symbol_id) = class_table.symbol_id(name) {
-            add_annotated_declarations(
-                db,
-                class_use_def.end_of_scope_symbol_declarations(symbol_id),
-                &mut class_body_declarations,
-            );
-        }
+    for name in attribute_names {
+        let class_body_declarations: Vec<_> = class_table
+            .symbol_id(name)
+            .map(|symbol_id| {
+                annotated_declarations(
+                    db,
+                    class_use_def.end_of_scope_symbol_declarations(symbol_id),
+                )
+                .collect()
+            })
+            .unwrap_or_default();
 
         let mut instance_method_declarations = Vec::new();
         let mut classmethod_declarations = Vec::new();
-        for (reachable_declarations, scope_id) in attribute_declarations(db, class_body_scope, name)
-        {
-            let method_declarations = match method_kinds.get(&scope_id) {
+        for (declarations, scope_id) in attribute_declarations(db, class_body_scope, name) {
+            let method_kind = *method_kinds.entry(scope_id).or_insert_with(|| {
+                if method_is_bound_at_class_exit(db, index, class_scope_id, scope_id) {
+                    classify_method(db, index, context.module(), index.scope(scope_id))
+                } else {
+                    None
+                }
+            });
+            let method_declarations = match method_kind {
                 Some(MethodDecorator::None) => &mut instance_method_declarations,
                 Some(MethodDecorator::ClassMethod) => &mut classmethod_declarations,
                 Some(MethodDecorator::StaticMethod) | None => continue,
             };
 
-            // A class-body declaration applies throughout every method, so it conflicts with any
-            // declaration a method makes. Without one, a later declaration in a method replaces an
-            // earlier one, so only the declarations active when the method returns are compared.
-            let declarations = if class_body_declarations.is_empty()
-                && let Some(member_id) = index
-                    .place_table(scope_id)
-                    .member_id_by_instance_attribute_name(name)
-            {
-                index
-                    .use_def_map(scope_id)
-                    .end_of_scope_declarations(ScopedPlaceId::Member(member_id))
-            } else {
-                reachable_declarations
-            };
-            add_annotated_declarations(db, declarations, method_declarations);
+            method_declarations.extend(annotated_declarations(db, declarations));
         }
 
         for method_declarations in [&instance_method_declarations, &classmethod_declarations] {
-            // Class-body declarations on their own are checked like declarations of any other
-            // symbol, so only attributes that are also declared in a method are checked here.
-            if method_declarations.is_empty() {
-                continue;
-            }
             report_conflicting_attribute_declarations(
                 context,
                 name,
-                class_body_declarations.iter().chain(method_declarations),
+                &class_body_declarations,
+                method_declarations,
             );
         }
     }

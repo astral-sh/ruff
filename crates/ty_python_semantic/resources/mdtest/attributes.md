@@ -244,8 +244,8 @@ reveal_type(c_instance.z)  # revealed: int
 
 #### Diagnostic for conflicting attribute declarations
 
-The diagnostic points at the first declaration that disagrees with the earliest one and marks every
-other declaration involved in the conflict.
+The diagnostic points at the first method declaration that disagrees with the earliest declaration
+and marks every other declaration involved in the conflict.
 
 ```py
 class C:
@@ -274,45 +274,94 @@ error[conflicting-declarations]: Conflicting declared types for `x`: `int`, `str
   |         ------ declared as `bytes` here
 ```
 
-#### Sequential declarations in one method
+#### Narrower declarations in methods
 
-Conflict checking uses the declarations active at method exit. A later declaration in the same
-method replaces the earlier declaration for this comparison, so the two declarations do not conflict
-with each other.
+Declared types conflict unless they are equivalent. A method declaration that narrows the class-body
+declaration therefore conflicts with it, even though every value of the narrower type is also valid
+for the wider type.
+
+```py
+class C:
+    x: list[int] | None
+
+    def __init__(self) -> None:
+        self.x: list[int] = []  # error: [conflicting-declarations]
+```
+
+#### Type qualifiers are not compared
+
+Only the declared types are compared, not type qualifiers such as `ClassVar`.
+
+```py
+from typing import ClassVar
+
+class C:
+    x: ClassVar[int]
+
+    def set_value(self) -> None:
+        self.x: int = 1  # no diagnostic
+```
+
+#### Conflicts among class-body declarations
+
+When only declarations in the class body disagree, the conflict is reported by the checks for
+class-body symbols, as for any other symbol. A method declaration that agrees with the earliest
+class-body declaration does not cause a second diagnostic for the same conflict.
+
+```py
+def flag() -> bool:
+    return True
+
+class C:
+    if flag():
+        x: int
+    else:
+        x: str
+    x = 1  # error: [conflicting-declarations]
+
+    def set_value(self) -> None:
+        self.x: int = 1
+```
+
+A method declaration that disagrees with the earliest class-body declaration is reported in the
+method.
+
+```py
+class D:
+    if flag():
+        x: int
+    else:
+        x: str
+
+    def set_value(self) -> None:
+        self.x: str = ""  # error: [conflicting-declarations]
+```
+
+#### Several declarations in one method
+
+Every reachable declaration in a method takes part in conflict checking. A later declaration in the
+same method does not hide an earlier one, so the two conflict.
 
 ```py
 class C:
     def set_value(self) -> None:
         self.x: int = 1
-        self.x: str = "a"
+        self.x: str = "a"  # error: [conflicting-declarations]
 ```
 
-A declaration in the class body is still visible and conflicts with the declarations in the method.
+A declaration followed by `return` is compared like any other declaration.
 
 ```py
 class C:
-    x: float
-
-    def set_value(self) -> None:
-        self.x: int = 1  # error: [conflicting-declarations]
-        self.x: str = "a"
-```
-
-Only the declaration that is active at the end of a method participates in comparisons with other
-methods. The two methods below therefore agree that `x` is a `str`.
-
-```py
-class C:
-    def set_value(self) -> None:
+    def get_value(self) -> int:
         self.x: int = 1
-        self.x: str = "a"
+        return self.x
 
     def reset_value(self) -> None:
-        self.x: str = ""
+        self.x: str = ""  # error: [conflicting-declarations]
 ```
 
-Declarations on different control-flow paths can both be active at the end of a method, so they
-conflict with each other.
+Declarations on different control-flow paths conflict with each other.
 
 ```py
 class C:
@@ -403,6 +452,38 @@ class C:
             self.x: str = "a"  # error: [conflicting-declarations]
 ```
 
+A method that is no longer bound to its own name at class scope exit can still run if something else
+kept a reference to it. We do not detect this, so declarations in such a method are not checked for
+conflicts. One example is the getter of a property, whose name the setter rebinds:
+
+```py
+class C:
+    @property
+    def value(self) -> int:
+        self._cache: int = 1
+        return self._cache
+
+    @value.setter
+    def value(self, new_value: int) -> None:
+        # TODO: should be an error, since the getter still runs when `value` is read
+        self._cache: str = ""
+```
+
+Another example is a method that is assigned to another name before its own name is deleted:
+
+```py
+class C:
+    def _init(self) -> None:
+        self.x: int = 1
+
+    __init__ = _init
+    del _init
+
+    def reset_value(self) -> None:
+        # TODO: should be an error, since `_init` still runs as `__init__`
+        self.x: str = ""
+```
+
 #### Class-method declaration conflicts
 
 Declarations in class methods are compared with other class-method declarations, but not with
@@ -440,6 +521,42 @@ class D:
     @classmethod
     def reset_class_value(cls) -> None:
         cls.x: bytes = b"a"  # error: [conflicting-declarations]
+```
+
+A class-body declaration applies to both kinds of attribute, so it is also compared with
+class-method declarations.
+
+```py
+class E:
+    x: int
+
+    @classmethod
+    def set_class_value(cls) -> None:
+        cls.x: str = ""  # error: [conflicting-declarations]
+```
+
+Methods that are implicitly class methods, such as `__init_subclass__`, are treated like methods
+decorated with `@classmethod`.
+
+```py
+class F:
+    x: int
+
+    def __init_subclass__(cls) -> None:
+        cls.x: str = ""  # error: [conflicting-declarations]
+```
+
+Static methods have no `self` or `cls` parameter, so an annotated assignment to an attribute of
+their first parameter is rejected. It does not declare an attribute and is not compared with other
+declarations.
+
+```py
+class G:
+    x: int
+
+    @staticmethod
+    def set_value(obj) -> None:
+        obj.x: str = ""  # error: [invalid-type-form]
 ```
 
 #### Singleton promotion happens after unioning implicit assignments

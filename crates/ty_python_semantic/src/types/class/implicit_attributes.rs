@@ -26,7 +26,7 @@ use ty_python_core::{
 /// Classifies a method in a class body as an instance method, classmethod, or staticmethod.
 ///
 /// Returns `None` for scopes that are not functions, such as a comprehension nested in a method.
-pub(in crate::types) fn method_decorator(
+pub(in crate::types) fn classify_method(
     db: &dyn Db,
     index: &SemanticIndex,
     module: &ParsedModuleRef,
@@ -175,7 +175,7 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
-            if method_decorator(db, index, &module, method_scope)
+            if classify_method(db, index, &module, method_scope)
                 .is_some_and(|decorator| decorator != target_method_decorator)
             {
                 continue;
@@ -243,7 +243,7 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
-            if method_decorator(db, index, &module, binding_scope)
+            if classify_method(db, index, &module, binding_scope)
                 .is_some_and(|decorator| decorator != target_method_decorator)
             {
                 continue;

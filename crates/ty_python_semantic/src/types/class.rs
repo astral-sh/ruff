@@ -6,7 +6,7 @@ pub(crate) use self::dynamic_literal::{
 };
 pub(super) use self::enum_literal::{DynamicEnumAnchor, DynamicEnumLiteral, EnumSpec};
 use self::implicit_attributes::{AugmentedBindings, ImplicitAttribute};
-pub(super) use self::implicit_attributes::{implicit_attribute_names, method_decorator};
+pub(super) use self::implicit_attributes::{classify_method, implicit_attribute_names};
 pub use self::known::KnownClass;
 use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
