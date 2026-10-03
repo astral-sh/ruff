@@ -252,12 +252,12 @@ def tuple_subclass(value: TupleSubclass) -> int:  # no diagnostic
 A guard or a refutable attribute pattern can still leave values unmatched:
 
 ```py
-def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type]
+def guarded(value: Point, flag: bool) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
     match value:
         case Point() if flag:
             return 42
 
-def refutable(value: Point) -> int:  # error: [invalid-return-type]
+def refutable(value: Point) -> int:  # error: [invalid-return-type] "can implicitly return `None`"
     match value:
         case Point(x=True):
             return 42
