@@ -288,6 +288,70 @@ class C:
         self.x: list[int] = []  # error: [conflicting-declarations]
 ```
 
+#### Gradual declarations in methods
+
+`Any` is not equivalent to any other type, so a declaration as `Any` conflicts with a declaration as
+`int`, as it does for other symbols.
+
+```py
+from typing import Any
+
+class C:
+    x: Any
+
+    def __init__(self) -> None:
+        self.x: int = 1  # error: [conflicting-declarations]
+```
+
+#### `Self` in declarations
+
+`Self` in a method refers to the same type as `Self` in the class body or in another method, so
+these declarations do not conflict.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self
+
+class C:
+    x: Self
+    y: list[Self]
+
+    def __init__(self) -> None:
+        self.x: Self = self  # no diagnostic
+        self.y: list[Self] = []  # no diagnostic
+        self.z: Self | None = None
+
+    def reset(self) -> None:
+        self.z: Self | None = None  # no diagnostic
+```
+
+This also holds in a generic class.
+
+```py
+class Box[T]:
+    item: T
+    parent: Self | None
+
+    def __init__(self, item: T) -> None:
+        self.item: T = item  # no diagnostic
+        self.parent: Self | None = None  # no diagnostic
+```
+
+`Self` still differs from the class itself, since `Self` refers to a subclass when the method is
+called on one.
+
+```py
+class D:
+    x: "D"
+
+    def __init__(self) -> None:
+        self.x: Self = self  # error: [conflicting-declarations]
+```
+
 #### Type qualifiers are not compared
 
 Only the declared types are compared, not type qualifiers such as `ClassVar`.
@@ -339,14 +403,27 @@ class D:
 
 #### Several declarations in one method
 
-Every reachable declaration in a method takes part in conflict checking. A later declaration in the
-same method does not hide an earlier one, so the two conflict.
+As for other symbols, a later declaration of an attribute in the same method replaces an earlier
+one. Only the declarations that can still be in effect when the method finishes take part in
+conflict checking.
 
 ```py
 class C:
     def set_value(self) -> None:
         self.x: int = 1
-        self.x: str = "a"  # error: [conflicting-declarations]
+        self.x: str = "a"  # no diagnostic
+```
+
+The replaced declaration is also not compared with declarations in other methods.
+
+```py
+class C:
+    def set_value(self) -> None:
+        self.x: int = 1
+        self.x: str = "a"
+
+    def reset_value(self) -> None:
+        self.x: str = ""  # no diagnostic
 ```
 
 A declaration followed by `return` is compared like any other declaration.
@@ -370,6 +447,40 @@ class C:
             self.x: int = 1
         else:
             self.x: str = "a"  # error: [conflicting-declarations]
+```
+
+A declaration in a branch that returns early is still in effect after the method returns, but we do
+not detect this yet.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> None:
+        if flag:
+            self.x: int = 1
+            return
+        self.x: str = "a"  # TODO: should be an error
+
+    def reset_value(self, flag: bool) -> None:
+        if flag:
+            self.y: int = 1
+            return
+
+    def clear_value(self) -> None:
+        self.y: str = ""  # TODO: should be an error
+```
+
+When every branch returns, only the declarations from the last branch are compared, so a conflict
+between the branches is not detected yet either.
+
+```py
+class C:
+    def set_value(self, flag: bool) -> int:
+        if flag:
+            self.x: int = 1
+            return 1
+        else:
+            self.x: str = "a"  # TODO: should be an error
+            return 2
 ```
 
 Statically unreachable declarations do not participate in conflict checking.

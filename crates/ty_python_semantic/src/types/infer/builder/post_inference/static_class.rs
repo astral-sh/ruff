@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use crate::attribute_assignments;
 use crate::{
     FxOrderSet, TypeQualifiers,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
@@ -47,7 +48,7 @@ use crate::{
         },
         enums::is_enum_class_by_inheritance,
         function::KnownFunction,
-        generics::enclosing_generic_contexts,
+        generics::{enclosing_generic_contexts, typing_self},
         infer::builder::post_inference::typed_dict::validate_typed_dict_class,
         infer_definition_types, inferred_declaration,
         mro::StaticMroErrorKind,
@@ -59,7 +60,6 @@ use crate::{
         visitor::find_over_type,
     },
 };
-use crate::{attribute_assignments, attribute_declarations};
 use ty_python_core::{
     DeclarationsIterator, FileScopeId, SemanticIndex, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState},
@@ -136,10 +136,19 @@ fn check_class_slots<'db>(
 
 /// Returns the reachable annotated assignments among `declarations`, such as `x: int` in a class
 /// body or `self.x: int = 1` in a method, together with their declared types.
+///
+/// Every method has its own `Self` type variable, so `x: Self` in the class body and
+/// `self.x: Self` in `__init__` would not compare as equivalent. Each `Self` is therefore replaced
+/// with `class_self`, the `Self` type variable of the class body. Replacing it with the instance
+/// type of the class instead would hide a conflict between `x: C` and `self.x: Self`, which differ
+/// for subclasses of `C`.
 fn annotated_declarations<'map, 'db>(
-    db: &'db dyn Db,
+    context: &'map InferContext<'db, '_>,
     declarations: DeclarationsIterator<'map, 'db>,
+    class_self: Type<'db>,
 ) -> impl Iterator<Item = (Definition<'db>, Type<'db>)> + use<'map, 'db> {
+    let db = context.db();
+    let env = context.program_environment();
     let predicates = declarations.predicates();
     let reachability_constraints = declarations.reachability_constraints();
 
@@ -157,8 +166,56 @@ fn annotated_declarations<'map, 'db>(
             return None;
         }
         let declared = inferred_declaration(db, definition).declared()?;
-        Some((definition, declared.inner_type()))
+        Some((
+            definition,
+            declared
+                .inner_type()
+                .bind_self_typevars(db, env, class_self),
+        ))
     })
+}
+
+/// Returns the reachable declarations of attribute `name` in `method_scope_id` that can still be in
+/// effect when the method finishes.
+///
+/// As for other symbols, a later declaration replaces an earlier one, so the two do not conflict:
+///
+/// ```python
+/// def set_value(self) -> None:
+///     self.x: int = 1
+///     self.x: str = ""  # replaces `self.x: int`
+/// ```
+///
+/// The declarations at the end of the method's scope tell us which ones were not replaced.
+/// Their reachability is not used, because a trailing `return` makes the end of the scope
+/// unreachable. Declarations in a branch that ends in `return` are not tracked at the end of the
+/// scope either, so they are not checked for conflicts.
+fn method_exit_declarations<'db>(
+    context: &InferContext<'db, '_>,
+    index: &SemanticIndex<'db>,
+    method_scope_id: FileScopeId,
+    name: &str,
+    class_self: Type<'db>,
+) -> Vec<(Definition<'db>, Type<'db>)> {
+    let Some(member) = index
+        .place_table(method_scope_id)
+        .member_id_by_instance_attribute_name(name)
+    else {
+        return Vec::new();
+    };
+    let use_def = index.use_def_map(method_scope_id);
+    let not_replaced: FxHashSet<_> = use_def
+        .end_of_scope_declarations(member.into())
+        .filter_map(|declaration| declaration.declaration.definition())
+        .collect();
+
+    annotated_declarations(
+        context,
+        use_def.reachable_member_declarations(member),
+        class_self,
+    )
+    .filter(|(definition, _)| not_replaced.contains(definition))
+    .collect()
 }
 
 /// Returns whether the method defined in `method_scope_id` is still bound to its name when the
@@ -278,7 +335,7 @@ fn report_conflicting_attribute_declarations<'db>(
     }
 }
 
-/// Reports attributes whose declarations in the class body and in methods disagree.
+/// Reports attributes whose declarations in the class body or in methods disagree with each other.
 ///
 /// ```python
 /// class C:
@@ -287,10 +344,6 @@ fn report_conflicting_attribute_declarations<'db>(
 ///     def __init__(self) -> None:
 ///         self.x: str = ""  # error: [conflicting-declarations]
 /// ```
-///
-/// Every reachable declaration in a method is compared, including one that a later declaration in
-/// the same method replaces. A method can return before reaching the later declaration, so both
-/// can be in effect when the method returns.
 ///
 /// Instance methods (`self.x: int`) and classmethods (`cls.x: int`) declare different attributes,
 /// so they are checked separately. A class-body declaration applies to both and is compared with
@@ -307,6 +360,10 @@ fn check_conflicting_attribute_declarations<'db>(
         return;
     }
 
+    let Some(class_self) = typing_self(db, class_body_scope, None, class.into()) else {
+        return;
+    };
+    let class_self = Type::TypeVar(class_self);
     let class_scope_id = class_body_scope.file_scope_id(db);
     let class_table = index.place_table(class_scope_id);
     let class_use_def = index.use_def_map(class_scope_id);
@@ -320,8 +377,9 @@ fn check_conflicting_attribute_declarations<'db>(
             .symbol_id(name)
             .map(|symbol_id| {
                 annotated_declarations(
-                    db,
+                    context,
                     class_use_def.end_of_scope_symbol_declarations(symbol_id),
+                    class_self,
                 )
                 .collect()
             })
@@ -329,7 +387,7 @@ fn check_conflicting_attribute_declarations<'db>(
 
         let mut instance_method_declarations = Vec::new();
         let mut classmethod_declarations = Vec::new();
-        for (declarations, scope_id) in attribute_declarations(db, class_body_scope, name) {
+        for scope_id in attribute_scopes(db, class_body_scope) {
             let method_kind = *method_kinds.entry(scope_id).or_insert_with(|| {
                 if method_is_bound_at_class_exit(db, index, class_scope_id, scope_id) {
                     classify_method(db, index, context.module(), index.scope(scope_id))
@@ -343,7 +401,9 @@ fn check_conflicting_attribute_declarations<'db>(
                 Some(MethodDecorator::StaticMethod) | None => continue,
             };
 
-            method_declarations.extend(annotated_declarations(db, declarations));
+            method_declarations.extend(method_exit_declarations(
+                context, index, scope_id, name, class_self,
+            ));
         }
 
         for method_declarations in [&instance_method_declarations, &classmethod_declarations] {
