@@ -14,3 +14,7 @@ class C:
 @typing.no_type_check
 def f(arg: "A") -> "R":
     x: "A" = 1
+
+
+@typing.no_type_check
+def g(arg: "'A' or ''") -> None: ...

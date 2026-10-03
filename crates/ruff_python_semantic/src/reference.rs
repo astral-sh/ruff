@@ -183,6 +183,11 @@ impl UnresolvedReference {
         self.flags
             .contains(UnresolvedReferenceFlags::WILDCARD_IMPORT)
     }
+
+    /// Returns `true` if the unresolved reference occurred in a `@no_type_check` context.
+    pub const fn in_no_type_check(&self) -> bool {
+        self.flags.contains(UnresolvedReferenceFlags::NO_TYPE_CHECK)
+    }
 }
 
 bitflags! {
@@ -198,6 +203,10 @@ bitflags! {
         /// print(x)
         /// ```
         const WILDCARD_IMPORT = 1 << 0;
+
+        /// The unresolved reference occurred within a `@typing.no_type_check` context.
+        /// captured at the time of reference.
+        const NO_TYPE_CHECK = 1 << 1;
     }
 }
 
