@@ -1,0 +1,61 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+  --> multi_alias_line_pragma.py:1:1
+   |
+ 1 | / from ldap._ldap import (
+ 2 | |         __version__, __license__, __author__,  # noqa: F401
+ 3 | | )
+ 4 | |
+ 5 | | from foo import (
+ 6 | |     beta, alpha,  # noqa: F401
+ 7 | |     delta, gamma,  # noqa: F401
+ 8 | | )
+ 9 | |
+10 | | from bar import (
+11 | |     beta, alpha,  # noqa: F401
+12 | |     delta, gamma,  # type: ignore
+13 | | )
+14 | |
+15 | | from baz import (
+16 | |     beta, alpha,  # keep me next to the names I describe
+17 | | )
+   | |_^
+help: Organize imports
+   |
+   - from ldap._ldap import (
+   -         __version__, __license__, __author__,  # noqa: F401
+1  + from bar import (
+2  +         alpha,
+3  +         beta,  # noqa: F401
+4  +         delta,  # type: ignore
+5  +         gamma,
+6  + )
+7  + from baz import (
+8  +         alpha,
+9  +         beta,  # keep me next to the names I describe
+10 | )
+   -
+11 | from foo import (
+   -     beta, alpha,  # noqa: F401
+   -     delta, gamma,  # noqa: F401
+   - )
+   -
+   - from bar import (
+   -     beta, alpha,  # noqa: F401
+   -     delta, gamma,  # type: ignore
+12 +         alpha,
+13 +         beta,  # noqa: F401
+14 +         delta,  # noqa: F401
+15 +         gamma,
+16 | )
+   -
+   - from baz import (
+   -     beta, alpha,  # keep me next to the names I describe
+17 + from ldap._ldap import (
+18 +         __author__,
+19 +         __license__,
+20 +         __version__,  # noqa: F401
+21 | )
+   |

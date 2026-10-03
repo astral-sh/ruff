@@ -88,6 +88,7 @@ pub(crate) fn format_imports(
         locator,
         settings.split_on_trailing_comma,
         tokens,
+        preview,
     );
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
@@ -355,6 +356,7 @@ mod tests {
     #[test_case(Path::new("lazy_imports.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
+    #[test_case(Path::new("multi_alias_line_pragma.py"))]
     #[test_case(Path::new("match_case.py"))]
     #[test_case(Path::new("natural_order.py"))]
     #[test_case(Path::new("no_lines_before.py"))]
@@ -401,6 +403,7 @@ mod tests {
 
     #[test_case(Path::new("fit_line_length_mixed_pragma.py"))]
     #[test_case(Path::new("fit_line_length_pragma.py"))]
+    #[test_case(Path::new("multi_alias_line_pragma.py"))]
     fn preview(path: &Path) -> Result<()> {
         let snapshot = format!("preview__{}", path.to_string_lossy());
         let diagnostics = test_path(
@@ -444,6 +447,31 @@ mod tests {
 
         // Re-linting the converged output must produce no diagnostics: I001 is fully fixed
         // and, in particular, the fix must not have introduced any E501 violations.
+        let (diagnostics, _) = test_contents(&transformed, &path, &settings);
+        assert!(
+            diagnostics.is_empty(),
+            "expected no diagnostics after applying fixes, found:\n{diagnostics:#?}"
+        );
+        Ok(())
+    }
+
+    /// Fixing I001 must not leave behind an import that F401 then flags.
+    ///
+    /// A `# noqa` at the end of a line holding several aliases suppresses all of them.
+    /// Splitting that line one alias per line used to carry the pragma along with a single
+    /// alias, so the rest became unused imports (issue #28857).
+    #[test]
+    fn no_unused_import_after_fix() -> Result<()> {
+        let path = test_resource_path("fixtures").join("isort/multi_alias_line_pragma.py");
+        let source_type = SourceType::Python(PySourceType::from(&path));
+        let source_kind = SourceKind::from_path(&path, source_type)?.expect("valid source");
+        let settings = LinterSettings {
+            preview: PreviewMode::Enabled,
+            src: vec![test_resource_path("fixtures/isort")],
+            ..LinterSettings::for_rules([Rule::UnsortedImports, Rule::UnusedImport])
+        };
+
+        let (_, transformed) = test_contents(&source_kind, &path, &settings);
         let (diagnostics, _) = test_contents(&transformed, &path, &settings);
         assert!(
             diagnostics.is_empty(),

@@ -1,9 +1,12 @@
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_trivia::is_pragma_comment;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Locator;
+use crate::preview::is_pragma_kept_on_import_statement_enabled;
+use crate::settings::types::PreviewMode;
 
 use super::comments::Comment;
 use super::helpers::trailing_comma;
@@ -16,6 +19,7 @@ pub(crate) fn annotate_imports<'a>(
     locator: &Locator<'a>,
     split_on_trailing_comma: bool,
     tokens: &Tokens,
+    preview: PreviewMode,
 ) -> Vec<AnnotatedImport<'a>> {
     let mut comments_iter = comments.into_iter().peekable();
 
@@ -155,6 +159,31 @@ pub(crate) fn annotate_imports<'a>(
                         trailing.push(comment);
                     }
 
+                    // A comment at the end of a line that holds several aliases trails the
+                    // whole line, not the alias that happens to come first on it. Splitting
+                    // the import one alias per line would carry a pragma away from the names
+                    // it suppressed, so move it to the statement instead.
+                    if is_pragma_kept_on_import_statement_enabled(preview) {
+                        for (alias, annotated) in names.iter().zip(&mut aliases) {
+                            if !shares_line_with_another_alias(alias, names, locator) {
+                                continue;
+                            }
+                            let (pragmas, rest): (Vec<_>, Vec<_>) = annotated
+                                .inline
+                                .drain(..)
+                                .partition(|comment| is_pragma_comment(&comment.value));
+                            annotated.inline = rest;
+                            for pragma in pragmas {
+                                if inline
+                                    .iter()
+                                    .all(|existing: &Comment| existing.value != pragma.value)
+                                {
+                                    inline.push(pragma);
+                                }
+                            }
+                        }
+                    }
+
                     AnnotatedImport::ImportFrom {
                         module: module.as_ref().map(|module| locator.slice(module)),
                         names: aliases,
@@ -174,4 +203,16 @@ pub(crate) fn annotate_imports<'a>(
             }
         })
         .collect()
+}
+
+/// Whether another alias of the same import sits on `alias`'s line.
+fn shares_line_with_another_alias(
+    alias: &ast::Alias,
+    names: &[ast::Alias],
+    locator: &Locator,
+) -> bool {
+    let line = locator.line_range(alias.start());
+    names
+        .iter()
+        .any(|other| other.range() != alias.range() && line.contains_range(other.range()))
 }
