@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use crate::FxIndexSet;
 use crate::place::implicit_builtins_symbol_scope;
 use crate::reachability::is_range_reachable;
-use crate::types::call::bind::CheckTypesMode;
+use crate::types::call::bind::{CallableBinding, CheckTypesMode};
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
@@ -13,6 +13,7 @@ use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
     CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
     PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
+    infer_definition_types,
 };
 use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
 use ruff_db::files::FileRange;
@@ -23,6 +24,7 @@ use ruff_python_trivia::NameMatcher;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{ImportingFile, Module, ResolverFile};
+use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::{ProgramFile, attribute_scopes, semantic_index, use_def_map};
 
@@ -922,6 +924,141 @@ pub fn definitions_and_overloads_for_function<'db>(
     } else {
         vec![ResolvedDefinition::Definition(function.definition(model))]
     }
+}
+
+/// Whether a function definition is decorated with `typing.overload`.
+pub fn is_overload_definition<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
+    definition.kind(db).is_function_def()
+        && infer_definition_types(db, definition)
+            .function_type(definition)
+            .is_some_and(|function| function.literal(db).last_definition.is_overload(db))
+}
+
+/// Returns the implementations associated with an overload declaration.
+///
+/// A declaration can have multiple implementations when the implementation is conditional.
+/// Other definitions, including overloads without an implementation, return an empty vector.
+pub fn overload_implementations<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Vec<Definition<'db>> {
+    if !is_overload_definition(db, definition) {
+        return Vec::new();
+    }
+
+    let file = definition.program_file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    let use_def = use_def_map(db, definition.scope(db));
+    use_def
+        .reachable_bindings(definition.place(db))
+        .filter_map(|binding| binding.binding.definition())
+        .filter(|candidate| {
+            candidate.kind(db).is_function_def()
+                && !is_overload_definition(db, *candidate)
+                && is_reachable_implementation_definition(db, *candidate)
+        })
+        .filter(|candidate| {
+            // Follow every branch of conditional overload declarations. Inferred function types
+            // can omit branches, and a non-overload binding separates distinct overload groups.
+            let mut pending = vec![*candidate];
+            let mut seen = FxHashSet::default();
+            while let Some(current) = pending.pop() {
+                if current == definition {
+                    return true;
+                }
+                let DefinitionKind::Function(function) = current.kind(db) else {
+                    continue;
+                };
+                let use_id = function.node(&parsed).name.scoped_use_id(db, file);
+                pending.extend(
+                    use_def
+                        .bindings_at_use(use_id)
+                        .filter_map(|binding| binding.binding.definition())
+                        .filter(|previous| {
+                            seen.insert(*previous) && is_overload_definition(db, *previous)
+                        }),
+                );
+            }
+            false
+        })
+        .collect()
+}
+
+/// Returns the implementations of inferred functions, retaining overloads without implementations.
+///
+/// Handles function literals and bound methods, including unions of these, with at least one
+/// overloaded function. Unions containing other types use fallback resolution. The inferred types
+/// preserve which conditional implementations can reach the use site; searching for implementations
+/// from their shared overloads would lose that information.
+pub fn overloaded_function_definitions<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<Vec<Definition<'db>>> {
+    let mut pending = vec![ty];
+    let mut definitions = Vec::new();
+    let mut has_overloads = false;
+
+    while let Some(ty) = pending.pop() {
+        match ty {
+            Type::Union(union) => pending.extend(union.elements(db).iter().rev().copied()),
+            Type::BoundMethod(method) => pending.push(method.func(db)),
+            Type::FunctionLiteral(function) => {
+                let (overloads, implementation) = function.overloads_and_implementation(db);
+                has_overloads |= !overloads.is_empty();
+                if implementation.is_some() {
+                    definitions.push(function.last_definition(db));
+                } else {
+                    definitions.extend(
+                        overloads
+                            .iter()
+                            .filter_map(|overload| overload.signature(db).definition()),
+                    );
+                }
+            }
+            _ => return None,
+        }
+    }
+
+    has_overloads.then_some(definitions)
+}
+
+/// Returns all matching signature definitions for a call to a single overload group.
+///
+/// Unlike signature help, declaration navigation does not pick one ambiguous match or use an
+/// arity-based fallback for an invalid call. Unions of callables retain their existing targets.
+pub fn matching_call_definitions<'db>(
+    model: &SemanticModel<'db>,
+    call: &ast::ExprCall,
+) -> Option<Vec<Definition<'db>>> {
+    let db = model.db();
+    let env = &model.program_environment();
+    let callable = call
+        .func
+        .inferred_type(model)
+        .and_then(|ty| ty.try_upcast_to_callable(db, env))
+        .and_then(|callables| callables.exactly_one())?;
+
+    let signatures = &callable.signatures(db).overloads;
+    let first = signatures.first()?.definition?;
+    // Constructors can combine `__new__` and `__init__`. Only replace targets when all signatures
+    // belong to the same overloaded function, independently of any assignment used to access it.
+    if !signatures.iter().all(|signature| {
+        signature.definition.is_some_and(|definition| {
+            definition.scope(db) == first.scope(db)
+                && definition.place(db) == first.place(db)
+                && is_overload_definition(db, definition)
+        })
+    }) {
+        return None;
+    }
+
+    Some(
+        full_type_bindings_for_call(model, Type::Callable(callable), call)
+            .iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .filter_map(|(_, overload)| overload.signature.definition)
+            .collect(),
+    )
 }
 
 /// Details about a callable signature for IDE support.

@@ -102,7 +102,7 @@ pub(crate) fn references(
 
     let target_definitions = goto_target
         .definitions(&model, mode.to_import_alias_resolution())?
-        .goto_declaration(&model, goto_target)?;
+        .for_symbol(&model, goto_target)?;
     let import_alias_resolution = mode.to_import_alias_resolution();
     // An identifier can have both ordinary Python references and pytest fixture references.
     // Keep its Python definitions alongside any fixture roots used for the same search.
@@ -801,7 +801,7 @@ impl<'a> LocalReferencesFinder<'a> {
             && self.search.target_definitions.iter().next().is_some()
             && goto_target
                 .definitions(self.model, self.search.import_alias_resolution)
-                .and_then(|definitions| definitions.goto_declaration(self.model, &goto_target))
+                .and_then(|definitions| definitions.for_symbol(self.model, &goto_target))
                 .is_some_and(|definitions| self.search.target_definitions.intersects(&definitions));
 
         if !fixture_match && !ordinary_match {

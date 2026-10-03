@@ -43,7 +43,7 @@ pub fn incoming_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
         return Vec::new();
     };
     let is_externally_visible = has_any_external_visible_definitions(db, &target_definitions);
-    let Some(target_definitions) = target_definitions.goto_declaration(&model, &goto_target) else {
+    let Some(target_definitions) = target_definitions.for_symbol(&model, &goto_target) else {
         return Vec::new();
     };
     let Some(target_text) = goto_target.to_string() else {
@@ -331,7 +331,7 @@ impl<'a> CallSitesFinder<'a, '_> {
 
         let Some(current_definitions) = goto_target
             .definitions(self.model, ImportAliasResolution::ResolveAliases)
-            .and_then(|d| d.goto_declaration(self.model, &goto_target))
+            .and_then(|d| d.for_symbol(self.model, &goto_target))
         else {
             return;
         };

@@ -42,7 +42,7 @@ pub fn prepare_call_hierarchy(
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definitions = goto_target
         .definitions(&model, ImportAliasResolution::ResolveAliases)?
-        .goto_declaration(&model, &goto_target)?;
+        .for_symbol(&model, &goto_target)?;
 
     let mut items = Vec::new();
     for resolved in &definitions {

@@ -4,7 +4,7 @@ use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_core::ProgramFile;
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_semantic::SemanticModel;
 
 /// Navigate to the definition of a symbol.
 ///
@@ -12,6 +12,8 @@ use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 /// rather than a stub file. This differs from "declaration" which may navigate to stub files.
 /// When possible, this function will map from stub file declarations to their corresponding
 /// source file implementations using the `StubMapper`.
+/// Overloaded functions and methods navigate to their implementations when available,
+/// falling back to overload declarations when no implementation can be found.
 pub fn goto_definition(
     db: &dyn Db,
     file: ProgramFile<'_>,
@@ -21,8 +23,7 @@ pub fn goto_definition(
     let model = SemanticModel::new(db, file);
     let goto_target = find_goto_target(&model, &module, offset)?;
     let definition_targets = goto_target
-        .definitions(&model, ImportAliasResolution::ResolveAliases)?
-        .goto_definition(&model, &goto_target)?
+        .goto_definition(&model)?
         .into_navigation_targets(model.db());
 
     Some(RangedValue {
@@ -1091,6 +1092,334 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
     }
 
     #[test]
+    fn goto_definition_overloaded_function() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+f<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:11:1
+           |
+        11 | f(1)
+           | ^ Clicking here
+        info: Found 1 definition
+         --> main.py:8:5
+          |
+        8 | def f(x: int | str) -> int | str:
+          |     -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloaded_method() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+class C:
+    @overload
+    def f(self, x: int) -> int: ...
+    @overload
+    def f(self, x: str) -> str: ...
+    def f(self, x: int | str) -> int | str:
+        return x
+
+C().f<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:12:5
+           |
+        12 | C().f(1)
+           |     ^ Clicking here
+        info: Found 1 definition
+         --> main.py:9:9
+          |
+        9 |     def f(self, x: int | str) -> int | str:
+          |         -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_conditional_declarations() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+def outer(flag: bool):
+    if flag:
+        @overload
+        def f(x: int) -> int: ...
+    else:
+        @overload
+        def f(x: bytes) -> bytes: ...
+    @overload
+    def f(x: str) -> str: ...
+    def f(x):
+        return x
+
+    f<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:16:5
+           |
+        16 |     f(1)
+           |     ^ Clicking here
+        info: Found 1 definition
+          --> main.py:13:9
+           |
+        13 |     def f(x):
+           |         -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_conditional_redefinition() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+def outer(flag: bool):
+    if flag:
+        @overload
+        def f<CURSOR>(x: int) -> int: ...
+    else:
+        @overload
+        def f(x: bytes) -> bytes: ...
+    @overload
+    def f(x: str) -> str: ...
+    def f(x):
+        return x
+
+    @overload
+    def f(x: int) -> int: ...
+    @overload
+    def f(x: str) -> str: ...
+    def f(x):
+        return x
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:7:13
+          |
+        7 |         def f(x: int) -> int: ...
+          |             ^ Clicking here
+        info: Found 1 definition
+          --> main.py:13:9
+           |
+        13 |     def f(x):
+           |         -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_conditional_implementation_at_call() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+def outer(flag: bool):
+    @overload
+    def f(x: int) -> int: ...
+    @overload
+    def f(x: str) -> str: ...
+    if flag:
+        def f(x):
+            return x
+        f<CURSOR>(1)
+    else:
+        def f(x):
+            return x
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:12:9
+           |
+        12 |         f(1)
+           |         ^ Clicking here
+        info: Found 1 definition
+          --> main.py:10:13
+           |
+        10 |         def f(x):
+           |             -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_conditional_implementation_at_definition() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+def outer(flag: bool):
+    @overload
+    def f(x: int) -> int: ...
+    @overload
+    def f(x: str) -> str: ...
+    if flag:
+        def f<CURSOR>(x):
+            return x
+    else:
+        def f(x):
+            return x
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:10:13
+           |
+        10 |         def f(x):
+           |             ^ Clicking here
+        info: Found 1 definition
+          --> main.py:10:13
+           |
+        10 |         def f(x):
+           |             -
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overload_saved_conditional_union() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+def outer(a: bool, b: bool):
+    @overload
+    def f(x: int) -> int: ...
+    @overload
+    def f(x: str) -> str: ...
+    if a:
+        if b:
+            def f(x):
+                return x
+        else:
+            def f(x):
+                return x
+        saved = f
+    else:
+        def f(x):
+            return x
+        return
+
+    saved<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:22:5
+           |
+        22 |     saved(1)
+           |     ^^^^^ Clicking here
+        info: Found 3 definitions
+          --> main.py:11:17
+           |
+        11 |             def f(x):
+           |                 -
+        12 |                 return x
+        13 |         else:
+        14 |             def f(x):
+           |                 -
+        15 |                 return x
+        16 |         saved = f
+           |         -----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_union_of_overloaded_and_regular_functions() {
+        let test = cursor_test(
+            "
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+def f(x: int | str) -> int | str:
+    return x
+
+def g(x: int) -> int:
+    return x
+
+def use(flag: bool):
+    saved = f if flag else g
+    saved<CURSOR>(1)
+",
+        );
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+          --> main.py:16:5
+           |
+        16 |     saved(1)
+           |     ^^^^^ Clicking here
+        info: Found 3 definitions
+          --> main.py:8:5
+           |
+         8 | def f(x: int | str) -> int | str:
+           |     -
+         9 |     return x
+        10 |
+        11 | def g(x: int) -> int:
+           |     -
+           |
+          ::: main.py:15:5
+           |
+        15 |     saved = f if flag else g
+           |     -----
+        ");
+    }
+
+    #[test]
+    fn goto_definition_overloads_without_implementation() {
+        let test = CursorTest::builder()
+            .source("main.py", "from lib import f\nf<CURSOR>(1)")
+            .source(
+                "lib.pyi",
+                "
+from typing import overload
+
+@overload
+def f(x: int) -> int: ...
+@overload
+def f(x: str) -> str: ...
+",
+            )
+            .build();
+        assert_snapshot!(test.goto_definition(), @"
+        info[goto-definition]: Go to definition
+         --> main.py:2:1
+          |
+        2 | f(1)
+          | ^ Clicking here
+        info: Found 2 definitions
+         --> lib.pyi:5:5
+          |
+        5 | def f(x: int) -> int: ...
+          |     -
+        6 | @overload
+        7 | def f(x: str) -> str: ...
+          |     -
+        ");
+    }
+
+    #[test]
     fn goto_definition_overload_type_disambiguated1() {
         let test = CursorTest::builder()
             .source(
@@ -1104,6 +1433,12 @@ a<CURSOR>b(1)
             .source(
                 "mymodule.py",
                 r#"
+from typing import overload
+
+@overload
+def ab(a: int): ...
+@overload
+def ab(a: str): ...
 def ab(a):
     """the real implementation!"""
 "#,
@@ -1129,9 +1464,9 @@ def ab(a: str): ...
         4 | ab(1)
           | ^^ Clicking here
         info: Found 1 definition
-         --> mymodule.py:2:5
+         --> mymodule.py:8:5
           |
-        2 | def ab(a):
+        8 | def ab(a):
           |     --
         ");
     }

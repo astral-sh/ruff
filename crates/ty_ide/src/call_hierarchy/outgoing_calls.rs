@@ -38,7 +38,7 @@ pub fn outgoing_calls(db: &dyn Db, file: ProgramFile<'_>, offset: TextSize) -> V
     };
     let Some(definitions) = goto_target
         .definitions(&model, ImportAliasResolution::ResolveAliases)
-        .and_then(|d| d.goto_declaration(&model, &goto_target))
+        .and_then(|d| d.for_symbol(&model, &goto_target))
     else {
         return Vec::new();
     };
@@ -135,7 +135,7 @@ impl<'a> OutgoingCallsFinder<'a, '_> {
 
         let Some(definitions) = goto_target
             .definitions(self.model, ImportAliasResolution::ResolveAliases)
-            .and_then(|d| d.goto_declaration(self.model, &goto_target))
+            .and_then(|d| d.for_symbol(self.model, &goto_target))
         else {
             return;
         };

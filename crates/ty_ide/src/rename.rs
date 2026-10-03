@@ -32,7 +32,7 @@ pub fn can_rename(
 
     let declaration_targets = goto_target
         .definitions(&model, ReferencesMode::Rename.to_import_alias_resolution())?
-        .goto_declaration(&model, &goto_target)?
+        .for_symbol(&model, &goto_target)?
         .into_navigation_targets(model.db());
 
     for target in &declaration_targets {
