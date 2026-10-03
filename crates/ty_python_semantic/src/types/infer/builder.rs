@@ -48,7 +48,8 @@ use crate::place_load::{
     PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
 };
 use crate::reachability::{
-    ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
+    PatternSubjectExpansion, ReachabilityEvaluationCache, analyze_condition_expression,
+    evaluate_reachability_with_cache, type_narrowed_after_pattern,
 };
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -71,7 +72,7 @@ use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_DECLARATION,
     INVALID_ENUM_MEMBER_ANNOTATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_NEWTYPE,
     INVALID_PARAMSPEC, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, NON_EXHAUSTIVE_MATCH,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_SUBMODULE, TypeCheckDiagnostics,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_REFERENCE, UNSOUND_ASSIGNMENT,
     UNSOUND_YIELD, UNSUPPORTED_OPERATOR, YieldKind, autofix_with_notimplementederror,
@@ -173,6 +174,7 @@ mod function;
 mod imports;
 mod named_tuple;
 mod new_class;
+mod non_exhaustive_match;
 mod paramspec_validation;
 mod post_inference;
 mod subscript;
@@ -2768,7 +2770,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cases,
         } = match_statement;
 
-        self.infer_standalone_expression(subject, TypeContext::default());
+        let subject_ty = self.infer_standalone_expression(subject, TypeContext::default());
 
         for case in cases {
             let ast::MatchCase {
@@ -2789,6 +2791,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             self.infer_body(body);
+        }
+
+        if self.context.is_lint_enabled(&NON_EXHAUSTIVE_MATCH)
+            && let Some(last_pattern) = self.index.last_match_pattern(subject.as_ref())
+        {
+            let remaining =
+                type_narrowed_after_pattern(db, last_pattern, PatternSubjectExpansion::Expanded);
+            if !remaining.is_never() {
+                self.report_non_exhaustive_match(match_statement, subject_ty, remaining);
+            }
         }
     }
 
