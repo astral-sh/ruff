@@ -924,7 +924,6 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
@@ -933,7 +932,8 @@ impl<'db> Type<'db> {
             typevar_evaluation,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            signature_relation_visitor: materialization_visitor
+                .materialization_signature_relations(),
             materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -1249,6 +1249,65 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             ..self.clone()
         }
+    }
+
+    /// Check assignability with a new inferable set while retaining the active recursion guards.
+    pub(super) fn is_assignable_with_inferable_typevars(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
+        Self::new(
+            self.env,
+            TypeRelation::Assignability,
+            self.constraints,
+            inferable,
+            self.relation_visitor,
+            self.disjointness_visitor,
+            self.signature_relation_visitor,
+            self.materialization_visitor,
+        )
+        .check_type_pair(db, source, target)
+        .is_always_satisfied(db, self.env)
+    }
+
+    /// Computes a receiver constraint while preserving the active signature comparisons.
+    ///
+    /// The bound signature must own its constraints, so this uses a separate builder. A
+    /// recursive protocol can require the same receiver comparison while that builder is still
+    /// in use. Treat an exact active revisit coinductively, and don't cache its result: it may
+    /// depend on the signature comparisons currently being checked.
+    pub(super) fn receiver_constraint_to_owned(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> OwnedConstraintSet<'db> {
+        if source.is_trivially_constraint_set_assignable_to(db, target) {
+            return OwnedConstraintSet::always();
+        }
+        let types = TypePair::new(db, self.env.program(db), source, target);
+        self.signature_relation_visitor.receiver_constraints.visit(
+            &types,
+            OwnedConstraintSet::always,
+            || {
+                ConstraintSetBuilder::new().into_owned(|constraints| {
+                    let relation_visitor = HasRelationToVisitor::default(constraints);
+                    let disjointness_visitor = IsDisjointVisitor::default(constraints);
+                    TypeRelationChecker::constraint_set_assignability(
+                        self.env,
+                        constraints,
+                        &relation_visitor,
+                        &disjointness_visitor,
+                        self.signature_relation_visitor,
+                        self.materialization_visitor,
+                    )
+                    .check_type_pair(db, source, target)
+                })
+            },
+        )
     }
 
     /// Checks class subtyping without discarding the active recursive relation state.
@@ -3160,7 +3219,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         // Recursive materialization fallbacks depend on the comparison root, so each directional
         // pass needs fresh materialization caches. Nested equivalence checks still share the
-        // materialization-equivalence recursion guard to avoid re-entering the same comparison.
+        // active type and signature comparisons so they can detect recursive materialization.
         let left_to_right_materialization_visitor =
             self.materialization_visitor.for_new_materialization_root();
         self.as_relation_checker(&left_to_right_materialization_visitor)

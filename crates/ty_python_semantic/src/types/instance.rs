@@ -524,20 +524,39 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Every gradual type lies between its bottom and top materializations. Comparing the
         // exact same class specialization can therefore settle these directions without expanding
         // a recursive protocol's members or confusing opposite materialization requirements.
+        // For assignability, an unmaterialized source can use its bottom materialization and an
+        // unmaterialized target can use its top materialization.
         if let Some(source) = source_protocol
-            && matches!(
-                (
-                    source.materialization_kind(db),
-                    protocol.materialization_kind(db)
-                ),
-                (
-                    None | Some(MaterializationKind::Bottom),
-                    Some(MaterializationKind::Top)
-                ) | (Some(MaterializationKind::Bottom), None)
-            )
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin == target_origin
+            && {
+                let materializations = (
+                    source.materialization_kind(db),
+                    protocol.materialization_kind(db),
+                );
+                // An existing specialization marker can change read and write requirements
+                // separately, even when the two protocol origins are otherwise equal.
+                let unmaterialized_origin = match *source_origin {
+                    ClassType::Generic(alias) => {
+                        alias.specialization(db).materialization_kind(db).is_none()
+                    }
+                    ClassType::NonGeneric(_) => true,
+                };
+                matches!(
+                    materializations,
+                    (
+                        None | Some(MaterializationKind::Bottom),
+                        Some(MaterializationKind::Top)
+                    ) | (Some(MaterializationKind::Bottom), None)
+                ) || (self.relation.is_assignability()
+                    && unmaterialized_origin
+                    && matches!(
+                        materializations,
+                        (None, Some(MaterializationKind::Bottom))
+                            | (Some(MaterializationKind::Top), None)
+                    ))
+            }
         {
             return self.always();
         }
@@ -570,6 +589,52 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
 
             let env = self.env;
+            // The same materialization of a protocol has compatible member requirements when
+            // its type arguments are equal or mutually subtypes. Compare the arguments directly:
+            // nominal variance alone does not account for explicit receiver annotations.
+            if self.relation.is_subtyping()
+                && nominally_satisfied.is_trivially_always_satisfied()
+                && source_protocol.is_some_and(|source| {
+                    source.materialization_kind(db).is_some()
+                        && source.materialization_kind(db) == protocol.materialization_kind(db)
+                })
+                && source_protocol_as_nominal.is_some_and(|source_instance| {
+                    self.without_context_collection(|| {
+                        match (
+                            source_instance.class(db, env),
+                            nominal_instance.class(db, env),
+                        ) {
+                            (ClassType::Generic(source), ClassType::Generic(target)) => {
+                                let same_origin = source.origin(db) == target.origin(db);
+                                let source = source.specialization(db);
+                                let target = target.specialization(db);
+                                same_origin
+                                    && source.generic_context(db) == target.generic_context(db)
+                                    && source.tuple(db) == target.tuple(db)
+                                    && source.types(db).len() == target.types(db).len()
+                                    && source.types(db).iter().zip(target.types(db)).all(
+                                        |(source, target)| {
+                                            source == target
+                                                || (self
+                                                    .check_type_pair(db, *source, *target)
+                                                    .is_trivially_always_satisfied()
+                                                    && self
+                                                        .check_type_pair(db, *target, *source)
+                                                        .is_trivially_always_satisfied())
+                                        },
+                                    )
+                            }
+                            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) => {
+                                source == target
+                            }
+                            _ => false,
+                        }
+                    })
+                })
+            {
+                return nominally_satisfied;
+            }
+
             // `result` combines nominal and structural ways to satisfy the protocol. Including the
             // nominal constraints directly is safe when the target's requirements are unchanged or
             // weakened by top materialization, and the source's requirements are unchanged. It is

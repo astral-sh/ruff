@@ -34,6 +34,7 @@ use crate::types::generics::{
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
 };
+use crate::types::protocol_class::ProtocolMethodRelationKey;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
@@ -45,13 +46,14 @@ use crate::types::typevar::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypePair,
     TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
     VarianceTerm, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast, name::Name};
+use ty_python_core::Program;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
 
 /// Selects which binding context to use for type variables that only appear in a return-position
@@ -105,6 +107,50 @@ fn function_signature_type_expression_flags<'db>(
     } else {
         // expression is in the PEP-695 type params sub-scope
         infer_complete_scope_types(db, scope).type_expression_flags(expression)
+    }
+}
+
+/// Returns whether a concrete receiver violates a direct receiver type variable's domain.
+///
+/// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
+/// leaving the original receiver relation available to normal inference. Transparent PEP 695
+/// receiver aliases are resolved by the caller before this check.
+///
+/// ```python
+/// class C:
+///     def method[T: int](self: T) -> None: ...
+/// ```
+///
+/// A protocol bound can refer back to the method being bound. Assume it accepts the receiver
+/// while checking that cycle; an incompatible member can still disprove the relation.
+#[salsa::tracked(
+    returns(copy),
+    cycle_initial=|_, _, _, _, _| false,
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn receiver_violates_typevar_domain<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    receiver: Type<'db>,
+    typevar: TypeVarInstance<'db>,
+) -> bool {
+    let env = &ProgramEnvironment::from_program(program);
+    let Some(domain) = typevar.bound_or_constraints(db, env) else {
+        return false;
+    };
+    if receiver.has_typevar(db, env) {
+        return false;
+    }
+
+    !match domain {
+        TypeVarBoundOrConstraints::UpperBound(bound) => {
+            receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
+        }
+        TypeVarBoundOrConstraints::Constraints(constraints) => {
+            constraints.elements(db).iter().any(|constraint| {
+                receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
+            })
+        }
     }
 }
 
@@ -507,14 +553,42 @@ impl<'db> CallableSignature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Self {
+        let constraints = ConstraintSetBuilder::new();
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let checker = TypeRelationChecker::new(
+            env,
+            TypeRelation::Assignability,
+            &constraints,
+            TypeVarSet::None,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        self.bind_method_receiver_with_checker(db, &checker, receiver_type, typing_self_type)
+    }
+
+    /// Bind a receiver during a relation check without restarting recursive overload comparisons.
+    pub(super) fn bind_method_receiver_with_checker(
+        &self,
+        db: &'db dyn Db,
+        checker: &TypeRelationChecker<'_, '_, 'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let env = checker.env;
         let specialized = match self.overloads.as_slice() {
             [signature] => {
                 if signature.has_receiver_determined_method_typevar(db, env) {
-                    signature.specialize_for_bound_receiver(
+                    signature.specialize_for_bound_receiver_impl(
                         db,
                         env,
                         receiver_type,
                         typing_self_type,
+                        Some(checker),
                     )
                 } else {
                     None
@@ -528,13 +602,14 @@ impl<'db> CallableSignature<'db> {
                 Some(Self::from_overloads(
                     signatures
                         .iter()
-                        .filter(|signature| signature.can_bind_self_to(db, env, receiver_type))
+                        .filter(|signature| signature.can_bind_self_to(db, checker, receiver_type))
                         .filter_map(|signature| {
-                            signature.specialize_for_bound_receiver(
+                            signature.specialize_for_bound_receiver_impl(
                                 db,
                                 env,
                                 receiver_type,
                                 typing_self_type,
+                                Some(checker),
                             )
                         })
                         .flat_map(|signature| signature.overloads),
@@ -543,10 +618,23 @@ impl<'db> CallableSignature<'db> {
             _ => None,
         };
 
-        specialized
-            .as_ref()
-            .unwrap_or(self)
-            .bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type))
+        Self {
+            overloads: specialized
+                .as_ref()
+                .unwrap_or(self)
+                .overloads
+                .iter()
+                .map(|signature| {
+                    signature.bind_self_with_receiver_impl(
+                        db,
+                        env,
+                        Some(receiver_type),
+                        Some(typing_self_type),
+                        Some(checker),
+                    )
+                })
+                .collect(),
+        }
     }
 
     pub(crate) fn has_parameters(&self) -> bool {
@@ -756,7 +844,12 @@ impl<'db> SignatureRelationKey<'db> {
     }
 }
 
-pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+#[derive(Default)]
+pub(crate) struct SignatureRelationVisitor<'db> {
+    signatures: ActiveRecursionDetector<SignatureRelationKey<'db>>,
+    pub(super) receiver_constraints: ActiveRecursionDetector<TypePair<'db>>,
+    pub(super) protocol_methods: ActiveRecursionDetector<ProtocolMethodRelationKey<'db>>,
+}
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
@@ -1235,6 +1328,56 @@ impl<'db> Signature<'db> {
         self.bind_self_with_receiver(db, env, self_type, self_type)
     }
 
+    /// The receiver domain declared by a protocol method, after substituting its `Self`.
+    /// An omitted annotation permits any instance of the implementing class.
+    pub(super) fn protocol_receiver_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> Type<'db> {
+        self.parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+            .map_or(receiver_type, |parameter| {
+                parameter.annotated_type().apply_type_mapping(
+                    db,
+                    env,
+                    &TypeMapping::BindSelf(SelfBinding::new(
+                        db,
+                        env,
+                        self_type,
+                        self.definition.map(BindingContext::Definition),
+                    )),
+                    TypeContext::default(),
+                )
+            })
+    }
+
+    /// Make an implicit receiver explicit when comparing it with a protocol's receiver domain.
+    /// For example, a method declared on `C` cannot accept an unrelated `str` receiver.
+    pub(super) fn with_explicit_receiver(&self, receiver_type: Type<'db>) -> Self {
+        if !self.has_implicit_positional_receiver_annotation() {
+            return self.clone();
+        }
+
+        let parameters = self.parameters.with_transformed_parameters(
+            self.parameters
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(index, parameter)| {
+                    if index == 0 {
+                        parameter.with_annotated_type(receiver_type)
+                    } else {
+                        parameter
+                    }
+                }),
+        );
+        self.clone().with_parameters(parameters)
+    }
+
     /// Binds the receiver while preserving the relation between its runtime type and annotation.
     ///
     /// `typing_self_type` is used separately to replace `typing.Self`; it differs from
@@ -1245,6 +1388,17 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Option<Type<'db>>,
         typing_self_type: Option<Type<'db>>,
+    ) -> Self {
+        self.bind_self_with_receiver_impl(db, env, receiver_type, typing_self_type, None)
+    }
+
+    fn bind_self_with_receiver_impl(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Option<Type<'db>>,
+        typing_self_type: Option<Type<'db>>,
+        checker: Option<&TypeRelationChecker<'_, '_, 'db>>,
     ) -> Self {
         // A fixed unpacked tuple has a known first positional argument, even though it is
         // declared with `*args`. Expand it before consuming the receiver.
@@ -1320,11 +1474,23 @@ impl<'db> Signature<'db> {
                     _ => None,
                 };
                 if receiver_typevar.is_some_and(|typevar| {
-                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
+                    receiver_violates_typevar_domain(
+                        db,
+                        env.program(db),
+                        receiver,
+                        typevar.typevar(db),
+                    )
                 }) {
                     return std::borrow::Cow::Owned(OwnedConstraintSet::default());
                 }
-                receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+                checker.map_or_else(
+                    || receiver.when_constraint_set_assignable_to_owned(db, env, annotation),
+                    |checker| {
+                        std::borrow::Cow::Owned(
+                            checker.receiver_constraint_to_owned(db, receiver, annotation),
+                        )
+                    },
+                )
             })
         };
         let receiver_constraints = merge_receiver_constraints(
@@ -1362,41 +1528,6 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns whether a concrete receiver violates a direct receiver type variable's domain.
-    ///
-    /// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
-    /// leaving the original receiver relation available to normal inference. Transparent PEP 695
-    /// receiver aliases are resolved by the caller before this check.
-    ///
-    /// ```python
-    /// class C:
-    ///     def method[T: int](self: T) -> None: ...
-    /// ```
-    fn receiver_violates_typevar_domain(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        receiver: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        let Some(domain) = typevar.typevar(db).bound_or_constraints(db, env) else {
-            return false;
-        };
-        if receiver.has_typevar(db, env) {
-            return false;
-        }
-
-        !match domain {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                constraints.elements(db).iter().any(|constraint| {
-                    receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
-                })
-            }
-        }
-    }
-
     /// Specializes this signature using the type variables determined by its bound receiver.
     ///
     /// Matching the receiver can constrain type variables that occur elsewhere in the signature.
@@ -1411,8 +1542,24 @@ impl<'db> Signature<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> Option<CallableSignature<'db>> {
-        let bound_signature =
-            self.bind_self_with_receiver(db, env, Some(receiver_type), Some(typing_self_type));
+        self.specialize_for_bound_receiver_impl(db, env, receiver_type, typing_self_type, None)
+    }
+
+    fn specialize_for_bound_receiver_impl(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+        checker: Option<&TypeRelationChecker<'_, '_, 'db>>,
+    ) -> Option<CallableSignature<'db>> {
+        let bound_signature = self.bind_self_with_receiver_impl(
+            db,
+            env,
+            Some(receiver_type),
+            Some(typing_self_type),
+            checker,
+        );
         let Some(receiver_constraints) = bound_signature.receiver_constraints() else {
             return Some(CallableSignature::single(self.clone()));
         };
@@ -1494,9 +1641,10 @@ impl<'db> Signature<'db> {
     fn can_bind_self_to(
         &self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        checker: &TypeRelationChecker<'_, '_, 'db>,
         self_type: Type<'db>,
     ) -> bool {
+        let env = checker.env;
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
             return true;
@@ -1546,16 +1694,12 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let constraints = ConstraintSetBuilder::new();
-        self_type
-            .when_assignable_to(
-                db,
-                env,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_always_satisfied(db, env)
+        checker.is_assignable_with_inferable_typevars(
+            db,
+            self_type,
+            expected_self_ty,
+            self.inferable_typevars(db),
+        )
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -2659,6 +2803,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // the finite layer still bubbles out of `work`, because only exact active revisits take
         // this branch and the result is not memoized.
         self.signature_relation_visitor
+            .signatures
             .visit(&key, || self.always(), work)
     }
 
