@@ -480,7 +480,9 @@ def write_github_issue_body(
         raise RuntimeError(
             f"{args.test_executable_path} does not report its build commit"
         )
-    executable_revision: str = commit_info["commit_hash"]
+    commit_hash = commit_info["commit_hash"]
+    assert isinstance(commit_hash, str)
+    executable_revision: str = commit_hash
     fuzzer_revision = subprocess.check_output(
         ["git", "-C", Path(__file__).parent, "rev-parse", "HEAD"], text=True
     ).strip()
