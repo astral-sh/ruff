@@ -1,5 +1,9 @@
 # Non-exhaustive match statements
 
+The `non-exhaustive-match` rule detects `match` statements that may not handle every possible
+subject value. It can alert developers when, for example, a newly added enum member would otherwise
+go unhandled.
+
 ```toml
 [environment]
 python-version = "3.11"
