@@ -1,8 +1,5 @@
 # Non-exhaustive match statements
 
-These tests describe the proposed `non-exhaustive-match` rule. TODOs marked `should error` indicate
-matches that should produce a diagnostic once the rule is implemented.
-
 ```toml
 [environment]
 python-version = "3.11"
