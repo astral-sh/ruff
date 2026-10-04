@@ -912,19 +912,25 @@ note: This is a display-only fix and is likely to be incorrect
 from typing import Literal
 
 def describe(value: Literal["handled", "\x1b", "\u200b", "\U000e0001"]) -> None:
-    # A snapshot would also check the suggested `case` for these escaped values.
-    # However, mdtest normalizes Windows path separators (`\`) to `/` in rendered
-    # snapshots so the same snapshots work on all platforms. Its filter acts on
-    # the entire diagnostic and matches a backslash followed by two word
-    # characters, among other patterns. It therefore rewrites `\x1b` as
-    # `/x1b`, including in the suggested `case`; `\n` below is not affected.
-    # We therefore use an error assertion to check the diagnostic message without
-    # this filter until snapshots can preserve these escapes.
-    #
-    # error: [non-exhaustive-match] "Match is not exhaustive: values `"\x1b"`, `"\u200b"` and `"\U000e0001"` are not covered"
-    match value:
+    match value:  # snapshot: non-exhaustive-match
         case "handled":
             pass
+```
+
+```snapshot
+error[non-exhaustive-match]: Match is not exhaustive: values `"\x1b"`, `"\u200b"` and `"\U000e0001"` are not covered
+ --> src/mdtest_snippet.py:4:11
+  |
+4 |     match value:  # snapshot: non-exhaustive-match
+  |           ^^^^^ Subject has type `Literal["handled", "\x1b", "\u200b", "\U000e0001"]`
+help: Add a `case` branch for the remaining values
+  |
+6 |             pass
+7 +         case "\x1b" | "\u200b" | "\U000e0001":
+8 +             raise NotImplementedError("TODO")
+9 | def line_break(value: Literal["handled", "\n"]) -> None:
+  |
+note: This is a display-only fix and is likely to be incorrect
 ```
 
 ```py
@@ -936,17 +942,17 @@ def line_break(value: Literal["handled", "\n"]) -> None:
 
 ```snapshot
 error[non-exhaustive-match]: Match is not exhaustive: value `"\n"` is not covered
-  --> src/mdtest_snippet.py:18:11
-   |
-18 |     match value:  # snapshot: non-exhaustive-match
-   |           ^^^^^ Subject has type `Literal["handled", "\n"]`
+ --> src/mdtest_snippet.py:8:11
+  |
+8 |     match value:  # snapshot: non-exhaustive-match
+  |           ^^^^^ Subject has type `Literal["handled", "\n"]`
 help: Add a `case` branch for the remaining values
    |
-19 |         case "handled":
+9  |         case "handled":
    -             pass
-20 +             pass
-21 +         case "\n":
-22 +             raise NotImplementedError("TODO")
+10 +             pass
+11 +         case "\n":
+12 +             raise NotImplementedError("TODO")
    |
 note: This is a display-only fix and is likely to be incorrect
 ```
