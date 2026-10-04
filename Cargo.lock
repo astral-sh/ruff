@@ -2120,10 +2120,12 @@ dependencies = [
  "serde",
  "similar 3.2.0",
  "smallvec",
+ "test-case",
  "thiserror 2.0.20",
  "toml 1.1.4+spec-1.1.0",
  "toml_parser",
  "tracing",
+ "zip",
 ]
 
 [[package]]

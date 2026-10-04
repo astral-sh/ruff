@@ -41,5 +41,9 @@ toml = { workspace = true }
 toml_parser = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+test-case = { workspace = true }
+zip = { workspace = true }
+
 [lints]
 workspace = true

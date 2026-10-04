@@ -20,6 +20,7 @@ use std::assert_matches;
 use std::fmt::Write;
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
+    system_module_search_paths,
 };
 use ty_python_core::TestProgramDb as _;
 use ty_python_core::platform::PythonPlatform;
@@ -314,6 +315,9 @@ fn run_test(
     db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 
+    let search_roots =
+        system_module_search_paths(db, db.program().resolver_environment(db)).collect::<Vec<_>>();
+    let snapshot_context = mdtest::SnapshotContext::new(db, "ty", &search_roots);
     let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
@@ -350,8 +354,7 @@ fn run_test(
             )
             .and_then(|inline_diagnostics| {
                 mdtest::validate_inline_snapshot(
-                    db,
-                    "ty",
+                    &snapshot_context,
                     test_file,
                     &inline_diagnostics,
                     &mut markdown_edits,
@@ -412,8 +415,7 @@ fn run_test(
     // since they make snapshots very noisy!
     mdtest::snapshot_diagnostics(
         test,
-        db,
-        "ty",
+        &snapshot_context,
         relative_fixture_path,
         snapshot_path,
         &all_diagnostics,
