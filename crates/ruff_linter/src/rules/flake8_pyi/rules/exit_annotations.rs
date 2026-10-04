@@ -214,10 +214,11 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
 /// contains a star-args argument annotated with `object`. If not, report an error.
 fn check_short_args_list(checker: &Checker, parameters: &Parameters, func_kind: FuncKind) {
     if let Some(varargs) = &parameters.vararg {
-        if let Some(annotation) = varargs
-            .annotation()
-            .filter(|ann| !is_object_or_unused(ann, checker.semantic()))
-        {
+        if let Some(annotation) = varargs.annotation().filter(|annotation| {
+            !checker.match_maybe_stringized_annotation(annotation, |expr| {
+                is_object_or_unused(expr, checker.semantic())
+            })
+        }) {
             let mut diagnostic = checker.report_diagnostic(
                 BadExitAnnotation {
                     func_kind,
@@ -272,15 +273,13 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         };
 
-        if is_object_or_unused(annotation, checker.semantic()) {
-            continue;
-        }
-
-        // If there's an annotation that's not `object` or `Unused`, check that the annotated type
-        // matches the predicate.
-        if non_none_annotation_element(annotation, checker.semantic())
-            .is_some_and(|elem| predicate(elem, checker.semantic()))
-        {
+        // If the annotation is `object` or `Unused`, or the annotated type matches the predicate,
+        // the parameter is fine. Stringized annotations are checked against their parsed form.
+        if checker.match_maybe_stringized_annotation(annotation, |expr| {
+            is_object_or_unused(expr, checker.semantic())
+                || non_none_annotation_element(expr, checker.semantic())
+                    .is_some_and(|elem| predicate(elem, checker.semantic()))
+        }) {
             continue;
         }
 
@@ -304,12 +303,14 @@ fn check_positional_args_for_overloaded_method(
     parameters_range: TextRange,
 ) {
     fn parameter_annotation_loosely_matches_predicate(
+        checker: &Checker,
         parameter: &ParameterWithDefault,
         predicate: impl FnOnce(&Expr) -> bool,
-        semantic: &SemanticModel,
     ) -> bool {
         parameter.annotation().is_none_or(|annotation| {
-            predicate(annotation) || is_object_or_unused(annotation, semantic)
+            checker.match_maybe_stringized_annotation(annotation, |expr| {
+                predicate(expr) || is_object_or_unused(expr, checker.semantic())
+            })
         })
     }
 
@@ -398,9 +399,9 @@ fn check_positional_args_for_overloaded_method(
     // Start by checking the first possibility:
     if non_self_positional_args.iter().all(|parameter| {
         parameter_annotation_loosely_matches_predicate(
+            checker,
             parameter,
             Expr::is_none_literal_expr,
-            semantic,
         )
     }) {
         return;
@@ -408,17 +409,17 @@ fn check_positional_args_for_overloaded_method(
 
     // Now check the second:
     if parameter_annotation_loosely_matches_predicate(
+        checker,
         non_self_positional_args[0],
         |annotation| is_base_exception_type(annotation, semantic),
-        semantic,
     ) && parameter_annotation_loosely_matches_predicate(
+        checker,
         non_self_positional_args[1],
         |annotation| semantic.match_builtin_expr(annotation, "BaseException"),
-        semantic,
     ) && parameter_annotation_loosely_matches_predicate(
+        checker,
         non_self_positional_args[2],
         |annotation| is_traceback_type(annotation, semantic),
-        semantic,
     ) {
         return;
     }
