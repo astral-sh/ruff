@@ -1718,12 +1718,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// well as source constraints so that `T: (Y, Z)` can still be related to
     /// `type[Y] | type[Z]`.
     ///
-    /// Exact class objects also have an over-approximated instance projection. For `T: (Y, Z)`
-    /// where `Z` extends `Y`, instance subtyping would incorrectly simplify
-    /// `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are subtypes of `Y`, but
-    /// only the class object `Y` satisfies `klass is Y`. The exception is a type variable whose
-    /// upper bound normalizes to this exact class object. That can only happen for a final class,
-    /// so the exact object is the only valid specialization of the type variable.
+    /// Exact class objects have an over-approximated instance projection unless the class is
+    /// final. For `T: (Y, Z)` where `Z` extends `Y`, instance subtyping would incorrectly
+    /// simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are subtypes of
+    /// `Y`, but only the class object `Y` satisfies `klass is Y`.
     ///
     /// Return `None` for targets without a `.to_instance()` projection, allowing other type-pair
     /// branches to decide their relation.
@@ -1735,9 +1733,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     ) -> Option<ConstraintSet<'db, 'c>> {
         let source_i = source_subclass.into_type_var()?;
         let env = self.env;
-        let is_exact_upper_bound =
-            source_subclass.exact_typevar_upper_bound(db, env) == Some(target);
-
         if self.is_metaclass_instance(db, target) {
             return Some(self.check_type_pair(
                 db,
@@ -1747,7 +1742,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let projection = target.to_instance(db, env)?;
-        if projection.is_exact() || is_exact_upper_bound {
+        if projection.is_exact() {
             return Some(self.check_type_pair(
                 db,
                 Type::TypeVar(source_i),

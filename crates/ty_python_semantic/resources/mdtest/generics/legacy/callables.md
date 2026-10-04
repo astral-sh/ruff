@@ -1036,6 +1036,76 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Inferring instance types from final class parameters
+
+When a callback accepts `type[T]`, we infer `T` as the instance type, including when the class is
+final. The same applies to specialized final generic classes.
+
+```py
+from typing import Callable, Generic, TypeVar, final
+
+T = TypeVar("T")
+
+def solve(callback: Callable[[type[T]], None]) -> T:
+    raise NotImplementedError
+
+class Open: ...
+
+@final
+class Closed: ...
+
+@final
+class GenericClosed(Generic[T]): ...
+
+def takes_open(cls: type[Open]) -> None: ...
+def takes_closed(cls: type[Closed]) -> None: ...
+def takes_generic_closed(cls: type[GenericClosed[int]]) -> None: ...
+
+reveal_type(solve(takes_open))  # revealed: Open
+reveal_type(solve(takes_closed))  # revealed: Closed
+reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
+```
+
+The inferred instance type must also satisfy the type variable's bound:
+
+```py
+B = TypeVar("B", bound=Closed)
+
+def solve_bounded(callback: Callable[[type[B]], None]) -> B:
+    raise NotImplementedError
+
+reveal_type(solve_bounded(takes_closed))  # revealed: Closed
+```
+
+## Decorating classmethods of final classes
+
+A decorator can infer the instance type from an unannotated `cls` parameter while preserving the
+remaining parameters and return type. Regression test for
+<https://github.com/astral-sh/ty/issues/4664>.
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, final
+
+CLS = TypeVar("CLS")
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def field(
+    f: Callable[Concatenate[type[CLS], P], R],
+) -> Callable[Concatenate[type[CLS], P], R]:
+    return f
+
+@final
+class Closed:
+    @field  # no diagnostic
+    @classmethod
+    def f(cls, value: int) -> str:
+        return ""
+
+reveal_type(Closed.f(1))  # revealed: str
+Closed.f("")  # error: [invalid-argument-type]
+```
+
 ## Gradual class parameters
 
 A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.
