@@ -49,7 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// On Python 3.15 and later, lazy imports are also exempt, including imports
 /// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
-/// `lazy` to single-name import statements where the syntax is legal and
+/// `lazy` to import statements where all names qualify for the fix, the syntax is legal, and
 /// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
 /// keeping the name available for runtime annotation inspection.
 ///
@@ -158,7 +158,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 ///
 /// On Python 3.15 and later, lazy imports are also exempt, including imports
 /// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
-/// `lazy` to single-name import statements where the syntax is legal and
+/// `lazy` to import statements where all names qualify for the fix, the syntax is legal, and
 /// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
 /// keeping the name available for runtime annotation inspection.
 ///
@@ -267,7 +267,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// On Python 3.15 and later, lazy imports are also exempt, including imports
 /// made lazy by a literal `__lazy_modules__` declaration. The fix prefers adding
-/// `lazy` to single-name import statements where the syntax is legal and
+/// `lazy` to import statements where all names qualify for the fix, the syntax is legal, and
 /// [`lint.flake8-tidy-imports.ban-lazy`] allows it. This defers the import while
 /// keeping the name available for runtime annotation inspection.
 ///
@@ -478,6 +478,19 @@ pub(crate) fn typing_only_runtime_import(
         }
     }
 
+    // A whole-statement lazy fix must cover every name, including names in other import categories.
+    // Ignored imports do not qualify because the fix would also change their import behavior.
+    let mut typing_only_import_counts: FxHashMap<NodeId, usize> = FxHashMap::default();
+    if checker.target_version() >= PythonVersion::PY315 && scope.kind.is_module() {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "summing import counts does not depend on iteration order"
+        )]
+        for ((node_id, _), imports) in &errors_by_statement {
+            *typing_only_import_counts.entry(*node_id).or_default() += imports.len();
+        }
+    }
+
     // Generate a diagnostic for every import, but share a fix across all imports within the same
     // statement (excluding those that are ignored).
     #[expect(
@@ -485,7 +498,15 @@ pub(crate) fn typing_only_runtime_import(
         reason = "each statement group produces diagnostics and a fix independently"
     )]
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix_style = ImportFixStyle::for_import(checker, scope, node_id);
+        let fix_style = ImportFixStyle::for_import(
+            checker,
+            scope,
+            node_id,
+            typing_only_import_counts
+                .get(&node_id)
+                .copied()
+                .unwrap_or_default(),
+        );
         let fix = fix_imports(checker, node_id, &imports, fix_style).ok();
 
         for ImportBinding {
@@ -518,7 +539,15 @@ pub(crate) fn typing_only_runtime_import(
         reason = "each ignored statement group produces diagnostics independently"
     )]
     for ((node_id, import_type), imports) in ignores_by_statement {
-        let fix_style = ImportFixStyle::for_import(checker, scope, node_id);
+        let fix_style = ImportFixStyle::for_import(
+            checker,
+            scope,
+            node_id,
+            typing_only_import_counts
+                .get(&node_id)
+                .copied()
+                .unwrap_or_default(),
+        );
         for ImportBinding {
             import,
             range,
@@ -724,7 +753,12 @@ enum ImportFixStyle {
 }
 
 impl ImportFixStyle {
-    fn for_import(checker: &Checker, scope: &Scope, node_id: NodeId) -> Self {
+    fn for_import(
+        checker: &Checker,
+        scope: &Scope,
+        node_id: NodeId,
+        typing_only_import_count: usize,
+    ) -> Self {
         let semantic = checker.semantic();
         if checker.target_version() < PythonVersion::PY315
             || !scope.kind.is_module()
@@ -740,7 +774,7 @@ impl ImportFixStyle {
             _ => return Self::TypeCheckingBlock,
         };
         // Other members may be used at runtime, suppressed, or governed by another lazy-import policy.
-        if names.len() != 1 {
+        if names.len() != 1 && names.len() != typing_only_import_count {
             return Self::TypeCheckingBlock;
         }
 
