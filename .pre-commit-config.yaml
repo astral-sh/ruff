@@ -59,21 +59,6 @@ repos:
       - id: prettier
         types: [yaml]
         priority: 0
-      - id: prettier
-        name: prettier (JavaScript scripts)
-        files: "^scripts/"
-        types: [text]
-        types_or: [javascript, jsx]
-        priority: 0
-
-  - repo: https://github.com/oxc-project/mirrors-oxlint
-    rev: d42efd5dd14140712244e62976c1c9ed7115c288 # frozen: v1.80.0
-    hooks:
-      - id: oxlint
-        files: "^scripts/"
-        types_or: [javascript, jsx]
-        args: [--deny-warnings, --warn, suspicious]
-        priority: 0
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`

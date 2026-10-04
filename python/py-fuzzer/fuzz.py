@@ -25,13 +25,13 @@ from __future__ import annotations
 
 import argparse
 import ast
-import builtins
 import concurrent.futures
 import contextlib
 import enum
 import json
 import operator
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -43,6 +43,7 @@ from functools import partial
 from pathlib import Path
 from typing import Final, NewType, NoReturn, assert_never, cast
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
@@ -53,6 +54,12 @@ ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 MINIMIZATION_BUDGET_SECONDS: Final = 60
+
+# GitHub issue descriptions are reportedly limited to 65,536 Unicode code points:
+# https://github.com/dead-claudia/github-limits#issue-description
+# Each UTF-8-encoded code point takes at least one byte, so this lower byte
+# limit leaves headroom.
+MAX_GITHUB_ISSUE_BODY_BYTES: Final = 60_000
 
 # ty supports `--python-version=3.8`, but typeshed only supports 3.10+,
 # so that's probably the oldest version we can usefully test with.
@@ -174,8 +181,10 @@ def contains_new_bug(
     )
 
 
-@dataclass(slots=True, kw_only=True)
+@dataclass(slots=True, kw_only=True, frozen=True)
 class Bug:
+    """A bug reproducer and whether minimization succeeded."""
+
     source: str
     minimization_succeeded: bool
 
@@ -192,9 +201,7 @@ class FuzzResult:
     _: KW_ONLY
     only_new_bugs: bool
 
-    def print_description(
-        self, index: int, num_seeds: int, *, print: Callable[..., None]
-    ) -> None:
+    def print_description(self, index: int, num_seeds: int) -> None:
         """Describe the results of fuzzing the parser with this seed."""
         progress = f"[{index}/{num_seeds}]"
         msg = (
@@ -228,7 +235,6 @@ class FuzzResult:
 
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
-    print = args.progress_print
     code = generate_random_code(seed)
     bug_found = False
     minimizer_callback: Callable[[str], bool] | None = None
@@ -317,7 +323,6 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
-    print = args.progress_print
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
@@ -335,7 +340,7 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
             ):
                 fuzz_result = future.result()
                 if not args.quiet:
-                    fuzz_result.print_description(i, num_seeds, print=print)
+                    fuzz_result.print_description(i, num_seeds)
                 if fuzz_result.maybe_bug is not None:
                     bugs.append(fuzz_result)
         except KeyboardInterrupt:
@@ -347,7 +352,6 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
 
 
 def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
-    print = args.progress_print
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
@@ -358,10 +362,136 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     for i, seed in enumerate(args.seeds, start=1):
         fuzz_result = fuzz_code(seed, args)
         if not args.quiet:
-            fuzz_result.print_description(i, num_seeds, print=print)
+            fuzz_result.print_description(i, num_seeds)
         if fuzz_result.maybe_bug is not None:
             bugs.append(fuzz_result)
     return bugs
+
+
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RenderableReproducer:
+    """A bug and its seed, paired with a Markdown fence for its source."""
+
+    seed: Seed
+    bug: Bug
+    fence: str
+
+
+def render_issue_body(
+    bugs: list[FuzzResult],
+    *,
+    executable: Executable,
+    executable_revision: str,
+    run_url: str,
+    fuzzer_revision: str,
+) -> str:
+    """Render a GitHub issue body containing reproducers for the reported bugs.
+
+    Omit reproducers when including them alongside an omission notice would
+    exceed the issue body size limit.
+    """
+    match executable:
+        case Executable.RUFF:
+            failure_description = (
+                "Each snippet caused Ruff to exit with a nonzero status or time out "
+                "after five seconds during fuzzing."
+            )
+            reproduction_command = (
+                "target/debug/ruff check --isolated --config 'lint.select=[]' "
+                "--no-cache --target-version py314 --preview - < repro.py"
+            )
+        case Executable.TY:
+            failure_description = (
+                "Each snippet caused ty to exit with a status other than 0, 1, or 2, "
+                "or time out after five seconds during fuzzing."
+            )
+            reproduction_command = (
+                'repro_dir=$(mktemp -d)\ncp repro.py "$repro_dir/input.py"\n'
+                f'target/debug/ty check "$repro_dir/input.py" '
+                f"--python-version={OLDEST_SUPPORTED_PYTHON} "
+                f"--python-platform={TY_TARGET_PLATFORM}"
+            )
+        case _ as unreachable:
+            assert_never(unreachable)
+
+    environment = Environment(
+        loader=FileSystemLoader(Path(__file__).parent),
+        undefined=StrictUndefined,
+        autoescape=False,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = environment.get_template("daily_fuzz_issue.md.jinja")
+
+    def render(reproducers: list[RenderableReproducer], *, omitted: bool) -> str:
+        """Render the selected reproducers and an omission notice when needed."""
+        return template.render(
+            run_url=run_url,
+            fuzzer_revision=fuzzer_revision,
+            executable=executable,
+            executable_revision=executable_revision,
+            failure_description=failure_description,
+            reproduction_command=reproduction_command,
+            reproducers=reproducers,
+            omitted=omitted,
+        ).removesuffix("\n")
+
+    reproducers: list[RenderableReproducer] = []
+    omitted = False
+    # Keep the report simple by listing each seed separately, even when several
+    # have the same reproducer. The workflow logs list all failing seeds if the
+    # issue body fills up.
+    for result in sorted(bugs, key=operator.attrgetter("seed")):
+        assert result.maybe_bug is not None
+        longest_fence = max(
+            (len(run) for run in re.findall(r"`+", result.maybe_bug.source)), default=0
+        )
+        renderable = RenderableReproducer(
+            seed=result.seed,
+            bug=result.maybe_bug,
+            fence="`" * max(3, longest_fence + 1),
+        )
+        candidate = render([*reproducers, renderable], omitted=True)
+        if len(candidate.encode("utf-8")) <= MAX_GITHUB_ISSUE_BODY_BYTES:
+            reproducers.append(renderable)
+        else:
+            omitted = True
+    return render(reproducers, omitted=omitted)
+
+
+def write_github_issue_body(
+    bugs: list[FuzzResult], args: ResolvedCliArgs, path: Path
+) -> None:
+    """Write a GitHub issue body for the reported bugs to a Markdown file."""
+    try:
+        run_url = (
+            f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+            f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+        )
+    except KeyError as error:
+        raise RuntimeError(
+            f"--write-github-issue requires the {error.args[0]} environment variable"
+        ) from None
+    version_output = subprocess.check_output(
+        [args.test_executable_path, "version", "--output-format=json"], text=True
+    )
+    commit_info = json.loads(version_output)["commit_info"]
+    if commit_info is None:
+        raise RuntimeError(
+            f"{args.test_executable_path} does not report its build commit"
+        )
+    executable_revision: str = commit_info["commit_hash"]
+    fuzzer_revision = subprocess.check_output(
+        ["git", "-C", Path(__file__).parent, "rev-parse", "HEAD"], text=True
+    ).strip()
+    body = render_issue_body(
+        bugs,
+        executable=args.executable,
+        executable_revision=executable_revision,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision,
+    )
+    path.write_text(body, encoding="utf-8")
 
 
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
@@ -369,27 +499,16 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         bugs = run_fuzzer_sequentially(args)
     else:
         bugs = run_fuzzer_concurrently(args)
-    if args.output_format is OutputFormat.JSON:
-        bug_reports = [
-            {
-                "seed": str(result.seed),
-                "reproducer": result.maybe_bug.source,
-                "minimization_succeeded": result.maybe_bug.minimization_succeeded,
-            }
-            for result in sorted(bugs, key=operator.attrgetter("seed"))
-            if result.maybe_bug is not None
-        ]
-        print(json.dumps({"bugs": bug_reports}, indent=2))
+    noun_phrase = "New bugs" if args.baseline_executable_path is not None else "Bugs"
+    if bugs:
+        print(colored(f"{noun_phrase} found in the following seeds:", "red"))
+        print(*sorted(bug.seed for bug in bugs))
+        if args.github_issue_path is not None:
+            write_github_issue_body(bugs, args, args.github_issue_path)
+        return ExitCode(1)
     else:
-        noun_phrase = (
-            "New bugs" if args.baseline_executable_path is not None else "Bugs"
-        )
-        if bugs:
-            print(colored(f"{noun_phrase} found in the following seeds:", "red"))
-            print(*sorted(bug.seed for bug in bugs))
-        else:
-            print(colored(f"No {noun_phrase.lower()} found!", "green"))
-    return ExitCode(1 if bugs else 0)
+        print(colored(f"No {noun_phrase.lower()} found!", "green"))
+        return ExitCode(0)
 
 
 def absolute_path(p: str) -> Path:
@@ -424,14 +543,6 @@ class Executable(enum.StrEnum):
     TY = "ty"
 
 
-# `--output-format` uses these members as argparse choices. Using `StrEnum`
-# rather than a plain `Enum` makes the help text show `{text,json}` instead of
-# `{OutputFormat.TEXT,OutputFormat.JSON}`.
-class OutputFormat(enum.StrEnum):
-    TEXT = "text"
-    JSON = "json"
-
-
 @dataclass(slots=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
@@ -440,14 +551,7 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
-    output_format: OutputFormat
-
-    @property
-    def progress_print(self) -> Callable[..., None]:
-        return partial(
-            builtins.print,
-            file=sys.stderr if self.output_format is OutputFormat.JSON else sys.stdout,
-        )
+    github_issue_path: Path | None
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -476,11 +580,10 @@ def parse_args() -> ResolvedCliArgs:
         help="Print fewer things to the terminal while running the fuzzer",
     )
     parser.add_argument(
-        "--output-format",
-        choices=list(OutputFormat),
-        default=OutputFormat.TEXT,
-        type=OutputFormat,
-        help="Output format for the final results (default: text)",
+        "--write-github-issue",
+        type=Path,
+        metavar="PATH",
+        help="Write a GitHub issue body to PATH if bugs are found (intended for CI workflows)",
     )
     parser.add_argument(
         "--test-executable",
@@ -509,10 +612,6 @@ def parse_args() -> ResolvedCliArgs:
     args = parser.parse_args()
 
     executable = Executable(args.bin)
-    progress_stream = (
-        sys.stderr if args.output_format is OutputFormat.JSON else sys.stdout
-    )
-    print = partial(builtins.print, file=progress_stream)
 
     if args.baseline_executable:
         if not args.only_new_bugs:
@@ -590,7 +689,7 @@ def parse_args() -> ResolvedCliArgs:
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
-        output_format=args.output_format,
+        github_issue_path=args.write_github_issue,
     )
 
 

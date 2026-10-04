@@ -1,0 +1,35 @@
+Run listed here: {{ run_url }}
+
+{% if reproducers %}
+{{ failure_description }}
+
+Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run:
+
+```shell
+{{ reproduction_command }}
+```
+{% for reproducer in reproducers %}
+{% if reproducer.bug.minimization_succeeded %}
+
+### Seed: {{ reproducer.seed }}
+
+{{ reproducer.fence }}python
+{{ reproducer.bug.source }}
+{{ reproducer.fence }}
+{% else %}
+
+<details>
+<summary>Seed: {{ reproducer.seed }} (original source; minimization did not complete)</summary>
+
+{{ reproducer.fence }}python
+{{ reproducer.bug.source }}
+{{ reproducer.fence }}
+
+</details>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if omitted %}
+
+Some reproducers were omitted to fit the issue body. The workflow logs list all failing seeds; run py-fuzzer from Ruff commit `{{ fuzzer_revision }}` with a seed to regenerate its input.
+{% endif %}
