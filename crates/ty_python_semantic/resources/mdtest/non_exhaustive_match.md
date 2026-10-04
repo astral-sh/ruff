@@ -1366,9 +1366,4 @@ def unreachable(value: int) -> None:
         match value:  # no diagnostic
             case 1:
                 pass
-
-def suppressed(value: int) -> None:
-    match value:  # TODO: suppress `non-exhaustive-match` and check that no diagnostic is emitted
-        case 1:
-            pass
 ```
