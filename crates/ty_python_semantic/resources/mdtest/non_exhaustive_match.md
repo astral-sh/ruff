@@ -223,7 +223,7 @@ def mixed_union(value: Color | Literal["", "stop"]) -> None:
 ## Enum intersections with additional constraints
 
 When an enum's members cover all its instances, intersecting it with another type cannot add values
-outside that enum. Ty retains a member unless it can prove the member cannot satisfy the other
+outside that enum. ty retains a member unless it can prove the member cannot satisfy the other
 constraints. Here, `__bool__` returns `bool`, so ty cannot determine its result for an individual
 member.
 
@@ -549,7 +549,7 @@ def describe(value: Literal[b"red", b"blue"]) -> None:
 
 ## Boolean literals
 
-Ty treats a `Literal[True, False]` subject as `bool` and reports the uncovered type. For a union of
+ty treats a `Literal[True, False]` subject as `bool` and reports the uncovered type. For a union of
 a boolean literal and another literal, it lists the uncovered value.
 
 ```py
@@ -916,7 +916,7 @@ def describe(value: Color | Literal["stop"], Color: int) -> None:
 
 ## An enum defined after a match
 
-Ty suggests a wildcard when the enum is defined later in the file, even if it might be available
+ty suggests a wildcard when the enum is defined later in the file, even if it might be available
 when the function is called.
 
 ```py
@@ -1248,7 +1248,7 @@ def expression_incomplete(first: bool, second: bool) -> None:
 ## Guards
 
 An enum reference such as `Color` can be rebound by a guard before the suggested `case` is reached,
-causing that `case` to refer to a different object. Ty therefore suggests a wildcard even when the
+causing that `case` to refer to a different object. ty therefore suggests a wildcard even when the
 guard shown does not rebind `Color`. Non-enum literal patterns do not resolve such a name.
 
 ```py
