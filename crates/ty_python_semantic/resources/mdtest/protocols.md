@@ -6056,6 +6056,59 @@ class Constructor(Protocol):
 constructor: Constructor = Product
 ```
 
+## Callback protocols with overloads selected by receiver
+
+A generic callback protocol can select its `__call__` overloads through explicit receiver
+annotations. `Callback[str]` only requires the overload whose receiver it can be, with the type
+variables determined by the receiver specialized:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Protocol, overload
+
+class Var[T]: ...
+
+class Callback[*Ts](Protocol):
+    @overload
+    def __call__(self: "Callback[()]") -> Any: ...
+    @overload
+    def __call__[V](self: "Callback[V]", value: Var[V], /) -> Any: ...
+    @overload
+    def __call__[V, V2](self: "Callback[V, V2]", value: Var[V], value2: Var[V2], /) -> Any: ...
+    def __call__(self, *args: Any) -> Any: ...
+
+class Single[*Ts](Protocol):
+    def __call__[V](self: "Single[V]", value: Var[V], /) -> Any: ...
+
+class Field:
+    def setter(self, value: Any) -> None: ...
+
+def takes_var_str(value: Var[str]) -> None: ...
+def takes_var_int(value: Var[int]) -> None: ...
+def takes_two(value: Var[str], value2: Var[int]) -> None: ...
+
+none: Callback[()] = lambda: None
+one: Callback[str] = lambda value: value
+one_method: Callback[str] = Field().setter
+one_function: Callback[str] = takes_var_str
+two: Callback[str, int] = takes_two
+single: Single[str] = lambda value: value
+single_method: Single[str] = Field().setter
+
+none_extra: Callback[()] = lambda value: value  # error: [invalid-assignment]
+one_missing: Callback[str] = lambda: None  # error: [invalid-assignment]
+one_wrong_type: Callback[str] = takes_var_int  # error: [invalid-assignment]
+two_missing: Callback[str, int] = takes_var_str  # error: [invalid-assignment]
+
+def call(callback: Callback[str]) -> None:
+    callback(Var[str]())
+    callback()  # error: [invalid-argument-type]
+```
+
 ## Generic constructor callback inference
 
 Passing `type[T]` to a generic callback protocol must preserve the type variable returned by the

@@ -20,7 +20,10 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
+use super::{
+    DynamicType, NominalInstanceType, Type, TypeVarVariance, UnionType, any_over_type,
+    semantic_index,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     CandidateSolutions, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -1485,6 +1488,67 @@ impl<'db> Signature<'db> {
         }
 
         Some(specialized)
+    }
+
+    /// Binds an explicit receiver annotation that names a specialization of `receiver`'s protocol
+    /// class, for the interface of the protocol specialized as `receiver`.
+    ///
+    /// Returns `None` if `receiver` can never be the receiver. Otherwise, the receiver constraint
+    /// is recorded against `receiver` rather than the value that satisfies the protocol, which is
+    /// itself the relation being checked, and the annotation is marked inferred so that binding the
+    /// member does not record it again. The receiver is compared nominally, since a structural
+    /// comparison would need the protocol interface that is being built.
+    pub(super) fn bind_protocol_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver: NominalInstanceType<'db>,
+    ) -> Option<Self> {
+        let Some(annotation) = self
+            .parameters
+            .get(0)
+            .filter(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
+            .and_then(|parameter| parameter.annotated_type().as_protocol_instance())
+            .and_then(|protocol| protocol.nominal_origin_instance(db))
+            .filter(|annotation| {
+                annotation.class_literal(db, env) == receiver.class_literal(db, env)
+            })
+        else {
+            return Some(self.clone());
+        };
+
+        let receiver_constraints = self
+            .with_receiver(|parameter| {
+                parameter.with_annotated_type(Type::NominalInstance(annotation))
+            })
+            .bind_self_with_receiver(db, env, Some(Type::NominalInstance(receiver)), None)
+            .receiver_constraints()
+            .cloned();
+        if receiver_constraints.as_ref().is_some_and(|constraints| {
+            constraints.query(|_builder, constraints| constraints.is_never_satisfied(db, env))
+        }) {
+            return None;
+        }
+        Some(Self {
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                receiver_constraints,
+                self.is_paramspec_value(),
+            ),
+            ..self.with_receiver(|parameter| {
+                let annotation = parameter.annotated_type();
+                parameter.with_inferred_type(annotation)
+            })
+        })
+    }
+
+    fn with_receiver(&self, map: impl FnOnce(Parameter<'db>) -> Parameter<'db>) -> Self {
+        let mut parameters = self.parameters.iter().cloned();
+        let receiver = parameters.next().map(map);
+        self.clone().with_parameters(
+            self.parameters
+                .with_transformed_parameters(receiver.into_iter().chain(parameters)),
+        )
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
