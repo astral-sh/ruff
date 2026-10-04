@@ -25,9 +25,12 @@ from __future__ import annotations
 
 import argparse
 import ast
+import builtins
 import concurrent.futures
 import contextlib
 import enum
+import json
+import operator
 import os
 import signal
 import subprocess
@@ -45,7 +48,6 @@ from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
 from termcolor import colored
 
-MinimizedSourceCode = NewType("MinimizedSourceCode", str)
 Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
@@ -172,20 +174,27 @@ def contains_new_bug(
     )
 
 
+@dataclass(slots=True, kw_only=True)
+class Bug:
+    source: str
+    minimization_succeeded: bool
+
+
 @dataclass(slots=True)
 class FuzzResult:
     # The seed used to generate the random Python file.
     # The same seed always generates the same file.
     seed: Seed
-    # If we found a bug, this will be the minimum Python code
-    # required to trigger the bug. If not, it will be `None`.
-    maybe_bug: MinimizedSourceCode | None
+    # If we found a bug, this contains a reproducer. If not, it is `None`.
+    maybe_bug: Bug | None
     # The executable we're testing
     executable: Executable
     _: KW_ONLY
     only_new_bugs: bool
 
-    def print_description(self, index: int, num_seeds: int) -> None:
+    def print_description(
+        self, index: int, num_seeds: int, *, print: Callable[..., None]
+    ) -> None:
         """Describe the results of fuzzing the parser with this seed."""
         progress = f"[{index}/{num_seeds}]"
         msg = (
@@ -213,12 +222,13 @@ class FuzzResult:
 
             print(colored(panic_message, "red"))
             print()
-            print(self.maybe_bug)
+            print(self.maybe_bug.source)
             print(flush=True)
 
 
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
+    print = args.progress_print
     code = generate_random_code(seed)
     bug_found = False
     minimizer_callback: Callable[[str], bool] | None = None
@@ -274,7 +284,9 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
         return minimizer_callback(candidate)
 
     try:
-        maybe_bug = MinimizedSourceCode(minimize_repro(code, bounded_callback))
+        maybe_bug = Bug(
+            source=minimize_repro(code, bounded_callback), minimization_succeeded=True
+        )
     except CouldNotMinimize as e:
         # This is to double-check that there isn't a bug in
         # `pysource-minimize`/`pysource-codegen`.
@@ -284,11 +296,11 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
         except SyntaxError:
             raise e from None
         else:
-            maybe_bug = MinimizedSourceCode(code)
+            maybe_bug = Bug(source=code, minimization_succeeded=False)
     except MinimizationTimedOut:
         if not args.quiet:
             print(f"Minimization timed out for seed {seed}; reporting original source.")
-        maybe_bug = MinimizedSourceCode(code)
+        maybe_bug = Bug(source=code, minimization_succeeded=False)
     # An input whose execution time is close to the timeout may time out during
     # the minimizer's initial check but finish when the same source is rechecked.
     # `pysource-minimize` currently raises a plain `ValueError` in this case, so
@@ -299,12 +311,13 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     except ValueError as e:
         if not args.quiet:
             print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
-        maybe_bug = MinimizedSourceCode(code)
+        maybe_bug = Bug(source=code, minimization_succeeded=False)
 
     return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
 
 
 def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
+    print = args.progress_print
     num_seeds = len(args.seeds)
     print(
         f"Concurrently running the fuzzer on "
@@ -322,7 +335,7 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
             ):
                 fuzz_result = future.result()
                 if not args.quiet:
-                    fuzz_result.print_description(i, num_seeds)
+                    fuzz_result.print_description(i, num_seeds, print=print)
                 if fuzz_result.maybe_bug is not None:
                     bugs.append(fuzz_result)
         except KeyboardInterrupt:
@@ -334,6 +347,7 @@ def run_fuzzer_concurrently(args: ResolvedCliArgs) -> list[FuzzResult]:
 
 
 def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
+    print = args.progress_print
     num_seeds = len(args.seeds)
     print(
         f"Sequentially running the fuzzer on "
@@ -344,7 +358,7 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     for i, seed in enumerate(args.seeds, start=1):
         fuzz_result = fuzz_code(seed, args)
         if not args.quiet:
-            fuzz_result.print_description(i, num_seeds)
+            fuzz_result.print_description(i, num_seeds, print=print)
         if fuzz_result.maybe_bug is not None:
             bugs.append(fuzz_result)
     return bugs
@@ -355,14 +369,27 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
         bugs = run_fuzzer_sequentially(args)
     else:
         bugs = run_fuzzer_concurrently(args)
-    noun_phrase = "New bugs" if args.baseline_executable_path is not None else "Bugs"
-    if bugs:
-        print(colored(f"{noun_phrase} found in the following seeds:", "red"))
-        print(*sorted(bug.seed for bug in bugs))
-        return ExitCode(1)
+    if args.output_format is OutputFormat.JSON:
+        bug_reports = [
+            {
+                "seed": str(result.seed),
+                "reproducer": result.maybe_bug.source,
+                "minimization_succeeded": result.maybe_bug.minimization_succeeded,
+            }
+            for result in sorted(bugs, key=operator.attrgetter("seed"))
+            if result.maybe_bug is not None
+        ]
+        print(json.dumps({"bugs": bug_reports}, indent=2))
     else:
-        print(colored(f"No {noun_phrase.lower()} found!", "green"))
-        return ExitCode(0)
+        noun_phrase = (
+            "New bugs" if args.baseline_executable_path is not None else "Bugs"
+        )
+        if bugs:
+            print(colored(f"{noun_phrase} found in the following seeds:", "red"))
+            print(*sorted(bug.seed for bug in bugs))
+        else:
+            print(colored(f"No {noun_phrase.lower()} found!", "green"))
+    return ExitCode(1 if bugs else 0)
 
 
 def absolute_path(p: str) -> Path:
@@ -397,6 +424,14 @@ class Executable(enum.StrEnum):
     TY = "ty"
 
 
+# `--output-format` uses these members as argparse choices. Using `StrEnum`
+# rather than a plain `Enum` makes the help text show `{text,json}` instead of
+# `{OutputFormat.TEXT,OutputFormat.JSON}`.
+class OutputFormat(enum.StrEnum):
+    TEXT = "text"
+    JSON = "json"
+
+
 @dataclass(slots=True)
 class ResolvedCliArgs:
     seeds: list[Seed]
@@ -405,6 +440,14 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
+    output_format: OutputFormat
+
+    @property
+    def progress_print(self) -> Callable[..., None]:
+        return partial(
+            builtins.print,
+            file=sys.stderr if self.output_format is OutputFormat.JSON else sys.stdout,
+        )
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -433,6 +476,13 @@ def parse_args() -> ResolvedCliArgs:
         help="Print fewer things to the terminal while running the fuzzer",
     )
     parser.add_argument(
+        "--output-format",
+        choices=list(OutputFormat),
+        default=OutputFormat.TEXT,
+        type=OutputFormat,
+        help="Output format for the final results (default: text)",
+    )
+    parser.add_argument(
         "--test-executable",
         help=(
             "Executable to test. "
@@ -459,6 +509,10 @@ def parse_args() -> ResolvedCliArgs:
     args = parser.parse_args()
 
     executable = Executable(args.bin)
+    progress_stream = (
+        sys.stderr if args.output_format is OutputFormat.JSON else sys.stdout
+    )
+    print = partial(builtins.print, file=progress_stream)
 
     if args.baseline_executable:
         if not args.only_new_bugs:
@@ -495,6 +549,7 @@ def parse_args() -> ResolvedCliArgs:
                     f"the baseline (the version of `{executable}` installed in your "
                     f"current Python environment)"
                 )
+            args.baseline_executable = Path(executable)
 
     if not args.test_executable:
         print(
@@ -535,6 +590,7 @@ def parse_args() -> ResolvedCliArgs:
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
+        output_format=args.output_format,
     )
 
 
