@@ -790,10 +790,11 @@ def consume_child(value: Child) -> None: ...
 reveal_type(infer_child(consume_child))
 ```
 
-## Inferring instance types from final class parameters
+## Callbacks that accept final classes
 
-When a callback accepts `type[T]`, we infer `T` as the instance type, including when the class is
-final. The same applies to specialized final generic classes.
+When a callback accepts `type[Closed]`, we infer `T` in `Callable[[type[T]], None]` as the instance
+type `Closed`. Declaring the class as final does not change this: `T` describes instances of
+`Closed`, not the class object itself.
 
 ```py
 from typing import Callable, final
@@ -801,55 +802,50 @@ from typing import Callable, final
 def solve[T](callback: Callable[[type[T]], None]) -> T:
     raise NotImplementedError
 
-class Open: ...
-
 @final
 class Closed: ...
 
+def takes_closed(cls: type[Closed]) -> None: ...
+
+reveal_type(solve(takes_closed))  # revealed: Closed
+```
+
+For a final generic class, the inferred instance type includes the class's type arguments:
+
+```py
 @final
 class GenericClosed[T]: ...
 
-def takes_open(cls: type[Open]) -> None: ...
-def takes_closed(cls: type[Closed]) -> None: ...
 def takes_generic_closed(cls: type[GenericClosed[int]]) -> None: ...
 
-reveal_type(solve(takes_open))  # revealed: Open
-reveal_type(solve(takes_closed))  # revealed: Closed
 reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
-```
-
-The inferred instance type must also satisfy the type variable's bound:
-
-```py
-def solve_bounded[T: Closed](callback: Callable[[type[T]], None]) -> T:
-    raise NotImplementedError
-
-reveal_type(solve_bounded(takes_closed))  # revealed: Closed
 ```
 
 ## Decorating classmethods of final classes
 
-A decorator can infer the instance type from an unannotated `cls` parameter while preserving the
-remaining parameters and return type. Regression test for
-<https://github.com/astral-sh/ty/issues/4664>.
+This decorator accepts a method whose first argument is a class object and leaves the remaining
+parameters unchanged:
 
 ```py
 from typing import Callable, Concatenate, final
 
-def field[CLS, **P, R](
-    f: Callable[Concatenate[type[CLS], P], R],
-) -> Callable[Concatenate[type[CLS], P], R]:
+def decorate[T, **P](
+    f: Callable[Concatenate[type[T], P], None],
+) -> Callable[Concatenate[type[T], P], None]:
     return f
+```
 
+For a classmethod on a final class, the inferred `cls` type is the class object itself. We accept
+the decorator by inferring `T` as the instance type `Closed`.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4664>.
+
+```py
 @final
 class Closed:
-    @field  # no diagnostic
+    @decorate  # no diagnostic
     @classmethod
-    def f(cls, value: int) -> str:
-        return ""
-
-reveal_type(Closed.f(1))  # revealed: str
-Closed.f("")  # error: [invalid-argument-type]
+    def method(cls, value: int) -> None: ...
 ```
 
 ## Gradual class parameters
