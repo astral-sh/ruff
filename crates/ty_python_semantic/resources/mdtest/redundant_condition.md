@@ -2518,10 +2518,10 @@ error[redundant-condition-strict]: Condition is always truthy
 error[redundant-condition-strict]: Condition is always false
   --> src/mdtest_snippet.py:13:10
    |
-13 |     elif some_bytes[0] == b"/x1e":  # snapshot: redundant-condition-strict
+13 |     elif some_bytes[0] == b"\x1e":  # snapshot: redundant-condition-strict
    |          -------------^^^^-------
    |          |                |
-   |          |                Has type `Literal[b"/x1e"]`
+   |          |                Has type `Literal[b"\x1e"]`
    |          Has type `int`
 ```
 

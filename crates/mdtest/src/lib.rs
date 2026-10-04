@@ -1,8 +1,10 @@
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
+use std::sync::LazyLock;
 
 use camino::Utf8Path;
 use colored::Colorize;
+use regex::Regex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::Db;
@@ -335,7 +337,12 @@ pub fn render_diagnostic(db: &dyn Db, tool_name: &'static str, diagnostic: &Diag
 fn render_diagnostics(db: &dyn Db, tool_name: &'static str, diagnostics: &[Diagnostic]) -> String {
     let mut rendered = String::new();
     for diag in diagnostics {
-        writeln!(rendered, "{}", render_diagnostic(db, tool_name, diag)).unwrap();
+        writeln!(
+            rendered,
+            "{}",
+            diag.display(&db, &diagnostic_display_config(tool_name))
+        )
+        .unwrap();
     }
 
     rendered.trim_end_matches('\n').to_string()
@@ -348,10 +355,42 @@ fn is_update_inline_snapshots_enabled() -> bool {
     *is_enabled
 }
 
-fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
-    static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
-    INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
+/// Normalizes Windows-style paths in snapshot text to use forward slashes.
+///
+/// Leaves path-like text unchanged when it appears to consist of escape sequences.
+fn normalize_snapshot_paths(rendered: &str) -> std::borrow::Cow<'_, str> {
+    static PATH: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?:[a-zA-Z]:\\|\\{0,2}[\w./-]+\\|\\{1,2})[\w.-]+(?:\\[\w.-]+)*").unwrap()
+    });
+    static ESCAPE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"^(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[abfnrtv]$)").unwrap()
+    });
+
+    PATH.replace_all(rendered, |captures: &regex::Captures<'_>| {
+        let path = &captures[0];
+        // In an f-string like `{value:\b}`, the `e:\b` substring is not a drive path.
+        let has_drive = path.as_bytes().get(1) == Some(&b':')
+            && captures.get(0).is_some_and(|matched| {
+                rendered[..matched.start()]
+                    .chars()
+                    .next_back()
+                    .is_none_or(|previous| {
+                        !previous.is_alphanumeric() && !matches!(previous, '_' | '{' | '.')
+                    })
+            });
+        // A run of escapes such as `prefix\x1b\u200b` can also look like a path.
+        if !has_drive
+            && path
+                .split('\\')
+                .skip(1)
+                .filter(|component| !component.is_empty())
+                .all(|component| ESCAPE.is_match(component))
+        {
+            path.to_string()
+        } else {
+            path.replace('\\', "/")
+        }
+    })
 }
 
 pub fn validate_inline_snapshot(
@@ -420,7 +459,7 @@ pub fn validate_inline_snapshot(
         };
 
         let rendered = render_diagnostics(db, tool_name, block_diagnostics);
-        let actual = snapshot_filter(&apply_snapshot_filters(&rendered));
+        let actual = snapshot_filter(&normalize_snapshot_paths(&rendered));
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
@@ -576,7 +615,12 @@ fn create_diagnostic_snapshot<'d, C>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", render_diagnostic(db, tool_name, diagnostic)).unwrap();
+        write!(
+            snapshot,
+            "{}",
+            diagnostic.display(&db, &diagnostic_display_config(tool_name))
+        )
+        .unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
@@ -732,17 +776,15 @@ pub fn snapshot_diagnostics<C>(
             {
                 snapshot_path => snapshot_path,
                 input_file => name.clone(),
-                filters => vec![(r"\\", "/")],
                 prepend_module_to_snapshot => false,
             },
-            { insta::assert_snapshot!(name, snapshot) }
+            { insta::assert_snapshot!(name, normalize_snapshot_paths(&snapshot)) }
         );
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::apply_snapshot_filters;
     use ruff_db::Db;
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
@@ -795,10 +837,30 @@ pub(crate) mod tests {
     #[salsa::db]
     impl salsa::Database for TestDb {}
 
+    /// Checks that snapshot paths use forward slashes while escape sequences are preserved.
     #[test]
-    fn preserves_site_packages_paths_in_inline_snapshots() {
-        let rendered = " ::: .venv/lib/python3.10/site-packages/dependency.py:1:5";
+    fn snapshot_paths_preserve_escape_sequences() {
+        let snapshot = r#"error[example]: Type `C @ src\nested\example.py:1:1` contains `Literal["prefix\x1b\u200b\U000e0001"]`
+ --> C:\src\nested\example.py:1:9
+  |
+1 | value = "\x1b\u200b\n"
+2 | format_spec = f"{value:\b}"
+3 | format_spec = f"{x:\b}"
+  |         ^^^^^^^^^^^^^^
+help: Read C:\Program Files\Python\module.py
+help: Read \\server\share\module.py, \src, and C:\a
+"#;
+        let expected = r#"error[example]: Type `C @ src/nested/example.py:1:1` contains `Literal["prefix\x1b\u200b\U000e0001"]`
+ --> C:/src/nested/example.py:1:9
+  |
+1 | value = "\x1b\u200b\n"
+2 | format_spec = f"{value:\b}"
+3 | format_spec = f"{x:\b}"
+  |         ^^^^^^^^^^^^^^
+help: Read C:/Program Files/Python/module.py
+help: Read //server/share/module.py, /src, and C:/a
+"#;
 
-        assert_eq!(apply_snapshot_filters(rendered), rendered);
+        assert_eq!(super::normalize_snapshot_paths(snapshot), expected);
     }
 }
