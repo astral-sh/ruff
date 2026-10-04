@@ -448,6 +448,14 @@ pub(crate) fn unquote_annotation_string(
     Edit::range_replacement(fix_string, annotation_expr.range())
 }
 
+/// Returns `true` if the quoted annotation inserted by `edit` contains an escape sequence.
+///
+/// Tools like ty can't analyze a forward reference that contains an escape sequence, such as
+/// the `\"` in `"Literal[\"'\"]"`, so callers make such fixes display-only.
+pub(crate) fn contains_escape(edit: &Edit) -> bool {
+    edit.content().is_some_and(|content| content.contains('\\'))
+}
+
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
 pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
     let mut edits = edits;

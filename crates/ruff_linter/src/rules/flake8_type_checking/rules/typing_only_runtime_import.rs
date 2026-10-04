@@ -14,11 +14,11 @@ use crate::fix;
 use crate::importer::ImportedMembers;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
 use crate::rules::flake8_type_checking::helpers::{
-    TypingReference, filter_contained, quote_annotation,
+    TypingReference, contains_escape, filter_contained, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
 use crate::rules::isort::{ImportSection, ImportType, categorize};
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for first-party imports that are only used for type annotations, but
@@ -90,6 +90,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// This rule's fixes are unsafe because changing when a module is imported can
 /// affect runtime behavior, including import-time side effects.
+///
+/// With `lint.flake8-type-checking.quote-annotations` enabled, the fix is display-only
+/// when quoting a runtime reference would introduce an escape sequence, since tools
+/// like ty can't analyze forward references that contain escape sequences.
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.ban-lazy`
@@ -200,6 +204,10 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// This rule's fixes are unsafe because changing when a module is imported can
 /// affect runtime behavior, including import-time side effects.
 ///
+/// With `lint.flake8-type-checking.quote-annotations` enabled, the fix is display-only
+/// when quoting a runtime reference would introduce an escape sequence, since tools
+/// like ty can't analyze forward references that contain escape sequences.
+///
 /// ## Options
 /// - `lint.flake8-tidy-imports.ban-lazy`
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -308,6 +316,10 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ## Fix safety
 /// This rule's fixes are unsafe because changing when a module is imported can
 /// affect runtime behavior, including import-time side effects.
+///
+/// With `lint.flake8-type-checking.quote-annotations` enabled, the fix is display-only
+/// when quoting a runtime reference would introduce an escape sequence, since tools
+/// like ty can't analyze forward references that contain escape sequences.
 ///
 /// ## Options
 /// - `lint.flake8-tidy-imports.ban-lazy`
@@ -703,12 +715,18 @@ fn fix_imports(
                 })
                 .collect::<Vec<_>>(),
         );
-        Fix::unsafe_edits(
+        let applicability = if quote_reference_edits.iter().any(contains_escape) {
+            Applicability::DisplayOnly
+        } else {
+            Applicability::Unsafe
+        };
+        Fix::applicable_edits(
             type_checking_edit,
             add_import_edit
                 .into_iter()
                 .chain(std::iter::once(remove_import_edit))
                 .chain(quote_reference_edits),
+            applicability,
         )
     };
 
