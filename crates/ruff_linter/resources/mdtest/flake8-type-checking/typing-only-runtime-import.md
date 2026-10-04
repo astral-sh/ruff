@@ -174,3 +174,51 @@ from decimal import Decimal  # error: [typing-only-standard-library-import] "typ
 
 def load(value: Path) -> Decimal: ...
 ```
+
+## Quoted references that need an escape sequence
+
+Before Python 3.14, with `lint.flake8-type-checking.quote-annotations` enabled, the import moves
+into an `if TYPE_CHECKING:` block and its runtime references are quoted. Quoting
+`Type[Literal["\n"]]` leaves an escape sequence in the forward reference, which tools like ty
+can't analyze. A single fix quotes every runtime reference, so the whole fix is display-only.
+
+```toml
+target-version = "py313"
+
+[lint]
+select = ["TC002"]
+
+[lint.flake8-type-checking]
+quote-annotations = true
+```
+
+```py
+from typing import Literal
+from third_party import Type  # snapshot: typing-only-third-party-import
+
+def f(x: Type[int]): ...
+def g(x: Type[Literal["\n"]]): ...
+```
+
+```snapshot
+error[TC002]: Move third-party import `third_party.Type` into a type-checking block
+ --> src/mdtest_snippet.py:2:25
+  |
+2 | from third_party import Type  # snapshot: typing-only-third-party-import
+  |                         ^^^^
+help: Move into type-checking block
+  |
+  - from typing import Literal
+  - from third_party import Type  # snapshot: typing-only-third-party-import
+1 + from typing import Literal, TYPE_CHECKING
+2 +
+3 + if TYPE_CHECKING:
+4 +     from third_party import Type
+5 |
+  - def f(x: Type[int]): ...
+  - def g(x: Type[Literal["\n"]]): ...
+6 + def f(x: "Type[int]"): ...
+7 + def g(x: "Type[Literal['\\n']]"): ...
+  |
+note: This is a display-only fix and is likely to be incorrect
+```
