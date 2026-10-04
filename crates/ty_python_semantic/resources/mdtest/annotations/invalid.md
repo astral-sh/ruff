@@ -1597,7 +1597,7 @@ note: This is an unsafe fix and may change runtime behavior
 error[invalid-type-form]: Bytes literals are not allowed in this context in a parameter annotation
  --> src/mdtest_snippet.py:5:11
   |
-5 |     data: b"/x41",
+5 |     data: b"\x41",
   |           ^^^^^^^ Did you mean `typing.Literal[b"A"]`?
 info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
@@ -1608,8 +1608,8 @@ help: Wrap in `Literal[...]`
 3 |     # snapshot: invalid-type-form
 4 |     integer: (0x_FF),
 5 |     # snapshot: invalid-type-form
-  -     data: b"/x41",
-6 +     data: Literal[b"/x41"],
+  -     data: b"\x41",
+6 +     data: Literal[b"\x41"],
 7 |     # snapshot: invalid-type-form
   |
 note: This is an unsafe fix and may change runtime behavior
