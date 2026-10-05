@@ -31,7 +31,9 @@ use crate::lint::LintMetadata;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::ProgramEnvironment;
-use crate::types::call::arguments::{CallArgumentExpansions, CallArgumentTypes, Expansion};
+use crate::types::call::arguments::{
+    CallArgument, CallArgumentExpansions, Expansion, KeywordArgument, VariadicArgument,
+};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintSet,
@@ -62,7 +64,7 @@ use crate::types::signatures::{
     PartialApplication, PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType, VariableSegment};
-use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
+use crate::types::typed_dict::TypedDictOpenness;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator, TypeVarSet};
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
@@ -1507,7 +1509,7 @@ impl<'db> Bindings<'db> {
         argument_index: usize,
     ) -> Type<'db> {
         let argument_types = call_arguments
-            .argument_types(argument_index)
+            .source_types(argument_index)
             .expect("argument index should be valid");
 
         // If there is a single matching parameter, return the argument type inferred against
@@ -2019,7 +2021,9 @@ impl<'db> Bindings<'db> {
                             {
                                 return ty;
                             }
-                            call_arguments.iter().find_map(|(arg, types)| {
+                            call_arguments.iter().find_map(|argument| {
+                                let arg = argument.kind();
+                                let types = argument.source_types();
                                 if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
                                     types.get_default()
                                 } else {
@@ -2719,9 +2723,10 @@ impl<'db> Bindings<'db> {
                                 .or_else(|| {
                                     // Older `__dataclass_transform__` signatures can accept
                                     // extensions through `**kwargs`.
-                                    call_arguments.iter().find_map(|(arg, types)| {
-                                        if matches!(arg, Argument::Keyword(name) if name == "slots_default") {
-                                            types.get_default()
+                                    call_arguments.iter().find_map(|argument| {
+                                        if let Argument::Keyword("slots_default") = argument.kind()
+                                        {
+                                            argument.source_type()
                                         } else {
                                             None
                                         }
@@ -2815,18 +2820,18 @@ impl<'db> Bindings<'db> {
                                 let mut flags = dataclass_params.flags(db);
 
                                 for (param, flag) in DATACLASS_FLAGS {
-                                    if let Some(ty) =
-                                        call_arguments.iter().find_map(|(arg, arg_types)| {
-                                            if let Argument::Keyword(arg_name) = arg
-                                                && *arg_name == **param
-                                            {
-                                                arg_types.get_default()
-                                            } else {
-                                                None
-                                            }
-                                        })
-                                        && let Some(LiteralValueTypeKind::Bool(value)) =
-                                            ty.as_literal_value_kind()
+                                    if let Some(ty) = call_arguments.iter().find_map(|argument| {
+                                        let arg = argument.kind();
+                                        let arg_types = argument.source_types();
+                                        if let Argument::Keyword(arg_name) = arg
+                                            && *arg_name == **param
+                                        {
+                                            arg_types.get_default()
+                                        } else {
+                                            None
+                                        }
+                                    }) && let Some(LiteralValueTypeKind::Bool(value)) =
+                                        ty.as_literal_value_kind()
                                     {
                                         flags.set(*flag, value);
                                     }
@@ -3961,24 +3966,28 @@ impl<'db> CallableBinding<'db> {
         // This heuristic tries to detect if there's any need to perform argument type expansion or
         // not by checking whether there are any non-expandable argument type that cannot be
         // assigned to any of the overloads.
-        for (argument_index, (argument, argument_types)) in call_arguments.iter().enumerate() {
+        for (argument_index, call_argument) in call_arguments.iter().enumerate() {
+            let argument = call_argument.kind();
             // TODO: Remove `Keywords` once `**kwargs` support is added
             if matches!(argument, Argument::Synthetic | Argument::Keywords) {
                 continue;
             }
             // TODO: For types inferred multiple times with distinct type context, we currently only
             // expand the default inference.
-            let Some(argument_type) = argument_types.get_default() else {
+            let Some(argument_type) = call_argument.source_type() else {
                 continue;
             };
-            if argument_expansions.argument_types(argument_index).is_some() {
+            if argument_expansions
+                .argument_alternatives(argument_index)
+                .is_some()
+            {
                 continue;
             }
             let is_argument_assignable_to_any_overload = self.overloads.iter().any(|overload| {
                 let matched_parameters = &overload.argument_matches[argument_index].parameters;
                 if matched_parameters.is_empty() {
-                    return matches!(argument, Argument::Variadic)
-                        && argument_type.iterate(db, env).len().minimum() == 0;
+                    return matches!(call_argument, CallArgument::Variadic(variadic)
+                        if variadic.sequence(db, env).is_some_and(|sequence| sequence.len().minimum() == 0));
                 }
 
                 // A starred argument contributes its individual element types, not the type of
@@ -3994,9 +4003,9 @@ impl<'db> CallableBinding<'db> {
                     let parameter_type = matched_parameter
                         .expected_type
                         .unwrap_or_else(|| parameter.annotated_type());
-                    let argument_type = matched_parameter
-                        .argument_type
-                        .unwrap_or_else(|| argument_types.get_for_declared_type(parameter_type));
+                    let argument_type = call_argument
+                        .matched_type(parameter_type, matched_parameter.argument_type)
+                        .unwrap_or(Type::unknown());
 
                     argument_type
                         .when_assignable_to(
@@ -4262,8 +4271,8 @@ impl<'db> CallableBinding<'db> {
                 let slots = overload
                     .argument_matches
                     .iter()
-                    .zip(arguments.iter_types())
-                    .flat_map(move |(matched_argument, argument_types)| {
+                    .zip(arguments.iter())
+                    .flat_map(move |(matched_argument, argument)| {
                         matched_argument.iter().map(move |matched_parameter| {
                             // TODO: For an unannotated `self` / `cls` parameter, the type should be
                             // `typing.Self` / `type[typing.Self]`
@@ -4278,7 +4287,9 @@ impl<'db> CallableBinding<'db> {
                                 parameter: parameter_type,
                                 // Argument types are cached by the raw parameter type, even when
                                 // they were inferred using a return-context specialization.
-                                argument: argument_types.get_for_declared_type(raw_parameter_type),
+                                argument: argument
+                                    .source_types()
+                                    .get_for_declared_type(raw_parameter_type),
                                 variadic_argument: matched_parameter.argument_type,
                             }
                         })
@@ -4957,7 +4968,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     ) -> Self {
         let explicit_keyword_parameters: FxHashSet<usize> = arguments
             .iter()
-            .filter_map(|(argument, _)| {
+            .filter_map(|argument| {
+                let argument = argument.kind();
                 if let Argument::Keyword(name) = argument {
                     parameters.keyword_by_name(name).map(|(idx, _)| idx)
                 } else {
@@ -4985,7 +4997,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         self.arguments
             .iter()
             .skip(argument_index + 1)
-            .any(|(argument, _)| {
+            .any(|argument| {
+                let argument = argument.kind();
                 matches!(
                     argument,
                     Argument::Synthetic | Argument::Positional | Argument::Variadic
@@ -5024,7 +5037,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             && !matches!(
                 argument,
                 Argument::Keyword(name)
-                    if self.arguments.iter().take(argument_index).any(|(previous, _)| {
+                    if self.arguments.iter().take(argument_index).any(|previous| {
+                        let previous = previous.kind();
                         matches!(previous, Argument::Keyword(previous_name) if previous_name == name)
                     })
             )
@@ -5136,143 +5150,20 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         argument_index: usize,
-        argument: Argument<'a>,
-        argument_type: Option<Type<'db>>,
+        variadic: &VariadicArgument<'db>,
     ) -> Result<(), ()> {
-        enum VariadicArgumentType<'db> {
-            ParamSpec(Type<'db>),
-            /// A union type where each element has been individually iterated into a tuple spec.
-            /// We pre-compute the per-position union types, length bounds, and variable element
-            /// so the rest of the matching logic can handle unions without special-casing.
-            Union {
-                argument_types: Vec<Type<'db>>,
-                length: TupleLength,
-                variable_element: Option<Type<'db>>,
-            },
-            Other {
-                argument_types: Vec<Type<'db>>,
-                length: TupleLength,
-                variable_element: Option<Type<'db>>,
-            },
-            None,
-        }
-
-        let variadic_type = match argument_type {
-            Some(argument_type) => match argument_type.as_paramspec_typevar(db) {
-                // If the argument is a `ParamSpec` `P.args`, we should not call `iterate` on it.
-                // This would lose the `ParamSpec` information and just flatten to `object` from
-                // the upper bound. What we want is to always use the `P.args` type to perform type
-                // checking against the parameter type. This will allow us to error when `*args:
-                // P.args` is matched against, for example, `n: int` and correctly type check when
-                // `*args: P.args` is matched against `*args: P.args` (another `ParamSpec`).
-                Some(paramspec) => VariadicArgumentType::ParamSpec(paramspec),
-                None => match argument_type {
-                    // `Type::iterate` unions tuple specs in a way that can invent additional
-                    // arities. Iterate each union element individually and compute per-position
-                    // union types, length bounds, and variable element so that the rest of the
-                    // matching logic handles unions correctly.
-                    //
-                    // The per-position union loses the correlation between tuple length and the
-                    // later element types. `match_variadic` accounts for that by treating
-                    // positions beyond the guaranteed minimum as only conditionally present: they
-                    // can satisfy optional parameters, but any required positional parameter
-                    // beyond the minimum still causes the match to fail provisionally. This is
-                    // only sound when no later argument can still contribute more positional
-                    // slots; otherwise, a later positional argument could shift left differently
-                    // for different union members.
-                    Type::Union(union)
-                        if self.parameters.variadic().is_none()
-                            && !self.has_later_positional_input(argument_index) =>
-                    {
-                        let tuple_specs: Vec<_> = union
-                            .elements(db)
-                            .iter()
-                            .map(|ty| ty.iterate(db, env))
-                            .collect();
-
-                        let min_len = tuple_specs
-                            .iter()
-                            .map(|s| s.len().minimum())
-                            .min()
-                            .unwrap_or(0);
-
-                        let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
-                        let max_elements = tuple_specs
-                            .iter()
-                            .map(|s| s.iter_element_types(db).count())
-                            .max()
-                            .unwrap_or(0);
-
-                        let variable_element = {
-                            let var_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.variable_element_type(db))
-                                .collect();
-                            if var_types.is_empty() {
-                                None
-                            } else {
-                                Some(UnionType::from_elements_leave_aliases(db, env, var_types))
-                            }
-                        };
-
-                        let max_elements = i32::try_from(max_elements).unwrap_or(i32::MAX);
-                        let mut argument_types_vec = Vec::new();
-                        for index in 0..max_elements {
-                            let positional_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.py_index(db, env, index).ok())
-                                .collect();
-                            if positional_types.is_empty() {
-                                break;
-                            }
-                            argument_types_vec.push(UnionType::from_elements_leave_aliases(
-                                db,
-                                env,
-                                positional_types,
-                            ));
-                        }
-
-                        let length = if any_variable || argument_types_vec.len() > min_len {
-                            TupleLength::Variable(min_len, 0)
-                        } else {
-                            TupleLength::Fixed(min_len)
-                        };
-
-                        VariadicArgumentType::Union {
-                            argument_types: argument_types_vec,
-                            length,
-                            variable_element,
-                        }
-                    }
-                    _ => {
-                        let tuple = argument_type.iterate(db, env);
-                        VariadicArgumentType::Other {
-                            argument_types: tuple.iter_element_types(db).collect(),
-                            length: tuple.len(),
-                            variable_element: tuple.variable_element_type(db),
-                        }
-                    }
-                },
-            },
-            None => VariadicArgumentType::None,
-        };
-
-        let (argument_types, length, variable_element) = match &variadic_type {
-            VariadicArgumentType::ParamSpec(paramspec) => {
-                ([].as_slice(), TupleLength::unknown(), Some(*paramspec))
-            }
-            VariadicArgumentType::Union {
-                argument_types,
-                length,
-                variable_element,
-            } => (argument_types.as_slice(), *length, *variable_element),
-            VariadicArgumentType::Other {
-                argument_types,
-                length,
-                variable_element,
-            } => (argument_types.as_slice(), *length, *variable_element),
-            VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
-        };
+        let argument = Argument::Variadic;
+        // Correlations between tuple-union lengths and element types are only safe to
+        // combine when later arguments cannot shift their positional slots.
+        let unpacked = variadic.matching(
+            db,
+            env,
+            self.parameters.variadic().is_none()
+                && !self.has_later_positional_input(argument_index),
+        );
+        let argument_types = unpacked.types;
+        let length = unpacked.length;
+        let variable_element = unpacked.variable_element;
 
         let mut argument_types = argument_types.iter().copied();
         // This can be true either if we have a true variable-length tuple (in which case
@@ -5378,11 +5269,9 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         argument_index: usize,
-        argument_type: Option<Type<'db>>,
+        keywords: &KeywordArgument<'db>,
     ) {
-        if let Some(unpacked) =
-            argument_type.and_then(|ty| extract_unpacked_typed_dict_from_value_type(db, env, ty))
-        {
+        if let Some(unpacked) = keywords.unpack(db, env) {
             let openness = unpacked.openness;
 
             // Special case TypedDict-shaped values because we know which keys are present.
@@ -5413,14 +5302,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     .keyword_name()
                     .map(Name::as_str);
 
-                let value_type = match argument_type {
-                    Some(argument_type) => argument_type
-                        .as_paramspec_typevar(db)
-                        .or_else(|| argument_type.getitem_dunder_call(db, env, parameter_name))
-                        .unwrap_or(Type::unknown()),
-
-                    None => Type::unknown(),
-                };
+                let value_type = keywords.value_type(db, env, parameter_name);
 
                 self.assign_argument(
                     argument_index,
@@ -5818,13 +5700,14 @@ fn enumerate_argument_types<'a, 'db>(
         usize,
         Option<usize>,
         Argument<'a>,
-        &'a CallArgumentTypes<'db>,
+        &'a CallArgument<'a, 'db>,
     ),
 > + 'a {
     let mut iter = arguments.iter().enumerate();
     let mut num_synthetic_args = 0;
     std::iter::from_fn(move || {
-        let (argument_index, (argument, argument_types)) = iter.next()?;
+        let (argument_index, call_argument) = iter.next()?;
+        let argument = call_argument.kind();
         let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
             // If we are erroring on a synthetic argument, we'll just emit the
             // diagnostic on the entire Call node, since there's no argument node for
@@ -5840,7 +5723,7 @@ fn enumerate_argument_types<'a, 'db>(
             argument_index,
             adjusted_argument_index,
             argument,
-            argument_types,
+            call_argument,
         ))
     })
 }
@@ -5905,9 +5788,8 @@ impl<'a, 'db> CallInference<'a, 'db> {
                         let declared_type = matched_parameter
                             .expected_type
                             .unwrap_or_else(|| parameter.annotated_type());
-                        let argument_type = matched_parameter
-                            .argument_type
-                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
+                        let argument_type = argument_types
+                            .matched_type(declared_type, matched_parameter.argument_type)?;
 
                         Some(ArgumentRelation::new(
                             argument_index,
@@ -5985,7 +5867,9 @@ impl<'db> ArgumentTypeChecker<'_, 'db> {
                     .find_map(|matched_parameter| {
                         let declared_type =
                             self.signature.parameters()[matched_parameter.index].annotated_type();
-                        let argument_type = argument_types.get_for_declared_type(declared_type);
+                        let argument_type = argument_types
+                            .source_types()
+                            .get_for_declared_type(declared_type);
                         let paramspec_prefix_len = |candidate: Type<'db>| {
                             candidate
                                 .try_upcast_to_callable(db, env)?
@@ -6644,7 +6528,7 @@ impl<'db> CallInference<'_, 'db> {
         let mut actual = TupleSpecBuilder::with_capacity(self.arguments.len());
         // Source indices of the first and last arguments matched to the variadic parameter.
         let mut argument_indices: Option<(usize, usize)> = None;
-        for (argument_index, adjusted_argument_index, argument, argument_types) in
+        for (argument_index, adjusted_argument_index, _, argument_types) in
             enumerate_argument_types(self.arguments)
         {
             let matches = &self.argument_matches[argument_index];
@@ -6660,9 +6544,8 @@ impl<'db> CallInference<'_, 'db> {
                     Some((argument_indices.map_or(index, |(first, _)| first), index));
             }
 
-            if matches!(argument, Argument::Variadic) {
-                let argument_type = argument_types.get_default()?;
-                let mut argument_tuple = argument_type.iterate(db, self.env);
+            if let CallArgument::Variadic(variadic) = argument_types {
+                let mut argument_tuple = variadic.sequence(db, self.env)?;
                 let consumed_prefix = matches
                     .parameters
                     .iter()
@@ -6687,9 +6570,9 @@ impl<'db> CallInference<'_, 'db> {
                     .expected_type
                     .unwrap_or_else(|| parameter.annotated_type());
                 actual.push(
-                    matched
-                        .argument_type
-                        .unwrap_or_else(|| argument_types.get_for_declared_type(declared_type)),
+                    argument_types
+                        .matched_type(declared_type, matched.argument_type)
+                        .unwrap_or(Type::unknown()),
                 );
             }
         }
@@ -7082,20 +6965,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 continue;
             }
 
-            match argument {
-                Argument::Variadic => self.check_variadic_argument_type(
+            match argument_types {
+                CallArgument::Variadic(_) => self.check_variadic_argument_type(
                     constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
                     paramspec_component_start,
                 ),
-                Argument::Keywords => self.check_keyword_variadic_argument_type(
+                CallArgument::Keywords(keywords) => self.check_keyword_variadic_argument_type(
                     constraints,
                     argument_index,
                     adjusted_argument_index,
-                    // Splatted arguments are inferred without type context.
-                    argument_types.get_default().unwrap_or(Type::unknown()),
+                    keywords,
                     paramspec_component_start,
                 ),
                 _ => {
@@ -7107,8 +6989,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         let parameter = &self.signature.parameters()[parameter_index];
-                        let argument_type =
-                            argument_types.get_for_declared_type(parameter.annotated_type());
+                        let argument_type = argument_types
+                            .matched_type(parameter.annotated_type(), None)
+                            .unwrap_or(Type::unknown());
                         let relation = ArgumentRelation::new(
                             argument_index,
                             adjusted_argument_index,
@@ -7306,11 +7189,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
-        argument_type: Type<'db>,
+        keywords: &KeywordArgument<'db>,
         paramspec_component_start: Option<usize>,
     ) {
         let db = self.db;
-        if extract_unpacked_typed_dict_from_value_type(db, self.env, argument_type).is_some() {
+        if keywords.unpack(db, self.env).is_some() {
             self.check_variadic_argument_type(
                 constraints,
                 argument_index,
@@ -7321,6 +7204,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return;
         }
 
+        let argument_type = keywords.source_type().unwrap_or(Type::unknown());
         let value_type_paramspec = if let Some(paramspec) = argument_type.as_paramspec_typevar(db) {
             Some(paramspec)
         } else {
@@ -7357,9 +7241,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .keyword_name()
                     .map(Name::as_str);
 
-                argument_type
-                    .getitem_dunder_call(db, self.env, parameter_name)
-                    .unwrap_or(Type::unknown())
+                keywords.value_type(db, self.env, parameter_name)
             };
 
             let relation = ArgumentRelation::new(
@@ -7948,11 +7830,9 @@ impl<'db> Binding<'db> {
             || arguments_types
                 .iter()
                 .take(argument_index)
-                .any(|(argument, types)| {
-                    matches!(argument, Argument::Variadic)
-                        && types
-                            .get_default()
-                            .is_none_or(|ty| ty.iterate(db, env).len().maximum().is_none())
+                .any(|argument| {
+                    matches!(argument, CallArgument::Variadic(variadic)
+                        if variadic.sequence(db, env).is_none_or(|sequence| sequence.len().maximum().is_none()))
                 })
         {
             return None;
@@ -8236,37 +8116,24 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
-        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+        for (argument_index, argument) in arguments.iter().enumerate() {
             match argument {
-                Argument::Positional | Argument::Synthetic => {
-                    let _ = matcher.match_positional(argument_index, argument, None, false);
+                CallArgument::Positional(_) | CallArgument::Synthetic(_) => {
+                    let _ = matcher.match_positional(argument_index, argument.kind(), None, false);
                 }
-                Argument::Keyword(name) => {
-                    let _ = matcher.match_keyword(argument_index, argument, None, name);
+                CallArgument::Keyword { name, .. } => {
+                    let _ = matcher.match_keyword(argument_index, argument.kind(), None, name);
                 }
-                Argument::Variadic => {
-                    let _ = matcher.match_variadic(
-                        db,
-                        env,
-                        argument_index,
-                        argument,
-                        // Splatted arguments are inferred without type context.
-                        argument_types.get_default(),
-                    );
+                CallArgument::Variadic(variadic) => {
+                    let _ = matcher.match_variadic(db, env, argument_index, variadic);
                 }
-                Argument::Keywords => {
-                    keywords_arguments.push((argument_index, argument_types));
+                CallArgument::Keywords(keywords) => {
+                    keywords_arguments.push((argument_index, keywords));
                 }
             }
         }
         for (keywords_index, keywords_type) in keywords_arguments {
-            matcher.match_keyword_variadic(
-                db,
-                env,
-                keywords_index,
-                // Splatted arguments are inferred without type context.
-                keywords_type.get_default(),
-            );
+            matcher.match_keyword_variadic(db, env, keywords_index, keywords_type);
         }
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
@@ -8343,7 +8210,8 @@ impl<'db> Binding<'db> {
     ) {
         let mut num_synthetic_args = 0;
 
-        for (argument_index, (argument, argument_types)) in arguments.iter().enumerate() {
+        for (argument_index, call_argument) in arguments.iter().enumerate() {
+            let argument = call_argument.kind();
             let adjusted_argument_index = if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
                 None
@@ -8351,11 +8219,11 @@ impl<'db> Binding<'db> {
                 Some(argument_index - num_synthetic_args)
             };
 
-            if !matches!(argument, Argument::Keywords) {
+            let CallArgument::Keywords(keywords) = call_argument else {
                 continue;
-            }
+            };
 
-            let argument_type = argument_types.get_default().unwrap_or(Type::unknown());
+            let argument_type = keywords.source_type().unwrap_or(Type::unknown());
             if let KeywordUnpackKeyTypeCheck::Invalid(provided_ty) =
                 validate_keyword_unpack_key_type(
                     db,
@@ -8460,10 +8328,8 @@ impl<'db> Binding<'db> {
         let parameters = self.signature.parameters().as_slice();
         let mut partial_application = PartialApplication::new(parameters.len());
 
-        for ((argument, argument_ty), argument_matches) in
-            arguments.iter().zip(&self.argument_matches)
-        {
-            match argument {
+        for (argument, argument_matches) in arguments.iter().zip(&self.argument_matches) {
+            match argument.kind() {
                 Argument::Positional | Argument::Synthetic | Argument::Variadic => {
                     for matched_parameter in argument_matches.iter() {
                         let parameter_index = matched_parameter.index;
@@ -8495,9 +8361,9 @@ impl<'db> Binding<'db> {
                         partial_application.bind_by_keyword(
                             parameter_index,
                             (parameter.annotated_type() != Type::Never).then(|| {
-                                matched_parameter.argument_type.unwrap_or_else(|| {
-                                    argument_ty.get_default().unwrap_or_else(Type::unknown)
-                                })
+                                argument
+                                    .matched_type(None, matched_parameter.argument_type)
+                                    .unwrap_or_else(Type::unknown)
                             }),
                         );
                     }
@@ -8579,11 +8445,11 @@ impl<'db> Binding<'db> {
                     .iter()
                     .any(|parameter| parameter.index == parameter_index)
             })
-            .map(move |((argument, argument_types), _)| {
+            .map(move |(argument, _)| {
                 let declared_type = self.signature.parameters()[parameter_index].annotated_type();
                 (
-                    argument,
-                    argument_types.get_for_declared_type(declared_type),
+                    argument.kind(),
+                    argument.source_types().get_for_declared_type(declared_type),
                 )
             })
     }

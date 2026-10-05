@@ -1956,6 +1956,29 @@ def _(arg: list[Any]):
     reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
+### Variable-length arguments matched to different arities
+
+A variable-length argument can match different numbers of parameters in each overload. Here, the
+later keyword argument does not cause an otherwise viable overload to be discarded.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: int, y: int, /, *, flag: str) -> int: ...
+@overload
+def f(x: int, /, *, flag: str) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(args: tuple[int, ...]):
+    reveal_type(f(*args, flag=""))  # revealed: Unknown
+```
+
 ### Variadic argument with generics
 
 `overloaded.pyi`:
