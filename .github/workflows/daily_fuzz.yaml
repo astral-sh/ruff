@@ -105,27 +105,32 @@ jobs:
         with:
           name: daily-fuzz-issue
           path: ${{ runner.temp }}/fuzz-report
-      - name: Create an issue for parser bugs
-        id: create_issue
-        if: ${{ steps.download_report.outcome == 'success' }}
+      - name: Create an issue for the failed fuzz run
+        if: ${{ !cancelled() }}
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh issue create \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Daily parser fuzz failed on $(date -u '+%a %b %d %Y')" \
-            --label bug --label parser --label fuzzer \
-            --body-file "$RUNNER_TEMP/fuzz-report/fuzz-issue.md"
-      - name: Create a fallback issue
-        if: ${{ !cancelled() && steps.create_issue.outcome != 'success' }}
+          REPORT_DOWNLOAD_OUTCOME: ${{ steps.download_report.outcome }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.issues.create({
+            const issue = {
               owner: "astral-sh",
               repo: "ruff",
               title: `Daily parser fuzz failed on ${new Date().toDateString()}`,
-              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               labels: ["bug", "parser", "fuzzer"],
-            })
+            };
+            const fallbackBody = "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}";
+            const createIssue = (body) => github.rest.issues.create({ ...issue, body });
+
+            if (process.env.REPORT_DOWNLOAD_OUTCOME === "success") {
+              try {
+                const report = require("node:fs").readFileSync(`${process.env.RUNNER_TEMP}/fuzz-report/fuzz-issue.md`, "utf8");
+                await createIssue(report);
+                return;
+              } catch (error) {
+                core.error(error);
+                await createIssue(fallbackBody);
+                throw error;
+              }
+            }
+            await createIssue(fallbackBody);
