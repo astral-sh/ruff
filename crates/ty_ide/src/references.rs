@@ -252,7 +252,9 @@ fn references_for_keyword_arguments_in_file(
     );
 
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Reference and rename searches can scan the whole project, so release closed files' ASTs
+    // as we go.
+    let module = parsed.load_clear_on_drop(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
 
@@ -305,7 +307,9 @@ fn references_for_file(
     mode: ReferencesMode,
 ) -> Vec<ReferenceTarget> {
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Reference and rename searches can scan the whole project, so release closed files' ASTs
+    // as we go.
+    let module = parsed.load_clear_on_drop(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
 
