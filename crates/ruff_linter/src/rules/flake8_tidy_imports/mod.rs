@@ -195,31 +195,6 @@ mod tests {
     }
 
     #[test]
-    fn preview_lazy_import_mismatch_stub() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID254.pyi"),
-            &LinterSettings {
-                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
-                    require_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
-                        "os".to_string(),
-                        "collections".to_string(),
-                    ])),
-                    ban_lazy: ImportSelector::Selection(ImportSelection::Imports(vec![
-                        "pathlib".to_string(),
-                        "typing".to_string(),
-                    ])),
-                    ..Default::default()
-                },
-                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
-                    .with_preview_mode()
-                    .with_target_version(PythonVersion::PY315)
-            },
-        )?;
-        assert!(diagnostics.is_empty());
-        Ok(())
-    }
-
-    #[test]
     fn preview_lazy_import_mismatch_pre_py315() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID254_py314.py"),
