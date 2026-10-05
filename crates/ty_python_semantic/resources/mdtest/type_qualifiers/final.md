@@ -60,8 +60,10 @@ symbol cannot be modified:
 from typing import Final
 
 FINAL_A: Final = 1
+FINAL_B: Final = int("1")
 
 reveal_type(FINAL_A)  # revealed: Literal[1]
+reveal_type(FINAL_B)  # revealed: int
 
 def nonlocal_uses():
     reveal_type(FINAL_A)  # revealed: Literal[1]

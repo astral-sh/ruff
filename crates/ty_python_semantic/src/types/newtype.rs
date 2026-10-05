@@ -6,7 +6,7 @@ use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visi
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::Definition;
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to
@@ -71,10 +71,11 @@ impl<'db> NewType<'db> {
         let env = ProgramEnvironment::from_file(program_file);
         let object_fallback = NewTypeBase::ClassType(ClassType::object(db, &env));
         let module = parsed_module(db, python_file).load(db);
-        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-            return object_fallback;
-        };
-        let Some(call_expr) = assignment.value(&module).as_call_expr() else {
+        let Some(call_expr) = definition
+            .kind(db)
+            .value(&module)
+            .and_then(ast::Expr::as_call_expr)
+        else {
             return object_fallback;
         };
         let Some(second_arg) = call_expr.arguments.args.get(1) else {
