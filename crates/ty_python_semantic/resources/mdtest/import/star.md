@@ -983,6 +983,8 @@ reveal_type(excluded)  # revealed: bool
 
 ### An `__all__` assignment followed by a slice assignment
 
+Slice assignments fall back to treating all public names as potential exports.
+
 `source.py`:
 
 ```py
@@ -1004,6 +1006,7 @@ __all__[:] = ["second"]
 ```py
 from exporter import *
 
+reveal_type(first)  # revealed: int
 reveal_type(second)  # revealed: str
 ```
 

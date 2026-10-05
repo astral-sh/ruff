@@ -30,7 +30,7 @@ use ruff_python_ast::{
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
-use crate::dunder_all::static_dunder_all;
+use crate::static_dunder_all::static_dunder_all;
 use crate::{Db, ProgramFile};
 
 #[salsa::tracked(

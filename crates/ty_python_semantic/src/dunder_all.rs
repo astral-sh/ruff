@@ -7,7 +7,7 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
-use ty_python_core::dunder_all::static_dunder_all;
+use ty_python_core::static_dunder_all::static_dunder_all;
 use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
