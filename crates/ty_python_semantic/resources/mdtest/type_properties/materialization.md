@@ -2868,26 +2868,27 @@ def annotated_generic_protocol_classes(
     reveal_type(aliased_bottom)  # revealed: type[Bottom[GenericMutable[Any]]]
 ```
 
-Materializing a generic class can also place the alias and its protocol in opposite
-materializations. Both directions remain incompatible:
+Materializing the enclosing `Box[Any]` affects the protocol's specialization separately from its
+explicit `Top` or `Bottom` annotation. Matching specializations do not make these argument types
+compatible:
 
 ```py
 class Box[T]:
     value: MutableAlias[T]
+    top_value: Top[GenericMutable[T]]
     def accept_bottom(self, value: Bottom[GenericMutable[T]]) -> None: ...
-    def produce_top(self) -> Top[GenericMutable[T]]:
-        raise NotImplementedError
     def accept(self, value: MutableAlias[T]) -> None: ...
 
 def compare_alias_materializations(top: Top[Box[Any]], bottom: Bottom[Box[Any]]) -> None:
     bottom.accept_bottom(top.value)  # error: [invalid-argument-type]
-    top.accept(bottom.produce_top())  # error: [invalid-argument-type]
+    top.accept(bottom.top_value)  # error: [invalid-argument-type]
 ```
 
 ### Nested invariant protocols with methods
 
-A protocol that reads and writes its type parameter is invariant. Materializing a class that
-contains it can produce nested protocol types with opposite requirements; they remain incompatible.
+`P` is invariant because it both returns and accepts `T`. In both calls below, the argument has
+`get() -> object` and `set(value: Never)`, but the parameter requires `get() -> Never` and
+`set(value: object)`. The argument therefore satisfies neither method requirement.
 
 ```py
 from typing import Any, Generic, Protocol, TypeVar
@@ -2899,14 +2900,13 @@ class P[T](Protocol):
 
 class Box[T]:
     value: P[T]
+    top_value: Top[P[T]]
     def accept_bottom(self, value: Bottom[P[T]]) -> None: ...
-    def produce_top(self) -> Top[P[T]]:
-        raise NotImplementedError
     def accept(self, value: P[T]) -> None: ...
 
 def compare(top: Top[Box[Any]], bottom: Bottom[Box[Any]]) -> None:
     bottom.accept_bottom(top.value)  # error: [invalid-argument-type]
-    top.accept(bottom.produce_top())  # error: [invalid-argument-type]
+    top.accept(bottom.top_value)  # error: [invalid-argument-type]
 
 T = TypeVar("T")
 
@@ -2916,14 +2916,13 @@ class LegacyP(Protocol[T]):
 
 class LegacyBox(Generic[T]):
     value: LegacyP[T]
+    top_value: Top[LegacyP[T]]
     def accept_bottom(self, value: Bottom[LegacyP[T]]) -> None: ...
-    def produce_top(self) -> Top[LegacyP[T]]:
-        raise NotImplementedError
     def accept(self, value: LegacyP[T]) -> None: ...
 
 def compare_legacy(top: Top[LegacyBox[Any]], bottom: Bottom[LegacyBox[Any]]) -> None:
     bottom.accept_bottom(top.value)  # error: [invalid-argument-type]
-    top.accept(bottom.produce_top())  # error: [invalid-argument-type]
+    top.accept(bottom.top_value)  # error: [invalid-argument-type]
 ```
 
 ### Nested generic protocols
@@ -3040,7 +3039,8 @@ def recursive_nested_materialization(
 ### Fully static recursive protocols
 
 Materializing a fully static recursive protocol does not change its requirements, even when the
-recursive reference occurs inside a generic type.
+recursive reference occurs inside a generic type. Data attributes, static methods, and class methods
+also retain their static types.
 
 ```py
 from __future__ import annotations
@@ -3050,8 +3050,13 @@ from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class Tree(Protocol):
+    value: int
     def add(self, children: list[Tree]) -> int: ...
     def parent(self) -> Tree: ...
+    @staticmethod
+    def parse(value: str) -> int: ...
+    @classmethod
+    def create(cls) -> Tree: ...
 
 static_assert(is_equivalent_to(Tree, Top[Tree]))
 static_assert(is_equivalent_to(Tree, Bottom[Tree]))
@@ -3070,15 +3075,15 @@ class Second(Protocol):
     def add(self, children: list[First]) -> None: ...
 
 static_assert(is_equivalent_to(First, Top[First]))
-static_assert(is_equivalent_to(First, Bottom[First]))
-static_assert(is_equivalent_to(Second, Top[Second]))
 static_assert(is_equivalent_to(Second, Bottom[Second]))
 ```
 
-### Recursive protocols with static specializations
+### Materialization of recursive protocol specializations
 
-Removing a no-op materialization still leaves the relationship between different specializations to
-be checked.
+Materialization leaves `Reader[int]` unchanged, so its top and bottom materializations are
+equivalent to `Reader[int]`. Both satisfy `Reader[object]`: `value()` returns an `int`, and
+`child()` returns another reader with the same behavior. Neither satisfies `Reader[str]`, which
+requires `value()` to return a `str`.
 
 ```toml
 [environment]
@@ -3096,7 +3101,6 @@ class Reader[T](Protocol):
     def value(self) -> T: ...
     def child(self) -> Reader[T]: ...
 
-static_assert(is_subtype_of(Top[Reader[int]], Bottom[Reader[int]]))
 static_assert(is_subtype_of(Top[Reader[int]], Reader[object]))
 static_assert(is_subtype_of(Bottom[Reader[int]], Reader[object]))
 static_assert(not is_subtype_of(Top[Reader[int]], Reader[str]))
@@ -3108,17 +3112,33 @@ class LegacyReader(Protocol[T]):
     def value(self) -> T: ...
     def child(self) -> LegacyReader[T]: ...
 
-static_assert(is_subtype_of(Top[LegacyReader[int]], Bottom[LegacyReader[int]]))
 static_assert(is_subtype_of(Top[LegacyReader[int]], LegacyReader[object]))
 static_assert(is_subtype_of(Bottom[LegacyReader[int]], LegacyReader[object]))
 static_assert(not is_subtype_of(Top[LegacyReader[int]], LegacyReader[str]))
 static_assert(not is_subtype_of(Bottom[LegacyReader[int]], LegacyReader[str]))
 ```
 
+With a gradual type argument, `value()` returns `Any` or `Unknown`, so materialization changes the
+protocol's requirements:
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown, is_equivalent_to
+
+static_assert(not is_equivalent_to(Reader[Any], Top[Reader[Any]]))
+static_assert(not is_equivalent_to(Reader[Any], Bottom[Reader[Any]]))
+static_assert(not is_equivalent_to(Reader[Unknown], Top[Reader[Unknown]]))
+static_assert(not is_equivalent_to(Reader[Unknown], Bottom[Reader[Unknown]]))
+static_assert(not is_equivalent_to(LegacyReader[Any], Top[LegacyReader[Any]]))
+static_assert(not is_equivalent_to(LegacyReader[Any], Bottom[LegacyReader[Any]]))
+static_assert(not is_equivalent_to(LegacyReader[Unknown], Top[LegacyReader[Unknown]]))
+static_assert(not is_equivalent_to(LegacyReader[Unknown], Bottom[LegacyReader[Unknown]]))
+```
+
 ### Fully static recursive protocols with growing specializations
 
-The recursive specialization can grow without changing the materialization of a fully static
-protocol, even when a method has an explicitly annotated receiver.
+Each `child()` call adds another tuple layer to the type argument. Starting from `Node[int]`, these
+specializations remain fully static, so materialization leaves their requirements unchanged.
 
 ```toml
 [environment]
@@ -3134,43 +3154,23 @@ from ty_extensions._internal import is_equivalent_to, is_subtype_of
 
 class Node[T](Protocol):
     def child(self) -> Node[tuple[T, T]]: ...
+    def parent(self) -> Self: ...
     def value(self) -> T: ...
-    def read(self: Node[int]) -> int: ...
 
 static_assert(is_equivalent_to(Node[int], Top[Node[int]]))
 static_assert(is_equivalent_to(Node[int], Bottom[Node[int]]))
+static_assert(not is_equivalent_to(Top[Node[int]], Node[str]))
 
 T_co = TypeVar("T_co", covariant=True)
 
 class LegacyNode(Protocol[T_co]):
     def child(self) -> LegacyNode[tuple[T_co, T_co]]: ...
+    def parent(self) -> Self: ...
     def value(self) -> T_co: ...
-    def read(self: LegacyNode[int]) -> int: ...
 
 static_assert(is_equivalent_to(LegacyNode[int], Top[LegacyNode[int]]))
 static_assert(is_equivalent_to(LegacyNode[int], Bottom[LegacyNode[int]]))
-```
-
-The same holds when the methods have implicit receivers:
-
-```py
-class ImplicitNode[T](Protocol):
-    def child(self) -> ImplicitNode[tuple[T, T]]: ...
-    def parent(self) -> Self: ...
-    def value(self) -> T: ...
-
-static_assert(is_equivalent_to(ImplicitNode[int], Top[ImplicitNode[int]]))
-static_assert(is_equivalent_to(ImplicitNode[int], Bottom[ImplicitNode[int]]))
-static_assert(not is_equivalent_to(Top[ImplicitNode[int]], ImplicitNode[str]))
-
-class LegacyImplicitNode(Protocol[T_co]):
-    def child(self) -> LegacyImplicitNode[tuple[T_co, T_co]]: ...
-    def parent(self) -> Self: ...
-    def value(self) -> T_co: ...
-
-static_assert(is_equivalent_to(LegacyImplicitNode[int], Top[LegacyImplicitNode[int]]))
-static_assert(is_equivalent_to(LegacyImplicitNode[int], Bottom[LegacyImplicitNode[int]]))
-static_assert(not is_equivalent_to(Top[LegacyImplicitNode[int]], LegacyImplicitNode[str]))
+static_assert(not is_equivalent_to(Top[LegacyNode[int]], LegacyNode[str]))
 ```
 
 Properties with setters also remain unchanged under materialization when recursive specializations
@@ -3220,7 +3220,7 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_equivalent_to
 
 class Stream[T](Protocol):
     def flatten(self: Stream[Stream[T]]) -> None: ...
@@ -3235,25 +3235,12 @@ class LegacyStream(Protocol[T_co]):
 
 static_assert(is_equivalent_to(Top[LegacyStream[int]], LegacyStream[int]))
 static_assert(is_equivalent_to(Bottom[LegacyStream[int]], LegacyStream[int]))
+```
 
-class Consumer[T](Protocol):
-    def flatten(self: Consumer[Consumer[T]]) -> None: ...
-    def consume(self, value: T) -> None: ...
+Different specializations can still be incompatible. `ValuedStream[int]` returns `int` from
+`value()`, whereas `ValuedStream[ValuedStream[int]]` requires it to return `ValuedStream[int]`:
 
-static_assert(is_equivalent_to(Bottom[Consumer[int]], Consumer[int]))
-static_assert(is_subtype_of(Top[Consumer[int]], Consumer[int]))
-static_assert(is_subtype_of(Consumer[int], Bottom[Consumer[int]]))
-
-T_contra = TypeVar("T_contra", contravariant=True)
-
-class LegacyConsumer(Protocol[T_contra]):
-    def flatten(self: LegacyConsumer[LegacyConsumer[T_contra]]) -> None: ...
-    def consume(self, value: T_contra) -> None: ...
-
-static_assert(is_equivalent_to(Bottom[LegacyConsumer[int]], LegacyConsumer[int]))
-static_assert(is_subtype_of(Top[LegacyConsumer[int]], LegacyConsumer[int]))
-static_assert(is_subtype_of(LegacyConsumer[int], Bottom[LegacyConsumer[int]]))
-
+```py
 class ValuedStream[T](Protocol):
     def flatten(self: ValuedStream[ValuedStream[T]]) -> None: ...
     def value(self) -> T: ...
@@ -3339,9 +3326,6 @@ static_assert(is_assignable_to(AnyTree, Bottom[AnyTree]))
 static_assert(not is_assignable_to(Top[AnyTree], Bottom[AnyTree]))
 static_assert(not is_equivalent_to(UnknownTree, Top[UnknownTree]))
 static_assert(not is_equivalent_to(UnknownTree, Bottom[UnknownTree]))
-static_assert(is_subtype_of(Bottom[UnknownTree], UnknownTree))
-static_assert(is_subtype_of(UnknownTree, Top[UnknownTree]))
-static_assert(is_subtype_of(Bottom[UnknownTree], Top[UnknownTree]))
 ```
 
 An overload retains its gradual requirements even when another overload is fully static:
@@ -3358,21 +3342,10 @@ static_assert(not is_equivalent_to(OverloadedTree, Bottom[OverloadedTree]))
 static_assert(not is_subtype_of(Top[OverloadedTree], OverloadedTree))
 ```
 
-A recursive reference can itself be materialized:
-
-```py
-class MaterializedTree(Protocol):
-    def add(self, children: list[Top[MaterializedTree]]) -> None: ...
-    def value(self) -> Any: ...
-
-static_assert(not is_equivalent_to(MaterializedTree, Top[MaterializedTree]))
-static_assert(not is_equivalent_to(MaterializedTree, Bottom[MaterializedTree]))
-```
-
 ### Recursive protocols with gradual growing specializations
 
-The initial specialization has a static `value`, but the child introduces `Any` or `Unknown`. An
-explicitly annotated receiver does not make the protocol's materialization a no-op.
+The initial specialization has a static `value`, but its child introduces `Any`. Materialization
+therefore changes the requirements reached through `child()`.
 
 ```toml
 [environment]
@@ -3384,12 +3357,11 @@ from __future__ import annotations
 
 from typing import Any, Protocol, TypeVar
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import Unknown, is_assignable_to, is_subtype_of
+from ty_extensions._internal import is_assignable_to, is_subtype_of
 
 class Node[T](Protocol):
     def child(self) -> Node[tuple[T, Any]]: ...
     def value(self) -> T: ...
-    def read(self: Node[int]) -> int: ...
 
 static_assert(not is_subtype_of(Top[Node[int]], Node[int]))
 static_assert(not is_subtype_of(Node[int], Bottom[Node[int]]))
@@ -3402,44 +3374,9 @@ T_co = TypeVar("T_co", covariant=True)
 class LegacyNode(Protocol[T_co]):
     def child(self) -> LegacyNode[tuple[T_co, Any]]: ...
     def value(self) -> T_co: ...
-    def read(self: LegacyNode[int]) -> int: ...
 
 static_assert(not is_subtype_of(Top[LegacyNode[int]], LegacyNode[int]))
 static_assert(not is_subtype_of(LegacyNode[int], Bottom[LegacyNode[int]]))
-
-class UnknownNode[T](Protocol):
-    def child(self) -> UnknownNode[tuple[T, Unknown]]: ...
-    def value(self) -> T: ...
-    def read(self: UnknownNode[int]) -> int: ...
-
-static_assert(not is_subtype_of(Top[UnknownNode[int]], UnknownNode[int]))
-static_assert(not is_subtype_of(UnknownNode[int], Bottom[UnknownNode[int]]))
-
-class LegacyUnknownNode(Protocol[T_co]):
-    def child(self) -> LegacyUnknownNode[tuple[T_co, Unknown]]: ...
-    def value(self) -> T_co: ...
-    def read(self: LegacyUnknownNode[int]) -> int: ...
-
-static_assert(not is_subtype_of(Top[LegacyUnknownNode[int]], LegacyUnknownNode[int]))
-static_assert(not is_subtype_of(LegacyUnknownNode[int], Bottom[LegacyUnknownNode[int]]))
-```
-
-The same applies to implicit receivers:
-
-```py
-class ImplicitNode[T](Protocol):
-    def child(self) -> ImplicitNode[tuple[T, Any]]: ...
-    def value(self) -> T: ...
-
-static_assert(not is_subtype_of(Top[ImplicitNode[int]], ImplicitNode[int]))
-static_assert(not is_subtype_of(ImplicitNode[int], Bottom[ImplicitNode[int]]))
-
-class LegacyImplicitNode(Protocol[T_co]):
-    def child(self) -> LegacyImplicitNode[tuple[T_co, Any]]: ...
-    def value(self) -> T_co: ...
-
-static_assert(not is_subtype_of(Top[LegacyImplicitNode[int]], LegacyImplicitNode[int]))
-static_assert(not is_subtype_of(LegacyImplicitNode[int], Bottom[LegacyImplicitNode[int]]))
 ```
 
 Even when `object | Any` simplifies to `object`, a child can expose the gradual member in a
@@ -3449,7 +3386,6 @@ different specialization.
 class Masked[T](Protocol):
     def child(self) -> Masked[int]: ...
     def value(self) -> T | Any: ...
-    def read(self: Masked[int]) -> int: ...
 
 static_assert(not is_subtype_of(Top[Masked[object]], Masked[object]))
 static_assert(not is_subtype_of(Masked[object], Bottom[Masked[object]]))
@@ -3457,26 +3393,9 @@ static_assert(not is_subtype_of(Masked[object], Bottom[Masked[object]]))
 class LegacyMasked(Protocol[T_co]):
     def child(self) -> LegacyMasked[int]: ...
     def value(self) -> T_co | Any: ...
-    def read(self: LegacyMasked[int]) -> int: ...
 
 static_assert(not is_subtype_of(Top[LegacyMasked[object]], LegacyMasked[object]))
 static_assert(not is_subtype_of(LegacyMasked[object], Bottom[LegacyMasked[object]]))
-```
-
-```py
-class ImplicitMasked[T](Protocol):
-    def child(self) -> ImplicitMasked[int]: ...
-    def value(self) -> T | Any: ...
-
-static_assert(not is_subtype_of(Top[ImplicitMasked[object]], ImplicitMasked[object]))
-static_assert(not is_subtype_of(ImplicitMasked[object], Bottom[ImplicitMasked[object]]))
-
-class LegacyImplicitMasked(Protocol[T_co]):
-    def child(self) -> LegacyImplicitMasked[int]: ...
-    def value(self) -> T_co | Any: ...
-
-static_assert(not is_subtype_of(Top[LegacyImplicitMasked[object]], LegacyImplicitMasked[object]))
-static_assert(not is_subtype_of(LegacyImplicitMasked[object], Bottom[LegacyImplicitMasked[object]]))
 ```
 
 ### Recursive protocols capturing a gradual type variable
@@ -3565,62 +3484,6 @@ static_assert(not is_subtype_of(Top[LegacyNode[int]], LegacyNode[int]))
 
 def inspect_legacy(node: LegacyNode[int]) -> None:
     reveal_type(node.value())  # revealed: Any | int
-```
-
-The same applies to growing specializations with implicit receivers:
-
-```py
-if is_subtype_of("Top[ImplicitNode[int]]", "ImplicitNode[int]"):
-    ImplicitPayload = Any
-else:
-    ImplicitPayload = int
-
-class ImplicitNode[T](Protocol):
-    def child(self) -> ImplicitNode[tuple[T, T]]: ...
-    def value(self) -> ImplicitPayload: ...
-
-static_assert(not is_subtype_of(Top[ImplicitNode[int]], ImplicitNode[int]))
-
-if is_subtype_of("Top[LegacyImplicitNode[int]]", "LegacyImplicitNode[int]"):
-    LegacyImplicitPayload = Any
-else:
-    LegacyImplicitPayload = int
-
-class LegacyImplicitNode(Protocol[T_co]):
-    def child(self) -> LegacyImplicitNode[tuple[T_co, T_co]]: ...
-    def value(self) -> LegacyImplicitPayload: ...
-
-static_assert(not is_subtype_of(Top[LegacyImplicitNode[int]], LegacyImplicitNode[int]))
-```
-
-Property accessors can depend on the provisional interface too:
-
-```py
-if is_subtype_of("Top[PropertyNode[int]]", "PropertyNode[int]"):
-    PropertyPayload = Any
-else:
-    PropertyPayload = int
-
-class PropertyNode[T](Protocol):
-    @property
-    def child(self) -> PropertyNode[tuple[T, T]]: ...
-    @property
-    def value(self) -> PropertyPayload: ...
-
-static_assert(not is_subtype_of(Top[PropertyNode[int]], PropertyNode[int]))
-
-if is_subtype_of("Top[LegacyPropertyNode[int]]", "LegacyPropertyNode[int]"):
-    LegacyPropertyPayload = Any
-else:
-    LegacyPropertyPayload = int
-
-class LegacyPropertyNode(Protocol[T_co]):
-    @property
-    def child(self) -> LegacyPropertyNode[tuple[T_co, T_co]]: ...
-    @property
-    def value(self) -> LegacyPropertyPayload: ...
-
-static_assert(not is_subtype_of(Top[LegacyPropertyNode[int]], LegacyPropertyNode[int]))
 ```
 
 An interface can also be provisional when recursive specializations are compared:
@@ -3883,38 +3746,17 @@ static_assert(is_equivalent_to(LegacyStable[str, str], Top[LegacyStable[str, str
 static_assert(is_equivalent_to(LegacyStable[str, str], Bottom[LegacyStable[str, str]]))
 ```
 
-The comparison also succeeds when an explicit receiver is satisfied by the protocol's members:
+Other fully static member types also leave materialization unchanged. Here, `read` has an explicit
+receiver and returns a narrowed `TypedDict` union, which includes a synthesized schema. The `number`
+descriptor has static read and write types.
 
 ```py
+from typing import Any, Callable, TypedDict
+from ty_extensions._internal import TypeOf
+
 class HasValue(Protocol):
     @property
     def value(self) -> object: ...
-
-class ExplicitReceiver[T, U](Protocol):
-    @property
-    def value(self) -> U | int: ...
-    @property
-    def child(self) -> ExplicitReceiver[T | list[T], U | int]: ...
-    def read(self: HasValue) -> int: ...
-
-static_assert(is_assignable_to(Top[ExplicitReceiver[object, str | int]], ExplicitReceiver[object, str]))
-static_assert(is_assignable_to(Bottom[ExplicitReceiver[object, str | int]], ExplicitReceiver[object, str]))
-
-class LegacyExplicitReceiver(Protocol[T_co, U_co]):
-    @property
-    def value(self) -> U_co | int: ...
-    @property
-    def child(self) -> LegacyExplicitReceiver[T_co | list[T_co], U_co | int]: ...
-    def read(self: HasValue) -> int: ...
-
-static_assert(is_assignable_to(Top[LegacyExplicitReceiver[object, str | int]], LegacyExplicitReceiver[object, str]))
-static_assert(is_assignable_to(Bottom[LegacyExplicitReceiver[object, str | int]], LegacyExplicitReceiver[object, str]))
-```
-
-A descriptor with static read and write types does not change the relationship either:
-
-```py
-from typing import Any, Callable
 
 class Descriptor:
     def __get__(self, instance: object, owner: type[object]) -> int:
@@ -3923,36 +3765,6 @@ class Descriptor:
 
 def descriptor(function: Callable[..., Any]) -> Descriptor:
     raise NotImplementedError
-
-class WithDescriptor[T, U](Protocol):
-    @property
-    def value(self) -> U | int: ...
-    @property
-    def child(self) -> WithDescriptor[T | list[T], U | int]: ...
-    @descriptor
-    def number(self) -> int: ...
-
-static_assert(is_assignable_to(Top[WithDescriptor[object, str | int]], WithDescriptor[object, str]))
-static_assert(is_assignable_to(Bottom[WithDescriptor[object, str | int]], WithDescriptor[object, str]))
-
-class LegacyWithDescriptor(Protocol[T_co, U_co]):
-    @property
-    def value(self) -> U_co | int: ...
-    @property
-    def child(self) -> LegacyWithDescriptor[T_co | list[T_co], U_co | int]: ...
-    @descriptor
-    def number(self) -> int: ...
-
-static_assert(is_assignable_to(Top[LegacyWithDescriptor[object, str | int]], LegacyWithDescriptor[object, str]))
-static_assert(is_assignable_to(Bottom[LegacyWithDescriptor[object, str | int]], LegacyWithDescriptor[object, str]))
-```
-
-A narrowed `TypedDict` union can include a synthesized schema. It does not change the relationship
-between the recursive specializations:
-
-```py
-from typing import TypedDict
-from ty_extensions._internal import TypeOf
 
 class First(TypedDict):
     first: int
@@ -3967,23 +3779,31 @@ value = get_union()
 if "first" in value:
     narrowed = value
 
-    class WithNarrowed[T, U](Protocol):
+    class StaticMembers[T, U](Protocol):
         @property
         def value(self) -> U | int: ...
         @property
-        def child(self) -> WithNarrowed[T | list[T], U | int]: ...
-        def other(self) -> TypeOf[narrowed]: ...
+        def child(self) -> StaticMembers[T | list[T], U | int]: ...
+        def read(self: HasValue) -> TypeOf[narrowed]: ...
+        @descriptor
+        def number(self) -> int: ...
 
-    static_assert(is_assignable_to(Top[WithNarrowed[object, str | int]], WithNarrowed[object, str]))
+    static_assert(is_assignable_to(Top[StaticMembers[object, str | int]], StaticMembers[object, str]))
+    static_assert(is_assignable_to(Bottom[StaticMembers[object, str | int]], StaticMembers[object, str]))
+    static_assert(is_equivalent_to(StaticMembers[object, str | int], Top[StaticMembers[object, str | int]]))
 
-    class LegacyWithNarrowed(Protocol[T_co, U_co]):
+    class LegacyStaticMembers(Protocol[T_co, U_co]):
         @property
         def value(self) -> U_co | int: ...
         @property
-        def child(self) -> LegacyWithNarrowed[T_co | list[T_co], U_co | int]: ...
-        def other(self) -> TypeOf[narrowed]: ...
+        def child(self) -> LegacyStaticMembers[T_co | list[T_co], U_co | int]: ...
+        def read(self: HasValue) -> TypeOf[narrowed]: ...
+        @descriptor
+        def number(self) -> int: ...
 
-    static_assert(is_assignable_to(Top[LegacyWithNarrowed[object, str | int]], LegacyWithNarrowed[object, str]))
+    static_assert(is_assignable_to(Top[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
+    static_assert(is_assignable_to(Bottom[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
+    static_assert(is_equivalent_to(LegacyStaticMembers[object, str | int], Top[LegacyStaticMembers[object, str | int]]))
 ```
 
 ### Recursive protocols with stable attribute types

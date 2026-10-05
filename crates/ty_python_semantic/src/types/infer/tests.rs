@@ -1373,7 +1373,8 @@ class Model(ModelBase):
 #[test]
 fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Result<()> {
     // Changing an imported type must invalidate the cached proof even when the protocol and its
-    // consumer are unchanged.
+    // consumer are unchanged. Cover both direct inspection and the type-parameter proof needed
+    // for growing specializations.
     const STATIC: &str = "Payload = int\n";
     const GRADUAL: &str = "from typing import Any\nPayload = Any\n";
     const FAILURE: &str =
@@ -1399,7 +1400,7 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
             T = TypeVar("T", covariant=True)
 
             class GenericNode(Protocol[T]):
-                def child(self) -> GenericNode[T]: ...
+                def child(self) -> GenericNode[tuple[T, T]]: ...
                 def read(self: GenericNode[int]) -> int: ...
                 def payload(self) -> Payload: ...
             "#,

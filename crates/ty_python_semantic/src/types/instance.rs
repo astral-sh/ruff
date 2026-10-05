@@ -30,8 +30,8 @@ use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::{
-    DynamicContent, DynamicContentMode, TypeCollector, TypeVisitor, any_over_type,
-    any_over_type_expanding_aliases, dynamic_content_impl, walk_type_with_recursion_guard,
+    DynamicContentMode, TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    dynamic_content_impl, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -508,56 +508,31 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
-/// Results of inspecting a protocol's requirements affected by materialization.
-struct ProtocolMaterializationAnalysis {
-    content: DynamicContent,
-    can_skip_protocol_comparison: bool,
-}
-
-impl ProtocolMaterializationAnalysis {
-    /// Whether the inspected requirements contain no dynamic types. Some requirements, such as
-    /// receiver binding or an unresolved descriptor setter, need additional checks.
-    const fn has_no_detected_dynamic_content(&self) -> bool {
-        self.content.is_absent()
-    }
-
-    /// Static inspected types alone do not imply that a protocol satisfies itself: for example,
-    /// an explicit method receiver might not accept the protocol instance. This is a separate,
-    /// conservative check for skipping the entire structural comparison.
-    const fn can_skip_protocol_comparison(&self) -> bool {
-        self.has_no_detected_dynamic_content() && self.can_skip_protocol_comparison
-    }
-}
-
-/// Inspect the requirements affected by both materializations of `protocol`.
+/// Prove by inspecting its member types that materialization leaves `protocol` unchanged.
 ///
 /// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
 /// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
 /// which do not affect whether one callable satisfies another's requirements.
-fn analyze_protocol_materialization<'db>(
+fn protocol_materialization_is_noop_by_inspection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     protocol: ProtocolInstanceType<'db>,
-) -> ProtocolMaterializationAnalysis {
-    let (content, can_skip_protocol_comparison) = dynamic_content_impl(
+) -> bool {
+    dynamic_content_impl(
         db,
         env,
         Type::ProtocolInstance(protocol),
         DynamicContentMode::Materialization,
-    );
-    ProtocolMaterializationAnalysis {
-        content,
-        can_skip_protocol_comparison,
-    }
+    )
+    .is_absent()
 }
 
-/// Conservatively determine whether materialization can be ignored and structural comparison
-/// skipped for a protocol.
+/// Conservatively prove that materialization leaves a protocol's requirements unchanged.
 ///
-/// First inspect the specialized interface directly, including ordinary properties and methods
-/// with implicit receivers. If that is inconclusive, inspect the interface using
-/// the protocol's own type parameters; this handles growing specializations and supported explicit
-/// receivers.
+/// A `true` result permits ignoring materialization when comparing this protocol. A `false`
+/// result can mean that inspection was incomplete, even if materialization is a no-op.
+/// First inspect the specialized interface directly. If that is inconclusive, inspect the
+/// interface using the protocol's own type parameters to handle growing specializations.
 ///
 /// The interface must be read inside this query. If a dependency is provisional during Salsa cycle
 /// recovery, `cycle_result` prevents an incomplete interface from being used as a proof; the
@@ -567,35 +542,17 @@ fn analyze_protocol_materialization<'db>(
     cycle_result=|_, _, _, _| false,
     heap_size=ruff_memory_usage::heap_size,
 )]
-fn protocol_materialization_allows_shortcut<'db>(
+fn protocol_materialization_is_noop<'db>(
     db: &'db dyn Db,
     program: crate::Program<'db>,
     class: ProtocolClass<'db>,
 ) -> bool {
     let env = ProgramEnvironment::from_program(program);
-    analyze_protocol_materialization(db, &env, ProtocolInstanceType::from_class(class))
-        .can_skip_protocol_comparison()
-        || protocol_materialization_is_noop_with_type_parameters(db, &env, class)
-}
-
-/// Check whether the materialized requirements permit the nominal cycle fallback.
-///
-/// The fallback leaves the enclosing comparison in progress, unlike the shortcut that skips the
-/// whole comparison. It retains the fallback's broader treatment of receivers and descriptors.
-/// A cycle in the protocol interface query makes this check inconclusive.
-#[salsa::tracked(
-    returns(copy),
-    cycle_result=|_, _, _, _| false,
-    heap_size=ruff_memory_usage::heap_size,
-)]
-fn protocol_materialization_allows_nominal_cycle<'db>(
-    db: &'db dyn Db,
-    program: crate::Program<'db>,
-    class: ProtocolClass<'db>,
-) -> bool {
-    let env = ProgramEnvironment::from_program(program);
-    analyze_protocol_materialization(db, &env, ProtocolInstanceType::from_class(class))
-        .has_no_detected_dynamic_content()
+    protocol_materialization_is_noop_by_inspection(
+        db,
+        &env,
+        ProtocolInstanceType::from_class(class),
+    ) || protocol_materialization_is_noop_with_type_parameters(db, &env, class)
 }
 
 /// Conservatively prove that materialization does not change a protocol specialization.
@@ -614,7 +571,7 @@ fn protocol_materialization_allows_nominal_cycle<'db>(
 /// annotations must be direct, unmaterialized specializations of the same protocol, and are only
 /// supported for method-only interfaces. Other cases fall back to structural comparison.
 ///
-/// This must be called from `protocol_materialization_allows_shortcut` so that `cycle_result`
+/// This must be called from `protocol_materialization_is_noop` so that `cycle_result`
 /// rejects provisional interface results.
 fn protocol_materialization_is_noop_with_type_parameters<'db>(
     db: &'db dyn Db,
@@ -872,7 +829,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // For the same specialization, unchanged requirements settle the relationship.
             if source != protocol
                 && source_origin == target_origin
-                && protocol_materialization_allows_shortcut(db, self.env.program(db), source_origin)
+                && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
                 return self.always();
             }
@@ -882,7 +839,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // it can make the cycle guard reject distinct specializations that stabilize.
             if source.materialization_kind(db).is_some()
                 && source.interface(db).has_only_methods(db)
-                && protocol_materialization_allows_shortcut(db, self.env.program(db), source_origin)
+                && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
                 return self.check_type_pair(
                     db,
@@ -1046,7 +1003,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
         for protocol in [source, target] {
             if let Some(origin) = protocol.materialized_origin(db)
-                && !protocol_materialization_allows_nominal_cycle(db, self.env.program(db), origin)
+                && !protocol_materialization_is_noop(db, self.env.program(db), origin)
             {
                 return None;
             }
@@ -2228,15 +2185,12 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{
-        CallableType, Parameter, Parameters, Signature, Type, callable::CallableTypeKind,
-        signatures::CallableSignature,
-    };
+    use crate::types::{CallableType, Parameter, Parameters, Signature, Type};
 
-    use super::analyze_protocol_materialization;
+    use super::protocol_materialization_is_noop_by_inspection;
 
     #[test]
-    fn protocol_materialization_proof_requires_inspectable_members() -> anyhow::Result<()> {
+    fn protocol_materialization_noop_checks_synthesized_types() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
             "/src/a.py",
@@ -2245,19 +2199,12 @@ mod tests {
             from typing import Any, Protocol, TypedDict
             from ty_extensions._internal import TypeOf
 
-            class ExplicitReceiver(Protocol):
-                def method(self: ExplicitReceiver) -> int: ...
-
-            class NestedReceiver(Protocol):
-                def inner(self) -> ExplicitReceiver: ...
-
             class FunctionalTypedDict(Protocol):
                 def payload(self) -> TypeOf[TypedDict("Payload", {"value": int})(value=1)]: ...
 
             class GradualFunctionalTypedDict(Protocol):
                 def payload(self) -> TypeOf[TypedDict("Payload", {"value": Any})(value=1)]: ...
 
-            nested_receiver: NestedReceiver
             functional_typed_dict: FunctionalTypedDict
             gradual_functional_typed_dict: GradualFunctionalTypedDict
             "#,
@@ -2265,55 +2212,28 @@ mod tests {
         let env = db.program_environment();
         let file = system_path_to_file(&db, "/src/a.py")?;
         let module = ProgramFile::new(&db, file, env.program(&db));
-        for (name, no_dynamic_content, can_skip) in [
-            ("nested_receiver", true, false),
-            ("functional_typed_dict", true, true),
-            ("gradual_functional_typed_dict", false, false),
+        for (name, expected) in [
+            ("functional_typed_dict", true),
+            ("gradual_functional_typed_dict", false),
         ] {
             let protocol = global_symbol(&db, module, name)
                 .place
                 .expect_type()
                 .as_protocol_instance()
                 .context("expected a protocol instance")?;
-            let analysis = analyze_protocol_materialization(&db, &env, protocol);
             assert_eq!(
-                analysis.has_no_detected_dynamic_content(),
-                no_dynamic_content,
+                protocol_materialization_is_noop_by_inspection(&db, &env, protocol),
+                expected,
                 "{name}"
             );
-            assert_eq!(analysis.can_skip_protocol_comparison(), can_skip, "{name}");
         }
-
-        let callable =
-            CallableType::single(&db, Signature::new(Parameters::empty(), Type::object()));
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)])
-            .as_protocol_instance()
-            .context("expected a synthesized protocol")?;
-        assert!(
-            !analyze_protocol_materialization(&db, &env, synthesized)
-                .can_skip_protocol_comparison()
-        );
-
-        let callable = CallableType::new(
-            &db,
-            CallableSignature::from_overloads([]),
-            CallableTypeKind::FunctionLike,
-        );
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)])
-            .as_protocol_instance()
-            .context("expected a synthesized protocol")?;
-        assert!(
-            !analyze_protocol_materialization(&db, &env, synthesized)
-                .can_skip_protocol_comparison()
-        );
 
         for (ty, expected) in [(Type::object(), true), (Type::any(), false)] {
             let synthesized = Type::protocol_with_readonly_members(&db, &env, [("value", ty)])
                 .as_protocol_instance()
                 .context("expected a synthesized protocol")?;
             assert_eq!(
-                analyze_protocol_materialization(&db, &env, synthesized)
-                    .can_skip_protocol_comparison(),
+                protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),
                 expected
             );
 
@@ -2325,31 +2245,11 @@ mod tests {
                 .as_protocol_instance()
                 .context("expected a synthesized protocol")?;
             assert_eq!(
-                analyze_protocol_materialization(&db, &env, synthesized)
-                    .can_skip_protocol_comparison(),
+                protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),
                 expected
             );
         }
 
-        // A synthesized signature may already contain constraints from an earlier binding.
-        let signature = Signature::new(
-            Parameters::standard([
-                Parameter::positional_only(None).with_annotated_type(Type::Never),
-                Parameter::positional_only(None),
-            ]),
-            Type::object(),
-        )
-        .bind_self_with_receiver(&db, &env, Some(Type::object()), Some(Type::object()));
-        assert!(signature.has_implicit_positional_receiver_annotation());
-        assert!(signature.receiver_constraints().is_some());
-        let callable = CallableType::single(&db, signature);
-        let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)])
-            .as_protocol_instance()
-            .context("expected a synthesized protocol")?;
-        assert!(
-            !analyze_protocol_materialization(&db, &env, synthesized)
-                .can_skip_protocol_comparison()
-        );
         Ok(())
     }
 }

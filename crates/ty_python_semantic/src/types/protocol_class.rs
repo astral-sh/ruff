@@ -474,30 +474,26 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.members(db).all(|member| member.is_method())
     }
 
-    pub(super) fn members_allow_materialization_shortcut(
+    /// Whether every declared property type can be inspected by the member walker.
+    pub(super) fn has_resolvable_member_types(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        is_synthesized: bool,
     ) -> bool {
         self.members(db).all(|member| match member.data.kind {
-            ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) => {
-                let signatures = callable.signatures(db);
-                (!is_synthesized || signatures.iter().next().is_some())
-                    && signatures.iter().all(|signature| {
-                        signature.has_implicit_positional_receiver_annotation()
-                            && (!is_synthesized || signature.receiver_constraints().is_none())
+            ProtocolMemberKind::Property { read, write } => {
+                read.is_none_or(|read| read.resolve(db, env).is_some())
+                    && write.is_none_or(|write| match write {
+                        ProtocolMemberWrite::Type(ty) => ty.resolve(db, env).is_some(),
+                        ProtocolMemberWrite::Descriptor { descriptor, domain } => {
+                            // An unrepresentable domain is retained as a descriptor requirement;
+                            // materialization only transforms the domain when one is available.
+                            descriptor.resolve(db, env).is_some()
+                                && domain.is_none_or(|domain| domain.resolve(db, env).is_some())
+                        }
                     })
             }
-            // Synthesized read-only members store the read type directly, without an accessor.
-            ProtocolMemberKind::Property {
-                read: Some(ProtocolPropertyType::Annotation(_)),
-                write: None,
-            } if is_synthesized => true,
-            ProtocolMemberKind::Property { read, write } => {
-                property_accessors_are_inspectable(db, env, read, write)
-            }
-            _ => false,
+            ProtocolMemberKind::Method(..) | ProtocolMemberKind::Attribute(_) => true,
         })
     }
 
@@ -1383,8 +1379,8 @@ enum ProtocolPropertyType<'db> {
     PropertySetter(Type<'db>),
 }
 
-/// The member walker needs resolved read and write types to prove materialization is a no-op.
-/// Descriptor requirements need additional checks, so only accept ordinary property accessors.
+/// The type-parameter proof supports ordinary properties with resolved read and write types.
+/// Descriptor requirements are outside that proof's supported shapes.
 fn property_accessors_are_inspectable<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,

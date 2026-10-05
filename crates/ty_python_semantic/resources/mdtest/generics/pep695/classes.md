@@ -1917,36 +1917,21 @@ def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -
 
 ## Materialized recursive generic protocols
 
-A fully static specialization is unchanged by materialization. Specializations with gradual type
-arguments still have their requirements materialized.
+Materialization leaves recursive return types unchanged when a receiver annotation names a fixed
+specialization:
 
 ```py
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Protocol
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import Unknown, is_equivalent_to
+from ty_extensions._internal import is_equivalent_to
 
-class Tree[T](Protocol):
-    def add(self, children: list[Tree[T]]) -> int: ...
-    def value(self) -> T: ...
-
-static_assert(is_equivalent_to(Tree[int], Top[Tree[int]]))
-static_assert(is_equivalent_to(Tree[int], Bottom[Tree[int]]))
-static_assert(not is_equivalent_to(Tree[Any], Top[Tree[Any]]))
-static_assert(not is_equivalent_to(Tree[Any], Bottom[Tree[Any]]))
-static_assert(not is_equivalent_to(Tree[Unknown], Top[Tree[Unknown]]))
-static_assert(not is_equivalent_to(Tree[Unknown], Bottom[Tree[Unknown]]))
-```
-
-Materialization also leaves recursive return types unchanged when a receiver annotation names a
-fixed specialization:
-
-```py
 class Fixed[T](Protocol):
     def read(self: Fixed[int]) -> Fixed[tuple[T, T]]: ...
 
 static_assert(is_equivalent_to(Fixed[int], Top[Fixed[int]]))
+static_assert(is_equivalent_to(Fixed[int], Bottom[Fixed[int]]))
 ```
 
 The receiver itself can name a growing specialization:

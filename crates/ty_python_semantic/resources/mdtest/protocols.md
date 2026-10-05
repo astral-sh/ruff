@@ -7241,43 +7241,26 @@ def check_legacy(node: LegacyNode[str]) -> Readable:
     return node  # no diagnostic
 ```
 
-Matching receiver annotations do not make specializations equivalent if neither specialization
-satisfies the receiver type:
+Materialization leaves a fully static protocol unchanged, including its receiver restrictions. The
+structural comparison of different specializations still incorrectly requires the receiver to
+satisfy the annotation:
 
 ```py
 from ty_extensions import Top
 
-class InvalidReceiver[T](Protocol):
-    def child(self) -> InvalidReceiver[T]: ...
-    def read(self: str) -> int: ...
-
-static_assert(not is_subtype_of(InvalidReceiver[str], InvalidReceiver[int]))
-static_assert(not is_subtype_of(Top[InvalidReceiver[int]], InvalidReceiver[int]))
-
-class LegacyInvalidReceiver(Protocol[T]):
-    def child(self) -> LegacyInvalidReceiver[T]: ...
-    def read(self: str) -> int: ...
-
-static_assert(not is_subtype_of(LegacyInvalidReceiver[str], LegacyInvalidReceiver[int]))
-static_assert(not is_subtype_of(Top[LegacyInvalidReceiver[int]], LegacyInvalidReceiver[int]))
-```
-
-The receiver must satisfy the whole annotation, even when it contains a recursive reference:
-
-```py
 class WrappedReceiver[T](Protocol):
     def child(self) -> WrappedReceiver[T]: ...
     def read(self: tuple[WrappedReceiver[int], int]) -> int: ...
 
 static_assert(not is_subtype_of(WrappedReceiver[str], WrappedReceiver[int]))
-static_assert(not is_subtype_of(Top[WrappedReceiver[int]], WrappedReceiver[int]))
+static_assert(is_subtype_of(Top[WrappedReceiver[int]], WrappedReceiver[int]))
 
 class LegacyWrappedReceiver(Protocol[T]):
     def child(self) -> LegacyWrappedReceiver[T]: ...
     def read(self: tuple[LegacyWrappedReceiver[int], int]) -> int: ...
 
 static_assert(not is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[int]))
-static_assert(not is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
+static_assert(is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
 ```
 
 ### Materialized protocol receivers

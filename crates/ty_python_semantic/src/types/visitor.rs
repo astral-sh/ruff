@@ -459,7 +459,7 @@ pub(super) fn dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::All).0
+    dynamic_content_impl(db, env, ty, DynamicContentMode::All)
 }
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
@@ -483,7 +483,7 @@ pub(super) fn non_any_dynamic_content<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> DynamicContent {
-    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny).0
+    dynamic_content_impl(db, env, ty, DynamicContentMode::NonAny)
 }
 
 pub(super) fn dynamic_content_impl<'db>(
@@ -491,7 +491,7 @@ pub(super) fn dynamic_content_impl<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
     mode: DynamicContentMode,
-) -> (DynamicContent, bool) {
+) -> DynamicContent {
     struct DynamicContentVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         recursion_guard: TypeCollector<'db>,
@@ -500,7 +500,6 @@ pub(super) fn dynamic_content_impl<'db>(
         active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
         content: Cell<DynamicContent>,
-        can_skip_protocol_comparison: Cell<bool>,
         mode: DynamicContentMode,
     }
 
@@ -606,20 +605,15 @@ pub(super) fn dynamic_content_impl<'db>(
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            if self.can_skip_protocol_comparison.get()
-                && matches!(self.mode, DynamicContentMode::Materialization)
+            if matches!(self.mode, DynamicContentMode::Materialization)
                 && !protocol
                     .interface(db)
-                    .members_allow_materialization_shortcut(
-                        db,
-                        self.env,
-                        protocol.class_origin(db).is_none(),
-                    )
+                    .has_resolvable_member_types(db, self.env)
             {
-                // This does not prevent inspecting the types affected by materialization. It
-                // only means that unchanged types cannot settle the whole comparison by
-                // themselves; binding a receiver or resolving a descriptor may add constraints.
-                self.can_skip_protocol_comparison.set(false);
+                // The member walker skips unresolved accessors. An incomplete inspection
+                // cannot establish that materialization leaves the requirements unchanged.
+                self.record(DynamicContent::Indeterminate);
+                return;
             }
             let Some((origin, specialization)) = protocol
                 .class_origin(db)
@@ -678,14 +672,10 @@ pub(super) fn dynamic_content_impl<'db>(
         active_type_aliases: ActiveRecursionDetector::default(),
         active_recursive_types: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
-        can_skip_protocol_comparison: Cell::new(true),
         mode,
     };
     visitor.visit_type(db, ty);
-    (
-        visitor.content.get(),
-        visitor.can_skip_protocol_comparison.get(),
-    )
+    visitor.content.get()
 }
 
 /// Whether inspecting `ty` can encounter recursive types with changing specializations.
@@ -1058,7 +1048,6 @@ mod tests {
             let ty = global_symbol(&db, module, name).place.expect_type();
             assert!(
                 !dynamic_content_impl(&db, &env, ty, DynamicContentMode::Materialization)
-                    .0
                     .is_absent(),
                 "{name}"
             );
@@ -1079,7 +1068,6 @@ mod tests {
         ] {
             assert!(
                 !dynamic_content_impl(&db, &env, ty, DynamicContentMode::Materialization)
-                    .0
                     .is_absent()
             );
         }
