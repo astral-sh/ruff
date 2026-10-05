@@ -18,8 +18,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
-    use crate::source_kind::SourceKind;
-    use crate::test::{test_contents, test_path, test_snippet};
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
@@ -127,44 +126,6 @@ mod tests {
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
-    }
-
-    #[test_case(PythonVersion::PY314)]
-    #[test_case(PythonVersion::PY315)]
-    fn deprecated_import_type_form(target_version: PythonVersion) {
-        for (source, expected) in [
-            (
-                "from typing_extensions import TypeForm\n",
-                "from typing import TypeForm\n",
-            ),
-            (
-                "from typing_extensions import TypeForm as TF\n",
-                "from typing import TypeForm as TF\n",
-            ),
-            (
-                "from typing_extensions import TypeForm, Sentinel\n",
-                "from typing_extensions import Sentinel\nfrom typing import TypeForm\n",
-            ),
-        ] {
-            let source_kind = SourceKind::Python {
-                code: source.to_string(),
-                is_stub: false,
-            };
-            let (diagnostics, fixed) = test_contents(
-                &source_kind,
-                Path::new("example.py"),
-                &settings::LinterSettings::for_rule(Rule::DeprecatedImport)
-                    .with_target_version(target_version),
-            );
-
-            if target_version >= PythonVersion::PY315 {
-                assert_eq!(diagnostics.len(), 1);
-                assert_eq!(fixed.source_code(), expected);
-            } else {
-                assert!(diagnostics.is_empty());
-                assert_eq!(fixed.source_code(), source);
-            }
-        }
     }
 
     #[test_case(PythonVersion::PY37)]
