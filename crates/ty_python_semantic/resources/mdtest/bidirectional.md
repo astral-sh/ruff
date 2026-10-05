@@ -872,14 +872,6 @@ T = TypeVar("T", bound=Client, default=Client, covariant=True)
 class EmptyBox(Generic[T]):
     def __init__(self) -> None:
         pass
-
-class Holder(Generic[T]):
-    def related(self) -> RelatedBox[T]:
-        return RelatedBox(self)
-
-class RelatedBox(Generic[T]):
-    def __init__(self, holder: Holder[T]) -> None:
-        self.holder = holder
 ```
 
 ## Dataclass constructors with outer return contexts
