@@ -595,6 +595,32 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## Narrowing class objects of final generic classes
+
+A specialized alias is distinct from the bare class object, even when the specialization matches the
+default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
+check the return type in that branch.
+
+```py
+from typing import final
+from typing_extensions import Generic, TypeVar
+
+U = TypeVar("U", default=str)
+
+@final
+class P(Generic[U]): ...
+
+T = TypeVar("T", bound=P[str])
+
+def create(cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(P[str])
+```
+
 ## A subclass of a fully specialized generic is not generic
 
 A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a

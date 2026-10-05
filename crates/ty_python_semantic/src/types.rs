@@ -2139,7 +2139,10 @@ impl<'db> DiscardDisjointUnionElementsResult<'db> {
 /// `type[Base]` projects to `Base` exactly: both admit `Child`. In contrast,
 /// `TypeOf[Base]` (the type of the expression `Base`) admits only the `Base` class object, but
 /// also projects to `Base`, which admits `Child` instances. That projection is an
-/// over-approximation. For a final class, the projection is exact because there are no subclasses.
+/// over-approximation. For a final, non-generic nominal class, the projection is exact because
+/// there are no subclasses. For a final generic class `C[T = int]`, projecting the bare class `C`
+/// to the instance type `C[int]` is still an over-approximation: `type[C[int]]` also admits the
+/// distinct alias object `C[int]`.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InstanceProjection<T> {
     Exact(T),
@@ -8655,7 +8658,7 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => Some(InstanceProjection::new(
                 Type::instance(db, env, class.default_specialization(db)),
-                class.is_final(db),
+                class.is_final(db) && class.generic_context(db).is_none(),
             )),
             Type::GenericAlias(alias) => Some(InstanceProjection::new(
                 Type::instance(db, env, ClassType::from(alias)),

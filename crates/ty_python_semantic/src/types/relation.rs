@@ -1718,8 +1718,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// well as source constraints so that `T: (Y, Z)` can still be related to
     /// `type[Y] | type[Z]`.
     ///
-    /// Exact class objects have an over-approximated instance projection unless the class is
-    /// final. For `T: (Y, Z)` where `Z` extends `Y`, instance subtyping would incorrectly
+    /// Class literals have an over-approximated instance projection unless the class is final and
+    /// non-generic. For `T: (Y, Z)` where `Z` extends `Y`, instance subtyping would incorrectly
     /// simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are subtypes of
     /// `Y`, but only the class object `Y` satisfies `klass is Y`.
     ///
