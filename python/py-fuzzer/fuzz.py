@@ -28,7 +28,10 @@ import ast
 import concurrent.futures
 import contextlib
 import enum
+import json
+import operator
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -40,17 +43,23 @@ from functools import partial
 from pathlib import Path
 from typing import Final, NewType, NoReturn, assert_never, cast
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
 from termcolor import colored
 
-MinimizedSourceCode = NewType("MinimizedSourceCode", str)
 Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 MINIMIZATION_BUDGET_SECONDS: Final = 60
+
+# GitHub issue descriptions are reportedly limited to 65,536 Unicode code points:
+# https://github.com/dead-claudia/github-limits#issue-description
+# Each UTF-8-encoded code point takes at least one byte, so this lower byte
+# limit leaves headroom.
+MAX_GITHUB_ISSUE_BODY_BYTES: Final = 60_000
 
 # ty supports `--python-version=3.8`, but typeshed only supports 3.10+,
 # so that's probably the oldest version we can usefully test with.
@@ -172,14 +181,21 @@ def contains_new_bug(
     )
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class Bug:
+    """A bug reproducer and whether minimization succeeded."""
+
+    source: str
+    minimization_succeeded: bool
+
+
 @dataclass(slots=True)
 class FuzzResult:
     # The seed used to generate the random Python file.
     # The same seed always generates the same file.
     seed: Seed
-    # If we found a bug, this will be the minimum Python code
-    # required to trigger the bug. If not, it will be `None`.
-    maybe_bug: MinimizedSourceCode | None
+    # If we found a bug, this contains a reproducer. If not, it is `None`.
+    maybe_bug: Bug | None
     # The executable we're testing
     executable: Executable
     _: KW_ONLY
@@ -213,7 +229,7 @@ class FuzzResult:
 
             print(colored(panic_message, "red"))
             print()
-            print(self.maybe_bug)
+            print(self.maybe_bug.source)
             print(flush=True)
 
 
@@ -274,7 +290,9 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
         return minimizer_callback(candidate)
 
     try:
-        maybe_bug = MinimizedSourceCode(minimize_repro(code, bounded_callback))
+        maybe_bug = Bug(
+            source=minimize_repro(code, bounded_callback), minimization_succeeded=True
+        )
     except CouldNotMinimize as e:
         # This is to double-check that there isn't a bug in
         # `pysource-minimize`/`pysource-codegen`.
@@ -284,11 +302,11 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
         except SyntaxError:
             raise e from None
         else:
-            maybe_bug = MinimizedSourceCode(code)
+            maybe_bug = Bug(source=code, minimization_succeeded=False)
     except MinimizationTimedOut:
         if not args.quiet:
             print(f"Minimization timed out for seed {seed}; reporting original source.")
-        maybe_bug = MinimizedSourceCode(code)
+        maybe_bug = Bug(source=code, minimization_succeeded=False)
     # An input whose execution time is close to the timeout may time out during
     # the minimizer's initial check but finish when the same source is rechecked.
     # `pysource-minimize` currently raises a plain `ValueError` in this case, so
@@ -299,7 +317,7 @@ def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     except ValueError as e:
         if not args.quiet:
             print(f"Could not minimize seed {seed}: {e}", file=sys.stderr, flush=True)
-        maybe_bug = MinimizedSourceCode(code)
+        maybe_bug = Bug(source=code, minimization_succeeded=False)
 
     return FuzzResult(seed, maybe_bug, args.executable, only_new_bugs=only_new_bugs)
 
@@ -350,6 +368,134 @@ def run_fuzzer_sequentially(args: ResolvedCliArgs) -> list[FuzzResult]:
     return bugs
 
 
+@dataclass(slots=True, kw_only=True, frozen=True)
+class RenderableReproducer:
+    """A bug and its seed, paired with a Markdown fence for its source."""
+
+    seed: Seed
+    bug: Bug
+    fence: str
+
+
+def render_issue_body(
+    bugs: list[FuzzResult],
+    *,
+    executable: Executable,
+    executable_revision: str,
+    run_url: str,
+    fuzzer_revision: str,
+) -> str:
+    """Render a GitHub issue body containing reproducers for the reported bugs.
+
+    Omit reproducers when including them alongside an omission notice would
+    exceed the issue body size limit.
+    """
+    match executable:
+        case Executable.RUFF:
+            failure_description = (
+                "Each snippet caused Ruff to exit with a nonzero status or time out "
+                "after five seconds during fuzzing."
+            )
+            reproduction_command = (
+                "target/debug/ruff check --isolated --config 'lint.select=[]' "
+                "--no-cache --target-version py314 --preview - < repro.py"
+            )
+        case Executable.TY:
+            failure_description = (
+                "Each snippet caused ty to exit with a status other than 0, 1, or 2, "
+                "or time out after five seconds during fuzzing."
+            )
+            reproduction_command = (
+                'repro_dir=$(mktemp -d)\ncp repro.py "$repro_dir/input.py"\n'
+                f'target/debug/ty check "$repro_dir/input.py" '
+                f"--python-version={OLDEST_SUPPORTED_PYTHON} "
+                f"--python-platform={TY_TARGET_PLATFORM}"
+            )
+        case _ as unreachable:
+            assert_never(unreachable)
+
+    environment = Environment(
+        loader=FileSystemLoader(Path(__file__).parent),
+        undefined=StrictUndefined,
+        autoescape=False,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    template = environment.get_template("daily_fuzz_issue.md.jinja")
+
+    def render(reproducers: list[RenderableReproducer], *, omitted: bool) -> str:
+        """Render the selected reproducers and an omission notice when needed."""
+        return template.render(
+            run_url=run_url,
+            fuzzer_revision=fuzzer_revision,
+            executable=executable,
+            executable_revision=executable_revision,
+            failure_description=failure_description,
+            reproduction_command=reproduction_command,
+            reproducers=reproducers,
+            omitted=omitted,
+        ).removesuffix("\n")
+
+    reproducers: list[RenderableReproducer] = []
+    omitted = False
+    # Keep the report simple by listing each seed separately, even when several
+    # have the same reproducer. The workflow logs list all failing seeds if the
+    # issue body fills up.
+    for result in sorted(bugs, key=operator.attrgetter("seed")):
+        assert result.maybe_bug is not None
+        longest_fence = max(
+            (len(run) for run in re.findall(r"`+", result.maybe_bug.source)), default=0
+        )
+        renderable = RenderableReproducer(
+            seed=result.seed,
+            bug=result.maybe_bug,
+            fence="`" * max(3, longest_fence + 1),
+        )
+        candidate = render([*reproducers, renderable], omitted=True)
+        if len(candidate.encode("utf-8")) <= MAX_GITHUB_ISSUE_BODY_BYTES:
+            reproducers.append(renderable)
+        else:
+            omitted = True
+    return render(reproducers, omitted=omitted)
+
+
+def write_github_issue_body(
+    bugs: list[FuzzResult], args: ResolvedCliArgs, path: Path
+) -> None:
+    """Write a GitHub issue body for the reported bugs to a Markdown file."""
+    try:
+        run_url = (
+            f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}"
+            f"/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+        )
+    except KeyError as error:
+        raise RuntimeError(
+            f"--write-github-issue requires the {error.args[0]} environment variable"
+        ) from None
+    version_output = subprocess.check_output(
+        [args.test_executable_path, "version", "--output-format=json"], text=True
+    )
+    commit_info = json.loads(version_output)["commit_info"]
+    if commit_info is None:
+        raise RuntimeError(
+            f"{args.test_executable_path} does not report its build commit"
+        )
+    commit_hash = commit_info["commit_hash"]
+    assert isinstance(commit_hash, str)
+    executable_revision: str = commit_hash
+    fuzzer_revision = subprocess.check_output(
+        ["git", "-C", Path(__file__).parent, "rev-parse", "HEAD"], text=True
+    ).strip()
+    body = render_issue_body(
+        bugs,
+        executable=args.executable,
+        executable_revision=executable_revision,
+        run_url=run_url,
+        fuzzer_revision=fuzzer_revision,
+    )
+    path.write_text(body, encoding="utf-8")
+
+
 def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
     if len(args.seeds) <= 5:
         bugs = run_fuzzer_sequentially(args)
@@ -359,6 +505,8 @@ def run_fuzzer(args: ResolvedCliArgs) -> ExitCode:
     if bugs:
         print(colored(f"{noun_phrase} found in the following seeds:", "red"))
         print(*sorted(bug.seed for bug in bugs))
+        if args.github_issue_path is not None:
+            write_github_issue_body(bugs, args, args.github_issue_path)
         return ExitCode(1)
     else:
         print(colored(f"No {noun_phrase.lower()} found!", "green"))
@@ -405,6 +553,7 @@ class ResolvedCliArgs:
     test_executable_path: Path
     baseline_executable_path: Path | None
     quiet: bool
+    github_issue_path: Path | None
 
 
 def parse_args() -> ResolvedCliArgs:
@@ -431,6 +580,12 @@ def parse_args() -> ResolvedCliArgs:
         "--quiet",
         action="store_true",
         help="Print fewer things to the terminal while running the fuzzer",
+    )
+    parser.add_argument(
+        "--write-github-issue",
+        type=Path,
+        metavar="PATH",
+        help="Write a GitHub issue body to PATH if bugs are found (intended for CI workflows)",
     )
     parser.add_argument(
         "--test-executable",
@@ -495,6 +650,7 @@ def parse_args() -> ResolvedCliArgs:
                     f"the baseline (the version of `{executable}` installed in your "
                     f"current Python environment)"
                 )
+            args.baseline_executable = Path(executable)
 
     if not args.test_executable:
         print(
@@ -535,6 +691,7 @@ def parse_args() -> ResolvedCliArgs:
         executable=executable,
         test_executable_path=args.test_executable,
         baseline_executable_path=args.baseline_executable,
+        github_issue_path=args.write_github_issue,
     )
 
 

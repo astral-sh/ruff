@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/daily_fuzz.yaml"
+      - "python/py-fuzzer/**"
 
 permissions:
   contents: read
@@ -33,6 +34,11 @@ jobs:
     name: Fuzz
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    permissions:
+      contents: read
+      issues: write
+    outputs:
+      issue-created: ${{ steps.create_issue.outputs.created }}
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
@@ -54,7 +60,12 @@ jobs:
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
         run: cargo build --locked
       - name: Fuzz
+        id: fuzz
         run: |
+          issue_options=()
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            issue_options+=(--write-github-issue="$RUNNER_TEMP/fuzz-issue.md")
+          fi
           # shellcheck disable=SC2046
           (
             uv run \
@@ -64,14 +75,32 @@ jobs:
             fuzz \
             --test-executable=target/debug/ruff \
             --bin=ruff \
+            "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)
           )
+      - name: Create an issue for parser bugs
+        id: create_issue
+        if: ${{ failure() && github.event_name == 'schedule' && steps.fuzz.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ -f "$RUNNER_TEMP/fuzz-issue.md" ]]; then
+            gh issue create \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Daily parser fuzz failed on $(date -u '+%a %b %d %Y')" \
+              --label bug --label parser --label fuzzer \
+              --body-file "$RUNNER_TEMP/fuzz-issue.md"
+            echo 'created=true' >> "$GITHUB_OUTPUT"
+          fi
 
+  # If a scheduled fuzz job fails before creating an issue (for example, on a
+  # timeout), report the failure with a link to the run. The `issue-created`
+  # output prevents a second issue when the fuzz job already created one.
   create-issue-on-failure:
-    name: Create an issue if the daily fuzz surfaced any bugs
+    name: Create a fallback issue if the fuzz job fails
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: fuzz
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result != 'success' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result != 'success' && needs.fuzz.outputs.issue-created != 'true' }}
     permissions:
       issues: write
     steps:
