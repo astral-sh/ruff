@@ -98,7 +98,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::{ConcatenateTail, SignatureRelationVisitor, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -502,8 +502,12 @@ impl MetaTypeRecursion<'_> {
 struct ApplyTypeMappingTag;
 struct ApplyMaterializationEquivalence;
 
-type MaterializationEquivalenceVisitor<'db> =
-    Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
+struct MaterializationEquivalenceVisitor<'db> {
+    types: CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>,
+    // Nested equivalence checks can revisit protocol method comparisons while materializing
+    // their signatures. Keep their active comparisons with the equivalence cycle guard.
+    signatures: SignatureRelationVisitor<'db>,
+}
 
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
@@ -522,7 +526,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    materialization_equivalence: OnceCell<Rc<MaterializationEquivalenceVisitor<'db>>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -554,9 +558,17 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
-    fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
-        self.materialization_equivalence
-            .get_or_init(|| Rc::new(CycleDetector::new(true)))
+    fn materialization_equivalence(&self) -> &Rc<MaterializationEquivalenceVisitor<'db>> {
+        self.materialization_equivalence.get_or_init(|| {
+            Rc::new(MaterializationEquivalenceVisitor {
+                types: CycleDetector::new(true),
+                signatures: SignatureRelationVisitor::default(),
+            })
+        })
+    }
+
+    fn materialization_signature_relations(&self) -> &SignatureRelationVisitor<'db> {
+        &self.materialization_equivalence().signatures
     }
 
     fn visit(
@@ -593,6 +605,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         right: Type<'db>,
     ) -> bool {
         self.materialization_equivalence()
+            .types
             .visit(db, (left, right), || {
                 left.is_equivalent_to_with_materialization_visitor(db, right, self)
             })
@@ -4379,7 +4392,7 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => ty
                 .to_meta_type(db, env)
-                .class_object_member(db, env, name, policy),
+                .class_object_member(db, env, name, policy, None),
 
             _ => ty
                 .to_meta_type(db, env)
@@ -4448,13 +4461,27 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
         policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        let class_attr = self
-            .find_name_in_mro_with_policy(db, env, name, policy)
-            .expect(
-                "Calling `class_object_member` on class literals and subclass-of types \
+        let protocol_attr = if let Type::SubclassOf(subclass_of) = self
+            && let SubclassOfInner::Protocol(protocol) = subclass_of.subclass_of()
+        {
+            protocol.interface(db).meta_member(
+                db,
+                env,
+                name,
+                receiver.and_then(|ty| ty.to_instance_approximation(db, env)),
+            )
+        } else {
+            None
+        };
+        let class_attr = protocol_attr.unwrap_or_else(|| {
+            self.find_name_in_mro_with_policy(db, env, name, policy)
+                .expect(
+                    "Calling `class_object_member` on class literals and subclass-of types \
                 should always find an MRO",
-            );
+                )
+        });
 
         let own_class = match self {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -5696,6 +5723,7 @@ impl<'db> Type<'db> {
             env,
             name,
             MemberLookupPolicy::default(),
+            None,
         );
         let Place::Defined(DefinedPlace {
             ty,
@@ -6511,7 +6539,8 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let class_attr_plain = this.class_object_member(db, env, name_str, policy);
+                    let class_attr_plain =
+                        this.class_object_member(db, env, name_str, policy, Some(receiver));
 
                     let self_instance = receiver.to_instance_approximation(db, env).expect(
                         "The receiver for a class-object lookup should always be instantiable",
