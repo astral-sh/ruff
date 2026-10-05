@@ -1413,6 +1413,20 @@ def upper_bounded_noninferable[I, N]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))
 ```
 
+### Substitution exceeding the derivation budget
+
+If substituting an exact type into a deeply nested bound exceeds the derivation budget, the original
+symbolic bound still contributes to the solution.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def limited_substitution[I, U, V]() -> None:
+    constraints = ConstraintSet.equality(I, list[list[list[list[list[tuple[U, V]]]]]]) & ConstraintSet.equality(U, int)
+    # revealed: tuple[Solution[I=list[list[list[list[list[tuple[U@limited_substitution, V@limited_substitution]]]]]], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[I, U]))
+```
+
 ### Invariant classes containing bounded non-inferable typevars
 
 A non-inferable typevar can appear inside an invariant generic class in an inferable typevar's

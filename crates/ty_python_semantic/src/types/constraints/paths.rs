@@ -63,6 +63,8 @@ pub(crate) struct PathAssignments {
     /// Constraints that have been _replaced_ with other constraints on this path, because a
     /// sequent substituted an exact type for some typevar.
     substituted_constraints: FxIndexSet<ConstraintId>,
+    /// Substitutions awaiting admission of their replacement assignment.
+    pending_substitutions: Vec<(ConstraintId, ConstraintId)>,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
     /// replenishment and rollback do not need to update these indices.
     positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
@@ -182,6 +184,7 @@ impl Default for PathAssignments {
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -275,6 +278,7 @@ impl PathAssignments {
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
             substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -531,6 +535,7 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        self.pending_substitutions.clear();
         // A branch can replenish an assignment more than once. Restore in reverse order while
         // every referenced assignment still exists.
         for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
@@ -875,6 +880,19 @@ impl PathAssignments {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
         }
+        // Either fuel limit can prevent a replacement from being admitted. Keep the original
+        // evidence until the replacement actually holds, including when another derivation
+        // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
+        for (original, replacement) in self.pending_substitutions.drain(..) {
+            if self
+                .positive_assignment_indices
+                .get(replacement)
+                .is_some_and(Option::is_some)
+                && !self.substituted_constraints.contains(&replacement)
+            {
+                self.substituted_constraints.insert(original);
+            }
+        }
         Ok(())
     }
 
@@ -1177,8 +1195,8 @@ impl PathAssignments {
         let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
             return;
         };
-        if is_substitution && !self.substituted_constraints.contains(&post) {
-            self.substituted_constraints.insert(ante1);
+        if is_substitution {
+            self.pending_substitutions.push((ante1, post));
         }
         let available_fuel = ante1_fuel.min(ante2_fuel);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
