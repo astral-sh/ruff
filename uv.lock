@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.7"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -1660,6 +1660,15 @@ typeshed-docstrings = [
 typeshed-formatting = [
     { name = "black", marker = "python_full_version >= '3.10'" },
 ]
+
+[package.group-requires-python]
+dev = ">=3.12"
+docs = ">=3.12"
+release = ">=3.12"
+ruff-lsp-test = ">=3.12"
+ty-ecosystem = ">=3.13"
+typeshed-docstrings = ">=3.10"
+typeshed-formatting = ">=3.10"
 
 [package.metadata]
 

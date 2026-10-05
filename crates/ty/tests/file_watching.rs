@@ -3370,7 +3370,7 @@ mod uv_metadata {
         let diagnostics = case.db().check();
         assert_snapshot!(
             case.render_diagnostics(&diagnostics),
-            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: `pyproject.toml`"
+            @"pyproject.toml: warning[uv-metadata] Failed to load uv metadata: Failed to parse: pyproject.toml"
         );
         assert_eq!(project.program_settings(case.db()), &program_settings);
 

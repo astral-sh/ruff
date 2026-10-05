@@ -43,6 +43,9 @@
     {
       groupName: "prek dependencies",
       matchManagers: ["pre-commit"],
+      // The shared preset groups uv-pre-commit with uv workflow pins.
+      // Exclude it here so the prek group doesn't override that grouping.
+      matchPackageNames: ["!astral-sh/uv-pre-commit"],
       description: "Weekly update of prek dependencies",
     },
     {
