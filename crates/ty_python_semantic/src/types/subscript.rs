@@ -725,12 +725,14 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
-            (
-                Type::NominalInstance(maybe_tuple_nominal),
-                Type::NominalInstance(maybe_slice_nominal),
-            ) if let Some(tuple) = maybe_tuple_nominal.tuple_spec(db, env)
-                && let Some(SliceLiteral { start, stop, step }) =
-                    maybe_slice_nominal.slice_literal(db) =>
+            (value_ty, Type::NominalInstance(maybe_slice_nominal))
+                if let Some(SliceLiteral { start, stop, step }) =
+                    maybe_slice_nominal.slice_literal(db)
+                    && let Some(tuple) = match value_ty {
+                        Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db),
+                        _ => value_ty,
+                    }
+                    .tuple_instance_spec(db, env) =>
             {
                 Some(
                     tuple
