@@ -144,6 +144,21 @@ def with_target_reuses_context_manager():
         pass
 ```
 
+We also flag a `with` target that fills in a `None` placeholder, even when a nested function reads
+the name and the overwrite is intentional:
+
+```py
+def placeholder_read_by_nested_function():
+    progress = None
+
+    def advance():
+        if progress is not None:
+            progress.update()
+
+    with make_progress() as progress:  # error: [block-variable-shadows-local]
+        run(advance)
+```
+
 ## Exception names
 
 Python deletes the exception name when the handler exits, so the earlier value is lost entirely.
