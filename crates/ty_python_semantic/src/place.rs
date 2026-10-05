@@ -15,9 +15,9 @@ use crate::reachability::{
     evaluate_reachability_with_cache,
 };
 use crate::types::{
-    DescriptorOrigin, DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers,
-    TypeQualifiers, UnionBuilder, UnionType, binding_type, inferred_declaration,
-    is_discarded_dict_key_assignment, may_exist_at_runtime,
+    DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
+    may_exist_at_runtime,
 };
 use crate::{Db, FxIndexSet, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
@@ -336,41 +336,6 @@ impl<'db> Place<'db> {
         PlaceAndQualifiers {
             place: self,
             qualifiers,
-        }
-    }
-
-    /// Try to call `__get__(None, owner)` on the type of this place (not on the meta type).
-    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original place.
-    /// This is used to resolve (potential) descriptor attributes.
-    ///
-    /// Retains the descriptor calls that produced the resolved type.
-    pub(crate) fn try_call_dunder_get(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        owner: Type<'db>,
-    ) -> (Place<'db>, DescriptorOrigin<'db>) {
-        match self {
-            Place::Defined(defined) => {
-                let result = defined
-                    .ty
-                    .try_call_dunder_get(db, env, None, owner)
-                    .unwrap_or_else(|error| Some(error.fallback()));
-                if let Some(result) = result {
-                    (
-                        Place::Defined(DefinedPlace {
-                            ty: result.return_type,
-                            provenance: Provenance::Unknown,
-                            ..defined
-                        }),
-                        result.origin,
-                    )
-                } else {
-                    (self, DescriptorOrigin::default())
-                }
-            }
-
-            Place::Undefined => (Place::Undefined, DescriptorOrigin::default()),
         }
     }
 

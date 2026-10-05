@@ -105,11 +105,92 @@ missing_argument: Callable[[], Factory[int]] = Factory[int]  # error: [invalid-a
 wrong_argument: Callable[[str], Factory[int]] = Factory[int]  # error: [invalid-assignment]
 ```
 
+## Shared generic initializer alternatives
+
+In the example below, two forwarding classes share the same initializer. Specializing the forwarding
+classes leaves no extra type parameters in the constructor signature, but the initializer's aliased
+parameter and bounded method type variable still constrain callback arguments.
+
+```py
+from typing import Callable, Generic, TypeAlias, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U", bound=int)
+Values: TypeAlias = list[T]
+
+class End(Generic[T]):
+    def __init__(self, values: Values[T], count: U) -> None: ...
+
+class Left(Generic[T]):
+    __init__: type[End[T]]
+
+class Right(Generic[T]):
+    __init__: type[End[T]]
+
+class Root(Generic[T]):
+    __init__: type[Left[T] | Right[T]]
+
+valid: Callable[[list[str], int], Root[str]] = Root[str]
+wrong_values: Callable[[list[int], int], Root[str]] = Root[str]  # error: [invalid-assignment]
+wrong_bound: Callable[[list[str], str], Root[str]] = Root[str]  # error: [invalid-assignment]
+
+def create(factory: Callable[[list[str], int], Root[str]]) -> Root[str]:
+    return factory(["x"], 1)
+
+reveal_type(create(Root))  # revealed: Root[str]
+```
+
+## Shared descriptor cycles with concrete alternatives
+
+In the example below, both initializer paths return to `Root`, but each also reaches an initializer
+that requires an integer. Changing the union order preserves that requirement. The growing path in
+`Mixed` also terminates without hiding the concrete initializer's required argument.
+
+```py
+from __future__ import annotations
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type) -> type[T]:
+        raise NotImplementedError
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Left(Generic[T]):
+    __init__: Descriptor[Root[T] | End]
+
+class Right(Generic[T]):
+    __init__: Descriptor[Root[T] | End]
+
+class Root(Generic[T]):
+    __init__: Descriptor[Left[T] | Right[T]]
+
+class Reverse(Generic[T]):
+    __init__: Descriptor[Right[T] | Left[T]]
+
+class Grow(Generic[T]):
+    __init__: Descriptor[Grow[list[T]]]
+
+class Mixed(Generic[T]):
+    __init__: Descriptor[Left[T] | Grow[T] | Right[T]]
+
+root: Callable[[int], Root[int]] = Root[int]
+missing_root: Callable[[], Root[int]] = Root[int]  # error: [invalid-assignment]
+reverse: Callable[[int], Reverse[int]] = Reverse[int]
+missing_reverse: Callable[[], Reverse[int]] = Reverse[int]  # error: [invalid-assignment]
+mixed: Callable[[int], Mixed[int]] = Mixed[int]
+missing_mixed: Callable[[], Mixed[int]] = Mixed[int]  # error: [invalid-assignment]
+```
+
 ## Recursive constructors with growing type arguments
 
 In the example below, resolving either constructor repeatedly nests its type argument inside another
 `list`. Both direct calls and callback assignments stop expanding these recursive constructors
-rather than overflowing the stack.
+rather than overflowing the stack. Stopping a `__new__` expansion leaves its result unknown. For
+`__init__`, the enclosing constructor still returns the allocated instance.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -125,7 +206,7 @@ class Init(Generic[T]):
 new: Callable[..., object] = New[int]
 init: Callable[..., Init[int]] = Init[int]
 
-reveal_type(New[int]())  # revealed: New[int]
+reveal_type(New[int]())  # revealed: Unknown
 reveal_type(Init[int]())  # revealed: Init[int]
 ```
 
@@ -169,7 +250,8 @@ reveal_type(Parameters[[str]](1))  # revealed: Parameters[(str, /)]
 In the example below, the forwarding class calls whichever constructor it receives as its type
 argument. Expanding both nested uses of this helper exposes a growing constructor, whether the
 helper is used as `__new__` or `__init__`. Direct calls and callback assignments stop expanding the
-resulting cycles.
+resulting cycles. The forwarded `__new__` result is unknown, while the initializer preserves the
+allocated instance type.
 
 ```py
 from typing import Callable, Generic, TypeVar
@@ -187,8 +269,95 @@ class Init(Generic[T]):
 
 callback: Callable[..., object] = Grow[int]
 initializer: Callable[..., Init[int]] = Init[int]
-reveal_type(Grow[int]())  # revealed: Grow[int]
+reveal_type(Grow[int]())  # revealed: Unknown
 reveal_type(Init[int]())  # revealed: Init[int]
+```
+
+## Recursive descriptors supplied as type arguments
+
+In the example below, the initializer is supplied as a type argument. The descriptor can produce
+another specialization of the same constructor or an initializer that requires an integer. Direct
+calls stop expanding the growing chain, and callback assignments retain the integer requirement.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type) -> "type[C[Descriptor[list[T]]]] | type[End]":
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __init__: T
+
+valid: Callable[[int], C[Descriptor[int]]] = C[Descriptor[int]]
+missing: Callable[[], C[Descriptor[int]]] = C[Descriptor[int]]  # error: [invalid-assignment]
+wrong: Callable[[str], C[Descriptor[int]]] = C[Descriptor[int]]  # error: [invalid-assignment]
+
+reveal_type(C[Descriptor[int]](1))  # revealed: C[Descriptor[int]]
+```
+
+## Recursive descriptors forwarded through callable objects
+
+In the example below, the initializer delegates to a callable object whose `__call__` descriptor is
+supplied as a type argument. The alias and wrapper preserve both the growing constructor alternative
+and the initializer's required integer parameter.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Wrapper(Generic[T]):
+    __call__: T
+
+Initializer = Wrapper[T]
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type) -> "type[C[Descriptor[list[T]]]] | type[End]":
+        raise NotImplementedError
+
+class C(Generic[T]):
+    __init__: Initializer[T]
+
+valid: Callable[[int], C[Descriptor[int]]] = C[Descriptor[int]]
+missing: Callable[[], C[Descriptor[int]]] = C[Descriptor[int]]  # error: [invalid-assignment]
+wrong: Callable[[str], C[Descriptor[int]]] = C[Descriptor[int]]  # error: [invalid-assignment]
+
+reveal_type(C[Descriptor[int]](1))  # revealed: C[Descriptor[int]]
+```
+
+## Recursive aliases supplied as constructor type arguments
+
+In the example below, each constructor forwards to its type argument. The recursive alias expands
+that argument into another constructor specialization or `End`. Calls and callback assignments stop
+expanding the recursion while preserving the integer parameter required by `End`.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class C(Generic[T]):
+    __init__: type[T]
+
+Grow = C["Grow[list[T]]"] | End
+
+valid: Callable[[int], C[Grow[int]]] = C[Grow[int]]
+missing: Callable[[], C[Grow[int]]] = C[Grow[int]]  # error: [invalid-assignment]
+wrong: Callable[[str], C[Grow[int]]] = C[Grow[int]]  # error: [invalid-assignment]
+
+C[Grow[int]](1)
 ```
 
 ## Finite initializer chains with unused type parameters
@@ -329,6 +498,362 @@ def check(cls: type[C[int]]) -> None:
     valid: Callable[[int], C[int]] = cls
     missing: Callable[[], C[int]] = cls  # error: [invalid-assignment]
     wrong: Callable[[str], C[int]] = cls  # error: [invalid-assignment]
+```
+
+## Finite constructor chains selected by properties
+
+In the example below, the initializer property forwards to another specialization until its getter's
+receiver matches the terminal overload. Direct calls and callback assignments retain the integer
+parameter required by the final initializer.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class C(Generic[T]):
+    value: T
+
+    @overload
+    def getter(self: "C[list[list[int]]]") -> type[End]: ...
+    @overload
+    def getter(self) -> "type[C[list[T]]]": ...
+    def getter(self) -> Any: ...
+
+    __init__ = property(getter)
+
+C[int](1)
+C[int]()  # error: [missing-argument]
+C[int]("bad")  # error: [invalid-argument-type]
+
+valid: Callable[[int], C[int]] = C[int]
+missing: Callable[[], C[int]] = C[int]  # error: [invalid-assignment]
+wrong: Callable[[str], C[int]] = C[int]  # error: [invalid-assignment]
+```
+
+## Finite constructor chains selected by callable property getters
+
+In the example below, a callable object serves as the initializer property's getter. Its overloads
+select a finite chain ending in an initializer that requires an integer. Direct calls and callback
+assignments preserve that parameter.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Getter:
+    @overload
+    def __call__(self, instance: "C[list[list[int]]]") -> type[End]: ...
+    @overload
+    def __call__(self, instance: "C[T]") -> "type[C[list[T]]]": ...
+    def __call__(self, instance: Any) -> Any: ...
+
+class C(Generic[T]):
+    value: T
+    __init__ = property(Getter())
+
+C[int](1)
+C[int]()  # error: [missing-argument]
+C[int]("bad")  # error: [invalid-argument-type]
+
+valid: Callable[[int], C[int]] = C[int]
+missing: Callable[[], C[int]] = C[int]  # error: [invalid-assignment]
+wrong: Callable[[str], C[int]] = C[int]  # error: [invalid-assignment]
+```
+
+## Finite constructor chains selected by static descriptor methods
+
+In the example below, the initializer descriptor stores its `__get__` method as a static method. Its
+overloads distinguish each specialization needed to reach the final initializer, whose integer
+parameter is preserved in direct calls and callback assignments.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+@overload
+def getter(descriptor: "Descriptor", instance: "C[list[list[int]]]", owner: type) -> type[End]: ...
+@overload
+def getter(descriptor: "Descriptor", instance: "C[T]", owner: type) -> "type[C[list[T]]]": ...
+def getter(descriptor: "Descriptor", instance: Any, owner: type) -> Any: ...
+
+class Descriptor:
+    __get__ = staticmethod(getter)
+
+class C(Generic[T]):
+    value: T
+    __init__ = Descriptor()
+
+C[int](1)
+C[int]()  # error: [missing-argument]
+C[int]("bad")  # error: [invalid-argument-type]
+
+valid: Callable[[int], C[int]] = C[int]
+missing: Callable[[], C[int]] = C[int]  # error: [invalid-assignment]
+wrong: Callable[[str], C[int]] = C[int]  # error: [invalid-assignment]
+```
+
+## Properties selecting descriptor callables
+
+In the example below, a property selects the callable used by an initializer descriptor. It forwards
+through five specializations before choosing a callable that returns `End`. Constructor calls and
+callback assignments retain `End`'s integer parameter.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Terminal:
+    @staticmethod
+    def __call__(descriptor: object, instance: object, owner: type) -> type[End]:
+        raise NotImplementedError
+
+class Forward:
+    @staticmethod
+    def __call__(descriptor: object, instance: "C[T]", owner: type) -> "type[C[list[T]]]":
+        raise NotImplementedError
+
+class Invoker(Generic[T]):
+    value: T
+
+    @overload
+    def choose(self: "Invoker[list[list[list[list[list[int]]]]]]") -> Terminal: ...
+    @overload
+    def choose(self) -> Forward: ...
+    def choose(self) -> Any: ...
+
+    __call__ = property(choose)
+
+class Descriptor(Generic[T]):
+    __get__: Invoker[T]
+
+class C(Generic[T]):
+    value: T
+    __init__: Descriptor[T]
+
+C[int](1)
+C[int]()  # error: [missing-argument]
+C[int]("bad")  # error: [invalid-argument-type]
+
+valid: Callable[[int], C[int]] = C[int]
+missing: Callable[[], C[int]] = C[int]  # error: [invalid-assignment]
+wrong: Callable[[str], C[int]] = C[int]  # error: [invalid-assignment]
+```
+
+## Recursive protocol methods in rejected descriptor overloads
+
+In the example below, the initializer reaches `End` after three specializations. An unrelated
+overload accepts a protocol whose method recursively changes its type argument. Inspecting that
+rejected overload terminates, and the constructor retains `End`'s required integer parameter.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, Protocol, TypeVar, overload
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class P(Protocol[T_co]):
+    def method(self) -> P[list[T_co]]: ...
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer:
+    @overload
+    def __get__(self, instance: C[list[list[list[int]]]], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: P[int], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: C[T], owner: type) -> type[C[list[T]]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class C(Generic[T]):
+    value: T
+    __init__ = Initializer()
+
+def check(cls: type[C[int]]) -> None:
+    cls(1)
+    cls()  # error: [missing-argument]
+    cls("bad")  # error: [invalid-argument-type]
+
+    valid: Callable[[int], C[int]] = cls
+    missing: Callable[[], C[int]] = cls  # error: [invalid-assignment]
+    wrong: Callable[[str], C[int]] = cls  # error: [invalid-assignment]
+```
+
+## Constructors used by descriptor and property getters
+
+In the example below, constructing a getter follows a finite chain that returns a callable requiring
+an integer. Both the property and the descriptor use that callable as an initializer. Their
+constructors retain its parameter in direct calls and callback assignments.
+
+```py
+from typing import Any, Callable, Generic, TypeVar, overload
+
+T = TypeVar("T")
+
+class End:
+    def __new__(cls, *args: object) -> Callable[[int], None]:
+        raise NotImplementedError
+
+class Descriptor(Generic[T]):
+    @overload
+    def __get__(self: "Descriptor[list[list[list[int]]]]", instance: object, owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> "type[Factory[list[T]]]": ...
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class Factory(Generic[T]):
+    __new__: Descriptor[T]
+
+class Getter:
+    __get__ = Factory[int]
+
+class PropertyInit:
+    __init__ = property(Factory[int])
+
+class DescriptorInit:
+    __init__ = Getter()
+
+PropertyInit(1)
+PropertyInit()  # error: [missing-argument]
+PropertyInit("bad")  # error: [invalid-argument-type]
+DescriptorInit(1)
+DescriptorInit()  # error: [missing-argument]
+DescriptorInit("bad")  # error: [invalid-argument-type]
+
+property_callback: Callable[[int], PropertyInit] = PropertyInit
+descriptor_callback: Callable[[int], DescriptorInit] = DescriptorInit
+missing_property: Callable[[], PropertyInit] = PropertyInit  # error: [invalid-assignment]
+missing_descriptor: Callable[[], DescriptorInit] = DescriptorInit  # error: [invalid-assignment]
+```
+
+## Recursive constructors used as property getters
+
+In the example below, the initializer's property getter is a constructor whose `__new__` descriptor
+refers to another specialization of the enclosing class. Expanding the getter therefore reaches
+another initializer before the property lookup finishes. Direct calls and callback assignments stop
+expanding this growing recursion.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: object, owner: type) -> "type[C[list[T]]]":
+        raise NotImplementedError
+
+class Factory(Generic[T]):
+    __new__: Descriptor[T]
+
+class C(Generic[T]):
+    value: T
+    __init__ = property(Factory[T])
+
+C[int](1)
+callback: Callable[..., C[int]] = C[int]
+```
+
+## Recursive and concrete property getter alternatives
+
+In the example below, the metaclass's property getter either expands a recursive constructor or
+returns a callable instance. Recovering from recursion preserves the unknown alternative alongside
+the instance's integer return type, for both direct calls and callback conversion. Calling through a
+`staticmethod` wrapper preserves the same result.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+class Grow(Generic[T]):
+    __new__: "type[Grow[list[T]]]"
+
+class Concrete:
+    def __init__(self, owner: object) -> None: ...
+    def __call__(self) -> int:
+        return 1
+
+def invoke(callback: Callable[[], R]) -> R:
+    return callback()
+
+def check(getter: type[Grow[int]] | type[Concrete]) -> None:
+    class Meta(type):
+        __call__ = property(getter)
+
+    class C(metaclass=Meta): ...
+
+    reveal_type(C())  # revealed: Unknown | int
+    reveal_type(invoke(C))  # revealed: Unknown | int
+    reveal_type(staticmethod(C)())  # revealed: Unknown | int
+    result: int = C()
+    callback: Callable[[], int] = C
+```
+
+An ordinary callable with an unannotated return does not inherit recovery from the other getter
+alternative. Its constructor call still infers the constructed instance; the recursive alternative
+remains unknown.
+
+```py
+class Unannotated:
+    def __init__(self, owner: object) -> None: ...
+    def __call__(self): ...
+
+def check_unannotated(getter: type[Grow[int]] | type[Unannotated]) -> None:
+    class Meta(type):
+        __call__ = property(getter)
+
+    class C(metaclass=Meta): ...
+
+    reveal_type(C())  # revealed: Unknown | C
+    reveal_type(staticmethod(C)())  # revealed: Unknown | C
+    result: C = C()
+```
+
+## Recursive constructors used as descriptor methods
+
+In the example below, each descriptor's `__get__` is itself a constructor. Finding its callable
+signature requires another descriptor lookup at a growing specialization. Callback conversion stops
+this recursion whether the descriptor supplies `__new__`, `__init__`, or an instance's `__call__`.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    __get__: type[T]
+
+class New(Generic[T]):
+    __new__: Descriptor["New[list[T]]"]
+
+class Init(Generic[T]):
+    __init__: Descriptor["Init[list[T]]"]
+
+class Call(Generic[T]):
+    __call__: Descriptor["Call[list[T]]"]
+
+new: Callable[..., object] = New[int]
+init: Callable[..., Init[int]] = Init[int]
+call: Callable[..., object] = Call[int]()
 ```
 
 ## Finite constructor chains selected by metaclass descriptors
@@ -602,6 +1127,223 @@ def check(cls: type[C[int, str]]) -> None:
     wrong: Callable[[str], C[int, str]] = cls  # error: [invalid-assignment]
 ```
 
+## Constructor stopping types introduced by forwarding
+
+In the example below, the descriptor forwards to another constructor, whose initializer supplies a
+fixed stopping type. After four steps, the growing first argument reaches that type and selects
+`End`. Direct calls and callback assignments retain its required integer parameter.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+
+E = TypeVar("E")
+T = TypeVar("T")
+U = TypeVar("U")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer(Generic[E]):
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: C[T, U], owner: type) -> type[Forward[list[T]]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward(Generic[T]):
+    __init__: type[C[T, list[list[list[list[int]]]]]]
+
+class C(Generic[T, U]):
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+def check(cls: type[C[int, str]]) -> None:
+    cls(1)
+    cls()  # error: [missing-argument]
+    cls("x")  # error: [invalid-argument-type]
+
+    valid: Callable[[int], C[int, str]] = cls
+    missing: Callable[[], C[int, str]] = cls  # error: [invalid-assignment]
+    wrong: Callable[[str], C[int, str]] = cls  # error: [invalid-assignment]
+```
+
+## Constructor stopping types supplied through inherited aliases
+
+In the example below, the forwarding constructor inherits an initializer whose stopping type is
+built from a type argument. The alias preserves the substitution of `int` for `V`, so the growing
+first argument eventually reaches four nested lists of integers.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+
+E = TypeVar("E")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer(Generic[E]):
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: C[T, U], owner: type) -> type[Forward[list[T], int]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class C(Generic[T, U]):
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+Target = C[T, list[list[list[list[V]]]]]
+
+class Base(Generic[T, V]):
+    __init__: type[Target[T, V]]
+
+class Forward(Base[T, V]): ...
+
+def check(cls: type[C[int, str]]) -> None:
+    cls(1)
+    cls()  # error: [missing-argument]
+    cls("x")  # error: [invalid-argument-type]
+
+    valid: Callable[[int], C[int, str]] = cls
+    missing: Callable[[], C[int, str]] = cls  # error: [invalid-assignment]
+    wrong: Callable[[str], C[int, str]] = cls  # error: [invalid-assignment]
+```
+
+## Constructor stopping types changed by later forwarding
+
+In the example below, the forwarding class initially builds its stopping type from `str`, then is
+called again with `int`. That later specialization changes the stopping type to four nested lists of
+integers. Once the growing first argument reaches it, the descriptor selects `End`, preserving its
+required integer parameter for direct calls and callback assignments.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+
+E = TypeVar("E")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer(Generic[E]):
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: C[T, U], owner: type) -> type[Forward[list[T], int]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward(Generic[T, V]):
+    __init__: type[C[T, list[list[list[list[V]]]]]]
+
+class C(Generic[T, U]):
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+def check(factory: type[Forward[int, str]]) -> None:
+    factory(1)
+    factory()  # error: [missing-argument]
+    factory("wrong")  # error: [invalid-argument-type]
+
+    valid: Callable[[int], Forward[int, str]] = factory
+    missing: Callable[[], Forward[int, str]] = factory  # error: [invalid-assignment]
+    wrong: Callable[[str], Forward[int, str]] = factory  # error: [invalid-assignment]
+```
+
+## Alternative constructor paths with different stopping types
+
+In the example below, the two possible initializers use the same forwarding class with different
+type arguments. Each path reaches its own stopping type and contributes its argument requirement. An
+integer or a string alone cannot satisfy both possible initializers.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+
+E = TypeVar("E")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class End(Generic[T]):
+    def __init__(self, value: T) -> None: ...
+
+class Initializer(Generic[E]):
+    @overload
+    def __get__(self, instance: C[E, E, V], owner: type) -> type[End[V]]: ...
+    @overload
+    def __get__(self, instance: C[T, U, V], owner: type) -> type[Forward[list[T], V]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward(Generic[T, V]):
+    __init__: type[C[T, list[list[list[list[V]]]], V]]
+
+class C(Generic[T, U, V]):
+    first: T
+    second: U
+    third: V
+    __init__ = Initializer[U]()
+
+class Root:
+    __init__: type[C[int, bool, int]] | type[C[str, bool, str]]
+
+def check(value: Any) -> None:
+    Root(value)
+    Root(1)  # error: [invalid-argument-type] "Expected `str`"
+    Root("x")  # error: [invalid-argument-type] "Expected `int`"
+
+    valid: Callable[[Any], Root] = Root
+    integers: Callable[[int], Root] = Root  # error: [invalid-assignment]
+    strings: Callable[[str], Root] = Root  # error: [invalid-assignment]
+```
+
+## Constructor forwarding with a moving stopping type
+
+In the example below, the forwarding initializer sets the second argument to one more list layer
+than the first argument. Each step moves both arguments forward, so they never match and `End` is
+never selected. Direct calls and callback assignments stop expanding this chain.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+
+E = TypeVar("E")
+T = TypeVar("T")
+U = TypeVar("U")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer(Generic[E]):
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: C[T, U], owner: type) -> type[Forward[list[T]]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward(Generic[T]):
+    __init__: type[C[T, list[T]]]
+
+class C(Generic[T, U]):
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+def check(cls: type[C[int, str]]) -> None:
+    cls()
+    callback: Callable[..., C[int, str]] = cls
+```
+
 ## Constructor descriptor overloads relating type arguments
 
 In the example below, the terminating overload requires both constructor type arguments to be the
@@ -682,6 +1424,42 @@ def check(cls: type[C[int]]) -> None:
     valid: Callable[[int], C[int]] = cls
     missing: Callable[[], C[int]] = cls  # error: [invalid-assignment]
     wrong: Callable[[str], C[int]] = cls  # error: [invalid-assignment]
+```
+
+## Constructor chains selected by variadic descriptor parameters
+
+In the example below, the descriptor accepts its instance and owner through an unpacked tuple
+annotation on `*args`. Those annotations select the stopping overload, so direct calls and callback
+assignments retain the final initializer's required integer parameter.
+
+```py
+from __future__ import annotations
+from typing import Any, Callable, Generic, TypeVar, overload
+from typing_extensions import Unpack
+
+T = TypeVar("T")
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Descriptor:
+    @overload
+    def __get__(self, *args: Unpack[tuple[C[list[list[list[int]]]], type]]) -> type[End]: ...
+    @overload
+    def __get__(self, *args: Unpack[tuple[C[T], type]]) -> type[C[list[T]]]: ...
+    def __get__(self, *args: Any) -> Any: ...
+
+class C(Generic[T]):
+    value: T
+    __init__ = Descriptor()
+
+C[int](1)
+C[int]()  # error: [missing-argument]
+C[int]("bad")  # error: [invalid-argument-type]
+
+valid: Callable[[int], C[int]] = C[int]
+missing: Callable[[], C[int]] = C[int]  # error: [invalid-assignment]
+wrong: Callable[[str], C[int]] = C[int]  # error: [invalid-assignment]
 ```
 
 ## Variadic constructor chains selected by descriptors

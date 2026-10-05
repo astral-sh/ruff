@@ -11,6 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::num::NonZeroU32;
 use std::slice::Iter;
@@ -27,27 +28,34 @@ use crate::types::constraints::{
     OwnedConstraintSet, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
+use crate::types::function::FunctionType;
 use crate::types::generics::{
     ApplySpecialization, GenericContext, Specialization, SpecializationBuilder, TypeVarInference,
-    walk_generic_context,
+    walk_generic_context, walk_specialization_types,
 };
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
 };
+use crate::types::instance::walk_protocol_instance_type;
+use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_interface};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::tuple::{Tuple, TupleType, VariableSegment};
-use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{
-    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context,
+use crate::types::typed_dict::{
+    extract_unpacked_typed_dict_keys_from_kwargs_annotation, walk_typed_dict_type,
 };
+use crate::types::typevar::{
+    TypeVarInstance, TypeVarSet, max_typevar_freshness_matching_generic_context, walk_type_var_type,
+};
+use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
-    VarianceTerm, infer_complete_scope_types, todo_type,
+    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, GenericAlias,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, ProtocolInstanceType,
+    RecursiveType, SelfBinding, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable, VarianceTerm,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_db::parsed::parsed_module;
@@ -365,6 +373,7 @@ impl<'db> CallableSignature<'db> {
                             )
                         },
                         is_paramspec_value: self_signature.is_paramspec_value,
+                        is_recursion_recovery: self_signature.is_recursion_recovery,
                     }))
                 }
                 Type::Callable(callable)
@@ -413,6 +422,7 @@ impl<'db> CallableSignature<'db> {
                                 )
                             },
                             is_paramspec_value: self_signature.is_paramspec_value,
+                            is_recursion_recovery: self_signature.is_recursion_recovery,
                         }),
                     ))
                 }
@@ -677,6 +687,10 @@ pub struct Signature<'db> {
     /// callers should instead _ignore_ the `return_ty` field of a `paramspec_value` — for
     /// instance, when visiting, mapping, or comparing types.
     is_paramspec_value: bool,
+
+    /// An unknown result supplied by recursion recovery must not acquire the nominal return
+    /// normally inferred for an unannotated constructor.
+    is_recursion_recovery: bool,
 }
 
 /// Additional signature data needed for overload diagnostics or receiver binding.
@@ -835,6 +849,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: false,
+            is_recursion_recovery: false,
         }
     }
 
@@ -850,12 +865,14 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: false,
+            is_recursion_recovery: false,
         }
     }
 
     pub(super) fn into_paramspec_value(mut self) -> Self {
         self.return_ty = Type::unknown();
         self.is_paramspec_value = true;
+        self.is_recursion_recovery = false;
         self
     }
 
@@ -868,6 +885,7 @@ impl<'db> Signature<'db> {
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
             is_paramspec_value: false,
+            is_recursion_recovery: false,
         }
     }
 
@@ -922,6 +940,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: false,
+            is_recursion_recovery: false,
         }
     }
 
@@ -947,6 +966,20 @@ impl<'db> Signature<'db> {
         Self::new(Parameters::unknown(), Type::unknown())
     }
 
+    /// A gradual callable used when recursive expansion cannot establish its signature.
+    pub(super) fn recursion_recovery() -> Self {
+        Self::unknown().with_recursion_recovery()
+    }
+
+    pub(super) fn with_recursion_recovery(mut self) -> Self {
+        self.is_recursion_recovery = self.return_ty.is_unknown();
+        self
+    }
+
+    pub(super) fn is_recursion_recovery(&self) -> bool {
+        self.is_recursion_recovery && self.return_ty.is_unknown()
+    }
+
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
         Self::new(Parameters::bottom(), Type::Never)
@@ -966,6 +999,239 @@ impl<'db> Signature<'db> {
             && !self.parameters().iter().any(|p| {
                 p.should_annotation_be_displayed() && p.annotated_type().contains_self(db, env)
             })
+    }
+
+    /// Removes binders that no longer affect this signature after specialization or rewriting.
+    ///
+    /// Check actual type arguments separately from declaration bodies. A declaration's own
+    /// parameters are bound there; only captured outer parameters can add dependencies beyond
+    /// its arguments. Visiting each unspecialized body once avoids expanding growing recursive
+    /// types just to determine which binders the signature needs.
+    pub(super) fn remove_unused_typevars(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        struct ReferencesTypeVar<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            variable: BoundTypeVarInstance<'db>,
+            found: Cell<bool>,
+            visited: TypeCollector<'db>,
+            declarations: RefCell<FxHashSet<Type<'db>>>,
+        }
+
+        impl<'db> ReferencesTypeVar<'_, 'db> {
+            fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+                if !signature.is_paramspec_value {
+                    self.visit_type(db, signature.return_ty);
+                }
+                for parameter in signature.parameters() {
+                    self.visit_type(db, parameter.annotated_type());
+                    // Deferred source defaults are runtime values, unaffected by specialization.
+                    if let Some(default) = parameter.eager_default_type() {
+                        self.visit_type(db, default);
+                    }
+                }
+                for constraint in signature.receiver_constraint_types() {
+                    self.visit_type(db, constraint);
+                }
+            }
+
+            fn visit_declaration(
+                &self,
+                db: &'db dyn Db,
+                identity: Type<'db>,
+                parameters: Option<GenericContext<'db>>,
+                visit: impl FnOnce(),
+            ) {
+                if self.found.get()
+                    || parameters.is_some_and(|parameters| {
+                        parameters.contains(db, self.variable.identity(db))
+                    })
+                    || !self.declarations.borrow_mut().insert(identity)
+                {
+                    return;
+                }
+                visit();
+            }
+        }
+
+        impl<'db> TypeVisitor<'db> for ReferencesTypeVar<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                true
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.found.get() {
+                    walk_type_with_recursion_guard(db, ty, self, &self.visited);
+                }
+            }
+
+            fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+                for signature in callable.signatures(db) {
+                    self.visit_signature(db, signature);
+                }
+            }
+
+            fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+                for signature in function.signature(db) {
+                    self.visit_signature(db, signature);
+                }
+            }
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                walk_specialization_types(db, alias.specialization(db), self);
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                if let Some(arguments) = alias.specialization(db).or_else(|| {
+                    alias
+                        .generic_context(db)
+                        .map(|context| context.default_specialization(db, None))
+                }) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                let declaration = alias.unspecialized(db);
+                self.visit_declaration(
+                    db,
+                    Type::TypeAlias(declaration),
+                    declaration.generic_context(db),
+                    || {
+                        self.visit_type(db, declaration.raw_value_type(db));
+                    },
+                );
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                if let Some(arguments) = recursive.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                let declaration = recursive.constructor(db);
+                self.visit_declaration(
+                    db,
+                    Type::Recursive(declaration),
+                    declaration.parameters(db),
+                    || {
+                        self.visit_type(db, declaration.unfold(db, self.env).into_type());
+                    },
+                );
+            }
+
+            fn visit_protocol_instance_type(
+                &self,
+                db: &'db dyn Db,
+                protocol: ProtocolInstanceType<'db>,
+            ) {
+                let Some((origin, _)) = protocol
+                    .class_origin(db)
+                    .and_then(|class| class.static_class_literal(db))
+                else {
+                    walk_protocol_instance_type(db, protocol, self);
+                    return;
+                };
+                if let Some(class) = protocol.class_origin(db) {
+                    self.visit_type(db, Type::from(*class));
+                }
+                let declaration = origin.identity_specialization(db);
+                self.visit_declaration(
+                    db,
+                    Type::from(declaration),
+                    origin.generic_context(db),
+                    || {
+                        if let Some(protocol) = declaration.into_protocol_class(db) {
+                            walk_protocol_interface(
+                                db,
+                                ProtocolInterfaceView::new(protocol.interface(db), None),
+                                self,
+                            );
+                        }
+                    },
+                );
+            }
+
+            fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+                let Some((origin, _)) = typed_dict
+                    .defining_class()
+                    .and_then(|class| class.static_class_literal(db))
+                else {
+                    walk_typed_dict_type(db, typed_dict, self);
+                    return;
+                };
+                if let Some(class) = typed_dict.defining_class() {
+                    self.visit_type(db, Type::from(class));
+                }
+                let declaration = origin.identity_specialization(db);
+                self.visit_declaration(
+                    db,
+                    Type::from(declaration),
+                    origin.generic_context(db),
+                    || {
+                        walk_typed_dict_type(db, TypedDictType::new(declaration), self);
+                    },
+                );
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                variable: BoundTypeVarInstance<'db>,
+            ) {
+                let variable = if variable.is_paramspec(db) {
+                    variable.without_paramspec_attr(db)
+                } else {
+                    variable
+                };
+                if variable.identity(db) == self.variable.identity(db) {
+                    self.found.set(true);
+                    return;
+                }
+                if let Some(bound) = variable.typevar(db).bound_or_constraints(db, self.env) {
+                    self.visit_type(db, bound.as_type(db, self.env));
+                }
+                if let Some(default) = variable.default_type(db) {
+                    self.visit_type(db, default);
+                }
+            }
+
+            fn visit_type_var_type(&self, db: &'db dyn Db, variable: TypeVarInstance<'db>) {
+                if variable.identity(db) == self.variable.typevar(db).identity(db) {
+                    self.found.set(true);
+                } else {
+                    walk_type_var_type(db, variable, self);
+                }
+            }
+        }
+
+        let Some(context) = self.generic_context else {
+            return self;
+        };
+        let variables = context
+            .variables(db)
+            .filter(|variable| {
+                let visitor = ReferencesTypeVar {
+                    env,
+                    variable: *variable,
+                    found: Cell::new(false),
+                    visited: TypeCollector::default(),
+                    declarations: RefCell::default(),
+                };
+                visitor.visit_signature(db, &self);
+                visitor.found.get()
+            })
+            .collect::<Vec<_>>();
+        if variables.len() == context.len(db) {
+            return self;
+        }
+        self.generic_context = if variables.is_empty() {
+            None
+        } else {
+            Some(GenericContext::from_typevar_instances(db, env, variables))
+        };
+        self
     }
 
     fn with_inherited_generic_context(
@@ -1016,6 +1282,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: self.is_paramspec_value,
+            is_recursion_recovery: self.is_recursion_recovery,
         }
     }
 
@@ -1048,6 +1315,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: self.is_paramspec_value,
+            is_recursion_recovery: self.is_recursion_recovery,
         })
     }
 
@@ -1078,6 +1346,7 @@ impl<'db> Signature<'db> {
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
             is_paramspec_value: self.is_paramspec_value,
+            is_recursion_recovery: self.is_recursion_recovery,
         }
     }
 
@@ -1319,6 +1588,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: self.is_paramspec_value,
+            is_recursion_recovery: self.is_recursion_recovery,
         }
     }
 
@@ -1725,6 +1995,7 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
             is_paramspec_value: self.is_paramspec_value,
+            is_recursion_recovery: self.is_recursion_recovery,
         }
     }
 
@@ -2162,7 +2433,11 @@ impl<'db> Signature<'db> {
 
     /// Create a new signature with the given return type.
     pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
-        Self { return_ty, ..self }
+        Self {
+            return_ty,
+            is_recursion_recovery: self.is_recursion_recovery && return_ty.is_unknown(),
+            ..self
+        }
     }
 }
 
@@ -6352,6 +6627,132 @@ mod tests {
             merge_receiver_constraints(db, &env, None, Some(&OwnedConstraintSet::always()),)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn unused_signature_binders_preserve_transitive_dependencies() -> anyhow::Result<()> {
+        for (source, expected) in [
+            ("def f[T, Unused](value: T) -> None: ...", vec!["T"]),
+            ("def f[T, U: int, Unused](value: U) -> None: ...", vec!["U"]),
+            (
+                "def f[T, U = list[T], Unused = int](value: U) -> None: ...",
+                vec!["T", "U"],
+            ),
+            (
+                "def f[T, U: (int, str), Unused](value: U) -> None: ...",
+                vec!["U"],
+            ),
+            (
+                "def f[**P, Unused](*args: P.args, **kwargs: P.kwargs) -> None: ...",
+                vec!["P"],
+            ),
+            (
+                "type Alias[T] = list[T]\ndef f[T, Unused](value: Alias[T]) -> None: ...",
+                vec!["T"],
+            ),
+            (
+                "type Alias[T] = T | list[Alias[T]]\ndef f[T, Unused](value: Alias[T]) -> None: ...",
+                vec!["T"],
+            ),
+        ] {
+            let mut db = setup_db();
+            db.write_dedented("/src/a.py", source)?;
+            let env = db.program_environment();
+            let signature = get_function_f(&db, "/src/a.py")
+                .literal(&db)
+                .last_definition
+                .signature(&db)
+                .remove_unused_typevars(&db, &env);
+            let actual = signature
+                .generic_context
+                .into_iter()
+                .flat_map(|context| context.variables(&db))
+                .map(|variable| variable.typevar(&db).name(&db).as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "{source}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn signature_binders_referenced_only_by_receivers_or_defaults() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented("/src/a.py", "def f[T: int, Unused](self: T) -> None: ...")?;
+        let env = db.program_environment();
+        let signature = get_function_f(&db, "/src/a.py")
+            .literal(&db)
+            .last_definition
+            .signature(&db);
+        let variable = signature.parameters()[0].annotated_type();
+        let receiver = KnownClass::Int.to_instance(&db, &env);
+        let bound =
+            signature
+                .clone()
+                .bind_self_with_receiver(&db, &env, Some(receiver), Some(receiver));
+        assert_eq!(bound.parameters().len(), 0);
+        assert!(bound.receiver_constraint_types().any(|ty| ty == variable));
+
+        let with_default = Signature::new_generic(
+            signature.generic_context,
+            Parameters::standard([Parameter::positional_only(None).with_default_type(variable)]),
+            Type::unknown(),
+        );
+        for signature in [bound, with_default] {
+            let normalized = signature.remove_unused_typevars(&db, &env);
+            let variables = normalized
+                .generic_context
+                .into_iter()
+                .flat_map(|context| context.variables(&db))
+                .map(Type::TypeVar)
+                .collect::<Vec<_>>();
+            assert_eq!(variables, vec![variable]);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn signature_binders_captured_by_nested_declarations() -> anyhow::Result<()> {
+        for declaration in [
+            "type Value = T",
+            "class Value(Protocol):\n    item: T",
+            "class Value(TypedDict):\n    item: T",
+        ] {
+            let mut db = setup_db();
+            let declaration = declaration
+                .lines()
+                .map(|line| format!("    {line}"))
+                .join("\n");
+            db.write_dedented("/src/a.py", &format!(
+                "from typing import Protocol, TypedDict\nclass Scope[T]:\n{declaration}\n    def method[Unused](self, value: Value) -> None: ...\nf = Scope.method\n"
+            ))?;
+            let env = db.program_environment();
+            let function = get_function_f(&db, "/src/a.py");
+            let module = ruff_db::files::system_path_to_file(&db, "/src/a.py")?;
+            let module = ProgramFile::new(&db, module, env.program(&db));
+            let Type::ClassLiteral(class) = global_symbol(&db, module, "Scope").place.expect_type()
+            else {
+                anyhow::bail!("expected a generic class");
+            };
+            let mut signature = function
+                .literal(&db)
+                .last_definition
+                .signature(&db)
+                .bind_self(&db, &env, Some(Type::unknown()));
+            signature.generic_context = GenericContext::merge_optional(
+                &db,
+                class.generic_context(&db),
+                signature.generic_context,
+            );
+            let signature = signature.remove_unused_typevars(&db, &env);
+            let variables = signature
+                .generic_context
+                .into_iter()
+                .flat_map(|context| context.variables(&db))
+                .map(|variable| variable.name(&db).as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(variables, vec!["T"], "{declaration}");
+        }
+        Ok(())
     }
 
     #[test]

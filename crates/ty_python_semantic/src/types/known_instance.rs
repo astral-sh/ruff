@@ -9,7 +9,7 @@ use crate::{
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
         TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
-        callable::{CallableTypeKind, CallableTypes},
+        callable::CallableTypeKind,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
         dedicated::pydantic::ConfigBoolean,
@@ -162,17 +162,6 @@ impl<'db> MethodWrapper<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
         self.class(db).to_instance(db, env)
-    }
-
-    pub(super) fn callables(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Option<CallableTypes<'db>> {
-        match self.kind(db) {
-            MethodWrapperKind::Staticmethod => self.wrapped(db).try_upcast_to_callable(db, env),
-            MethodWrapperKind::Classmethod => None,
-        }
     }
 
     fn recursive_type_normalized_impl(

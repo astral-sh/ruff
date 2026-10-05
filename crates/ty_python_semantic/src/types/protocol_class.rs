@@ -2379,6 +2379,7 @@ fn protocol_member_read_type<'db>(
             ty,
             Place::Undefined.into(),
             InstanceFallbackShadowsNonDataDescriptor::No,
+            None,
         )
         .unwrap_or_else(|error| error.fallback_member(db))
         .member(db)

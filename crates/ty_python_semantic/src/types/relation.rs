@@ -1,3 +1,5 @@
+mod callable;
+
 use crate::{FxOrderMap, FxOrderSet, ProgramEnvironment};
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -25,7 +27,6 @@ use crate::types::{
     ClassType, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, PropertyInstanceType,
     ProtocolInstanceType, SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType,
-    UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1828,11 +1829,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             };
             let mut results = observations.results.borrow_mut();
             for (pattern, actual, is_target) in [(source, target, false), (target, source, true)] {
+                if !observations.patterns.contains(&pattern) {
+                    continue;
+                }
                 if matches!(
                     observations.site.get(),
                     RelationObservationSite::Argument(_)
-                ) && observations.patterns.contains(&pattern)
-                    && let Type::TypeVar(typevar) = pattern
+                ) && let Type::TypeVar(typevar) = pattern
                     && typevar.is_inferable(db, self.inferable)
                 {
                     observations
@@ -1842,20 +1845,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         .or_default()
                         .insert(actual);
                 }
-                if observations.patterns.contains(&pattern) {
-                    let arity = TypeArity::of(db, self.env, actual)
-                        .min(TypeArity::of(db, self.env, pattern));
-                    let size = TypeStructureSize::of(db, self.env, actual)
-                        .min(TypeStructureSize::of(db, self.env, pattern));
-                    results.insert(RelationObservation {
-                        site: observations.site.get(),
-                        pattern,
-                        is_target,
-                        outcome,
-                        size,
-                        arity,
-                    });
-                }
+                let arity =
+                    TypeArity::of(db, self.env, actual).min(TypeArity::of(db, self.env, pattern));
+                let size = TypeStructureSize::of(db, self.env, actual)
+                    .min(TypeStructureSize::of(db, self.env, pattern));
+                results.insert(RelationObservation {
+                    site: observations.site.get(),
+                    pattern,
+                    is_target,
+                    outcome,
+                    size,
+                    arity,
+                });
             }
         }
         result
@@ -2618,39 +2619,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (_, Type::Callable(target_callable)) => {
-                self.with_recursion_guard(db, source, target, || {
-                    // Bound methods can be assigned to inferred function-like callback types,
-                    // but are not nominal subtypes of functions.
-                    let target_callable = if self.relation.is_assignability()
-                        && matches!(source, Type::BoundMethod(_))
-                        && target_callable.is_function_like(db)
-                    {
-                        target_callable.into_regular(db)
-                    } else {
-                        target_callable
-                    };
-                    let Some(callables) = source.try_upcast_to_callable_with_policy(
-                        db,
-                        env,
-                        UpcastPolicy::from(self.relation),
-                    ) else {
-                        return self.never();
-                    };
-
-                    let result = self.check_callables_vs_callable(db, &callables, target_callable);
-
-                    if let Some(context) = self.report_context()
-                        && self.should_provide_callable_upcast_context(source)
-                        && result.is_never_satisfied(db, env)
-                    {
-                        context.push(ErrorContext::InferredCallableType {
-                            source,
-                            callable: callables.to_type(db, env),
-                        });
-                    }
-
-                    result
-                })
+                self.check_callable_source(db, source, target_callable)
             }
 
             // `type[Any]` is assignable to arbitrary protocols as it has arbitrary attributes

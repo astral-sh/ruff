@@ -100,7 +100,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
-use crate::types::signatures::{ConcatenateTail, walk_signature};
+use crate::types::signatures::{CallableSignature, ConcatenateTail, walk_signature};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
@@ -146,6 +146,7 @@ mod context;
 mod context_manager;
 mod cyclic;
 mod dedicated;
+mod descriptor;
 mod diagnostic;
 mod display;
 mod enums;
@@ -765,23 +766,31 @@ impl<'db> DescriptorGetCallContext<'db> {
     }
 }
 
-/// A descriptor invocation and the declarations selected for that invocation.
-/// Keeping the arguments with their selected declarations preserves correlations across unions.
-/// The function retains its specialization: a descriptor's class parameters can determine which
-/// receivers match its overloads, even when consecutive calls select the same declaration.
+/// A call that determines a descriptor's result, including calls delegated to property getters.
+/// Candidate signatures and actual arguments retain dispatch information even when a function
+/// has been converted to `Callable`, or when the callable has no source declaration.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct DescriptorDispatch<'db> {
     #[returns(ref)]
-    definitions: Box<[Definition<'db>]>,
-    #[returns(copy)]
-    function: Option<FunctionType<'db>>,
-    #[returns(copy)]
-    bound_receiver: Option<Type<'db>>,
-    #[returns(copy)]
-    call: DescriptorGetCallContext<'db>,
+    signatures: CallableSignature<'db>,
+    #[returns(ref)]
+    arguments: Box<[Type<'db>]>,
+    #[returns(ref)]
+    comparisons: Box<[Box<[DescriptorArgumentComparison<'db>]>]>,
+    #[returns(ref)]
+    selected_overloads: Box<[usize]>,
+    failed: bool,
 }
 
 impl get_size2::GetSize for DescriptorDispatch<'_> {}
+
+/// The effective obligation for a matched descriptor argument, after unpacked parameter matching.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+struct DescriptorArgumentComparison<'db> {
+    argument_index: usize,
+    argument_type: Type<'db>,
+    parameter_type: Type<'db>,
+}
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 struct DescriptorDispatches<'db> {
@@ -795,12 +804,17 @@ impl get_size2::GetSize for DescriptorDispatches<'_> {}
 #[derive(
     Clone, Copy, Debug, Default, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue,
 )]
-pub(crate) struct DescriptorOrigin<'db> {
+struct DescriptorOrigin<'db> {
     dispatches: Option<DescriptorDispatches<'db>>,
+    /// A failed call without callable candidates has no dispatch to observe.
+    incomplete: bool,
+    /// Whether an `Unknown` alternative in the returned value came from recursion recovery.
+    /// This does not describe concrete callables with an unknown return annotation.
+    return_contains_recursive_recovery: bool,
 }
 
 impl<'db> DescriptorOrigin<'db> {
-    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+    fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         let dispatches = match (self.dispatches, other.dispatches) {
             (Some(left), Some(right)) if left != right => Some(DescriptorDispatches::new(
                 db,
@@ -814,7 +828,32 @@ impl<'db> DescriptorOrigin<'db> {
             )),
             _ => self.dispatches.or(other.dispatches),
         };
-        Self { dispatches }
+        Self {
+            dispatches,
+            incomplete: self.incomplete || other.incomplete,
+            return_contains_recursive_recovery: self.return_contains_recursive_recovery
+                || other.return_contains_recursive_recovery,
+        }
+    }
+
+    /// Discards recovery provenance when the effective result no longer includes `Unknown`.
+    fn restrict_to_return_type(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        return_type: Type<'db>,
+    ) -> Self {
+        if self.return_contains_recursive_recovery {
+            let return_type = return_type.resolve_type_alias(db);
+            let return_type = return_type
+                .as_union_like(db)
+                .map_or(return_type, |union| union.expand_aliases(db, env));
+            self.return_contains_recursive_recovery = match return_type {
+                Type::Union(union) => union.elements(db).iter().any(Type::is_unknown),
+                ty => ty.is_unknown(),
+            };
+        }
+        self
     }
 }
 
@@ -822,7 +861,7 @@ impl<'db> DescriptorOrigin<'db> {
 #[derive(Clone, Debug, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DescriptorGetResult<'db> {
     pub(crate) return_type: Type<'db>,
-    pub(crate) origin: DescriptorOrigin<'db>,
+    origin: DescriptorOrigin<'db>,
     kind: AttributeKind,
 }
 
@@ -4883,6 +4922,17 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
+        self.try_call_dunder_get_with_recursion_guard(db, env, instance, owner, None)
+    }
+
+    fn try_call_dunder_get_with_recursion_guard(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -4891,177 +4941,7 @@ impl<'db> Type<'db> {
             instance: Option<Type<'db>>,
             owner: Type<'db>,
         ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
-            let env = &ProgramEnvironment::from_program(program);
-            if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get(db, env, instance, owner);
-            }
-
-            if let Some(dynamic) = ty.dynamic_descriptor_type() {
-                return Ok(Some(DescriptorGetResult {
-                    return_type: dynamic,
-                    origin: DescriptorOrigin::default(),
-                    kind: AttributeKind::DataDescriptor,
-                }));
-            }
-
-            if let Some(union) = ty.as_union_like(db) {
-                let mut return_types = UnionBuilder::new(db, env)
-                    .or_recursively_defined(union.recursively_defined(db));
-                let mut error = None;
-                let mut any_descriptor = false;
-                let mut all_data_descriptors = true;
-                let mut origins = DescriptorOrigin::default();
-
-                for alternative in union.elements(db) {
-                    let result = alternative
-                        .try_call_dunder_get(db, env, instance, owner)
-                        .unwrap_or_else(|failure| {
-                            error = error.or(Some(failure.context));
-                            Some(failure.fallback())
-                        });
-                    if let Some(DescriptorGetResult {
-                        return_type,
-                        kind,
-                        origin,
-                    }) = result
-                    {
-                        origins = origins.merge(db, origin);
-                        any_descriptor = true;
-                        all_data_descriptors &= kind.is_data();
-                        return_types = return_types.add(return_type);
-                    } else {
-                        all_data_descriptors = false;
-                        return_types = return_types.add(*alternative);
-                    }
-                }
-
-                return if any_descriptor {
-                    descriptor_get_result(
-                        return_types.build(),
-                        origins,
-                        if all_data_descriptors {
-                            AttributeKind::DataDescriptor
-                        } else {
-                            AttributeKind::NormalOrNonDataDescriptor
-                        },
-                        error,
-                    )
-                } else {
-                    Ok(None)
-                };
-            }
-
-            if let Type::Intersection(intersection) = ty {
-                let mut return_types = IntersectionBuilder::new(db, env);
-                let mut origin = DescriptorOrigin::default();
-                let mut error = None;
-                let mut any_descriptor = false;
-                for &element in intersection.positive(db) {
-                    let result = element
-                        .try_call_dunder_get(db, env, instance, owner)
-                        .unwrap_or_else(|failure| {
-                            error = error.or(Some(failure.context));
-                            Some(failure.fallback())
-                        });
-                    let (return_type, element_origin) = if let Some(result) = result {
-                        any_descriptor = true;
-                        (result.return_type, result.origin)
-                    } else {
-                        (element, DescriptorOrigin::default())
-                    };
-                    return_types.add_positive_in_place(return_type);
-                    origin = origin.merge(db, element_origin);
-                }
-                return if any_descriptor {
-                    descriptor_get_result(
-                        return_types.build(),
-                        origin,
-                        // TODO: Discover data descriptors in intersections without decomposing
-                        // the descriptor return type into an unsound intersection.
-                        AttributeKind::NormalOrNonDataDescriptor,
-                        error,
-                    )
-                } else {
-                    Ok(None)
-                };
-            }
-
-            let Place::Defined(DefinedPlace {
-                ty: concrete_descr_get,
-                ..
-            }) = ty
-                .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
-                .place
-            else {
-                return Ok(None);
-            };
-
-            // A recursive member lookup can yield the internal cycle marker. It does not
-            // represent a concrete descriptor method and must not escape through the access.
-            if concrete_descr_get.is_divergent() {
-                return Ok(None);
-            }
-
-            // Descriptor special-method lookup checks the descriptor's type, so instance storage
-            // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
-            let Place::Defined(DefinedPlace {
-                ty: descr_get,
-                definedness: descr_get_boundness,
-                ..
-            }) = ty
-                .class_member_with_policy(
-                    db,
-                    env,
-                    "__get__",
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            else {
-                return Ok(None);
-            };
-
-            let instance_ty = instance.unwrap_or_else(|| Type::none(db, env));
-            let kind = if ty.is_data_descriptor(db, env) {
-                AttributeKind::DataDescriptor
-            } else {
-                AttributeKind::NormalOrNonDataDescriptor
-            };
-            let (return_type, origin, error) = match descr_get.try_call(
-                db,
-                env,
-                &CallArguments::positional([ty, instance_ty, owner]),
-            ) {
-                Ok(bindings) => {
-                    let origin = bindings
-                        .iter_flat()
-                        .map(|binding| {
-                            binding.descriptor_origin(
-                                db,
-                                DescriptorGetCallContext::new(db, ty, descr_get, instance, owner),
-                            )
-                        })
-                        .reduce(|left, right| left.merge(db, right))
-                        .unwrap_or_default();
-                    (bindings.return_type(db, env), origin, None)
-                }
-                Err(error) => {
-                    let call = DescriptorGetCallContext::new(db, ty, descr_get, instance, owner);
-                    let origin = error
-                        .1
-                        .iter_flat()
-                        .map(|binding| binding.descriptor_origin(db, call))
-                        .reduce(|left, right| left.merge(db, right))
-                        .unwrap_or_default();
-                    (error.return_type(db, env), origin, Some(call))
-                }
-            };
-            let return_type = if descr_get_boundness == Definedness::AlwaysDefined {
-                return_type
-            } else {
-                UnionType::from_two_elements(db, env, return_type, ty)
-            };
-
-            descriptor_get_result(return_type, origin, kind, error)
+            descriptor::evaluate(db, program, ty, instance, owner, None)
         }
 
         tracing::trace!(
@@ -5101,7 +4981,11 @@ impl<'db> Type<'db> {
             }));
         }
 
-        try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
+        if recursion_guard.is_some() {
+            descriptor::evaluate(db, env.program(db), self, instance, owner, recursion_guard)
+        } else {
+            try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
+        }
     }
 
     /// Applies the descriptor protocol while preserving the attribute's place metadata.
@@ -5111,6 +4995,7 @@ impl<'db> Type<'db> {
         attribute: PlaceAndQualifiers<'db>,
         instance: Option<Type<'db>>,
         owner: Type<'db>,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) -> (
         PlaceAndQualifiers<'db>,
         AttributeKind,
@@ -5127,7 +5012,7 @@ impl<'db> Type<'db> {
         };
         let mut error = None;
         let Some(result) = ty
-            .try_call_dunder_get(db, env, instance, owner)
+            .try_call_dunder_get_with_recursion_guard(db, env, instance, owner, recursion_guard)
             .unwrap_or_else(|failure| {
                 error = Some(failure.context);
                 Some(failure.fallback())
@@ -5295,6 +5180,7 @@ impl<'db> Type<'db> {
         receiver: Type<'db>,
         fallback: MemberLookupResult<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain =
             Self::instance_lookup_class_member_with_policy(db, env, key, receiver);
@@ -5309,7 +5195,14 @@ impl<'db> Type<'db> {
             meta_attr_kind,
             meta_attr_error,
             meta_descriptor,
-        ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
+        ) = Self::try_call_dunder_get_on_attribute(
+            db,
+            env,
+            meta_attr_plain,
+            Some(receiver),
+            owner,
+            recursion_guard,
+        );
 
         let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
         let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
@@ -5611,6 +5504,18 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> MemberLookupResult<'db> {
+        self.member_lookup_with_recursion_guard(db, env, name, policy, receiver, None)
+    }
+
+    fn member_lookup_with_recursion_guard(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        receiver: Option<Type<'db>>,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> MemberLookupResult<'db> {
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, id, _| Place::bound(Type::divergent(id)).into(),
@@ -5623,7 +5528,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
         ) -> MemberLookupResult<'db> {
-            member_lookup_with_policy_impl(db, key, None)
+            member_lookup_with_policy_impl(db, key, None, None)
         }
 
         #[salsa::tracked(
@@ -5639,13 +5544,14 @@ impl<'db> Type<'db> {
             key: MemberLookupKey<'db>,
             receiver: Type<'db>,
         ) -> MemberLookupResult<'db> {
-            member_lookup_with_policy_impl(db, key, Some(receiver))
+            member_lookup_with_policy_impl(db, key, Some(receiver), None)
         }
 
         fn member_lookup_with_policy_impl<'db>(
             db: &'db dyn Db,
             key: MemberLookupKey<'db>,
             receiver: Option<Type<'db>>,
+            recursion_guard: Option<&CallableRecursionGuard<'db>>,
         ) -> MemberLookupResult<'db> {
             fn promote_inferred_attribute_class_literals<'db>(
                 db: &'db dyn Db,
@@ -5675,6 +5581,7 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment<'db>,
                 key: MemberLookupKey<'db>,
                 receiver: Type<'db>,
+                recursion_guard: Option<&CallableRecursionGuard<'db>>,
             ) -> MemberLookupResult<'db> {
                 let this = key.ty(db);
                 let name = key.name(db);
@@ -5709,6 +5616,7 @@ impl<'db> Type<'db> {
                     receiver,
                     fallback.into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
+                    recursion_guard,
                 );
 
                 if result
@@ -5744,16 +5652,27 @@ impl<'db> Type<'db> {
                 name
             );
             if let Some(fallback) = this.materialized_divergent_fallback() {
-                return fallback
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver);
+                return fallback.member_lookup_with_recursion_guard(
+                    db,
+                    env,
+                    name_str,
+                    policy,
+                    receiver,
+                    recursion_guard,
+                );
             }
 
             match this {
                 Type::Recursive(recursive) => recursive
                     .unfold(db, env)
                     .map(|unfolded| {
-                        unfolded.member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
+                        unfolded.member_lookup_with_recursion_guard(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            receiver,
+                            recursion_guard,
                         )
                     })
                     .unwrap_or(Place::bound(Type::unknown()).into()),
@@ -5765,8 +5684,13 @@ impl<'db> Type<'db> {
                     let mut properties = None;
                     let mut descriptor = DescriptorOrigin::default();
                     let member = union.map_with_boundness_and_qualifiers(db, env, |elem| {
-                        let result = elem.member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
+                        let result = elem.member_lookup_with_recursion_guard(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            receiver,
+                            recursion_guard,
                         );
                         error = error.or_else(|| result.err().map(|error| error.kind(db)));
                         let member = result.unwrap_or_else(|error| error.fallback_member(db));
@@ -5796,8 +5720,13 @@ impl<'db> Type<'db> {
                         let mut all_deprecated = true;
                         let member =
                             intersection.map_with_boundness_and_qualifiers(db, env, |elem| {
-                                let result = elem.member_lookup_with_policy_and_receiver(
-                                    db, env, name_str, policy, receiver,
+                                let result = elem.member_lookup_with_recursion_guard(
+                                    db,
+                                    env,
+                                    name_str,
+                                    policy,
+                                    receiver,
+                                    recursion_guard,
                                 );
                                 error = error.or_else(|| result.err().map(|error| error.kind(db)));
                                 let member =
@@ -6003,8 +5932,13 @@ impl<'db> Type<'db> {
                     }
                     _ => wrapper
                         .instance_fallback(db, env)
-                        .member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
+                        .member_lookup_with_recursion_guard(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            receiver,
+                            recursion_guard,
                         ),
                 },
                 Type::BoundMethod(bound_method) => match name_str {
@@ -6023,32 +5957,61 @@ impl<'db> Type<'db> {
                     _ => {
                         let result = KnownClass::MethodType
                             .to_instance(db, env)
-                            .member_lookup_with_policy_and_receiver(
-                                db, env, name_str, policy, receiver,
+                            .member_lookup_with_recursion_guard(
+                                db,
+                                env,
+                                name_str,
+                                policy,
+                                receiver,
+                                recursion_guard,
                             );
                         member_lookup_or_fall_back_to(db, env, result, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object. This
                             // changes the lookup object, so do not forward the bound-method
                             // receiver.
-                            bound_method
-                                .func(db)
-                                .member_lookup_with_policy_and_receiver(
-                                    db, env, name_str, policy, None,
-                                )
+                            bound_method.func(db).member_lookup_with_recursion_guard(
+                                db,
+                                env,
+                                name_str,
+                                policy,
+                                None,
+                                recursion_guard,
+                            )
                         })
                     }
                 },
                 Type::KnownBoundMethod(method) => method
                     .class()
                     .to_instance(db, env)
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                    .member_lookup_with_recursion_guard(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        receiver,
+                        recursion_guard,
+                    ),
                 Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                     .to_instance(db, env)
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                    .member_lookup_with_recursion_guard(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        receiver,
+                        recursion_guard,
+                    ),
                 Type::DataclassDecorator(_) => KnownClass::FunctionType
                     .to_instance(db, env)
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                    .member_lookup_with_recursion_guard(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        receiver,
+                        recursion_guard,
+                    ),
 
                 Type::Callable(callable)
                     if name_str == "__call__"
@@ -6072,10 +6035,24 @@ impl<'db> Type<'db> {
                 }
                 Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => class
                     .to_instance(db, env)
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                    .member_lookup_with_recursion_guard(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        receiver,
+                        recursion_guard,
+                    ),
 
                 Type::Callable(_) | Type::DataclassTransformer(_) => Type::object()
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                    .member_lookup_with_recursion_guard(
+                        db,
+                        env,
+                        name_str,
+                        policy,
+                        receiver,
+                        recursion_guard,
+                    ),
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "major" | "minor") && instance.is_sys_version_info() =>
@@ -6140,12 +6117,24 @@ impl<'db> Type<'db> {
                 Type::NewTypeInstance(new_type_instance) if this.as_union_like(db).is_some() => {
                     new_type_instance
                         .concrete_base_type(db)
-                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, None)
+                        .member_lookup_with_recursion_guard(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            None,
+                            recursion_guard,
+                        )
                 }
 
-                Type::TypeAlias(alias) => alias
-                    .value_type(db)
-                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                Type::TypeAlias(alias) => alias.value_type(db).member_lookup_with_recursion_guard(
+                    db,
+                    env,
+                    name_str,
+                    policy,
+                    receiver,
+                    recursion_guard,
+                ),
 
                 _ if policy.no_instance_fallback() => {
                     let receiver = receiver.unwrap_or(this);
@@ -6156,6 +6145,7 @@ impl<'db> Type<'db> {
                         receiver,
                         Place::Undefined.into(),
                         InstanceFallbackShadowsNonDataDescriptor::No,
+                        recursion_guard,
                     );
                     map_member_lookup_type(db, result, |ty| {
                         ty.bind_self_typevars(db, env, receiver)
@@ -6211,7 +6201,7 @@ impl<'db> Type<'db> {
                             policy,
                         )
                     } else {
-                        instance_like_member_lookup(db, env, key, receiver)
+                        instance_like_member_lookup(db, env, key, receiver, recursion_guard)
                     }
                 }
 
@@ -6258,8 +6248,13 @@ impl<'db> Type<'db> {
                     let nominal_lookup = partial
                         .partial(db)
                         .into_functools_partial_instance(db, env)
-                        .member_lookup_with_policy_and_receiver(
-                            db, env, name_str, policy, receiver,
+                        .member_lookup_with_recursion_guard(
+                            db,
+                            env,
+                            name_str,
+                            policy,
+                            receiver,
+                            recursion_guard,
                         );
                     if name_str == "func" {
                         match nominal_lookup
@@ -6304,7 +6299,7 @@ impl<'db> Type<'db> {
                 | Type::TypeForm(..)
                 | Type::TypedDict(_) => {
                     let receiver = receiver.unwrap_or(this);
-                    instance_like_member_lookup(db, env, key, receiver)
+                    instance_like_member_lookup(db, env, key, receiver, recursion_guard)
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -6348,6 +6343,7 @@ impl<'db> Type<'db> {
                             class_attr_plain,
                             None,
                             receiver,
+                            recursion_guard,
                         );
 
                     let result = Type::invoke_descriptor_protocol(
@@ -6363,6 +6359,7 @@ impl<'db> Type<'db> {
                             class_descriptor,
                         ),
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
+                        recursion_guard,
                     );
 
                     // A class is an instance of its metaclass. If attribute lookup on the class
@@ -6433,6 +6430,9 @@ impl<'db> Type<'db> {
         }
 
         let key = MemberLookupKey::new(db, env.program(db), self, name, policy);
+        if recursion_guard.is_some() {
+            return member_lookup_with_policy_impl(db, key, receiver, recursion_guard);
+        }
         match receiver {
             Some(receiver) => member_lookup_with_policy_and_receiver_inner(db, key, receiver),
             None => member_lookup_with_policy_inner(db, key),
@@ -6589,11 +6589,7 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Bindings<'db> {
-        self.bindings_impl(
-            db,
-            env,
-            &CallableRecursionGuard::new(CallableExpansion::Bindings),
-        )
+        self.bindings_impl(db, env, &CallableRecursionGuard::new())
     }
 
     fn bindings_impl(
@@ -6602,14 +6598,66 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         recursion_guard: &CallableRecursionGuard<'db>,
     ) -> Bindings<'db> {
+        self.bindings_with_recovery(db, env, recursion_guard, false)
+    }
+
+    fn bindings_from_descriptor(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
+        origin: DescriptorOrigin<'db>,
+    ) -> Bindings<'db> {
+        let mut bindings = self.bindings_with_recovery(
+            db,
+            env,
+            recursion_guard,
+            origin.return_contains_recursive_recovery,
+        );
+        bindings.add_descriptor_origin(db, origin);
+        bindings
+    }
+
+    fn bindings_with_recovery(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
+        unknown_is_recovery: bool,
+    ) -> Bindings<'db> {
+        // Reading these signatures does not expand another callable. Builtin delegation is
+        // checked later, under the same guard, after the bindings have been constructed.
+        if matches!(self, Type::FunctionLiteral(_) | Type::Callable(_)) {
+            return self.bindings_body(db, env, recursion_guard, unknown_is_recovery);
+        }
+        let on_cycle = || Binding::single(self, Signature::unknown()).into();
+        recursion_guard.visit(
+            db,
+            env,
+            (CallableExpansion::Bindings, self),
+            on_cycle,
+            || Binding::single(self, Signature::recursion_recovery()).into(),
+            || self.bindings_body(db, env, recursion_guard, unknown_is_recovery),
+        )
+    }
+
+    fn bindings_body(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
+        unknown_is_recovery: bool,
+    ) -> Bindings<'db> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings_impl(db, env, recursion_guard);
+            return fallback.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery);
         }
 
         match self {
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
-                .map(|unfolded| unfolded.bindings_impl(db, env, recursion_guard))
+                .map(|unfolded| {
+                    unfolded.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
+                })
                 .unwrap_or_else(|| CallableBinding::not_callable(self).into()),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
@@ -6622,14 +6670,13 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.require_bound_or_constraints(db, env) {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        bound.bindings_impl(db, env, recursion_guard)
+                        bound.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => Bindings::from_union(
                         self,
-                        constraints
-                            .elements(db)
-                            .iter()
-                            .map(|ty| ty.bindings_impl(db, env, recursion_guard)),
+                        constraints.elements(db).iter().map(|ty| {
+                            ty.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
+                        }),
                     ),
                 }
             }
@@ -6638,7 +6685,15 @@ impl<'db> Type<'db> {
                 let Some(signature) = bound_method.unbound_signatures(db) else {
                     return bound_method
                         .func(db)
-                        .try_upcast_to_callable(db, env)
+                        .try_upcast_to_callable_from_descriptor(
+                            db,
+                            env,
+                            recursion_guard,
+                            DescriptorOrigin {
+                                return_contains_recursive_recovery: unknown_is_recovery,
+                                ..DescriptorOrigin::default()
+                            },
+                        )
                         .map_or_else(
                             || CallableBinding::not_callable(self).into(),
                             |callables| {
@@ -6708,7 +6763,7 @@ impl<'db> Type<'db> {
             // Keep the receiver constraints and known-function handling of a direct call.
             Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
                 .inner(db)
-                .bindings_impl(db, env, recursion_guard)
+                .bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
                 .with_callable_type(self),
             Type::KnownBoundMethod(method) => method.callables(db, env).map_or_else(
                 || CallableBinding::not_callable(self).into(),
@@ -6974,12 +7029,13 @@ impl<'db> Type<'db> {
                 // like "`X` is not callable" instead of "`<type of illegal '__call__'>` is not
                 // callable".
                 let member = self
-                    .member_lookup_with_policy_and_receiver(
+                    .member_lookup_with_recursion_guard(
                         db,
                         env,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                         None,
+                        Some(recursion_guard),
                     )
                     .unwrap_or_else(|error| error.fallback_member(db));
                 match member.member(db).place {
@@ -6991,7 +7047,14 @@ impl<'db> Type<'db> {
                         let mut bindings = recursion_guard.with_dependency(
                             db,
                             member.descriptor_origin(db),
-                            || dunder_callable.bindings_impl(db, env, recursion_guard),
+                            || {
+                                dunder_callable.bindings_from_descriptor(
+                                    db,
+                                    env,
+                                    recursion_guard,
+                                    member.descriptor_origin(db),
+                                )
+                            },
                         );
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
@@ -7006,16 +7069,20 @@ impl<'db> Type<'db> {
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
-                Binding::single(self, Signature::dynamic(self)).into()
+                let signature = if self.is_unknown() && unknown_is_recovery {
+                    Signature::recursion_recovery()
+                } else {
+                    Signature::dynamic(self)
+                };
+                Binding::single(self, signature).into()
             }
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
                 self,
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                union.elements(db).iter().map(|element| {
+                    element.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
+                }),
             ),
 
             // A narrowed `type[T: Base] & type[Child]` still needs to construct `T & Child`,
@@ -7050,9 +7117,9 @@ impl<'db> Type<'db> {
 
             Type::Intersection(intersection) => Bindings::from_intersection(
                 self,
-                intersection
-                    .positive_elements_or_object(db)
-                    .map(|element| element.bindings_impl(db, env, recursion_guard)),
+                intersection.positive_elements_or_object(db).map(|element| {
+                    element.bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
+                }),
             ),
 
             Type::EnumComplement(complement) => {
@@ -7110,21 +7177,27 @@ impl<'db> Type<'db> {
             ) => Type::Callable(partial.partial(db)).bindings_impl(db, env, recursion_guard),
 
             Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                wrapper.callables(db, env).map_or_else(
-                    || CallableBinding::not_callable(self).into(),
-                    |callables| {
-                        callables
-                            .to_type(db, env)
-                            .bindings_impl(db, env, recursion_guard)
-                    },
-                )
+                match wrapper.kind(db) {
+                    known_instance::MethodWrapperKind::Staticmethod => wrapper
+                        .wrapped(db)
+                        .bindings_with_recovery(db, env, recursion_guard, unknown_is_recovery)
+                        .with_callable_type(self),
+                    known_instance::MethodWrapperKind::Classmethod => {
+                        CallableBinding::not_callable(self).into()
+                    }
+                }
             }
 
             Type::KnownInstance(known_instance) => known_instance
                 .instance_fallback(db, env)
                 .bindings_impl(db, env, recursion_guard),
 
-            Type::TypeAlias(alias) => alias.value_type(db).bindings_impl(db, env, recursion_guard),
+            Type::TypeAlias(alias) => alias.value_type(db).bindings_with_recovery(
+                db,
+                env,
+                recursion_guard,
+                unknown_is_recovery,
+            ),
 
             Type::PropertyInstance(_)
             | Type::SlotDescriptor(_)
@@ -7584,180 +7657,158 @@ impl<'db> Type<'db> {
             _ => self,
         };
 
-        let on_cycle = || {
-            // Leave the return type unknown so the enclosing constructor supplies its own
-            // instance type, rather than the class where the cycle happened to be detected.
-            Binding::single(self_type, Signature::dynamic(Type::unknown())).into()
+        let Some(constructor_instance_ty) = self_type.to_instance_approximation(db, env) else {
+            return fallback_bindings();
         };
-        // Key recursion by the full receiver type. Descriptor overloads can distinguish `C` from
-        // `type[C]`, and different specializations need separate expansion even if one contains
-        // the other, because a constructor may ignore its nested type arguments.
-        recursion_guard.visit(db, env, &self_type, on_cycle, on_cycle, || {
-            let Some(constructor_instance_ty) = self_type.to_instance_approximation(db, env) else {
-                return fallback_bindings();
-            };
-            let lookup_class = self_type.to_class_type(db).unwrap_or(class);
-            let members = constructor::ConstructorMembers::new(db, env, lookup_class, self_type);
+        let lookup_class = self_type.to_class_type(db).unwrap_or(class);
+        let members = constructor::ConstructorMembers::new(db, env, lookup_class, self_type);
 
-            // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
-            // We preserve its full overload set here and defer constructor branching decisions
-            // until call-time overload resolution.
-            let metaclass_dunder_call = members.metaclass_call(db, env);
+        // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
+        // We preserve its full overload set here and defer constructor branching decisions
+        // until call-time overload resolution.
+        let metaclass_dunder_call = members.metaclass_call(db, env, recursion_guard);
 
-            // TypedDict classes inherit `dict.__new__`, whose gradual `**kwargs` signature cannot
-            // constrain their type variables. Their synthesized `__init__` contains the actual field
-            // types, including generic extra items, so constructor inference should start there.
-            let new_method = if class_literal.is_typed_dict(db) {
-                constructor::ConstructorMember::undefined()
-            } else {
-                members.new_method(db, env)
-            };
+        // TypedDict classes inherit `dict.__new__`, whose gradual `**kwargs` signature cannot
+        // constrain their type variables. Their synthesized `__init__` contains the actual field
+        // types, including generic extra items, so constructor inference should start there.
+        let new_method = if class_literal.is_typed_dict(db) {
+            constructor::ConstructorMember::undefined()
+        } else {
+            members.new_method(db, env, recursion_guard)
+        };
 
-            let init_method_no_object = members.initializer(db, env, false);
+        let init_method_no_object = members.initializer(db, env, false, recursion_guard);
 
-            let new_bindings = if let Place::Defined(DefinedPlace {
-                ty: new_callable,
+        let new_bindings = if let Place::Defined(DefinedPlace {
+            ty: new_callable,
+            definedness,
+            ..
+        }) = new_method.place
+        {
+            let bindings = recursion_guard.with_dependency(db, new_method.origin, || {
+                new_callable.bindings_from_descriptor(db, env, recursion_guard, new_method.origin)
+            });
+            let mut bindings =
+                bind_constructor_new(db, env, bindings, self_type, constructor_instance_ty)
+                    .into_constructor_bindings(
+                        constructor_instance_ty,
+                        ConstructorCallableKind::New,
+                    )
+                    .with_constructed_instance_type(db, constructor_instance_ty);
+            if definedness == Definedness::PossiblyUndefined {
+                bindings.set_implicit_dunder_new_is_possibly_unbound();
+            }
+            Some(bindings)
+        } else {
+            None
+        };
+
+        // Only fall back to `object.__init__` when `__new__` is absent.
+        let init_method = if init_method_no_object.place.is_undefined() && new_bindings.is_none() {
+            members.initializer(db, env, true, recursion_guard)
+        } else {
+            init_method_no_object
+        };
+        let init_bindings = match init_method.place {
+            Place::Defined(DefinedPlace {
+                ty: init_callable,
                 definedness,
                 ..
-            }) = new_method.place
-            {
-                let bindings = recursion_guard.with_dependency(db, new_method.origin, || {
-                    new_callable.bindings_impl(db, env, recursion_guard)
-                });
-                let mut bindings =
-                    bind_constructor_new(db, env, bindings, self_type, constructor_instance_ty)
-                        .into_constructor_bindings(
-                            constructor_instance_ty,
-                            ConstructorCallableKind::New,
+            }) => {
+                let mut bindings = recursion_guard
+                    .with_dependency(db, init_method.origin, || {
+                        init_callable.bindings_from_descriptor(
+                            db,
+                            env,
+                            recursion_guard,
+                            init_method.origin,
                         )
-                        .with_constructed_instance_type(db, constructor_instance_ty);
-                if definedness == Definedness::PossiblyUndefined {
-                    bindings.set_implicit_dunder_new_is_possibly_unbound();
-                }
-                Some(bindings)
-            } else {
-                None
-            };
-
-            // Only fall back to `object.__init__` when `__new__` is absent.
-            let init_bindings = match (&init_method_no_object.place, new_bindings.is_some()) {
-                (
-                    Place::Defined(DefinedPlace {
-                        ty: init_method,
-                        definedness,
-                        ..
-                    }),
-                    _,
-                ) => {
-                    let mut bindings = recursion_guard
-                        .with_dependency(db, init_method_no_object.origin, || {
-                            init_method.bindings_impl(db, env, recursion_guard)
-                        })
-                        .into_constructor_bindings(
-                            constructor_instance_ty,
-                            ConstructorCallableKind::Init,
-                        )
-                        .with_constructed_instance_type(db, constructor_instance_ty);
-                    if *definedness == Definedness::PossiblyUndefined {
-                        bindings.set_implicit_dunder_init_is_possibly_unbound();
-                    }
-                    Some(bindings)
-                }
-                (Place::Undefined, false) => {
-                    let init_method_with_object = members.initializer(db, env, true);
-                    match init_method_with_object.place {
-                        Place::Defined(DefinedPlace {
-                            ty: init_method,
-                            definedness,
-                            ..
-                        }) => {
-                            let mut bindings = recursion_guard
-                                .with_dependency(db, init_method_with_object.origin, || {
-                                    init_method.bindings_impl(db, env, recursion_guard)
-                                })
-                                .into_constructor_bindings(
-                                    constructor_instance_ty,
-                                    ConstructorCallableKind::Init,
-                                )
-                                .with_constructed_instance_type(db, constructor_instance_ty);
-                            if definedness == Definedness::PossiblyUndefined {
-                                bindings.set_implicit_dunder_init_is_possibly_unbound();
-                            }
-                            Some(bindings)
-                        }
-                        Place::Undefined => {
-                            // If we are using vendored typeshed, it should be impossible to have missing
-                            // or unbound `__init__` method on a class, as all classes have `object` in MRO.
-                            // Thus the following may only trigger if a custom typeshed is used.
-                            // Custom/broken typeshed: no `__init__` available even after falling back
-                            // to `object`. Keep analysis going and surface the missing-implicit-call
-                            // lint via the builder.
-                            let mut bindings: Bindings<'db> = Binding::single(
-                                self_type,
-                                Signature::new(Parameters::gradual_form(), constructor_instance_ty),
-                            )
-                            .into();
-                            bindings = bindings
-                                .into_constructor_bindings(
-                                    constructor_instance_ty,
-                                    ConstructorCallableKind::Init,
-                                )
-                                .with_constructed_instance_type(db, constructor_instance_ty);
-                            bindings.set_implicit_dunder_init_is_possibly_unbound();
-                            Some(bindings)
-                        }
-                    }
-                }
-                (Place::Undefined, true) => None,
-            }
-            .map(|mut bindings| {
-                for binding in bindings.iter_flat_mut() {
-                    if let Some(self_type) = binding.typing_self_type(db) {
-                        binding.bind_unused_self(db, env, self_type);
-                    }
-                }
-                bindings
-            });
-
-            let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
-                // Preserve the full `__new__` signature and defer `__init__` validation until we know
-                // which `__new__` overload matched at call time.
-                if let Some(init_bindings) = init_bindings.as_ref() {
-                    new_bindings.set_downstream_constructor(init_bindings);
-                }
-                Some(new_bindings)
-            } else {
-                init_bindings
-            };
-
-            let bindings = if let Place::Defined(DefinedPlace {
-                ty: metaclass_call_method,
-                ..
-            }) = metaclass_dunder_call.place
-            {
-                let mut metaclass_bindings = recursion_guard
-                    .with_dependency(db, metaclass_dunder_call.origin, || {
-                        metaclass_call_method.bindings_impl(db, env, recursion_guard)
                     })
                     .into_constructor_bindings(
                         constructor_instance_ty,
-                        ConstructorCallableKind::MetaclassCall,
+                        ConstructorCallableKind::Init,
                     )
                     .with_constructed_instance_type(db, constructor_instance_ty);
-                if let Some(downstream_bindings) = constructor_bindings.as_ref() {
-                    // Preserve the full metaclass `__call__` signature and defer whether constructor
-                    // downstream checks apply until the matched overload is known.
-                    metaclass_bindings.set_downstream_constructor(downstream_bindings);
+                if definedness == Definedness::PossiblyUndefined {
+                    bindings.set_implicit_dunder_init_is_possibly_unbound();
                 }
-                metaclass_bindings
-            } else if let Some(constructor_bindings) = constructor_bindings {
-                constructor_bindings
-            } else {
-                return fallback_bindings();
-            };
+                Some(bindings)
+            }
+            Place::Undefined if new_bindings.is_none() => {
+                // If we are using vendored typeshed, it should be impossible to have missing
+                // or unbound `__init__` method on a class, as all classes have `object` in MRO.
+                // Thus the following may only trigger if a custom typeshed is used.
+                // Custom/broken typeshed: no `__init__` available even after falling back
+                // to `object`. Keep analysis going and surface the missing-implicit-call
+                // lint via the builder.
+                let mut bindings: Bindings<'db> = Binding::single(
+                    self_type,
+                    Signature::new(Parameters::gradual_form(), constructor_instance_ty),
+                )
+                .into();
+                bindings = bindings
+                    .into_constructor_bindings(
+                        constructor_instance_ty,
+                        ConstructorCallableKind::Init,
+                    )
+                    .with_constructed_instance_type(db, constructor_instance_ty);
+                bindings.set_implicit_dunder_init_is_possibly_unbound();
+                Some(bindings)
+            }
+            Place::Undefined => None,
+        }
+        .map(|mut bindings| {
+            for binding in bindings.iter_flat_mut() {
+                if let Some(self_type) = binding.typing_self_type(db) {
+                    binding.bind_unused_self(db, env, self_type);
+                }
+            }
+            bindings
+        });
 
-            bindings.with_generic_context(db, class_generic_context)
-        })
+        let constructor_bindings = if let Some(mut new_bindings) = new_bindings {
+            // Preserve the full `__new__` signature and defer `__init__` validation until we know
+            // which `__new__` overload matched at call time.
+            if let Some(init_bindings) = init_bindings.as_ref() {
+                new_bindings.set_downstream_constructor(init_bindings);
+            }
+            Some(new_bindings)
+        } else {
+            init_bindings
+        };
+
+        let bindings = if let Place::Defined(DefinedPlace {
+            ty: metaclass_call_method,
+            ..
+        }) = metaclass_dunder_call.place
+        {
+            let mut metaclass_bindings = recursion_guard
+                .with_dependency(db, metaclass_dunder_call.origin, || {
+                    metaclass_call_method.bindings_from_descriptor(
+                        db,
+                        env,
+                        recursion_guard,
+                        metaclass_dunder_call.origin,
+                    )
+                })
+                .into_constructor_bindings(
+                    constructor_instance_ty,
+                    ConstructorCallableKind::MetaclassCall,
+                )
+                .with_constructed_instance_type(db, constructor_instance_ty);
+            if let Some(downstream_bindings) = constructor_bindings.as_ref() {
+                // Preserve the full metaclass `__call__` signature and defer whether constructor
+                // downstream checks apply until the matched overload is known.
+                metaclass_bindings.set_downstream_constructor(downstream_bindings);
+            }
+            metaclass_bindings
+        } else if let Some(constructor_bindings) = constructor_bindings {
+            constructor_bindings
+        } else {
+            return fallback_bindings();
+        };
+
+        bindings.with_generic_context(db, class_generic_context)
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
@@ -7772,16 +7823,29 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
+        self.try_call_with_recursion_guard(db, env, argument_types, None)
+    }
+
+    fn try_call_with_recursion_guard(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
+        let local_guard = CallableRecursionGuard::new();
+        let recursion_guard = recursion_guard.unwrap_or(&local_guard);
         let constraints = ConstraintSetBuilder::new();
-        self.bindings(db, env)
+        self.bindings_impl(db, env, recursion_guard)
             .match_parameters(db, env, argument_types)
-            .check_types(
+            .check_types_with_recursion_guard(
                 db,
                 env,
                 &constraints,
                 argument_types,
                 TypeContext::default(),
                 &[],
+                Some(recursion_guard),
             )
     }
 

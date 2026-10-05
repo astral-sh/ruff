@@ -23,6 +23,84 @@ fn member_lookup_result_size() {
     );
 }
 
+#[test_case("Value = int", false; "nominal parameter")]
+#[test_case("from typing import Protocol\nclass Value(Protocol):\n    def method(self) -> int: ...", false; "protocol parameter")]
+#[test_case("from typing import TypedDict\nclass Value(TypedDict):\n    field: int", false; "typed dict parameter")]
+#[test_case("from typing import Protocol\nclass Growing[T](Protocol):\n    def child(self) -> Growing[list[T]]: ...\nValue = Growing[int]", false; "growing protocol parameter")]
+#[test_case("from typing import TypedDict\nclass Growing[T](TypedDict):\n    child: Growing[list[T]]\nValue = Growing[int]", false; "growing typed dict parameter")]
+#[test_case("type Growing[T] = T | list[Growing[list[T]]]\nValue = Growing[int]", false; "growing alias parameter")]
+#[test_case("from ty_extensions._internal import TypeOf\ndef callback(value: int) -> int: ...\ntype Value = TypeOf[callback]", true; "function parameter")]
+#[test_case("from ty_extensions._internal import TypeOf\ndef callback(value: TypeOf[callback]) -> int: ...\ntype Value = TypeOf[callback]", true; "recursive function parameter")]
+fn shared_initializer_signatures_do_not_accumulate_unused_binders(
+    declarations: &str,
+    function_parameter: bool,
+) -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/value.py",
+        &format!("from __future__ import annotations\n{declarations}"),
+    )?;
+    db.write_dedented(
+        "/src/constructors.py",
+        r#"
+        from value import Value
+
+        class End:
+            def __init__(self, value: Value) -> None: ...
+
+        class Left[T]:
+            __init__: type[End]
+
+        class Right[T]:
+            __init__: type[End]
+
+        class Root[T]:
+            __init__: type[Left[T] | Right[T]]
+
+        def choose() -> bool: ...
+
+        class LiteralRoot:
+            __init__ = Left if choose() else Right
+
+        specialized = Root[int]
+        "#,
+    )?;
+    let env = db.program_environment();
+    let file = system_path_to_file(&db, "/src/constructors.py")?;
+    let file = ProgramFile::new(&db, file, env.program(&db));
+    for (name, expected_binders) in [("Root", 1), ("specialized", 0), ("LiteralRoot", 0)] {
+        let ty = global_symbol(&db, file, name).place.expect_type();
+        let callables = ty
+            .try_upcast_to_callable(&db, &env)
+            .ok_or_else(|| anyhow::anyhow!("expected a constructor for {name}"))?;
+        // Both paths reach the same initializer. Only Root's unspecialized return type
+        // needs a binder; retaining Left's or Right's would prevent deduplication.
+        assert_eq!(callables.iter().count(), 1);
+        let signature = callables
+            .signatures(&db)
+            .exactly_one()
+            .map_err(|_| anyhow::anyhow!("expected one constructor signature"))?;
+        let parameter = signature
+            .parameters()
+            .get_positional(0)
+            .ok_or_else(|| anyhow::anyhow!("expected an initializer parameter"))?
+            .annotated_type()
+            .resolve_type_alias(&db);
+        assert!(!parameter.is_dynamic());
+        assert_eq!(
+            matches!(parameter, Type::FunctionLiteral(_)),
+            function_parameter
+        );
+        assert_eq!(
+            signature
+                .generic_context
+                .map_or(0, |context| context.len(&db)),
+            expected_binders,
+        );
+    }
+    Ok(())
+}
+
 #[test]
 fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()> {
     let mut db = setup_db();

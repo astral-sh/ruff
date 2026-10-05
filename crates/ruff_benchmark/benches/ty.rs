@@ -1066,6 +1066,515 @@ fn benchmark_constructor_cyclic_dependencies(criterion: &mut Criterion) {
     );
 }
 
+/// Descriptor results form a cyclic graph with exponentially many paths through shared classes.
+/// Exact-cycle recovery must allow reuse under the same active-ancestor assumptions.
+fn benchmark_constructor_cyclic_descriptors(criterion: &mut Criterion) {
+    for method in ["__new__", "__init__"] {
+        for layers in [12, 24] {
+            let mut code = String::from(
+                "from __future__ import annotations
+from typing import Callable
+class Descriptor[T]:
+    def __get__(self, instance: object, owner: type) -> type[T]:
+        raise NotImplementedError
+",
+            );
+            for index in 0..layers {
+                let target = if index == layers - 1 {
+                    "A0[T]".to_string()
+                } else {
+                    format!("A{0}[T] | B{0}[T]", index + 1)
+                };
+                writeln!(
+                    code,
+                    "class A{index}[T]:\n    {method}: Descriptor[{target}]\nclass B{index}[T]:\n    {method}: Descriptor[{target}]"
+                )
+                .ok();
+            }
+            code.push_str("callback: Callable[..., object] = A0[int]\n");
+            benchmark_constructor_callables(
+                criterion,
+                &format!("ty_micro[constructor_cyclic_descriptors_{method}_{layers}]"),
+                &code,
+            );
+        }
+    }
+}
+
+/// Forwarding through specialized generic classes must not accumulate unused signature binders.
+/// Otherwise, identical initializer alternatives stay distinct and double at every layer.
+fn benchmark_constructor_shared_generic_initializers(criterion: &mut Criterion) {
+    for (kind, specialized) in [("specialized", true), ("literal", false)] {
+        for layers in [12, 24] {
+            let mut code = String::from(
+                "from __future__ import annotations
+from typing import Callable
+def choose() -> bool: raise NotImplementedError
+class End:
+    def __init__(self, value: int) -> None: ...
+",
+            );
+            for index in (0..layers).rev() {
+                let initializer = if index == layers - 1 {
+                    "__init__ = End".to_string()
+                } else if specialized {
+                    format!("__init__: type[A{0}[T] | B{0}[T]]", index + 1)
+                } else {
+                    format!("__init__ = A{0} if choose() else B{0}", index + 1)
+                };
+                writeln!(
+                    code,
+                    "class A{index}[T]:\n    {initializer}\nclass B{index}[T]:\n    {initializer}"
+                )
+                .ok();
+            }
+            code.push_str("callback: Callable[[int], A0[int]] = A0[int]\n");
+            benchmark_constructor_callables(
+                criterion,
+                &format!("ty_micro[constructor_shared_generic_initializers_{kind}_{layers}]"),
+                &code,
+            );
+        }
+    }
+}
+
+/// Inspecting rejected overloads must terminate even when protocol methods grow recursively.
+/// The accepted overload reaches a concrete initializer whose argument remains required.
+fn benchmark_constructor_recursive_protocol_observation(criterion: &mut Criterion) {
+    let code = r#"
+from __future__ import annotations
+from typing import Any, Protocol, overload
+
+class Recursive[T](Protocol):
+    def method(self) -> Recursive[list[T]]: ...
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer:
+    @overload
+    def __get__(self, instance: C[list[list[list[int]]]], owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: Recursive[int], owner: type) -> type[End]: ...
+    @overload
+    def __get__[T](self, instance: C[T], owner: type) -> type[C[list[T]]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class C[T]:
+    value: T
+    __init__ = Initializer()
+
+def check(cls: type[C[int]]) -> None:
+    cls(1)
+    cls()
+    cls("bad")
+"#;
+    benchmark_constructor_diagnostics(
+        criterion,
+        "ty_micro[constructor_recursive_protocol_observation]",
+        code,
+        &["missing-argument", "invalid-argument-type"],
+    );
+}
+
+/// A constructor supplied by a type parameter can keep growing after specialization.
+/// Both instance and class-object parameters require one guard across the entire expansion.
+fn benchmark_constructor_symbolic_dependencies(criterion: &mut Criterion) {
+    for (kind, declarations, argument) in [
+        (
+            "typevar",
+            r#"
+class Descriptor[T]:
+    def __get__(self, instance: object, owner: type) -> type[C[Descriptor[list[T]]]]:
+        raise NotImplementedError
+
+class C[T]:
+    __init__: T
+"#,
+            "Descriptor[int]",
+        ),
+        (
+            "subclass",
+            r#"
+class C[T]:
+    __init__: type[T]
+
+type Grow[T] = C[Grow[list[T]]]
+"#,
+            "Grow[int]",
+        ),
+    ] {
+        let code = format!(
+            "from __future__ import annotations\nfrom typing import Callable\n{declarations}\ncallback: Callable[..., C[{argument}]] = C[{argument}]\n"
+        );
+        benchmark_constructor_callables(
+            criterion,
+            &format!("ty_micro[constructor_symbolic_dependencies_{kind}]"),
+            &code,
+        );
+    }
+}
+
+/// Different descriptor lookup routes can select the same finite constructor chain.
+/// Each fixture checks terminal argument errors so prematurely stopping is not a fast result.
+fn benchmark_constructor_descriptor_dispatch(criterion: &mut Criterion) {
+    for layers in [3, 6] {
+        let terminal = format!("{}int{}", "list[".repeat(layers), "]".repeat(layers));
+        for (kind, declarations) in [
+            (
+                "descriptor",
+                format!(
+                    r#"
+class Initializer:
+    @overload
+    def __get__(self, instance: C[{terminal}], owner: type) -> type[End]: ...
+    @overload
+    def __get__[T](self, instance: C[T], owner: type) -> type[C[list[T]]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class C[T]:
+    value: T
+    __init__ = Initializer()
+"#
+                ),
+            ),
+            (
+                "property",
+                format!(
+                    r#"
+class C[T]:
+    value: T
+    @overload
+    def getter(self: C[{terminal}]) -> type[End]: ...
+    @overload
+    def getter(self) -> type[C[list[T]]]: ...
+    def getter(self) -> Any: ...
+    __init__ = property(getter)
+"#
+                ),
+            ),
+            (
+                "staticmethod",
+                format!(
+                    r#"
+@overload
+def getter(descriptor: Initializer, instance: C[{terminal}], owner: type) -> type[End]: ...
+@overload
+def getter[T](descriptor: Initializer, instance: C[T], owner: type) -> type[C[list[T]]]: ...
+def getter(descriptor: Initializer, instance: Any, owner: type) -> Any: ...
+
+class Initializer:
+    __get__ = staticmethod(getter)
+
+class C[T]:
+    value: T
+    __init__ = Initializer()
+"#
+                ),
+            ),
+            (
+                "callable_getter",
+                format!(
+                    r#"
+class Getter:
+    @overload
+    def __call__(self, instance: C[{terminal}]) -> type[End]: ...
+    @overload
+    def __call__[T](self, instance: C[T]) -> type[C[list[T]]]: ...
+    def __call__(self, instance: Any) -> Any: ...
+
+class C[T]:
+    value: T
+    __init__ = property(Getter())
+"#
+                ),
+            ),
+            (
+                "nested_call_lookup",
+                format!(
+                    r#"
+class Terminal:
+    @staticmethod
+    def __call__(descriptor: object, instance: object, owner: type) -> type[End]:
+        raise NotImplementedError
+
+class Forward:
+    @staticmethod
+    def __call__[T](descriptor: object, instance: C[T], owner: type) -> type[C[list[T]]]:
+        raise NotImplementedError
+
+class Invoker[T]:
+    value: T
+    @overload
+    def choose(self: Invoker[{terminal}]) -> Terminal: ...
+    @overload
+    def choose(self) -> Forward: ...
+    def choose(self) -> Any: ...
+    __call__ = property(choose)
+
+class Initializer[T]:
+    __get__: Invoker[T]
+
+class C[T]:
+    value: T
+    __init__: Initializer[T]
+"#
+                ),
+            ),
+        ] {
+            let code = format!(
+                "from __future__ import annotations\nfrom typing import Any, overload\nclass End:\n    def __init__(self, value: int) -> None: ...\n{declarations}\nC[int](1)\nC[int]()\nC[int](\"bad\")\n"
+            );
+            benchmark_constructor_diagnostics(
+                criterion,
+                &format!("ty_micro[constructor_descriptor_dispatch_{kind}_{layers}]"),
+                &code,
+                &["missing-argument", "invalid-argument-type"],
+            );
+        }
+    }
+}
+
+/// Descriptor lookup can invoke another constructor before producing its callable result.
+/// Nested execution must share recursion supervision across those unfinished lookups.
+fn benchmark_constructor_nested_descriptor_execution(criterion: &mut Criterion) {
+    for (kind, code) in [
+        (
+            "property_growth",
+            r#"
+from __future__ import annotations
+from typing import Callable
+
+class Descriptor[T]:
+    def __get__(self, instance: object, owner: type) -> type[C[list[T]]]:
+        raise NotImplementedError
+
+class Factory[T]:
+    __new__: Descriptor[T]
+
+class C[T]:
+    value: T
+    __init__ = property(Factory[T])
+
+C[int](1)
+callback: Callable[..., C[int]] = C[int]
+"#,
+        ),
+        (
+            "class_get_growth",
+            r#"
+from __future__ import annotations
+from typing import Callable
+
+class Descriptor[T]:
+    __get__: type[Factory[list[T]]]
+
+class Factory[T]:
+    __new__: Descriptor[T]
+
+Factory[int](1)
+callback: Callable[..., object] = Factory[int]
+"#,
+        ),
+    ] {
+        benchmark_constructor_callables(
+            criterion,
+            &format!("ty_micro[constructor_nested_descriptor_execution_{kind}]"),
+            code,
+        );
+    }
+
+    for layers in [3, 6] {
+        let terminal = format!("{}int{}", "list[".repeat(layers), "]".repeat(layers));
+        for (kind, getter, initializer) in [
+            ("property", "", "property(Factory[int])"),
+            (
+                "class_get",
+                "class Getter:\n    __get__ = Factory[int]\n",
+                "Getter()",
+            ),
+        ] {
+            let code = format!(
+                r#"
+from __future__ import annotations
+from typing import Any, Callable, overload
+
+class End:
+    def __new__(cls, *args: object) -> Callable[[int], None]:
+        raise NotImplementedError
+
+class Descriptor[T]:
+    @overload
+    def __get__(self: Descriptor[{terminal}], instance: object, owner: type) -> type[End]: ...
+    @overload
+    def __get__(self, instance: object, owner: type) -> type[Factory[list[T]]]: ...
+    def __get__(self, instance: object, owner: type) -> Any: ...
+
+class Factory[T]:
+    __new__: Descriptor[T]
+
+{getter}
+class C:
+    __init__ = {initializer}
+
+C(1)
+C()
+C("bad")
+"#
+            );
+            benchmark_constructor_diagnostics(
+                criterion,
+                &format!("ty_micro[constructor_nested_descriptor_execution_{kind}_{layers}]"),
+                &code,
+                &["missing-argument", "invalid-argument-type"],
+            );
+        }
+    }
+}
+
+/// Recovery in one property-getter alternative must preserve the other alternatives' results
+/// for both direct constructor calls and conversion to a callback.
+fn benchmark_constructor_property_getter_union_recovery(criterion: &mut Criterion) {
+    let code = r#"
+from __future__ import annotations
+from typing import Callable
+
+class Grow[T]:
+    __new__: type[Grow[list[T]]]
+
+class Concrete:
+    def __init__(self, owner: object) -> None: ...
+    def __call__(self) -> int:
+        return 1
+
+def check(getter: type[Grow[int]] | type[Concrete]) -> None:
+    class Meta(type):
+        __call__ = property(getter)
+
+    class C(metaclass=Meta): ...
+
+    result: int = C()
+    callback: Callable[[], int] = C
+"#;
+    benchmark_constructor_callables(
+        criterion,
+        "ty_micro[constructor_property_getter_union_recovery]",
+        code,
+    );
+}
+
+/// A forwarding constructor can supply the target of a later descriptor overload.
+/// Fixed targets preserve terminal argument checks; targets that keep moving still terminate.
+fn benchmark_constructor_forwarding_targets(criterion: &mut Criterion) {
+    for (kind, layers, parameters, forwarded, target, finite) in [
+        ("literal", 4, "T", "Forward[list[T]]", "int", true),
+        ("literal", 8, "T", "Forward[list[T]]", "int", true),
+        ("substituted", 4, "T, V", "Forward[list[T], int]", "V", true),
+        ("substituted", 8, "T, V", "Forward[list[T], int]", "V", true),
+        ("moving", 4, "T", "Forward[list[T]]", "T", false),
+    ] {
+        let target = format!("{}{target}{}", "list[".repeat(layers), "]".repeat(layers));
+        let mut code = format!(
+            r#"
+from __future__ import annotations
+from typing import Any, Callable, overload
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer[E]:
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__[T, U](self, instance: C[T, U], owner: type) -> type[{forwarded}]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward[{parameters}]:
+    __init__: type[C[T, {target}]]
+
+class C[T, U]:
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+def check(cls: type[C[int, str]]) -> None:
+    cls(1)
+    valid: Callable[[int], C[int, str]] = cls
+"#
+        );
+        let expected: &[&str] = if finite {
+            code.push_str(
+                "    cls()\n    cls(\"bad\")\n    missing: Callable[[], C[int, str]] = cls\n    wrong: Callable[[str], C[int, str]] = cls\n",
+            );
+            &[
+                "missing-argument",
+                "invalid-argument-type",
+                "invalid-assignment",
+                "invalid-assignment",
+            ]
+        } else {
+            &[]
+        };
+        benchmark_constructor_diagnostics(
+            criterion,
+            &format!("ty_micro[constructor_forwarding_target_{kind}_{layers}]"),
+            &code,
+            expected,
+        );
+    }
+}
+
+/// Revisiting a forwarding class with different type arguments can introduce a stopping target.
+/// The later specialization must retain its terminal argument checks in calls and callbacks.
+fn benchmark_constructor_later_forwarding_specialization(criterion: &mut Criterion) {
+    for layers in [4, 8] {
+        let target = format!("{}V{}", "list[".repeat(layers), "]".repeat(layers));
+        let code = format!(
+            r#"
+from __future__ import annotations
+from typing import Any, Callable, overload
+
+class End:
+    def __init__(self, value: int) -> None: ...
+
+class Initializer[E]:
+    @overload
+    def __get__(self, instance: C[E, E], owner: type) -> type[End]: ...
+    @overload
+    def __get__[T, U](self, instance: C[T, U], owner: type) -> type[Forward[list[T], int]]: ...
+    def __get__(self, instance: Any, owner: type) -> Any: ...
+
+class Forward[T, V]:
+    __init__: type[C[T, {target}]]
+
+class C[T, U]:
+    first: T
+    second: U
+    __init__ = Initializer[U]()
+
+def check(factory: type[Forward[int, str]]) -> None:
+    factory(1)
+    factory()
+    factory("bad")
+    valid: Callable[[int], Forward[int, str]] = factory
+    missing: Callable[[], Forward[int, str]] = factory
+    wrong: Callable[[str], Forward[int, str]] = factory
+"#
+        );
+        benchmark_constructor_diagnostics(
+            criterion,
+            &format!("ty_micro[constructor_later_forwarding_specialization_{layers}]"),
+            &code,
+            &[
+                "missing-argument",
+                "invalid-argument-type",
+                "invalid-assignment",
+                "invalid-assignment",
+            ],
+        );
+    }
+}
+
 /// Each callback adds one link to a previously checked constructor chain. Reusing results
 /// across callback assignments avoids expanding every prefix again, which would be quadratic.
 fn benchmark_constructor_repeated_callbacks(criterion: &mut Criterion) {
@@ -1085,13 +1594,27 @@ class C0:
 }
 
 fn benchmark_constructor_callables(criterion: &mut Criterion, name: &str, code: &str) {
+    benchmark_constructor_diagnostics(criterion, name, code, &[]);
+}
+
+fn benchmark_constructor_diagnostics(
+    criterion: &mut Criterion,
+    name: &str,
+    code: &str,
+    expected: &[&str],
+) {
     setup_rayon();
 
     criterion.bench_function(name, |b| {
         b.iter_batched_ref(
             || setup_micro_case(code),
             |case| {
-                assert!(case.db.check().is_empty());
+                let diagnostics = case.db.check();
+                let actual: Vec<_> = diagnostics
+                    .iter()
+                    .map(|diagnostic| diagnostic.id().as_str())
+                    .collect();
+                assert_eq!(actual, expected);
             },
             BatchSize::SmallInput,
         );
@@ -2147,6 +2670,15 @@ criterion_group!(
     benchmark_materialized_recursive_protocol_overload,
     benchmark_constructor_shared_subgraphs,
     benchmark_constructor_cyclic_dependencies,
+    benchmark_constructor_cyclic_descriptors,
+    benchmark_constructor_shared_generic_initializers,
+    benchmark_constructor_recursive_protocol_observation,
+    benchmark_constructor_symbolic_dependencies,
+    benchmark_constructor_descriptor_dispatch,
+    benchmark_constructor_nested_descriptor_execution,
+    benchmark_constructor_property_getter_union_recovery,
+    benchmark_constructor_forwarding_targets,
+    benchmark_constructor_later_forwarding_specialization,
     benchmark_constructor_repeated_callbacks,
     benchmark_vararg_parameter_type_accumulation,
     benchmark_typed_dict_get_large_literal_union,

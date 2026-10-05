@@ -34,19 +34,22 @@ use ty_python_core::definition::Definition;
 
 use crate::place::Place;
 use crate::types::constructor::ConstructorMembers;
-use crate::types::function::FunctionLiteral;
+use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
+use crate::types::instance::walk_protocol_instance_type;
 use crate::types::known_instance::MethodWrapperKind;
+use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_instance_interface};
 use crate::types::relation::RelationObservation;
+use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
     TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, CallableTypes, ClassType, DescriptorDispatch,
-    DescriptorDispatches, DescriptorOrigin, GenericAlias, KnownBoundMethodType, KnownInstanceType,
-    LiteralValueTypeKind, MemberLookupPolicy, ProtocolInstanceType, RecursiveType,
-    StaticClassLiteral, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, CallableType, CallableTypes, ClassType,
+    DescriptorDispatch, DescriptorDispatches, DescriptorOrigin, GenericAlias, KnownBoundMethodType,
+    KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, ProtocolInstanceType,
+    RecursiveType, StaticClassLiteral, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
     TypeVarBoundOrConstraints, TypedDictType,
 };
 use crate::{Db, Program, ProgramEnvironment};
@@ -316,6 +319,15 @@ struct SpecializationFlowVisitor<'db> {
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
     inconclusive: Cell<bool>,
+    mode: SpecializationFlowMode,
+}
+
+/// Type relations guard method signatures separately; inspecting their annotations requires
+/// including those signatures in the specialization-flow proof as well.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::SalsaValue)]
+enum SpecializationFlowMode {
+    Semantic,
+    Inspection,
 }
 
 /// Finds which parameters of the current source definition occur in one actual argument.
@@ -433,21 +445,29 @@ impl<'db> RecursiveDefinition<'db> {
     /// A false result proves that reachable specializations are bounded. A true result also
     /// includes incomplete dependency discovery, and does not establish growth on any given path.
     fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+        self.may_have_unbounded_specialization_with_mode(db, SpecializationFlowMode::Semantic)
+    }
+
+    fn may_have_unbounded_specialization_with_mode(
+        self,
+        db: &'db dyn Db,
+        mode: SpecializationFlowMode,
+    ) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_initial=|_, _, _, _| true,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn specialization_flow_inner<'db>(
             db: &'db dyn Db,
             root: RecursiveDefinition<'db>,
-            _: (),
+            mode: SpecializationFlowMode,
         ) -> bool {
-            let graph = SpecializationFlowGraph::build(db, root);
+            let graph = SpecializationFlowGraph::build_with_mode(db, root, mode);
             graph.root_may_have_unbounded_specialization(db, root)
         }
 
-        specialization_flow_inner(db, self, ())
+        specialization_flow_inner(db, self, mode)
     }
 }
 
@@ -693,6 +713,14 @@ impl<'db> TypeVisitor<'db> for StoredTypeChildren<'_, 'db> {
 
 impl<'db> SpecializationFlowGraph<'db> {
     fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>) -> Self {
+        Self::build_with_mode(db, root, SpecializationFlowMode::Semantic)
+    }
+
+    fn build_with_mode(
+        db: &'db dyn Db,
+        root: RecursiveDefinition<'db>,
+        mode: SpecializationFlowMode,
+    ) -> Self {
         let mut graph = Self::default();
         let mut pending = vec![root];
         let mut visited = FxHashSet::default();
@@ -702,7 +730,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visited.insert(source) {
                 continue;
             }
-            let Some(visitor) = SpecializationFlowVisitor::new(db, source) else {
+            let Some(visitor) = SpecializationFlowVisitor::new(db, source, mode) else {
                 graph.inconclusive = true;
                 continue;
             };
@@ -881,7 +909,11 @@ impl<'db> SpecializationFlowGraph<'db> {
 }
 
 impl<'db> SpecializationFlowVisitor<'db> {
-    fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
+    fn new(
+        db: &'db dyn Db,
+        source: RecursiveDefinition<'db>,
+        mode: SpecializationFlowMode,
+    ) -> Option<Self> {
         Some(Self {
             source_parameters: source.source_parameters(db)?,
             env: ProgramEnvironment::from_definition(source.definition(db)),
@@ -889,6 +921,7 @@ impl<'db> SpecializationFlowVisitor<'db> {
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
             inconclusive: Cell::default(),
+            mode,
         })
     }
 
@@ -906,7 +939,22 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 else {
                     return false;
                 };
-                protocol.walk_recursive_member_types(db, self);
+                match self.mode {
+                    SpecializationFlowMode::Semantic => {
+                        protocol.walk_recursive_member_types(db, self);
+                    }
+                    SpecializationFlowMode::Inspection => {
+                        // Inferred receivers describe the method's owner rather than a recursive
+                        // annotation. Bind them before inspecting parameters and return types.
+                        let receiver = Type::instance(db, &self.env, *protocol);
+                        walk_protocol_instance_interface(
+                            db,
+                            ProtocolInterfaceView::new(protocol.interface(db), None),
+                            receiver,
+                            self,
+                        );
+                    }
+                }
             }
             RecursiveDefinition::TypedDict(origin) => {
                 let typed_dict = TypedDictType::new(origin.identity_specialization(db));
@@ -1223,10 +1271,7 @@ where
         match self.begin_visit(db, item) {
             CycleDetectorVisit::Ready(result) => result,
             CycleDetectorVisit::Cycle(_) => self.fallback.clone(),
-            CycleDetectorVisit::Pending(item) => {
-                let result = compute();
-                self.finish_visit(item, result)
-            }
+            CycleDetectorVisit::Pending(visit) => visit.finish(compute()),
         }
     }
 
@@ -1246,38 +1291,48 @@ where
         reuse_cached: impl FnOnce(&R) -> bool,
         compute: impl FnOnce() -> R,
     ) -> Result<R, T> {
+        match self.try_begin_visit(db, item, reuse_cached) {
+            CycleDetectorVisit::Ready(result) => Ok(result),
+            CycleDetectorVisit::Cycle(item) => Err(item),
+            CycleDetectorVisit::Pending(visit) => Ok(visit.finish(compute())),
+        }
+    }
+
+    /// Starts a visit that can remain active while its computation is suspended.
+    ///
+    /// A rejected cached result is recomputed without replacing the original cache entry.
+    /// The returned scope must finish or be dropped before its enclosing visit ends.
+    pub(super) fn try_begin_visit(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        reuse_cached: impl FnOnce(&R) -> bool,
+    ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>> {
         let cached_result = self.cache.borrow().get(&item).cloned();
         let was_cached = cached_result.is_some();
         if let Some(result) = cached_result
             && reuse_cached(&result)
         {
-            return Ok(result);
+            return CycleDetectorVisit::Ready(result);
         }
 
-        match self.begin_active_visit(db, item) {
-            CycleDetectorVisit::Ready(result) => Ok(result),
-            CycleDetectorVisit::Cycle(item) => Err(item),
-            CycleDetectorVisit::Pending(item) => {
-                let result = compute();
-                if was_cached {
-                    self.finish_active_visit(&item);
-                    Ok(result)
-                } else {
-                    Ok(self.finish_visit(item, result))
-                }
-            }
-        }
+        self.begin_active_visit(db, item, !was_cached)
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
-        if let Some(result) = self.cache.borrow().get(&item) {
-            return CycleDetectorVisit::Ready(result.clone());
-        }
-
-        self.begin_active_visit(db, item)
+    fn begin_visit(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+    ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>> {
+        self.try_begin_visit(db, item, |_| true)
     }
 
-    fn begin_active_visit(&self, db: &'db dyn Db, item: T) -> CycleDetectorVisit<T, R> {
+    fn begin_active_visit(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        cache_result: bool,
+    ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>> {
         let seen = self.seen.borrow();
         if seen.iter().any(|active| active.item == item) {
             return CycleDetectorVisit::Ready(self.fallback.clone());
@@ -1306,21 +1361,69 @@ where
             item: item.clone(),
             identity,
         });
-        CycleDetectorVisit::Pending(item)
+        CycleDetectorVisit::Pending(CycleDetectorScope {
+            detector: self,
+            item: Some(item),
+            cache_result,
+        })
     }
+}
 
-    /// Finish a [`CycleDetectorVisit::Pending`] visit and cache its result.
-    fn finish_visit(&self, item: T, result: R) -> R {
-        self.finish_active_visit(&item);
-        self.cache
-            .borrow_mut()
-            .insert_completed(item, result.clone());
+/// Keeps a cycle-detector entry active until its result is available.
+///
+/// Dropping an unfinished visit removes the active entry without caching a partial result.
+pub(super) struct CycleDetectorScope<
+    'a,
+    'db,
+    Tag,
+    T: Eq + HasIdentity<'db>,
+    R,
+    const INLINE_CAPACITY: usize,
+> {
+    detector: &'a CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>,
+    item: Option<T>,
+    cache_result: bool,
+}
+
+impl<'db, Tag, T, R, const INLINE_CAPACITY: usize>
+    CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Eq + HasIdentity<'db>,
+{
+    fn take_active(&mut self) -> Option<T> {
+        let item = self.item.take()?;
+        let active = self.detector.seen.borrow_mut().pop();
+        debug_assert!(active.as_ref().is_some_and(|active| active.item == item));
+        Some(item)
+    }
+}
+
+impl<'db, Tag, T, R, const INLINE_CAPACITY: usize>
+    CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Hash + Eq + HasIdentity<'db>,
+    R: Clone,
+{
+    pub(super) fn finish(mut self, result: R) -> R {
+        if let Some(item) = self.take_active()
+            && self.cache_result
+        {
+            self.detector
+                .cache
+                .borrow_mut()
+                .insert_completed(item, result.clone());
+        }
         result
     }
+}
 
-    fn finish_active_visit(&self, item: &T) {
-        let active = self.seen.borrow_mut().pop();
-        debug_assert!(active.as_ref().is_some_and(|active| active.item == *item));
+impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> Drop
+    for CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Eq + HasIdentity<'db>,
+{
+    fn drop(&mut self) {
+        self.take_active();
     }
 }
 
@@ -1336,13 +1439,13 @@ impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVi
 }
 
 /// Result of starting a cycle-detector visit.
-pub(super) enum CycleDetectorVisit<T, R> {
+pub(super) enum CycleDetectorVisit<T, R, Pending> {
     /// The item already has a completed result or hit an exact recursive edge.
     Ready(R),
     /// A different item with the same abstract identity is already pending.
     Cycle(T),
     /// The caller should compute the result and finish the pending visit.
-    Pending(T),
+    Pending(Pending),
 }
 
 /// Guards recursive type transformations.
@@ -1571,6 +1674,7 @@ struct CallableDependencies<'db> {
     visited: RefCell<FxHashSet<Type<'db>>>,
     active: ActiveRecursionDetector<DefinitionUse<'db>>,
     identities: ActiveRecursionDetector<TypeIdentity<'db>>,
+    member_identities: ActiveRecursionDetector<TypeIdentity<'db>>,
     references: RefCell<Vec<DefinitionUse<'db>>>,
 }
 
@@ -1651,6 +1755,9 @@ impl<'db> CallableDependencies<'db> {
                     (class, receiver)
                 }),
                 SubclassOfInner::TypeVar(typevar) => {
+                    // A bound constrains assignability, but does not determine the constructor
+                    // exposed by a future specialization of this parameter.
+                    self.inconclusive.set(true);
                     match typevar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             visit(bound.constructor_for_typevar_bound(db, env));
@@ -1684,22 +1791,13 @@ impl<'db> CallableDependencies<'db> {
                 None
             }
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
-                let member = ty
-                    .member_lookup_with_policy_and_receiver(
-                        db,
-                        env,
-                        "__call__",
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        None,
-                    )
-                    .unwrap_or_else(|error| error.fallback_member(db));
-                self.visit_member(
+                let member = ty.class_member_with_policy(
                     db,
                     env,
-                    member.member(db).place,
-                    member.descriptor_origin(db),
-                    mode,
+                    "__call__",
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
                 );
+                self.visit_member(db, env, member.place, mode);
                 None
             }
             Type::TypeAlias(alias) => {
@@ -1725,6 +1823,9 @@ impl<'db> CallableDependencies<'db> {
                 None
             }
             Type::TypeVar(typevar) => {
+                // Specialization can introduce a descriptor or callable whose dependencies are
+                // absent from the parameter's bound, even when the bound is not callable.
+                self.inconclusive.set(true);
                 if mode == CallableExpansion::Bindings {
                     match typevar.require_bound_or_constraints(db, env) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => visit(bound),
@@ -1787,11 +1888,21 @@ impl<'db> CallableDependencies<'db> {
             // Include every possible constructor stage. Choosing a stage can depend on call-time
             // overload resolution, so dependency discovery must not discard downstream stages.
             for member in [
-                members.metaclass_call(db, env),
-                members.new_method(db, env),
-                members.initializer(db, env, false),
+                Type::from(class)
+                    .class_member_with_policy(
+                        db,
+                        env,
+                        "__call__",
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .place,
+                Type::from(class)
+                    .lookup_dunder_new(db, env)
+                    .map_or(Place::Undefined, |member| member.place),
+                members.raw_initializer(db, env, false),
             ] {
-                self.visit_member(db, env, member.place, member.origin, mode);
+                self.visit_member(db, env, member, mode);
             }
         }
     }
@@ -1801,16 +1912,60 @@ impl<'db> CallableDependencies<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         place: Place<'db>,
-        origin: DescriptorOrigin<'db>,
         mode: CallableExpansion,
     ) {
-        // Resolving a symbolic receiver can select a different descriptor overload from a
-        // concrete specialization. Such a call cannot prove that specialization is bounded.
-        if origin.dispatches.is_some() {
-            self.inconclusive.set(true);
-        } else if let Some(ty) = place.ignore_possibly_undefined() {
-            self.visit(db, env, ty, mode);
-        }
+        let Some(ty) = place.ignore_possibly_undefined() else {
+            return;
+        };
+        self.member_identities.visit(
+            &ty.to_type_identity(db),
+            || (),
+            || match ty {
+                Type::Union(union) => {
+                    for &element in union.elements(db) {
+                        self.visit_member(db, env, Place::bound(element), mode);
+                    }
+                }
+                Type::Intersection(intersection) => {
+                    for element in intersection.positive_elements_or_object(db) {
+                        self.visit_member(db, env, Place::bound(element), mode);
+                    }
+                }
+                Type::TypeAlias(alias) => {
+                    self.visit_member(db, env, Place::bound(alias.value_type(db)), mode);
+                }
+                Type::Recursive(recursive) => {
+                    if let Some(unfolded) = recursive.unfold(db, env).into_unfolded() {
+                        self.visit_member(db, env, Place::bound(unfolded), mode);
+                    }
+                }
+                _ if ty.function_like_kind(db).is_some() => {
+                    self.visit(db, env, ty.underlying_function(db), mode);
+                }
+                Type::BoundMethod(_) | Type::TypeVar(_) | Type::Dynamic(_) => {
+                    self.visit(db, env, ty, mode);
+                }
+                _ => {
+                    // An arbitrary descriptor can invoke another constructor before it returns.
+                    // Inspect its declaration without executing it: neither its selected overload
+                    // nor its termination behavior is fixed under future specialization.
+                    if ty
+                        .class_member_with_policy(
+                            db,
+                            env,
+                            "__get__",
+                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        )
+                        .place
+                        .is_undefined()
+                    {
+                        self.visit(db, env, ty, mode);
+                    } else {
+                        self.inconclusive.set(true);
+                    }
+                }
+            },
+        );
     }
 }
 
@@ -1819,46 +1974,130 @@ impl<'db> CallableDependencies<'db> {
 /// a changing specialization needs a gradual approximation.
 #[derive(Debug, Default)]
 pub(super) struct CallableRecursionGuard<'db> {
-    mode: CallableExpansion,
-    active: ActiveRecursionDetector<Type<'db>>,
-    identities: ActiveRecursionDetector<TypeIdentity<'db>>,
+    active: ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
+    identities: ActiveRecursionDetector<(CallableExpansion, TypeIdentity<'db>)>,
     growth: CallableGrowthDetector<'db>,
     cache: ConstructorCallableCache<'db>,
 }
 
-/// Constructor results that used an ancestor-dependent fallback cannot be reused on another
-/// path. The recovery counter invalidates only those results, preserving memoization of siblings.
+/// Memoizes constructor expansion under the active-cycle assumptions it actually used.
+///
+/// An exact cycle contributes the same provisional result while its ancestor remains active.
+/// Shared descendants can reuse that result, provided no other dependency has become active.
+/// Growth recovery also depends on descriptor history, so those results are not memoized.
 #[derive(Debug, Default)]
 struct ConstructorCallableCache<'db> {
     use_shared_cache: bool,
-    recoveries: Cell<usize>,
-    constructors: RefCell<CycleDetectorCache<(ClassType<'db>, Type<'db>), CallableTypes<'db>>>,
+    growth_recoveries: Cell<usize>,
+    dependencies: RefCell<FxHashSet<(CallableExpansion, Type<'db>)>>,
+    constructors: RefCell<FxHashMap<(ClassType<'db>, Type<'db>), CachedConstructor<'db>>>,
 }
 
 impl<'db> ConstructorCallableCache<'db> {
-    fn get_or_insert(
-        &self,
-        db: &'db dyn Db,
+    fn enter<'a>(
+        &'a self,
         class: ClassType<'db>,
         receiver: Type<'db>,
-        expand: impl FnOnce() -> CallableTypes<'db>,
-    ) -> CallableTypes<'db> {
-        if self.use_shared_cache {
-            return class.into_callable_with_receiver(db, receiver);
+        active: &'a ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
+    ) -> ConstructorEntry<'a, 'db> {
+        if self.use_shared_cache
+            && active
+                .seen
+                .borrow()
+                .iter()
+                .all(|(mode, _)| *mode == CallableExpansion::Upcast)
+        {
+            return ConstructorEntry::SharedQuery;
         }
         let key = (class, receiver);
-        if let Some(callables) = self.constructors.borrow().get(&key) {
-            return callables.clone();
+        if let Some(cached) = self.constructors.borrow().get(&key)
+            && cached.can_reuse(&active.seen.borrow())
+        {
+            self.dependencies
+                .borrow_mut()
+                .extend(cached.dependencies.iter().copied());
+            return ConstructorEntry::Ready(cached.callables.clone());
         }
 
-        let recoveries = self.recoveries.get();
-        let callables = expand();
-        if self.recoveries.get() == recoveries {
-            self.constructors
-                .borrow_mut()
-                .insert_completed(key, callables.clone());
+        let dependencies = RecursionDependencyScope {
+            dependencies: &self.dependencies,
+            parent: self.dependencies.take(),
+        };
+        let recoveries = self.growth_recoveries.get();
+        ConstructorEntry::Expand(ConstructorCacheScope {
+            cache: self,
+            active,
+            key,
+            recoveries,
+            _dependencies: dependencies,
+        })
+    }
+}
+
+pub(super) enum ConstructorEntry<'a, 'db> {
+    SharedQuery,
+    Ready(CallableTypes<'db>),
+    Expand(ConstructorCacheScope<'a, 'db>),
+}
+
+/// A constructor collects dependencies until its completed result can be cached. Dropping this
+/// scope without finishing still contributes those dependencies to the enclosing computation.
+pub(super) struct ConstructorCacheScope<'a, 'db> {
+    cache: &'a ConstructorCallableCache<'db>,
+    active: &'a ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
+    key: (ClassType<'db>, Type<'db>),
+    recoveries: usize,
+    _dependencies: RecursionDependencyScope<'a, (CallableExpansion, Type<'db>)>,
+}
+
+impl<'db> ConstructorCacheScope<'_, 'db> {
+    /// Publish before leaving the enclosing callable expansion: active ancestors determine
+    /// which later expansions can reuse this result.
+    pub(super) fn finish(self, callables: &CallableTypes<'db>) {
+        if self.cache.growth_recoveries.get() == self.recoveries {
+            let dependencies = self.cache.dependencies.borrow().clone();
+            let active_dependencies = dependencies
+                .intersection(&self.active.seen.borrow())
+                .copied()
+                .collect();
+            self.cache.constructors.borrow_mut().insert(
+                self.key,
+                CachedConstructor {
+                    callables: callables.clone(),
+                    dependencies,
+                    active_dependencies,
+                },
+            );
         }
-        callables
+    }
+}
+
+#[derive(Debug)]
+struct CachedConstructor<'db> {
+    callables: CallableTypes<'db>,
+    dependencies: FxHashSet<(CallableExpansion, Type<'db>)>,
+    active_dependencies: FxHashSet<(CallableExpansion, Type<'db>)>,
+}
+
+impl<'db> CachedConstructor<'db> {
+    fn can_reuse(&self, active: &FxHashSet<(CallableExpansion, Type<'db>)>) -> bool {
+        self.active_dependencies.is_subset(active)
+            && active
+                .intersection(&self.dependencies)
+                .all(|ty| self.active_dependencies.contains(ty))
+    }
+}
+
+/// Nested expansions and cache hits contribute their dependencies to the enclosing computation.
+struct RecursionDependencyScope<'a, T: Eq + Hash> {
+    dependencies: &'a RefCell<FxHashSet<T>>,
+    parent: FxHashSet<T>,
+}
+
+impl<T: Eq + Hash> Drop for RecursionDependencyScope<'_, T> {
+    fn drop(&mut self) {
+        let dependencies = self.dependencies.replace(mem::take(&mut self.parent));
+        self.dependencies.borrow_mut().extend(dependencies);
     }
 }
 
@@ -1873,16 +2112,16 @@ impl<'db> ConstructorCallableCache<'db> {
 /// observations alone never justify stopping. When both growth and repeated observations occur,
 /// the gradual fallback can still lose diagnostics on finite chains outside this abstraction.
 ///
-/// Each descriptor declaration gets a fixed observation vocabulary from its first invocation on
-/// the active path. Later invocations use their actual specialized signatures, but record only
-/// comparisons involving that vocabulary. This separates specialization needed for dispatch from
-/// the finite state needed for termination: even the descriptor's own type arguments can grow.
+/// Each set of called declarations gets a vocabulary from its first invocation on the active path.
+/// Later invocations retain their actual specialized signatures, but record only comparisons
+/// involving that vocabulary. Delegated calls contribute their own signatures, so a property
+/// getter or a descriptor that selects `__call__` can distinguish progress towards termination.
 #[derive(Debug, Default)]
 struct CallableGrowthDetector<'db> {
     active: ActiveRecursionDetector<(DefinitionUse<'db>, DescriptorOrigin<'db>)>,
     embedding: TypeEmbedding<'db>,
     dispatch: Cell<DescriptorOrigin<'db>>,
-    initial_dispatches: RefCell<FxHashMap<FunctionLiteral<'db>, DescriptorDispatches<'db>>>,
+    anchors: RefCell<Vec<(RecursiveDefinition<'db>, DescriptorDispatches<'db>)>>,
 }
 
 impl<'db> CallableGrowthDetector<'db> {
@@ -1902,67 +2141,97 @@ impl<'db> CallableGrowthDetector<'db> {
             return false;
         }
         let current = self.dispatch.get();
-        let initial_dispatches = self.initial_dispatches.borrow();
+        let anchors = self.anchors.borrow();
+        let initial = current.dispatches.and_then(|current| {
+            anchors.iter().find_map(|(target, initial)| {
+                (*target == reference.target
+                    && current.declarations(db) == initial.declarations(db))
+                .then_some(*initial)
+            })
+        });
         previous.into_iter().any(|(previous, origin)| {
             reference.structurally_expands(db, env, *previous, &self.embedding)
-                && same_descriptor_observations(db, env, &initial_dispatches, current, *origin)
+                && match compare_descriptor_observations(db, env, initial, current, *origin) {
+                    DescriptorComparison::Equal => true,
+                    DescriptorComparison::Different => false,
+                    // Missing call candidates cannot establish dispatch equivalence. Once the
+                    // type arguments grow, retain the same conservative recovery as a failed call.
+                    DescriptorComparison::Incomplete => true,
+                }
         })
     }
 }
 
 /// Matching observations can permit approximation after structural growth has been established.
 /// They do not imply equivalent future expansion behavior.
-fn same_descriptor_observations<'db>(
+enum DescriptorComparison {
+    Equal,
+    Different,
+    Incomplete,
+}
+
+fn compare_descriptor_observations<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
-    initial_dispatches: &FxHashMap<FunctionLiteral<'db>, DescriptorDispatches<'db>>,
+    initial: Option<DescriptorDispatches<'db>>,
     left: DescriptorOrigin<'db>,
     right: DescriptorOrigin<'db>,
-) -> bool {
-    if left == right {
-        return true;
+) -> DescriptorComparison {
+    if left.incomplete || right.incomplete {
+        return DescriptorComparison::Incomplete;
     }
-    let (Some(left), Some(right)) = (left.dispatches, right.dispatches) else {
-        return false;
+    if left == right {
+        return DescriptorComparison::Equal;
+    }
+    let (Some(initial), Some(left), Some(right)) = (initial, left.dispatches, right.dispatches)
+    else {
+        return DescriptorComparison::Different;
     };
     let left = left.elements(db);
     let right = right.elements(db);
-    left.len() == right.len()
-        && left.iter().zip(right).all(|(&left, &right)| {
-            if left.definitions(db) != right.definitions(db) {
-                return false;
-            }
-            match (left.function(db), right.function(db)) {
-                (Some(left_function), Some(right_function))
-                    if left_function.literal(db) == right_function.literal(db) =>
-                {
-                    let Some(&initial) = initial_dispatches.get(&left_function.literal(db)) else {
-                        return false;
-                    };
-                    left.observations(db, env.program(db), initial)
-                        == right.observations(db, env.program(db), initial)
-                }
-                (None, None) => true,
-                _ => false,
-            }
+    let contained = |left: &[DescriptorDispatch<'db>], right: &[DescriptorDispatch<'db>]| {
+        left.iter().all(|left| {
+            let left = left.observations(db, env.program(db), initial);
+            right.iter().any(|right| {
+                let right = right.observations(db, env.program(db), initial);
+                left.len() == right.len() && left.iter().all(|overload| right.contains(overload))
+            })
         })
+    };
+    let equivalent = contained(left, right) && contained(right, left);
+    if equivalent {
+        DescriptorComparison::Equal
+    } else {
+        DescriptorComparison::Different
+    }
+}
+
+#[salsa::tracked]
+impl<'db> DescriptorDispatches<'db> {
+    /// Source declarations form a finite vocabulary even when unions or parameter lists grow.
+    /// Anonymous signatures share an entry here, but retain separate argument observations.
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn declarations(self, db: &'db dyn Db) -> FxHashSet<Option<Definition<'db>>> {
+        let mut declarations = self
+            .elements(db)
+            .iter()
+            .flat_map(|dispatch| dispatch.signatures(db).iter().map(Signature::definition))
+            .collect::<FxHashSet<_>>();
+        declarations.shrink_to_fit();
+        declarations
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct DescriptorOverloadObservation<'db> {
+    definition: Option<Definition<'db>>,
+    selected: bool,
+    failed: bool,
+    relations: FxHashSet<RelationObservation<'db>>,
 }
 
 #[salsa::tracked]
 impl<'db> DescriptorDispatch<'db> {
-    fn arguments(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> impl Iterator<Item = Type<'db>> {
-        let call = self.call(db);
-        self.bound_receiver(db).into_iter().chain([
-            call.descriptor_type(db),
-            call.instance(db).unwrap_or_else(|| Type::none(db, env)),
-            call.owner(db),
-        ])
-    }
-
     /// Observe assignability against every current specialized overload, including rejected ones.
     /// A fixed vocabulary of types from the first invocation bounds the observations even when
     /// both the arguments and the signatures change. Nested obligations still distinguish progress
@@ -1973,31 +2242,40 @@ impl<'db> DescriptorDispatch<'db> {
         db: &'db dyn Db,
         program: Program<'db>,
         initial_dispatches: DescriptorDispatches<'db>,
-    ) -> Box<[FxHashSet<RelationObservation<'db>>]> {
+    ) -> Box<[DescriptorOverloadObservation<'db>]> {
         let env = ProgramEnvironment::from_program(program);
-        let Some(function) = self.function(db) else {
-            return Box::default();
-        };
-        let patterns =
-            descriptor_observation_patterns(db, program, initial_dispatches, function.literal(db));
+        let patterns = descriptor_observation_patterns(db, program, initial_dispatches);
         let mut observations = Vec::new();
-        for signature in function.signature(db) {
+        for (index, (signature, comparisons)) in self
+            .signatures(db)
+            .iter()
+            .zip(self.comparisons(db))
+            .enumerate()
+        {
             let inferable = signature
                 .generic_context
                 .map_or(TypeVarSet::None, |context| context.inferable_typevars(db));
-            // A callable object used as `__get__` also binds its own `__call__` receiver.
-            // Observe its specialized signature with that same complete argument list.
-            let comparisons =
-                self.arguments(db, &env)
-                    .enumerate()
-                    .filter_map(|(index, argument)| {
-                        let parameter = signature.parameters().get_positional(index)?;
-                        Some((index, argument, parameter.annotated_type()))
-                    });
+            let comparisons = comparisons.iter().map(|comparison| {
+                (
+                    comparison.argument_index,
+                    comparison.argument_type,
+                    comparison.parameter_type,
+                )
+            });
             let mut result =
                 Type::assignability_observations(db, &env, comparisons, patterns, inferable);
             result.shrink_to_fit();
-            observations.push(result);
+            let observation = DescriptorOverloadObservation {
+                definition: signature.definition(),
+                selected: self
+                    .selected_overloads(db)
+                    .contains(&signature.source_overload_index().unwrap_or(index)),
+                failed: *self.failed(db),
+                relations: result,
+            };
+            if !observations.contains(&observation) {
+                observations.push(observation);
+            }
         }
         observations.into_boxed_slice()
     }
@@ -2007,32 +2285,24 @@ impl<'db> DescriptorDispatch<'db> {
 /// unspecialized declaration. Return annotations also matter: they can introduce a new descriptor
 /// specialization farther down the chain. Include every alternative of this initial invocation so
 /// union ordering cannot determine which specialization contributes the observation vocabulary.
-#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| FxHashSet::default(), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| FxHashSet::default(), heap_size=ruff_memory_usage::heap_size)]
 fn descriptor_observation_patterns<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
     initial_dispatches: DescriptorDispatches<'db>,
-    literal: FunctionLiteral<'db>,
 ) -> FxHashSet<Type<'db>> {
     let env = ProgramEnvironment::from_program(program);
-    let visitor = DescriptorPatternTypes {
-        env: &env,
-        types: RefCell::default(),
-        active: ActiveRecursionDetector::default(),
-    };
+    let visitor = DescriptorPatternTypes::new(&env);
     for dispatch in initial_dispatches.elements(db) {
-        if let Some(function) = dispatch.function(db)
-            && function.literal(db) == literal
-        {
-            for argument in dispatch.arguments(db, &env) {
-                visitor.visit_type(db, argument);
-            }
-            for signature in function.signature(db) {
-                for parameter in signature.parameters() {
-                    visitor.visit_type(db, parameter.annotated_type());
-                }
-                visitor.visit_type(db, signature.return_ty);
-            }
+        for &argument in dispatch.arguments(db) {
+            visitor.visit_type(db, argument);
+        }
+        for signature in dispatch.signatures(db) {
+            visitor.visit_signature(db, signature);
+        }
+        for comparison in dispatch.comparisons(db).iter().flatten() {
+            visitor.visit_type(db, comparison.argument_type);
+            visitor.visit_type(db, comparison.parameter_type);
         }
     }
     let mut types = visitor.types.into_inner();
@@ -2040,12 +2310,73 @@ fn descriptor_observation_patterns<'db>(
     types
 }
 
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+enum PatternBoundary<'db> {
+    Type(TypeIdentity<'db>),
+    Signature(Definition<'db>),
+    Protocol(StaticClassLiteral<'db>),
+}
+
+/// Reuse a completed walk only under the same recursive assumptions. A type recorded at a
+/// back-edge still needs expansion if a later input supplies that type outside the cycle.
+struct PatternDependencies<'db> {
+    boundaries: FxHashSet<PatternBoundary<'db>>,
+    active_boundaries: FxHashSet<PatternBoundary<'db>>,
+}
+
+struct PendingPatternExpansion<'db> {
+    key: (Type<'db>, bool),
+    active_boundaries: FxHashSet<PatternBoundary<'db>>,
+}
+
 /// Enumerate a fixed invocation's types without traversing nominal class bodies. Later receiver
 /// specializations do not extend this set; doing so would make the observation state unbounded.
 struct DescriptorPatternTypes<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     types: RefCell<FxHashSet<Type<'db>>>,
-    active: ActiveRecursionDetector<TypeIdentity<'db>>,
+    active: ActiveRecursionDetector<PatternBoundary<'db>>,
+    signatures_are_bounded: Cell<bool>,
+    dependencies: RefCell<FxHashSet<PatternBoundary<'db>>>,
+    expansions: RefCell<FxHashMap<(Type<'db>, bool), PatternDependencies<'db>>>,
+    pending: RefCell<Vec<PendingPatternExpansion<'db>>>,
+    pending_indices: RefCell<FxHashMap<(Type<'db>, bool), usize>>,
+    /// The earliest pending expansion reachable from the current walk through exact back-edges.
+    component: Cell<Option<usize>>,
+    #[cfg(test)]
+    expansion_count: Cell<usize>,
+}
+
+impl<'a, 'db> DescriptorPatternTypes<'a, 'db> {
+    fn new(env: &'a ProgramEnvironment<'db>) -> Self {
+        Self {
+            env,
+            types: RefCell::default(),
+            active: ActiveRecursionDetector::default(),
+            signatures_are_bounded: Cell::new(false),
+            dependencies: RefCell::default(),
+            expansions: RefCell::default(),
+            pending: RefCell::default(),
+            pending_indices: RefCell::default(),
+            component: Cell::new(None),
+            #[cfg(test)]
+            expansion_count: Cell::new(0),
+        }
+    }
+
+    fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+        let visit = || walk_signature(db, signature, self);
+        if !self.signatures_are_bounded.get()
+            && let Some(definition) = signature.definition()
+        {
+            let boundary = PatternBoundary::Signature(definition);
+            self.dependencies.borrow_mut().insert(boundary);
+            // Protocol methods become Callable types, but their declarations still bound the
+            // walk when a return annotation introduces another specialization of the method.
+            self.active.visit(&boundary, || (), visit);
+        } else {
+            visit();
+        }
+    }
 }
 
 impl<'db> TypeVisitor<'db> for DescriptorPatternTypes<'_, 'db> {
@@ -2056,56 +2387,147 @@ impl<'db> TypeVisitor<'db> for DescriptorPatternTypes<'_, 'db> {
         true
     }
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        if self.types.borrow_mut().insert(ty) {
-            self.active.visit(
-                &ty.to_type_identity(db),
-                || (),
-                || {
-                    if let TypeKind::NonAtomic(ty) = TypeKind::from(ty) {
-                        walk_non_atomic_type(db, ty, self);
-                    }
-                },
-            );
+        self.types.borrow_mut().insert(ty);
+        let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
+            return;
+        };
+        let key = (ty, self.signatures_are_bounded.get());
+        if let Some(&index) = self.pending_indices.borrow().get(&key) {
+            self.component.set(Some(
+                self.component.get().map_or(index, |root| root.min(index)),
+            ));
+            return;
+        }
+        if let Some(cached) = self.expansions.borrow().get(&key)
+            && cached.boundaries.iter().all(|&boundary| {
+                cached.active_boundaries.contains(&boundary)
+                    == self.active.seen.borrow().contains(&boundary)
+            })
+        {
+            self.dependencies
+                .borrow_mut()
+                .extend(cached.boundaries.iter().copied());
+            return;
+        }
+        let index = self.pending.borrow().len();
+        self.pending_indices.borrow_mut().insert(key, index);
+        self.pending.borrow_mut().push(PendingPatternExpansion {
+            key,
+            active_boundaries: self.active.seen.borrow().clone(),
+        });
+        let parent_component = self.component.replace(Some(index));
+        let _scope = RecursionDependencyScope {
+            dependencies: &self.dependencies,
+            parent: self.dependencies.take(),
+        };
+        let identity = ty.to_type_identity(db);
+        let visit = || {
+            #[cfg(test)]
+            self.expansion_count.set(self.expansion_count.get() + 1);
+            walk_non_atomic_type(db, non_atomic, self);
+        };
+        if matches!(identity, TypeIdentity::Other(_)) {
+            visit();
+        } else {
+            let boundary = PatternBoundary::Type(identity);
+            self.dependencies.borrow_mut().insert(boundary);
+            self.active.visit(&boundary, || (), visit);
+        }
+
+        let component = self.component.replace(parent_component);
+        if component == Some(index) {
+            // Exact cycles accumulate the same vocabulary, so expand each member just once.
+            // All members share the coarse cutoffs encountered anywhere in the component:
+            // a back-edge can reach a cutoff discovered after its own walk has returned.
+            let boundaries = self.dependencies.borrow();
+            for pending in self.pending.borrow_mut().drain(index..) {
+                self.pending_indices.borrow_mut().remove(&pending.key);
+                self.expansions.borrow_mut().insert(
+                    pending.key,
+                    PatternDependencies {
+                        active_boundaries: pending
+                            .active_boundaries
+                            .intersection(&boundaries)
+                            .copied()
+                            .collect(),
+                        boundaries: boundaries.clone(),
+                    },
+                );
+            }
+        }
+        if let (Some(parent), Some(component)) = (parent_component, component) {
+            self.component.set(Some(parent.min(component)));
         }
     }
     fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-        for &ty in alias.specialization(db).types(db) {
-            self.visit_type(db, ty);
+        walk_specialization_types(db, alias.specialization(db), self);
+    }
+
+    fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+        for signature in callable.signatures(db) {
+            self.visit_signature(db, signature);
         }
+    }
+
+    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+        for signature in function.signature(db) {
+            self.visit_signature(db, signature);
+        }
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        let origin = protocol
+            .class_origin(db)
+            .and_then(|class| class.static_class_literal(db));
+        if let Some((_, Some(specialization))) = origin {
+            walk_specialization_types(db, specialization, self);
+        }
+        let bounded = origin.is_some_and(|(origin, _)| {
+            !RecursiveDefinition::Protocol(origin)
+                .may_have_unbounded_specialization_with_mode(db, SpecializationFlowMode::Inspection)
+        });
+        let previous = self.signatures_are_bounded.replace(bounded);
+        let visit = || walk_protocol_instance_type(db, protocol, self);
+        if let Some((origin, _)) = origin
+            && !bounded
+        {
+            let boundary = PatternBoundary::Protocol(origin);
+            self.dependencies.borrow_mut().insert(boundary);
+            // Anonymous method signatures have no source declaration to guard. The protocol
+            // origin also bounds these walks when their specialization cannot be proven finite.
+            self.active.visit(&boundary, || (), visit);
+        } else {
+            visit();
+        }
+        self.signatures_are_bounded.set(previous);
     }
 }
 
 impl<'db> CallableRecursionGuard<'db> {
+    /// Retain a descriptor's dispatch state until its callable dependency finishes. Dependencies
+    /// without a new descriptor origin inherit the current dispatch state.
+    pub(super) fn enter_dependency(
+        &self,
+        origin: DescriptorOrigin<'db>,
+    ) -> DescriptorDispatchScope<'_, 'db> {
+        let previous =
+            (origin != DescriptorOrigin::default()).then(|| self.growth.dispatch.replace(origin));
+        DescriptorDispatchScope {
+            current: &self.growth.dispatch,
+            previous,
+        }
+    }
+
     /// Follow a resolved callable dependency with the dispatch state that produced it.
     /// Plain forwarding helpers retain the preceding dispatch until another descriptor is invoked.
     /// Observation vocabularies live only for this path, so sibling expansions start independently.
     pub(super) fn with_dependency<R>(
         &self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         origin: DescriptorOrigin<'db>,
         func: impl FnOnce() -> R,
     ) -> R {
-        let Some(dispatches) = origin.dispatches else {
-            return func();
-        };
-        let previous_dispatch = self.growth.dispatch.replace(origin);
-        let mut scope = DescriptorDispatchScope {
-            current: &self.growth.dispatch,
-            previous: previous_dispatch,
-            initial_dispatches: &self.growth.initial_dispatches,
-            introduced_functions: SmallVec::new(),
-        };
-        {
-            let mut initial_dispatches = self.growth.initial_dispatches.borrow_mut();
-            for dispatch in dispatches.elements(db) {
-                if let Some(function) = dispatch.function(db)
-                    && let Entry::Vacant(entry) = initial_dispatches.entry(function.literal(db))
-                {
-                    entry.insert(dispatches);
-                    scope.introduced_functions.push(function.literal(db));
-                }
-            }
-        }
+        let _scope = self.enter_dependency(origin);
         func()
     }
 
@@ -2132,89 +2554,146 @@ impl<'db> CallableRecursionGuard<'db> {
         }
     }
 
-    pub(super) fn new(mode: CallableExpansion) -> Self {
-        Self {
-            mode,
-            ..Self::default()
-        }
+    pub(super) fn new() -> Self {
+        Self::default()
     }
 
-    pub(super) fn constructor_callables(
+    pub(super) fn enter_constructor(
         &self,
-        db: &'db dyn Db,
         class: ClassType<'db>,
         receiver: Type<'db>,
-    ) -> CallableTypes<'db> {
-        self.cache.get_or_insert(db, class, receiver, || {
-            class.into_callable_with_recursion_guard(db, receiver, self)
-        })
+    ) -> ConstructorEntry<'_, 'db> {
+        self.cache.enter(class, receiver, &self.active)
     }
 
     pub(super) fn visit<R>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        ty: &Type<'db>,
+        key: (CallableExpansion, Type<'db>),
         on_cycle: impl FnOnce() -> R,
         on_growth: impl FnOnce() -> R,
         func: impl FnOnce() -> R,
     ) -> R {
-        let on_cycle = || {
-            self.cache.recoveries.set(self.cache.recoveries.get() + 1);
-            on_cycle()
-        };
+        match self.enter(db, env, key) {
+            CallableEntry::ExactCycle => on_cycle(),
+            CallableEntry::Growth => on_growth(),
+            CallableEntry::Entered(_scope) => func(),
+        }
+    }
+
+    pub(super) fn enter(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        key: (CallableExpansion, Type<'db>),
+    ) -> CallableEntry<'_, 'db> {
+        let (mode, ty) = key;
+        self.cache.dependencies.borrow_mut().insert(key);
         let on_growth = || {
-            self.cache.recoveries.set(self.cache.recoveries.get() + 1);
-            on_growth()
+            self.cache
+                .growth_recoveries
+                .set(self.cache.growth_recoveries.get() + 1);
+            CallableEntry::Growth
         };
-        if self.active.seen.borrow().contains(ty) {
-            return on_cycle();
+        if self.active.seen.borrow().contains(&key) {
+            return CallableEntry::ExactCycle;
         }
 
-        let Some(reference) = CallableDefinition::from_type(db, env, *ty, self.mode) else {
-            let Some(identity) = ty.recursive_identity(db) else {
-                return self.active.visit(ty, on_cycle, func);
-            };
-            return self.identities.visit(&identity, on_growth, || {
-                self.active.visit(ty, on_cycle, func)
-            });
+        let mut scope = CallableVisitScope {
+            guard: self,
+            key: None,
+            identity: None,
+            dispatch_reference: None,
+            anchor_introduced: false,
         };
-
-        if self.growth.should_approximate(db, env, reference) {
-            return on_growth();
+        if let Some(reference) = CallableDefinition::from_type(db, env, ty, mode) {
+            if self.growth.should_approximate(db, env, reference) {
+                return on_growth();
+            }
+            if let Some(dispatches) = self.growth.dispatch.get().dispatches {
+                let mut anchors = self.growth.anchors.borrow_mut();
+                if !anchors.iter().any(|(target, initial)| {
+                    *target == reference.target
+                        && dispatches.declarations(db) == initial.declarations(db)
+                }) {
+                    anchors.push((reference.target, dispatches));
+                    scope.anchor_introduced = true;
+                }
+            }
+            let dispatch_reference = (reference, self.growth.dispatch.get());
+            if self
+                .growth
+                .active
+                .seen
+                .borrow_mut()
+                .insert(dispatch_reference)
+            {
+                scope.dispatch_reference = Some(dispatch_reference);
+            }
+        } else if let Some(identity) = ty.recursive_identity(db) {
+            let identity = (mode, identity);
+            if !self.identities.seen.borrow_mut().insert(identity) {
+                return on_growth();
+            }
+            scope.identity = Some(identity);
         }
-        let dispatch_reference = (reference, self.growth.dispatch.get());
-        if self
-            .growth
-            .active
-            .seen
-            .borrow()
-            .contains(&dispatch_reference)
-        {
-            return self.active.visit(ty, on_cycle, func);
-        }
 
-        self.growth
-            .active
-            .visit(&dispatch_reference, on_growth, || {
-                self.active.visit(ty, on_cycle, func)
-            })
+        if !self.active.seen.borrow_mut().insert(key) {
+            return CallableEntry::ExactCycle;
+        }
+        scope.key = Some(key);
+        CallableEntry::Entered(scope)
     }
 }
 
-struct DescriptorDispatchScope<'a, 'db> {
+pub(super) enum CallableEntry<'a, 'db> {
+    ExactCycle,
+    Growth,
+    Entered(CallableVisitScope<'a, 'db>),
+}
+
+/// Keeps an expansion active across its suspended dependencies. Nested scopes must be dropped in
+/// reverse entry order so descriptor anchors remain available until their descendants finish.
+pub(super) struct CallableVisitScope<'a, 'db> {
+    guard: &'a CallableRecursionGuard<'db>,
+    key: Option<(CallableExpansion, Type<'db>)>,
+    identity: Option<(CallableExpansion, TypeIdentity<'db>)>,
+    dispatch_reference: Option<(DefinitionUse<'db>, DescriptorOrigin<'db>)>,
+    anchor_introduced: bool,
+}
+
+impl Drop for CallableVisitScope<'_, '_> {
+    fn drop(&mut self) {
+        if let Some(key) = self.key {
+            self.guard.active.seen.borrow_mut().remove(&key);
+        }
+        if let Some(identity) = self.identity {
+            self.guard.identities.seen.borrow_mut().remove(&identity);
+        }
+        if let Some(reference) = self.dispatch_reference {
+            self.guard
+                .growth
+                .active
+                .seen
+                .borrow_mut()
+                .remove(&reference);
+        }
+        if self.anchor_introduced {
+            self.guard.growth.anchors.borrow_mut().pop();
+        }
+    }
+}
+
+pub(super) struct DescriptorDispatchScope<'a, 'db> {
     current: &'a Cell<DescriptorOrigin<'db>>,
-    previous: DescriptorOrigin<'db>,
-    initial_dispatches: &'a RefCell<FxHashMap<FunctionLiteral<'db>, DescriptorDispatches<'db>>>,
-    introduced_functions: SmallVec<[FunctionLiteral<'db>; 1]>,
+    previous: Option<DescriptorOrigin<'db>>,
 }
 
 impl Drop for DescriptorDispatchScope<'_, '_> {
     fn drop(&mut self) {
-        self.current.set(self.previous);
-        let mut initial_dispatches = self.initial_dispatches.borrow_mut();
-        for function in &self.introduced_functions {
-            initial_dispatches.remove(function);
+        if let Some(previous) = self.previous {
+            self.current.set(previous);
         }
     }
 }
@@ -2224,22 +2703,208 @@ mod tests {
     use std::assert_matches;
 
     use super::{
-        CycleDetector, CycleDetectorVisit, Db, FlowEdge, FlowKind, HasIdentity,
-        RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
+        CallableDefinition, CallableExpansion, CallableRecursionGuard, CycleDetector,
+        CycleDetectorVisit, Db, DescriptorPatternTypes, FlowEdge, FlowKind, HasIdentity,
+        RecursiveDefinition, SpecializationFlowGraph, SpecializationFlowMode, TypeIdentity,
     };
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
     use crate::place::global_symbol;
-    use crate::types::{KnownInstanceType, Type, TypeAliasType};
+    use crate::types::callable::CallableTypeKind;
+    use crate::types::signatures::{Parameters, Signature};
+    use crate::types::visitor::TypeVisitor;
+    use crate::types::{CallableSignature, CallableType, KnownInstanceType, Type, TypeAliasType};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem;
     use std::cell::Cell;
+    use std::fmt::Write;
     use std::hash::{Hash, Hasher};
     use ty_python_core::ProgramFile;
 
     struct TestVisit;
 
     type Detector<'db> = CycleDetector<'db, TestVisit, u8, u8, 1>;
+
+    #[test]
+    fn symbolic_callable_dependencies_are_inconclusive() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from typing import Callable
+
+            type Alias[T] = T
+
+            class Initializer[T]:
+                __init__: T
+
+            class AliasedInitializer[T]:
+                __init__: Alias[T]
+
+            class UnionInitializer[T]:
+                __init__: T | Callable[[], None]
+
+            class BoundedInitializer[T: object]:
+                __init__: T
+
+            class Allocator[T]:
+                __new__: T
+
+            class Wrapper[T]:
+                __call__: T
+
+            class WrappedInitializer[T]:
+                __init__: Wrapper[T]
+
+            class Descriptor[T]:
+                __get__: T
+
+            class DescriptorInitializer[T]:
+                __init__: Descriptor[T]
+
+            class RecursiveDescriptor[T]:
+                __get__: type[RecursiveGetter[list[T]]]
+
+            class RecursiveGetter[T]:
+                __new__: RecursiveDescriptor[T]
+
+            class ConstructorInitializer[T]:
+                __init__: type[T]
+
+            class BoundedConstructorInitializer[T: object]:
+                __init__: type[T]
+
+            class ConstrainedConstructorInitializer[T: (int, str)]:
+                __init__: type[T]
+
+            class OrdinaryInitializer[T]:
+                def __init__(self, value: T) -> None: ...
+
+            class CallableInitializer[T]:
+                __init__: Callable[[T], None]
+
+            class StaticInitializer[T]:
+                @staticmethod
+                def __init__(value: T) -> None: ...
+
+            class ClassInitializer[T]:
+                @classmethod
+                def __init__(cls, value: T) -> None: ...
+
+            class ForwardInitializer[T]:
+                __init__: type[OrdinaryInitializer[T]]
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        for mode in [CallableExpansion::Bindings, CallableExpansion::Upcast] {
+            for (name, expected) in [
+                ("Initializer", true),
+                ("AliasedInitializer", true),
+                ("UnionInitializer", true),
+                ("BoundedInitializer", true),
+                ("Allocator", true),
+                ("WrappedInitializer", true),
+                ("DescriptorInitializer", true),
+                ("RecursiveGetter", true),
+                ("ConstructorInitializer", true),
+                ("BoundedConstructorInitializer", true),
+                ("ConstrainedConstructorInitializer", true),
+                ("OrdinaryInitializer", false),
+                ("CallableInitializer", false),
+                ("StaticInitializer", false),
+                ("ClassInitializer", false),
+                ("ForwardInitializer", false),
+            ] {
+                let ty = global_symbol(&db, file, name).place.expect_type();
+                let Some(reference) = CallableDefinition::from_type(&db, &env, ty, mode) else {
+                    panic!("expected a constructor for {name}");
+                };
+                assert_eq!(
+                    reference.target.may_have_unbounded_specialization(&db),
+                    expected,
+                    "{name}, {mode:?}",
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn constructor_cache_preserves_active_cycle_dependencies() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from __future__ import annotations
+
+            class Descriptor[T]:
+                def __get__(self, instance: object, owner: type) -> type[T]: ...
+
+            class Integer:
+                def __new__(cls, *args: object) -> int: ...
+
+            class Text:
+                def __new__(cls, *args: object) -> str: ...
+
+            class A:
+                __new__: Descriptor[B | Integer]
+
+            class B:
+                __new__: Descriptor[A | Text]
+
+            class Forward:
+                __new__: Descriptor[B]
+
+            a: type[A]
+            b: type[B]
+            forward: type[Forward]
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let a = global_symbol(&db, file, "a").place.expect_type();
+        let guard = CallableRecursionGuard::new();
+        let returns_integer = |name| {
+            let ty = global_symbol(&db, file, name).place.expect_type();
+            ty.try_upcast_to_callable_from_descriptor(
+                &db,
+                &env,
+                &guard,
+                crate::types::DescriptorOrigin::default(),
+            )
+            .is_some_and(|callables| {
+                callables.signatures(&db).any(|signature| {
+                    signature.return_ty == crate::types::KnownClass::Int.to_instance(&db, &env)
+                })
+            })
+        };
+
+        // While A is active, B's edge back to A contributes no integer-returning overload.
+        // Forward consumes a cache hit for B and must inherit that dependency on A.
+        guard.active.visit(
+            &(CallableExpansion::Upcast, a),
+            || (),
+            || {
+                assert!(!returns_integer("b"));
+                assert!(!returns_integer("forward"));
+            },
+        );
+        // Once A leaves the stack, both cached results must be recomputed.
+        assert!(returns_integer("forward"));
+        assert!(returns_integer("b"));
+        // A newly active dependency also invalidates a previously complete result.
+        guard.active.visit(
+            &(CallableExpansion::Upcast, a),
+            || (),
+            || {
+                assert!(!returns_integer("forward"));
+            },
+        );
+        Ok(())
+    }
 
     impl<'db> HasIdentity<'db> for u8 {
         type Id = Self;
@@ -2769,6 +3434,205 @@ class RecursivePropertySetter[T](Protocol):
     }
 
     #[test]
+    fn descriptor_patterns_inspect_recursive_signatures_finitely() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/patterns.py",
+            r#"
+            from __future__ import annotations
+            from typing import Any, Callable, NewType, Protocol, TypedDict
+            from ty_extensions._internal import TypeOf
+
+            class Method[T](Protocol):
+                def child(self) -> Method[list[T]]: ...
+
+            class Inherited[T](Method[T], Protocol): ...
+
+            class Anonymous[T](Protocol):
+                __call__: Callable[[object], Anonymous[list[T]]]
+
+            class Dictionary[T](TypedDict):
+                child: Dictionary[list[T]]
+
+            type Alias[T] = T | list[Alias[list[T]]]
+
+            class ResetProtocol[A, B](Protocol):
+                value: A
+                child: ResetProtocol[B, bytes]
+
+            class ResetMethod[A, B, C](Protocol):
+                def child(self) -> ResetMethod[list[B], list[C], int]: ...
+
+            class ResetDictionary[A, B](TypedDict):
+                value: A
+                child: ResetDictionary[B, bytes]
+
+            class Bridge(Protocol):
+                def child(self) -> tuple[Back, Spiral[int]]: ...
+
+            class Back(Protocol):
+                def child(self) -> Bridge: ...
+
+            class Spiral[T](Protocol):
+                def child(self) -> tuple[Bridge, Spiral[list[T]]]: ...
+
+            type ResetAlias[A, B] = A | tuple[ResetAlias[B, bytes]]
+
+            def callback(value: TypeOf[callback]) -> int: ...
+
+            Node = NewType("Node", list["Node"])
+
+            method: Method[int]
+            method_next: Method[list[int]]
+            method_next_next: Method[list[list[int]]]
+            inherited: Inherited[int]
+            nested: Method[Method[int]]
+            anonymous: Anonymous[int]
+            dictionary: Dictionary[int]
+            alias: Alias[int]
+            reset_protocol: ResetProtocol[int, str]
+            reset_method: ResetMethod[int, int, int]
+            reset_dictionary: ResetDictionary[int, str]
+            reset_alias: ResetAlias[int, str]
+            function: TypeOf[callback]
+            newtype: Node
+            gradual: Method[Any]
+            integer: int
+            terminal: bytes
+            newtype_base: list[Node]
+            method_terminal: ResetMethod[list[list[int]], list[int], int]
+            spiral: Spiral[bytes]
+            back: Back
+            spiral_next: Spiral[list[int]]
+            tuple_class = tuple[int, object]
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/patterns.py")?;
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let symbol = |name| global_symbol(&db, file, name).place.expect_type();
+
+        for (name, expected) in [
+            ("method", "integer"),
+            ("inherited", "integer"),
+            ("nested", "integer"),
+            ("anonymous", "integer"),
+            ("dictionary", "integer"),
+            ("alias", "integer"),
+            ("reset_protocol", "terminal"),
+            ("reset_method", "method_terminal"),
+            ("reset_dictionary", "terminal"),
+            ("reset_alias", "terminal"),
+            ("function", "integer"),
+            ("newtype", "newtype_base"),
+            ("tuple_class", "integer"),
+        ] {
+            let visitor = DescriptorPatternTypes::new(&env);
+            let root = symbol(name);
+            assert!(!root.is_dynamic(), "{name} must resolve to a concrete type");
+            visitor.visit_type(&db, root);
+            assert!(visitor.types.borrow().contains(&symbol(expected)), "{name}");
+        }
+
+        for root in [
+            symbol("gradual").top_materialization(&db, &env),
+            symbol("gradual").bottom_materialization(&db, &env),
+        ] {
+            assert!(
+                root.as_protocol_instance()
+                    .is_some_and(|protocol| { protocol.materialization_kind(&db).is_some() })
+            );
+            let visitor = DescriptorPatternTypes::new(&env);
+            visitor.visit_type(&db, root);
+            assert!(visitor.types.borrow().len() > 1);
+        }
+
+        let mut previous_patterns = None;
+        for roots in [
+            [symbol("method"), symbol("method_next")],
+            [symbol("method_next"), symbol("method")],
+        ] {
+            let visitor = DescriptorPatternTypes::new(&env);
+            for root in roots {
+                visitor.visit_type(&db, root);
+            }
+            assert!(visitor.types.borrow().contains(&symbol("method_next_next")));
+            let patterns = visitor.types.into_inner();
+            if let Some(previous) = &previous_patterns {
+                assert_eq!(&patterns, previous);
+            }
+            previous_patterns = Some(patterns);
+        }
+
+        let visitor = DescriptorPatternTypes::new(&env);
+        visitor.visit_type(&db, symbol("spiral"));
+        assert!(!visitor.types.borrow().contains(&symbol("spiral_next")));
+        visitor.visit_type(&db, symbol("back"));
+        assert!(visitor.types.borrow().contains(&symbol("spiral_next")));
+
+        let recursive = RecursiveDefinition::from_type(&db, symbol("method"))
+            .ok_or_else(|| anyhow::anyhow!("expected a protocol declaration"))?;
+        assert!(!recursive.target.may_have_unbounded_specialization(&db));
+        assert!(
+            recursive
+                .target
+                .may_have_unbounded_specialization_with_mode(
+                    &db,
+                    SpecializationFlowMode::Inspection,
+                )
+        );
+
+        let signature = Signature::new(Parameters::empty(), symbol("method"));
+        let callable = CallableType::new(
+            &db,
+            CallableSignature::single(signature),
+            CallableTypeKind::Regular,
+        );
+        let synthesized = Type::protocol_with_methods(&db, &env, [("child", callable)]);
+        let visitor = DescriptorPatternTypes::new(&env);
+        visitor.visit_type(&db, synthesized);
+        assert!(visitor.types.borrow().contains(&symbol("integer")));
+        Ok(())
+    }
+
+    #[test]
+    fn descriptor_patterns_share_cyclic_subgraph_expansions() -> anyhow::Result<()> {
+        for layers in [8, 16] {
+            let mut db = setup_db();
+            let mut source =
+                String::from("from __future__ import annotations\nfrom typing import Protocol\n");
+            for layer in 0..layers {
+                let child = if layer + 1 == layers {
+                    "A0[T]".to_owned()
+                } else {
+                    format!("A{}[T] | B{}[T]", layer + 1, layer + 1)
+                };
+                for (name, attribute) in [("A", "left"), ("B", "right")] {
+                    writeln!(
+                        source,
+                        "class {name}{layer}[T](Protocol):\n    {attribute}: T\n    def child(self) -> {child}: ..."
+                    )?;
+                }
+            }
+            source.push_str("root: A0[int]\n");
+            db.write_dedented("/src/patterns.py", &source)?;
+            let env = db.program_environment();
+            let file = system_path_to_file(&db, "/src/patterns.py")?;
+            let file = ProgramFile::new(&db, file, env.program(&db));
+            let root = global_symbol(&db, file, "root").place.expect_type();
+            assert!(root.as_protocol_instance().is_some());
+            let visitor = DescriptorPatternTypes::new(&env);
+            visitor.visit_type(&db, root);
+            let count = visitor.expansion_count.get();
+            assert!(count > layers);
+            assert_eq!(count, visitor.expansions.borrow().len());
+            visitor.visit_type(&db, root);
+            assert_eq!(visitor.expansion_count.get(), count);
+        }
+        Ok(())
+    }
+
+    #[test]
     fn different_items_with_same_identity_form_cycle() {
         let db = setup_db();
         let db = &db;
@@ -2784,7 +3648,7 @@ class RecursivePropertySetter[T](Protocol):
             panic!("a different item with the same identity should form a cycle");
         };
         assert_eq!(item.0, 2);
-        detector.finish_visit(pending, 1);
+        pending.finish(1);
 
         let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(1))
         else {
@@ -2796,7 +3660,7 @@ class RecursivePropertySetter[T](Protocol):
         else {
             panic!("the second identity should be pending after the first is finished");
         };
-        detector.finish_visit(pending, 2);
+        pending.finish(2);
         let CycleDetectorVisit::Ready(seen) = detector.begin_visit(db, ConstantIdentityItem(2))
         else {
             panic!("the second identity should be ready after the pending visit is finished");

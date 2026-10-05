@@ -1,14 +1,19 @@
 //! Resolve constructor members before expanding the callables they refer to.
 //!
-//! Direct calls, conversion to `Callable`, and dependency discovery share this lookup. Resolution
-//! preserves the actual receiver and invokes descriptors, but leaves signatures to the consumer:
+//! Direct calls and conversion to `Callable` share this lookup. Dependency discovery inspects the
+//! raw declarations without evaluating descriptors. Resolution preserves the actual receiver and invokes descriptors, but leaves signatures to the consumer:
 //! direct calls choose constructor stages after checking arguments, while callable conversion
 //! assembles their signatures before any arguments are available.
 
-use crate::place::{DefinedPlace, Place};
+use crate::place::{DefinedPlace, Place, Provenance};
 use crate::{Db, ProgramEnvironment};
 
+use super::cyclic::CallableRecursionGuard;
 use super::{BoundMethodType, ClassType, DescriptorOrigin, DynamicType, MemberLookupPolicy, Type};
+
+pub(super) use super::callable::evaluation::constructor_callables;
+
+pub(in crate::types) mod callable;
 
 /// Constructor member lookup uses the class for inheritance and the actual receiver for
 /// descriptor binding. Keeping both also preserves materialized protocol receivers.
@@ -39,10 +44,11 @@ impl<'db> ConstructorMembers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> ConstructorMember<'db> {
         let lookup_type = Type::from(self.class);
         let member = lookup_type
-            .member_lookup_with_policy_and_receiver(
+            .member_lookup_with_recursion_guard(
                 db,
                 env,
                 "__call__",
@@ -53,6 +59,7 @@ impl<'db> ConstructorMembers<'db> {
                 } else {
                     Some(self.receiver)
                 },
+                Some(recursion_guard),
             )
             .unwrap_or_else(|error| error.fallback_member(db));
         ConstructorMember {
@@ -65,12 +72,13 @@ impl<'db> ConstructorMembers<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> ConstructorMember<'db> {
         let Some(member) = Type::from(self.class).lookup_dunder_new(db, env) else {
             return ConstructorMember::undefined();
         };
         self.receiver
-            .resolve_dunder_new_callable(db, env, member.place)
+            .resolve_dunder_new_callable(db, env, member.place, Some(recursion_guard))
     }
 
     pub(super) fn raw_initializer(
@@ -94,13 +102,16 @@ impl<'db> ConstructorMembers<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         include_object: bool,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> ConstructorMember<'db> {
         match self.raw_initializer(db, env, include_object) {
             Place::Defined(place) => {
-                let initializer = self.bind_initializer(db, env, place.ty);
+                let initializer = self.bind_initializer(db, env, place.ty, recursion_guard);
                 ConstructorMember {
                     place: Place::Defined(DefinedPlace {
-                        ty: initializer.bound_type(),
+                        ty: initializer
+                            .bound_method
+                            .map_or(initializer.callable, Type::BoundMethod),
                         ..place
                     }),
                     origin: initializer.origin,
@@ -115,6 +126,7 @@ impl<'db> ConstructorMembers<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         initializer: Type<'db>,
+        recursion_guard: &CallableRecursionGuard<'db>,
     ) -> InitializerBinding<'db> {
         let mut binding = match initializer.function_like_dunder_get(
             db,
@@ -134,7 +146,13 @@ impl<'db> ConstructorMembers<'db> {
             },
             None => {
                 let descriptor = initializer
-                    .try_call_dunder_get(db, env, Some(self.instance), self.receiver)
+                    .try_call_dunder_get_with_recursion_guard(
+                        db,
+                        env,
+                        Some(self.instance),
+                        self.receiver,
+                        Some(recursion_guard),
+                    )
                     .unwrap_or_else(|error| Some(error.fallback()));
                 InitializerBinding {
                     callable: descriptor.map_or(initializer, |descriptor| descriptor.return_type),
@@ -171,22 +189,36 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         place: Place<'db>,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) -> ConstructorMember<'db> {
+        let Place::Defined(defined) = place else {
+            return ConstructorMember::undefined();
+        };
         // If `__new__` itself resolved to `Any`, treat it as absent rather than as a real
         // constructor override. This preserves the known nominal constructor result for
         // subclasses of `Any` while still allowing explicitly typed `__new__` callables
         // returning `Any` to keep their annotated behavior.
-        if matches!(
-            place,
-            Place::Defined(DefinedPlace {
-                ty: Type::Dynamic(DynamicType::Any),
-                ..
-            })
-        ) {
+        if matches!(defined.ty, Type::Dynamic(DynamicType::Any)) {
             return ConstructorMember::undefined();
         }
-        let (place, origin) = place.try_call_dunder_get(db, env, self);
-        ConstructorMember { place, origin }
+        let descriptor = defined
+            .ty
+            .try_call_dunder_get_with_recursion_guard(db, env, None, self, recursion_guard)
+            .unwrap_or_else(|error| Some(error.fallback()));
+        match descriptor {
+            Some(descriptor) => ConstructorMember {
+                place: Place::Defined(DefinedPlace {
+                    ty: descriptor.return_type,
+                    provenance: Provenance::Unknown,
+                    ..defined
+                }),
+                origin: descriptor.origin,
+            },
+            None => ConstructorMember {
+                place,
+                origin: DescriptorOrigin::default(),
+            },
+        }
     }
 }
 
@@ -197,10 +229,4 @@ pub(super) struct InitializerBinding<'db> {
     pub(super) callable: Type<'db>,
     pub(super) bound_method: Option<BoundMethodType<'db>>,
     pub(super) origin: DescriptorOrigin<'db>,
-}
-
-impl<'db> InitializerBinding<'db> {
-    pub(super) fn bound_type(self) -> Type<'db> {
-        self.bound_method.map_or(self.callable, Type::BoundMethod)
-    }
 }

@@ -5,6 +5,7 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
+use crate::types::cyclic::CallableRecursionGuard;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::Parameter;
 use crate::types::typevar::TypeVarNonceGenerator;
@@ -270,10 +271,11 @@ impl<'db> ConstructorBinding<'db> {
         // If any matching overload returns the constructed instance type itself, or an instance of
         // the constructed class, we need to check downstream constructors.
         callable.matching_overloads().any(|(_, overload)| {
-            overload.return_ty == constructed_instance_type
-                || constructor_class_literal.is_some_and(|class_literal| {
-                    constructor_returns_instance(db, env, class_literal, overload.return_ty)
-                })
+            !overload.signature.is_recursion_recovery()
+                && (overload.return_ty == constructed_instance_type
+                    || constructor_class_literal.is_some_and(|class_literal| {
+                        constructor_returns_instance(db, env, class_literal, overload.return_ty)
+                    }))
         })
     }
 
@@ -292,6 +294,7 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// Check types for downstream constructors, if any.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn check_downstream_constructor(
         &mut self,
         db: &'db dyn Db,
@@ -300,11 +303,12 @@ impl<'db> ConstructorBinding<'db> {
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) {
         if let Some(downstream) = self.downstream_constructor_mut() {
             // We discard the result here, but that's fine; it's `report_diagnostics` and
             // `as_result` that ultimately matter.
-            let _ = downstream.check_types_impl(
+            let _ = downstream.check_types_impl_with_recursion_guard(
                 db,
                 env,
                 constraints,
@@ -312,6 +316,7 @@ impl<'db> ConstructorBinding<'db> {
                 call_expression_tcx,
                 dataclass_field_specifiers,
                 CheckTypesMode::Finalize,
+                recursion_guard,
             );
         }
     }
@@ -602,6 +607,9 @@ impl<'db> ConstructorBinding<'db> {
         env: &ProgramEnvironment<'db>,
         overload: &Binding<'db>,
     ) -> (Type<'db>, bool) {
+        if overload.signature.is_recursion_recovery() {
+            return (Type::unknown(), false);
+        }
         let return_ty = overload
             .unspecialized_return_type(db)
             .apply_optional_specialization(
@@ -868,7 +876,9 @@ impl<'db> Binding<'db> {
             self.signature.return_ty.resolve_type_alias(db),
         ) {
             (ConstructorCallableKind::Init, _) => Some(instance_type),
-            (_, ty) if ty.is_unknown() => Some(instance_type),
+            (_, ty) if ty.is_unknown() && !self.signature.is_recursion_recovery() => {
+                Some(instance_type)
+            }
             (ConstructorCallableKind::New, Type::TypeVar(typevar))
                 if self.is_self_like_constructor_return_typevar(db, typevar) =>
             {

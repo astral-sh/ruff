@@ -942,7 +942,7 @@ impl<'db> BoundSuperType<'db> {
     ) -> Option<MemberLookupResult<'db>> {
         let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
         let (member, _, descriptor_error, descriptor) =
-            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
+            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner, None);
         Some(member_lookup_result_with_origin(
             db,
             member,

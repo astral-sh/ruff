@@ -30,11 +30,12 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
-use crate::types::constructor::ConstructorMembers;
-use crate::types::cyclic::CallableRecursionGuard;
-use crate::types::enums::enum_metadata;
+use crate::types::constructor::constructor_callables;
+use crate::types::cyclic::{CallableExpansion, CallableRecursionGuard};
 use crate::types::function::DataclassTransformerParams;
-use crate::types::generics::{GenericContext, Specialization, walk_specialization};
+use crate::types::generics::{
+    ApplySpecialization, GenericContext, Specialization, walk_specialization,
+};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
@@ -66,7 +67,6 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use smallvec::SmallVec;
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
@@ -2397,16 +2397,16 @@ impl<'db> ClassType<'db> {
         recursion_guard.visit(
             db,
             &env,
-            &receiver,
+            (CallableExpansion::Upcast, receiver),
             || CallableTypes::one(CallableType::bottom(db)),
-            || CallableTypes::one(CallableType::single(db, Signature::unknown())),
+            || CallableTypes::one(CallableType::single(db, Signature::recursion_recovery())),
             || self.into_callable_with_recursion_guard(db, receiver, &recursion_guard),
         )
     }
 
     /// Expands a constructor within an already guarded callable conversion.
     ///
-    /// [`CallableRecursionGuard::constructor_callables`] shares cached conversions when specialization
+    /// [`CallableRecursionGuard::enter_constructor`] shares cached conversions when specialization
     /// is bounded. Potentially growing expansions keep their recursion context and use a local cache.
     pub(super) fn into_callable_with_recursion_guard(
         self,
@@ -2414,212 +2414,32 @@ impl<'db> ClassType<'db> {
         receiver: Type<'db>,
         recursion_guard: &CallableRecursionGuard<'db>,
     ) -> CallableTypes<'db> {
-        let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
-
-        // Dynamic classes don't have a generic context.
-        let class_generic_context = self
-            .static_class_literal(db)
-            .and_then(|(class_literal, _)| class_literal.generic_context(db));
-
-        let lookup_type = Type::from(self);
-        let members = ConstructorMembers::new(db, env, self, receiver);
-        let instance_type = members.instance;
-        let metaclass_dunder_call = members.metaclass_call(db, env);
-
-        if let Place::Defined(DefinedPlace { ty, .. }) = metaclass_dunder_call.place {
-            // TODO: this intentionally diverges from step 1 in
-            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-            // by always respecting the signature of the metaclass `__call__`, rather than
-            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            //
-            // The only situation where we ignore the metaclass `__call__` is when the class is an actual enum
-            // (i.e. not a memberless superclass like `Enum`, `StrEnum`, etc.). In this case, we want to fall
-            // back to `Enum.__new__`/`StrEnum.__new__`/... which have more precise signatures for calls like
-            // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
-            // for dynamic Enum creation.
-            let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum
-                && let Some(callables) =
-                    recursion_guard.with_dependency(db, metaclass_dunder_call.origin, || {
-                        ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
-                    })
-            {
-                return callables;
-            }
-        }
-
-        let new_method = members.new_method(db, env);
-        let dunder_new_callables = new_method.place.ignore_possibly_undefined().and_then(|ty| {
-            recursion_guard.with_dependency(db, new_method.origin, || {
-                ty.try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
-            })
-        });
-
-        let dunder_new_callables = if let Some(callables) = dunder_new_callables {
-            let bound_callables =
-                callables.map(|callable| callable.bind_self(db, env, receiver, instance_type));
-
-            // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
-            // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = bound_callables
-                .signatures(db)
-                .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
-
-            if returns_non_subclass {
-                return bound_callables;
-            }
-            Some(bound_callables)
-        } else {
-            None
-        };
-
-        let synthesized_dunder_init_callables = members
-            .raw_initializer(db, env, false)
-            .ignore_possibly_undefined()
-            .and_then(|init_type| {
-                self.synthesize_init_callables(
-                    db,
-                    env,
-                    init_type,
-                    receiver,
-                    instance_type,
-                    recursion_guard,
-                )
-            });
-
-        match (dunder_new_callables, synthesized_dunder_init_callables) {
-            (Some(dunder_new_callables), Some(synthesized_dunder_init_callables)) => {
-                CallableTypes::from_elements(
-                    dunder_new_callables
-                        .iter()
-                        .copied()
-                        .chain(synthesized_dunder_init_callables.iter().copied()),
-                )
-            }
-            (Some(constructors), None) | (None, Some(constructors)) => constructors,
-            (None, None) => {
-                // If no `__new__` or `__init__` method is found, then we fall back to looking for
-                // an `object.__new__` method.
-                let new_function_symbol = lookup_type
-                    .member_lookup_with_policy(
-                        db,
-                        env,
-                        "__new__",
-                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .place;
-
-                if let Place::Defined(DefinedPlace {
-                    ty: Type::FunctionLiteral(mut new_function),
-                    ..
-                }) = new_function_symbol
-                {
-                    if let Some(class_generic_context) = class_generic_context {
-                        new_function =
-                            new_function.with_inherited_generic_context(db, class_generic_context);
-                    }
-                    if let Some(callable) = new_function
-                        .into_bound_method_type(db, instance_type)
-                        .into_callable_type(db)
-                    {
-                        return CallableTypes::one(callable);
-                    }
-                }
-
-                // Fallback if no `object.__new__` is found.
-                CallableTypes::one(CallableType::single(
-                    db,
-                    Signature::new_generic(
-                        class_generic_context,
-                        Parameters::empty(),
-                        instance_type,
-                    ),
-                ))
-            }
-        }
+        let env = ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        constructor_callables(db, &env, self, receiver, recursion_guard)
     }
 
-    /// Synthesizes constructor callables with the parameters of the bound `__init__` attribute
-    /// and the constructed instance as their return type.
-    fn synthesize_init_callables(
+    /// Returns the class parameters that remain inferable in its constructor.
+    ///
+    /// Member specialization already removes replaced parameters from method signatures.
+    /// Synthesizing the constructor's return type must not introduce those parameters again.
+    pub(super) fn constructor_generic_context(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        init_type: Type<'db>,
-        receiver: Type<'db>,
-        instance_type: Type<'db>,
-        recursion_guard: &CallableRecursionGuard<'db>,
-    ) -> Option<CallableTypes<'db>> {
-        if let Some(union) = init_type.as_union_like(db) {
-            let mut callables = SmallVec::new();
-            for alternative in union.elements(db) {
-                let alternatives = self.synthesize_init_callables(
-                    db,
-                    env,
-                    *alternative,
-                    receiver,
-                    instance_type,
-                    recursion_guard,
-                )?;
-                callables.extend(alternatives.iter().copied());
-            }
-            return Some(CallableTypes::new(callables));
-        }
-
-        let initializer =
-            ConstructorMembers::new(db, env, self, receiver).bind_initializer(db, env, init_type);
-        let bound_method = initializer.bound_method;
-        let callables = recursion_guard.with_dependency(db, initializer.origin, || {
-            initializer
-                .callable
-                .try_upcast_to_callable_with_recursion_guard(db, env, recursion_guard)
-        })?;
-
-        let class_generic_context = self
-            .static_class_literal(db)
-            .and_then(|(class_literal, _)| class_literal.generic_context(db));
-
-        let synthesized_signature = |signature: &Signature<'db>| {
-            let self_annotation = bound_method
-                .filter(|method| !method.class_method(db))
-                .and_then(|_| signature.parameters().get_positional(0))
-                .filter(|parameter| !parameter.inferred_annotation)
-                .map(Parameter::annotated_type)
-                .filter(|ty| {
-                    ty.as_typevar()
-                        .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
-                });
-
-            let mut signature = signature.clone();
-
-            signature.generic_context = GenericContext::merge_optional(
-                db,
-                class_generic_context,
-                signature.generic_context,
-            );
-
-            signature.return_ty = self_annotation.unwrap_or(instance_type);
-
-            let Some(method) = bound_method else {
-                return signature;
-            };
-
-            // Constructor arguments determine the class's specialization, so
-            // preserve generic parameters and overloads until they are checked.
-            signature.bind_self_with_receiver(
-                db,
-                env,
-                Some(method.signature_receiver(db)),
-                Some(method.typing_self_type(db)),
-            )
+    ) -> Option<GenericContext<'db>> {
+        let (class, specialization) = self.static_class_literal(db)?;
+        let context = class.generic_context(db)?;
+        let context = if let Some(specialization) = specialization {
+            TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization))
+                .update_signature_generic_context(db, env, context)
+        } else {
+            context
         };
-
-        Some(callables.map(|callable| {
-            let signatures = CallableSignature::from_overloads(
-                callable.signatures(db).iter().map(synthesized_signature),
-            );
-            callable.with_signatures(db, signatures).into_regular(db)
-        }))
+        if context.len(db) == 0 {
+            None
+        } else {
+            Some(context)
+        }
     }
 
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {

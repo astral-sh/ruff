@@ -8,8 +8,10 @@
 //! have a `target` field, which is the name of the module the message appears in — in this case,
 //! `ty_python_semantic::types::call::bind`.
 
+mod checking;
 mod constructor;
 mod property;
+mod selection;
 
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
@@ -23,7 +25,9 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
+use self::checking::BindingsCheckStep;
 use self::constructor::{ConstructorBinding, ConstructorContext};
+use self::selection::OverloadFilterStep;
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
@@ -38,6 +42,7 @@ use crate::types::constraints::{
     SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
+use crate::types::cyclic::CallableRecursionGuard;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_DATACLASS,
@@ -71,12 +76,12 @@ use crate::types::visitor::{
 };
 use crate::types::{
     BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DescriptorDispatch, DescriptorDispatches,
-    DescriptorGetCallContext, DescriptorOrigin, DynamicType, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, is_property_method, list_members,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DescriptorArgumentComparison,
+    DescriptorDispatch, DescriptorDispatches, DescriptorOrigin, DynamicType, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -512,28 +517,6 @@ impl<'db> BindingsElement<'db> {
             )
         } else {
             Type::unknown()
-        }
-    }
-
-    /// Check types for all bindings in this element.
-    fn check_types(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        call_arguments: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
-        mode: CheckTypesMode,
-    ) {
-        for item in &mut self.items {
-            item.check_types(
-                db,
-                env,
-                constraints,
-                call_arguments,
-                call_expression_tcx,
-                mode,
-            );
         }
     }
 
@@ -1004,6 +987,44 @@ impl<'db> Bindings<'db> {
             .flat_map(BindingsElement::callables_mut)
     }
 
+    /// Retains the calls that selected the callable before argument checking begins.
+    pub(in crate::types) fn add_descriptor_origin(
+        &mut self,
+        db: &'db dyn Db,
+        origin: DescriptorOrigin<'db>,
+    ) {
+        if origin == DescriptorOrigin::default() {
+            return;
+        }
+        for binding in self.iter_flat_mut() {
+            binding.descriptor_origin = binding.descriptor_origin.merge(db, origin);
+        }
+    }
+
+    /// Summarizes the calls that determine this result, including delegated getter calls and
+    /// constructor stages that remained after overload resolution.
+    pub(in crate::types) fn descriptor_origin(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &[Type<'db>],
+    ) -> DescriptorOrigin<'db> {
+        let mut origin = DescriptorOrigin::default();
+        for item in self.iter_callable_items() {
+            origin = origin.merge(db, item.callable().descriptor_origin(db, arguments));
+            if let Some(constructor) = item.as_constructor()
+                && let Some(downstream) = constructor.downstream_constructor()
+            {
+                origin = origin.merge(db, downstream.descriptor_origin(db, env, arguments));
+            }
+        }
+        if origin.return_contains_recursive_recovery {
+            origin.restrict_to_return_type(db, env, self.return_type(db, env))
+        } else {
+            origin
+        }
+    }
+
     fn iter_callable_items(&self) -> impl Iterator<Item = &CallableItem<'db>> {
         self.elements.iter().flat_map(BindingsElement::items)
     }
@@ -1327,7 +1348,7 @@ impl<'db> Bindings<'db> {
     /// parameters, and any errors resulting from binding the call, all for each union element and
     /// overload (if any).
     pub(crate) fn check_types(
-        mut self,
+        self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         constraints: &ConstraintSetBuilder<'db>,
@@ -1335,7 +1356,29 @@ impl<'db> Bindings<'db> {
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
-        match self.check_types_impl(
+        self.check_types_with_recursion_guard(
+            db,
+            env,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            None,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    pub(in crate::types) fn check_types_with_recursion_guard(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> Result<Self, CallError<'db>> {
+        match self.check_types_impl_with_recursion_guard(
             db,
             env,
             constraints,
@@ -1343,6 +1386,7 @@ impl<'db> Bindings<'db> {
             call_expression_tcx,
             dataclass_field_specifiers,
             CheckTypesMode::Finalize,
+            recursion_guard,
         ) {
             Ok(()) => Ok(self),
             Err(err) => Err(CallError(err, Box::new(self))),
@@ -1360,46 +1404,71 @@ impl<'db> Bindings<'db> {
         dataclass_field_specifiers: &[Type<'db>],
         mode: CheckTypesMode,
     ) -> Result<(), CallErrorKind> {
-        // Check types for each element (union variant)
-        for element in &mut self.elements {
-            element.check_types(
-                db,
-                env,
-                constraints,
-                call_arguments,
-                call_expression_tcx,
-                mode,
-            );
+        self.check_types_impl_with_recursion_guard(
+            db,
+            env,
+            constraints,
+            call_arguments,
+            call_expression_tcx,
+            dataclass_field_specifiers,
+            mode,
+            None,
+        )
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn check_types_impl_with_recursion_guard(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_arguments: &CallArguments<'_, 'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        mode: CheckTypesMode,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> Result<(), CallErrorKind> {
+        let mut step = BindingsCheckStep::start(self, mode);
+        loop {
+            step = match step {
+                BindingsCheckStep::Item(pending) => {
+                    pending.item(self).check_types(
+                        db,
+                        env,
+                        constraints,
+                        call_arguments,
+                        call_expression_tcx,
+                        pending.mode(),
+                    );
+                    pending.resume(self)
+                }
+                BindingsCheckStep::KnownCases(pending) => {
+                    self.evaluate_known_cases(
+                        db,
+                        env,
+                        call_arguments,
+                        dataclass_field_specifiers,
+                        recursion_guard,
+                    );
+                    pending.resume(db, self)
+                }
+                BindingsCheckStep::Downstream(pending) => {
+                    if let Some(constructor) = pending.item(self).as_constructor_mut() {
+                        constructor.check_downstream_constructor(
+                            db,
+                            env,
+                            constraints,
+                            call_arguments,
+                            call_expression_tcx,
+                            dataclass_field_specifiers,
+                            recursion_guard,
+                        );
+                    }
+                    pending.resume(db, self)
+                }
+                BindingsCheckStep::Complete(result) => return result,
+            };
         }
-
-        // Generic call inference must maintain a stable set of overloads until the final round
-        // of fixpoint iteration.
-        if mode.is_provisional() {
-            return Ok(());
-        }
-
-        self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers);
-
-        // For constructor bindings with deferred downstream checks: validate downstream bindings
-        // if the matched overload is instance-returning.
-        for constructor in self.iter_constructor_items_mut() {
-            constructor.check_downstream_constructor(
-                db,
-                env,
-                constraints,
-                call_arguments,
-                call_expression_tcx,
-                dataclass_field_specifiers,
-            );
-        }
-
-        // For intersection elements with at least one successful binding,
-        // filter out the failing bindings after deferred constructor checks.
-        for element in &mut self.elements {
-            element.retain_successful(db);
-        }
-
-        self.as_result(db)
     }
 
     /// Finalize the bindings after a provisional check, retaining only those that contribute
@@ -1411,7 +1480,7 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<(), CallErrorKind> {
-        self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers);
+        self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers, None);
 
         for constructor in self.iter_constructor_items_mut() {
             if constructor.discard_downstream_constructor(db, env)
@@ -1660,6 +1729,7 @@ impl<'db> Bindings<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) {
         let to_bool = |ty: &Option<Type<'_>>, default| {
             ty.map_or(Some(default), |ty| match ty.as_literal_value_kind() {
@@ -1761,7 +1831,14 @@ impl<'db> Bindings<'db> {
                             },
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    overload.check_property_getter(db, env, getter, *instance, 1);
+                                    overload.check_property_getter(
+                                        db,
+                                        env,
+                                        getter,
+                                        *instance,
+                                        1,
+                                        recursion_guard,
+                                    );
                                 } else {
                                     overload
                                         .errors
@@ -1787,7 +1864,14 @@ impl<'db> Bindings<'db> {
                             }
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
-                                    overload.check_property_getter(db, env, getter, *instance, 0);
+                                    overload.check_property_getter(
+                                        db,
+                                        env,
+                                        getter,
+                                        *instance,
+                                        0,
+                                        recursion_guard,
+                                    );
                                 } else {
                                     overload.set_return_type(Type::Never);
                                     overload
@@ -1808,8 +1892,15 @@ impl<'db> Bindings<'db> {
                         ] = overload.parameter_types()
                         {
                             if let Some(setter) = property.setter(db) {
-                                overload
-                                    .check_property_setter(db, env, setter, *instance, *value, 1);
+                                overload.check_property_setter(
+                                    db,
+                                    env,
+                                    setter,
+                                    *instance,
+                                    *value,
+                                    1,
+                                    recursion_guard,
+                                );
                             } else {
                                 overload
                                     .errors
@@ -1823,8 +1914,14 @@ impl<'db> Bindings<'db> {
                             overload.parameter_types()
                         {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Ok(return_ty) = deleter
-                                    .try_call(db, env, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = overload
+                                    .call_property_accessor(
+                                        db,
+                                        env,
+                                        deleter,
+                                        &[*instance],
+                                        recursion_guard,
+                                    )
                                     .map(|binding| binding.return_type(db, env))
                                 {
                                     // `property.__delete__` returns `None` for ordinary deleters,
@@ -1851,8 +1948,15 @@ impl<'db> Bindings<'db> {
                     Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
                         if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                             if let Some(setter) = property.setter(db) {
-                                overload
-                                    .check_property_setter(db, env, setter, *instance, *value, 0);
+                                overload.check_property_setter(
+                                    db,
+                                    env,
+                                    setter,
+                                    *instance,
+                                    *value,
+                                    0,
+                                    recursion_guard,
+                                );
                             } else {
                                 overload
                                     .errors
@@ -1866,8 +1970,14 @@ impl<'db> Bindings<'db> {
                     )) => {
                         if let [Some(instance), ..] = overload.parameter_types() {
                             if let Some(deleter) = property.deleter(db) {
-                                if let Ok(return_ty) = deleter
-                                    .try_call(db, env, &CallArguments::positional([*instance]))
+                                if let Ok(return_ty) = overload
+                                    .call_property_accessor(
+                                        db,
+                                        env,
+                                        deleter,
+                                        &[*instance],
+                                        recursion_guard,
+                                    )
                                     .map(|binding| binding.return_type(db, env))
                                 {
                                     // `property.__delete__` returns `None` for ordinary deleters,
@@ -3318,6 +3428,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            descriptor_origin: DescriptorOrigin::default(),
             overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -3352,6 +3463,9 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
+
+    /// Descriptor calls that selected this callable, before its own arguments were supplied.
+    descriptor_origin: DescriptorOrigin<'db>,
 
     /// The result of evaluating this overloaded callable when a single overload does not
     /// determine its return type.
@@ -3445,6 +3559,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            descriptor_origin: DescriptorOrigin::default(),
             overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -3457,6 +3572,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            descriptor_origin: DescriptorOrigin::default(),
             overload_call_result: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -3939,15 +4055,12 @@ impl<'db> CallableBinding<'db> {
                         .argument_type
                         .unwrap_or_else(|| argument_types.get_for_declared_type(parameter_type));
 
-                    argument_type
-                        .when_assignable_to(
-                            db,
-                            env,
-                            parameter_type,
-                            constraints,
-                            overload.inferable_typevars,
-                        )
-                        .is_always_satisfied(db, env)
+                    BinderCondition::Always(BinderComparison::Assignable {
+                        source: argument_type,
+                        target: parameter_type,
+                        inferable_typevars: overload.inferable_typevars,
+                    })
+                    .evaluate(db, env, constraints)
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -4209,185 +4322,26 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) -> bool {
-        struct OverloadFilterSlot<'db> {
-            parameter: Type<'db>,
-            argument: Type<'db>,
-            variadic_argument: Option<Type<'db>>,
-        }
-
-        let matching_overload_slots = matching_overload_indexes
-            .iter()
-            .map(|&index| {
-                let overload = &self.overloads[index];
-                let slots = overload
-                    .argument_matches
-                    .iter()
-                    .zip(arguments.iter_types())
-                    .flat_map(move |(matched_argument, argument_types)| {
-                        matched_argument.iter().map(move |matched_parameter| {
-                            // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                            // `typing.Self` / `type[typing.Self]`
-                            let raw_parameter_type = overload.signature.parameters()
-                                [matched_parameter.index]
-                                .annotated_type();
-                            let parameter_type = raw_parameter_type.apply_optional_specialization(
-                                db,
-                                overload.merged_specialization(db),
-                            );
-                            OverloadFilterSlot {
-                                parameter: parameter_type,
-                                // Argument types are cached by the raw parameter type, even when
-                                // they were inferred using a return-context specialization.
-                                argument: argument_types.get_for_declared_type(raw_parameter_type),
-                                variadic_argument: matched_parameter.argument_type,
-                            }
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                (index, slots)
-            })
-            .collect::<Vec<_>>();
-
-        let max_slot_count = matching_overload_slots
-            .iter()
-            .map(|(_, slots)| slots.len())
-            .max()
-            .unwrap_or(0);
-
-        let mut participating_slot_indices = HashSet::new();
-        for slot_index in 0..max_slot_count {
-            let mut first_parameter_type: Option<Type<'db>> = None;
-            for (_, overload_slots) in &matching_overload_slots {
-                let current_parameter_type =
-                    overload_slots.get(slot_index).map(|slot| slot.parameter);
-                match (first_parameter_type, current_parameter_type) {
-                    (Some(first_parameter_type), Some(current_parameter_type)) => {
-                        if !first_parameter_type
-                            .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env)
-                        {
-                            participating_slot_indices.insert(slot_index);
-                        }
-                    }
-                    (Some(_), None) => {
-                        participating_slot_indices.insert(slot_index);
-                    }
-                    (None, Some(current_parameter_type)) => {
-                        first_parameter_type = Some(current_parameter_type);
-                    }
-                    (None, None) => {}
+        let mut step =
+            OverloadFilterStep::start(db, env, self, arguments, matching_overload_indexes);
+        let result = loop {
+            match step {
+                OverloadFilterStep::Compare(pending) => {
+                    let answer = pending.condition().evaluate(db, env, constraints);
+                    step = pending.resume(db, env, answer);
                 }
-            }
-        }
-
-        // A flag to indicate whether we've found the overload that makes the remaining overloads
-        // unmatched for the given argument types.
-        let mut filter_remaining_overloads = false;
-
-        for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
-            if filter_remaining_overloads {
-                self.overloads[*current_index].mark_as_unmatched_overload();
-                continue;
-            }
-
-            let mut union_argument_type_builders =
-                std::iter::repeat_with(|| UnionBuilder::new(db, env))
-                    .take(max_slot_count)
-                    .collect::<Vec<_>>();
-
-            let (_, current_slots) = &matching_overload_slots[upto];
-
-            for (_, slots) in &matching_overload_slots {
-                for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
-                        let argument_type = slot.variadic_argument.unwrap_or_else(|| {
-                            current_slots
-                                .get(slot_index)
-                                .map_or(Type::unknown(), |slot| slot.argument)
-                        });
-                        union_argument_type_builders[slot_index]
-                            .add_in_place(argument_type.top_materialization(db, env));
-                    }
-                }
-            }
-
-            let top_materialized_argument_type = Type::heterogeneous_tuple(
-                db,
-                env,
-                union_argument_type_builders
-                    .into_iter()
-                    .filter_map(|builder| {
-                        if builder.is_empty() {
-                            None
-                        } else {
-                            Some(builder.build())
-                        }
-                    }),
-            );
-
-            let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db, env))
-                .take(max_slot_count)
-                .collect::<Vec<_>>();
-            for (_, slots) in &matching_overload_slots[..=upto] {
-                for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
-                        union_parameter_types[slot_index].add_in_place(slot.parameter);
-                    }
-                }
-            }
-
-            let parameter_types = Type::heterogeneous_tuple(
-                db,
-                env,
-                union_parameter_types.into_iter().filter_map(|builder| {
-                    if builder.is_empty() {
-                        None
-                    } else {
-                        Some(builder.build())
-                    }
-                }),
-            );
-
-            if top_materialized_argument_type
-                .when_assignable_to(
-                    db,
-                    env,
-                    parameter_types,
-                    constraints,
-                    self.overloads[*current_index].inferable_typevars,
-                )
-                .is_always_satisfied(db, env)
-            {
-                filter_remaining_overloads = true;
-            }
-        }
-
-        // Once this filtering process is applied for all arguments, examine the return types of
-        // the remaining overloads. If the resulting return types for all remaining overloads are
-        // equivalent, proceed to step 6.
-        let are_return_types_equivalent_for_all_matching_overloads = {
-            let mut matching_overloads = self.matching_overloads();
-            if let Some(first_overload_return_type) = matching_overloads
-                .next()
-                .map(|(_, overload)| overload.return_type())
-            {
-                matching_overloads.all(|(_, overload)| {
-                    overload
-                        .return_type()
-                        .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env)
-                })
-            } else {
-                // No matching overload
-                true
+                OverloadFilterStep::Complete(result) => break result,
             }
         };
 
-        if !are_return_types_equivalent_for_all_matching_overloads {
+        for &index in &matching_overload_indexes[result.retained_count..] {
+            self.overloads[index].mark_as_unmatched_overload();
+        }
+        if result.is_ambiguous {
             // Overload matching is ambiguous.
             self.overload_call_result = Some(OverloadCallResult::Ambiguous);
         }
-        !are_return_types_equivalent_for_all_matching_overloads
+        result.is_ambiguous
     }
 
     fn as_result(&self) -> Result<(), CallErrorKind> {
@@ -4509,37 +4463,85 @@ impl<'db> CallableBinding<'db> {
         }))
     }
 
-    /// Retains the invocation and selected declarations for recursive callable expansion.
-    pub(in crate::types) fn descriptor_origin(
-        &self,
-        db: &'db dyn Db,
-        call: DescriptorGetCallContext<'db>,
-    ) -> DescriptorOrigin<'db> {
-        let selected = self.selected_overloads();
-        let definitions = selected
-            .clone()
-            .map(|(_, overload)| overload.signature.definition())
-            .collect::<Option<FxOrderSet<_>>>()
-            .filter(|definitions| !definitions.is_empty());
-        let (function, bound_receiver) = match self.signature_type {
-            Type::FunctionLiteral(function) => (Some(function), None),
-            Type::BoundMethod(method) => (method.function(db), Some(method.signature_receiver(db))),
-            _ => (None, None),
-        };
+    fn descriptor_origin(&self, db: &'db dyn Db, arguments: &[Type<'db>]) -> DescriptorOrigin<'db> {
+        let mut selected = self
+            .selected_overloads()
+            .map(|(_, overload)| overload)
+            .collect::<SmallVec<[_; 1]>>();
+        // A single failing overload still supplies the recovery return type.
+        if selected.is_empty()
+            && self.overload_call_result.is_none()
+            && let [overload] = self.overloads.as_slice()
+        {
+            selected.push(overload);
+        }
+        let arguments = self
+            .bound_type
+            .into_iter()
+            .chain(arguments.iter().copied())
+            .collect::<Box<[_]>>();
+        let comparisons = self
+            .overloads
+            .iter()
+            .map(|binding| {
+                binding
+                    .argument_matches
+                    .iter()
+                    .zip(&arguments)
+                    .enumerate()
+                    .flat_map(|(index, (matched_argument, &argument_type))| {
+                        matched_argument.iter().filter_map(move |parameter| {
+                            let relation = parameter.argument_relation(
+                                binding.signature.parameters(),
+                                index,
+                                None,
+                                |_| Some(argument_type),
+                            )?;
+                            Some(DescriptorArgumentComparison {
+                                argument_index: index,
+                                argument_type: relation.argument_type,
+                                parameter_type: relation.declared_type,
+                            })
+                        })
+                    })
+                    .collect::<Box<[_]>>()
+            })
+            .collect::<Box<[_]>>();
         let dispatches = Some(DescriptorDispatches::new(
             db,
             Box::from([DescriptorDispatch::new(
                 db,
-                definitions
-                    .unwrap_or_default()
-                    .into_iter()
+                CallableSignature::from_overloads(
+                    self.overloads
+                        .iter()
+                        .map(|binding| binding.signature.clone()),
+                ),
+                arguments,
+                comparisons,
+                selected
+                    .iter()
+                    .map(|overload| overload.source_overload_index())
                     .collect::<Box<[_]>>(),
-                function,
-                bound_receiver,
-                call,
+                self.has_binding_errors(),
             )]),
         ));
-        DescriptorOrigin { dispatches }
+        let return_contains_recursive_recovery = selected.iter().any(|overload| {
+            overload.signature.is_recursion_recovery()
+                || overload.return_origin.return_contains_recursive_recovery
+        });
+        let mut origin = self.descriptor_origin.merge(
+            db,
+            DescriptorOrigin {
+                dispatches,
+                incomplete: self.overloads.is_empty(),
+                return_contains_recursive_recovery: false,
+            },
+        );
+        for overload in selected {
+            origin = origin.merge(db, overload.return_origin);
+        }
+        origin.return_contains_recursive_recovery = return_contains_recursive_recovery;
+        origin
     }
 
     /// Returns the deprecated implementation, taking precedence over any deprecated overloads.
@@ -5639,6 +5641,62 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
     }
 }
 
+/// A type comparison requested by argument validation or overload selection.
+///
+/// The operands and inference policy are available before relation checking begins. Equivalence
+/// uses its own relation API and does not have an inferable-typevar parameter.
+#[derive(Clone, Copy, Debug)]
+enum BinderComparison<'db> {
+    Assignable {
+        source: Type<'db>,
+        target: Type<'db>,
+        inferable_typevars: TypeVarSet<'db>,
+    },
+    Equivalent {
+        left: Type<'db>,
+        right: Type<'db>,
+    },
+}
+
+/// A comparison together with the satisfaction test used to make a binder decision.
+///
+/// Requests contain no constraint-builder state. Evaluation uses the invocation's builder at the
+/// point where the binder needs the result, preserving short circuiting and constraint order.
+#[derive(Clone, Copy, Debug)]
+enum BinderCondition<'db> {
+    /// Apply [`ConstraintSet::is_always_satisfied`] to the comparison's constraints.
+    Always(BinderComparison<'db>),
+    /// Apply [`ConstraintSet::is_never_satisfied`] to the comparison's constraints.
+    Never(BinderComparison<'db>),
+}
+
+impl<'db> BinderCondition<'db> {
+    fn evaluate(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
+        let comparison = match self {
+            Self::Always(comparison) | Self::Never(comparison) => comparison,
+        };
+        let constraints = match comparison {
+            BinderComparison::Assignable {
+                source,
+                target,
+                inferable_typevars,
+            } => source.when_assignable_to(db, env, target, constraints, inferable_typevars),
+            BinderComparison::Equivalent { left, right } => {
+                left.when_equivalent_to(db, env, right, constraints)
+            }
+        };
+        match self {
+            Self::Always(_) => constraints.is_always_satisfied(db, env),
+            Self::Never(_) => constraints.is_never_satisfied(db, env),
+        }
+    }
+}
+
 struct ArgumentTypeChecker<'a, 'db> {
     db: &'db dyn Db,
     env: &'a ProgramEnvironment<'db>,
@@ -5732,15 +5790,12 @@ fn validate_keyword_unpack_key_type<'db>(
         return KeywordUnpackKeyTypeCheck::NotApplicable;
     };
 
-    if key_type
-        .when_assignable_to(
-            db,
-            env,
-            KnownClass::Str.to_instance(db, env),
-            constraints,
-            inferable_typevars,
-        )
-        .is_always_satisfied(db, env)
+    if BinderCondition::Always(BinderComparison::Assignable {
+        source: key_type,
+        target: KnownClass::Str.to_instance(db, env),
+        inferable_typevars,
+    })
+    .evaluate(db, env, constraints)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -5831,26 +5886,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 argument_matches[argument_index]
                     .iter()
                     .filter_map(move |matched_parameter| {
-                        let parameter_index = matched_parameter.index;
-                        if Self::is_gradual_variadic_parameter(parameters, parameter_index) {
-                            return None;
-                        }
-
-                        let parameter = &parameters[parameter_index];
-                        let declared_type = matched_parameter
-                            .expected_type
-                            .unwrap_or_else(|| parameter.annotated_type());
-                        let argument_type = matched_parameter
-                            .argument_type
-                            .or_else(|| argument_types.try_get_for_declared_type(declared_type))?;
-
-                        Some(ArgumentRelation::new(
+                        matched_parameter.argument_relation(
+                            parameters,
                             argument_index,
                             adjusted_argument_index,
-                            parameter,
-                            matched_parameter,
-                            argument_type,
-                        ))
+                            |declared_type| argument_types.try_get_for_declared_type(declared_type),
+                        )
                     })
             },
         )
@@ -6739,15 +6780,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             && !constructor_receiver
             && (!has_starred_annotation || matched_parameter.expected_type.is_some())
             && !is_valid_isinstance_target()
-            && argument_type
-                .when_assignable_to(
-                    db,
-                    self.env,
-                    expected_ty,
-                    constraints,
-                    self.inferable_typevars,
-                )
-                .is_never_satisfied(db, self.env)
+            && BinderCondition::Never(BinderComparison::Assignable {
+                source: argument_type,
+                target: expected_ty,
+                inferable_typevars: self.inferable_typevars,
+            })
+            .evaluate(db, self.env, constraints)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,
@@ -7268,6 +7306,34 @@ pub struct MatchedParameter<'db> {
     provenance: InvalidArgumentTypeProvenance,
 }
 
+impl<'db> MatchedParameter<'db> {
+    fn argument_relation(
+        self,
+        parameters: &Parameters<'db>,
+        argument_index: usize,
+        adjusted_argument_index: Option<usize>,
+        argument_type: impl FnOnce(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<ArgumentRelation<'db>> {
+        if ArgumentTypeChecker::is_gradual_variadic_parameter(parameters, self.index) {
+            return None;
+        }
+        let parameter = &parameters[self.index];
+        let declared_type = self
+            .expected_type
+            .unwrap_or_else(|| parameter.annotated_type());
+        let argument_type = self
+            .argument_type
+            .or_else(|| argument_type(declared_type))?;
+        Some(ArgumentRelation::new(
+            argument_index,
+            adjusted_argument_index,
+            parameter,
+            self,
+            argument_type,
+        ))
+    }
+}
+
 impl<'db> MatchedArgument<'db> {
     /// Returns an iterator over the matched parameters.
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
@@ -7482,6 +7548,9 @@ pub(crate) struct Binding<'db> {
     /// Return type of the call.
     pub(crate) return_ty: Type<'db>,
 
+    /// Calls whose result was used to evaluate a builtin wrapper's return type.
+    return_origin: DescriptorOrigin<'db>,
+
     /// Constructor metadata used to normalize the declared return type before type checking.
     constructor_context: Option<ConstructorContext<'db>>,
 
@@ -7511,6 +7580,29 @@ pub(crate) struct Binding<'db> {
 }
 
 impl<'db> Binding<'db> {
+    /// Retains a builtin's delegated call even when argument checking uses its recovery result.
+    fn call_property_accessor(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        accessor: Type<'db>,
+        arguments: &[Type<'db>],
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
+        let result = accessor.try_call_with_recursion_guard(
+            db,
+            env,
+            &CallArguments::positional(arguments.iter().copied()),
+            recursion_guard,
+        );
+        let bindings = match &result {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => bindings,
+        };
+        self.return_origin = bindings.descriptor_origin(db, env, arguments);
+        result
+    }
+
     /// Checks the getter invoked by `property.__get__`, retaining its error and recovery type.
     fn check_property_getter(
         &mut self,
@@ -7519,9 +7611,12 @@ impl<'db> Binding<'db> {
         getter: Type<'db>,
         instance: Type<'db>,
         argument_index_offset: usize,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) {
-        match getter.try_call(db, env, &CallArguments::positional([instance])) {
-            Ok(bindings) => self.set_return_type(bindings.return_type(db, env)),
+        match self.call_property_accessor(db, env, getter, &[instance], recursion_guard) {
+            Ok(bindings) => {
+                self.set_return_type(bindings.return_type(db, env));
+            }
             Err(CallError(_, bindings)) => {
                 self.set_return_type(bindings.return_type(db, env));
                 self.errors.push(BindingError::PropertyGetterCallError(
@@ -7534,6 +7629,7 @@ impl<'db> Binding<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn check_property_setter(
         &mut self,
         db: &'db dyn Db,
@@ -7542,8 +7638,9 @@ impl<'db> Binding<'db> {
         instance: Type<'db>,
         value: Type<'db>,
         argument_index_offset: usize,
+        recursion_guard: Option<&CallableRecursionGuard<'db>>,
     ) {
-        match setter.try_call(db, env, &CallArguments::positional([instance, value])) {
+        match self.call_property_accessor(db, env, setter, &[instance, value], recursion_guard) {
             Ok(bindings) => {
                 let return_ty = bindings.return_type(db, env);
                 // `property.__set__` returns `None` for ordinary setters, but preserving `Never`
@@ -7575,6 +7672,7 @@ impl<'db> Binding<'db> {
             callable_type: signature_type,
             signature_type,
             return_ty,
+            return_origin: DescriptorOrigin::default(),
             constructor_context: None,
             inferable_typevars: TypeVarSet::None,
             inference: None,
@@ -8454,6 +8552,7 @@ impl<'db> Binding<'db> {
     fn snapshot(&self) -> BindingSnapshot<'db> {
         BindingSnapshot {
             return_ty: self.return_ty,
+            return_origin: self.return_origin,
             inferable_typevars: self.inferable_typevars,
             inference: self.inference,
             argument_matches: self.argument_matches.clone(),
@@ -8465,6 +8564,7 @@ impl<'db> Binding<'db> {
     fn restore(&mut self, snapshot: BindingSnapshot<'db>) {
         let BindingSnapshot {
             return_ty,
+            return_origin,
             inferable_typevars,
             inference,
             argument_matches,
@@ -8473,6 +8573,7 @@ impl<'db> Binding<'db> {
         } = snapshot;
 
         self.return_ty = return_ty;
+        self.return_origin = return_origin;
         self.inferable_typevars = inferable_typevars;
         self.inference = inference;
         self.argument_matches = argument_matches;
@@ -8516,6 +8617,7 @@ impl<'db> Binding<'db> {
     /// Resets the state of this binding to its initial state.
     fn reset(&mut self, db: &'db dyn Db) {
         self.return_ty = self.initial_return_type(db);
+        self.return_origin = DescriptorOrigin::default();
         self.inferable_typevars = TypeVarSet::None;
         self.inference = None;
         self.argument_matches = Box::from([]);
@@ -8527,6 +8629,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
+    return_origin: DescriptorOrigin<'db>,
     inferable_typevars: TypeVarSet<'db>,
     inference: Option<TypeVarInference<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -8568,6 +8671,7 @@ impl<'db> CallableBindingSnapshot<'db> {
 
                 // ... and update the snapshot with the current state of the binding.
                 snapshot.return_ty = binding.return_ty;
+                snapshot.return_origin = binding.return_origin;
                 snapshot.inferable_typevars = binding.inferable_typevars;
                 snapshot.inference = binding.inference;
                 snapshot
@@ -10211,8 +10315,179 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
+    use crate::types::ApplyTypeMappingVisitor;
     use crate::types::constraints::resolution::SolutionType::Resolved;
     use crate::types::generics::TypeVarInferenceSolutions;
+
+    #[test]
+    fn recursive_recovery_tracks_selected_returns() -> anyhow::Result<()> {
+        fn check<'db>(
+            db: &'db TestDb,
+            bindings: Bindings<'db>,
+            arguments: &CallArguments<'_, 'db>,
+        ) -> anyhow::Result<Bindings<'db>> {
+            let env = db.program_environment();
+            bindings
+                .match_parameters(db, &env, arguments)
+                .check_types(
+                    db,
+                    &env,
+                    &ConstraintSetBuilder::new(),
+                    arguments,
+                    TypeContext::default(),
+                    &[],
+                )
+                .map_err(|error| anyhow::anyhow!("call binding failed: {error:?}"))
+        }
+
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let str = KnownClass::Str.to_instance(&db, &env);
+        let signature = |parameter| {
+            Signature::new(
+                Parameters::standard([
+                    Parameter::positional_only(None).with_annotated_type(parameter)
+                ]),
+                Type::unknown(),
+            )
+        };
+        let ordinary = signature(int);
+        let recovered = signature(str).with_recursion_recovery();
+        for (argument, is_recovery) in [(int, false), (str, true)] {
+            let arguments = CallArguments::positional([argument]);
+            let make_bindings = || {
+                Bindings::from(CallableBinding::from_overloads(
+                    Type::unknown(),
+                    [ordinary.clone(), recovered.clone()],
+                ))
+            };
+            let bindings = check(&db, make_bindings(), &arguments)?;
+            let origin = bindings.descriptor_origin(&db, &env, &[argument]);
+            assert_eq!(origin.return_contains_recursive_recovery, is_recovery);
+
+            // Only the selected recovery result suppresses nominal constructor inference.
+            let constructor = check(
+                &db,
+                make_bindings()
+                    .into_constructor_bindings(int, ConstructorCallableKind::New)
+                    .with_constructed_instance_type(&db, int),
+                &arguments,
+            )?;
+            assert_eq!(
+                constructor.return_type(&db, &env),
+                if is_recovery { Type::unknown() } else { int },
+            );
+
+            // A descriptor can return a callable through a gradual recovery value. Its result
+            // provenance must survive conversion back to callables and then to call bindings.
+            let callables = Type::unknown()
+                .try_upcast_to_callable_from_descriptor(
+                    &db,
+                    &env,
+                    &CallableRecursionGuard::new(),
+                    origin,
+                )
+                .ok_or_else(|| anyhow::anyhow!("unknown should be callable"))?;
+            let ty = callables.to_type(&db, &env);
+            let constructor = check(
+                &db,
+                ty.bindings(&db, &env)
+                    .into_constructor_bindings(int, ConstructorCallableKind::New)
+                    .with_constructed_instance_type(&db, int),
+                &arguments,
+            )?;
+            assert_eq!(
+                constructor.return_type(&db, &env),
+                if is_recovery { Type::unknown() } else { int },
+            );
+        }
+
+        // Only the unknown callable value inherits recovery from this descriptor result.
+        // The concrete callable's unannotated return still uses nominal constructor inference.
+        let returned_callables = UnionType::from_two_elements(
+            &db,
+            &env,
+            Type::unknown(),
+            Type::Callable(CallableType::unknown(&db)),
+        );
+        let origin = DescriptorOrigin {
+            return_contains_recursive_recovery: true,
+            ..DescriptorOrigin::default()
+        };
+        let arguments = CallArguments::none();
+        let recursion_guard = CallableRecursionGuard::new();
+        let callables = returned_callables
+            .try_upcast_to_callable_from_descriptor(&db, &env, &recursion_guard, origin)
+            .ok_or_else(|| anyhow::anyhow!("both descriptor alternatives should be callable"))?;
+        assert_eq!(callables.signatures(&db).count(), 2);
+        assert_eq!(
+            callables
+                .signatures(&db)
+                .filter(|signature| signature.is_recursion_recovery())
+                .count(),
+            1,
+        );
+        for bindings in [
+            returned_callables.bindings_from_descriptor(&db, &env, &recursion_guard, origin),
+            Bindings::from_union(
+                returned_callables,
+                callables
+                    .iter()
+                    .map(|callable| Type::Callable(*callable).bindings(&db, &env)),
+            ),
+        ] {
+            let constructor = check(
+                &db,
+                bindings
+                    .into_constructor_bindings(int, ConstructorCallableKind::New)
+                    .with_constructed_instance_type(&db, int),
+                &arguments,
+            )?;
+            assert_eq!(
+                constructor.return_type(&db, &env),
+                UnionType::from_two_elements(&db, &env, Type::unknown(), int),
+            );
+            assert!(
+                constructor
+                    .descriptor_origin(&db, &env, &[])
+                    .return_contains_recursive_recovery
+            );
+        }
+
+        assert!(
+            !origin
+                .restrict_to_return_type(&db, &env, int)
+                .return_contains_recursive_recovery
+        );
+        assert!(
+            !origin
+                .restrict_to_return_type(
+                    &db,
+                    &env,
+                    Type::homogeneous_tuple(&db, &env, Type::unknown())
+                )
+                .return_contains_recursive_recovery
+        );
+
+        let bound = recovered.bind_self_with_receiver(&db, &env, Some(str), Some(str));
+        assert!(bound.is_recursion_recovery());
+        let mapped = bound.apply_type_mapping_impl(
+            &db,
+            &TypeMapping::ReplaceParameterDefaults,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(&env),
+        );
+        assert!(mapped.is_recursion_recovery());
+        let concrete = mapped.with_return_type(int);
+        assert!(!concrete.is_recursion_recovery());
+        assert!(
+            !concrete
+                .with_return_type(Type::unknown())
+                .is_recursion_recovery()
+        );
+        Ok(())
+    }
 
     fn call_inference<'db>(
         db: &'db TestDb,
