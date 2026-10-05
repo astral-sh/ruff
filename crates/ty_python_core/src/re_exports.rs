@@ -30,6 +30,7 @@ use ruff_python_ast::{
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
+use crate::static_dunder_all::static_dunder_all;
 use crate::{Db, ProgramFile};
 
 #[salsa::tracked(
@@ -38,6 +39,10 @@ use crate::{Db, ProgramFile};
     heap_size=ruff_memory_usage::heap_size)
 ]
 pub(super) fn exported_names(db: &dyn Db, file: ProgramFile<'_>) -> Box<[Name]> {
+    if let Some(names) = static_dunder_all(db, file) {
+        return names.into();
+    }
+
     let module = parsed_module(db, file.python_file(db)).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());

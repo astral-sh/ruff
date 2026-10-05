@@ -7,12 +7,17 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::types::{Type, TypeContext, infer_expression_types};
 use crate::{Db, ProgramEnvironment};
+use ty_python_core::static_dunder_all::static_dunder_all;
 use ty_python_core::{ProgramFile, SemanticIndex, Truthiness, semantic_index};
 
 /// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
 /// if it contains invalid elements.
 #[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dunder_all_names(db: &dyn Db, file: ProgramFile<'_>) -> Option<FxHashSet<Name>> {
+    if let Some(names) = static_dunder_all(db, file) {
+        return Some(names.iter().cloned().collect());
+    }
+
     let source_file = file.file(db);
     let _span = tracing::trace_span!("dunder_all_names", file=?source_file.path(db)).entered();
 
@@ -259,18 +264,6 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                             continue;
                         }
 
-                        // We could do the `__all__` lookup lazily in case it's not needed. This would
-                        // happen if a `__all__` is imported from another module but then the module
-                        // redefines it. For example:
-                        //
-                        // ```python
-                        // from module import __all__ as __all__
-                        //
-                        // __all__ = ["a", "b"]
-                        // ```
-                        //
-                        // I'm avoiding this for now because it doesn't seem likely to happen in
-                        // practice.
                         let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
                         else {
                             self.invalid = true;
