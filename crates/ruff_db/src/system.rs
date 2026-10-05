@@ -22,6 +22,7 @@ pub use self::path::{
     SystemVirtualPathBuf, deduplicate_nested_paths,
 };
 use crate::file_revision::FileRevision;
+use crate::files::FilePath;
 
 mod command;
 mod memory_fs;
@@ -70,6 +71,11 @@ pub trait System: Debug + Sync + Send {
 
     /// Returns `true` if both paths refer to the same file.
     fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool>;
+
+    /// Returns `true` if `path` is known to be open in an editor.
+    fn is_file_open(&self, _path: &FilePath) -> bool {
+        false
+    }
 
     /// Returns the source type for `path` if known or `None`.
     ///

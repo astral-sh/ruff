@@ -419,12 +419,10 @@ pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -
     let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
-    if source_file
-        .path(db)
-        .as_system_path()
-        .is_none_or(|path| !db.project().is_file_included(db, path).is_included())
-    {
-        // Eagerly clear ASTs of third party files.
+    if !db.system().is_file_open(source_file.path(db)) {
+        // Auto-imports scan every module. Release ASTs of closed files as we go,
+        // so the next database update doesn't have to drop them all at once.
+        // Keep open files' ASTs for subsequent editor requests.
         parsed.clear();
     }
     visitor.into_flat_symbols()
