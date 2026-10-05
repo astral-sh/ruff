@@ -412,19 +412,13 @@ pub(crate) fn symbols_for_file(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbol
     heap_size=ruff_memory_usage::heap_size,
 )]
 pub(crate) fn symbols_for_file_global_only(db: &dyn Db, file: ProgramFile<'_>) -> FlatSymbols {
-    let source_file = file.file(db);
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Auto-imports scan every module, so release closed files' ASTs as we go.
+    let module = parsed.load_clear_on_drop(db);
 
     let mut visitor = SymbolVisitor::globals(db, file);
     visitor.visit_body(&module.syntax().body);
 
-    if !db.system().is_file_open(source_file.path(db)) {
-        // Auto-imports scan every module. Release ASTs of closed files as we go,
-        // so the next database update doesn't have to drop them all at once.
-        // Keep open files' ASTs for subsequent editor requests.
-        parsed.clear();
-    }
     visitor.into_flat_symbols()
 }
 
