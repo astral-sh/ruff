@@ -173,7 +173,8 @@ fn call_sites_for_file(
     needle: Option<&str>,
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file.python_file(db));
-    let module = parsed.load(db);
+    // Incoming call searches can scan the whole project, so release closed files' ASTs as we go.
+    let module = parsed.load_clear_on_drop(db);
     let model = SemanticModel::new(db, file);
     let mut sites = Vec::new();
 
