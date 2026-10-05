@@ -2003,7 +2003,6 @@ strict-generic-narrowing = false
 
 ```py
 from collections.abc import Collection, Iterable, Sized
-from typing import cast
 
 def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
     if isinstance(value, Iterable) and not isinstance(value, Sized):
@@ -2011,8 +2010,7 @@ def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
         reveal_type(list(value))
         # revealed: list[T@maybe_iterable_to_list | Unknown]
         return reveal_type(list(value))
-    value = cast(Collection[T], value)
-    return value
+    raise NotImplementedError
 ```
 
 ## Iterable element types with strict generic narrowing
