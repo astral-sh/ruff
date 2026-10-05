@@ -1718,10 +1718,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     /// well as source constraints so that `T: (Y, Z)` can still be related to
     /// `type[Y] | type[Z]`.
     ///
-    /// Class literals have an over-approximated instance projection unless the class is final and
-    /// non-generic. For `T: (Y, Z)` where `Z` extends `Y`, instance subtyping would incorrectly
-    /// simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are subtypes of
-    /// `Y`, but only the class object `Y` satisfies `klass is Y`.
+    /// Class literals have an over-approximated instance projection unless the class is final,
+    /// nominal, and non-generic. For `T: (Y, Z)` where `Z` extends `Y`, instance subtyping would
+    /// incorrectly simplify `type[T] & <class 'Y'>` to `type[T]`: both `Y` and `Z` instances are
+    /// subtypes of `Y`, but only the class object `Y` satisfies `klass is Y`.
     ///
     /// Return `None` for targets without a `.to_instance()` projection, allowing other type-pair
     /// branches to decide their relation.
@@ -2212,8 +2212,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.never()
             }
 
-            // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype
-            // of an instance of `A`. If `A` is a metaclass instance (instance of a specific
+            // When `A` has an exact instance projection, `type[T]` is a subtype of `A` if `T`
+            // is a subtype of that projection. If `A` is a metaclass instance (instance of a specific
             // subclass of `type`), we instead compare in the metaclass-instance domain, since
             // collapsing `A` through `to_instance()` would erase it to `object` (we have no
             // precise representation for "all instances of any classes with a given metaclass").
