@@ -19,8 +19,8 @@ use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{walk_specialization, walk_specialization_types};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
-    walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_interface,
+    walk_protocol_instance_member, walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
@@ -596,6 +596,8 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         }
 
         fn visit_bound_type_var_type(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+            // Signature generic contexts are visited even for unused parameters, so this also
+            // rejects method-scoped type variables absent from parameter and return types.
             if !variable.typevar(db).is_self(db)
                 && self
                     .class_context
@@ -690,20 +692,15 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
     let template_view = ProtocolInterfaceView::new(template.interface(db), None);
     let class_context = origin.generic_context(db);
     if ![interface, template_view].iter().all(|interface| {
-        interface.has_only_inspectable_members_with_positional_receivers(
-            db,
-            env,
-            class_context,
-            origin.into(),
-        )
+        interface.has_only_inspectable_members_with_positional_receivers(db, env, origin.into())
     }) || (!template_view.has_only_methods(db)
         && template_view
             .members(db)
             .any(|member| member.has_explicit_receiver_annotation(db)))
-        || interface.member_count(db) != template_view.member_count(db)
-        || template_view
+        || !interface
             .members(db)
-            .any(|member| !interface.includes_member(db, member.name()))
+            .map(|member| member.name())
+            .eq(template_view.members(db).map(|member| member.name()))
     {
         return false;
     }
@@ -734,14 +731,12 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         invalid: Cell::new(false),
         recursion_guard: TypeCollector::default(),
     };
-    for member in template_view.members(db) {
-        walk_protocol_instance_member(
-            db,
-            &member,
-            Type::ProtocolInstance(ProtocolInstanceType::from_class(template)),
-            &visitor,
-        );
-    }
+    walk_protocol_instance_interface(
+        db,
+        template_view,
+        Type::ProtocolInstance(ProtocolInstanceType::from_class(template)),
+        &visitor,
+    );
     !visitor.invalid.get()
 }
 

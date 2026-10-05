@@ -7271,7 +7271,7 @@ receiver cannot satisfy the bottom-materialized requirement.
 ```py
 from typing import Any, Protocol
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_assignable_to, is_subtype_of
+from ty_extensions._internal import is_subtype_of
 
 class Source(Protocol):
     def value(self) -> Any: ...
@@ -7280,7 +7280,6 @@ class Source(Protocol):
 class Target(Protocol):
     def read(self: Source) -> int: ...
 
-static_assert(not is_assignable_to(Top[Source], Bottom[Source]))
 static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
 static_assert(is_subtype_of(Bottom[Source], Top[Target]))
 

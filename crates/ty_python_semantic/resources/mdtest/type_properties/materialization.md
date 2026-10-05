@@ -3085,11 +3085,6 @@ equivalent to `Reader[int]`. Both satisfy `Reader[object]`: `value()` returns an
 `child()` returns another reader with the same behavior. Neither satisfies `Reader[str]`, which
 requires `value()` to return a `str`.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from __future__ import annotations
 
@@ -3139,11 +3134,6 @@ static_assert(not is_equivalent_to(LegacyReader[Unknown], Bottom[LegacyReader[Un
 
 Each `child()` call adds another tuple layer to the type argument. Starting from `Node[int]`, these
 specializations remain fully static, so materialization leaves their requirements unchanged.
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 from __future__ import annotations
@@ -3207,13 +3197,9 @@ static_assert(not is_subtype_of(Top[LegacyTypedSetter[int]], LegacyTypedSetter[s
 ### Fully static recursive protocol receivers
 
 A protocol may use another specialization of itself in an explicit receiver annotation.
-Materializing a fully static specialization leaves it unchanged, including when it is compared with
-a different specialization.
-
-```toml
-[environment]
-python-version = "3.12"
-```
+Materializing a fully static specialization leaves it unchanged. Different specializations can still
+be incompatible: `ValuedStream[int]` returns `int` from `value()`, whereas
+`ValuedStream[ValuedStream[int]]` requires it to return `ValuedStream[int]`.
 
 ```py
 from __future__ import annotations
@@ -3222,36 +3208,23 @@ from typing import Protocol, TypeVar
 from ty_extensions import Bottom, Top, static_assert
 from ty_extensions._internal import is_assignable_to, is_equivalent_to
 
-class Stream[T](Protocol):
-    def flatten(self: Stream[Stream[T]]) -> None: ...
-
-static_assert(is_equivalent_to(Top[Stream[int]], Stream[int]))
-static_assert(is_equivalent_to(Bottom[Stream[int]], Stream[int]))
-
-T_co = TypeVar("T_co", covariant=True)
-
-class LegacyStream(Protocol[T_co]):
-    def flatten(self: LegacyStream[LegacyStream[T_co]]) -> None: ...
-
-static_assert(is_equivalent_to(Top[LegacyStream[int]], LegacyStream[int]))
-static_assert(is_equivalent_to(Bottom[LegacyStream[int]], LegacyStream[int]))
-```
-
-Different specializations can still be incompatible. `ValuedStream[int]` returns `int` from
-`value()`, whereas `ValuedStream[ValuedStream[int]]` requires it to return `ValuedStream[int]`:
-
-```py
 class ValuedStream[T](Protocol):
     def flatten(self: ValuedStream[ValuedStream[T]]) -> None: ...
     def value(self) -> T: ...
 
+static_assert(is_equivalent_to(Top[ValuedStream[int]], ValuedStream[int]))
+static_assert(is_equivalent_to(Bottom[ValuedStream[int]], ValuedStream[int]))
 static_assert(not is_assignable_to(Top[ValuedStream[int]], ValuedStream[ValuedStream[int]]))
 static_assert(not is_assignable_to(Bottom[ValuedStream[int]], ValuedStream[ValuedStream[int]]))
+
+T_co = TypeVar("T_co", covariant=True)
 
 class LegacyValuedStream(Protocol[T_co]):
     def flatten(self: LegacyValuedStream[LegacyValuedStream[T_co]]) -> None: ...
     def value(self) -> T_co: ...
 
+static_assert(is_equivalent_to(Top[LegacyValuedStream[int]], LegacyValuedStream[int]))
+static_assert(is_equivalent_to(Bottom[LegacyValuedStream[int]], LegacyValuedStream[int]))
 static_assert(not is_assignable_to(Top[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
 static_assert(not is_assignable_to(Bottom[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
 ```
@@ -3259,11 +3232,6 @@ static_assert(not is_assignable_to(Bottom[LegacyValuedStream[int]], LegacyValued
 ### Recursive protocol receivers with gradual members
 
 A gradual member changes the materializations even when the receiver is recursively specialized.
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 from __future__ import annotations
@@ -3347,11 +3315,6 @@ static_assert(not is_subtype_of(Top[OverloadedTree], OverloadedTree))
 The initial specialization has a static `value`, but its child introduces `Any`. Materialization
 therefore changes the requirements reached through `child()`.
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from __future__ import annotations
 
@@ -3402,11 +3365,6 @@ static_assert(not is_subtype_of(LegacyMasked[object], Bottom[LegacyMasked[object
 
 An enclosing type variable can introduce a gradual type in a recursive specialization:
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ```py
 from __future__ import annotations
 
@@ -3440,11 +3398,6 @@ The `is_subtype_of` condition depends on the return type of `Node.value`, which 
 which branch is reachable. During this cycle, the condition is neither definitely truthy nor
 definitely falsy, so both branches contribute to `Payload`, yielding `Any | int`. This gradual
 member means that `Top[Node[int]]` is not a subtype of `Node[int]`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
 
 ```py
 from __future__ import annotations

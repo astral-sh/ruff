@@ -501,12 +501,25 @@ impl<'db> ProtocolInterfaceView<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        class_context: Option<GenericContext<'db>>,
         class_origin: ClassLiteral<'db>,
     ) -> bool {
         self.members(db).all(|member| {
             if let ProtocolMemberKind::Property { read, write } = member.data.kind {
-                return property_accessors_are_inspectable(db, env, read, write);
+                // The proof supports resolved ordinary property accessors, excluding descriptors.
+                return matches!(
+                    (read, write),
+                    (
+                        None | Some(ProtocolPropertyType::PropertyGetter(_)),
+                        None | Some(ProtocolMemberWrite::Type(
+                            ProtocolPropertyType::PropertySetter(_)
+                        ))
+                    )
+                ) && read.is_none_or(|getter| getter.resolve(db, env).is_some())
+                    && write.is_none_or(|setter| {
+                        setter
+                            .domain()
+                            .is_some_and(|setter| setter.resolve(db, env).is_some())
+                    });
             }
             let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
                 member.data.kind
@@ -515,14 +528,7 @@ impl<'db> ProtocolInterfaceView<'db> {
             };
             callable.signatures(db).iter().next().is_some()
                 && callable.signatures(db).iter().all(|signature| {
-                    signature.generic_context.is_none_or(|context| {
-                        context.variables(db).all(|variable| {
-                            variable.typevar(db).is_self(db)
-                                || class_context.is_some_and(|class_context| {
-                                    class_context.contains(db, variable.identity(db))
-                                })
-                        })
-                    }) && (signature.has_implicit_positional_receiver_annotation()
+                    signature.has_implicit_positional_receiver_annotation()
                         || (signature.has_explicit_positional_receiver_annotation()
                             && signature.parameters().get(0).is_some_and(|parameter| {
                                 parameter
@@ -534,7 +540,7 @@ impl<'db> ProtocolInterfaceView<'db> {
                                                 class.class_literal(db) == class_origin
                                             })
                                     })
-                            })))
+                            }))
                 })
         })
     }
@@ -1377,29 +1383,6 @@ enum ProtocolPropertyType<'db> {
     ///
     /// Here, assignment to `name` accepts `str | None`, from the `value` parameter.
     PropertySetter(Type<'db>),
-}
-
-/// The type-parameter proof supports ordinary properties with resolved read and write types.
-/// Descriptor requirements are outside that proof's supported shapes.
-fn property_accessors_are_inspectable<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    read: Option<ProtocolPropertyType<'db>>,
-    write: Option<ProtocolMemberWrite<'db>>,
-) -> bool {
-    matches!(read, None | Some(ProtocolPropertyType::PropertyGetter(_)))
-        && matches!(
-            write,
-            None | Some(ProtocolMemberWrite::Type(
-                ProtocolPropertyType::PropertySetter(_)
-            ))
-        )
-        && read.is_none_or(|getter| getter.resolve(db, env).is_some())
-        && write.is_none_or(|setter| {
-            setter
-                .domain()
-                .is_some_and(|setter| setter.resolve(db, env).is_some())
-        })
 }
 
 impl<'db> ProtocolPropertyType<'db> {

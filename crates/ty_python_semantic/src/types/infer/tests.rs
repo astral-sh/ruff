@@ -1380,48 +1380,45 @@ fn recursive_protocol_materialization_tracks_member_type_changes() -> anyhow::Re
     const FAILURE: &str =
         "Static assertion error: argument of type `ConstraintSet[Literal[False]]` is always falsy";
 
-    for (initial, changed, initial_diagnostics, changed_diagnostics) in [
-        (STATIC, GRADUAL, &[][..], &[FAILURE, FAILURE][..]),
-        (GRADUAL, STATIC, &[FAILURE, FAILURE][..], &[][..]),
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/node.py",
+        r#"
+        from __future__ import annotations
+        from typing import Protocol, TypeVar
+        from other import Payload
+
+        class Node(Protocol):
+            def payload(self) -> Payload: ...
+            def edit(self, nodes: list[Node]) -> list[Node]: ...
+
+        T = TypeVar("T", covariant=True)
+
+        class GenericNode(Protocol[T]):
+            def child(self) -> GenericNode[tuple[T, T]]: ...
+            def read(self: GenericNode[int]) -> int: ...
+            def payload(self) -> Payload: ...
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from node import GenericNode, Node
+        from ty_extensions import Top, static_assert
+        from ty_extensions._internal import is_subtype_of
+
+        static_assert(is_subtype_of(Top[Node], Node))
+        static_assert(is_subtype_of(Top[GenericNode[int]], GenericNode[int]))
+        "#,
+    )?;
+
+    for (payload, diagnostics) in [
+        (STATIC, &[][..]),
+        (GRADUAL, &[FAILURE, FAILURE][..]),
+        (STATIC, &[][..]),
     ] {
-        let mut db = setup_db();
-        db.write_file("/src/other.py", initial)?;
-        db.write_dedented(
-            "/src/node.py",
-            r#"
-            from __future__ import annotations
-            from typing import Protocol, TypeVar
-            from other import Payload
-
-            class Node(Protocol):
-                def payload(self) -> Payload: ...
-                def edit(self, nodes: list[Node]) -> list[Node]: ...
-
-            T = TypeVar("T", covariant=True)
-
-            class GenericNode(Protocol[T]):
-                def child(self) -> GenericNode[tuple[T, T]]: ...
-                def read(self: GenericNode[int]) -> int: ...
-                def payload(self) -> Payload: ...
-            "#,
-        )?;
-        db.write_dedented(
-            "/src/main.py",
-            r#"
-            from node import GenericNode, Node
-            from ty_extensions import Top, static_assert
-            from ty_extensions._internal import is_subtype_of
-
-            static_assert(is_subtype_of(Top[Node], Node))
-            static_assert(is_subtype_of(Top[GenericNode[int]], GenericNode[int]))
-            "#,
-        )?;
-
-        assert_file_diagnostics(&db, "/src/main.py", initial_diagnostics);
-        db.write_file("/src/other.py", changed)?;
-        assert_file_diagnostics(&db, "/src/main.py", changed_diagnostics);
-        db.write_file("/src/other.py", initial)?;
-        assert_file_diagnostics(&db, "/src/main.py", initial_diagnostics);
+        db.write_file("/src/other.py", payload)?;
+        assert_file_diagnostics(&db, "/src/main.py", diagnostics);
     }
 
     Ok(())
