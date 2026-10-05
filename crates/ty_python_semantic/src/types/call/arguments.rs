@@ -603,6 +603,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                     CallArgument::Variadic(argument),
                     ast::ArgOrKeyword::Arg(ast::Expr::Starred(ast::ExprStarred { value, .. })),
                 ) => {
+                    // Set literals keep ordinary type-based unpacking. Handling duplicate elements
+                    // and unspecified iteration order is not worth the extra complexity for now.
                     let ast::Expr::List(ast::ExprList { elts, .. }) = value.as_ref() else {
                         continue;
                     };
@@ -637,7 +639,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         items.len(),
                         BuildHasherDefault::default(),
                     );
-                    let complete = items.iter().all(|ast::DictItem { key, value }| {
+                    let all_entries_known = items.iter().all(|ast::DictItem { key, value }| {
                         let Some(ast::Expr::StringLiteral(key)) = key else {
                             return false;
                         };
@@ -655,7 +657,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         );
                         true
                     });
-                    if complete {
+                    if all_entries_known {
                         *argument = KeywordArgument::Known {
                             types: argument.source_types().clone(),
                             keywords: UnpackedKeywords {

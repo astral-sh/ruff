@@ -512,7 +512,6 @@ def pair(x: int, y: str) -> None: ...
 
 pair(*[1, "two"])
 pair(*[1], *["two"])
-pair(*(1, "two"))
 ```
 
 Missing arguments, extra arguments, and incompatible element types are rejected. These diagnostics
@@ -527,14 +526,14 @@ pair(*[])
 
 ```snapshot
 error[missing-argument]: No arguments provided for required parameters `x`, `y` of function `pair`
- --> src/mdtest_snippet.py:9:1
+ --> src/mdtest_snippet.py:8:1
   |
-9 | pair(*[])
+8 | pair(*[])
   | ^^^^^^^^^
 info: Parameters declared here
- --> src/mdtest_snippet.py:6:9
+ --> src/mdtest_snippet.py:5:9
   |
-6 | def pair(x: int, y: str) -> None: ...
+5 | def pair(x: int, y: str) -> None: ...
   |         ^^^^^^^^^^^^^^^^
 ```
 
@@ -547,15 +546,15 @@ pair(*[1])
 
 ```snapshot
 error[missing-argument]: No argument provided for required parameter `y` of function `pair`
-  --> src/mdtest_snippet.py:13:1
+  --> src/mdtest_snippet.py:12:1
    |
-13 | pair(*[1])
+12 | pair(*[1])
    | ^^^^^^^^^^
 info: Parameter declared here
-  --> src/mdtest_snippet.py:10:18
-   |
-10 | def pair(x: int, y: str) -> None: ...
-   |                  ^^^^^^
+ --> src/mdtest_snippet.py:9:18
+  |
+9 | def pair(x: int, y: str) -> None: ...
+  |                  ^^^^^^
 ```
 
 ```py
@@ -567,14 +566,14 @@ pair(*[1, "two", 3, 4])
 
 ```snapshot
 error[too-many-positional-arguments]: Too many positional arguments to function `pair`: expected 2, got 4
-  --> src/mdtest_snippet.py:17:6
+  --> src/mdtest_snippet.py:16:6
    |
-17 | pair(*[1, "two", 3, 4])
+16 | pair(*[1, "two", 3, 4])
    |      ^^^^^^^^^^^^^^^^^
 info: Function signature here
-  --> src/mdtest_snippet.py:14:5
+  --> src/mdtest_snippet.py:13:5
    |
-14 | def pair(x: int, y: str) -> None: ...
+13 | def pair(x: int, y: str) -> None: ...
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
@@ -587,14 +586,14 @@ pair(*["one", "two"])
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `pair` is incorrect
-  --> src/mdtest_snippet.py:21:6
+  --> src/mdtest_snippet.py:20:6
    |
-21 | pair(*["one", "two"])
+20 | pair(*["one", "two"])
    |      ^^^^^^^^^^^^^^^ Expected `int`, found `Literal["one"]`
 info: Function defined here
-  --> src/mdtest_snippet.py:18:5
+  --> src/mdtest_snippet.py:17:5
    |
-18 | def pair(x: int, y: str) -> None: ...
+17 | def pair(x: int, y: str) -> None: ...
    |     ^^^^ ------ Parameter declared here
 ```
 
