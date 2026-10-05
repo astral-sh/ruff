@@ -227,13 +227,22 @@ impl<'a> ImplementationsFinder<'a> {
         })
     }
 
+    /// Returns whether `file` might contain an implementation based on its source text.
+    pub fn may_have_implementations_in_file(&self, db: &dyn Db, file: ProgramFile<'_>) -> bool {
+        let source = source_text(db, file.file(db));
+        // A member override also requires a class declaration.
+        self.name_matcher.may_match(&source)
+            && (matches!(self.kind, ImplementationsFinderKind::ClassFamily)
+                || CLASS_MATCHER.may_match(&source))
+    }
+
     /// Returns implementations contributed by classes defined in `file`.
     pub fn implementations_for_file<'scan>(
         &'scan self,
         db: &'scan dyn Db,
         file: ProgramFile<'scan>,
     ) -> Vec<ResolvedDefinition<'scan>> {
-        if !self.name_matcher.may_match(&source_text(db, file.file(db))) {
+        if !self.may_have_implementations_in_file(db, file) {
             return Vec::new();
         }
 
@@ -477,12 +486,6 @@ fn member_implementations_for_file<'db>(
     accessor_role: Option<PropertyAccessorRole>,
 ) -> Vec<ResolvedDefinition<'db>> {
     let mut definitions = Vec::new();
-
-    // The finder already checked for the member name. An override also requires a class.
-    let source = source_text(db, file.file(db));
-    if !CLASS_MATCHER.may_match(&source) {
-        return definitions;
-    }
 
     for candidate in reachable_class_literals_in_file(db, file) {
         // The implementations selected for the roots were collected during finder preparation.
@@ -1672,11 +1675,13 @@ mod stub_mapping {
     use ty_python_core::{ProgramFile, global_scope, semantic_index};
 
     /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
+    /// Calls `on_source_file` before inspecting the source file's AST.
     #[tracing::instrument(skip_all)]
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
         def: &ResolvedDefinition<'db>,
         cached_vendored_typeshed: Option<&SystemPath>,
+        on_source_file: impl FnOnce(ProgramFile<'db>),
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
         let Some(stub_program_file) = def.program_file(db) else {
             trace!("Found arbitrary FileWithRange while stub mapping, giving up");
@@ -1759,6 +1764,7 @@ mod stub_mapping {
 
         // Walk down the lexical name path in the real file.
         let mut definitions = Vec::new();
+        on_source_file(real_parse_file);
         let index = semantic_index(db, real_parse_file);
         let global_scope = global_scope(db, real_parse_file);
         let real_parsed = parsed_module(db, global_scope.python_file(db));
