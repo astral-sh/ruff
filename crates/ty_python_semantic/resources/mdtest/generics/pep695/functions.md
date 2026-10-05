@@ -3731,5 +3731,54 @@ def check(setter: ConstrainedSetter) -> None:
     writable: HasValue = setter  # error: [invalid-assignment]
 ```
 
+## Return-context preferences across alternatives
+
+When forwarding a generic call, an upper-only bound from one return-context alternative must not
+widen the argument's type just because another alternative provides invariant evidence.
+
+```py
+from collections.abc import Sequence
+
+def inner[I](value: I) -> list[I] | I | None:
+    raise NotImplementedError
+
+def outer[O](value: O) -> list[O] | O | None:
+    # revealed: list[O@outer] | O@outer | None
+    return reveal_type(inner(value))
+
+def sequence_inner[I](value: I) -> Sequence[I] | I | None:
+    raise NotImplementedError
+
+def sequence_outer[O](value: O) -> Sequence[O] | O | None:
+    # revealed: Sequence[O@sequence_outer] | O@sequence_outer | None
+    return reveal_type(sequence_inner(value))
+```
+
+An invariant context can still widen the element type when needed to match the enclosing return
+annotation.
+
+```py
+def singleton[I](value: I) -> list[I]:
+    return [value]
+
+def optional_singleton[O](value: O) -> list[O | None]:
+    # revealed: list[O@optional_singleton | None]
+    return reveal_type(singleton(value))
+```
+
+A callable context contributes both parameter and return constraints on the same path. Their
+combined evidence must still determine an invariant preference.
+
+```py
+from collections.abc import Callable
+
+def identity_callback[I](value: I) -> Callable[[I], I]:
+    return lambda item: item
+
+def optional_callback[O](value: O) -> Callable[[O | None], O | None]:
+    # revealed: (O@optional_callback | None, /) -> O@optional_callback | None
+    return reveal_type(identity_callback(value))
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
