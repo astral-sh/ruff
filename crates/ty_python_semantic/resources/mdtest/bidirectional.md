@@ -932,22 +932,6 @@ def nested_defaultdict[K: Hashable, K2: Hashable, T](
     value: defaultdict[K2, dict[K, T]] = defaultdict(dict)
 ```
 
-## Iterable constructors retain contextual outer element types
-
-After narrowing `Iterable[T] | T`, a `list` constructor retains the outer `T` instead of inferring
-`object`.
-
-```py
-from collections.abc import Collection, Iterable, Sized
-from typing import cast
-
-def maybe_iterable_to_list[T](value: Iterable[T] | T) -> Collection[T] | T:
-    if isinstance(value, Iterable) and not isinstance(value, Sized):
-        return list(value)
-    value = cast(Collection[T], value)
-    return value
-```
-
 ## Callback diagnostics retain contextual outer type variables
 
 A constrained outer return type remains visible in an invalid callback diagnostic. The callback
