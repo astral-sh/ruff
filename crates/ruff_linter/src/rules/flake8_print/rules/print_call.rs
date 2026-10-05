@@ -1,12 +1,15 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
+use ruff_python_index::Indexer;
 use ruff_python_semantic::SemanticModel;
-use ruff_text_size::Ranged;
+use ruff_python_trivia::has_leading_content;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::fix::edits::delete_stmt;
-use crate::{Fix, FixAvailability, Violation};
+use crate::fix::edits::{delete_stmt, is_lone_child};
+use crate::{Edit, Fix, FixAvailability, Locator, Violation};
 
 /// ## What it does
 /// Checks for `print` statements.
@@ -156,12 +159,45 @@ pub(crate) fn print_call(checker: &Checker, call: &ast::ExprCall) {
     if semantic.current_expression_parent().is_none() {
         let statement = semantic.current_statement();
         let parent = semantic.current_statement_parent();
-        let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
+        let edit = delete_print_stmt(statement, parent, checker.locator(), checker.indexer());
         diagnostic.set_fix(
             Fix::unsafe_edit(edit)
                 .isolate(Checker::isolation(semantic.current_statement_parent_id())),
         );
     }
+}
+
+/// Delete a `print`/`pprint` statement, retaining any comment that trails it
+/// on the same line.
+///
+/// The default statement deletion removes the statement's full lines, which
+/// would take such a comment with it. When the statement ends its line with
+/// only a comment following it, and the default deletion would have taken the
+/// full-lines path (i.e. the statement is not a lone child, does not share its
+/// line with other content, and is not part of a continuation), delete only up
+/// to the start of the comment instead, so that the comment and its
+/// indentation survive. All other cases defer to [`delete_stmt`] unchanged, so
+/// lone children still get a `pass` replacement and multi-statement lines keep
+/// their existing handling.
+fn delete_print_stmt(
+    stmt: &ast::Stmt,
+    parent: Option<&ast::Stmt>,
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Edit {
+    let full_lines_path = !parent.is_some_and(|parent| is_lone_child(stmt, parent))
+        && !has_leading_content(stmt.start(), locator.contents())
+        && indexer
+            .preceded_by_continuations(stmt.start(), locator.contents())
+            .is_none();
+
+    if full_lines_path {
+        if let Some(index) = trailing_comment_start_offset(stmt, locator.contents()) {
+            return Edit::range_deletion(TextRange::new(stmt.start(), stmt.end() + index));
+        }
+    }
+
+    delete_stmt(stmt, parent, locator, indexer)
 }
 
 fn has_non_default_output_target(

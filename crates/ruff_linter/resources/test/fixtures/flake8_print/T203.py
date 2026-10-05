@@ -21,3 +21,8 @@ with tempfile.NamedTemporaryFile() as fp:
     pprint.pprint("Hello, world!", stream=fp)  # OK
 
 pprint.pformat("Hello, world!")
+
+
+def dump():
+    pprint.pprint(sys.version)  # NOTE: keep an eye on this while debugging
+
