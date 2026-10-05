@@ -570,7 +570,7 @@ pub(in crate::types) fn constructor_fields_are_keyword_only(
     !is_root_model(db, class)
 }
 
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub(in crate::types) IsRootModelConfiguration), returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn is_root_model<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class
         .iter_mro(db, None)
@@ -635,7 +635,7 @@ pub(in crate::types) fn extend_settings_constructor_parameters<'db>(
     );
 }
 
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) ModelConfigConfiguration),
     returns(copy),
     cycle_initial=|_, _, _| ModelConfig::unknown(),
     heap_size=ruff_memory_usage::heap_size,
@@ -1353,23 +1353,12 @@ fn model_init_discards_extra(
 /// Report keyword arguments that the Pydantic model constructor silently discards.
 pub(in crate::types) fn report_discarded_extra_arguments<'db>(
     context: &InferContext<'db, '_>,
-    class: ClassType<'db>,
+    class: StaticClassLiteral<'db>,
+    metadata: ModelMetadata<'db>,
     arguments: &Arguments,
     bindings: &Bindings<'db>,
 ) {
-    if !context.is_lint_enabled(&PYDANTIC_DISCARDED_EXTRA_ARGUMENT) {
-        return;
-    }
-
     let db = context.db();
-    let Some((class, _)) = class.static_class_literal(db) else {
-        return;
-    };
-    let Some(metadata) = CodeGeneratorKind::from_class(db, class.into())
-        .and_then(CodeGeneratorKind::pydantic_metadata)
-    else {
-        return;
-    };
     if !model_init_discards_extra(db, class, metadata) {
         return;
     }
@@ -1423,4 +1412,12 @@ pub(in crate::types) fn extra_parameter<'db>(parameters: &[Parameter<'db>]) -> P
     }
 
     Parameter::keyword_variadic(Name::new(name)).with_annotated_type(Type::any())
+}
+
+#[cfg(feature = "experimental-analysis")]
+crate::types::class::runtime::class_memo_schema! {
+    pub(in crate::types) type ClassMemoSchema<'db> = crate::types::StaticClassLiteral<'static>;
+    pub(in crate::types) fn register_class_memos;
+    (is_root_model, salsa::execution_probe::FixedQueryKeyProfile),
+            (model_config, salsa::execution_probe::FixedQueryKeyProfile)
 }

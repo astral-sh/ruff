@@ -1,0 +1,8 @@
+error[E0624]: method `field` is private
+ --> tests/compile-fail/get-on-private-tracked-field.rs:9:13
+  |
+2 |     #[salsa::tracked]
+  |     ----------------- private method defined here
+...
+9 |     tracked.field(db);
+  |             ^^^^^ private method

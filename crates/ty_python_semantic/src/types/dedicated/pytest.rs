@@ -9,6 +9,10 @@ mod collection;
 mod fixtures;
 
 pub use collection::{PytestTest, pytest_tests_in_file};
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use collection::{
+    TestFunctionDefinitionConfiguration, test_function_definition_ingredient,
+};
 pub use fixtures::{
     FixtureBinding, FixtureExposure, FixtureNameSource, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files,

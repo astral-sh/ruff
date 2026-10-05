@@ -1,10 +1,12 @@
+use crate::hash_certificate::FrozenHashTable;
+use crate::place::table_lookup_work;
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 // Selected using performance and memory profiling across the 162-project ecosystem corpus.
 // Symbol-name equality is cheap enough that raising the cutoff from 8 to 16 reduced retained
@@ -207,10 +209,28 @@ impl SymbolReverseTable {
 pub(super) struct SymbolTable {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
     /// Reverse lookup retained only when linear search would be expensive.
-    reverse: Option<Box<SymbolReverseTable>>,
+    reverse: Option<Box<FrozenHashTable<ScopedSymbolId>>>,
 }
 
 impl SymbolTable {
+    pub(crate) fn comparison_entry_work(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Option<usize>> + '_ {
+        // Read each name's length lazily, after the caller admits that entry's metadata scan.
+        // The fixed representation covers string metadata and the symbol's flags.
+        self.symbols
+            .iter()
+            .map(|symbol| symbol.name.len().checked_add(size_of::<Symbol>()))
+    }
+
+    pub(crate) fn lookup_work(&self, name_bytes: usize) -> Option<usize> {
+        table_lookup_work(
+            self.symbols.len(),
+            self.reverse.as_deref(),
+            name_bytes.checked_add(8)?,
+        )
+    }
+
     /// Look up a symbol by its ID.
     ///
     /// ## Panics
@@ -220,19 +240,12 @@ impl SymbolTable {
         &self.symbols[id]
     }
 
-    /// Look up a symbol by its ID, mutably.
-    ///
-    /// ## Panics
-    /// If the ID is not valid for this symbol table.
-    #[track_caller]
-    pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
-        &mut self.symbols[id]
-    }
-
     /// Look up the ID of a symbol by its name.
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         if let Some(reverse) = self.reverse.as_deref() {
-            return reverse.symbol_id(&self.symbols, name);
+            return reverse
+                .find(SymbolReverseTable::hash_name(name), |id| self.symbols[*id].name == name)
+                .copied();
         }
 
         self.symbols
@@ -268,6 +281,15 @@ pub(super) struct SymbolTableBuilder {
 }
 
 impl SymbolTableBuilder {
+    /// Look up a symbol by its ID, mutably.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this symbol table.
+    #[track_caller]
+    pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
+        &mut self.table.symbols[id]
+    }
+
     pub(super) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
         self.reverse.symbol_id(&self.table.symbols, name)
     }
@@ -281,7 +303,7 @@ impl SymbolTableBuilder {
                 let id = *entry.get();
 
                 if !symbol.flags.is_empty() {
-                    self.symbols[id].flags.insert(symbol.flags);
+                    self.table.symbols[id].flags.insert(symbol.flags);
                 }
 
                 (id, false)
@@ -303,7 +325,9 @@ impl SymbolTableBuilder {
 
         if table.symbols.len() > LINEAR_SEARCH_THRESHOLD {
             reverse.shrink_to_fit(&table.symbols);
-            table.reverse = Some(Box::new(reverse));
+            table.reverse = Some(Box::new(FrozenHashTable::new(reverse.0, |id| {
+                SymbolReverseTable::hash_name(&table.symbols[*id].name)
+            })));
         }
 
         table
@@ -315,11 +339,5 @@ impl Deref for SymbolTableBuilder {
 
     fn deref(&self) -> &Self::Target {
         &self.table
-    }
-}
-
-impl DerefMut for SymbolTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
     }
 }

@@ -81,9 +81,11 @@
 //! example, type inference establishes that the branches in `make_counter`
 //! always define `value`, so the `Exhausted` step is unreachable.
 
+use std::ops::ControlFlow;
+
 use ruff_python_ast::{self as ast, name::Name};
 use smallvec::SmallVec;
-use ty_python_core::ast_ids::{HasScopedUseId, ScopedUseId};
+use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef, ScopedPlaceId};
@@ -97,6 +99,7 @@ use ty_python_core::{
 use crate::Db;
 
 /// Returns an iterator over the steps that resolve a value for a place load.
+/// The calling query must have read `index` for the file containing `scope`.
 pub(crate) fn resolve_place_load<'db, 'ast>(
     db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
@@ -104,16 +107,56 @@ pub(crate) fn resolve_place_load<'db, 'ast>(
     place_expr: PlaceExpr,
     mode: PlaceLoadMode<'ast>,
 ) -> PlaceLoadResolution<'db, 'ast> {
+    resolve_place_load_with_scope_fields(
+        index,
+        scope,
+        scope.program_file(db),
+        scope.file_scope_id(db),
+        place_expr,
+        mode,
+    )
+}
+
+/// Resolves a load using the already-read file and file-local scope of `scope`.
+/// The calling query must have read `index` for `file` before constructing the resolver.
+pub(crate) fn resolve_place_load_with_scope_fields<'db, 'ast>(
+    index: &'db SemanticIndex<'db>,
+    scope: ScopeId<'db>,
+    file: ProgramFile<'db>,
+    file_scope: FileScopeId,
+    place_expr: PlaceExpr,
+    mode: PlaceLoadMode<'ast>,
+) -> PlaceLoadResolution<'db, 'ast> {
+    let current_symbol = PlaceExprRef::from(&place_expr)
+        .as_symbol()
+        .and_then(|symbol| index.place_table(file_scope).symbol_id(symbol.name()));
     PlaceLoadResolution::new(
         PlaceLoadResolutionContext {
-            db,
             index,
             scope,
-            file: scope.program_file(db),
+            file,
+            file_scope,
             mode,
+            current_symbol,
         },
         place_expr,
     )
+}
+
+/// Bounds construction's scope-declaration lookup before it runs.
+#[cfg(feature = "experimental-analysis")]
+pub(crate) fn place_load_construction_work(
+    index: &SemanticIndex<'_>,
+    file_scope: FileScopeId,
+    place: &PlaceExpr,
+) -> Option<usize> {
+    let lookup = match place {
+        PlaceExpr::Symbol(_) => index
+            .place_table(file_scope)
+            .lookup_work(place.into())?,
+        PlaceExpr::Member(_) => 1,
+    };
+    lookup.checked_add(32)
 }
 
 /// Selects the binding state used for a place load's own scope.
@@ -165,174 +208,177 @@ pub(crate) struct PlaceLoadResolution<'db, 'ast> {
 impl<'db> Iterator for PlaceLoadResolution<'db, '_> {
     type Item = PlaceLoadResolutionStep<'db>;
 
-    /// Lazily yields [`PlaceLoadResolutionStep`] values to describe the resolution process.
-    ///
-    /// Internally, this traverses a directed, acyclic graph that models the resolution process.
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(current_node) = self.next_node.take() {
-            match current_node {
-                PlaceLoadResolutionNode::LocalSource => {
-                    self.next_node =
-                        Some(PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember);
-
-                    if let Some((kind, exit_constraint)) =
-                        self.context.local_source(self.place_expr())
-                    {
-                        let source = self.constraints.source(
-                            kind,
-                            PlaceLoadSourceRole::Ordinary,
-                            exit_constraint,
-                        );
-                        return Some(PlaceLoadResolutionStep::Source(source));
-                    }
-                }
-                PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember => {
-                    self.next_node = Some(PlaceLoadResolutionNode::DecideResolutionPath);
-
-                    if let Some(prefix_loads) =
-                        self.context.place_expr_prefix_loads(self.place_expr())
-                    {
-                        return Some(PlaceLoadResolutionStep::MemberResolutionCondition(
-                            prefix_loads,
-                        ));
-                    }
-                }
-                PlaceLoadResolutionNode::DecideResolutionPath => {
-                    self.next_node = Some(self.decide_resolution_path());
-                }
-                PlaceLoadResolutionNode::DunderClassSource {
-                    definition,
-                    enclosing_scopes,
-                } => {
-                    self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource(
-                        enclosing_scopes,
-                    ));
-
-                    return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
-                            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::DunderClass(
-                                definition,
-                            )),
-                            PlaceLoadSourceRole::Ordinary,
-                        ),
-                    ));
-                }
-                PlaceLoadResolutionNode::EnclosingScopeSource(mut scopes) => {
-                    let (next_node, source) = self.resolve_enclosing_scopes(&mut scopes);
-                    self.next_node = Some(next_node);
-
-                    if let Some(source) = source {
-                        return Some(PlaceLoadResolutionStep::Source(source));
-                    }
-                }
-                PlaceLoadResolutionNode::ImplicitClassBodySource(forwarded_global_snapshot) => {
-                    self.next_node = Some(forwarded_global_snapshot.map_or(
-                        PlaceLoadResolutionNode::ExplicitGlobalSource(
-                            PlaceLoadSourceRole::Ordinary,
-                        ),
-                        PlaceLoadResolutionNode::ForwardedGlobalSnapshotSource,
-                    ));
-
-                    if self.context.is_class_body_scope()
-                        && let Some(name) = self.loaded_symbol_name()
-                    {
-                        let source = self.constraints.source(
-                            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(
-                                name.clone(),
-                            )),
-                            PlaceLoadSourceRole::Ordinary,
-                            None,
-                        );
-                        return Some(PlaceLoadResolutionStep::Source(source));
-                    }
-                }
-                PlaceLoadResolutionNode::ForwardedGlobalSnapshotSource(snapshot) => {
-                    let ForwardedGlobalSnapshot {
-                        bindings,
-                        enclosing_scope,
-                    } = snapshot;
-                    let global_place_table = self.context.index.place_table(FileScopeId::global());
-                    let has_explicit_global = self
-                        .loaded_symbol_name()
-                        .and_then(|name| global_place_table.symbol_id(name))
-                        .is_some_and(|symbol_id| {
-                            let symbol = global_place_table.symbol(symbol_id);
-                            symbol.is_bound() || symbol.is_declared()
-                        });
-
-                    // Nested global assignments create synthetic module bindings even when the
-                    // module never defines the name itself. Do not let those bindings hide an
-                    // implicit global or builtin when the forwarded assignment did not run.
-                    self.next_node = Some(if has_explicit_global {
-                        PlaceLoadResolutionNode::ExplicitGlobalSource(PlaceLoadSourceRole::Ordinary)
-                    } else {
-                        PlaceLoadResolutionNode::ImplicitGlobalSource
-                    });
-
-                    let source = self.constraints.source(
-                        PlaceLoadSourceKind::Bindings(bindings),
-                        PlaceLoadSourceRole::Ordinary,
-                        Some((
-                            enclosing_scope,
-                            ConstraintKey::NestedScope(
-                                self.context.scope.file_scope_id(self.context.db),
-                            ),
-                        )),
-                    );
-                    return Some(PlaceLoadResolutionStep::Source(source));
-                }
-                PlaceLoadResolutionNode::ExplicitGlobalSource(role) => {
-                    self.next_node = Some(PlaceLoadResolutionNode::ImplicitGlobalSource);
-
-                    if let Some(source) = self.resolve_global(role) {
-                        return Some(PlaceLoadResolutionStep::Source(source));
-                    }
-                }
-                PlaceLoadResolutionNode::ImplicitGlobalSource => {
-                    if let Some(name) = self.loaded_symbol_name().cloned() {
-                        self.next_node = Some(PlaceLoadResolutionNode::BuiltinSource(name.clone()));
-
-                        let source = self.constraints.source(
-                            PlaceLoadSourceKind::Implicit(
-                                ImplicitPlaceLoad::ModuleImplicitGlobal {
-                                    file: self.context.file,
-                                    name,
-                                },
-                            ),
-                            PlaceLoadSourceRole::Ordinary,
-                            None,
-                        );
-                        return Some(PlaceLoadResolutionStep::Source(source));
-                    }
-
-                    self.next_node =
-                        Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
-                }
-                PlaceLoadResolutionNode::BuiltinSource(name) => {
-                    self.next_node =
-                        Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
-
-                    return Some(PlaceLoadResolutionStep::Source(
-                        PlaceLoadConstraints::unnarrowed_source(
-                            PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::Builtin(name)),
-                            PlaceLoadSourceRole::Ordinary,
-                        ),
-                    ));
-                }
-                PlaceLoadResolutionNode::Failure(failure) => {
-                    return Some(PlaceLoadResolutionStep::Exhausted(failure));
-                }
+        loop {
+            if let ControlFlow::Break(step) = self.advance_node() {
+                return step;
             }
         }
-
-        None
     }
 }
 
 impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
+    /// Advances one node of the resolution graph. Both ordinary and admitted iteration keep
+    /// advancing until a node yields a public step or exhausts the graph.
+    fn advance_node(&mut self) -> ControlFlow<Option<PlaceLoadResolutionStep<'db>>> {
+        let Some(current_node) = self.next_node.take() else {
+            return ControlFlow::Break(None);
+        };
+        match current_node {
+            PlaceLoadResolutionNode::LocalSource => {
+                self.next_node =
+                    Some(PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember);
+
+                if let Some((kind, exit_constraint)) = self.context.local_source(self.place_expr())
+                {
+                    let source = self.constraints.source(
+                        kind,
+                        PlaceLoadSourceRole::Ordinary,
+                        exit_constraint,
+                    );
+                    return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+                }
+            }
+            PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember => {
+                self.next_node = Some(PlaceLoadResolutionNode::DecideResolutionPath);
+
+                if let Some(prefix_loads) = self.context.place_expr_prefix_loads(self.place_expr())
+                {
+                    return ControlFlow::Break(Some(
+                        PlaceLoadResolutionStep::MemberResolutionCondition(prefix_loads),
+                    ));
+                }
+            }
+            PlaceLoadResolutionNode::DecideResolutionPath => {
+                self.next_node = Some(self.decide_resolution_path());
+            }
+            PlaceLoadResolutionNode::DunderClassSource {
+                definition,
+                enclosing_scopes,
+            } => {
+                self.next_node = Some(PlaceLoadResolutionNode::EnclosingScopeSource(
+                    enclosing_scopes,
+                ));
+
+                return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(
+                    PlaceLoadConstraints::unnarrowed_source(
+                        PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::DunderClass(definition)),
+                        PlaceLoadSourceRole::Ordinary,
+                    ),
+                )));
+            }
+            PlaceLoadResolutionNode::EnclosingScopeSource(mut scopes) => {
+                let (next_node, source) = self.resolve_enclosing_scopes(&mut scopes);
+                self.next_node = Some(next_node);
+
+                if let Some(source) = source {
+                    return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+                }
+            }
+            PlaceLoadResolutionNode::ImplicitClassBodySource(forwarded_global_snapshot) => {
+                self.next_node = Some(forwarded_global_snapshot.map_or(
+                    PlaceLoadResolutionNode::ExplicitGlobalSource(PlaceLoadSourceRole::Ordinary),
+                    PlaceLoadResolutionNode::ForwardedGlobalSnapshotSource,
+                ));
+
+                if self.context.is_class_body_scope()
+                    && let Some(name) = self.loaded_symbol_name()
+                {
+                    let source = self.constraints.source(
+                        PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ClassBodySymbol(
+                            name.clone(),
+                        )),
+                        PlaceLoadSourceRole::Ordinary,
+                        None,
+                    );
+                    return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+                }
+            }
+            PlaceLoadResolutionNode::ForwardedGlobalSnapshotSource(snapshot) => {
+                let ForwardedGlobalSnapshot {
+                    bindings,
+                    enclosing_scope,
+                } = snapshot;
+                let global_place_table = self.context.index.place_table(FileScopeId::global());
+                let has_explicit_global = self
+                    .loaded_symbol_name()
+                    .and_then(|name| global_place_table.symbol_id(name))
+                    .is_some_and(|symbol_id| {
+                        let symbol = global_place_table.symbol(symbol_id);
+                        symbol.is_bound() || symbol.is_declared()
+                    });
+
+                // Nested global assignments create synthetic module bindings even when the
+                // module never defines the name itself. Do not let those bindings hide an
+                // implicit global or builtin when the forwarded assignment did not run.
+                self.next_node = Some(if has_explicit_global {
+                    PlaceLoadResolutionNode::ExplicitGlobalSource(PlaceLoadSourceRole::Ordinary)
+                } else {
+                    PlaceLoadResolutionNode::ImplicitGlobalSource
+                });
+
+                let source = self.constraints.source(
+                    PlaceLoadSourceKind::Bindings(bindings),
+                    PlaceLoadSourceRole::Ordinary,
+                    Some((
+                        enclosing_scope,
+                        ConstraintKey::NestedScope(self.context.file_scope),
+                    )),
+                );
+                return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+            }
+            PlaceLoadResolutionNode::ExplicitGlobalSource(role) => {
+                self.next_node = Some(PlaceLoadResolutionNode::ImplicitGlobalSource);
+
+                if let Some(source) = self.resolve_global(role) {
+                    return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+                }
+            }
+            PlaceLoadResolutionNode::ImplicitGlobalSource => {
+                if let Some(name) = self.loaded_symbol_name().cloned() {
+                    self.next_node = Some(PlaceLoadResolutionNode::BuiltinSource(name.clone()));
+
+                    let source = self.constraints.source(
+                        PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::ModuleImplicitGlobal {
+                            file: self.context.file,
+                            name,
+                        }),
+                        PlaceLoadSourceRole::Ordinary,
+                        None,
+                    );
+                    return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(source)));
+                }
+
+                self.next_node = Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
+            }
+            PlaceLoadResolutionNode::BuiltinSource(name) => {
+                self.next_node = Some(PlaceLoadResolutionNode::Failure(PlaceLoadFailure::NotFound));
+
+                return ControlFlow::Break(Some(PlaceLoadResolutionStep::Source(
+                    PlaceLoadConstraints::unnarrowed_source(
+                        PlaceLoadSourceKind::Implicit(ImplicitPlaceLoad::Builtin(name)),
+                        PlaceLoadSourceRole::Ordinary,
+                    ),
+                )));
+            }
+            PlaceLoadResolutionNode::Failure(failure) => {
+                return ControlFlow::Break(Some(PlaceLoadResolutionStep::Exhausted(failure)));
+            }
+        }
+
+        ControlFlow::Continue(())
+    }
+}
+
+impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
+    /// Quotes only the next graph node. Later paths are admitted if the consumer reaches them.
+    #[cfg(feature = "experimental-analysis")]
+    pub(crate) fn prepare_next(&mut self) -> Option<PlaceLoadAdmission<'_, 'db, 'ast>> {
+        PlaceLoadAdmission::new(self)
+    }
+
     fn new(context: PlaceLoadResolutionContext<'db, 'ast>, place_expr: PlaceExpr) -> Self {
-        let crosses_scope_declaration =
-            context.symbol_has_scope_declaration(PlaceExprRef::from(&place_expr));
+        let crosses_scope_declaration = context.symbol_has_scope_declaration();
         Self {
             context,
             place_expr,
@@ -342,17 +388,13 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         }
     }
 
-    fn decide_resolution_path(&mut self) -> PlaceLoadResolutionNode<'db> {
-        let db = self.context.db;
-        let scope = self.context.scope;
-        let file_scope = scope.file_scope_id(db);
+    fn decide_resolution_path(&self) -> PlaceLoadResolutionNode<'db> {
+        let file_scope = self.context.file_scope;
         let place_table = self.context.index.place_table(file_scope);
 
         let mut symbol_is_local = false;
         let place_expr = PlaceExprRef::from(&self.place_expr);
-        if let Some(symbol) = place_expr.as_symbol()
-            && let Some(symbol_id) = place_table.symbol_id(symbol.name())
-        {
+        if let Some(symbol_id) = self.context.current_symbol {
             let indexed_symbol = place_table.symbol(symbol_id);
             symbol_is_local = indexed_symbol.is_local();
 
@@ -369,7 +411,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         }
 
         if symbol_is_local {
-            return if scope.node(db).scope_kind().is_module() {
+            return if self.context.index.scope(file_scope).kind().is_module() {
                 PlaceLoadResolutionNode::ImplicitGlobalSource
             } else {
                 PlaceLoadResolutionNode::Failure(PlaceLoadFailure::UnboundLocal)
@@ -397,9 +439,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
         &mut self,
         scopes: &mut AncestorsIter<'db>,
     ) -> (PlaceLoadResolutionNode<'db>, Option<PlaceLoadSource<'db>>) {
-        let db = self.context.db;
-        let scope = self.context.scope;
-        let file_scope = scope.file_scope_id(db);
+        let file_scope = self.context.file_scope;
 
         for (enclosing_file_scope, _) in scopes {
             if enclosing_file_scope.is_global() {
@@ -438,7 +478,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                             enclosing_file_scope,
                             ConstraintKey::NarrowingConstraint(constraint),
                         );
-                        if scope.scope(db).is_eager() {
+                        if self.context.index.scope(file_scope).is_eager() {
                             eagerly_undefined = true;
                         }
                     }
@@ -518,7 +558,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
                 (!eagerly_undefined).then(|| {
                     self.constraints.source(
                         PlaceLoadSourceKind::DefinitionsFromOwningScope {
-                            scope: enclosing_file_scope.to_scope_id(db, self.context.file),
+                            scope: self.context.index.scope_id(enclosing_file_scope),
                             id: enclosing_place_id,
                         },
                         PlaceLoadSourceRole::Ordinary,
@@ -536,7 +576,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
     /// An eager nested scope uses the global snapshot captured when it began, so a class body
     /// cannot see a module binding created only after that body finishes.
     fn resolve_global(&mut self, role: PlaceLoadSourceRole) -> Option<PlaceLoadSource<'db>> {
-        let current_scope = self.context.scope.file_scope_id(self.context.db);
+        let current_scope = self.context.file_scope;
         if current_scope.is_global() {
             return None;
         }
@@ -874,29 +914,29 @@ pub(crate) enum PlaceExprPrefixLoad {
 /// Read-only context used to select sources for a place load.
 #[derive(Clone, Copy)]
 struct PlaceLoadResolutionContext<'db, 'ast> {
-    db: &'db dyn Db,
     index: &'db SemanticIndex<'db>,
     scope: ScopeId<'db>,
     file: ProgramFile<'db>,
+    file_scope: FileScopeId,
     mode: PlaceLoadMode<'ast>,
+    // Construction resolves symbols to inspect scope declarations. Keep that result, including
+    // absence, for later steps in this same scope; member lookup remains lazy.
+    current_symbol: Option<ScopedSymbolId>,
 }
 
 impl<'db> PlaceLoadResolutionContext<'db, '_> {
-    fn symbol_has_scope_declaration(self, place_expr: PlaceExprRef) -> bool {
-        let Some(symbol) = place_expr.as_symbol() else {
+    fn symbol_has_scope_declaration(self) -> bool {
+        let Some(symbol_id) = self.current_symbol else {
             return false;
         };
-        let scope = self.scope.file_scope_id(self.db);
+        let scope = self.file_scope;
         let table = self.index.place_table(scope);
-        let Some(symbol_id) = table.symbol_id(symbol.name()) else {
-            return false;
-        };
         let symbol = table.symbol(symbol_id);
         symbol.is_global() || symbol.is_nonlocal()
     }
 
     fn is_class_body_scope(self) -> bool {
-        self.scope.node(self.db).scope_kind().is_class()
+        self.index.scope(self.file_scope).kind().is_class()
     }
 
     fn uses_enclosing_snapshots(self) -> bool {
@@ -908,8 +948,8 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
 
     fn is_lexical_enclosing_scope(self, enclosing_scope: FileScopeId) -> bool {
         self.index.scope(enclosing_scope).kind().is_function_like()
-            || (self.scope.is_annotation(self.db)
-                && self.scope.scope(self.db).parent() == Some(enclosing_scope))
+            || (self.index.scope(self.file_scope).kind().is_annotation()
+                && self.index.scope(self.file_scope).parent() == Some(enclosing_scope))
     }
 
     fn local_source(
@@ -919,7 +959,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         PlaceLoadSourceKind<'db>,
         Option<(FileScopeId, ConstraintKey)>,
     )> {
-        let scope = self.scope.file_scope_id(self.db);
+        let scope = self.file_scope;
         let table = self.index.place_table(scope);
         let use_def = self.index.use_def_map(scope);
 
@@ -932,7 +972,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                     return None;
                 }
 
-                let use_id = expr_ref.scoped_use_id(self.db, self.file);
+                let use_id = self.index.scoped_use_id(expr_ref);
                 Some((
                     PlaceLoadSourceKind::Bindings(use_def.bindings_at_use(use_id)),
                     Some((scope, ConstraintKey::UseId(use_id))),
@@ -943,8 +983,11 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                 Some((scope, ConstraintKey::Snapshot(snapshot))),
             )),
             PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
-                let source = table
-                    .place_id(place_expr)
+                let place_id = match place_expr {
+                    PlaceExprRef::Symbol(_) => self.current_symbol.map(ScopedPlaceId::Symbol),
+                    PlaceExprRef::Member(_) => table.place_id(place_expr),
+                };
+                let source = place_id
                     .map(|id| PlaceLoadSourceKind::Bindings(use_def.reachable_bindings(id)));
                 assert!(
                     source.is_some() || matches!(self.mode, PlaceLoadMode::StringAnnotation),
@@ -960,7 +1003,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         self,
         place_expr: PlaceExprRef,
     ) -> Option<PlaceExprPrefixLoads<'db>> {
-        let table = self.index.place_table(self.scope.file_scope_id(self.db));
+        let table = self.index.place_table(self.file_scope);
 
         PlaceExprPrefixLoads::from_iter(
             self.scope,
@@ -1002,7 +1045,7 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
                         }
 
                         Some(PlaceExprPrefixLoad::AtUse(
-                            prefix_expr_ref.scoped_use_id(self.db, self.file),
+                            self.index.scoped_use_id(prefix_expr_ref),
                         ))
                     }
                 }),
@@ -1010,12 +1053,12 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
     }
 
     fn skips_non_global_scopes(self, symbol: ScopedSymbolId) -> bool {
-        let scope = self.scope.file_scope_id(self.db);
+        let scope = self.file_scope;
         !scope.is_global() && self.index.symbol_is_global_in_scope(symbol, scope)
     }
 
     fn dunder_class_cell_definition(self) -> Option<Definition<'db>> {
-        let current_scope = self.scope.file_scope_id(self.db);
+        let current_scope = self.file_scope;
         if let Some(definition) = self.index.class_definition_of_method(current_scope) {
             return Some(definition);
         }
@@ -1077,6 +1120,269 @@ struct ForwardedGlobalSnapshot<'db> {
 #[derive(Default)]
 struct PlaceLoadConstraints {
     constraint_keys: Vec<(FileScopeId, ConstraintKey)>,
+}
+
+/// Measures the scope traversal and retained storage of one resolver node. Ancestor measurement
+/// retains only a borrowed cursor and scalar totals; it never requests a source or activates a
+/// constraint. Each measuring operation and the eventual node execution are admitted separately.
+#[cfg(feature = "experimental-analysis")]
+pub(crate) struct PlaceLoadAdmission<'resolution, 'db, 'ast> {
+    resolution: &'resolution mut PlaceLoadResolution<'db, 'ast>,
+    scopes: Option<AncestorsIter<'db>>,
+    enclosing_sources: bool,
+    distance: usize,
+    snapshot_depth: Option<usize>,
+    constraints: usize,
+    work: usize,
+    bytes: usize,
+    measured: bool,
+}
+
+#[cfg(feature = "experimental-analysis")]
+impl<'resolution, 'db, 'ast> PlaceLoadAdmission<'resolution, 'db, 'ast> {
+    fn new(resolution: &'resolution mut PlaceLoadResolution<'db, 'ast>) -> Option<Self> {
+        let mut admission = Self {
+            resolution,
+            scopes: None,
+            enclosing_sources: false,
+            distance: 0,
+            snapshot_depth: None,
+            constraints: 0,
+            work: 128,
+            bytes: 0,
+            measured: true,
+        };
+        let context = admission.resolution.context;
+        let place = admission.resolution.place_expr();
+        let current_scope = context.file_scope;
+        let table = context.index.place_table(current_scope);
+        match &admission.resolution.next_node {
+            Some(PlaceLoadResolutionNode::LocalSource) => match context.mode {
+                PlaceLoadMode::AtExpression(_) => {
+                    admission.work = admission
+                        .work
+                        .checked_add(context.index.scoped_use_lookup_work().checked_mul(8)?)?;
+                    admission.constraints = 1;
+                }
+                PlaceLoadMode::AtNameSnapshot(_) => admission.constraints = 1,
+                PlaceLoadMode::Deferred | PlaceLoadMode::StringAnnotation => {
+                    if matches!(place, PlaceExprRef::Member(_)) {
+                        admission.work = admission.work.checked_add(table.lookup_work(place)?)?;
+                    }
+                }
+            },
+            Some(PlaceLoadResolutionNode::AskConsumerWhetherToContinueForMember) => {
+                let segments = place.num_member_segments();
+                admission.work = admission
+                    .work
+                    .checked_add(table.parent_lookup_work(place)?)?;
+                if matches!(context.mode, PlaceLoadMode::AtExpression(_)) {
+                    // Prefix lookup can restart the AST walk for every tracked prefix.
+                    admission.work = admission
+                        .work
+                        .checked_add(segments.checked_mul(segments)?.checked_mul(4)?)?
+                        .checked_add(
+                            segments.checked_mul(
+                                context
+                                    .index
+                                    .scoped_use_lookup_work()
+                                    .checked_mul(8)?
+                                    .checked_add(32)?,
+                            )?,
+                        )?;
+                }
+                if !matches!(context.mode, PlaceLoadMode::AtNameSnapshot(_)) {
+                    let (work, bytes) = prefix_collection_cost(segments)?;
+                    admission.work = admission.work.checked_add(work)?;
+                    admission.bytes = bytes;
+                }
+            }
+            Some(PlaceLoadResolutionNode::DecideResolutionPath) => {
+                if admission
+                    .resolution
+                    .loaded_symbol_name()
+                    .is_some_and(|name| name == "__class__")
+                {
+                    admission.work = admission
+                        .work
+                        .checked_add(context.index.definition_lookup_work().checked_mul(8)?)?;
+                }
+            }
+            Some(PlaceLoadResolutionNode::EnclosingScopeSource(scopes)) => {
+                admission.scopes = Some(scopes.clone());
+                admission.enclosing_sources = true;
+                admission.measured = false;
+                if !context.index.scope(current_scope).is_eager() {
+                    admission.snapshot_depth = Some(1);
+                }
+            }
+            Some(PlaceLoadResolutionNode::ForwardedGlobalSnapshotSource(_)) => {
+                if place.is_symbol() {
+                    admission.work = admission.work.checked_add(
+                        context
+                            .index
+                            .place_table(FileScopeId::global())
+                            .lookup_work(place)?,
+                    )?;
+                }
+                admission.constraints = 1;
+            }
+            Some(PlaceLoadResolutionNode::ExplicitGlobalSource(_)) => {
+                if !current_scope.is_global() && context.uses_enclosing_snapshots() {
+                    admission.scopes = Some(context.index.ancestor_scopes(current_scope));
+                    admission.measured = false;
+                    admission.constraints = 1;
+                    admission.work = admission
+                        .work
+                        .checked_add(
+                            context
+                                .index
+                                .place_table(FileScopeId::global())
+                                .lookup_work(place)?,
+                        )?
+                        .checked_add(
+                            context
+                                .index
+                                .enclosing_snapshot_lookup_work()
+                                .checked_mul(8)?,
+                        )?;
+                }
+            }
+            Some(
+                PlaceLoadResolutionNode::DunderClassSource { .. }
+                | PlaceLoadResolutionNode::ImplicitClassBodySource(_)
+                | PlaceLoadResolutionNode::ImplicitGlobalSource
+                | PlaceLoadResolutionNode::BuiltinSource(_)
+                | PlaceLoadResolutionNode::Failure(_),
+            ) => {}
+            None => admission.work = 1,
+        }
+        Some(admission)
+    }
+
+    pub(crate) fn needs_measurement(&self) -> bool {
+        !self.measured
+    }
+
+    /// One measuring operation reads one parent edge and a fixed number of retained lengths.
+    pub(crate) const fn measurement_work(&self) -> usize {
+        128
+    }
+
+    pub(crate) fn measure_next(&mut self) -> Option<()> {
+        let Some((scope, indexed_scope)) = self.scopes.as_mut().and_then(Iterator::next) else {
+            self.measured = true;
+            return Some(());
+        };
+        self.distance = self.distance.checked_add(1)?;
+        let context = self.resolution.context;
+        if self.enclosing_sources {
+            // Enclosing resolution stops before inspecting the global scope's table. The
+            // explicit-global node receives its own quotation only if lookup reaches it.
+            if scope.is_global() {
+                self.measured = true;
+                return Some(());
+            }
+            let table = context.index.place_table(scope);
+            let place = self.resolution.place_expr();
+            self.work = self
+                .work
+                .checked_add(table.lookup_work(place)?)?
+                .checked_add(64)?;
+            if context.uses_enclosing_snapshots() {
+                // Each snapshot starts at the original nested scope, stopping at the first
+                // lazy scope or this enclosing scope, whichever comes first.
+                let depth = self.snapshot_depth.unwrap_or(self.distance.checked_add(1)?);
+                self.work = self
+                    .work
+                    .checked_add(depth.checked_mul(16)?)?
+                    .checked_add(table.lookup_work(place)?)?
+                    .checked_add(table.parent_lookup_work(place)?)?
+                    .checked_add(
+                        context
+                            .index
+                            .enclosing_snapshot_lookup_work()
+                            .checked_mul(8)?,
+                    )?;
+                self.constraints = self.constraints.checked_add(1)?;
+                if self.snapshot_depth.is_none() && !indexed_scope.is_eager() {
+                    self.snapshot_depth = Some(self.distance.checked_add(1)?);
+                }
+            }
+        } else {
+            // A directly selected global snapshot walks this chain only once, and returns
+            // as soon as it encounters a lazy scope.
+            self.work = self.work.checked_add(16)?;
+            if scope.is_global() || !indexed_scope.is_eager() {
+                self.measured = true;
+            }
+        }
+        Some(())
+    }
+
+    pub(crate) fn cost(&self) -> Option<(usize, usize)> {
+        if !self.measured {
+            return None;
+        }
+        let keys = &self.resolution.constraints.constraint_keys;
+        let required = keys.len().checked_add(self.constraints)?;
+        let (copies, bytes) = if required > keys.capacity() {
+            (
+                keys.len(),
+                required.checked_mul(size_of::<(FileScopeId, ConstraintKey)>())?,
+            )
+        } else {
+            (0, 0)
+        };
+        Some((
+            self.work
+                .checked_add(copies)?
+                .checked_add(self.constraints.checked_mul(8)?)?,
+            self.bytes.checked_add(bytes)?,
+        ))
+    }
+
+    /// Reservation changes capacity only. Source-entry checkpoints and constraint activation
+    /// remain owned by the shared node implementation.
+    pub(crate) fn reserve(self) -> PreparedPlaceLoadNext<'resolution, 'db, 'ast> {
+        self.resolution
+            .constraints
+            .constraint_keys
+            .reserve_exact(self.constraints);
+        PreparedPlaceLoadNext {
+            resolution: self.resolution,
+        }
+    }
+}
+
+/// SmallVec collection starts inline, then requests capacities 4, 8, ... . Charge every
+/// request, all copies and retirement even when a prefix ends lookup early.
+#[cfg(feature = "experimental-analysis")]
+fn prefix_collection_cost(segments: usize) -> Option<(usize, usize)> {
+    if segments <= 2 {
+        return Some((0, 0));
+    }
+    let slots = segments
+        .checked_next_power_of_two()?
+        .checked_mul(2)?
+        .checked_sub(4)?;
+    Some((
+        slots.checked_mul(4)?,
+        slots.checked_mul(size_of::<PlaceExprPrefixLoad>())?,
+    ))
+}
+
+/// The caller admitted this node's work and storage before reserving its constraint slots.
+#[cfg(feature = "experimental-analysis")]
+pub(crate) struct PreparedPlaceLoadNext<'resolution, 'db, 'ast> {
+    resolution: &'resolution mut PlaceLoadResolution<'db, 'ast>,
+}
+
+#[cfg(feature = "experimental-analysis")]
+impl<'db> PreparedPlaceLoadNext<'_, 'db, '_> {
+    pub(crate) fn advance(self) -> ControlFlow<Option<PlaceLoadResolutionStep<'db>>> {
+        self.resolution.advance_node()
+    }
 }
 
 impl PlaceLoadConstraints {
@@ -1141,5 +1447,204 @@ impl PlaceLoadConstraints {
     /// Returns the constraints activated by the sources that were requested.
     fn into_constraints(self) -> Vec<(FileScopeId, ConstraintKey)> {
         self.constraint_keys
+    }
+}
+
+#[cfg(all(test, feature = "experimental-analysis"))]
+mod admission_tests {
+    use std::mem::discriminant;
+    use std::ops::ControlFlow;
+
+    use anyhow::Context;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
+    use ruff_python_ast as ast;
+    use salsa::prepared_source_probe::capture;
+    use smallvec::SmallVec;
+    use ty_python_core::ProgramFile;
+    use ty_python_core::place::PlaceExpr;
+    use ty_python_core::semantic_index;
+
+    use super::{
+        PlaceExprPrefixLoad, PlaceLoadMode, PlaceLoadResolutionStep, PlaceLoadSourceKind,
+        prefix_collection_cost, resolve_place_load,
+    };
+    use crate::db::tests::TestDbBuilder;
+
+    #[test]
+    fn prefix_collection_allocation_requests() {
+        for length in 0..=65 {
+            let mut prefixes = SmallVec::<[PlaceExprPrefixLoad; 2]>::new();
+            let mut requested_bytes = 0;
+            for _ in 0..length {
+                let capacity = prefixes.capacity();
+                prefixes.push(PlaceExprPrefixLoad::DefinitelyBound);
+                if prefixes.capacity() != capacity {
+                    requested_bytes += prefixes.capacity() * size_of::<PlaceExprPrefixLoad>();
+                }
+            }
+            assert_eq!(
+                prefix_collection_cost(length).map(|(_, bytes)| bytes),
+                Some(requested_bytes),
+            );
+        }
+    }
+
+    #[test]
+    fn prefix_collection_rejects_overflow() {
+        assert_eq!(prefix_collection_cost(usize::MAX), None);
+        assert_eq!(prefix_collection_cost(1usize << (usize::BITS - 1)), None);
+    }
+
+    #[test]
+    fn reservation_preserves_enclosing_source_checkpoints() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file("/src/resolution.py", "import dependency\nclass Outer:\n    if dependency:\n        class Inner:\n            value = dependency\n")
+            .build()?;
+        let file = ProgramFile::new(
+            &db,
+            system_path_to_file(&db, "/src/resolution.py")?,
+            db.program_environment().program(&db),
+        );
+        let module = parsed_module(&db, file.python_file(&db)).load(&db);
+        let [_, ast::Stmt::ClassDef(outer)] = module.suite().as_slice() else {
+            anyhow::bail!("expected the outer class");
+        };
+        let [ast::Stmt::If(condition)] = outer.body.as_slice() else {
+            anyhow::bail!("expected the outer condition");
+        };
+        let [ast::Stmt::ClassDef(inner)] = condition.body.as_slice() else {
+            anyhow::bail!("expected the nested class");
+        };
+        let [ast::Stmt::Assign(assignment)] = inner.body.as_slice() else {
+            anyhow::bail!("expected the nested name load");
+        };
+        let expression = assignment.value.as_ref();
+        let index = semantic_index(&db, file);
+        let scope = index.expression_scope_id(expression).to_scope_id(&db, file);
+        let mut ordinary = resolve_place_load(
+            &db,
+            index,
+            scope,
+            PlaceExpr::try_from_expr(expression).context("expected a place")?,
+            PlaceLoadMode::AtExpression(expression.into()),
+        );
+        let mut admitted = resolve_place_load(
+            &db,
+            index,
+            scope,
+            PlaceExpr::try_from_expr(expression).context("expected a place")?,
+            PlaceLoadMode::AtExpression(expression.into()),
+        );
+        assert!(admitted.constraints.constraint_keys.is_empty());
+        let mut source_checkpoints = Vec::new();
+        let mut measured_enclosing_scope = false;
+        loop {
+            let expected = capture(&db, || ordinary.next()).unwrap();
+            assert!(expected.reads.is_empty());
+            let expected = expected.value;
+            let actual = loop {
+                let initial_constraints = admitted.constraints.constraint_keys.clone();
+                let mut admission = admitted.prepare_next().context("expected node quotation")?;
+                if source_checkpoints.is_empty() {
+                    assert!(!admission.needs_measurement());
+                    assert_eq!(admission.constraints, 1);
+                }
+                while admission.needs_measurement() {
+                    measured_enclosing_scope = true;
+                    admission.measure_next().context("measurement overflow")?;
+                    assert_eq!(
+                        admission.resolution.constraints.constraint_keys,
+                        initial_constraints
+                    );
+                }
+                assert_eq!(
+                    admission.resolution.constraints.constraint_keys,
+                    initial_constraints
+                );
+                admission.cost().context("storage quotation overflow")?;
+                let next = admission.reserve();
+                let capacity = next.resolution.constraints.constraint_keys.capacity();
+                assert_eq!(
+                    next.resolution.constraints.constraint_keys,
+                    initial_constraints
+                );
+                let progress = capture(&db, || next.advance()).unwrap();
+                assert!(progress.reads.is_empty());
+                let progress = progress.value;
+                assert_eq!(admitted.constraints.constraint_keys.capacity(), capacity);
+                if let ControlFlow::Break(step) = progress {
+                    break step;
+                }
+            };
+            assert_eq!(
+                admitted.constraints.constraint_keys,
+                ordinary.constraints.constraint_keys
+            );
+            match (expected, actual) {
+                (
+                    Some(PlaceLoadResolutionStep::Source(expected)),
+                    Some(PlaceLoadResolutionStep::Source(actual)),
+                ) => {
+                    assert_eq!(expected.entry_checkpoint, actual.entry_checkpoint);
+                    assert_eq!(expected.role, actual.role);
+                    assert_eq!(
+                        ordinary.narrowing_constraints_for(&expected),
+                        admitted.narrowing_constraints_for(&actual)
+                    );
+                    source_checkpoints.push(actual.entry_checkpoint);
+                    assert_eq!(discriminant(&expected.kind), discriminant(&actual.kind));
+                    match (expected.kind, actual.kind) {
+                        (
+                            PlaceLoadSourceKind::Bindings(expected),
+                            PlaceLoadSourceKind::Bindings(actual),
+                        ) => {
+                            let expected: Vec<_> = expected
+                                .map(|binding| {
+                                    (
+                                        binding.binding,
+                                        binding.binding_order,
+                                        binding.narrowing_constraint.constraint(),
+                                        binding.reachability_constraint,
+                                    )
+                                })
+                                .collect();
+                            let actual: Vec<_> = actual
+                                .map(|binding| {
+                                    (
+                                        binding.binding,
+                                        binding.binding_order,
+                                        binding.narrowing_constraint.constraint(),
+                                        binding.reachability_constraint,
+                                    )
+                                })
+                                .collect();
+                            assert_eq!(expected, actual);
+                        }
+                        (
+                            PlaceLoadSourceKind::Implicit(expected),
+                            PlaceLoadSourceKind::Implicit(actual),
+                        ) => {
+                            assert_eq!(discriminant(&expected), discriminant(&actual));
+                        }
+                        _ => anyhow::bail!("unexpected source for the eager class load"),
+                    }
+                }
+                (
+                    Some(PlaceLoadResolutionStep::Exhausted(expected)),
+                    Some(PlaceLoadResolutionStep::Exhausted(actual)),
+                ) => assert_eq!(expected, actual),
+                (None, None) => break,
+                _ => anyhow::bail!("ordinary and admitted step sequences differ"),
+            }
+        }
+        assert_eq!(source_checkpoints.first(), Some(&0));
+        assert!(source_checkpoints.iter().any(|checkpoint| *checkpoint > 0));
+        assert!(measured_enclosing_scope);
+        let constraints = admitted.into_constraints();
+        assert!(constraints.len() > 1);
+        assert!(constraints.windows(2).any(|pair| pair[0].0 != pair[1].0));
+        assert_eq!(constraints, ordinary.into_constraints());
+        Ok(())
     }
 }

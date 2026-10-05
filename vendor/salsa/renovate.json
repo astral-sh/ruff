@@ -1,0 +1,63 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "minimumReleaseAge": "7 days",
+  "enabledManagers": [
+    "cargo",
+    "github-actions",
+    "rust-toolchain"
+  ],
+  "packageRules": [
+    {
+      "description": "Pin GitHub Actions to immutable commit SHAs and update them on Fridays",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "commitMessagePrefix": "chore:",
+      "pinDigests": true,
+      "schedule": [
+        "* * * * 5"
+      ]
+    },
+    {
+      "description": "Do not pin the synthetic Miri branch because only master commits are safe to pin",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchPackageNames": [
+        "dtolnay/rust-toolchain"
+      ],
+      "matchCurrentValue": "miri",
+      "pinDigests": false
+    },
+    {
+      "description": "Update the pinned stable Rust version without the dependency cooldown",
+      "matchManagers": [
+        "rust-toolchain"
+      ],
+      "commitMessagePrefix": "chore:",
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "Only raise the minimum supported version when the existing Cargo constraint blocks an update",
+      "matchManagers": [
+        "cargo"
+      ],
+      "commitMessagePrefix": "changed:",
+      "rangeStrategy": "replace"
+    },
+    {
+      "description": "Pin dev dependencies so Renovate proposes compatible updates too",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchDepTypes": [
+        "dev-dependencies"
+      ],
+      "commitMessagePrefix": "chore:",
+      "rangeStrategy": "pin"
+    }
+  ]
+}

@@ -1,15 +1,21 @@
+use crate::hash_certificate::FrozenHashTable;
+use crate::place::table_lookup_work;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast as ast;
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
 use bitflags::bitflags;
-use char_str::{CharStr, CharString, format_char};
+use char_str::{CharStr, CharString};
 use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
 use std::hash::{Hash, Hasher as _};
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
+
+pub(crate) mod construction;
+
+use construction::{MemberConstruction, MemberExprCursor, SubscriptSource};
 
 // Selected using performance and memory profiling across the 162-project ecosystem corpus.
 // Member-expression equality is relatively expensive, and raising the cutoff to 16 regressed
@@ -163,6 +169,10 @@ pub(crate) struct MemberExpr {
 }
 
 impl MemberExpr {
+    pub(super) fn text_len(&self) -> usize {
+        self.path.len()
+    }
+
     #[cfg(test)]
     fn try_from_expr(expression: ast::ExprRef<'_>) -> Option<Self> {
         MemberExprBuilder::visit_expr(expression).and_then(Self::try_from_builder)
@@ -215,85 +225,41 @@ pub(super) struct MemberExprBuilder {
 
 impl MemberExprBuilder {
     pub(super) fn visit_expr(expr: ast::ExprRef) -> Option<MemberExprBuilder> {
-        match expr {
-            ast::ExprRef::Name(name) => {
-                return Some(MemberExprBuilder {
-                    path: CharStr::from(name.id.clone()),
-                    segments: SmallVec::new_const(),
+        let mut cursor = MemberExprCursor::new(expr);
+        loop {
+            if let std::ops::ControlFlow::Break(result) = cursor.advance() {
+                return result.map(|result| match result {
+                    MemberConstruction::Name(name) => MemberExprBuilder {
+                        path: CharStr::from(name.id.clone()),
+                        segments: SmallVec::new_const(),
+                    },
+                    MemberConstruction::Member(builder) => builder,
                 });
             }
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
-                return Self::visit_expr(ast::ExprRef::from(named.target.as_ref()));
-            }
-            _ => {}
         }
-
-        let mut parts = SmallVec::new_const();
-        let mut segments = SmallVec::new_const();
-        let mut path_len = TextSize::new(0);
-        Self::collect_expr(expr, &mut parts, &mut segments, &mut path_len)?;
-
-        Some(MemberExprBuilder {
-            path: CharStr::concat(&parts),
-            segments,
-        })
     }
 
-    fn collect_expr<'a>(
-        expr: ast::ExprRef<'a>,
-        parts: &mut SmallVec<[MemberPathPart<'a>; 8]>,
-        segments: &mut SmallVec<[SegmentInfo; 8]>,
-        path_len: &mut TextSize,
-    ) -> Option<()> {
-        match expr {
-            ast::ExprRef::Name(name) => {
-                let text = name.id.as_str();
-                *path_len += text.text_len();
-                parts.push(MemberPathPart::Borrowed(text));
-                Some(())
-            }
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => Self::collect_expr(
-                ast::ExprRef::from(named.target.as_ref()),
-                parts,
-                segments,
-                path_len,
-            ),
-            ast::ExprRef::Named(_) => None,
-
-            ast::ExprRef::Attribute(attribute) => {
-                Self::collect_expr(
-                    ast::ExprRef::from(&attribute.value),
-                    parts,
-                    segments,
-                    path_len,
-                )?;
-
-                let start_offset = *path_len;
-                let text = attribute.attr.id.as_str();
-                *path_len += text.text_len();
-                parts.push(MemberPathPart::Borrowed(text));
-                segments.push(SegmentInfo::new(SegmentKind::Attribute, start_offset));
-
-                Some(())
-            }
-            ast::ExprRef::Subscript(subscript) => {
-                Self::collect_expr(
-                    ast::ExprRef::from(&subscript.value),
-                    parts,
-                    segments,
-                    path_len,
-                )?;
-
-                let start_offset = *path_len;
-                let (kind, part) = Self::subscript_part(&subscript.slice)?;
-                *path_len += part.as_ref().text_len();
-                parts.push(part);
-                segments.push(SegmentInfo::new(kind, start_offset));
-
-                Some(())
-            }
-            _ => None,
+    pub(super) fn finish_cost(&self) -> Option<(usize, usize)> {
+        if SmallSegments::try_from_slice(&self.segments).is_some() {
+            return Some((32, 0));
         }
+
+        let len = self.segments.len();
+        let capacity = self.segments.capacity();
+        // An inline SmallVec first moves into a Vec. Boxing may then shrink that Vec;
+        // a spilled SmallVec transfers its allocation, but boxing can still move it.
+        let requested_slots = if self.segments.spilled() {
+            if len == capacity { 0 } else { len }
+        } else {
+            len.max(4).checked_add(len)?
+        };
+        Some((
+            capacity
+                .checked_add(len.checked_mul(2)?)?
+                .checked_mul(size_of::<SegmentInfo>())?
+                .checked_add(32)?,
+            requested_slots.checked_mul(size_of::<SegmentInfo>())?,
+        ))
     }
 
     pub(super) fn visit_subscript_expr(
@@ -310,66 +276,7 @@ impl MemberExprBuilder {
     }
 
     fn subscript_part(subscript_slice: &ast::Expr) -> Option<(SegmentKind, MemberPathPart<'_>)> {
-        match subscript_slice {
-            // Handle integer subscripts, like `x[0]`.
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(index),
-                ..
-            }) => Some((
-                SegmentKind::IntSubscript,
-                MemberPathPart::Owned(format_char!("{index}")),
-            )),
-            // Handle negative integer subscripts, like `x[-1]`.
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::USub,
-                operand,
-                ..
-            }) => match operand.as_ref() {
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(index),
-                    ..
-                }) => Some((
-                    SegmentKind::IntSubscript,
-                    MemberPathPart::Owned(format_char!("-{index}")),
-                )),
-                _ => None,
-            },
-            // Handle positive integer subscripts with explicit plus, like `x[+1]`.
-            ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                op: ast::UnaryOp::UAdd,
-                operand,
-                ..
-            }) => match operand.as_ref() {
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(index),
-                    ..
-                }) => Some((
-                    SegmentKind::IntSubscript,
-                    MemberPathPart::Owned(format_char!("{index}")),
-                )),
-                _ => None,
-            },
-            // Handle boolean subscripts, like `x[True]` or `x[False]`.
-            // In Python, `True` and `False` are equivalent to `1` and `0` for indexing.
-            ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some((
-                SegmentKind::IntSubscript,
-                MemberPathPart::Borrowed(if *value { "1" } else { "0" }),
-            )),
-            ast::Expr::StringLiteral(string) => Some((
-                SegmentKind::StringSubscript,
-                MemberPathPart::Borrowed(string.value.to_str()),
-            )),
-            // Handle bytes literal subscripts, like `x[b"key"]`.
-            ast::Expr::BytesLiteral(bytes) => {
-                let bytes_vec: Vec<u8> = bytes.value.bytes().collect();
-                let text = String::from_utf8_lossy(&bytes_vec);
-                Some((
-                    SegmentKind::BytesSubscript,
-                    MemberPathPart::Owned(CharString::from(text.as_ref())),
-                ))
-            }
-            _ => None,
-        }
+        Some(SubscriptSource::new(subscript_slice)?.render())
     }
 }
 
@@ -532,10 +439,38 @@ impl MemberReverseTable {
 pub(super) struct MemberTable {
     members: IndexVec<ScopedMemberId, Member>,
     /// Reverse lookup retained only when linear search would be expensive.
-    reverse: Option<Box<MemberReverseTable>>,
+    reverse: Option<Box<FrozenHashTable<ScopedMemberId>>>,
 }
 
 impl MemberTable {
+    pub(crate) fn comparison_entry_work(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Option<usize>> + '_ {
+        // Read lengths lazily so the caller can admit each metadata chunk before inspection.
+        self.members.iter().map(|member| {
+            let segments = match &member.expression.segments {
+                Segments::Small(_) => 0,
+                Segments::Heap(segments) => segments.len().checked_mul(size_of::<SegmentInfo>())?,
+            };
+            // The fixed representation covers flags, string metadata, the segment discriminant,
+            // and inline segments. Heap equality also compares every retained packed segment.
+            member
+                .expression
+                .path
+                .len()
+                .checked_add(size_of::<Member>())?
+                .checked_add(segments)
+        })
+    }
+
+    pub(crate) fn lookup_work(&self, path_bytes: usize, segments: usize) -> Option<usize> {
+        table_lookup_work(
+            self.members.len(),
+            self.reverse.as_deref(),
+            path_bytes.checked_add(segments)?.checked_add(8)?,
+        )
+    }
+
     /// Returns the member with the given ID.
     ///
     /// ## Panics
@@ -545,14 +480,6 @@ impl MemberTable {
         &self.members[id]
     }
 
-    /// Returns a mutable reference to the member with the given ID.
-    ///
-    /// ## Panics
-    /// If the ID is not valid for this table.
-    #[track_caller]
-    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
-        &mut self.members[id]
-    }
 
     /// Returns an iterator over all members in the table.
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Member> {
@@ -567,7 +494,9 @@ impl MemberTable {
         let member = member.into();
 
         if let Some(reverse) = self.reverse.as_deref() {
-            return reverse.member_id(&self.members, &member);
+            return reverse
+                .find(hash_single(&member), |id| self.members[*id].expression == member)
+                .copied();
         }
 
         self.members
@@ -608,6 +537,15 @@ pub(super) struct MemberTableBuilder {
 }
 
 impl MemberTableBuilder {
+    /// Returns a mutable reference to the member with the given ID.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this table.
+    #[track_caller]
+    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
+        &mut self.table.members[id]
+    }
+
     pub(super) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,
@@ -627,7 +565,7 @@ impl MemberTableBuilder {
                 let id = *entry.get();
 
                 if !member.flags.is_empty() {
-                    self.members[id].flags.insert(member.flags);
+                    self.table.members[id].flags.insert(member.flags);
                 }
 
                 (id, false)
@@ -649,7 +587,9 @@ impl MemberTableBuilder {
 
         if table.members.len() > LINEAR_SEARCH_THRESHOLD {
             reverse.shrink_to_fit(&table.members);
-            table.reverse = Some(Box::new(reverse));
+            table.reverse = Some(Box::new(FrozenHashTable::new(reverse.0, |id| {
+                hash_single(&table.members[*id].expression.as_ref())
+            })));
         }
 
         table
@@ -664,11 +604,6 @@ impl Deref for MemberTableBuilder {
     }
 }
 
-impl DerefMut for MemberTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
-    }
-}
 
 /// Representation of segments that can be either inline or heap-allocated.
 ///
@@ -1036,6 +971,8 @@ fn hash_single<T: Hash>(value: &T) -> u64 {
 mod tests {
     use std::assert_matches;
 
+    use ruff_python_parser::parse_expression;
+
     use super::*;
 
     #[test]
@@ -1215,5 +1152,102 @@ mod tests {
         // Should use Heap allocation due to large relative offset
         assert_matches!(long_member.segments, Segments::Heap(_));
         assert_eq!(long_member.num_segments(), 2);
+    }
+
+    const MEMBER_TABLE_COLLISIONS: [&str; 9] = [
+        "a.b0",
+        r#"a["b0"]"#,
+        r#"a[b"b0"]"#,
+        "ab[0]",
+        r#"ab["0"]"#,
+        r#"ab[b"0"]"#,
+        "a.b[0]",
+        r#"a.b["0"]"#,
+        r#"a.b[b"0"]"#,
+    ];
+
+    fn parse_table_member(source: &str) -> MemberExpr {
+        let parsed = parse_expression(source).unwrap();
+        MemberExpr::try_from_expr(ast::ExprRef::from(parsed.expr())).unwrap()
+    }
+
+    #[test]
+    fn frozen_member_table_identity_and_flags() {
+        // These keys share their path text and hash, but differ in segment kinds or boundaries.
+        let expressions = MEMBER_TABLE_COLLISIONS.map(parse_table_member);
+        let mut builder = MemberTableBuilder::default();
+        let mut independent = MemberTableBuilder::default();
+        let mut ids = Vec::new();
+
+        for expression in &expressions {
+            assert_eq!(expression.path.as_str(), "ab0");
+
+            let mut bound = Member::new(expression.clone());
+            bound.mark_bound();
+            let (id, inserted) = builder.add(bound);
+            assert!(inserted);
+            assert!(!ids.contains(&id));
+            ids.push(id);
+
+            let mut declared = Member::new(expression.clone());
+            declared.mark_declared();
+            assert_eq!(builder.add(declared), (id, false));
+
+            let mut combined = Member::new(expression.clone());
+            combined.mark_bound();
+            combined.mark_declared();
+            assert_eq!(independent.add(combined), (id, true));
+        }
+
+        let table = builder.build();
+        let independent = independent.build();
+        assert!(table.reverse.is_some());
+        assert!(independent.reverse.is_some());
+        assert_eq!(table.iter().len(), expressions.len());
+        assert_eq!(table, independent);
+
+        for (expression, id) in expressions.iter().zip(ids) {
+            assert_matches!(expression.segments, Segments::Small(_));
+            assert_eq!(table.member_id(expression), Some(id));
+            assert!(table.member(id).is_bound());
+            assert!(table.member(id).is_declared());
+
+            let segments: Vec<_> = expression.segment_infos().collect();
+            let heap_query = MemberExprRef {
+                path: expression.path.as_str(),
+                segments: SegmentsRef::Heap(&segments),
+            };
+            assert_eq!(table.member_id(heap_query), Some(id));
+        }
+
+        let missing = parse_table_member(r#"a["b"]["0"]"#);
+        assert_eq!(table.member_id(&missing), None);
+    }
+
+    #[test]
+    fn frozen_member_table_heap_parent_prefixes() {
+        let mut builder = MemberTableBuilder::default();
+        for source in MEMBER_TABLE_COLLISIONS {
+            builder.add(Member::new(parse_table_member(source)));
+        }
+
+        let prefixes = ["x.a.b.c.d.e.f", "x.a.b.c.d.e.f.g"].map(parse_table_member);
+        let ids = prefixes.each_ref().map(|expression| {
+            assert_matches!(expression.segments, Segments::Small(_));
+            let (id, inserted) = builder.add(Member::new(expression.clone()));
+            assert!(inserted);
+            id
+        });
+        let table = builder.build();
+        assert!(table.reverse.is_some());
+
+        // Truncating this borrowed view keeps heap-backed segments even when the prefix fits inline.
+        let extended = parse_table_member("x.a.b.c.d.e.f.g.h");
+        let mut parent = extended.as_ref();
+        for id in ids.into_iter().rev() {
+            parent = parent.parent().unwrap();
+            assert_matches!(parent.segments, SegmentsRef::Heap(_));
+            assert_eq!(table.member_id(parent.clone()), Some(id));
+        }
     }
 }

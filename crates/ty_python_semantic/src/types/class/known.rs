@@ -11,17 +11,25 @@ use crate::{
         diagnostic::SUPER_CALL_IN_NAMED_TUPLE_METHOD,
         infer::nearest_enclosing_class,
         known_instance::DeprecatedInstance,
+        source_read::{SourceReadControl, UnrestrictedSourceRead, read_source},
     },
 };
 use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashSet;
+use salsa::plumbing::{AsId, function::IngredientImpl};
 use std::{
     borrow::Cow,
+    convert::Infallible,
     sync::{LazyLock, Mutex},
 };
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
 use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
+
+#[cfg(feature = "experimental-analysis")]
+mod runtime;
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use runtime::{KnownClassMemoSchema, register_known_class_values};
 
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
@@ -29,7 +37,7 @@ use ty_python_core::{SemanticIndex, Truthiness, scope::NodeWithScopeKind};
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
 /// Note: good candidates are any classes in `[ty_module_resolver::module::KnownModule]`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, strum_macros::EnumCount)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
@@ -170,6 +178,24 @@ pub enum KnownClass {
     PydanticStrict,
     // Pytest
     PytestParametrizeMarkDecorator,
+}
+
+pub(in crate::types) struct KnownClassCandidates {
+    candidates: &'static [KnownClass],
+    pub(in crate::types) minimum_python_version: Option<PythonVersion>,
+}
+
+impl KnownClassCandidates {
+    pub(in crate::types) fn matching_module(
+        self,
+        python_version: PythonVersion,
+        module: KnownModule,
+    ) -> Option<KnownClass> {
+        self.candidates
+            .iter()
+            .copied()
+            .find(|&candidate| candidate.check_module(python_version, module))
+    }
 }
 
 impl KnownClass {
@@ -1206,28 +1232,6 @@ impl KnownClass {
             "Use `Type::heterogeneous_tuple` or `Type::homogeneous_tuple` to create `tuple` instances"
         );
 
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
-                let env = ProgramEnvironment::from_program(argument.program(db));
-                result.cycle_normalized(db, &env, *previous, cycle)
-            },
-            heap_size=ruff_memory_usage::heap_size,
-        )]
-        fn known_class_to_instance<'db>(
-            db: &'db dyn Db,
-            argument: KnownClassArgument<'db>,
-        ) -> Type<'db> {
-            let env = &ProgramEnvironment::from_program(argument.program(db));
-            argument
-                .class(db)
-                .to_class_literal(db, env)
-                .to_class_type(db)
-                .map(|class| Type::instance(db, env, class))
-                .unwrap_or_else(Type::unknown)
-        }
-
         known_class_to_instance(db, KnownClassArgument::new(db, self, env.program(db)))
     }
 
@@ -1342,58 +1346,6 @@ impl KnownClass {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
-        fn known_class_to_class_literal<'db>(
-            db: &'db dyn Db,
-            argument: KnownClassArgument<'db>,
-        ) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
-            let program = argument.program(db);
-            let env = &ProgramEnvironment::from_program(program);
-            let python_version = env.python_version(db);
-            let class = argument.class(db);
-            let module = class.canonical_module(python_version);
-            let third_party = module.is_third_party();
-            let symbol = known_module_symbol(db, env, module, class.name(python_version)).place;
-            let result = match symbol {
-                Place::Defined(DefinedPlace {
-                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) => Ok(Some(class_literal)),
-                Place::Defined(DefinedPlace {
-                    ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                    definedness: Definedness::PossiblyUndefined,
-                    ..
-                }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
-                    class_literal,
-                    third_party,
-                }),
-                Place::Defined(DefinedPlace { ty: found_type, .. }) => {
-                    Err(KnownClassLookupError::SymbolNotAClass {
-                        found_type,
-                        third_party,
-                    })
-                }
-                Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
-            };
-
-            if let Err(lookup_error) = result {
-                if matches!(
-                    lookup_error,
-                    KnownClassLookupError::ClassPossiblyUnbound { .. }
-                ) {
-                    tracing::info!("{}", lookup_error.display(db, env, class));
-                } else {
-                    tracing::info!(
-                        "{}. Falling back to `Unknown` for the symbol instead.",
-                        lookup_error.display(db, env, class)
-                    );
-                }
-            }
-
-            result
-        }
-
         known_class_to_class_literal(db, KnownClassArgument::new(db, self, env.program(db)))
     }
 
@@ -1406,16 +1358,21 @@ impl KnownClass {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<StaticClassLiteral<'db>> {
-        match self.lookup_class_literal(db, env) {
-            Ok(class_literal) => class_literal,
-            Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. }) => {
-                Some(class_literal)
-            }
-            Err(
-                KnownClassLookupError::ClassNotFound { .. }
-                | KnownClassLookupError::SymbolNotAClass { .. },
-            ) => None,
+        match self.try_to_class_literal_with(db, env, &UnrestrictedSourceRead) {
+            Ok(class) => class,
+            Err(never) => match never {},
         }
+    }
+
+    /// Looks up the class while keeping source interruption separate from ordinary absence.
+    pub(in crate::types) fn try_to_class_literal_with<'db, C: SourceReadControl>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        control: &C,
+    ) -> Result<Option<StaticClassLiteral<'db>>, C::Error> {
+        let result = read_source(control, || self.lookup_class_literal(db, env))?;
+        Ok(interpret_class_literal_lookup(result))
     }
 
     /// Look up a [`KnownClass`] in its canonical module and return a [`Type`] representing that
@@ -1437,10 +1394,10 @@ impl KnownClass {
     ///
     /// If the class cannot be found, a debug-level log message will be emitted stating this.
     pub fn to_subclass_of<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        self.to_class_literal(db, env)
-            .to_class_type(db)
-            .map(|class| SubclassOfType::from(db, env, class))
-            .unwrap_or_else(SubclassOfType::subclass_of_unknown)
+        match known_class_to_subclass_of_sync(self, &InlineKnownClassEffects { db, env }) {
+            Ok(ty) => ty,
+            Err(never) => match never {},
+        }
     }
 
     pub(crate) fn to_specialized_subclass_of<'db>(
@@ -1746,6 +1703,26 @@ impl KnownClass {
         file: ImportingFile<'_>,
         class_name: &str,
     ) -> Option<Self> {
+        let candidates = Self::candidates_from_name(class_name)?;
+        if let Some(minimum) = candidates.minimum_python_version
+            && file.python_version(db) < minimum
+        {
+            return None;
+        }
+        let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
+        let python_version = file.python_version(db);
+        candidates.matching_module(python_version, module)
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn classification_work(name: &str) -> Option<usize> {
+        name.len()
+            .checked_add(1)?
+            .checked_mul(<Self as strum::EnumCount>::COUNT.checked_add(1)?)?
+            .checked_add(8)
+    }
+
+    pub(in crate::types) fn candidates_from_name(class_name: &str) -> Option<KnownClassCandidates> {
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
         let candidates: &[Self] = match class_name {
@@ -1823,8 +1800,8 @@ impl KnownClass {
             "SupportsIndex" => &[Self::SupportsIndex],
             "Enum" => &[Self::Enum],
             "EnumMeta" => &[Self::EnumType],
-            "EnumType" if file.python_version(db) >= PythonVersion::PY311 => &[Self::EnumType],
-            "StrEnum" if file.python_version(db) >= PythonVersion::PY311 => &[Self::StrEnum],
+            "EnumType" => &[Self::EnumType],
+            "StrEnum" => &[Self::StrEnum],
             "IntEnum" => &[Self::IntEnum],
             "Flag" => &[Self::Flag],
             "IntFlag" => &[Self::IntFlag],
@@ -1860,12 +1837,11 @@ impl KnownClass {
             _ => return None,
         };
 
-        let module = file_to_module(db, file.resolver_file(db))?.known(db)?;
-        let python_version = file.python_version(db);
-        candidates
-            .iter()
-            .copied()
-            .find(|&candidate| candidate.check_module(python_version, module))
+        Some(KnownClassCandidates {
+            candidates,
+            minimum_python_version: matches!(class_name, "EnumType" | "StrEnum")
+                .then_some(PythonVersion::PY311),
+        })
     }
 
     /// Return `true` if the module of `self` matches `module`
@@ -1999,9 +1975,25 @@ impl KnownClass {
         }
     }
 
+    pub(in crate::types) fn call_check(self) -> Option<KnownClassCallCheck> {
+        match self {
+            Self::Super => Some(KnownClassCallCheck::Super),
+            Self::Deprecated => Some(KnownClassCallCheck::Deprecated),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::types) enum KnownClassCallCheck {
+    Super,
+    Deprecated,
+}
+
+impl KnownClassCallCheck {
     /// Evaluate a call to this known class, emit any diagnostics that are necessary
-    /// as a result of the call, and return the type that results from the call.
-    pub(crate) fn check_call<'db>(
+    /// as a result of the call, and update the binding's return type.
+    pub(in crate::types) fn check_call<'db>(
         self,
         context: &InferContext<'db, '_>,
         index: &SemanticIndex<'db>,
@@ -2013,7 +2005,7 @@ impl KnownClass {
         let module = context.module();
 
         match self {
-            KnownClass::Super => {
+            Self::Super => {
                 // Handle the case where `super()` is called with no arguments.
                 // In this case, we need to infer the two arguments:
                 //   1. The nearest enclosing class
@@ -2121,7 +2113,7 @@ impl KnownClass {
                 }
             }
 
-            KnownClass::Deprecated => {
+            Self::Deprecated => {
                 // Parsing something of the form:
                 //
                 // @deprecated("message")
@@ -2149,19 +2141,247 @@ impl KnownClass {
                     },
                 )));
             }
-
-            _ => {}
         }
     }
 }
 
-#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-struct KnownClassArgument {
+#[salsa::interned(field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
+pub(in crate::types) struct KnownClassArgument {
     #[returns(copy)]
-    class: KnownClass,
+    pub(in crate::types) class: KnownClass,
 
     #[returns(copy)]
+    pub(in crate::types) program: Program<'db>,
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::types) struct KnownClassLookupFacts;
+
+#[cfg(feature = "experimental-analysis")]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KnownClassInstanceOperation {
+    DefaultSpecialization,
+    TypedDictClassification,
+    ExplicitAnyInheritance,
+    TupleNormalization,
+    CycleNormalization,
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousKnownClassLookupEffects)]
+    pub(in crate::types) trait KnownClassLookupEffects<'db> {
+        type Error;
+
+        #[operation(checkpoint)]
+        async fn checkpoint(&self) -> Result<(), Self::Error>;
+        #[operation(source)]
+        async fn known_module_symbol(
+            &self,
+            module: KnownModule,
+            name: &str,
+        ) -> Result<Place<'db>, Self::Error>;
+    }
+
+    #[finite_capability]
+    impl KnownClassLookupFacts {
+        fn target(&self, class: KnownClass, python_version: PythonVersion) -> (KnownModule, &'static str, bool) {
+            let module = class.canonical_module(python_version);
+            (module, class.name(python_version), module.is_third_party())
+        }
+    }
+
+    #[synchronous(known_class_to_class_literal_sync)]
+    #[capabilities(effects = KnownClassLookupEffects, facts = KnownClassLookupFacts)]
+    #[passive_values(Err, KnownClassLookupError::ClassPossiblyUnbound, KnownClassLookupError::SymbolNotAClass, KnownClassLookupError::ClassNotFound)]
+    /// The inner result is the canonical lookup result; source failures remain in the outer result.
+    pub(in crate::types) async fn known_class_to_class_literal_with<'db, E: KnownClassLookupEffects<'db>>(
+        class: KnownClass,
+        python_version: PythonVersion,
+        facts: KnownClassLookupFacts,
+        effects: &E,
+    ) -> Result<Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>>, E::Error> {
+        effects.checkpoint().await?;
+        let (module, name, third_party) = facts.target(class, python_version);
+        let symbol = effects.known_module_symbol(module, name).await?;
+        Ok(match symbol {
+            Place::Defined(DefinedPlace {
+                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) => Ok(Some(class_literal)),
+            Place::Defined(DefinedPlace {
+                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
+                definedness: Definedness::PossiblyUndefined,
+                ..
+            }) => Err(KnownClassLookupError::ClassPossiblyUnbound {
+                class_literal,
+                third_party,
+            }),
+            Place::Defined(DefinedPlace { ty: found_type, .. }) => Err(KnownClassLookupError::SymbolNotAClass {
+                found_type,
+                third_party,
+            }),
+            Place::Undefined => Err(KnownClassLookupError::ClassNotFound { third_party }),
+        })
+    }
+
+    #[synchronous(SynchronousKnownClassSubclassEffects)]
+    pub(in crate::types) trait KnownClassSubclassEffects<'db> {
+        type Error;
+
+        #[operation(child)]
+        async fn lookup(&self, class: KnownClass) -> Result<Option<StaticClassLiteral<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn default_specialization(&self, class: StaticClassLiteral<'db>) -> Result<ClassType<'db>, Self::Error>;
+        #[operation(child)]
+        async fn subclass_of(&self, class: ClassType<'db>) -> Result<Type<'db>, Self::Error>;
+    }
+
+    #[synchronous(known_class_to_subclass_of_sync)]
+    #[capabilities(effects = KnownClassSubclassEffects)]
+    #[passive_values(SubclassOfType::subclass_of_unknown)]
+    pub(in crate::types) async fn known_class_to_subclass_of_with<'db, E: KnownClassSubclassEffects<'db>>(
+        class: KnownClass,
+        effects: &E,
+    ) -> Result<Type<'db>, E::Error> {
+        let Some(class) = effects.lookup(class).await? else {
+            return Ok(SubclassOfType::subclass_of_unknown());
+        };
+        let class = effects.default_specialization(class).await?;
+        effects.subclass_of(class).await
+    }
+
+    #[synchronous(SynchronousKnownClassInstanceEffects)]
+    pub(in crate::types) trait KnownClassInstanceEffects<'db> {
+        type Error;
+
+        #[operation(child)]
+        async fn class_literal(&self, class: KnownClass) -> Result<Type<'db>, Self::Error>;
+        #[operation(child)]
+        async fn to_class_type(&self, ty: Type<'db>) -> Result<Option<ClassType<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn instance(&self, class: ClassType<'db>) -> Result<Type<'db>, Self::Error>;
+    }
+
+    #[synchronous(known_class_to_instance_sync)]
+    #[capabilities(effects = KnownClassInstanceEffects)]
+    #[passive_values(Type::unknown)]
+    pub(in crate::types) async fn known_class_to_instance_with<'db, E: KnownClassInstanceEffects<'db>>(
+        class: KnownClass,
+        effects: &E,
+    ) -> Result<Type<'db>, E::Error> {
+        let literal = effects.class_literal(class).await?;
+        let Some(class) = effects.to_class_type(literal).await? else {
+            return Ok(Type::unknown());
+        };
+        effects.instance(class).await
+    }
+}
+
+struct InlineKnownClassEffects<'env, 'db> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+}
+
+impl<'db> SynchronousKnownClassLookupEffects<'db> for InlineKnownClassEffects<'_, 'db> {
+    type Error = Infallible;
+
+    fn checkpoint(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn known_module_symbol(
+        &self,
+        module: KnownModule,
+        name: &str,
+    ) -> Result<Place<'db>, Self::Error> {
+        Ok(known_module_symbol(self.db, self.env, module, name).place)
+    }
+}
+
+impl<'db> SynchronousKnownClassSubclassEffects<'db> for InlineKnownClassEffects<'_, 'db> {
+    type Error = Infallible;
+
+    fn lookup(&self, class: KnownClass) -> Result<Option<StaticClassLiteral<'db>>, Self::Error> {
+        Ok(class.try_to_class_literal(self.db, self.env))
+    }
+
+    fn default_specialization(
+        &self,
+        class: StaticClassLiteral<'db>,
+    ) -> Result<ClassType<'db>, Self::Error> {
+        Ok(ClassLiteral::Static(class).default_specialization(self.db))
+    }
+
+    fn subclass_of(&self, class: ClassType<'db>) -> Result<Type<'db>, Self::Error> {
+        Ok(SubclassOfType::from(self.db, self.env, class))
+    }
+}
+
+impl<'db> SynchronousKnownClassInstanceEffects<'db> for InlineKnownClassEffects<'_, 'db> {
+    type Error = Infallible;
+
+    fn class_literal(&self, class: KnownClass) -> Result<Type<'db>, Infallible> {
+        Ok(class.to_class_literal(self.db, self.env))
+    }
+
+    fn to_class_type(&self, ty: Type<'db>) -> Result<Option<ClassType<'db>>, Infallible> {
+        Ok(ty.to_class_type(self.db))
+    }
+
+    fn instance(&self, class: ClassType<'db>) -> Result<Type<'db>, Infallible> {
+        Ok(Type::instance(self.db, self.env, class))
+    }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) KnownClassToClassLiteralConfiguration), attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
+fn known_class_to_class_literal<'db>(
+    db: &'db dyn Db,
+    argument: KnownClassArgument<'db>,
+) -> Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>> {
+    let program = argument.program(db);
+    let env = &ProgramEnvironment::from_program(program);
+    let python_version = env.python_version(db);
+    let class = argument.class(db);
+    let result = match known_class_to_class_literal_sync(
+        class,
+        python_version,
+        KnownClassLookupFacts,
+        &InlineKnownClassEffects { db, env },
+    ) {
+        Ok(result) => result,
+        Err(never) => match never {},
+    };
+
+    if let Err(lookup_error) = result {
+        if matches!(
+            lookup_error,
+            KnownClassLookupError::ClassPossiblyUnbound { .. }
+        ) {
+            tracing::info!("{}", lookup_error.display(db, env, class));
+        } else {
+            tracing::info!(
+                "{}. Falling back to `Unknown` for the symbol instead.",
+                lookup_error.display(db, env, class)
+            );
+        }
+    }
+
+    result
+}
+
+pub(in crate::types) fn known_class_to_class_literal_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<KnownClassToClassLiteralConfiguration> {
+    known_class_to_class_literal::fn_ingredient_(db, db.zalsa())
+}
+
+pub(in crate::types) fn known_class_to_class_literal_key<'db>(
+    db: &'db dyn Db,
+    class: KnownClass,
     program: Program<'db>,
+) -> salsa::Id {
+    KnownClassArgument::new(db, class, program).as_id()
 }
 
 /// Enumeration of ways in which looking up a [`KnownClass`] in its canonical module could fail.
@@ -2369,4 +2589,42 @@ mod tests {
             }
         }
     }
+}
+
+pub(in crate::types) fn interpret_class_literal_lookup<'db>(
+    result: Result<Option<StaticClassLiteral<'db>>, KnownClassLookupError<'db>>,
+) -> Option<StaticClassLiteral<'db>> {
+    match result {
+        Ok(class_literal) => class_literal,
+        Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. }) => {
+            Some(class_literal)
+        }
+        Err(
+            KnownClassLookupError::ClassNotFound { .. }
+            | KnownClassLookupError::SymbolNotAClass { .. },
+        ) => None,
+    }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) KnownClassToInstanceConfiguration), attempt = ReturnOnly,
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, argument: KnownClassArgument<'db>| {
+        let env = ProgramEnvironment::from_program(argument.program(db));
+        result.cycle_normalized(db, &env, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn known_class_to_instance<'db>(db: &'db dyn Db, argument: KnownClassArgument<'db>) -> Type<'db> {
+    let env = &ProgramEnvironment::from_program(argument.program(db));
+    match known_class_to_instance_sync(argument.class(db), &InlineKnownClassEffects { db, env }) {
+        Ok(result) => result,
+        Err(never) => match never {},
+    }
+}
+
+pub(in crate::types) fn known_class_to_instance_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<KnownClassToInstanceConfiguration> {
+    known_class_to_instance::fn_ingredient_(db, db.zalsa())
 }

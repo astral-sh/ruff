@@ -1,0 +1,17 @@
+error: Invalid return mode. Allowed modes are: ["copy", "clone", "ref", "deref", "as_ref", "as_deref"]
+ --> tests/compile-fail/invalid_return_mode.rs:9:26
+  |
+9 | #[salsa::tracked(returns(not_a_return_mode))]
+  |                          ^^^^^^^^^^^^^^^^^
+
+error: Invalid return mode. Allowed modes are: ["copy", "clone", "ref", "deref", "as_ref", "as_deref"]
+  --> tests/compile-fail/invalid_return_mode.rs:16:15
+   |
+16 |     #[returns(not_a_return_mode)]
+   |               ^^^^^^^^^^^^^^^^^
+
+error: cannot find attribute `returns` in this scope
+  --> tests/compile-fail/invalid_return_mode.rs:16:7
+   |
+16 |     #[returns(not_a_return_mode)]
+   |       ^^^^^^^

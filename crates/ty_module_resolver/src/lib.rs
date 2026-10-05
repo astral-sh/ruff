@@ -7,7 +7,7 @@ use rustc_hash::FxHasher;
 pub use db::Db;
 pub use environment::{ResolverEnvironment, ResolverFile};
 pub use module::KnownModule;
-pub use module::Module;
+pub use module::{FileModule, Module};
 pub use module_name::{ImportingFile, ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
 pub use resolve::{
@@ -21,6 +21,8 @@ pub use typeshed::{PyVersionRange, TypeshedVersions, TypeshedVersionsParseError}
 
 pub use list::{all_modules, list_modules};
 pub use module_glob::{ModuleGlobError, ModuleGlobSet, ModuleGlobSetBuilder, ModuleNameMatch};
+#[cfg(feature = "experimental-analysis")]
+pub use resolve::PreparedModuleResolution;
 pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
 
 mod db;

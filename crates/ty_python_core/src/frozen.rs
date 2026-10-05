@@ -11,6 +11,14 @@ use rustc_hash::FxHashMap;
 pub struct FrozenMap<K, V>(Box<[(K, V)]>);
 
 impl<K, V> FrozenMap<K, V> {
+    /// Bounds fixed-size key comparisons made by a lookup without traversing the entries.
+    pub(crate) fn lookup_work(&self) -> usize {
+        self.0
+            .len()
+            .checked_ilog2()
+            .map_or(1, |log| log as usize + 2)
+    }
+
     pub fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
         self.0.iter()
     }

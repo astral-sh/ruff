@@ -5,10 +5,9 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db, DisplaySettings,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, CallableType, ClassType, GenericContext,
+        InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
+        TypeAliasType, TypeContext, TypeMapping, UnionBuilder, VarianceTerm,
         callable::CallableTypeKind,
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -22,6 +21,8 @@ use crate::{
     },
 };
 use ty_python_core::{definition::Definition, scope::ScopeId};
+
+pub(in crate::types) mod mapping;
 
 /// A Salsa-interned constraint set. This is only needed to have something appropriately small to
 /// put in a [`KnownInstance::ConstraintSet`]. We don't actually manipulate these as part of using
@@ -52,7 +53,7 @@ impl<'db> InternedConstraintSet<'db> {
 }
 
 /// A Salsa-interned solution path exposed to mdtests as `ConstraintSetSolution`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSetSolution<'db> {
     #[returns(ref)]
     pub(super) bindings: Box<[TypeVarSolution<'db>]>,
@@ -62,7 +63,7 @@ pub struct InternedConstraintSetSolution<'db> {
 impl get_size2::GetSize for InternedConstraintSetSolution<'_> {}
 
 /// A salsa-interned payload for `functools.partial(...)` instances.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctoolsPartialInstance<'db> {
     #[returns(copy)]
     pub wrapped: InternedType<'db>,
@@ -78,7 +79,7 @@ impl get_size2::GetSize for FunctoolsPartialInstance<'_> {}
 /// The nominal `classmethod[T, P, R]` and `staticmethod[P, R]` types expose only a
 /// callable signature, which cannot preserve the wrapped object's attributes or
 /// correlations between its overloads.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct MethodWrapper<'db> {
     #[returns(copy)]
     pub(super) wrapped: Type<'db>,
@@ -569,98 +570,16 @@ impl<'db> KnownInstanceType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        match self {
-            KnownInstanceType::TypeVar(typevar) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => {
-                    Type::TypeVar(BoundTypeVarInstance::new(
-                        db,
-                        typevar,
-                        *binding_context,
-                        None,
-                        TypeVarNonce::NONE,
-                    ))
-                }
-                TypeMapping::ApplySpecialization(_)
-                | TypeMapping::ApplySpecializationWithMaterialization { .. }
-                | TypeMapping::Promote(..)
-                | TypeMapping::FreshenBoundTypeVars { .. }
-                | TypeMapping::BindSelf(..)
-                | TypeMapping::ReplaceSelf { .. }
-                | TypeMapping::Materialize(_)
-                | TypeMapping::ReplaceParameterDefaults
-                | TypeMapping::EagerExpansion
-                | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
-            },
-            KnownInstanceType::UnionType(instance) => {
-                Type::KnownInstance(KnownInstanceType::UnionType(
-                    instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }
-            KnownInstanceType::Annotated(ty) => {
-                Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                    db,
-                    ty.inner(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )))
-            }
-            KnownInstanceType::Callable(callable_type) => {
-                Type::KnownInstance(KnownInstanceType::Callable(
-                    callable_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }
-            KnownInstanceType::MethodWrapper(wrapper) => {
-                Type::KnownInstance(KnownInstanceType::MethodWrapper(
-                    wrapper.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }
-            KnownInstanceType::FunctoolsPartial(partial) => {
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(
-                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }
-            KnownInstanceType::Range { .. } => match type_mapping {
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular) => {
-                    self.instance_fallback(db, visitor.env)
-                }
-                _ => Type::KnownInstance(self),
-            },
-            KnownInstanceType::FunctoolsPartialCall(partial) => {
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartialCall(
-                    partial.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ))
-            }
-            KnownInstanceType::TypeGenericAlias(ty) => {
-                Type::KnownInstance(KnownInstanceType::TypeGenericAlias(InternedType::new(
-                    db,
-                    ty.inner(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )))
-            }
-            KnownInstanceType::LiteralStringAlias(ty) => {
-                Type::KnownInstance(KnownInstanceType::LiteralStringAlias(InternedType::new(
-                    db,
-                    ty.inner(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )))
-            }
-
-            KnownInstanceType::SubscriptedProtocol(_)
-            | KnownInstanceType::SubscriptedGeneric(_)
-            | KnownInstanceType::TypeAliasType(_)
-            | KnownInstanceType::Deprecated(_)
-            | KnownInstanceType::Field(_)
-            | KnownInstanceType::ConstraintSet(_)
-            | KnownInstanceType::ConstraintSetSolution(_)
-            | KnownInstanceType::GenericContext(_)
-            | KnownInstanceType::Specialization(_)
-            | KnownInstanceType::Literal(_)
-            | KnownInstanceType::NamedTupleSpec(_)
-            | KnownInstanceType::NewType(_)
-            | KnownInstanceType::Sentinel(_) => {
-                // TODO: For some of these, we may need to apply the type mapping to inner types.
-                Type::KnownInstance(self)
-            }
+        match mapping::map_known_instance_sync(
+            db,
+            self,
+            type_mapping,
+            tcx,
+            visitor,
+            &mapping::OrdinaryKnownInstanceMapping,
+        ) {
+            Ok(ty) => ty,
+            Err(never) => match never {},
         }
     }
 }
@@ -696,7 +615,7 @@ pub struct DeprecatedInstance<'db> {
 
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FieldInstance<'db> {
     /// The type of the default value for this field. This is derived from the `default` or
     /// `default_factory` arguments to `dataclasses.field()`.
@@ -778,7 +697,7 @@ impl<'db> FieldInstance<'db> {
 /// Contains information about a `types.UnionType` instance built from a PEP 604
 /// union or a legacy `typing.Union[…]` annotation in a value expression context,
 /// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionTypeInstance<'db> {
     /// You probably don't want to access this field outside `UnionTypeInstance`
     /// internals.
@@ -989,7 +908,7 @@ impl<'db> FunctoolsPartialInstance<'db> {
 }
 
 /// A salsa-interned `Type`
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedType<'db> {
     #[returns(copy)]
     pub(super) inner: Type<'db>,

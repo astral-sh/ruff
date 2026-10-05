@@ -6,6 +6,7 @@ use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visi
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
+use salsa::execution_probe::{FieldRequest, FieldRequestContext};
 use ty_python_core::definition::{Definition, DefinitionKind};
 
 /// A `typing.NewType` declaration, either from the perspective of the
@@ -23,7 +24,7 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 /// - `typing.NewType`: `Type::ClassLiteral(ClassLiteral)` with `KnownClass::NewType`.
 /// - `Foo`: `Type::KnownInstance(KnownInstanceType::NewType(NewType { .. }))`
 /// - `x`: `Type::NewTypeInstance(NewType { .. })`
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NewType<'db> {
     /// The name of this NewType (e.g. `"Foo"`)
     #[returns(ref)]
@@ -46,6 +47,33 @@ impl get_size2::GetSize for NewType<'_> {}
 
 #[salsa::tracked]
 impl<'db> NewType<'db> {
+    pub(in crate::types) fn eager_base_request(
+        self,
+        context: FieldRequestContext<'db>,
+    ) -> impl FieldRequest<'db, Stored = Option<NewTypeBase<'db>>, Output = Option<NewTypeBase<'db>>>
+    {
+        self.field_requests(context).eager_base()
+    }
+
+    pub(super) fn base_for_visitor(
+        self,
+        db: &'db dyn Db,
+        include_lazy: bool,
+    ) -> Option<NewTypeBase<'db>> {
+        if include_lazy {
+            Some(self.base(db))
+        } else {
+            self.eager_base_with_fields(salsa::FieldReads::new(db))
+        }
+    }
+
+    pub(in crate::types) fn eager_base_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> Option<NewTypeBase<'db>> {
+        *self.read_fields(fields).eager_base()
+    }
+
     pub fn base(self, db: &'db dyn Db) -> NewTypeBase<'db> {
         match self.eager_base(db) {
             Some(base) => base,
@@ -54,6 +82,7 @@ impl<'db> NewType<'db> {
     }
 
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(copy),
         cycle_initial=|db, _, self_: NewType<'db>| NewTypeBase::ClassType(ClassType::object(
             db,
@@ -260,15 +289,10 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     newtype: NewType<'db>,
     visitor: &V,
 ) {
-    let base = if visitor.should_visit_lazy_type_attributes() {
-        Some(newtype.base(db))
-    } else {
-        let base = newtype.eager_base(db);
-        if base.is_none() {
-            visitor.notify_skipped_lazy_type_attributes();
-        }
-        base
-    };
+    let base = newtype.base_for_visitor(db, visitor.should_visit_lazy_type_attributes());
+    if base.is_none() {
+        visitor.notify_skipped_lazy_type_attributes();
+    }
     if let Some(base) = base {
         visitor.visit_type(db, base.instance_type(db, visitor.program_environment()));
     }

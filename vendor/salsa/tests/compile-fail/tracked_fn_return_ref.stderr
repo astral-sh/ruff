@@ -1,0 +1,61 @@
+error: a reference tied to the database lifetime does not implement `SalsaValue`; return an owned value instead
+  --> tests/compile-fail/tracked_fn_return_ref.rs:15:67
+   |
+15 | fn tracked_fn_return_ref<'db>(db: &'db dyn Db, input: MyInput) -> &'db str {
+   |                                                                   ^^^^^^^^
+
+error[E0277]: `ContainsRef<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/tracked_fn_return_ref.rs:23:6
+   |
+23 | ) -> ContainsRef<'db> {
+   |      ^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `ContainsRef<'db>`
+  --> tests/compile-fail/tracked_fn_return_ref.rs:10:1
+   |
+10 | struct ContainsRef<'db> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `ContainsRef<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required by a bound in `salsa::plumbing::assert_salsa_value`
+  --> src/salsa_value.rs
+   |
+   |     pub const fn assert_salsa_value<T: SalsaValue>() {}
+   |                                        ^^^^^^^^^^ required by this bound in `assert_salsa_value`
+
+error[E0277]: `ContainsRef<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/tracked_fn_return_ref.rs:33:6
+   |
+33 | ) -> ContainsRef<'_> {
+   |      ^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `ContainsRef<'db>`
+  --> tests/compile-fail/tracked_fn_return_ref.rs:10:1
+   |
+10 | struct ContainsRef<'db> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `ContainsRef<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required by a bound in `salsa::plumbing::assert_salsa_value`
+  --> src/salsa_value.rs
+   |
+   |     pub const fn assert_salsa_value<T: SalsaValue>() {}
+   |                                        ^^^^^^^^^^ required by this bound in `assert_salsa_value`

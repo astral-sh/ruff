@@ -1,4 +1,8 @@
-use std::{cell::Cell, fmt, hint::cold_path, marker::PhantomData};
+pub(in crate::types) mod lint_reporting;
+
+pub(in crate::types) use lint_reporting::LintReportMetadata;
+
+use std::{cell::Cell, convert::Infallible, fmt, hint::cold_path, marker::PhantomData};
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::PythonFile;
@@ -17,18 +21,21 @@ use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 use crate::diagnostic::DiagnosticGuard;
 use crate::importer::Importer;
 use crate::lint::LintSource;
+use crate::suppression::FileSuppressionId;
 use crate::reachability::is_range_reachable;
-use crate::types::function::FunctionDecorators;
+use crate::types::function::{FunctionDecorators, FunctionType, OverloadLiteral};
 use crate::types::infer::InferenceFlags;
 use crate::{
     Db, Program,
     lint::{LintId, LintMetadata},
-    suppression::suppressions,
+};
+use self::lint_reporting::{
+    OrdinaryLintReportEligibilityEffects, lint_report_eligibility_sync, verbose_lint_suffix,
 };
 use ty_module_resolver::ResolverEnvironment;
 use ty_python_core::definition::Definition;
-use ty_python_core::scope::ScopeId;
-use ty_python_core::{ProgramFile, semantic_index};
+use ty_python_core::scope::{FileScopeId, ScopeId};
+use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
 
 /// The lazily resolved program used by a semantic operation.
 #[derive(Clone)]
@@ -70,6 +77,19 @@ impl<'db> ProgramEnvironment<'db> {
         }
     }
 
+    /// Returns the retained identity without reading any Salsa fields.
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn source(&self) -> ProgramEnvironmentSource<'db> {
+        match self.environment.get() {
+            ProgramSource::Program(id) => ProgramEnvironmentSource::Program(Program::from_id(id)),
+            ProgramSource::File(id) => ProgramEnvironmentSource::File(ProgramFile::from_id(id)),
+            ProgramSource::Definition(id) => {
+                ProgramEnvironmentSource::Definition(Definition::from_id(id))
+            }
+            ProgramSource::Scope(id) => ProgramEnvironmentSource::Scope(ScopeId::from_id(id)),
+        }
+    }
+
     /// Returns the program used by this operation.
     #[inline]
     pub fn program(&self, db: &'db dyn Db) -> Program<'db> {
@@ -95,9 +115,14 @@ impl<'db> ProgramEnvironment<'db> {
             }
         };
 
+        self.cache_program(program);
+        program
+    }
+
+    /// Caches the program resolved from this environment's source for subsequent reads.
+    pub(in crate::types) fn cache_program(&self, program: Program<'db>) {
         self.environment
             .set(ProgramSource::Program(program.as_id()));
-        program
     }
 
     /// Returns the Python version used by this operation.
@@ -123,6 +148,14 @@ enum ProgramSource {
     File(Id),
     Definition(Id),
     Scope(Id),
+}
+
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) enum ProgramEnvironmentSource<'db> {
+    Program(Program<'db>),
+    File(ProgramFile<'db>),
+    Definition(Definition<'db>),
+    Scope(ScopeId<'db>),
 }
 
 /// Context for inferring the types of a single file.
@@ -161,9 +194,34 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         module: &'ast ParsedModuleRef,
     ) -> Self {
         debug_assert_eq!(scope.program_file(db), program_file);
-        debug_assert_eq!(program_file.file(db), file);
-        debug_assert_eq!(program_environment.program(db), scope.program(db));
 
+        Self::new_with_scope_file(db, program_environment, scope, file, program_file, module)
+    }
+
+    pub(in crate::types) fn new_with_scope_file(
+        db: &'db dyn Db,
+        program_environment: &'ast ProgramEnvironment<'db>,
+        scope: ScopeId<'db>,
+        file: File,
+        program_file: ProgramFile<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
+        debug_assert_eq!(program_file.file(db), file);
+        debug_assert_eq!(program_environment.program(db), program_file.program(db));
+
+        Self::new_with_validated_source(db, program_environment, scope, file, program_file, module)
+    }
+
+    /// The caller has checked that the scope, physical file, and environment belong to
+    /// `program_file` before constructing the context.
+    pub(in crate::types) fn new_with_validated_source(
+        db: &'db dyn Db,
+        program_environment: &'ast ProgramEnvironment<'db>,
+        scope: ScopeId<'db>,
+        file: File,
+        program_file: ProgramFile<'db>,
+        module: &'ast ParsedModuleRef,
+    ) -> Self {
         Self {
             db,
             program_environment,
@@ -239,11 +297,37 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) fn retained_diagnostics(&self) -> std::cell::Ref<'_, TypeCheckDiagnostics> {
+        self.diagnostics.borrow()
+    }
+
+    /// Records a selected suppression in this inference context.
+    pub(in crate::types) fn mark_lint_suppression_used(&self, id: FileSuppressionId) {
+        self.diagnostics.borrow_mut().mark_used(id);
+    }
+
+    /// Reserves diagnostic slots without publishing any diagnostic.
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn reserve_lint_diagnostics(&self, additional: usize) {
+        self.diagnostics.borrow_mut().reserve_diagnostics(additional);
+    }
+
+    /// Moves a completed diagnostic into this inference context.
+    pub(in crate::types) fn push_lint_diagnostic(&self, diagnostic: Diagnostic) {
+        self.diagnostics.borrow_mut().push(diagnostic);
+    }
+
     /// Whether diagnostics inferred separately for a referenced alias should be collected.
     pub(super) fn should_collect_diagnostics(&self) -> bool {
-        !self.diagnostics_suppressed
-            && self.db().should_check_file(self.file())
-            && !self.is_in_no_type_check()
+        match collect_diagnostics_sync(self, &OrdinaryLintEligibilityEffects) {
+            Ok(collect) => collect,
+            Err(never) => match never {},
+        }
+    }
+
+    pub(in crate::types) fn diagnostics_suppressed(&self) -> bool {
+        self.diagnostics_suppressed
     }
 
     pub(super) fn has_diagnostics(&self) -> bool {
@@ -258,6 +342,27 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) async fn is_lint_enabled_with<E: LintEligibilityEffects<'db, 'ast>>(
+        &self,
+        lint: &'static LintMetadata,
+        effects: &E,
+    ) -> Result<bool, E::Error> {
+        Ok(lint_severity_with(self, LintId::of(lint), effects)
+            .await?
+            .is_some())
+    }
+
+    /// Returns the severity and selection source after applying lint policy.
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) async fn lint_severity_with<E: LintEligibilityEffects<'db, 'ast>>(
+        &self,
+        lint: LintId,
+        effects: &E,
+    ) -> Result<Option<(Severity, LintSource)>, E::Error> {
+        lint_severity_with(self, lint, effects).await
     }
 
     /// Optionally return a builder for a lint diagnostic guard.
@@ -318,36 +423,23 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         DiagnosticGuardBuilder::new(self, id, severity)
     }
 
-    fn is_in_no_type_check(&self) -> bool {
-        if self
-            .inference_flags
+    pub(in crate::types) fn no_type_check_flag(&self) -> bool {
+        self.inference_flags
             .contains(InferenceFlags::IN_NO_TYPE_CHECK)
-        {
-            return true;
-        }
+    }
 
-        // Accessing the semantic index here is fine because
-        // the index belongs to the same file as for which we emit the diagnostic.
-        let index = semantic_index(self.db(), self.program_file);
-
-        let scope_id = self.scope.file_scope_id(self.db());
-
-        // Inspect all ancestor function scopes by walking bottom up and check
-        // if any is decorated with `@no_type_check`. We use the undecorated type
-        // rather than the binding type because other decorators (e.g. unknown ones)
-        // may transform the function type into a non-`FunctionLiteral`.
-        // `undecorated_type()` can be `None` during cycle recovery.
-        index
-            .ancestor_scopes(scope_id)
-            .filter_map(|(_, scope)| scope.node().as_function())
-            .filter_map(|node| {
-                infer_definition_types(self.db(), index.expect_single_definition(node))
-                    .undecorated_type()
-                    .and_then(Type::as_function_literal)
-            })
-            .any(|function_ty| {
-                function_ty.has_known_decorator(self.db(), FunctionDecorators::NO_TYPE_CHECK)
-            })
+    pub(in crate::types) fn next_lint_ancestor(
+        index: &SemanticIndex<'db>,
+        cursor: &mut Option<FileScopeId>,
+    ) -> Option<Option<Definition<'db>>> {
+        let scope = index.scope((*cursor)?);
+        *cursor = scope.parent();
+        Some(
+            scope
+                .node()
+                .as_function()
+                .map(|node| index.expect_single_definition(node)),
+        )
     }
 
     /// Check whether a diagnostic emitted at `range` is in reachable code.
@@ -398,6 +490,197 @@ impl fmt::Debug for InferContext<'_, '_> {
             .field("inference_flags", &self.inference_flags)
             .finish()
     }
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousLintEligibilityEffects)]
+    pub(in crate::types) trait LintEligibilityEffects<'db, 'ast> {
+        type Error;
+
+        #[operation(local)]
+        async fn diagnostics_suppressed(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        async fn should_check_file(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        async fn configured_lint(&self, context: &InferContext<'db, 'ast>, lint: LintId) -> Result<Option<(Severity, LintSource)>, Self::Error>;
+        #[operation(local)]
+        async fn no_type_check_flag(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        async fn first_scope(&self, context: &InferContext<'db, 'ast>) -> Result<FileScopeId, Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_ancestor(&self, context: &InferContext<'db, 'ast>, cursor: &mut Option<FileScopeId>) -> Result<Option<Option<Definition<'db>>>, Self::Error>;
+        #[operation(child)]
+        async fn undecorated_function(&self, context: &InferContext<'db, 'ast>, definition: Definition<'db>) -> Result<Option<FunctionType<'db>>, Self::Error>;
+        #[operation(source)]
+        async fn function_has_no_type_check(&self, context: &InferContext<'db, 'ast>, function: FunctionType<'db>) -> Result<bool, Self::Error>;
+        #[operation(source)]
+        async fn in_no_type_check(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error>;
+    }
+
+    #[synchronous(collect_diagnostics_sync)]
+    #[capabilities(effects = LintEligibilityEffects)]
+    #[passive_values()]
+    async fn collect_diagnostics_with<'db, 'ast, E: LintEligibilityEffects<'db, 'ast>>(
+        context: &InferContext<'db, 'ast>,
+        effects: &E,
+    ) -> Result<bool, E::Error> {
+        Ok(!effects.diagnostics_suppressed(context).await?
+            && effects.should_check_file(context).await?
+            && !effects.in_no_type_check(context).await?)
+    }
+
+    #[synchronous(lint_severity_sync)]
+    #[capabilities(effects = LintEligibilityEffects)]
+    #[passive_values()]
+    async fn lint_severity_with<'db, 'ast, E: LintEligibilityEffects<'db, 'ast>>(
+        context: &InferContext<'db, 'ast>,
+        lint: LintId,
+        effects: &E,
+    ) -> Result<Option<(Severity, LintSource)>, E::Error> {
+        if effects.diagnostics_suppressed(context).await? {
+            return Ok(None);
+        }
+
+        // The comment below was copied from the original
+        // implementation of diagnostic reporting. The code
+        // has been refactored, but this still kind of looked
+        // relevant, so I've preserved the note. ---AG
+        //
+        // TODO: Don't emit the diagnostic if:
+        // * The enclosing node contains any syntax errors
+        // * The rule is disabled for this file. We probably want to introduce a new query that
+        //   returns a rule selector for a given file that respects the package's settings,
+        //   any global pragma comments in the file, and any per-file-ignores.
+
+        if !effects.should_check_file(context).await? {
+            return Ok(None);
+        }
+        // Skip over diagnostics if the rule
+        // is disabled.
+        let Some((severity, source)) = effects.configured_lint(context, lint).await? else {
+            return Ok(None);
+        };
+        // If we're not in type checking mode,
+        // we can bail now.
+        if effects.in_no_type_check(context).await? {
+            return Ok(None);
+        }
+
+        Ok(Some((severity, source)))
+    }
+
+    #[synchronous(in_no_type_check_sync)]
+    #[capabilities(effects = LintEligibilityEffects)]
+    #[passive_values()]
+    pub(in crate::types) async fn in_no_type_check_with<'db, 'ast, E: LintEligibilityEffects<'db, 'ast>>(
+        context: &InferContext<'db, 'ast>,
+        effects: &E,
+    ) -> Result<bool, E::Error> {
+        if effects.no_type_check_flag(context).await? {
+            return Ok(true);
+        }
+
+        // Inspect all ancestor function scopes by walking bottom up and check
+        // if any is decorated with `@no_type_check`. We use the undecorated type
+        // rather than the binding type because other decorators (e.g. unknown ones)
+        // may transform the function type into a non-`FunctionLiteral`.
+        // `undecorated_type()` can be `None` during cycle recovery.
+        let mut cursor = Some(effects.first_scope(context).await?);
+        #[cursor_loop]
+        while let Some(definition) = effects.next_ancestor(context, &mut cursor).await? {
+            if let Some(definition) = definition
+                && let Some(function) = effects.undecorated_function(context, definition).await?
+                && effects.function_has_no_type_check(context, function).await?
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+}
+
+struct OrdinaryLintEligibilityEffects;
+
+impl<'db, 'ast> SynchronousLintEligibilityEffects<'db, 'ast> for OrdinaryLintEligibilityEffects {
+    type Error = Infallible;
+
+    fn diagnostics_suppressed(
+        &self,
+        context: &InferContext<'db, 'ast>,
+    ) -> Result<bool, Self::Error> {
+        Ok(context.diagnostics_suppressed())
+    }
+
+    fn should_check_file(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error> {
+        Ok(context.db().should_check_file(context.file()))
+    }
+
+    fn configured_lint(
+        &self,
+        context: &InferContext<'db, 'ast>,
+        lint: LintId,
+    ) -> Result<Option<(Severity, LintSource)>, Self::Error> {
+        Ok(context.db().rule_selection(context.file()).get(lint))
+    }
+
+    fn no_type_check_flag(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error> {
+        Ok(context.no_type_check_flag())
+    }
+
+    fn first_scope(&self, context: &InferContext<'db, 'ast>) -> Result<FileScopeId, Self::Error> {
+        Ok(context.scope().file_scope_id(context.db()))
+    }
+
+    fn next_ancestor(
+        &self,
+        context: &InferContext<'db, 'ast>,
+        cursor: &mut Option<FileScopeId>,
+    ) -> Result<Option<Option<Definition<'db>>>, Self::Error> {
+        // Accessing the semantic index here is fine because
+        // the index belongs to the same file as for which we emit the diagnostic.
+        let index = semantic_index(context.db(), context.program_file());
+        Ok(InferContext::next_lint_ancestor(index, cursor))
+    }
+
+    fn undecorated_function(
+        &self,
+        context: &InferContext<'db, 'ast>,
+        definition: Definition<'db>,
+    ) -> Result<Option<FunctionType<'db>>, Self::Error> {
+        Ok(infer_definition_types(context.db(), definition)
+            .undecorated_type()
+            .and_then(Type::as_function_literal))
+    }
+
+    fn function_has_no_type_check(
+        &self,
+        context: &InferContext<'db, 'ast>,
+        function: FunctionType<'db>,
+    ) -> Result<bool, Self::Error> {
+        let (overloads, implementation) = function.overloads_and_implementation(context.db());
+        Ok(overloads_have_no_type_check(
+            context.db(),
+            overloads,
+            implementation,
+        ))
+    }
+
+    fn in_no_type_check(&self, context: &InferContext<'db, 'ast>) -> Result<bool, Self::Error> {
+        in_no_type_check_sync(context, self)
+    }
+}
+
+pub(in crate::types) fn overloads_have_no_type_check<'db>(
+    db: &'db dyn Db,
+    overloads: &[OverloadLiteral<'db>],
+    implementation: Option<OverloadLiteral<'db>>,
+) -> bool {
+    overloads
+        .iter()
+        .copied()
+        .chain(implementation)
+        .any(|overload| overload.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK))
 }
 
 /// An abstraction for mutating a diagnostic through the lense of a lint.
@@ -529,29 +812,11 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         if self.ctx.db().verbose() {
             let rule = diag.id();
 
-            diag.info(match self.source {
-                LintSource::Default => {
-                    format!("rule `{rule}` is enabled by default")
-                }
-                LintSource::Cli => {
-                    format!("rule `{rule}` was selected on the command line")
-                }
-                LintSource::File => {
-                    format!("rule `{rule}` was selected in the configuration file")
-                }
-                LintSource::ScriptMetadata => {
-                    format!("rule `{rule}` was selected in script metadata")
-                }
-                LintSource::Editor => {
-                    format!("rule `{rule}` was selected in the editor settings")
-                }
-                LintSource::UvMetadata => {
-                    format!("rule `{rule}` was selected by uv metadata")
-                }
-            });
+            let suffix = verbose_lint_suffix(self.source);
+            diag.info(format!("rule `{rule}{suffix}"));
         }
 
-        self.ctx.diagnostics.borrow_mut().push(diag);
+        self.ctx.push_lint_diagnostic(diag);
     }
 }
 
@@ -595,34 +860,10 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         ctx: &'ctx InferContext<'db, 'ctx>,
         lint: LintId,
     ) -> Option<(Severity, LintSource)> {
-        if ctx.diagnostics_suppressed {
-            return None;
+        match lint_severity_sync(ctx, lint, &OrdinaryLintEligibilityEffects) {
+            Ok(severity) => severity,
+            Err(never) => match never {},
         }
-
-        // The comment below was copied from the original
-        // implementation of diagnostic reporting. The code
-        // has been refactored, but this still kind of looked
-        // relevant, so I've preserved the note. ---AG
-        //
-        // TODO: Don't emit the diagnostic if:
-        // * The enclosing node contains any syntax errors
-        // * The rule is disabled for this file. We probably want to introduce a new query that
-        //   returns a rule selector for a given file that respects the package's settings,
-        //   any global pragma comments in the file, and any per-file-ignores.
-
-        if !ctx.db().should_check_file(ctx.file) {
-            return None;
-        }
-        // Skip over diagnostics if the rule
-        // is disabled.
-        let (severity, source) = ctx.db().rule_selection(ctx.file).get(lint)?;
-        // If we're not in type checking mode,
-        // we can bail now.
-        if ctx.is_in_no_type_check() {
-            return None;
-        }
-
-        Some((severity, source))
     }
 
     fn new(
@@ -630,29 +871,22 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         lint: &'static LintMetadata,
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
-        let lint_id = LintId::of(lint);
-
-        let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
-
-        let suppressions = suppressions(ctx.db(), ctx.python_file());
-        if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
-            ctx.diagnostics.borrow_mut().mark_used(suppression.id());
-            return None;
-        }
-
-        // Suppress diagnostics in unreachable code. This checks both whether
-        // the scope itself is unreachable and whether the specific statement or
-        // expression containing this diagnostic is unreachable.
-        if !ctx.is_range_reachable(range) {
-            return None;
-        }
+        let eligible = match lint_report_eligibility_sync(
+            ctx,
+            LintId::of(lint),
+            range,
+            &OrdinaryLintReportEligibilityEffects,
+        ) {
+            Ok(eligible) => eligible?,
+            Err(never) => match never {},
+        };
 
         Some(LintDiagnosticGuardBuilder {
             ctx,
-            id: lint_id,
-            severity,
-            source,
-            primary_range: range,
+            id: eligible.id,
+            severity: eligible.severity,
+            source: eligible.source,
+            primary_range: eligible.range,
             message_override: None,
         })
     }

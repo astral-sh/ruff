@@ -7,13 +7,13 @@ use crate::{
     Db,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
-        KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
-        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
+        BindingContext, BoundTypeVarInstance, ClassLiteral, ClassType, GenericContext, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, Parameter, Parameters, PropertyInstanceType,
+        Signature, SubclassOfType, Type, TypeContext, TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
-        mro::Mro,
+        mro::{Mro, dynamic::named_tuple_mro_with, root::InlineMroRootEffects},
         tuple::TupleType,
     },
 };
@@ -151,7 +151,7 @@ pub struct NamedTupleField<'db> {
 /// ```
 ///
 /// The type of `Point` would be `type[Point]` where `Point` is a `DynamicNamedTupleLiteral`.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests = field_requests, heap_size = ruff_memory_usage::heap_size)]
 pub struct DynamicNamedTupleLiteral<'db> {
     /// The name of the namedtuple (from the first argument).
     #[returns(ref)]
@@ -246,6 +246,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// 9. `typing.Generic`
     /// 10. `<class 'object'>`
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicNamedTupleLiteral<'db>| Mro::from_error(
@@ -255,12 +256,10 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         ),
     )]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
-        let env = ProgramEnvironment::from_scope(self.scope(db));
-        let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
-        let tuple_class = self.tuple_base_class(db, &env);
-        std::iter::once(self_base)
-            .chain(tuple_class.iter_mro(db))
-            .collect()
+        match named_tuple_mro_with(db, self, &InlineMroRootEffects::new(db)) {
+            Ok(mro) => mro,
+            Err(never) => match never {},
+        }
     }
 
     /// Returns the metaclass of this namedtuple.
@@ -440,6 +439,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
 
     fn spec(self, db: &'db dyn Db) -> NamedTupleSpec<'db> {
         #[salsa::tracked(
+            attempt = ReturnOnly,
             returns(copy),
             cycle_initial=|db, _, _| NamedTupleSpec::unknown(db),
             heap_size=ruff_memory_usage::heap_size
@@ -566,7 +566,7 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
 
 /// A specification describing the fields of a dynamic `namedtuple`
 /// or `NamedTuple` class.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamedTupleSpec<'db> {
     #[returns(deref)]
     pub(crate) fields: Box<[NamedTupleField<'db>]>,

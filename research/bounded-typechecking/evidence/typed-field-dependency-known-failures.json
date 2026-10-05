@@ -1,0 +1,600 @@
+{
+  "selected_baseline": "dynamic-guard-preparation-focused1",
+  "selected_failure_count": 38,
+  "selected_failures": {
+    "types::infer::source_runtime::tests::class_generic_validation::class_generic_report_policy::default_inline_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::class_generic_report_policy::default_inline_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2773,
+        2792
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::base_report_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::base_report_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    CollectionJournal { retained: [], finished: None, expanded_aliases: [], cancel: None, cancelled: false }",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2802,
+        2822
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::class_generic_report_policy::default_file_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::class_generic_report_policy::default_file_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2823,
+        2842
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::refused_retained_collection_retries::retained_collector_bytes": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:723:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::refused_retained_collection_retries::retained_collector_bytes' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:723:5:",
+        "    assertion failed: retains_second(resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2852,
+        2870
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cancelled_retained_collection_retries": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:682:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::cancelled_retained_collection_retries' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:682:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    CollectionJournal { retained: [], finished: None, expanded_aliases: [], cancel: Some(CancellationToken(0)), cancelled: false }",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2871,
+        2890
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::every_enclosing_identity_match": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::every_enclosing_identity_match' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    CollectionJournal { retained: [], finished: None, expanded_aliases: [], cancel: None, cancelled: false }",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2891,
+        2911
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::base_report_lint_disabled": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::base_report_lint_disabled' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    CollectionJournal { retained: [], finished: None, expanded_aliases: [], cancel: None, cancelled: false }",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2912,
+        2932
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::refused_retained_collection_retries::retained_collector_work": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:723:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::refused_retained_collection_retries::retained_collector_work' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:723:5:",
+        "    assertion failed: retains_second(resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2933,
+        2951
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::same_name_different_source_identity": {
+      "panic_sources": [],
+      "failure_payload": [
+        "    Error: base collection did not finish: []"
+      ],
+      "log_lines": [
+        2979,
+        2994
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::cold_class_generic_scans_preserve_reports::first_invalid_nested_reference": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::cold_class_generic_scans_preserve_reports::first_invalid_nested_reference' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation.rs:357:9:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        2995,
+        3014
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_construction": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_construction' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3033,
+        3052
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::same_source_identity": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::base_typevars::cold_base_shadowing_matches_fresh_ordinary::same_source_identity' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/base_typevars.rs:505:5:",
+        "    Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    []",
+        "    CollectionJournal { retained: [], finished: None, expanded_aliases: [], cancel: None, cancelled: false }",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3053,
+        3073
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_eligibility": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_eligibility' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3074,
+        3093
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_insertion": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::interruptions::cancelled_reports_retry_in_the_same_revision::default_insertion' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:186:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    []",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3094,
+        3113
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::interruptions::refused_insertions_remain_unpublished_and_retry::default_bytes": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:229:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::interruptions::refused_insertions_remain_unpublished_and_retry::default_bytes' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:229:5:",
+        "    assertion failed: insertion_completes(case, resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3132,
+        3150
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::interruptions::refused_insertions_remain_unpublished_and_retry::default_work": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:229:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::interruptions::refused_insertions_remain_unpublished_and_retry::default_work' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/interruptions.rs:229:5:",
+        "    assertion failed: insertion_completes(case, resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3160,
+        3178
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::report_construction": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:171:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::report_construction' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:171:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility)]",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3179,
+        3198
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::report_insertion": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:171:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::report_insertion' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:171:5:",
+        "    Ok(Ok(Incomplete { reason: RequestedAllocationLimit, completed: () }))",
+        "    [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility)]",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3199,
+        3218
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::retained_offenders": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cancelled_legacy_order_retries::retained_offenders' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility), Boundary(Id(2789), LegacyDefaultOrder, Construction), Boundary(Id(2789), LegacyDefaultOrder, Insertion), Inserted(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }]), Completed(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), DefaultReferences, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), OwnShadowing, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3219,
+        3239
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::single_offender": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::single_offender' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Eligibility), Boundary(Id(2789), LegacyDefaultOrder, Construction)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3240,
+        3260
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::insertion_bytes": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:226:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::insertion_bytes' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:226:5:",
+        "    assertion failed: reaches_admission(&source, admission, resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3261,
+        3279
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::protocol_offenders": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::protocol_offenders' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3280,
+        3300
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::suppressed_order": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::suppressed_order' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility), Completed(Id(2789), LegacyDefaultOrder, [], 1)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3301,
+        3321
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::insertion_work": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:226:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::insertion_work' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:226:5:",
+        "    assertion failed: reaches_admission(&source, admission, resource, high)?",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3322,
+        3340
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::three_offenders": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::three_offenders' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3341,
+        3361
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::valid_order": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::cold_legacy_order_matches_fresh_ordinary::valid_order' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Completed(Id(2789), LegacyDefaultOrder, [], 0), Completed(Id(2789), DefaultReferences, [], 0)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3380,
+        3400
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::both_validations_report": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::both_validations_report' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3941,
+        3961
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::multiple_defaults": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::multiple_defaults' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3962,
+        3982
+      ]
+    },
+    "types::infer::source_runtime::tests::partial_specialization::cold_partial_defaults_publish_the_complete_canonical_specialization": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/partial_specialization.rs:157:13"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::partial_specialization::cold_partial_defaults_publish_the_complete_canonical_specialization' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/partial_specialization.rs:157:13:",
+        "    cold partial defaults: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        3992,
+        4010
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::paramspec_default": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::paramspec_default' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4029,
+        4049
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::both_disabled": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::both_disabled' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4068,
+        4088
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::duplicate_pack_disabled": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::duplicate_pack_disabled' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4089,
+        4109
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::file_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::file_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4119,
+        4139
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::inline_duplicate_pack_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::inline_duplicate_pack_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4186,
+        4206
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::inline_later_default_suppression": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::inline_later_default_suppression' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4216,
+        4236
+      ]
+    },
+    "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::later_default_disabled": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_reporting_respects_rules_and_suppressions::later_default_disabled' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/pep695_parameter_validation.rs:278:9:",
+        "    assertion `left == right` failed: []",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(ProtocolVariance)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4305,
+        4325
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::partial_retention_work": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::partial_retention_work' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility), Boundary(Id(2789), LegacyDefaultOrder, Construction), Boundary(Id(2789), LegacyDefaultOrder, Insertion), Inserted(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }]), Completed(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), DefaultReferences, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), OwnShadowing, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4747,
+        4767
+      ]
+    },
+    "types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::partial_retention_bytes": {
+      "panic_sources": [
+        "crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5"
+      ],
+      "failure_payload": [
+        "    thread 'types::infer::source_runtime::tests::class_generic_validation::legacy_defaults::refused_legacy_order_retries::partial_retention_bytes' (<thread-id>) panicked at crates/ty_python_semantic/src/types/infer/source_runtime/tests/class_generic_validation/legacy_defaults.rs:72:5:",
+        "    assertion `left == right` failed: [Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Retention), Boundary(Id(2789), LegacyDefaultOrder, Eligibility), Boundary(Id(2789), LegacyDefaultOrder, Construction), Boundary(Id(2789), LegacyDefaultOrder, Insertion), Inserted(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }]), Completed(Id(2789), LegacyDefaultOrder, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), DefaultReferences, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0), Completed(Id(2789), OwnShadowing, [Diagnostic { inner: DiagnosticInner { id: Lint(LintName(\"invalid-generic-class\")), documentation_url: Some(\"https://ty.dev/rules#invalid-generic-class\"), severity: Error, message: DiagnosticMessage(\"Type parameters without defaults cannot follow type parameters with defaults\"), custom_concise_message: Some(DiagnosticMessage(\"Type parameter `U` without a default cannot follow earlier parameter `T` with a default\")), annotations: [Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Type variables `U`, `V`, `W` and `X` do not have defaults\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(165..178) }, message: Some(DiagnosticMessage(\"Earlier TypeVar `T` does\")), is_primary: true, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(46..75) }, message: Some(DiagnosticMessage(\"`T` defined here\")), is_primary: false, tags: [], hide_snippet: false }, Annotation { span: Span { file: Ty(file(Id(100))), range: Some(76..92) }, message: Some(DiagnosticMessage(\"`U` defined here\")), is_primary: false, tags: [], hide_snippet: false }], subs: [], fix: None, parent: None, noqa_offset: None, secondary_code: None, header_offset: 0 } }], 0)]",
+        "      left: Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "     right: Ok(Incomplete { reason: UnavailableOperation(ClassCheck(GenericContext)), completed: () })",
+        "    note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+      ],
+      "log_lines": [
+        4777,
+        4798
+      ]
+    }
+  },
+  "unselected_prior_failure_count": 7,
+  "unselected_prior_failures": {
+    "types::infer::source_runtime::tests::comparison_guard::cancellation_after_spill_drains_scopes_and_retries::completed_cache": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::cancellation_after_spill_drains_scopes_and_retries::active_stack": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::cold_nested_comparison_spills_active_stack_and_completed_cache": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::relocation_refusal_drains_scopes_and_retries::cache_work": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::relocation_refusal_drains_scopes_and_retries::active_work": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::relocation_refusal_drains_scopes_and_retries::cache_bytes": "FAIL",
+    "types::infer::source_runtime::tests::comparison_guard::relocation_refusal_drains_scopes_and_retries::active_bytes": "FAIL"
+  },
+  "unselected_cases_rechecked": false,
+  "baseline_report": {
+    "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/dynamic-guard-preparation-focused1-comparison.json",
+    "sha256": "e1c13022ac38ce95ff686a975b44f0d9ed1470120c91cfafe51220fbeb545111"
+  }
+}

@@ -32,7 +32,7 @@ use ty_module_resolver::{ImportingFile, resolve_module_for_import_from};
 
 use crate::{Db, ProgramFile};
 
-#[salsa::tracked(
+#[salsa::tracked(attempt = CompleteOnly,
     returns(deref),
     cycle_initial=|_, _, _| Box::default(),
     heap_size=ruff_memory_usage::heap_size)

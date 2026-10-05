@@ -11,7 +11,6 @@ use crate::{
         },
         function::{FunctionDecorators, FunctionType, OverloadLiteral},
         generics::GenericContext,
-        infer_definition_types,
         list_members::all_end_of_scope_members,
         member::class_member,
         signatures::ReturnCallableTypeVarScope,
@@ -35,24 +34,322 @@ pub(crate) fn check_function_definition<'db>(
     definition: Definition<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
-    let db = context.db();
-
-    let Some(function_type) =
-        infer_definition_types(context.db(), definition).function_type(definition)
-    else {
-        return;
-    };
-
-    let last_definition = function_type.literal(db).last_definition;
-    if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
-        return;
+    match source_effects::check_function_definition_sync(
+        definition,
+        source_effects::FunctionFacts,
+        &source_effects::OrdinaryFunctionEffects {
+            context,
+            file_expression_type,
+        },
+    ) {
+        Ok(()) => {}
+        Err(error) => match error {},
     }
-    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
+}
 
-    check_legacy_positional_only_convention(context, last_definition, &signature);
-    check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
-    check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
-    check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+pub(in crate::types::infer::builder) mod source_effects {
+    use std::convert::Infallible;
+
+    use ruff_python_ast as ast;
+    use ty_python_core::definition::Definition;
+
+    use crate::types::context::InferContext;
+    use crate::types::function::{FunctionDecorators, OverloadLiteral};
+    use crate::types::signatures::{Parameter, ReturnCallableTypeVarScope};
+    use crate::types::{Signature, Type, infer_definition_types};
+
+    pub(in crate::types::infer::builder) type ParameterCursor<'a, 'db> =
+        std::iter::Zip<ast::ParametersIterator<'a>, std::slice::Iter<'a, Parameter<'db>>>;
+
+    pub(in crate::types::infer::builder) struct FunctionFacts;
+
+    pub(super) struct OrdinaryFunctionEffects<'a, 'db, 'ast, F> {
+        pub(super) context: &'a InferContext<'db, 'ast>,
+        pub(super) file_expression_type: &'a F,
+    }
+
+    ty_mapping_probe_macros::shared_semantic_family! {
+        #[synchronous(SynchronousFunctionEffects)]
+        pub(in crate::types::infer::builder) trait FunctionEffects<'db> {
+            type Error;
+
+            #[operation(child)]
+            async fn canonical_last_definition(
+                &self,
+                definition: Definition<'db>,
+            ) -> Result<Option<OverloadLiteral<'db>>, Self::Error>;
+
+            #[operation(child)]
+            async fn has_no_type_check(
+                &self,
+                last_definition: OverloadLiteral<'db>,
+            ) -> Result<bool, Self::Error>;
+
+            #[operation(child)]
+            async fn raw_public_signature(
+                &self,
+                last_definition: OverloadLiteral<'db>,
+            ) -> Result<Signature<'db>, Self::Error>;
+
+            #[operation(source)]
+            async fn function_node<'a>(
+                &'a self,
+                last_definition: OverloadLiteral<'db>,
+            ) -> Result<&'a ast::StmtFunctionDef, Self::Error>;
+
+            #[operation(local)]
+            async fn parameter_cursor<'a>(
+                &self,
+                parameters: &'a ast::Parameters,
+                signature: &'a Signature<'db>,
+            ) -> Result<ParameterCursor<'a, 'db>, Self::Error>;
+
+            #[operation(local)]
+            #[progress]
+            async fn next_parameter<'a>(
+                &self,
+                cursor: &mut ParameterCursor<'a, 'db>,
+            ) -> Result<Option<(ast::AnyParameterRef<'a>, &'a Parameter<'db>)>, Self::Error>;
+
+            #[operation(source)]
+            async fn report_invalid_legacy_positional(
+                &self,
+                parameter: &ast::ParameterWithDefault,
+                previous: Option<&ast::ParameterWithDefault>,
+            ) -> Result<(), Self::Error>;
+
+            #[operation(source)]
+            async fn check_pep695_legacy_typevars(
+                &self,
+                last_definition: OverloadLiteral<'db>,
+            ) -> Result<(), Self::Error>;
+
+            #[operation(source)]
+            async fn check_legacy_typevar_defaults(
+                &self,
+                last_definition: OverloadLiteral<'db>,
+                signature: &Signature<'db>,
+            ) -> Result<(), Self::Error>;
+
+            #[operation(source)]
+            async fn check_legacy_typevar_ordering(
+                &self,
+                last_definition: OverloadLiteral<'db>,
+                signature: &Signature<'db>,
+            ) -> Result<(), Self::Error>;
+
+            #[operation(local)]
+            async fn retire_signature(&self, signature: Signature<'db>) -> Result<(), Self::Error>;
+        }
+
+        #[finite_capability]
+        impl FunctionFacts {
+            fn has_pep570_parameters(&self, node: &ast::StmtFunctionDef) -> bool {
+                !node.parameters.posonlyargs.is_empty()
+            }
+
+            fn is_positional_only(&self, parameter: &Parameter<'_>) -> bool {
+                parameter.is_positional_only()
+            }
+
+            fn uses_legacy_positional_convention(&self, parameter: &ast::ParameterWithDefault) -> bool {
+                parameter.uses_pep_484_positional_only_convention()
+            }
+
+            fn has_previous_parameter(&self, previous: Option<&ast::ParameterWithDefault>) -> bool {
+                previous.is_some()
+            }
+
+            fn has_pep695_parameters(&self, node: &ast::StmtFunctionDef) -> bool {
+                node.type_params.is_some()
+            }
+
+            fn has_generic_context(&self, signature: &Signature<'_>) -> bool {
+                signature.generic_context.is_some()
+            }
+        }
+
+        #[synchronous(check_function_definition_sync)]
+        #[capabilities(effects = FunctionEffects, facts = FunctionFacts)]
+        #[passive_values()]
+        pub(in crate::types::infer::builder) async fn check_function_definition_with<'db, E: FunctionEffects<'db>>(
+            definition: Definition<'db>,
+            facts: FunctionFacts,
+            effects: &E,
+        ) -> Result<(), E::Error> {
+            let Some(last_definition) = effects.canonical_last_definition(definition).await? else {
+                return Ok(());
+            };
+            if effects.has_no_type_check(last_definition).await? {
+                return Ok(());
+            }
+            let signature = effects.raw_public_signature(last_definition).await?;
+            let node = effects.function_node(last_definition).await?;
+
+            // If the function has any PEP-570 positional-only parameters,
+            // assume that `__`-prefixed parameters are not meant to be positional-only.
+            if !facts.has_pep570_parameters(node) {
+                let mut cursor = effects.parameter_cursor(&node.parameters, &signature).await?;
+                #[passive_state]
+                let mut previous_non_positional_only = None;
+                #[cursor_loop]
+                while let Some(entry) = effects.next_parameter(&mut cursor).await? {
+                    let (parameter_node, parameter) = entry;
+                    let ast::AnyParameterRef::NonVariadic(parameter_node) = parameter_node else {
+                        continue;
+                    };
+                    if facts.is_positional_only(parameter) {
+                        continue;
+                    }
+
+                    // Valid uses of the PEP-484 positional-only convention will have been detected
+                    // in the first iteration over this scope, so `is_positional_only()` returns true
+                    // for those. Only invalid uses of the convention reach this check.
+                    if facts.uses_legacy_positional_convention(parameter_node) {
+                        effects.report_invalid_legacy_positional(parameter_node, previous_non_positional_only).await?;
+                    } else if !facts.has_previous_parameter(previous_non_positional_only) {
+                        previous_non_positional_only = Some(parameter_node);
+                    }
+                }
+            }
+
+            if facts.has_pep695_parameters(node) {
+                effects.check_pep695_legacy_typevars(last_definition).await?;
+            }
+            if facts.has_generic_context(&signature) {
+                effects.check_legacy_typevar_defaults(last_definition, &signature).await?;
+                effects.check_legacy_typevar_ordering(last_definition, &signature).await?;
+            }
+            effects.retire_signature(signature).await?;
+            Ok(())
+        }
+    }
+
+    pub(in crate::types::infer::builder) fn parameter_cursor<'a, 'db>(
+        parameters: &'a ast::Parameters,
+        signature: &'a Signature<'db>,
+    ) -> ParameterCursor<'a, 'db> {
+        parameters.iter().zip(signature.parameters().iter())
+    }
+
+    pub(in crate::types::infer::builder) fn next_parameter<'a, 'db>(
+        cursor: &mut ParameterCursor<'a, 'db>,
+    ) -> Option<(ast::AnyParameterRef<'a>, &'a Parameter<'db>)> {
+        cursor.next()
+    }
+
+    impl<'db, F: Fn(&ast::Expr) -> Type<'db>> SynchronousFunctionEffects<'db>
+        for OrdinaryFunctionEffects<'_, 'db, '_, F>
+    {
+        type Error = Infallible;
+
+        fn canonical_last_definition(
+            &self,
+            definition: Definition<'db>,
+        ) -> Result<Option<OverloadLiteral<'db>>, Self::Error> {
+            Ok(infer_definition_types(self.context.db(), definition)
+                .function_type(definition)
+                .map(|function| function.literal(self.context.db()).last_definition))
+        }
+
+        fn has_no_type_check(
+            &self,
+            last_definition: OverloadLiteral<'db>,
+        ) -> Result<bool, Self::Error> {
+            Ok(last_definition
+                .has_known_decorator(self.context.db(), FunctionDecorators::NO_TYPE_CHECK))
+        }
+
+        fn raw_public_signature(
+            &self,
+            last_definition: OverloadLiteral<'db>,
+        ) -> Result<Signature<'db>, Self::Error> {
+            Ok(
+                last_definition
+                    .raw_signature(self.context.db(), ReturnCallableTypeVarScope::Public),
+            )
+        }
+
+        fn function_node<'a>(
+            &'a self,
+            last_definition: OverloadLiteral<'db>,
+        ) -> Result<&'a ast::StmtFunctionDef, Self::Error> {
+            Ok(last_definition.node(
+                self.context.db(),
+                self.context.file(),
+                self.context.module(),
+            ))
+        }
+
+        fn parameter_cursor<'a>(
+            &self,
+            parameters: &'a ast::Parameters,
+            signature: &'a Signature<'db>,
+        ) -> Result<ParameterCursor<'a, 'db>, Self::Error> {
+            Ok(parameter_cursor(parameters, signature))
+        }
+
+        fn next_parameter<'a>(
+            &self,
+            cursor: &mut ParameterCursor<'a, 'db>,
+        ) -> Result<Option<(ast::AnyParameterRef<'a>, &'a Parameter<'db>)>, Self::Error> {
+            Ok(next_parameter(cursor))
+        }
+
+        fn report_invalid_legacy_positional(
+            &self,
+            parameter: &ast::ParameterWithDefault,
+            previous: Option<&ast::ParameterWithDefault>,
+        ) -> Result<(), Self::Error> {
+            super::report_invalid_legacy_positional(self.context, parameter, previous);
+            Ok(())
+        }
+
+        fn check_pep695_legacy_typevars(
+            &self,
+            last_definition: OverloadLiteral<'db>,
+        ) -> Result<(), Self::Error> {
+            super::check_pep695_function_legacy_typevars(
+                self.context,
+                last_definition,
+                self.file_expression_type,
+            );
+            Ok(())
+        }
+
+        fn check_legacy_typevar_defaults(
+            &self,
+            last_definition: OverloadLiteral<'db>,
+            signature: &Signature<'db>,
+        ) -> Result<(), Self::Error> {
+            super::check_legacy_typevar_defaults(
+                self.context,
+                last_definition,
+                signature,
+                self.file_expression_type,
+            );
+            Ok(())
+        }
+
+        fn check_legacy_typevar_ordering(
+            &self,
+            last_definition: OverloadLiteral<'db>,
+            signature: &Signature<'db>,
+        ) -> Result<(), Self::Error> {
+            super::check_legacy_typevar_ordering(
+                self.context,
+                last_definition,
+                signature,
+                self.file_expression_type,
+            );
+            Ok(())
+        }
+
+        fn retire_signature(&self, signature: Signature<'db>) -> Result<(), Self::Error> {
+            drop(signature);
+            Ok(())
+        }
+    }
 }
 
 /// Check that a nominal class's exposed methods respect its declared type-parameter variance.
@@ -61,11 +358,9 @@ pub(crate) fn check_function_definition<'db>(
 pub(super) fn check_class_method_typevar_variance<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
+    generic_context: GenericContext<'db>,
 ) {
     let db = context.db();
-    if !context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
-        return;
-    }
 
     // Protocols require declared variance to match the inferred variance, including for explicitly
     // invariant type variables. Nominal classes can be more conservative, so they only reject uses
@@ -73,9 +368,6 @@ pub(super) fn check_class_method_typevar_variance<'db>(
     // variance inference, but only nominal classes currently skip overloads and independently
     // generic methods to avoid false positives.
     // TODO: Handle these cases in shared variance inference so both checks can account for them.
-    let Some(generic_context) = class.generic_context(db) else {
-        return;
-    };
     if !generic_context.variables(db).any(|typevar| {
         matches!(
             typevar.typevar(db).explicit_variance(db),
@@ -327,62 +619,32 @@ fn report_pep695_function_legacy_typevar<'db>(
     }
 }
 
-/// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
-fn check_legacy_positional_only_convention<'db>(
-    context: &InferContext<'db, '_>,
-    last_definition: OverloadLiteral<'db>,
-    signature: &Signature<'db>,
+fn report_invalid_legacy_positional(
+    context: &InferContext<'_, '_>,
+    parameter: &ast::ParameterWithDefault,
+    previous: Option<&ast::ParameterWithDefault>,
 ) {
-    let db = context.db();
-    let node = last_definition.node(db, context.file(), context.module());
-    let ast_parameters = &node.parameters;
-
-    // If the function has any PEP-570 positional-only parameters,
-    // assume that `__`-prefixed parameters are not meant to be positional-only
-    if !ast_parameters.posonlyargs.is_empty() {
+    let Some(builder) = context.report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, parameter.name())
+    else {
         return;
-    }
-    let parsed_parameters = signature.parameters();
-    let mut previous_non_positional_only: Option<&ast::ParameterWithDefault> = None;
-
-    for (param_node, param) in std::iter::zip(ast_parameters, parsed_parameters) {
-        let ast::AnyParameterRef::NonVariadic(param_node) = param_node else {
-            continue;
-        };
-        if param.is_positional_only() {
-            continue;
-        }
-
-        // Valid uses of the PEP-484 positional-only convention will have been detected as such
-        // in the first iteration over this scope, so `param.is_positional_only()` will return `true`
-        // for those. We only get here for invalid uses of the PEP-484 positional-only convention.
-        if param_node.uses_pep_484_positional_only_convention() {
-            let Some(builder) =
-                context.report_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER, param_node.name())
-            else {
-                continue;
-            };
-            let mut diagnostic = builder.into_diagnostic(
-                "Invalid use of the legacy convention \
-                    for positional-only parameters",
-            );
-            diagnostic.set_primary_annotation_message(
-                "Parameter name begins with `__` but will not be treated as positional-only",
-            );
-            diagnostic.info(
-                "A parameter can only be positional-only \
-                    if it precedes all positional-or-keyword parameters",
-            );
-            if let Some(earlier_node) = previous_non_positional_only {
-                diagnostic.annotate(
-                    context
-                        .secondary(earlier_node.name())
-                        .message("Prior parameter here was positional-or-keyword"),
-                );
-            }
-        } else if previous_non_positional_only.is_none() {
-            previous_non_positional_only = Some(param_node);
-        }
+    };
+    let mut diagnostic = builder.into_diagnostic(
+        "Invalid use of the legacy convention \
+            for positional-only parameters",
+    );
+    diagnostic.set_primary_annotation_message(
+        "Parameter name begins with `__` but will not be treated as positional-only",
+    );
+    diagnostic.info(
+        "A parameter can only be positional-only \
+            if it precedes all positional-or-keyword parameters",
+    );
+    if let Some(earlier_node) = previous {
+        diagnostic.annotate(
+            context
+                .secondary(earlier_node.name())
+                .message("Prior parameter here was positional-or-keyword"),
+        );
     }
 }
 

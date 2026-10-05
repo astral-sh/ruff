@@ -26,10 +26,22 @@ pub(super) struct Support {
 const CHUNK_SIZE: usize = usize::BITS as usize;
 
 impl Support {
+    pub(super) fn words(&self) -> &[usize] {
+        &self.chunks
+    }
+
+    pub(super) fn words_mut(&mut self) -> &mut SmallVec<[usize; 2]> {
+        &mut self.chunks
+    }
+
+    pub(super) fn words_needed(typevar: TypeVarId) -> usize {
+        typevar.index() / CHUNK_SIZE + 1
+    }
+
     /// Adds a typevar to this support.
     pub(super) fn insert(&mut self, typevar: TypeVarId) {
         let index = typevar.index();
-        let chunks_needed = (index + 1).div_ceil(CHUNK_SIZE);
+        let chunks_needed = Self::words_needed(typevar);
         if self.chunks.len() < chunks_needed {
             self.chunks.resize(chunks_needed, 0);
         }

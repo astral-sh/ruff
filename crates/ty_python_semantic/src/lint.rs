@@ -144,8 +144,10 @@ impl LintMetadata {
     }
 }
 
+pub(crate) const LINT_DOCUMENTATION_URL_PREFIX: &str = "https://ty.dev/rules#";
+
 pub(crate) fn lint_documentation_url(lint_name: LintName) -> String {
-    format!("https://ty.dev/rules#{lint_name}")
+    format!("{LINT_DOCUMENTATION_URL_PREFIX}{lint_name}")
 }
 
 #[doc(hidden)]

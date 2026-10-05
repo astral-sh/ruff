@@ -352,7 +352,7 @@ impl std::panic::RefUnwindSafe for Files {}
 /// # Ordering
 /// Ordering is based on the file's salsa-assigned id and not on its values.
 /// The id may change between runs.
-#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct File {
     /// The path of the file (immutable).
@@ -573,15 +573,7 @@ impl File {
     }
 
     pub fn source_type(self, db: &dyn Db) -> PySourceType {
-        match self.path(db) {
-            FilePath::System(path) => path
-                .extension()
-                .map_or(PySourceType::Python, PySourceType::from_extension),
-            FilePath::Vendored(_) => PySourceType::Stub,
-            FilePath::SystemVirtual(path) => path
-                .extension()
-                .map_or(PySourceType::Python, PySourceType::from_extension),
-        }
+        self.path(db).source_type()
     }
 }
 

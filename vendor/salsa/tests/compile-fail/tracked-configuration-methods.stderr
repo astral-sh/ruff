@@ -1,0 +1,102 @@
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+  --> tests/compile-fail/tracked-configuration-methods.rs:10:15
+   |
+10 |     fn method(self, db: &dyn salsa::Database) -> u32 {
+   |               ^^^^
+
+error: `configuration` is only supported on free tracked functions, not tracked methods or associated functions
+ --> tests/compile-fail/tracked-configuration-methods.rs:9:54
+  |
+9 |     #[salsa::tracked(returns(copy), configuration = (MethodConfiguration))]
+  |                                                      ^^^^^^^^^^^^^^^^^^^
+
+error: struct is not supported in `trait`s or `impl`s
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:5
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: consider moving the struct out to a nearby module scope
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `configuration` is only supported on free tracked functions, not tracked methods or associated functions
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:54
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |                                                      ^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `const` items in this context need a name
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:5
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `_` is not a valid name for this `const` item
+   |
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0401]: can't use `Self` from outer item
+  --> tests/compile-fail/tracked-configuration-methods.rs:18:52
+   |
+16 | impl Input {
+   | ---- `Self` type implicitly declared here, by this `impl`
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     --------------------------------------------------------------------------- `Self` used in this inner type alias
+18 |     fn associated(db: &dyn salsa::Database, value: Self) -> u32 {
+   |                                                    ^^^^ use of `Self` from outer item
+   |
+   = note: nested items are independent from their parent item for everything except for privacy and name resolution
+help: refer to the type directly here instead
+   |
+18 -     fn associated(db: &dyn salsa::Database, value: Self) -> u32 {
+18 +     fn associated(db: &dyn salsa::Database, value: Input) -> u32 {
+   |
+
+error[E0401]: can't use `Self` from outer item
+  --> tests/compile-fail/tracked-configuration-methods.rs:18:52
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ---------------------------------------------------------------------------
+   |     |
+   |     `Self` type implicitly declared here, by this `impl`
+   |     `Self` used in this inner function
+18 |     fn associated(db: &dyn salsa::Database, value: Self) -> u32 {
+   |                                                    ^^^^ use of `Self` from outer item
+   |
+   = note: nested items are independent from their parent item for everything except for privacy and name resolution
+help: refer to the type directly here instead
+   |
+18 -     fn associated(db: &dyn salsa::Database, value: Self) -> u32 {
+18 +     fn associated(db: &dyn salsa::Database, value: $Configuration) -> u32 {
+   |
+
+error[E0658]: inherent associated types are unstable
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:5
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: see issue #8995 <https://github.com/rust-lang/rust/issues/8995> for more information
+   = note: this error originates in the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `associated_Configuration_: salsa::plumbing::FromIdWithDb` is not satisfied
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:5
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `salsa::plumbing::FromId` is not implemented for `associated_Configuration_`
+  --> tests/compile-fail/tracked-configuration-methods.rs:17:5
+   |
+17 |     #[salsa::tracked(returns(copy), configuration = (AssociatedConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the following other types implement trait `salsa::plumbing::FromId`
+  --> tests/compile-fail/tracked-configuration-methods.rs:1:1
+   |
+ 1 | #[salsa::input]
+   | ^^^^^^^^^^^^^^^ `Input`
+   |
+  ::: src/id.rs
+   |
+   | impl FromId for Id {
+   | ^^^^^^^^^^^^^^^^^^ `Id`
+   = note: required for `associated_Configuration_` to implement `salsa::plumbing::FromIdWithDb`
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::input` (in Nightly builds, run with -Z macro-backtrace for more info)

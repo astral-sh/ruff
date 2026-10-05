@@ -1,0 +1,287 @@
+--- a/vendor/salsa/src/function/execute/execution_run/field_run.rs
++++ b/vendor/salsa/src/function/execute/execution_run/field_run.rs
+@@ -1,4 +1,7 @@
++use std::convert::Infallible;
+ use std::future::{Future, pending, ready};
++use std::ops::ControlFlow;
++use std::task::Poll;
+ 
+ use super::callback::{self, CallbackKind};
+ use super::frame_free::EntryScope;
+@@ -104,6 +107,8 @@
+ pub trait FieldRequest<'db>: sealed::Sealed {
+     type Stored: 'db;
+     type Output: 'db;
++    #[doc(hidden)]
++    type Dependency: FieldDependencyState;
+ 
+     /// Reads and converts the field synchronously, recording its ordinary dependency first.
+     /// This performs no execution admission; controlled callers use `TaskEndpoint::read_field`.
+@@ -116,20 +121,14 @@
+             "ordinary field request",
+         );
+         let selected = self.select();
+-        if let Some(read) = selected.read {
+-            self.storage().1.report_tracked_read_simple(
+-                read.input,
+-                read.durability,
+-                read.changed_at,
+-            );
+-        }
++        selected.read.record_ordinary(self.storage().1);
+         self.convert(selected.stored)
+     }
+ 
+     #[doc(hidden)]
+     fn storage(&self) -> (&'db Zalsa, &'db ZalsaLocal);
+     #[doc(hidden)]
+-    fn select(&self) -> FieldSelection<'db, Self::Stored>;
++    fn select(&self) -> FieldSelection<'db, Self::Stored, Self::Dependency>;
+     #[doc(hidden)]
+     fn convert(&self, stored: &'db Self::Stored) -> Self::Output;
+     #[doc(hidden)]
+@@ -137,11 +136,136 @@
+ }
+ 
+ #[doc(hidden)]
+-pub struct FieldSelection<'db, T> {
++pub struct FieldSelection<'db, T, D> {
+     stored: &'db T,
+-    read: Option<FieldDependency>,
++    read: D,
++}
++
++
++/// Borrows the existing field-read owner while its dependency is recorded.
++#[doc(hidden)]
++#[derive(Clone, Copy)]
++pub struct FieldRecordingContext<'call, 'run, 'db> {
++    endpoint: &'call TaskEndpoint<'run, 'db>,
++    owner: &'call EntryScope<'call, 'db>,
++    local: &'call ZalsaLocal,
++}
++
++/// Keeps the request's dependency capability in its concrete recording future.
++#[doc(hidden)]
++pub trait FieldDependencyState: sealed::Sealed + Sized + 'static {
++    const RECORDING_QUOTE: Option<(usize, usize)>;
++
++    fn record_ordinary(self, local: &ZalsaLocal);
++
++    fn record<'call, 'run: 'call, 'db: 'run>(
++        &'call self,
++        context: FieldRecordingContext<'call, 'run, 'db>,
++    ) -> impl Future<Output = ()> + 'call;
++}
++
++#[doc(hidden)]
++pub struct NoFieldDependency;
++
++impl sealed::Sealed for NoFieldDependency {}
++
++impl FieldDependencyState for NoFieldDependency {
++    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _, 8, 170>(
++        &|state: &'static Self, context: FieldRecordingContext<'static, 'static, 'static>| {
++            state.record(context)
++        },
++        true,
++    );
++
++    fn record_ordinary(self, _local: &ZalsaLocal) {}
++
++    fn record<'call, 'run: 'call, 'db: 'run>(
++        &'call self,
++        _context: FieldRecordingContext<'call, 'run, 'db>,
++    ) -> impl Future<Output = ()> + 'call {
++        ready(())
++    }
++}
++
++#[doc(hidden)]
++pub struct OptionalFieldDependency(Option<FieldDependency>);
++
++impl sealed::Sealed for OptionalFieldDependency {}
++
++impl FieldDependencyState for OptionalFieldDependency {
++    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _, 7, 84>(
++        &|state: &'static Self, context: FieldRecordingContext<'static, 'static, 'static>| {
++            state.record(context)
++        },
++        false,
++    );
++
++    fn record_ordinary(self, local: &ZalsaLocal) {
++        if let Some(read) = self.0 {
++            local.report_tracked_read_simple(read.input, read.durability, read.changed_at);
++        }
++    }
++
++    async fn record<'call, 'run: 'call, 'db: 'run>(
++        &'call self,
++        context: FieldRecordingContext<'call, 'run, 'db>,
++    ) {
++        if let Some(read) = &self.0 {
++            read_run::dependency(
++                context.endpoint,
++                context.owner,
++                context.local,
++                &read.as_read(),
++            )
++            .await;
++        }
++    }
+ }
+ 
++// The borrowed constructor identifies the future type without creating a context or a future.
++// Its static lifetimes are a type witness; recording uses the actual field-read borrow lifetimes.
++const fn recording_quote<D: 'static, F: Future<Output = ()>, M, const TRANSFERS: usize, const WORK: usize>(
++    _constructor: &M,
++    ready: bool,
++) -> Option<(usize, usize)>
++where
++    M: FnOnce(&'static D, FieldRecordingContext<'static, 'static, 'static>) -> F,
++{
++    let groups = [
++        (TRANSFERS, size_of::<F>()),
++        (4, size_of::<FieldRecordingContext<'static, 'static, 'static>>()),
++        (16, size_of::<&()>()),
++        (2, size_of::<(&Zalsa, &ZalsaLocal)>()),
++        (if ready { 3 } else { 0 }, size_of::<&str>()),
++        (if ready { 12 } else { 0 }, size_of::<Option<()>>()),
++        (8, size_of::<Poll<()>>()),
++    ];
++    let mut bytes = 0usize;
++    let mut index = 0;
++    while index < groups.len() {
++        let (count, width) = groups[index];
++        let Some(group) = count.checked_mul(width) else {
++            return None;
++        };
++        let Some(total) = bytes.checked_add(group) else {
++            return None;
++        };
++        bytes = total;
++        index += 1;
++    }
++    Some((WORK, bytes))
++}
++
++const RECORDING_PREPARATION_WORK: usize = 3 * (3 * 5 + 4 * 4) + 10;
++const RECORDING_PREPARATION_BYTES: usize = 3
++    * (5 * size_of::<RunResult<()>>()
++        + 4 * size_of::<ControlFlow<RunResult<Infallible>, ()>>()
++        + 3 * size_of::<RunResult<Infallible>>()
++        + 4 * size_of::<RunError>())
++    + 3 * size_of::<Option<(usize, usize)>>()
++    + 3 * size_of::<(usize, usize)>()
++    + 8 * size_of::<usize>();
++
+ struct FieldDependency {
+     input: DatabaseKeyIndex,
+     durability: Durability,
+@@ -198,12 +322,13 @@
+ {
+     type Stored = T;
+     type Output = R;
++    type Dependency = OptionalFieldDependency;
+ 
+     fn storage(&self) -> (&'db Zalsa, &'db ZalsaLocal) {
+         self.context.storage
+     }
+ 
+-    fn select(&self) -> FieldSelection<'db, T> {
++    fn select(&self) -> FieldSelection<'db, T, Self::Dependency> {
+         let zalsa = self.context.storage.0;
+         let id = self.value.as_id();
+         let ingredient = zalsa
+@@ -218,7 +343,7 @@
+         };
+         FieldSelection {
+             stored: (self.field)(fields),
+-            read: Some(read),
++            read: OptionalFieldDependency(Some(read)),
+         }
+     }
+ 
+@@ -267,12 +392,13 @@
+ {
+     type Stored = T;
+     type Output = R;
++    type Dependency = OptionalFieldDependency;
+ 
+     fn storage(&self) -> (&'db Zalsa, &'db ZalsaLocal) {
+         self.context.storage
+     }
+ 
+-    fn select(&self) -> FieldSelection<'db, T> {
++    fn select(&self) -> FieldSelection<'db, T, Self::Dependency> {
+         let zalsa = self.context.storage.0;
+         let ingredient = zalsa
+             .lookup_ingredient(zalsa.table().ingredient_index(self.value.as_id()))
+@@ -291,7 +417,7 @@
+         };
+         FieldSelection {
+             stored: (self.field)(fields),
+-            read,
++            read: OptionalFieldDependency(read),
+         }
+     }
+ 
+@@ -337,19 +463,20 @@
+ {
+     type Stored = T;
+     type Output = R;
++    type Dependency = NoFieldDependency;
+ 
+     fn storage(&self) -> (&'db Zalsa, &'db ZalsaLocal) {
+         self.context.storage
+     }
+ 
+-    fn select(&self) -> FieldSelection<'db, T> {
++    fn select(&self) -> FieldSelection<'db, T, Self::Dependency> {
+         let zalsa = self.context.storage.0;
+         let ingredient = zalsa
+             .lookup_ingredient(zalsa.table().ingredient_index(self.value.as_id()))
+             .assert_type::<interned::IngredientImpl<C>>();
+         FieldSelection {
+             stored: (self.field)(ingredient.select_fields(zalsa, self.value)),
+-            read: None,
++            read: NoFieldDependency,
+         }
+     }
+ 
+@@ -396,7 +523,15 @@
+                 // Selection uses direct table/ingredient indices, a type check, and (for tracked
+                 // fields) the canonical revision read lock. Interned fields retain the canonical
+                 // reusable-value check under their shard lock. Selection performs no user conversion.
+-                endpoint.admit_work(16)
++    endpoint.admit_work(16 + RECORDING_PREPARATION_WORK)?;
++            endpoint.admit(super::ExecutionWork::Resource {
++                requested_bytes: RECORDING_PREPARATION_BYTES,
++            })?;
++            let Some((work, requested_bytes)) = R::Dependency::RECORDING_QUOTE else {
++                return Err(RunError::Contract("field recording quotation overflow"));
++            };
++            endpoint.admit_work(work)?;
++            endpoint.admit(super::ExecutionWork::Resource { requested_bytes })
+             })())
+         },
+     )
+@@ -413,9 +548,14 @@
+     )
+     .await;
+     native_values::admit_quote(&endpoint.inner, &scope, quote).await;
+-    if let Some(read) = &selected.read {
+-        read_run::dependency(endpoint, &scope, request.storage().1, &read.as_read()).await;
+-    }
++    selected
++        .read
++        .record(FieldRecordingContext {
++            endpoint,
++            owner: &scope,
++            local: request.storage().1,
++        })
++        .await;
+     callback::complete(&endpoint.inner, &scope, CallbackKind::NativeCall, || {
+         ready(Ok(request.convert(selected.stored)))
+     })

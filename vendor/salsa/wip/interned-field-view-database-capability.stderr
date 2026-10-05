@@ -1,0 +1,92 @@
+error[E0277]: the trait bound `FieldReads<'db>: Database` is not satisfied
+  --> tests/compile-fail/interned-field-view-database-capability.rs:14:22
+   |
+14 |     let _ = ordinary(&fields, value);
+   |                      ^^^^^^^ the trait `Database` is not implemented for `FieldReads<'db>`
+   |
+help: the trait `Database` is implemented for `DatabaseImpl`
+  --> src/database_impl.rs
+   |
+   | impl Database for DatabaseImpl {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for the cast from `&FieldReads<'db>` to `&(dyn Database + 'static)`
+
+error[E0277]: the trait bound `FieldReads<'_>: Database` is not satisfied
+  --> tests/compile-fail/interned-field-view-database-capability.rs:15:24
+   |
+15 |     let _ = Value::new(&fields, 3u32);
+   |             ---------- ^^^^^^^ the trait `Database` is not implemented for `FieldReads<'_>`
+   |             |
+   |             required by a bound introduced by this call
+   |
+help: the trait `Database` is implemented for `DatabaseImpl`
+  --> src/database_impl.rs
+   |
+   | impl Database for DatabaseImpl {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `_::<impl Value<'db>>::new`
+  --> tests/compile-fail/interned-field-view-database-capability.rs:1:1
+   |
+ 1 | #[salsa::interned(field_view = read_fields)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `_::<impl Value<'db>>::new`
+ 2 | struct Value<'db> {
+   |        ----- required by a bound in this associated function
+   = note: this error originates in the macro `salsa::plumbing::setup_interned_struct` which comes from the expansion of the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Value_FieldView_<'_>: Database` is not satisfied
+  --> tests/compile-fail/interned-field-view-database-capability.rs:16:22
+   |
+16 |     let _ = ordinary(&view, value);
+   |                      ^^^^^ unsatisfied trait bound
+   |
+help: the trait `Database` is not implemented for `Value_FieldView_<'_>`
+  --> tests/compile-fail/interned-field-view-database-capability.rs:1:1
+   |
+ 1 | #[salsa::interned(field_view = read_fields)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Database` is implemented for `DatabaseImpl`
+  --> src/database_impl.rs
+   |
+   | impl Database for DatabaseImpl {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: required for the cast from `&Value_FieldView_<'_>` to `&(dyn Database + 'static)`
+   = note: this error originates in the macro `salsa::plumbing::setup_interned_struct` which comes from the expansion of the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `Value_FieldView_<'_>: Database` is not satisfied
+  --> tests/compile-fail/interned-field-view-database-capability.rs:17:24
+   |
+17 |     let _ = Value::new(&view, 3u32);
+   |             ---------- ^^^^^ unsatisfied trait bound
+   |             |
+   |             required by a bound introduced by this call
+   |
+help: the trait `Database` is not implemented for `Value_FieldView_<'_>`
+  --> tests/compile-fail/interned-field-view-database-capability.rs:1:1
+   |
+ 1 | #[salsa::interned(field_view = read_fields)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `Database` is implemented for `DatabaseImpl`
+  --> src/database_impl.rs
+   |
+   | impl Database for DatabaseImpl {}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `_::<impl Value<'db>>::new`
+  --> tests/compile-fail/interned-field-view-database-capability.rs:1:1
+   |
+ 1 | #[salsa::interned(field_view = read_fields)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ required by this bound in `_::<impl Value<'db>>::new`
+ 2 | struct Value<'db> {
+   |        ----- required by a bound in this associated function
+   = note: this error originates in the macro `salsa::plumbing::setup_interned_struct` which comes from the expansion of the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0614]: type `FieldReads<'db>` cannot be dereferenced
+  --> tests/compile-fail/interned-field-view-database-capability.rs:18:36
+   |
+18 |     let _: &dyn salsa::Database = &*fields;
+   |                                    ^^^^^^^ can't be dereferenced
+
+error[E0616]: field `zalsa` of struct `FieldReads` is private
+  --> tests/compile-fail/interned-field-view-database-capability.rs:19:20
+   |
+19 |     let _ = fields.zalsa;
+   |                    ^^^^^ private field

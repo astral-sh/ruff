@@ -1,0 +1,16 @@
+error[E0369]: binary operation `==` cannot be applied to type `&NotPartialEq`
+ --> tests/compile-fail/tracked_struct_field_not_partial_eq.rs:3:12
+  |
+3 |     field: NotPartialEq,
+  |            ^^^^^^^^^^^^
+  |
+note: an implementation of `PartialEq` might be missing for `NotPartialEq`
+ --> tests/compile-fail/tracked_struct_field_not_partial_eq.rs:7:1
+  |
+7 | struct NotPartialEq;
+  | ^^^^^^^^^^^^^^^^^^^ must implement `PartialEq`
+help: consider annotating `NotPartialEq` with `#[derive(PartialEq)]`
+  |
+7 + #[derive(PartialEq)]
+8 | struct NotPartialEq;
+  |

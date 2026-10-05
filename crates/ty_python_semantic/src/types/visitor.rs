@@ -1,6 +1,29 @@
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) mod runtime;
+mod search;
+
+pub(in crate::types) use search::{
+    OrdinaryTypeWalk, StoredTypeSequence, SyncTypeDepthEffects, SyncTypeSearchEffects,
+    SyncTypeSupportEffects, SyncTypeWalkEffects, TypeDepthEffects, TypeSearchEffects,
+    TypeSupportEffects, TypeWalkCursor, TypeWalkEffects, TypeWalkEvent, TypeWalkFacts,
+    TypeWalkPolicy, TypeWalkWork, WalkAction, enter_depth_active_with,
+    expand_known_instance_children_with, expand_method_wrapper_children_with,
+    expand_type_children_with, leave_depth_active_with, next_type_walk_event_with,
+    push_type_walk_action_with, push_type_walk_tuple_with, push_type_walk_visit_with,
+    reserve_walk_pending_with, search_type_sync, search_type_with, static_eligible_sync,
+    static_eligible_with, support_type_sync, support_type_with, type_depth_sync, type_depth_with,
+};
+pub(super) use search::{SearchControl, SearchWork, Unrestricted};
+pub use search::{SearchOperation, TypeWalkFieldOperation};
+
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::constraints::control::{
+    AllocationKind, GrowthPlan, TddControl, TddError, TddWork,
+    Unrestricted as UnrestrictedCollections, sequence_growth, unrestricted,
+};
 use std::cell::{Cell, RefCell};
+use std::convert::Infallible;
 use std::hash::Hash;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -365,8 +388,16 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
+    pub(in crate::types) fn type_was_already_seen_with<C: TddControl>(
+        &mut self,
+        ty: Type<'db>,
+        control: &mut C,
+    ) -> Result<bool, TddError<C::Error>> {
+        Ok(!self.0.get_mut().insert_with(ty, control)?)
+    }
+
     fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
-        !self.0.borrow_mut().insert(ty)
+        !unrestricted(self.0.borrow_mut().insert_with(ty, &mut UnrestrictedCollections))
     }
 }
 
@@ -375,7 +406,7 @@ type CollectedTypes<'db> = SmallSet<Type<'db>, 8>;
 
 /// A set optimized for values that usually contain only a few distinct elements.
 #[derive(Debug)]
-enum SmallSet<T, const INLINE_CAPACITY: usize> {
+pub(in crate::types) enum SmallSet<T, const INLINE_CAPACITY: usize> {
     Inline(SmallVec<[T; INLINE_CAPACITY]>),
     Spilled(FxHashSet<T>),
 }
@@ -386,35 +417,143 @@ impl<T, const INLINE_CAPACITY: usize> Default for SmallSet<T, INLINE_CAPACITY> {
     }
 }
 
-impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+/// The storage metadata needed to admit an insertion without inspecting its keys.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::types) struct SmallSetLayout {
+    pub(in crate::types) inline: bool,
+    pub(in crate::types) len: usize,
+    pub(in crate::types) capacity: usize,
+}
+
+/// Admits key access and storage growth before the set changes its representation or contents.
+/// The candidate is admitted first; retained keys are admitted only when insertion needs growth.
+/// These callbacks do not cover every Hash/Eq operation or native collection wrapper, which the
+/// caller must fund separately. Refusing either callback leaves the keys and representation intact.
+pub(in crate::types) trait SmallSetControl<T> {
+    type Error;
+
+    /// Admits the candidate key, or one retained key before a spill or hash-table growth.
+    fn access(&mut self, value: T) -> Result<(), TddError<Self::Error>>;
+
+    /// Admits growth after all retained-key callbacks, before allocation or mutation.
+    fn grow(&mut self, plan: GrowthPlan) -> Result<(), TddError<Self::Error>>;
+}
+
+#[derive(Debug)]
+struct UnrestrictedSmallSet;
+
+impl<T> SmallSetControl<T> for UnrestrictedSmallSet {
+    type Error = Infallible;
+
+    fn access(&mut self, _value: T) -> Result<(), TddError<Infallible>> {
+        Ok(())
+    }
+
+    fn grow(&mut self, _plan: GrowthPlan) -> Result<(), TddError<Infallible>> {
+        Ok(())
+    }
+}
+
+fn admit_type_walk_access_with<C: TddControl>(
+    ty: Type<'_>,
+    control: &mut C,
+) -> Result<(), TddError<C::Error>> {
+    let units = ty
+        .inline_payload_bytes()
+        .checked_add(1)
+        .ok_or(TddError::CapacityExhausted)?;
+    control.admit(TddWork::TypeWalkAccess { units })?;
+    Ok(())
+}
+
+impl<'db, C: TddControl> SmallSetControl<Type<'db>> for C {
+    type Error = <C as TddControl>::Error;
+
+    fn access(&mut self, value: Type<'db>) -> Result<(), TddError<<C as TddControl>::Error>> {
+        admit_type_walk_access_with(value, self)
+    }
+
+    fn grow(&mut self, plan: GrowthPlan) -> Result<(), TddError<<C as TddControl>::Error>> {
+        self.admit(TddWork::Grow {
+            allocation: AllocationKind::TypeWalkSeen,
+            plan,
+        })?;
+        Ok(())
+    }
+}
+
+impl<T: Copy + Eq + Hash, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
+    /// Inserts a key without imposing an execution limit, returning true if it was absent.
     #[inline]
-    fn insert(&mut self, value: T) -> bool
-    where
-        T: Hash + Eq,
-    {
+    pub(in crate::types) fn insert(&mut self, value: T) -> bool {
+        unrestricted(self.insert_with(value, &mut UnrestrictedSmallSet))
+    }
+
+    /// Inserts a key after admitting access and relocation, returning true if it was absent.
+    /// Equality on `T` determines membership; refusing a callback leaves storage unchanged.
+    pub(in crate::types) fn insert_with<C: SmallSetControl<T>>(
+        &mut self,
+        value: T,
+        control: &mut C,
+    ) -> Result<bool, TddError<C::Error>> {
+        control.access(value)?;
         match self {
             Self::Inline(inline) => {
                 if inline.contains(&value) {
-                    return false;
+                    return Ok(false);
                 }
-
                 if inline.len() < INLINE_CAPACITY {
                     inline.push(value);
-                    return true;
+                    return Ok(true);
                 }
-
+                let requested_capacity = inline
+                    .len()
+                    .checked_add(1)
+                    .ok_or(TddError::CapacityExhausted)?;
+                let requested_payload_bytes = requested_capacity
+                    .checked_mul(size_of::<T>())
+                    .ok_or(TddError::CapacityExhausted)?;
+                if requested_payload_bytes > isize::MAX as usize {
+                    return Err(TddError::CapacityExhausted);
+                }
+                for ty in inline.iter() {
+                    control.access(*ty)?;
+                }
+                let plan = GrowthPlan {
+                    requested_capacity,
+                    requested_payload_bytes,
+                    relocation_units: inline.len(),
+                };
+                control.grow(plan)?;
                 *self = Self::Spilled(Self::spill(inline, value));
-                true
+                Ok(true)
             }
-            Self::Spilled(set) => set.insert(value),
+            Self::Spilled(set) => {
+                if set.contains(&value) {
+                    return Ok(false);
+                }
+                if set.len() == set.capacity() {
+                    let required = set
+                        .len()
+                        .checked_add(1)
+                        .ok_or(TddError::CapacityExhausted)?;
+                    for ty in set.iter() {
+                        control.access(*ty)?;
+                    }
+                    let mut plan =
+                        sequence_growth::<T, C::Error>(set.capacity(), required)?;
+                    plan.relocation_units = set.len();
+                    control.grow(plan)?;
+                    set.reserve(plan.requested_capacity - set.len());
+                }
+                Ok(set.insert(value))
+            }
         }
     }
 
+    /// Moves the full inline buffer into its first hash table and inserts the new key.
     #[cold]
-    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T>
-    where
-        T: Hash + Eq,
-    {
+    fn spill(inline: &mut SmallVec<[T; INLINE_CAPACITY]>, value: T) -> FxHashSet<T> {
         let mut set = FxHashSet::with_capacity_and_hasher(inline.len() + 1, FxBuildHasher);
         set.extend(inline.drain(..));
         let inserted = set.insert(value);
@@ -422,9 +561,38 @@ impl<T, const INLINE_CAPACITY: usize> SmallSet<T, INLINE_CAPACITY> {
         set
     }
 
+    /// Returns storage metadata without hashing or comparing keys.
+    pub(in crate::types) fn layout(&self) -> SmallSetLayout {
+        match self {
+            Self::Inline(values) => SmallSetLayout {
+                inline: true,
+                len: values.len(),
+                capacity: values.capacity(),
+            },
+            Self::Spilled(values) => SmallSetLayout {
+                inline: false,
+                len: values.len(),
+                capacity: values.capacity(),
+            },
+        }
+    }
+
     #[cfg(test)]
-    const fn is_spilled(&self) -> bool {
-        matches!(self, Self::Spilled(_))
+    pub(in crate::types) fn len(&self) -> usize {
+        self.layout().len
+    }
+
+    #[cfg(test)]
+    pub(in crate::types) fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[cfg(test)]
+    pub(in crate::types) const fn is_spilled(&self) -> bool {
+        match self {
+            Self::Inline(_) => false,
+            Self::Spilled(_) => true,
+        }
     }
 }
 
@@ -779,7 +947,7 @@ pub(super) fn contains_growing_type<'db>(
 }
 
 #[derive(Clone, Copy)]
-enum TypeSearchMode {
+pub(in crate::types) enum TypeSearchMode {
     SkipLazyAttributes,
     IncludeLazyAttributes,
     /// Visit alias arguments without evaluating alias bodies or other lazy attributes.
@@ -798,6 +966,24 @@ impl TypeSearchMode {
 
 /// Shared implementation for type searches.
 fn any_over_type_impl<'db, F, T>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    mode: TypeSearchMode,
+    query: F,
+) -> T
+where
+    T: Copy + Default + PartialEq,
+    F: Fn(Type<'db>) -> T,
+{
+    match search::search(db, env, ty, mode, query, &mut search::Unrestricted) {
+        Ok(found) => found,
+        Err(error) => match error {},
+    }
+}
+
+#[cfg(test)]
+fn recursive_search_reference<'db, F, T>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
@@ -830,6 +1016,8 @@ where
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             let default_value = U::default();
+            #[cfg(test)]
+            let _visit = crate::types::constructor::expansion_probe::search_observation::visit();
             let pre_existing = self.found_matching_type.get();
             if pre_existing != default_value {
                 return;
@@ -903,6 +1091,23 @@ pub(super) fn any_over_type_including_alias_arguments<'db>(
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     any_over_type_impl(db, env, ty, TypeSearchMode::IncludeAliasArguments, query)
+}
+
+pub(super) fn try_any_over_type_including_alias_arguments<'db, C: SearchControl>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+    control: &mut C,
+) -> Result<bool, C::Error> {
+    search::search(
+        db,
+        env,
+        ty,
+        TypeSearchMode::IncludeAliasArguments,
+        query,
+        control,
+    )
 }
 
 /// Searches through type aliases without forcing other lazily inferred type attributes.

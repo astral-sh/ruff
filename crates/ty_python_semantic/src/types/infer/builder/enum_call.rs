@@ -115,16 +115,19 @@ pub(crate) fn enum_functional_call_base<'db>(db: &'db dyn Db, ty: Type<'db>) -> 
     let ClassLiteral::Static(cls) = ty.as_class_literal()? else {
         return None;
     };
-    cls.known(db).filter(|k| {
-        matches!(
-            k,
-            KnownClass::Enum
-                | KnownClass::StrEnum
-                | KnownClass::IntEnum
-                | KnownClass::Flag
-                | KnownClass::IntFlag
-        )
-    })
+    cls.known(db)
+        .filter(|class| is_enum_functional_call_base(*class))
+}
+
+pub(super) const fn is_enum_functional_call_base(class: KnownClass) -> bool {
+    matches!(
+        class,
+        KnownClass::Enum
+            | KnownClass::StrEnum
+            | KnownClass::IntEnum
+            | KnownClass::Flag
+            | KnownClass::IntFlag
+    )
 }
 
 fn enum_functional_call_keyword_is_valid(name: &str, python_version: PythonVersion) -> bool {

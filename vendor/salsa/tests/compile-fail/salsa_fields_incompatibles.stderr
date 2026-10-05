@@ -1,0 +1,11 @@
+error: the field name `from` is disallowed in salsa structs
+ --> tests/compile-fail/salsa_fields_incompatibles.rs:4:5
+  |
+4 |     from: u32,
+  |     ^^^^
+
+error: the field name `new` is disallowed in salsa structs
+  --> tests/compile-fail/salsa_fields_incompatibles.rs:10:5
+   |
+10 |     new: u32,
+   |     ^^^

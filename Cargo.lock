@@ -2608,9 +2608,9 @@ dependencies = [
 
 [[package]]
 name = "pin-project-lite"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b3cff922bd51709b605d9ead9aa71031d81447142d828eb4a6eba76fe619f9b"
+checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pkg-config"
@@ -3904,8 +3904,6 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.28.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf0e374215cd2db2b5c75d7b3a99cb0cc052c0595335dfdefc03d4eb08f4aa81"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3918,6 +3916,7 @@ dependencies = [
  "inventory",
  "ordermap",
  "parking_lot",
+ "pin-project-lite",
  "portable-atomic",
  "rustc-hash",
  "salsa-macro-rules",
@@ -3931,14 +3930,10 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.28.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85f4b7d4405540bbd6d4ffa52d4322d983f3781954d3073067ac1bdb028459b3"
 
 [[package]]
 name = "salsa-macros"
 version = "0.28.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "445be2bfbb2f67cb663225ecd7bc5a25370c0250fca30f9d8cbad9a913650370"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4775,6 +4770,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ty_mapping_probe_macros"
+version = "0.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.3",
+]
+
+[[package]]
 name = "ty_module_resolver"
 version = "0.0.14"
 dependencies = [
@@ -4936,12 +4940,15 @@ dependencies = [
  "test-case",
  "thiserror 2.0.20",
  "tracing",
+ "ty_mapping_probe_macros",
  "ty_module_resolver",
+ "ty_project",
  "ty_python_core",
  "ty_site_packages",
  "ty_static",
  "ty_test",
  "ty_vendored",
+ "typed-arena",
 ]
 
 [[package]]

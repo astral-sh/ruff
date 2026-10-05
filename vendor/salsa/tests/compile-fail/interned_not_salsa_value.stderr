@@ -1,0 +1,11 @@
+error: a reference tied to the database lifetime does not implement `SalsaValue`; store owned data or a Salsa struct instead
+  --> tests/compile-fail/interned_not_salsa_value.rs:11:13
+   |
+11 |     _field: &'db str,
+   |             ^^^^^^^^
+
+error: a reference tied to the database lifetime does not implement `SalsaValue`; store owned data or a Salsa struct instead
+ --> tests/compile-fail/interned_not_salsa_value.rs:7:48
+  |
+7 | fn tracked_fn<'db>(_db: &'db dyn Db, _: (), _: &'db str) {}
+  |                                                ^^^^^^^^

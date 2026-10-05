@@ -29,7 +29,7 @@ use crate::{Db, FxOrderSet, ProgramEnvironment};
 /// This can seed a separate non-generic alias query while parameter discovery is incomplete.
 /// Parameters are part of the alias query's key: discovering them later selects a generic
 /// constructor rather than reusing that provisional non-generic value.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(in crate::types) fn implicit_alias_parameters<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,

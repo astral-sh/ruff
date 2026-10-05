@@ -1,0 +1,13 @@
+error: only a single lifetime parameter is accepted
+ --> tests/compile-fail/interned_struct_unknown_attribute.rs:1:1
+  |
+1 | #[salsa::interned]
+  | ^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: cannot find attribute `unknown_attr` in this scope
+ --> tests/compile-fail/interned_struct_unknown_attribute.rs:5:7
+  |
+5 |     #[unknown_attr]
+  |       ^^^^^^^^^^^^

@@ -1,10 +1,11 @@
 use crate::Db;
-use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    place_by_id, place_from_bindings,
+use crate::place::Place;
+use crate::place::PlaceAndQualifiers;
+use crate::types::Type;
+use crate::types::class::member_source::{
+    InlineMemberSourceEffects, RawClassMemberFacts, raw_class_member_sync,
 };
-use crate::types::{ProgramEnvironment, Type};
-use ty_python_core::{place_table, scope::ScopeId, use_def_map};
+use ty_python_core::scope::ScopeId;
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
@@ -54,56 +55,13 @@ impl<'db> Member<'db> {
 /// Infer the public type of a class member/symbol (its type as seen from outside its scope) in the given
 /// `scope`.
 pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str) -> Member<'db> {
-    place_table(db, scope)
-        .symbol_id(name)
-        .map(|symbol_id| {
-            let place_and_quals = place_by_id(
-                db,
-                scope,
-                symbol_id.into(),
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::EndOfScope,
-            );
-
-            if !place_and_quals.is_undefined() && !place_and_quals.is_init_var() {
-                // Trust the declared type if we see a class-level declaration
-                return Member {
-                    inner: place_and_quals,
-                };
-            }
-
-            if let PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty,
-                        provenance: declared_provenance,
-                        ..
-                    }),
-                qualifiers,
-            } = place_and_quals
-            {
-                // Otherwise, we need to check if the symbol has bindings
-                let use_def = use_def_map(db, scope);
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let env = ProgramEnvironment::from_scope(scope);
-                let inferred = place_from_bindings(db, &env, bindings).place;
-
-                // TODO: we should not need to calculate inferred type second time. This is a temporary
-                // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
-                Member {
-                    inner: match inferred {
-                        Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(place) => Place::Defined(DefinedPlace {
-                            ty,
-                            provenance: place.provenance.or(declared_provenance),
-                            ..place
-                        })
-                        .with_qualifiers(qualifiers),
-                    },
-                }
-            } else {
-                Member::unbound()
-            }
-        })
-        .unwrap_or_default()
+    match raw_class_member_sync(
+        scope,
+        name,
+        RawClassMemberFacts,
+        &InlineMemberSourceEffects::new(db),
+    ) {
+        Ok(member) => member,
+        Err(never) => match never {},
+    }
 }

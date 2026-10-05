@@ -8,6 +8,7 @@ use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
 use ruff_python_ast::PythonVersion;
 use salsa::Database;
+use salsa::execution_probe::{BorrowOrCopy, FieldRequest, FieldRequestContext, RunResult, TaskEndpoint};
 use salsa::plumbing::AsId;
 
 use crate::module_name::ModuleName;
@@ -56,7 +57,7 @@ impl<'db> Module<'db> {
     }
 
     /// The resolver environment used to resolve this module.
-    fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
+    pub fn resolver_environment(self, db: &'db dyn Database) -> ResolverEnvironment<'db> {
         match self {
             Module::File(module) => module.resolver_environment(db),
             Module::Namespace(module) => module.resolver_environment(db),
@@ -140,6 +141,130 @@ impl<'db> Module<'db> {
     /// That is, `{self.name}.{basename}` should give the full module name.
     pub fn all_submodules(self, db: &'db dyn Db) -> &'db [Module<'db>] {
         all_submodule_names_for_package(db, self).unwrap_or_default()
+    }
+}
+
+impl<'db> Module<'db> {
+    pub async fn name_with<'run>(
+        self,
+        endpoint: &TaskEndpoint<'run, 'db>,
+    ) -> RunResult<&'db ModuleName> {
+        let context = endpoint.field_request_context();
+        Ok(match self {
+            Self::File(module) => {
+                endpoint
+                    .read_field(module.field_requests(context).name(), &BorrowOrCopy)
+                    .await
+            }
+            Self::Namespace(package) => {
+                endpoint
+                    .read_field(package.field_requests(context).name(), &BorrowOrCopy)
+                    .await
+            }
+        })
+    }
+
+    pub async fn resolver_environment_with<'run>(
+        self,
+        endpoint: &TaskEndpoint<'run, 'db>,
+    ) -> RunResult<ResolverEnvironment<'db>> {
+        let context = endpoint.field_request_context();
+        Ok(match self {
+            Self::File(module) => {
+                endpoint
+                    .read_field(
+                        module.field_requests(context).resolver_environment(),
+                        &BorrowOrCopy,
+                    )
+                    .await
+            }
+            Self::Namespace(package) => {
+                endpoint
+                    .read_field(
+                        package.field_requests(context).resolver_environment(),
+                        &BorrowOrCopy,
+                    )
+                    .await
+            }
+        })
+    }
+
+    pub async fn file_with<'run>(
+        self,
+        endpoint: &TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Option<File>> {
+        Ok(match self {
+            Self::File(module) => Some(
+                endpoint
+                    .read_field(
+                        module
+                            .field_requests(endpoint.field_request_context())
+                            .file(),
+                        &BorrowOrCopy,
+                    )
+                    .await,
+            ),
+            Self::Namespace(_) => {
+                endpoint
+                    .local_call(|| {
+                        endpoint.admit_work(1)?;
+                        Ok(None)
+                    })
+                    .await
+            }
+        })
+    }
+
+    pub async fn known_with<'run>(
+        self,
+        endpoint: &TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Option<KnownModule>> {
+        Ok(match self {
+            Self::File(module) => {
+                endpoint
+                    .read_field(
+                        module
+                            .field_requests(endpoint.field_request_context())
+                            .known(),
+                        &BorrowOrCopy,
+                    )
+                    .await
+            }
+            Self::Namespace(_) => {
+                endpoint
+                    .local_call(|| {
+                        endpoint.admit_work(1)?;
+                        Ok(None)
+                    })
+                    .await
+            }
+        })
+    }
+
+    pub async fn kind_with<'run>(
+        self,
+        endpoint: &TaskEndpoint<'run, 'db>,
+    ) -> RunResult<ModuleKind> {
+        Ok(match self {
+            Self::File(module) => {
+                endpoint
+                    .read_field(
+                        module
+                            .field_requests(endpoint.field_request_context())
+                            .kind(),
+                        &BorrowOrCopy,
+                    )
+                    .await
+            }
+            Self::Namespace(_) => {
+                endpoint
+                    .local_call(|| {
+                        endpoint.admit_work(1)?;
+                        Ok(ModuleKind::Package)
+                    })
+                    .await
+            }
+        })
     }
 }
 
@@ -293,7 +418,7 @@ fn all_submodule_names_for_package<'db>(
 }
 
 /// A module that resolves to a file (`lib.py` or `package/__init__.py`).
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
 pub struct FileModule<'db> {
     #[returns(ref)]
     pub(super) name: ModuleName,
@@ -309,11 +434,24 @@ pub struct FileModule<'db> {
     pub(super) known: Option<KnownModule>,
 }
 
+impl<'db> FileModule<'db> {
+    /// Creates a request to borrow this module's resolver search path without reading it.
+    /// Controlled callers admit request construction and use `TaskEndpoint::read_field` to
+    /// validate and borrow immutable canonical storage for the database lifetime. The
+    /// `file_to_module` memo supplies the resolver dependency.
+    pub fn search_path_request(
+        self,
+        context: FieldRequestContext<'db>,
+    ) -> impl FieldRequest<'db, Stored = SearchPath, Output = &'db SearchPath> + use<'db> {
+        self.field_requests(context).search_path()
+    }
+}
+
 /// A namespace package.
 ///
 /// Namespace packages are special because there are
 /// multiple possible paths and they have no corresponding code file.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
 pub struct NamespacePackage<'db> {
     #[returns(copy)]
     pub(super) resolver_environment: ResolverEnvironment<'db>,

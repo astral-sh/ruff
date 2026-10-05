@@ -9,19 +9,82 @@ use crate::place::{
 };
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
+use crate::types::normalization::OrdinaryNormalizationEffects;
+use crate::types::visitor;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, InstanceProjection, Type, TypeContext, TypeMapping, TypePair,
+    TypeQualifiers,
 };
-use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
 
+pub(in crate::types) mod assembly;
 pub(crate) mod builder;
-mod generic_gradual_intersections;
+pub(in crate::types) mod finite_alternatives;
+pub(in crate::types) mod generic_gradual_intersections;
+pub(in crate::types) mod mapping;
+pub(in crate::types) mod normalization;
+pub(in crate::types) mod numeric;
+pub(in crate::types) mod pair_intersection;
+pub(in crate::types) mod pair_union;
+pub(in crate::types) mod widening;
+
+#[cfg(feature = "experimental-analysis")]
+mod runtime;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use runtime::{register_intersection_values, register_union_values};
+
+#[salsa::tracked(configuration = (pub(in crate::types) UnionFromTwoElementsConfiguration), attempt = ReturnOnly,
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
+        result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+    match pair_union::produce_sync(types, &pair_union::OrdinaryPairUnionEffects { db }) {
+        Ok(ty) => ty,
+        Err(never) => match never {},
+    }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) IntersectionFromTwoElementsConfiguration),
+    attempt = ReturnOnly,
+    returns(copy),
+    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
+        result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
+    match pair_intersection::produce_sync(
+        types,
+        &pair_intersection::OrdinaryPairIntersectionEffects { db },
+    ) {
+        Ok(ty) => ty,
+        Err(never) => match never {},
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) fn union_from_two_elements_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<UnionFromTwoElementsConfiguration> {
+    union_from_two_elements::fn_ingredient_(db, db.zalsa())
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) fn intersection_from_two_elements_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<IntersectionFromTwoElementsConfiguration> {
+    intersection_from_two_elements::fn_ingredient_(db, db.zalsa())
+}
+
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[returns(deref)]
@@ -61,23 +124,12 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let mut iter_elements = elements.into_iter();
-
-        if let Some(first) = iter_elements.next() {
-            if let Some(second) = iter_elements.next() {
-                let mut builder = UnionBuilder::new(db, env);
-                builder.add_in_place(first.into());
-                builder.add_in_place(second.into());
-                for element in iter_elements {
-                    builder.add_in_place(element.into());
-                }
-                builder.build()
-            } else {
-                first.into()
-            }
-        } else {
-            Type::Never
-        }
+        crate::types::signatures::effects::legacy_inline(assembly::union_from_elements(
+            db,
+            env,
+            &mut assembly::InlineTypeElements(elements.into_iter()),
+            &assembly::InlineTypeAssembly,
+        ))
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
@@ -87,22 +139,6 @@ impl<'db> UnionType<'db> {
         a: Type<'db>,
         b: Type<'db>,
     ) -> Type<'db> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
-            },
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn union_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let env = ProgramEnvironment::from_program(types.program(db));
-            UnionBuilder::new(db, &env)
-                .add(types.first(db))
-                .add(types.second(db))
-                .build()
-        }
-
         union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
@@ -193,65 +229,16 @@ impl<'db> UnionType<'db> {
         previous: Type<'db>,
         current: Type<'db>,
     ) -> Option<Type<'db>> {
-        if previous == current {
-            return None;
+        match widening::widen_growing_tuples_sync(
+            previous,
+            current,
+            env,
+            widening::TupleWideningFacts,
+            &widening::OrdinaryTupleWideningEffects { db },
+        ) {
+            Ok(widened) => widened,
+            Err(never) => match never {},
         }
-        let previous_types = match &previous {
-            Type::Union(union) => union.elements(db),
-            ty => std::slice::from_ref(ty),
-        };
-        let current_types = match &current {
-            Type::Union(union) => union.elements(db),
-            ty => std::slice::from_ref(ty),
-        };
-        let previous_lengths: Vec<_> = previous_types
-            .iter()
-            .filter_map(|ty| ty.exact_tuple_instance_spec(db).map(|tuple| tuple.len()))
-            .collect();
-        if previous_lengths.is_empty()
-            || !current_types.iter().any(|ty| {
-                ty.exact_tuple_instance_spec(db)
-                    .is_some_and(|tuple| !previous_lengths.contains(&tuple.len()))
-            })
-        {
-            return None;
-        }
-
-        // Recovery cannot perform relation queries, including when combining tuple elements.
-        // Mark those elements recursive so growing literal unions also widen promptly.
-        let mut elements = UnionBuilder::new(db, env)
-            .cycle_recovery(true)
-            .or_recursively_defined(RecursivelyDefined::Yes);
-        let mut result = UnionBuilder::new(db, env)
-            .cycle_recovery(true)
-            .or_recursively_defined(current.as_union().map_or(RecursivelyDefined::No, |union| {
-                union.recursively_defined(db)
-            }));
-        // During the first cycle iterations, the caller can discard previous alternatives.
-        // Retain their tuple elements for widening without restoring unrelated alternatives.
-        for ty in current_types {
-            if ty.exact_tuple_instance_spec(db).is_none() {
-                result.add_in_place(*ty);
-            }
-        }
-        for ty in previous_types.iter().chain(current_types) {
-            if let Some(tuple) = ty.exact_tuple_instance_spec(db) {
-                for element in tuple.iter_element_types(db) {
-                    elements.add_in_place(element);
-                }
-            }
-        }
-        let element_type = match elements.build() {
-            // `tuple[Never, ...]` normalizes to the empty tuple, which does not contain
-            // fixed-length types like `tuple[Never]`. Preserve a static upper bound.
-            Type::Never => Type::object(),
-            element_type => element_type,
-        };
-        Some(
-            result
-                .add(Type::homogeneous_tuple(db, env, element_type))
-                .build(),
-        )
     }
 
     /// A fallible version of [`UnionType::from_elements`].
@@ -283,19 +270,17 @@ impl<'db> UnionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            Type::Union(UnionType::new(
-                db,
-                self.elements(db)
-                    .iter()
-                    .map(|element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect::<Box<[_]>>(),
-                self.recursively_defined(db),
-            ))
-        } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            })
+        match mapping::map_union_sync(
+            db,
+            self,
+            type_mapping,
+            tcx,
+            visitor,
+            &mapping::OrdinarySetMapping { db },
+            mapping::SetMappingFacts,
+        ) {
+            Ok(mapped) => mapped,
+            Err(never) => match never {},
         }
     }
 
@@ -311,35 +296,6 @@ impl<'db> UnionType<'db> {
             Ok::<_, Infallible>(transform_fn(element))
         });
         mapped
-    }
-
-    /// A version of [`UnionType::map`] that does not unpack type aliases.
-    fn map_leave_aliases(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
-    ) -> Type<'db> {
-        let elements = self.elements(db);
-        let mut iter = elements.iter().enumerate();
-        while let Some((i, ty)) = iter.next() {
-            let new_ty = transform_fn(ty);
-            if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
-                for prev in &elements[..i] {
-                    builder.add_in_place(*prev);
-                }
-                builder.add_in_place(new_ty);
-                for (_, element) in iter {
-                    builder.add_in_place(transform_fn(element));
-                }
-                return builder
-                    .or_recursively_defined(self.recursively_defined(db))
-                    .build();
-            }
-        }
-
-        Type::Union(self)
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -430,6 +386,25 @@ impl<'db> UnionType<'db> {
         })
     }
 
+    pub(super) fn filter_expanding_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut f: impl FnMut(&Type<'db>) -> bool,
+    ) -> Type<'db> {
+        let union = if self.has_aliases(db) {
+            match self.expand_aliases(db, env) {
+                Type::Union(expanded) => expanded,
+                // Expanding collapsed the union to a single type, leaving nothing to filter
+                // between, so apply the predicate to it directly.
+                expanded => return if f(&expanded) { expanded } else { Type::Never },
+            }
+        } else {
+            self
+        };
+        union.filter(db, f)
+    }
+
     pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
         let current = self.elements(db);
         let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
@@ -511,38 +486,17 @@ impl<'db> UnionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db, env)
-            .unpack_aliases(false)
-            .cycle_recovery(true)
-            .or_recursively_defined(self.recursively_defined(db));
-        let mut empty = true;
-        for ty in self.elements(db) {
-            if nested {
-                // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, env, div, nested)?;
-                if ty.same_divergent_marker(div) {
-                    return Some(ty);
-                }
-                builder.add_in_place(ty);
-                empty = false;
-            } else {
-                // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
-                // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
-                    builder = builder.or_recursively_defined(RecursivelyDefined::Yes);
-                    continue;
-                }
-                builder.add_in_place(
-                    ty.recursive_type_normalized_impl(db, env, div, nested)
-                        .unwrap_or(div),
-                );
-                empty = false;
-            }
+        match normalization::union_normalize_sync(
+            self,
+            env,
+            div,
+            nested,
+            &OrdinaryNormalizationEffects { db },
+            normalization::UnionNormalizationFacts,
+        ) {
+            Ok(normalized) => normalized,
+            Err(never) => match never {},
         }
-        if empty {
-            builder.add_in_place(div);
-        }
-        Some(builder.build())
     }
 
     /// Identify some specific unions of known classes, currently the ones that `float` and
@@ -594,27 +548,14 @@ impl KnownUnion {
     }
 
     pub(crate) fn to_type<'db>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            KnownUnion::Float => UnionType::from_two_elements(
-                db,
-                env,
-                KnownClass::Int.to_instance(db, env),
-                KnownClass::Float.to_instance(db, env),
-            ),
-            KnownUnion::Complex => UnionType::from_elements(
-                db,
-                env,
-                [
-                    KnownClass::Int.to_instance(db, env),
-                    KnownClass::Float.to_instance(db, env),
-                    KnownClass::Complex.to_instance(db, env),
-                ],
-            ),
+        match numeric::numeric_union_sync(db, env, self, &numeric::InlineNumericUnionEffects) {
+            Ok(ty) => ty,
+            Err(never) => match never {},
         }
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[returns(ref)]
@@ -661,7 +602,7 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
-    fn len(&self) -> usize {
+    pub(in crate::types) fn len(&self) -> usize {
         match self {
             Self::Empty => 0,
             Self::Single(_) => 1,
@@ -885,10 +826,14 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
-        Some(
-            self.enum_complement(db, env)?
-                .remaining_literal_union(db, env),
-        )
+        match finite_alternatives::produce_sync(
+            self,
+            env,
+            &finite_alternatives::OrdinaryFiniteAlternativeEffects { db },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
+        }
     }
 
     /// Return the finite alternatives only if they remain concise enough for display.
@@ -915,22 +860,12 @@ impl<'db> IntersectionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
-        let mut elements_iter = elements.into_iter();
-
-        if let Some(first) = elements_iter.next() {
-            if let Some(second) = elements_iter.next() {
-                let mut builder = IntersectionBuilder::new(db, env)
-                    .positive_elements([first.into(), second.into()]);
-                for element in elements_iter {
-                    builder.add_positive_in_place(element.into());
-                }
-                builder.build()
-            } else {
-                first.into()
-            }
-        } else {
-            Type::object()
-        }
+        crate::types::signatures::effects::legacy_inline(assembly::intersection_from_elements(
+            db,
+            env,
+            &mut assembly::InlineTypeElements(elements.into_iter()),
+            &assembly::InlineTypeAssembly,
+        ))
     }
 
     /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements, while
@@ -962,21 +897,6 @@ impl<'db> IntersectionType<'db> {
         a: Type<'db>,
         b: Type<'db>,
     ) -> Type<'db> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_initial=|_, id, _| Type::divergent(id),
-            cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, types: TypePair<'db>| {
-                result.cycle_normalized(db, &ProgramEnvironment::from_program(types.program(db)), *previous, cycle)
-            },
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn intersection_from_two_elements<'db>(db: &'db dyn Db, types: TypePair<'db>) -> Type<'db> {
-            let env = ProgramEnvironment::from_program(types.program(db));
-            IntersectionBuilder::new(db, &env)
-                .positive_elements([types.first(db), types.second(db)])
-                .build()
-        }
-
         intersection_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
     }
 
@@ -1037,48 +957,17 @@ impl<'db> IntersectionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if type_mapping.is_structural() {
-            let positive = self
-                .positive(db)
-                .iter()
-                .map(|positive| positive.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<FxOrderSet<_>>();
-            let mut negative = NegativeIntersectionElements::default();
-            for element in self.negative(db) {
-                negative.insert(element.apply_type_mapping_impl(
-                    db,
-                    &type_mapping.flip(),
-                    tcx,
-                    visitor,
-                ));
-            }
-            Type::Intersection(IntersectionType::new(db, positive, negative))
-        } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
-            for positive in self.positive(db) {
-                builder.add_positive_in_place(positive.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                ));
-            }
-            // Regular promotion should remove negative contributions from intersections,
-            // so we don't preserve them here when regular promotion is enabled.
-            if !matches!(
-                type_mapping,
-                TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular)
-            ) {
-                for negative in self.negative(db) {
-                    builder.add_negative_in_place(negative.apply_type_mapping_impl(
-                        db,
-                        &type_mapping.flip(),
-                        tcx,
-                        visitor,
-                    ));
-                }
-            }
-            builder.build()
+        match mapping::map_intersection_sync(
+            db,
+            self,
+            type_mapping,
+            tcx,
+            visitor,
+            &mapping::OrdinarySetMapping { db },
+            mapping::SetMappingFacts,
+        ) {
+            Ok(mapped) => mapped,
+            Err(never) => match never {},
         }
     }
 
@@ -1260,7 +1149,15 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
-        self.positive(db).is_empty() && self.negative(db).len() == 1
+        self.is_simple_negation_with_fields(salsa::FieldReads::new(db))
+    }
+
+    pub(in crate::types) fn is_simple_negation_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> bool {
+        let view = self.read_fields(fields);
+        view.positive().is_empty() && view.negative().len() == 1
     }
 }
 
@@ -1270,29 +1167,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     positive: &FxOrderSet<Type<'db>>,
     negative: &NegativeIntersectionElements<'db>,
 ) -> Type<'db> {
-    let mut builder = IntersectionBuilder::new(db, env);
-    for &element in positive {
-        match element {
-            Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
-                TypeVarBoundOrConstraints::UpperBound(bound) => {
-                    builder.add_positive_in_place(bound);
-                }
-                TypeVarBoundOrConstraints::Constraints(constraints) => {
-                    builder.add_positive_in_place(constraints.as_type(db, env));
-                }
-            },
-            Type::NewTypeInstance(newtype) => {
-                builder.add_positive_in_place(newtype.concrete_base_type(db));
-            }
-            _ => builder.add_positive_in_place(element),
-        }
-    }
-
-    for &element in negative {
-        builder.add_negative_in_place(element);
-    }
-
-    builder.build()
+    builder::intersection_speculation::expand(db, env, positive, negative)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]

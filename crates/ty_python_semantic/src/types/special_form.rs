@@ -5,23 +5,11 @@ use super::{ClassType, Type, TypeFormType, TypingModule, class::KnownClass};
 use crate::ProgramEnvironment;
 use crate::db::Db;
 use crate::types::IntersectionType;
-use crate::types::infer::InferenceFlags;
-use crate::types::{
-    CallableType, FunctionDecorators, InvalidTypeExpression, TypeDefinition, TypeQualifiers,
-    generics::typing_self,
-    infer::{function_known_decorator_flags, nearest_enclosing_class},
-};
+use crate::types::{CallableType, TypeDefinition, TypeQualifiers};
 use ruff_python_ast::PythonVersion;
 use strum_macros::EnumString;
 use ty_module_resolver::{ImportingFile, KnownModule, file_to_module, resolve_module_confident};
-use ty_python_core::{
-    FileScopeId, ProgramFile,
-    definition::{Definition, DefinitionKind},
-    place::ScopedPlaceId,
-    place_table,
-    scope::ScopeId,
-    semantic_index, use_def_map,
-};
+use ty_python_core::{FileScopeId, ProgramFile, place::ScopedPlaceId, place_table, use_def_map};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
@@ -288,7 +276,7 @@ impl SpecialFormType {
     }
 
     /// Parse a `SpecialFormType` from its runtime symbol name.
-    fn candidates_from_name(name: &str) -> &'static [Self] {
+    pub(super) fn candidates_from_name(name: &str) -> &'static [Self] {
         /// An enum that maps 1:1 with `SpecialFormType`, but which holds no associated data
         /// (and therefore can have `EnumString` derived on it).
         /// This is much more robust than having a manual `from_string` method that matches
@@ -505,7 +493,7 @@ impl SpecialFormType {
     ///
     /// Some variants are defined in only one module; others can be defined in either
     /// `typing` or `typing_extensions`.
-    const fn check_module(self, module: KnownModule) -> bool {
+    pub(super) const fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::TypeQualifier(qualifier) => qualifier.check_module(module),
             Self::LegacyStdlibAlias(_)
@@ -805,156 +793,6 @@ impl SpecialFormType {
                     .definition()
             })
             .map(TypeDefinition::SpecialForm)
-    }
-
-    /// Interpret this special form as an unparameterized type in a type-expression context.
-    ///
-    /// This is called for the "misc" special forms that are not aliases, type qualifiers,
-    /// `Tuple`, `Type`, or `Callable` (those are handled by their respective call sites).
-    pub(super) fn in_type_expression<'db>(
-        self,
-        db: &'db dyn Db,
-        scope_id: ScopeId<'db>,
-        typevar_binding_context: Option<Definition<'db>>,
-        inference_flags: InferenceFlags,
-    ) -> Result<Type<'db>, InvalidTypeExpression<'db>> {
-        let env = ProgramEnvironment::from_scope(scope_id);
-        let env = &env;
-        match self {
-            Self::Never | Self::NoReturn => Ok(Type::Never),
-            Self::LiteralString => Ok(Type::literal_string()),
-            Self::Any => Ok(Type::any()),
-            Self::Unknown => Ok(Type::unknown()),
-            Self::Divergent | Self::Todo => Err(InvalidTypeExpression::InvalidType(
-                Type::SpecialForm(self),
-                scope_id,
-            )),
-            Self::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-            Self::AlwaysFalsy => Ok(Type::AlwaysFalsy),
-
-            // Special case: `NamedTuple` in a type expression is understood to describe the type
-            // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
-            // This isn't very principled (since at runtime, `NamedTuple` is just a function),
-            // but it appears to be what users often expect, and it improves compatibility with
-            // other type checkers such as mypy.
-            // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-            Self::NamedTuple => Ok(IntersectionType::from_two_elements(
-                db,
-                env,
-                Type::homogeneous_tuple(db, env, Type::object()),
-                KnownClass::NamedTupleLike.to_instance(db, env),
-            )),
-
-            Self::TypingSelf => {
-                if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS) {
-                    return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
-                }
-
-                let program_file = scope_id.program_file(db);
-                let index = semantic_index(db, program_file);
-                let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                    return Err(InvalidTypeExpression::InvalidType(
-                        Type::SpecialForm(self),
-                        scope_id,
-                    ));
-                };
-
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
-
-                let in_staticmethod = typing_self.is_some_and(|typing_self| {
-                    let Some(binding_definition) = typing_self.binding_context(db).definition()
-                    else {
-                        return false;
-                    };
-
-                    if !matches!(binding_definition.kind(db), DefinitionKind::Function(_)) {
-                        return false;
-                    }
-
-                    binding_definition.name(db).as_deref() != Some("__new__")
-                        && function_known_decorator_flags(db, binding_definition)
-                            .contains(FunctionDecorators::STATICMETHOD)
-                });
-                if in_staticmethod {
-                    return Err(InvalidTypeExpression::TypingSelfInStaticMethod);
-                }
-
-                let is_in_metaclass = KnownClass::Type
-                    .to_class_literal(db, env)
-                    .to_class_type(db)
-                    .is_some_and(|type_class| {
-                        class
-                            .default_specialization(db)
-                            .is_subclass_of(db, env, type_class)
-                    });
-                if is_in_metaclass {
-                    return Err(InvalidTypeExpression::TypingSelfInMetaclass);
-                }
-
-                if inference_flags.contains(InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER)
-                    && inference_flags.intersects(
-                        InferenceFlags::IN_RETURN_TYPE | InferenceFlags::IN_PARAMETER_ANNOTATION,
-                    )
-                    && let Some(typing_self) = typing_self
-                {
-                    return Err(InvalidTypeExpression::TypingSelfWithIncompatibleReceiver(
-                        typing_self,
-                    ));
-                }
-
-                Ok(typing_self
-                    .map(Type::TypeVar)
-                    .unwrap_or(Type::SpecialForm(self)))
-            }
-            // We ensure that `typing.TypeAlias` used in the expected position (annotating an
-            // annotated assignment statement) doesn't reach here. Using it in any other type
-            // expression is an error.
-            Self::TypeAlias => Err(InvalidTypeExpression::TypeAlias),
-            Self::TypedDict(_) => Err(InvalidTypeExpression::TypedDict),
-
-            Self::Literal | Self::Union | Self::Intersection => {
-                Err(InvalidTypeExpression::RequiresArguments(self))
-            }
-
-            Self::Protocol => Err(InvalidTypeExpression::Protocol),
-            Self::Generic => Err(InvalidTypeExpression::Generic),
-
-            // `Concatenate` is just always invalid in this context in a type expression
-            Self::Concatenate
-                if !inference_flags.contains(InferenceFlags::IN_VALID_CONCATENATE_CONTEXT) =>
-            {
-                Err(InvalidTypeExpression::Concatenate)
-            }
-
-            Self::Concatenate | Self::Annotated => {
-                Err(InvalidTypeExpression::RequiresTwoArguments(self))
-            }
-
-            Self::Optional
-            | Self::Not
-            | Self::Top
-            | Self::Bottom
-            | Self::TypeOf
-            | Self::TypeIs
-            | Self::TypeGuard
-            | Self::Unpack
-            | Self::CallableTypeOf
-            | Self::RegularCallableTypeOf => Err(InvalidTypeExpression::RequiresOneArgument(self)),
-
-            // We treat `typing.Type` exactly the same as `builtins.type`:
-            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db, env)),
-            SpecialFormType::TypeForm => Ok(TypeFormType::from_type_expression(db, Type::any())),
-            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, env, Type::unknown())),
-            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
-                Ok(Type::Callable(CallableType::unknown(db)))
-            }
-            SpecialFormType::LegacyStdlibAlias(alias) => {
-                Ok(alias.aliased_class().to_instance(db, env))
-            }
-            SpecialFormType::TypeQualifier(qualifier) => {
-                Err(InvalidTypeExpression::TypeQualifier(qualifier))
-            }
-        }
     }
 }
 

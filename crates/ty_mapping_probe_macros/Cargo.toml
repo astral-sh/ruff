@@ -1,0 +1,19 @@
+[package]
+name = "ty_mapping_probe_macros"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+license = { workspace = true }
+
+[lib]
+proc-macro = true
+doctest = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full", "visit-mut", "extra-traits"] }
+
+[lints]
+workspace = true

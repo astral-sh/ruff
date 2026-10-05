@@ -5,23 +5,21 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast::name::Name;
-use ty_python_core::{
-    definition::{Definition, DefinitionKind},
-    place_table, use_def_map,
-};
+use ty_python_core::{definition::Definition, place_table, use_def_map};
 
 use crate::{
     Db, FxIndexMap, ProgramEnvironment, TypeQualifiers,
     diagnostic::format_enumeration,
-    place::{DefinedPlace, Place, place_from_bindings, place_from_declarations},
+    place::{place_from_bindings, place_from_declarations},
     types::{
-        ClassBase, ClassLiteral, ClassType, LintDiagnosticGuard, Parameters, Signature, Type,
-        binding_type,
+        ClassBase, ClassType, LintDiagnosticGuard, Parameters, Signature, Type, binding_type,
         diagnostic::{AbstractMethodAnnotationPolicy, abstract_method_span},
-        function::{AbstractMethodKind, FunctionDecorators},
-        infer::{function_known_decorators, infer_definition_types},
+        function::AbstractMethodKind,
+        infer::infer_definition_types,
     },
 };
+
+pub(in crate::types) mod discovery;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct AbstractMethods<'db> {
@@ -32,10 +30,14 @@ pub(super) struct AbstractMethods<'db> {
 impl<'db> AbstractMethods<'db> {
     /// Find methods that remain abstract after applying overrides in MRO order.
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        Self {
-            class,
-            methods: class.abstract_methods(db),
-        }
+        Self::from_methods(class, class.abstract_methods(db))
+    }
+
+    pub(in crate::types) fn from_methods(
+        class: ClassType<'db>,
+        methods: &'db FxIndexMap<Name, AbstractMethod<'db>>,
+    ) -> Self {
+        Self { class, methods }
     }
 
     /// Annotate a diagnostic with the unimplemented methods and their declarations.
@@ -252,127 +254,11 @@ impl<'db> ClassType<'db> {
     /// The value of the map is a struct containing information about the abstract method.
     // Inferring class members can call constructors that query abstractness again.
     // Start with no abstract methods while resolving these cycles.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
     pub(in crate::types) fn abstract_methods(
         self,
         db: &'db dyn Db,
-    ) -> FxIndexMap<Name, AbstractMethod<'db>> {
-        fn type_as_abstract_method<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            defining_class: ClassType<'db>,
-        ) -> Option<AbstractMethodKind> {
-            match ty {
-                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
-                Type::BoundMethod(method) => {
-                    type_as_abstract_method(db, method.func(db), defining_class)
-                }
-                Type::PropertyInstance(property) => {
-                    // A property is abstract if any of its accessors is abstract.
-                    property
-                        .getter(db)
-                        .and_then(|getter| type_as_abstract_method(db, getter, defining_class))
-                        .or_else(|| {
-                            property.setter(db).and_then(|setter| {
-                                type_as_abstract_method(db, setter, defining_class)
-                            })
-                        })
-                        .or_else(|| {
-                            property.deleter(db).and_then(|deleter| {
-                                type_as_abstract_method(db, deleter, defining_class)
-                            })
-                        })
-                }
-                _ => None,
-            }
-        }
-
-        let mut abstract_methods: FxIndexMap<Name, _> = FxIndexMap::default();
-        let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
-
-        // Iterate through the MRO in reverse order,
-        // skipping `object` (we know it doesn't define any abstract methods)
-        for supercls in self.iter_mro(db).rev().skip(1) {
-            let ClassBase::Class(class) = supercls else {
-                continue;
-            };
-
-            // Currently we do not recognize dynamic classes as being able to define abstract methods,
-            // but we do recognise them as being able to override abstract methods defined in static classes.
-            let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
-                abstract_methods
-                    .retain(|name, _| class.own_class_member(db, env, None, name).is_undefined());
-                continue;
-            };
-
-            let scope = class_literal.body_scope(db);
-            let place_table = place_table(db, scope);
-            let use_def_map = use_def_map(db, class_literal.body_scope(db));
-            let can_be_implicitly_abstract =
-                !class_literal.file(db).is_stub(db) && class.is_protocol(db);
-
-            // Treat abstract methods from superclasses as having been overridden
-            // if this class has a synthesized method by that name,
-            // or this class has a `ClassVar` declaration by that name
-            abstract_methods.retain(|name, _| {
-                if class_literal
-                    .own_synthesized_member(db, env, None, None, name)
-                    .is_some()
-                {
-                    return false;
-                }
-
-                place_table.symbol_id(name).is_none_or(|symbol_id| {
-                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-                    !place_from_declarations(db, env, declarations)
-                        .ignore_conflicting_declarations()
-                        .qualifiers
-                        .contains(TypeQualifiers::CLASS_VAR)
-                })
-            });
-
-            for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
-                let name = place_table.symbol(symbol_id).name();
-                // Avoid inferring signatures for methods that cannot introduce abstractness.
-                // Inspect all reachable definitions: an earlier overload can be abstract even
-                // when the final implementation is concrete.
-                if !can_be_implicitly_abstract
-                    && !abstract_methods.contains_key(name)
-                    && use_def_map
-                        .reachable_symbol_bindings(symbol_id)
-                        .filter_map(|binding| binding.binding.definition())
-                        .all(|definition| !might_be_explicitly_abstract(db, definition))
-                {
-                    continue;
-                }
-                let place_and_definition = place_from_bindings(db, env, bindings_iterator);
-                let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
-                    continue;
-                };
-                let Some(definition) = place_and_definition.first_definition else {
-                    continue;
-                };
-                if let Some(kind) = type_as_abstract_method(db, ty, class) {
-                    let abstract_method = AbstractMethod {
-                        defining_class: class,
-                        definition,
-                        kind,
-                    };
-                    abstract_methods.insert(name.clone(), abstract_method);
-                } else {
-                    // If this method is concrete, remove it from the map of abstract methods.
-                    abstract_methods.shift_remove(name);
-                }
-            }
-
-            // Slot descriptors override abstract properties. Dataclass-generated slots can also
-            // replace abstract properties defined in this class's body.
-            abstract_methods.retain(|name, _| !class_literal.has_own_slot_descriptor(db, name));
-        }
-
-        abstract_methods.shrink_to_fit();
-
-        abstract_methods
+    ) -> &'db FxIndexMap<Name, AbstractMethod<'db>> {
+        abstract_methods(db, self)
     }
 }
 
@@ -381,19 +267,12 @@ impl<'db> ClassType<'db> {
 /// Keep the definition dependency in this query so unrelated edits to a superclass's module do
 /// not invalidate abstract-method discovery for all of its subclasses. Use cached decorator
 /// metadata to avoid reloading ASTs that were discarded after checking their files.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true)]
+#[salsa::tracked(configuration = (pub(in crate::types) MightBeExplicitlyAbstractConfiguration), attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| true)]
 fn might_be_explicitly_abstract<'db>(db: &'db dyn Db, definition: Definition<'db>) -> bool {
-    let DefinitionKind::Function(function) = definition.kind(db) else {
-        return true;
-    };
-    if !function.has_decorators() {
-        return false;
-    }
-    let decorators = function_known_decorators(db, definition);
-    decorators
-        .known_decorators()
-        .contains(FunctionDecorators::ABSTRACT_METHOD)
-        || decorators.has_unknown_decorators()
+    crate::types::signatures::effects::legacy_inline(discovery::might_be_explicitly_abstract_with(
+        definition,
+        &discovery::OrdinaryDiscoveryEffects(db),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -417,4 +296,43 @@ impl std::fmt::Display for FormattedAbstractMethods {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
     }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) AbstractMethodsConfiguration), self_ty = ClassType<'db>, attempt = ReturnOnly, returns(ref), heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| FxIndexMap::default())]
+fn abstract_methods<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+) -> FxIndexMap<Name, AbstractMethod<'db>> {
+    crate::types::signatures::effects::legacy_inline(discovery::abstract_methods_with(
+        class,
+        &discovery::OrdinaryDiscoveryEffects(db),
+    ))
+}
+
+#[cfg(feature = "experimental-analysis")]
+crate::types::class::runtime::class_memo_schema! {
+    pub(in crate::types) type ClassMemoSchema<'db> = crate::types::StaticClassLiteral<'static>;
+    pub(in crate::types) fn register_class_memos;
+    (abstract_methods, crate::types::class::runtime::AbstractMethodsProfile)
+}
+
+#[cfg(feature = "experimental-analysis")]
+crate::types::class::runtime::class_memo_schema! {
+    pub(in crate::types) type GenericAliasMemoSchema<'db> = crate::types::GenericAlias<'static>;
+    pub(in crate::types) fn register_generic_alias_memos;
+    (abstract_methods, crate::types::class::runtime::AbstractMethodsProfile)
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn abstract_methods_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<AbstractMethodsConfiguration> {
+    abstract_methods::fn_ingredient_(db, db.zalsa())
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn might_be_explicitly_abstract_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<MightBeExplicitlyAbstractConfiguration> {
+    might_be_explicitly_abstract::fn_ingredient_(db, db.zalsa())
 }

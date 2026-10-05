@@ -49,12 +49,15 @@
 mod diagnostic;
 mod exemptions;
 
+use std::convert::Infallible;
+
 use ruff_python_ast::{
     self as ast,
     helpers::any_over_expr,
     visitor::{Visitor, walk_expr},
 };
 use ruff_text_size::Ranged;
+use ty_mapping_probe_macros::shared_semantic_family;
 use ty_python_core::{Truthiness, expression::ExpressionContext, predicate::StatementCall};
 
 use crate::{
@@ -68,6 +71,165 @@ use crate::{
 };
 
 use self::exemptions::RedundantConditionContext;
+
+struct OrdinaryRedundantConditionEffects;
+
+shared_semantic_family! {
+    #[synchronous(SynchronousRedundantConditionEffects)]
+    pub(super) trait RedundantConditionEffects<'db> {
+        type Error;
+        #[operation(local)]
+        async fn in_string_annotation(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        async fn should_check_file(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        async fn is_stub(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error>;
+        #[operation(source)]
+        async fn is_lint_enabled(&self, builder: &TypeInferenceBuilder<'db, '_>, lint: &'static LintMetadata) -> Result<bool, Self::Error>;
+        #[operation(source)]
+        async fn should_check(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_statement<'suite>(&self, suite: &'suite [ast::Stmt], cursor: &mut usize) -> Result<Option<(usize, &'suite ast::Stmt)>, Self::Error>;
+        #[operation(source)]
+        async fn check_if(&self, builder: &TypeInferenceBuilder<'db, '_>, statement: &ast::StmtIf, suite: &[ast::Stmt], index: usize) -> Result<(), Self::Error>;
+        #[operation(source)]
+        async fn check_assert(&self, builder: &TypeInferenceBuilder<'db, '_>, statement: &ast::StmtAssert, suite: &[ast::Stmt], index: usize) -> Result<(), Self::Error>;
+        #[operation(source)]
+        async fn check_while(&self, builder: &TypeInferenceBuilder<'db, '_>, statement: &ast::StmtWhile, suite: &[ast::Stmt], index: usize) -> Result<(), Self::Error>;
+        #[operation(source)]
+        async fn check_match(&self, builder: &TypeInferenceBuilder<'db, '_>, statement: &ast::StmtMatch) -> Result<(), Self::Error>;
+    }
+
+    #[synchronous(should_check_redundant_conditions_sync)]
+    #[capabilities(effects = RedundantConditionEffects)]
+    #[passive_values(REDUNDANT_CONDITION, REDUNDANT_CONDITION_STRICT)]
+    pub(super) async fn should_check_redundant_conditions_with<'db, E: RedundantConditionEffects<'db>>(
+        builder: &TypeInferenceBuilder<'db, '_>,
+        effects: &E,
+    ) -> Result<bool, E::Error> {
+        Ok(!effects.in_string_annotation(builder).await?
+            && effects.should_check_file(builder).await?
+            && !effects.is_stub(builder).await?
+            && (effects.is_lint_enabled(builder, &REDUNDANT_CONDITION).await?
+                || effects.is_lint_enabled(builder, &REDUNDANT_CONDITION_STRICT).await?))
+    }
+
+    #[synchronous(check_suite_for_redundant_conditions_sync)]
+    #[capabilities(effects = RedundantConditionEffects)]
+    #[passive_values()]
+    pub(super) async fn check_suite_for_redundant_conditions_with<'db, E: RedundantConditionEffects<'db>>(
+        builder: &TypeInferenceBuilder<'db, '_>,
+        suite: &[ast::Stmt],
+        effects: &E,
+    ) -> Result<(), E::Error> {
+        if !effects.should_check(builder).await? {
+            return Ok(());
+        }
+
+        let mut cursor = 0;
+        #[cursor_loop]
+        while let Some(entry) = effects.next_statement(suite, &mut cursor).await? {
+            let (index, statement) = entry;
+            match statement {
+                ast::Stmt::If(statement) => effects.check_if(builder, statement, suite, index).await?,
+                ast::Stmt::Assert(statement) => effects.check_assert(builder, statement, suite, index).await?,
+                ast::Stmt::While(statement) => effects.check_while(builder, statement, suite, index).await?,
+                ast::Stmt::Match(statement) => effects.check_match(builder, statement).await?,
+                _ => continue,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'db> SynchronousRedundantConditionEffects<'db> for OrdinaryRedundantConditionEffects {
+    type Error = Infallible;
+
+    fn in_string_annotation(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+    ) -> Result<bool, Self::Error> {
+        Ok(builder.in_string_annotation())
+    }
+
+    fn should_check_file(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+    ) -> Result<bool, Self::Error> {
+        Ok(builder.db().should_check_file(builder.file()))
+    }
+
+    fn is_stub(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error> {
+        Ok(builder.file().is_stub(builder.db()))
+    }
+
+    fn is_lint_enabled(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+        lint: &'static LintMetadata,
+    ) -> Result<bool, Self::Error> {
+        Ok(builder.context.is_lint_enabled(lint))
+    }
+
+    fn should_check(&self, builder: &TypeInferenceBuilder<'db, '_>) -> Result<bool, Self::Error> {
+        should_check_redundant_conditions_sync(builder, self)
+    }
+
+    fn next_statement<'suite>(
+        &self,
+        suite: &'suite [ast::Stmt],
+        cursor: &mut usize,
+    ) -> Result<Option<(usize, &'suite ast::Stmt)>, Self::Error> {
+        let next = suite.get(*cursor).map(|statement| (*cursor, statement));
+        if next.is_some() {
+            *cursor += 1;
+        }
+        Ok(next)
+    }
+
+    fn check_if(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+        statement: &ast::StmtIf,
+        suite: &[ast::Stmt],
+        index: usize,
+    ) -> Result<(), Self::Error> {
+        builder.check_redundant_if(statement, &suite[index + 1..]);
+        Ok(())
+    }
+
+    fn check_assert(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+        statement: &ast::StmtAssert,
+        suite: &[ast::Stmt],
+        index: usize,
+    ) -> Result<(), Self::Error> {
+        builder.check_redundant_assert(statement, &suite[index + 1..]);
+        Ok(())
+    }
+
+    fn check_while(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+        statement: &ast::StmtWhile,
+        suite: &[ast::Stmt],
+        index: usize,
+    ) -> Result<(), Self::Error> {
+        builder.check_redundant_while(statement, &suite[index + 1..]);
+        Ok(())
+    }
+
+    fn check_match(
+        &self,
+        builder: &TypeInferenceBuilder<'db, '_>,
+        statement: &ast::StmtMatch,
+    ) -> Result<(), Self::Error> {
+        builder.check_redundant_match(statement);
+        Ok(())
+    }
+}
 
 /// Classification of a redundant condition.
 ///
@@ -371,11 +533,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// - Neither `redundant-condition` nor `redundant-condition-strict` is enabled
     ///   in the user's configuration.
     fn should_check_redundant_conditions(&self) -> bool {
-        !self.in_string_annotation()
-            && self.db().should_check_file(self.file())
-            && !self.file().is_stub(self.db())
-            && (self.context.is_lint_enabled(&REDUNDANT_CONDITION)
-                || self.context.is_lint_enabled(&REDUNDANT_CONDITION_STRICT))
+        let Ok(should_check) =
+            should_check_redundant_conditions_sync(self, &OrdinaryRedundantConditionEffects);
+        should_check
     }
 
     /// Check a condition, for which types have already been inferred, to see if it is redundant.
@@ -530,111 +690,112 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// [`ConditionKind::ContainsWalrus`], such as `assert (value := "foo")`, remain eligible for
     /// `redundant-condition-strict`.
     pub(super) fn check_suite_for_redundant_conditions(&self, suite: &[ast::Stmt]) {
-        if !self.should_check_redundant_conditions() {
-            return;
-        }
+        let Ok(()) = check_suite_for_redundant_conditions_sync(
+            self,
+            suite,
+            &OrdinaryRedundantConditionEffects,
+        );
+    }
 
-        for (i, statement) in suite.iter().enumerate() {
-            match statement {
-                ast::Stmt::If(if_stmt) => {
-                    let ast::StmtIf {
-                        test,
-                        body,
-                        elif_else_clauses,
-                        ..
-                    } = if_stmt;
+    fn check_redundant_if(&self, if_stmt: &ast::StmtIf, following_statements: &[ast::Stmt]) {
+        let ast::StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            ..
+        } = if_stmt;
 
-                    let branches = std::iter::once((test.as_ref(), body.as_slice())).chain(
-                        elif_else_clauses.iter().map_while(|clause| {
-                            Some((clause.test.as_ref()?, clause.body.as_slice()))
-                        }),
+        let branches = std::iter::once((test.as_ref(), body.as_slice())).chain(
+            elif_else_clauses
+                .iter()
+                .map_while(|clause| Some((clause.test.as_ref()?, clause.body.as_slice()))),
+        );
+
+        for (branch_index, (test, body)) in branches.enumerate() {
+            let following_clauses = &elif_else_clauses[branch_index..];
+
+            let context = RedundantConditionContext::for_if_statement(
+                self,
+                body,
+                following_clauses,
+                following_statements,
+            );
+
+            let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
+            for condition in self.redundant_conditions(boolean_test, context) {
+                if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                    // An operand's truthiness can differ from the full condition's,
+                    // so use the latter to determine which branch is unreachable.
+                    self.add_secondary_annotations_for_redundant_if_or_elif(
+                        &condition,
+                        &mut diagnostic,
+                        boolean_test.truthiness_implied_by(&condition),
+                        if_stmt,
+                        branch_index,
+                        following_statements,
                     );
-
-                    for (branch_index, (test, body)) in branches.enumerate() {
-                        let following_clauses = &elif_else_clauses[branch_index..];
-
-                        let context = RedundantConditionContext::for_if_statement(
-                            self,
-                            body,
-                            following_clauses,
-                            &suite[i + 1..],
-                        );
-
-                        let boolean_test = self.boolean_test(test, ExpressionContext::Condition);
-                        for condition in self.redundant_conditions(boolean_test, context) {
-                            if let Some(mut diagnostic) =
-                                self.report_redundant_condition(&condition)
-                            {
-                                // An operand's truthiness can differ from the full condition's,
-                                // so use the latter to determine which branch is unreachable.
-                                self.add_secondary_annotations_for_redundant_if_or_elif(
-                                    &condition,
-                                    &mut diagnostic,
-                                    boolean_test.truthiness_implied_by(&condition),
-                                    if_stmt,
-                                    branch_index,
-                                    &suite[i + 1..],
-                                );
-                            }
-                        }
-                    }
                 }
-                ast::Stmt::Assert(assert_statement) => {
-                    let boolean_test =
-                        self.boolean_test(&assert_statement.test, ExpressionContext::Condition);
-                    for condition in self
-                        .redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
-                    {
-                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
-                            self.add_secondary_annotations_for_redundant_assert(
-                                &mut diagnostic,
-                                boolean_test.truthiness_implied_by(&condition),
-                                &suite[i + 1..],
-                            );
-                        }
-                    }
-                }
-                ast::Stmt::While(while_statement) => {
-                    let boolean_test =
-                        self.boolean_test(&while_statement.test, ExpressionContext::Condition);
-                    for condition in self
-                        .redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
-                    {
-                        if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
-                            self.add_secondary_annotations_for_redundant_while(
-                                &mut diagnostic,
-                                boolean_test.truthiness_implied_by(&condition),
-                                while_statement,
-                                &suite[i + 1..],
-                            );
-                        }
-                    }
-                }
-                ast::Stmt::Match(match_statement) => {
-                    for (case_index, case) in match_statement.cases.iter().enumerate() {
-                        let Some(guard) = case.guard.as_deref() else {
-                            continue;
-                        };
+            }
+        }
+    }
 
-                        let boolean_test = self.boolean_test(guard, ExpressionContext::Condition);
-                        for condition in self.redundant_conditions(
-                            boolean_test,
-                            RedundantConditionContext::Standalone,
-                        ) {
-                            if let Some(mut diagnostic) =
-                                self.report_redundant_condition(&condition)
-                            {
-                                self.add_secondary_annotations_for_redundant_match(
-                                    &mut diagnostic,
-                                    boolean_test.truthiness_implied_by(&condition),
-                                    case,
-                                    &match_statement.cases[case_index + 1..],
-                                );
-                            }
-                        }
-                    }
+    fn check_redundant_assert(
+        &self,
+        statement: &ast::StmtAssert,
+        following_statements: &[ast::Stmt],
+    ) {
+        let boolean_test = self.boolean_test(&statement.test, ExpressionContext::Condition);
+        for condition in
+            self.redundant_conditions(boolean_test, RedundantConditionContext::Assertion)
+        {
+            if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                self.add_secondary_annotations_for_redundant_assert(
+                    &mut diagnostic,
+                    boolean_test.truthiness_implied_by(&condition),
+                    following_statements,
+                );
+            }
+        }
+    }
+
+    fn check_redundant_while(
+        &self,
+        statement: &ast::StmtWhile,
+        following_statements: &[ast::Stmt],
+    ) {
+        let boolean_test = self.boolean_test(&statement.test, ExpressionContext::Condition);
+        for condition in
+            self.redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+        {
+            if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                self.add_secondary_annotations_for_redundant_while(
+                    &mut diagnostic,
+                    boolean_test.truthiness_implied_by(&condition),
+                    statement,
+                    following_statements,
+                );
+            }
+        }
+    }
+
+    fn check_redundant_match(&self, statement: &ast::StmtMatch) {
+        for (case_index, case) in statement.cases.iter().enumerate() {
+            let Some(guard) = case.guard.as_deref() else {
+                continue;
+            };
+
+            let boolean_test = self.boolean_test(guard, ExpressionContext::Condition);
+            for condition in
+                self.redundant_conditions(boolean_test, RedundantConditionContext::Standalone)
+            {
+                if let Some(mut diagnostic) = self.report_redundant_condition(&condition) {
+                    self.add_secondary_annotations_for_redundant_match(
+                        &mut diagnostic,
+                        boolean_test.truthiness_implied_by(&condition),
+                        case,
+                        &statement.cases[case_index + 1..],
+                    );
                 }
-                _ => continue,
             }
         }
     }

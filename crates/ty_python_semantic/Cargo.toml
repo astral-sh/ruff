@@ -30,6 +30,7 @@ ty_module_resolver = { workspace = true }
 ty_site_packages = { workspace = true }
 ty_python_core = { workspace = true }
 ty_static = { workspace = true }
+ty_mapping_probe_macros = { path = "../ty_mapping_probe_macros" }
 
 bitflags = { workspace = true }
 char_str = { workspace = true, features = ["get-size"] }
@@ -51,8 +52,10 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+typed-arena = { workspace = true }
 
 [dev-dependencies]
+ty_project = { workspace = true }
 ruff_db = { workspace = true, features = ["testing"] }
 test-case = { workspace = true }
 ty_test = { workspace = true }
@@ -69,6 +72,7 @@ quickcheck = { workspace = true }
 quickcheck_macros = { workspace = true }
 
 [features]
+experimental-analysis = ["ty_module_resolver/experimental-analysis"]
 schemars = ["dep:schemars"]
 serde = [
     "ruff_db/serde",

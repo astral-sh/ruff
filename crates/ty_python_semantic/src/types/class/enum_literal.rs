@@ -95,7 +95,7 @@ impl<'db> DynamicEnumAnchor<'db> {
 }
 
 /// A class created via the functional enum syntax, e.g. `Enum("Color", "RED GREEN BLUE")`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicEnumLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
@@ -191,6 +191,7 @@ impl<'db> DynamicEnumLiteral<'db> {
     }
 
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(ref),
         heap_size=ruff_memory_usage::heap_size,
         cycle_initial=|db, _, self_: DynamicEnumLiteral<'db>| {

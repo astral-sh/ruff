@@ -46,6 +46,16 @@ type Chunk = u32;
 const CHUNK_SIZE: usize = Chunk::BITS as usize;
 
 impl RankBitBox {
+    /// Bounds structural equality from the retained lengths without reading bits or ranks.
+    pub(crate) fn comparison_work(&self) -> Option<usize> {
+        // BitBox equality delegates to BitSlice equality. Counting individual bits also
+        // bounds its word-wise fast path; the rank array participates in derived equality.
+        self.bits
+            .len()
+            .checked_add(self.chunk_ranks.len())?
+            .checked_add(2)
+    }
+
     pub fn bits_with_capacity(cap: usize) -> RankBitBoxVec {
         bitvec![Chunk, Msb0; 0; cap]
     }

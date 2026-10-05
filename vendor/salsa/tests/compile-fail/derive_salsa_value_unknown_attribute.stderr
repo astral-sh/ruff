@@ -1,0 +1,5 @@
+error: unexpected `#[salsa_value]` attribute on type
+ --> tests/compile-fail/derive_salsa_value_unknown_attribute.rs:2:3
+  |
+2 | #[salsa_value(unknown)]
+  |   ^^^^^^^^^^^

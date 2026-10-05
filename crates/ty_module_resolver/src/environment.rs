@@ -4,7 +4,7 @@ use ruff_python_ast::PythonVersion;
 use crate::{Db, ModuleResolveMode, SearchPaths, search_paths};
 
 /// The Python version and search paths used to resolve modules.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size, field_requests = read_fields)]
 pub struct ResolverEnvironment<'db> {
     #[returns(copy)]
     pub python_version: PythonVersion,
@@ -72,7 +72,7 @@ impl<'db> ResolverEnvironment<'db> {
 /// Including the resolver environment in the file's identity keeps these resolution results
 /// separate. Projects and scripts with equivalent resolver environments can still share resolution
 /// results.
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size, field_requests = read_fields)]
 pub struct ResolverFile<'db> {
     #[returns(copy)]
     pub file: File,

@@ -1633,9 +1633,30 @@ reveal_type(generic_context(outside_callable(1)))
 outside_callable(1)("string")
 ```
 
+## Returned callables alongside a type variable
+
+A type variable that also appears outside a returned `Callable` belongs to the function. This holds
+regardless of whether the callable comes before or after the other occurrence in a returned tuple.
+
+```pyi
+from typing import Callable, TypeVar
+from ty_extensions._internal import generic_context
+
+T = TypeVar("T")
+
+def outside_after() -> tuple[Callable[[], T], T]: ...
+def outside_before() -> tuple[T, Callable[[], T]]: ...
+
+reveal_type(generic_context(outside_after))  # revealed: ty_extensions._internal.GenericContext[T@outside_after]
+reveal_type(generic_context(outside_before))  # revealed: ty_extensions._internal.GenericContext[T@outside_before]
+reveal_type(outside_after)  # revealed: def outside_after[T]() -> tuple[() -> T, T]
+reveal_type(outside_before)  # revealed: def outside_before[T]() -> tuple[T, () -> T]
+```
+
 ## Naming a generic `Callable` with paramspecs: function return values
 
-The same pattern holds if the callable involves a paramspec.
+The pattern of returning a generic callable from a non-generic function also holds if the callable
+involves a paramspec.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar

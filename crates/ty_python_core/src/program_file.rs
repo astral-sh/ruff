@@ -50,6 +50,7 @@ use crate::{Db, program::Program};
 /// isolated.
 #[salsa::interned(
     debug,
+    field_requests = read_fields,
     constructor = new_internal,
     heap_size = ruff_memory_usage::heap_size
 )]

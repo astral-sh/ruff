@@ -1,20 +1,24 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::signatures::effects::legacy_inline;
 use crate::types::{
-    CallArguments, DataclassParams, KnownClass, KnownInstanceType, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Type, TypeContext, TypingModule,
+    CallArguments, KnownInstanceType, SpecialFormType, SubclassOfType, Type, TypeContext,
+    TypingModule,
     call::CallError,
-    function::KnownFunction,
-    infer::{
-        TypeInferenceBuilder,
-        builder::{DeclaredAndInferredType, DeferredExpressionState},
-        original_class_type,
-    },
+    function::{FunctionType, KnownFunction},
+    infer::{TypeInferenceBuilder, builder::DeferredExpressionState},
     special_form::TypeQualifier,
 };
-use ruff_python_ast::{self as ast, helpers::any_over_expr};
-use ty_module_resolver::{ImportingFile, KnownModule, file_to_module};
+use ruff_python_ast as ast;
+use ty_module_resolver::KnownModule;
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
+
+use self::source_effects::{
+    ClassDefinitionEffects, ClassDefinitionWork, ClassIdentity, LegacyInlineEffects,
+};
+use super::deferred::{DeferredClassWork, DeferredEffects};
+
+pub(in crate::types::infer) mod source_effects;
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
@@ -81,6 +85,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         class_node: &ast::StmtClassDef,
         definition: Definition<'db>,
     ) {
+        legacy_inline(self.infer_class_definition_with(
+            &LegacyInlineEffects,
+            class_node,
+            definition,
+        ));
+    }
+
+    pub(in crate::types::infer) async fn infer_class_definition_with<E>(
+        &mut self,
+        effects: &E,
+        class_node: &ast::StmtClassDef,
+        definition: Definition<'db>,
+    ) -> Result<(), E::Error>
+    where
+        E: ClassDefinitionEffects<'db>,
+    {
+        effects
+            .checkpoint(ClassDefinitionWork::InspectDefinition {
+                decorators: class_node.decorator_list.len(),
+                keywords: class_node.keywords().len(),
+                name_bytes: class_node.name.id.len(),
+            })
+            .await?;
         let env = self.program_environment();
         let ast::StmtClassDef {
             range: _,
@@ -92,34 +119,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             body: _,
         } = class_node;
         let db = self.db();
+        let known_function = async |function: FunctionType<'db>| {
+            let literal = effects.field(function.field_requests(db).literal()).await?;
+            effects
+                .field(literal.last_definition.field_requests(db).known())
+                .await
+        };
 
         let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
-            Vec::with_capacity(decorator_list.len());
+            effects.allocate_vec(decorator_list.len()).await?;
         for decorator in decorator_list {
-            let decorator_ty = self.infer_decorator(decorator);
+            effects
+                .checkpoint(ClassDefinitionWork::DecoratorExpression)
+                .await?;
+            let decorator_ty = effects.infer_class_decorator(self, decorator).await?;
             decorator_types_and_nodes.push((decorator_ty, decorator));
         }
 
-        let body_scope = self
-            .index
-            .node_scope(NodeWithScopeRef::Class(class_node))
-            .to_scope_id(db, self.program_file());
-
-        let file = self.program_file();
-        let importing_file = ImportingFile::File(file.file(db), env.resolver_environment(db));
-        let maybe_known_class = KnownClass::try_from_file_and_name(db, importing_file, name);
-
-        let known_module = || {
-            file_to_module(db, importing_file.resolver_file(db)).and_then(|module| module.known(db))
-        };
-        let in_typing_module = || {
-            matches!(
-                known_module(),
-                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+        let body_scope = effects
+            .class_body_scope(
+                db,
+                self,
+                self.index.node_scope(NodeWithScopeRef::Class(class_node)),
             )
-        };
+            .await?;
 
-        let mut decorators_to_apply = Vec::with_capacity(decorator_types_and_nodes.len());
+        let context = &self.context;
+        let maybe_known_class = effects.known_class(db, context, name).await?;
+
+        let mut decorators_to_apply = effects
+            .allocate_vec(decorator_types_and_nodes.len())
+            .await?;
         let mut metadata_applies_to_original_class = true;
         let mut deprecated = None;
         let mut type_check_only = false;
@@ -134,35 +164,60 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .arguments
             .as_deref()
             .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
-        let infer_original_class_ty = |deprecated,
-                                       type_check_only,
-                                       dataclass_params,
-                                       dataclass_transformer_params,
-                                       total_ordering| {
-            match (maybe_known_class, &*name.id) {
-                (None, "NamedTuple") if in_typing_module() => {
+        let infer_original_class_ty = async |deprecated,
+                                             type_check_only,
+                                             dataclass_params,
+                                             dataclass_transformer_params,
+                                             total_ordering| {
+            effects
+                .checkpoint(ClassDefinitionWork::OriginalClass)
+                .await?;
+            let original_class_ty = match (maybe_known_class, &*name.id) {
+                (None, "NamedTuple")
+                    if matches!(
+                        effects.known_module(db, context).await?,
+                        Some(KnownModule::Typing | KnownModule::TypingExtensions)
+                    ) =>
+                {
                     Type::SpecialForm(SpecialFormType::NamedTuple)
                 }
-                (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
-                (None, "InitVar") if known_module() == Some(KnownModule::Dataclasses) => {
+                (None, "Any")
+                    if matches!(
+                        effects.known_module(db, context).await?,
+                        Some(KnownModule::Typing | KnownModule::TypingExtensions)
+                    ) =>
+                {
+                    Type::SpecialForm(SpecialFormType::Any)
+                }
+                (None, "InitVar")
+                    if effects.known_module(db, context).await?
+                        == Some(KnownModule::Dataclasses) =>
+                {
                     Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar))
                 }
-                _ => Type::from(StaticClassLiteral::new(
-                    db,
-                    &name.id,
-                    body_scope,
-                    maybe_known_class,
-                    deprecated,
-                    type_check_only,
-                    dataclass_params,
-                    dataclass_transformer_params,
-                    total_ordering,
-                    !class_node.decorator_list.is_empty(),
-                    class_node.type_params.is_some(),
-                    has_explicit_bases,
-                    has_explicit_metaclass,
-                )),
-            }
+                _ => Type::from(
+                    effects
+                        .class_literal(
+                            db,
+                            ClassIdentity {
+                                name: &name.id,
+                                body_scope,
+                                known: maybe_known_class,
+                                deprecated,
+                                type_check_only,
+                                dataclass_params,
+                                dataclass_transformer_params,
+                                total_ordering,
+                                has_decorators: !class_node.decorator_list.is_empty(),
+                                has_type_params: class_node.type_params.is_some(),
+                                has_explicit_bases,
+                                has_explicit_metaclass,
+                            },
+                        )
+                        .await?,
+                ),
+            };
+            Ok::<_, E::Error>(original_class_ty)
         };
         // In the first pass, collect metadata decorators that shape the original class object.
         // Once an inner decorator replaces the public binding, outer decorators are ordinary
@@ -170,22 +225,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // For ordinary decorators that still apply to the original class, precompute the call so
         // the second pass can reuse it if no inner decorator has changed the binding.
         for &(decorator_ty, decorator) in decorator_types_and_nodes.iter().rev() {
+            effects
+                .checkpoint(ClassDefinitionWork::MetadataDecorator)
+                .await?;
             if !metadata_applies_to_original_class {
                 decorators_to_apply.push((decorator_ty, decorator, None));
                 continue;
             }
 
-            if decorator_ty
-                .as_function_literal()
-                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
+            if let Some(function) = decorator_ty.as_function_literal()
+                && known_function(function).await? == Some(KnownFunction::Dataclass)
             {
-                dataclass_params = Some(DataclassParams::default_params(db, env));
+                dataclass_params = Some(effects.default_dataclass_params(db, env).await?);
                 continue;
             }
 
-            if decorator_ty
-                .as_function_literal()
-                .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
+            if let Some(function) = decorator_ty.as_function_literal()
+                && known_function(function).await? == Some(KnownFunction::TotalOrdering)
             {
                 total_ordering = true;
                 continue;
@@ -198,10 +254,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             if decorator_ty.is_unknown()
                 && let ast::Expr::Call(call) = &decorator.expression
-                && self
-                    .expression_type(&call.func)
-                    .as_function_literal()
-                    .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
+                && let Some(function) = self.expression_type(&call.func).as_function_literal()
+                && known_function(function).await? == Some(KnownFunction::Dataclass)
             {
                 continue;
             }
@@ -213,25 +267,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if decorator_ty
-                .as_function_literal()
-                .is_some_and(|function| function.is_known(db, KnownFunction::TypeCheckOnly))
+            if let Some(function) = decorator_ty.as_function_literal()
+                && known_function(function).await? == Some(KnownFunction::TypeCheckOnly)
             {
                 type_check_only = true;
                 continue;
             }
 
             // Skip identity decorators to avoid salsa cycles on typeshed.
-            if decorator_ty.as_function_literal().is_some_and(|function| {
-                matches!(
-                    function.known(db),
+            if let Some(function) = decorator_ty.as_function_literal()
+                && matches!(
+                    known_function(function).await?,
                     Some(
                         KnownFunction::Final
                             | KnownFunction::DisjointBase
                             | KnownFunction::RuntimeCheckable
                     )
                 )
-            }) {
+            {
                 continue;
             }
 
@@ -246,15 +299,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // uses synthetic dataclass-transform return types to model decorator factories;
                 // treating this as an ordinary replacement-returning class decorator would
                 // conflate those two cases.
-                let transformer_params = f
-                    .iter_overloads_and_implementation(db)
-                    .rev()
-                    .find_map(|overload| overload.dataclass_transformer_params(db));
+                let transformer_params = effects.dataclass_transformer_params(db, f).await?;
                 if let Some(transformer_params) = transformer_params {
-                    dataclass_params = Some(DataclassParams::from_transformer_params(
-                        db,
-                        transformer_params,
-                    ));
+                    dataclass_params = Some(
+                        effects
+                            .dataclass_params_from_transformer(db, transformer_params)
+                            .await?,
+                    );
                     continue;
                 }
             }
@@ -270,14 +321,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 dataclass_params,
                 dataclass_transformer_params,
                 total_ordering,
-            );
-            let decorator_result = apply_class_decorator(db, env, decorator_ty, original_class_ty);
+            )
+            .await?;
+            let decorator_result = effects
+                .apply_class_decorator(db, env, decorator_ty, original_class_ty)
+                .await?;
             let decorated_ty = match &decorator_result {
                 Ok(return_ty) => *return_ty,
-                Err(error) => error.return_type(db, env),
+                Err(error) => effects.decorator_error_return_type(db, env, error).await?,
             };
-            if !is_unknown_decorator_result(db, decorated_ty)
-                && !type_retains_original_class(db, env, original_class_ty, decorated_ty)
+            if !effects
+                .is_unknown_decorator_result(db, decorated_ty)
+                .await?
+                && !effects
+                    .type_retains_original_class(db, env, original_class_ty, decorated_ty)
+                    .await?
             {
                 metadata_applies_to_original_class = false;
             }
@@ -295,7 +353,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             dataclass_params,
             dataclass_transformer_params,
             total_ordering,
-        );
+        )
+        .await?;
 
         let original_class_ty = inferred_ty;
         let mut undecorated_ty = None;
@@ -304,6 +363,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // to update the public binding. `original_class_ty` remains the class object whose body and
         // metadata were inferred above.
         for (decorator_ty, decorator_node, precomputed_result) in decorators_to_apply {
+            effects
+                .checkpoint(ClassDefinitionWork::RuntimeDecorator)
+                .await?;
             let decorator_result = match precomputed_result {
                 // The metadata pass already called this decorator with the same input. If an inner
                 // decorator changed the binding, apply this decorator to the new public binding.
@@ -312,34 +374,41 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     decorator_result
                 }
-                _ => apply_class_decorator(db, env, decorator_ty, inferred_ty),
+                _ => {
+                    effects
+                        .apply_class_decorator(db, env, decorator_ty, inferred_ty)
+                        .await?
+                }
             };
             let decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
-                Err(CallError(_, bindings)) => {
+                Err(error) => {
                     self.defer_decorator_call(decorator_node, inferred_ty);
-                    bindings.return_type(db, env)
+                    effects.decorator_error_return_type(db, env, &error).await?
                 }
             };
             let decorated_ty = match decorated_ty {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,
             };
-            inferred_ty = if is_unknown_decorator_result(db, decorated_ty) {
+            inferred_ty = if effects
+                .is_unknown_decorator_result(db, decorated_ty)
+                .await?
+            {
                 inferred_ty
-            } else if class_decorator_preserves_class_binding(
-                db,
-                env,
-                original_class_ty,
-                decorated_ty,
-            ) {
-                merge_class_preserving_decorator_result(
-                    db,
-                    env,
-                    original_class_ty,
-                    inferred_ty,
-                    decorated_ty,
-                )
+            } else if effects
+                .class_decorator_preserves_class_binding(db, env, original_class_ty, decorated_ty)
+                .await?
+            {
+                effects
+                    .merge_class_preserving_decorator_result(
+                        db,
+                        env,
+                        original_class_ty,
+                        inferred_ty,
+                        decorated_ty,
+                    )
+                    .await?
             } else {
                 // Only record an undecorated type once a decorator actually replaces the public
                 // binding. If all decorators preserve the class, there is no alternate class type
@@ -349,87 +418,122 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
         }
 
-        self.undecorated_type = undecorated_ty;
-
-        self.add_declaration_with_binding(
-            class_node.into(),
-            definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
-        );
+        effects
+            .checkpoint(ClassDefinitionWork::RecordBinding)
+            .await?;
+        effects
+            .bind_class(self, class_node, definition, inferred_ty, undecorated_ty)
+            .await?;
 
         // if there are type parameters, then the keywords and bases are within that scope
         // and we don't need to run inference here
         if type_params.is_none() {
             // In stub files, keyword values may reference names that are defined later in the file.
-            let previous_deferred_state = self.replace_deferred_state(self.in_stub().into());
-            for keyword in class_node.keywords() {
-                if keyword.arg.as_deref() != Some("extra_items") {
-                    self.infer_expression(&keyword.value, TypeContext::default());
+            let in_stub = effects.in_stub(&self.context).await?;
+            let previous_deferred_state = self.replace_deferred_state(in_stub.into());
+            let keyword_result = async {
+                for keyword in class_node.keywords() {
+                    effects
+                        .checkpoint(ClassDefinitionWork::KeywordExpression)
+                        .await?;
+                    if keyword.arg.as_deref() != Some("extra_items") {
+                        effects.infer_class_expression(self, &keyword.value).await?;
+                    }
                 }
+                Ok::<_, E::Error>(())
             }
+            .await;
             self.deferred_state = previous_deferred_state;
+            keyword_result?;
 
             // Inference of bases deferred in stubs, or if any are string literals.
-            if self.in_stub()
-                || class_node
-                    .bases()
-                    .iter()
-                    .any(|expr| any_over_expr(expr, &ast::Expr::is_string_literal_expr))
+            if effects.in_stub(&self.context).await?
+                || effects
+                    .class_bases_contain_string_literal(class_node)
+                    .await?
                 || class_node
                     .arguments
                     .as_deref()
                     .and_then(|args| args.find_keyword("extra_items"))
                     .is_some()
             {
-                self.deferred.insert(definition);
+                effects
+                    .checkpoint(ClassDefinitionWork::RecordDeferred)
+                    .await?;
+                effects.record_deferred(self, definition).await?;
             } else {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
-                for base in class_node.bases() {
-                    self.infer_expression(base, TypeContext::default());
+                let base_result = async {
+                    for base in class_node.bases() {
+                        effects
+                            .checkpoint(ClassDefinitionWork::BaseExpression)
+                            .await?;
+                        effects.infer_class_expression(self, base).await?;
+                    }
+                    Ok::<_, E::Error>(())
                 }
+                .await;
                 self.typevar_binding_context = previous_typevar_binding_context;
+                base_result?;
             }
         }
+        Ok(())
     }
 
-    pub(super) fn infer_class_deferred(
+    pub(super) async fn infer_class_deferred_with<E: DeferredEffects<'db>>(
         &mut self,
+        effects: &E,
         definition: Definition<'db>,
         class: &ast::StmtClassDef,
-    ) {
+    ) -> Result<(), E::Error> {
+        effects
+            .class_checkpoint(DeferredClassWork::Begin {
+                keywords: class.keywords().len(),
+            })
+            .await?;
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
-        for base in class.bases() {
-            if self.in_stub() {
-                self.infer_expression_with_state(
-                    base,
-                    TypeContext::default(),
-                    DeferredExpressionState::Deferred,
-                );
-            } else {
-                self.infer_expression(base, TypeContext::default());
+        let result = async {
+            for base in class.bases() {
+                effects.class_checkpoint(DeferredClassWork::Base).await?;
+                self.infer_deferred_class_expression_with(effects, base)
+                    .await?;
             }
-        }
 
-        if let Some(arguments) = class.arguments.as_deref()
-            && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
-        {
-            if original_class_type(self.db(), definition)
-                .is_some_and(|class_literal| class_literal.is_typed_dict(self.db()))
+            if let Some(arguments) = class.arguments.as_deref()
+                && let Some(extra_items_keyword) = arguments.find_keyword("extra_items")
             {
-                self.infer_extra_items_kwarg(&extra_items_keyword.value);
-            } else if self.in_stub() {
-                self.infer_expression_with_state(
-                    &extra_items_keyword.value,
-                    TypeContext::default(),
-                    DeferredExpressionState::Deferred,
-                );
-            } else {
-                self.infer_expression(&extra_items_keyword.value, TypeContext::default());
+                effects
+                    .class_checkpoint(DeferredClassWork::ExtraItems)
+                    .await?;
+                if effects.is_typed_dict(self, definition).await? {
+                    effects
+                        .extra_items(self, &extra_items_keyword.value)
+                        .await?;
+                } else {
+                    self.infer_deferred_class_expression_with(effects, &extra_items_keyword.value)
+                        .await?;
+                }
             }
+            Ok(())
         }
-
+        .await;
         self.typevar_binding_context = previous_typevar_binding_context;
+        result
+    }
+
+    async fn infer_deferred_class_expression_with<E: DeferredEffects<'db>>(
+        &mut self,
+        effects: &E,
+        expression: &ast::Expr,
+    ) -> Result<Type<'db>, E::Error> {
+        if !effects.in_stub(&self.context).await? {
+            return effects.expression(self, expression).await;
+        }
+        let previous = self.replace_deferred_state(DeferredExpressionState::Deferred);
+        let result = effects.expression(self, expression).await;
+        self.deferred_state = previous;
+        result
     }
 }
 

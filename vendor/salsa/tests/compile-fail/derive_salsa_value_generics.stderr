@@ -1,0 +1,35 @@
+error[E0277]: `NotSalsaValue<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/derive_salsa_value_generics.rs:14:26
+   |
+14 |     assert_salsa_value::<Generic<NotSalsaValue<'db>>>();
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `NotSalsaValue<'db>`
+  --> tests/compile-fail/derive_salsa_value_generics.rs:9:1
+   |
+ 9 | struct NotSalsaValue<'db>(PhantomData<&'db ()>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `NotSalsaValue<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required for `Generic<NotSalsaValue<'db>>` to implement `SalsaValue`
+  --> tests/compile-fail/derive_salsa_value_generics.rs:4:8
+   |
+ 3 | #[derive(salsa::SalsaValue)]
+   |          ----------------- type parameter would need to implement `SalsaValue`
+ 4 | struct Generic<T>(T);
+   |        ^^^^^^^^^^
+   = help: consider manually implementing `SalsaValue` to avoid undesired bounds
+note: required by a bound in `assert_salsa_value`
+  --> tests/compile-fail/derive_salsa_value_generics.rs:11:26
+   |
+11 | fn assert_salsa_value<T: salsa::SalsaValue>() {}
+   |                          ^^^^^^^^^^^^^^^^^ required by this bound in `assert_salsa_value`

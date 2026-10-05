@@ -1,0 +1,12 @@
+error[E0597]: `db` does not live long enough
+  --> tests/compile-fail/interned-view-outlives-database.rs:10:50
+   |
+ 7 |     let text: &String = {
+   |         ---- borrow later stored here
+ 8 |         let db = salsa::DatabaseImpl::new();
+   |             -- binding `db` declared here
+ 9 |         let value = Immortal::new(&db, String::from("borrowed"));
+10 |         value.read_fields(salsa::FieldReads::new(&db)).text()
+   |                                                  ^^^ borrowed value does not live long enough
+11 |     };
+   |     - `db` dropped here while still borrowed

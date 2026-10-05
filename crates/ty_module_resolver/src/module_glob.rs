@@ -60,6 +60,11 @@ pub struct ModuleGlobSet {
 }
 
 impl ModuleGlobSet {
+    /// Returns whether this set has no configured patterns.
+    pub fn is_empty(&self) -> bool {
+        self.globs.is_empty()
+    }
+
     pub fn empty() -> Self {
         Self {
             regex_set: RegexSet::empty(),

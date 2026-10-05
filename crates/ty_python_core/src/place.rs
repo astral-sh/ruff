@@ -1,4 +1,6 @@
 use crate::expression::Expression;
+use crate::hash_certificate::FrozenHashTable;
+use crate::member::construction::{MemberConstruction, MemberExprCursor};
 use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
     ScopedMemberId,
@@ -12,6 +14,9 @@ use ruff_python_ast as ast;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher};
 use std::iter::FusedIterator;
+use std::ops::ControlFlow;
+
+mod native_values;
 
 /// Return the expressions whose existing bindings a match pattern can narrow.
 ///
@@ -61,23 +66,12 @@ impl PlaceExpr {
     /// * attribute: `x.y`
     /// * subscripts with integer or string literals: `x[0]`, `x['key']`
     pub fn try_from_expr<'e>(expr: impl Into<ast::ExprRef<'e>>) -> Option<Self> {
-        let expr = expr.into();
-
-        // For named expressions (walrus operator), extract the target. The grammar only permits
-        // names as targets; parser recovery may still produce other expressions here.
-        let expr = match expr {
-            ast::ExprRef::Named(named) if named.target.is_name_expr() => {
-                named.target.as_ref().into()
+        let mut cursor = PlaceExprCursor::new(expr);
+        loop {
+            if let ControlFlow::Break(place) = cursor.prepare().advance() {
+                return place;
             }
-            ast::ExprRef::Named(_) => return None,
-            _ => expr,
-        };
-
-        if let ast::ExprRef::Name(name) = expr {
-            return Some(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
         }
-
-        MemberExprBuilder::visit_expr(expr).and_then(Self::try_from_member_expr)
     }
 
     /// Tries to create a `PlaceExpr` from a member expression.
@@ -86,6 +80,73 @@ impl PlaceExpr {
     pub(super) fn try_from_member_expr(builder: MemberExprBuilder) -> Option<Self> {
         let member_expression = MemberExpr::try_from_builder(builder)?;
         Some(Self::Member(Member::new(member_expression)))
+    }
+}
+
+/// Builds a place one receiver edge or literal operation at a time.
+///
+/// The resulting names, path text, and segment encoding are identical to
+/// [`PlaceExpr::try_from_expr`], which drives this same cursor to completion.
+/// The cursor borrows the expression; dropping unfinished construction never
+/// traverses or destroys the expression's AST.
+pub struct PlaceExprCursor<'ast> {
+    member: MemberExprCursor<'ast>,
+    finished_member: Option<MemberExprBuilder>,
+}
+
+impl<'ast> PlaceExprCursor<'ast> {
+    pub fn new(expression: impl Into<ast::ExprRef<'ast>>) -> Self {
+        Self {
+            member: MemberExprCursor::new(expression.into()),
+            finished_member: None,
+        }
+    }
+
+    /// Prepare an operation without executing it or allocating scratch storage.
+    pub fn prepare(&mut self) -> PlaceExprStep<'_, 'ast> {
+        PlaceExprStep { cursor: self }
+    }
+}
+
+/// One operation whose cost remains valid until it is executed.
+///
+/// Its exclusive cursor borrow prevents the quoted state from changing between
+/// admission and execution. Ordinary callers can execute the operation directly.
+pub struct PlaceExprStep<'cursor, 'ast> {
+    cursor: &'cursor mut PlaceExprCursor<'ast>,
+}
+
+impl PlaceExprStep<'_, '_> {
+    /// Return checked bounds for structural work and total requested allocation bytes.
+    ///
+    /// Computing these bounds takes constant time. Work includes destruction of
+    /// retained scratch and output storage on completion or interruption; allocator
+    /// latency is outside the structural bound. `None` indicates arithmetic overflow
+    /// or a path that exceeds the compact representation's existing offset limits.
+    pub fn cost(&self) -> Option<(usize, usize)> {
+        if let Some(builder) = &self.cursor.finished_member {
+            builder.finish_cost()
+        } else {
+            self.cursor.member.cost()
+        }
+    }
+
+    /// Execute this operation, returning the completed place or ordinary invalid-path result.
+    pub fn advance(self) -> ControlFlow<Option<PlaceExpr>> {
+        if let Some(builder) = self.cursor.finished_member.take() {
+            return ControlFlow::Break(PlaceExpr::try_from_member_expr(builder));
+        }
+        match self.cursor.member.advance() {
+            ControlFlow::Continue(()) => ControlFlow::Continue(()),
+            ControlFlow::Break(None) => ControlFlow::Break(None),
+            ControlFlow::Break(Some(MemberConstruction::Name(name))) => {
+                ControlFlow::Break(Some(PlaceExpr::from_expr_name(name)))
+            }
+            ControlFlow::Break(Some(MemberConstruction::Member(builder))) => {
+                self.cursor.finished_member = Some(builder);
+                ControlFlow::Continue(())
+            }
+        }
     }
 }
 
@@ -108,6 +169,14 @@ pub enum PlaceExprRef<'a> {
 }
 
 impl<'a> PlaceExprRef<'a> {
+    /// Returns the retained path length without formatting or traversing the place.
+    pub fn text_len(self) -> usize {
+        match self {
+            Self::Symbol(symbol) => symbol.name().len(),
+            Self::Member(member) => member.expression().text_len(),
+        }
+    }
+
     /// Returns `Some` if the reference is a `Symbol`, otherwise `None`.
     pub const fn as_symbol(self) -> Option<&'a Symbol> {
         if let PlaceExprRef::Symbol(symbol) = self {
@@ -183,6 +252,20 @@ pub enum ScopedPlaceId {
     Member(ScopedMemberId),
 }
 
+pub(crate) fn table_lookup_work<T>(
+    linear_len: usize,
+    reverse: Option<&FrozenHashTable<T>>,
+    key_work: usize,
+) -> Option<usize> {
+    if let Some(reverse) = reverse {
+        return reverse.lookup_work(key_work);
+    }
+    linear_len
+        .checked_add(1)?
+        .checked_mul(key_work)?
+        .checked_mul(4)
+}
+
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct PlaceTable {
     symbols: SymbolTable,
@@ -214,6 +297,37 @@ impl Hash for PlaceTable {
 }
 
 impl PlaceTable {
+    /// Bounds hashing, comparisons and index probing for one symbol-name lookup.
+    pub fn symbol_lookup_work(&self, name_bytes: usize) -> Option<usize> {
+        self.symbols.lookup_work(name_bytes)
+    }
+
+    /// Bounds path hashing, candidate comparisons and index probing for one lookup.
+    ///
+    /// This reads retained lengths and bucket counts only. Reverse-index bounds include empty
+    /// buckets; member equality can inspect both path bytes and segment metadata.
+    pub fn lookup_work(&self, place: PlaceExprRef<'_>) -> Option<usize> {
+        match place {
+            PlaceExprRef::Symbol(symbol) => self.symbol_lookup_work(symbol.name().len()),
+            PlaceExprRef::Member(member) => self.members.lookup_work(
+                member.expression().text_len(),
+                member.expression().num_segments(),
+            ),
+        }
+    }
+
+    /// Bounds complete parent iteration, including prefixes absent from this table.
+    pub fn parent_lookup_work(&self, place: PlaceExprRef<'_>) -> Option<usize> {
+        let segments = place.num_member_segments();
+        if segments == 0 {
+            return Some(1);
+        }
+        let member_work = self.members.lookup_work(place.text_len(), segments)?;
+        let parent_work = segments.checked_mul(4)?.checked_add(16)?;
+        self.symbol_lookup_work(place.text_len())?
+            .checked_add(segments.checked_mul(member_work.checked_add(parent_work)?)?)
+    }
+
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
     ///
     /// Note, this iterator may skip some parents if they are not defined in the current scope.

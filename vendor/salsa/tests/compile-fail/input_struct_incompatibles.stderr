@@ -1,0 +1,54 @@
+error: `returns` option not allowed here
+ --> tests/compile-fail/input_struct_incompatibles.rs:1:16
+  |
+1 | #[salsa::input(returns(ref))]
+  |                ^^^^^^^
+
+error: `specify` option not allowed here
+ --> tests/compile-fail/input_struct_incompatibles.rs:4:16
+  |
+4 | #[salsa::input(specify)]
+  |                ^^^^^^^
+
+error: `no_eq` option not allowed here
+ --> tests/compile-fail/input_struct_incompatibles.rs:7:16
+  |
+7 | #[salsa::input(no_eq)]
+  |                ^^^^^
+
+error: `db` option not allowed here
+  --> tests/compile-fail/input_struct_incompatibles.rs:10:16
+   |
+10 | #[salsa::input(db = Db)]
+   |                ^^
+
+error: unrecognized option `recover_fn`
+  --> tests/compile-fail/input_struct_incompatibles.rs:13:16
+   |
+13 | #[salsa::input(recover_fn = recover)]
+   |                ^^^^^^^^^^
+
+error: `lru` option not allowed here
+  --> tests/compile-fail/input_struct_incompatibles.rs:16:16
+   |
+16 | #[salsa::input(lru =12)]
+   |                ^^^
+
+error: `revisions` option not allowed here
+  --> tests/compile-fail/input_struct_incompatibles.rs:19:16
+   |
+19 | #[salsa::input(revisions = 12)]
+   |                ^^^^^^^^^
+
+error: `#[tracked]` cannot be used with `#[salsa::input]`
+  --> tests/compile-fail/input_struct_incompatibles.rs:24:5
+   |
+24 | /     #[tracked]
+25 | |     field: u32,
+   | |______________^
+
+error: cannot find attribute `tracked` in this scope
+  --> tests/compile-fail/input_struct_incompatibles.rs:24:7
+   |
+24 |     #[tracked]
+   |       ^^^^^^^

@@ -1,0 +1,23 @@
+error: option `serialize` provided twice
+  --> tests/compile-fail/invalid_persist_options.rs:26:65
+   |
+26 | #[salsa::input(persist(serialize = serde::Serialize::serialize, serialize = serde::Serialize::serialize))]
+   |                                                                 ^^^^^^^^^
+
+error: option `deserialize` provided twice
+  --> tests/compile-fail/invalid_persist_options.rs:31:71
+   |
+31 | #[salsa::input(persist(deserialize = serde::Deserialize::deserialize, deserialize = serde::Deserialize::deserialize))]
+   |                                                                       ^^^^^^^^^^^
+
+error: unexpected argument
+  --> tests/compile-fail/invalid_persist_options.rs:36:24
+   |
+36 | #[salsa::input(persist(not_an_option = std::convert::identity))]
+   |                        ^^^^^^^^^^^^^
+
+error: unexpected argument
+  --> tests/compile-fail/invalid_persist_options.rs:51:26
+   |
+51 | #[salsa::tracked(persist(serialize = serde::Serialize::serialize, deserialize = serde::Deserialize::deserialize))]
+   |                          ^^^^^^^^^

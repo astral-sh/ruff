@@ -282,6 +282,7 @@ use crate::{
 };
 
 mod exception_checkpoint;
+mod native_values;
 mod place_state;
 
 pub(super) use exception_checkpoint::ExceptionCheckpointKey;
@@ -675,6 +676,12 @@ impl PredicateNarrowingTargets {
         self.0
             .binary_search_by_key(&place, |&(_, target)| target)
             .is_ok()
+    }
+
+    /// Upper bound on the comparisons needed to look up a place, including the final comparison.
+    /// Computing the bound does not inspect any target entries.
+    pub fn contains_place_work(&self) -> usize {
+        (usize::BITS - self.0.len().leading_zeros()) as usize + 1
     }
 }
 
@@ -1332,6 +1339,14 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
+    /// Returns the symbol at a position in the sequence used by both end-of-scope passes.
+    ///
+    /// This bounded access lets a caller retain fixed-size progress without collecting symbols
+    /// or advancing a fresh iterator through the preceding symbols on every step.
+    pub fn end_of_scope_symbol_at(&self, index: usize) -> Option<ScopedSymbolId> {
+        (index < self.symbol_states.len()).then(|| ScopedSymbolId::from_usize(index))
+    }
+
     pub fn all_end_of_scope_symbol_declarations<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedSymbolId, DeclarationsIterator<'map, 'db>)> + 'map {
@@ -1447,6 +1462,11 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
+    /// Number of retained entries left to inspect, including an initial unbound sentinel.
+    pub fn traversal_len(&self) -> usize {
+        self.inner.len() + usize::from(self.initial_unbound.is_some())
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1533,6 +1553,12 @@ pub struct DeclarationsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> DeclarationsIterator<'map, 'db> {
+    /// Number of retained entries left to inspect, including imports that are filtered out and
+    /// an initial undeclared sentinel.
+    pub fn traversal_len(&self) -> usize {
+        self.inner.len() + usize::from(self.initial_undeclared.is_some())
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }
@@ -1596,6 +1622,11 @@ pub struct ImportedFinalCandidatesIterator<'map, 'db> {
 }
 
 impl<'map, 'db> ImportedFinalCandidatesIterator<'map, 'db> {
+    /// Number of retained entries left to inspect, including declarations that are filtered out.
+    pub fn traversal_len(&self) -> usize {
+        self.inner.len()
+    }
+
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         &self.constraint_tables.predicates
     }

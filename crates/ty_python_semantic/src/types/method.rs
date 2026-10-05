@@ -1,5 +1,9 @@
+use crate::types::callable::function_descriptor::{
+    FunctionBindingFacts, OrdinaryFunctionBinding, bound_method_from_callable_sync,
+};
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use salsa::execution_probe::{FieldRequest, FieldRequestContext};
 
 use crate::{
     Db, Program, ProgramEnvironment,
@@ -13,11 +17,16 @@ use crate::{
     },
 };
 
+#[cfg(feature = "experimental-analysis")]
+mod runtime;
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use runtime::{BoundMethodMemoSchema, register_bound_method_values};
+
 /// This type represents bound method objects that are created when a method is accessed
 /// on an instance of a class. For example, the expression `Path("a.txt").touch` creates
 /// a bound method object that represents the `Path.touch` method which is bound to the
 /// instance `Path("a.txt")`.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundMethodType<'db> {
     /// The callable being bound, exposed as `__func__`. A classmethod can bind a callable
     /// instance as well as a Python function.
@@ -104,21 +113,45 @@ pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
     visitor.visit_type(db, method.signature_receiver(db));
 }
 
-#[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
+    pub(in crate::types) fn receiver_request(
+        self,
+        context: FieldRequestContext<'db>,
+    ) -> impl FieldRequest<'db, Stored = BoundMethodReceiver<'db>, Output = BoundMethodReceiver<'db>>
+    {
+        self.field_requests(context).receiver()
+    }
+
+    pub(in crate::types) fn self_instance_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> Type<'db> {
+        self.read_fields(fields).receiver().self_instance()
+    }
+
+    pub(in crate::types) fn signature_receiver_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> Type<'db> {
+        self.read_fields(fields).receiver().signature_receiver()
+    }
+
     pub(crate) fn from_callable(
         db: &'db dyn Db,
         func: Type<'db>,
         program: Program<'db>,
         receiver: Type<'db>,
     ) -> Self {
-        Self::new_internal(
-            db,
-            func.underlying_function(db),
+        match bound_method_from_callable_sync(
+            func,
             program,
-            func.is_classmethod(db),
-            BoundMethodReceiver::Instance(receiver),
-        )
+            receiver,
+            FunctionBindingFacts,
+            &OrdinaryFunctionBinding { db },
+        ) {
+            Ok(method) => method,
+            Err(error) => match error {},
+        }
     }
 
     pub(super) fn apply_type_mapping_impl(
@@ -233,19 +266,8 @@ impl<'db> BoundMethodType<'db> {
     ///
     /// Unions retain separate callable alternatives, each of which may contain multiple overloads.
     /// Returns `None` if the wrapped value cannot be converted to callables.
-    #[salsa::tracked(
-        returns(as_ref),
-        cycle_initial=|db, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
-        heap_size=ruff_memory_usage::heap_size
-    )]
-    pub(crate) fn callables(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
-        let env = ProgramEnvironment::from_program(self.program(db));
-        self.callables_with_receiver(
-            db,
-            &env,
-            self.signature_receiver(db),
-            self.typing_self_type(db),
-        )
+    pub(crate) fn callables(self, db: &'db dyn Db) -> Option<&'db CallableTypes<'db>> {
+        callables_(db, self)
     }
 
     pub(crate) fn callables_with_receiver(
@@ -293,6 +315,22 @@ impl<'db> BoundMethodType<'db> {
                 .try_map(|ty| ty.recursive_type_normalized_impl(db, env, div, true))?,
         ))
     }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) CallablesConfiguration), attempt = ReturnOnly,
+    self_ty = BoundMethodType<'db>,
+    returns(as_ref),
+    cycle_initial=|db, _, _| Some(CallableTypes::one(CallableType::bottom(db))),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn callables_<'db>(db: &'db dyn Db, method: BoundMethodType<'db>) -> Option<CallableTypes<'db>> {
+    let env = ProgramEnvironment::from_program(method.program(db));
+    method.callables_with_receiver(
+        db,
+        &env,
+        method.signature_receiver(db),
+        method.typing_self_type(db),
+    )
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -959,86 +997,6 @@ impl WrapperDescriptorKind {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> impl Iterator<Item = Signature<'db>> {
-        /// Similar to what we do in [`KnownBoundMethod::signatures`],
-        /// here we also model `types.FunctionType.__get__` (or builtins.property.__get__),
-        /// but now we consider a call to this as a function, i.e. we also expect the `self`
-        /// argument to be passed in.
-        ///
-        /// TODO: Consider merging these synthesized signatures with the ones in
-        /// [`KnownBoundMethod::signatures`], since that one is just this signature
-        /// with the `self` parameters removed.
-        fn dunder_get_signatures<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            class: KnownClass,
-        ) -> [Signature<'db>; 2] {
-            let type_instance = KnownClass::Type.to_instance(db, env);
-            let none = Type::none(db, env);
-            let descriptor = class.to_instance(db, env);
-            [
-                Signature::new(
-                    Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(descriptor),
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(none),
-                        Parameter::positional_only(Some(Name::new_static("owner")))
-                            .with_annotated_type(type_instance),
-                    ]),
-                    Type::unknown(),
-                ),
-                Signature::new(
-                    Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(descriptor),
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(Type::object()),
-                        Parameter::positional_only(Some(Name::new_static("owner")))
-                            .with_annotated_type(UnionType::from_two_elements(
-                                db,
-                                env,
-                                type_instance,
-                                none,
-                            ))
-                            .with_default_type(none),
-                    ]),
-                    Type::unknown(),
-                ),
-            ]
-        }
-
-        match self {
-            WrapperDescriptorKind::FunctionTypeDunderGet => {
-                Either::Left(dunder_get_signatures(db, env, KnownClass::FunctionType).into_iter())
-            }
-            WrapperDescriptorKind::PropertyDunderGet => {
-                Either::Left(dunder_get_signatures(db, env, KnownClass::Property).into_iter())
-            }
-            WrapperDescriptorKind::PropertyDunderSet => {
-                let object = Type::object();
-                Either::Right(std::iter::once(Signature::new(
-                    Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(KnownClass::Property.to_instance(db, env)),
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(object),
-                        Parameter::positional_only(Some(Name::new_static("value")))
-                            .with_annotated_type(object),
-                    ]),
-                    Type::unknown(),
-                )))
-            }
-            WrapperDescriptorKind::PropertyDunderDelete => {
-                Either::Right(std::iter::once(Signature::new(
-                    Parameters::standard([
-                        Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(KnownClass::Property.to_instance(db, env)),
-                        Parameter::positional_only(Some(Name::new_static("instance")))
-                            .with_annotated_type(Type::object()),
-                    ]),
-                    Type::unknown(),
-                )))
-            }
-        }
+        crate::types::call::preparation::known_class::wrapper_descriptor_signatures(db, env, self)
     }
 }

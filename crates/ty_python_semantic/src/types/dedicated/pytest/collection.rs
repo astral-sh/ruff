@@ -64,6 +64,8 @@
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::StmtClassDef;
 use ruff_text_size::Ranged;
+#[cfg(feature = "experimental-analysis")]
+use salsa::plumbing::function::IngredientImpl;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::scope::ScopeKind;
 use ty_python_core::{ProgramFile, global_scope, place_table, semantic_index, use_def_map};
@@ -305,9 +307,16 @@ fn place_value_type<'db>(db: &'db dyn Db, place: Place<'db>) -> Option<Type<'db>
 /// This is tracked because `FunctionType::definition` reads the function's semantic index.
 /// Without this boundary, unrelated edits to that file could make importing bindings' collection
 /// queries rerun. Tracking lets Salsa stop that invalidation when the returned definition is unchanged.
-#[salsa::tracked(returns(copy))]
+#[salsa::tracked(configuration = (pub(in crate::types) TestFunctionDefinitionConfiguration), returns(copy))]
 fn test_function_definition<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Definition<'db> {
     function.definition(db)
+}
+
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) fn test_function_definition_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<TestFunctionDefinitionConfiguration> {
+    test_function_definition::fn_ingredient_(db, db.zalsa())
 }
 
 #[derive(Debug, Clone, Copy)]

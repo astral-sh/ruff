@@ -1,0 +1,8 @@
+error[E0624]: method `field` is private
+ --> tests/compile-fail/get-on-private-interned-field.rs:9:14
+  |
+2 |     #[salsa::interned]
+  |     ------------------ private method defined here
+...
+9 |     interned.field(db);
+  |              ^^^^^ private method

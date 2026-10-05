@@ -1,4 +1,6 @@
+use std::alloc::{Layout, LayoutError};
 use std::fmt::{Display, Formatter};
+use std::sync::atomic::AtomicUsize;
 use std::{borrow::Cow, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
@@ -63,14 +65,31 @@ impl Diagnostic {
         severity: Severity,
         message: impl IntoDiagnosticMessage + 'a,
     ) -> Diagnostic {
+        Self::new_with_capacity(id, severity, message.into_diagnostic_message(), 0, 0)
+    }
+
+    /// Creates a diagnostic with reserved space for annotations and sub-diagnostics.
+    ///
+    /// The capacities count elements, not bytes. Adding elements within these capacities
+    /// avoids vector growth while the diagnostic is uniquely owned. Mutating a shared clone
+    /// may still allocate through copy-on-write.
+    ///
+    /// The message is moved into the diagnostic without copying its buffer.
+    pub fn new_with_capacity(
+        id: DiagnosticId,
+        severity: Severity,
+        message: DiagnosticMessage,
+        annotation_capacity: usize,
+        subdiagnostic_capacity: usize,
+    ) -> Diagnostic {
         let inner = Arc::new(DiagnosticInner {
             id,
             severity,
-            message: message.into_diagnostic_message(),
+            message,
             custom_concise_message: None,
             documentation_url: None,
-            annotations: vec![],
-            subs: vec![],
+            annotations: Vec::with_capacity(annotation_capacity),
+            subs: Vec::with_capacity(subdiagnostic_capacity),
             fix: None,
             parent: None,
             noqa_offset: None,
@@ -78,6 +97,22 @@ impl Diagnostic {
             header_offset: 0,
         });
         Diagnostic { inner }
+    }
+
+    /// Returns the layout used to account for this diagnostic's fixed shared allocation.
+    ///
+    /// This includes the reference counts and private diagnostic fields, but excludes buffers
+    /// owned by those fields, such as messages, annotations and sub-diagnostics.
+    ///
+    /// The calculation follows the standard library's current `Arc` layout: two atomic
+    /// reference counts followed by the value, with C field ordering and final alignment
+    /// padding. This representation is not part of `Arc`'s public API; changes to it require
+    /// updating this accounting.
+    pub const fn allocation_layout() -> Result<Layout, LayoutError> {
+        match Layout::new::<[AtomicUsize; 2]>().extend(Layout::new::<DiagnosticInner>()) {
+            Ok((layout, _)) => Ok(layout.pad_to_align()),
+            Err(error) => Err(error),
+        }
     }
 
     /// Creates a `Diagnostic` for a syntax error.
@@ -216,6 +251,14 @@ impl Diagnostic {
     /// A diagnostic always has a message, but it may be empty.
     pub fn headline_message(&self) -> &str {
         self.inner.message.as_str()
+    }
+
+    /// Returns the custom concise message without deriving one from the annotations.
+    pub fn custom_concise_message(&self) -> Option<&str> {
+        self.inner
+            .custom_concise_message
+            .as_ref()
+            .map(DiagnosticMessage::as_str)
     }
 
     /// Sets the headline message for this diagnostic.
@@ -644,6 +687,13 @@ pub struct SubDiagnostic {
 }
 
 impl SubDiagnostic {
+    /// Returns the layout of this sub-diagnostic's fixed boxed allocation.
+    ///
+    /// Message and annotation buffers are separate allocations and are not included.
+    pub const fn allocation_layout() -> Layout {
+        Layout::new::<SubDiagnosticInner>()
+    }
+
     /// Create a new sub-diagnostic with the given severity and message.
     ///
     /// The severity should describe the assumed level of importance to an end
@@ -904,6 +954,11 @@ impl Annotation {
     /// Attaches an additional tag to this annotation.
     pub fn push_tag(&mut self, tag: DiagnosticTag) {
         self.tags.push(tag);
+    }
+
+    /// Returns the tags associated with this annotation.
+    pub fn tags(&self) -> &[DiagnosticTag] {
+        &self.tags
     }
 
     /// Set whether or not the snippet on this annotation should be suppressed when rendering.

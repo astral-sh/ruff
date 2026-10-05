@@ -1,3 +1,7 @@
+use std::convert::Infallible;
+
+use ty_mapping_probe_macros::shared_semantic_family;
+
 use crate::types::{
     ClassLiteral, Type, binding_type,
     class::{DynamicClassAnchor, DynamicMetaclassConflict, dynamic_class_bases_argument},
@@ -9,7 +13,7 @@ use crate::types::{
         report_dynamic_mro_errors, report_inconsistent_dynamic_generic_bases,
     },
 };
-use ty_python_core::definition::{Definition, DefinitionKind};
+use ty_python_core::definition::{AssignmentDefinitionKind, Definition, DefinitionKind};
 
 /// Iterate over all dynamic class definitions (created using `type()` calls) to check that
 /// the definition will not cause an exception to be raised at runtime. This needs to be done
@@ -18,11 +22,67 @@ pub(crate) fn check_dynamic_class_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
 ) {
-    let db = context.db();
+    match check_dynamic_class_definition_sync(context, definition, &OrdinaryDynamicClassEffects) {
+        Ok(()) => {}
+        Err(error) => match error {},
+    }
+}
 
-    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
-        return;
-    };
+struct OrdinaryDynamicClassEffects;
+
+shared_semantic_family! {
+    #[synchronous(SynchronousDynamicClassEffects)]
+    pub(in crate::types::infer::builder) trait DynamicClassEffects<'db> {
+        type Error;
+        #[operation(local)]
+        async fn definition_kind(&self, context: &InferContext<'db, '_>, definition: Definition<'db>) -> Result<&'db DefinitionKind<'db>, Self::Error>;
+        #[operation(source)]
+        async fn assignment_class(&self, context: &InferContext<'db, '_>, definition: Definition<'db>, assignment: &AssignmentDefinitionKind<'db>) -> Result<(), Self::Error>;
+    }
+
+    #[synchronous(check_dynamic_class_definition_sync)]
+    #[capabilities(effects = DynamicClassEffects)]
+    #[passive_values()]
+    pub(in crate::types::infer::builder) async fn check_dynamic_class_definition_with<'db, E: DynamicClassEffects<'db>>(
+        context: &InferContext<'db, '_>,
+        definition: Definition<'db>,
+        effects: &E,
+    ) -> Result<(), E::Error> {
+        let DefinitionKind::Assignment(assignment) = effects.definition_kind(context, definition).await? else {
+            return Ok(());
+        };
+        effects.assignment_class(context, definition, assignment).await
+    }
+}
+
+impl<'db> SynchronousDynamicClassEffects<'db> for OrdinaryDynamicClassEffects {
+    type Error = Infallible;
+
+    fn definition_kind(
+        &self,
+        context: &InferContext<'db, '_>,
+        definition: Definition<'db>,
+    ) -> Result<&'db DefinitionKind<'db>, Self::Error> {
+        Ok(definition.kind(context.db()))
+    }
+
+    fn assignment_class(
+        &self,
+        context: &InferContext<'db, '_>,
+        definition: Definition<'db>,
+        assignment: &AssignmentDefinitionKind<'db>,
+    ) -> Result<(), Self::Error> {
+        check_dynamic_class_assignment(context, definition, assignment);
+        Ok(())
+    }
+}
+
+fn check_dynamic_class_assignment<'db>(
+    context: &InferContext<'db, '_>,
+    definition: Definition<'db>,
+    assignment: &AssignmentDefinitionKind<'db>,
+) {
+    let db = context.db();
 
     let ty = binding_type(context.db(), definition);
 

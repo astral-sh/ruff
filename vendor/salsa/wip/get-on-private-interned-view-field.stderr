@@ -1,0 +1,8 @@
+error[E0624]: method `hidden` is private
+  --> tests/compile-fail/get-on-private-interned-view-field.rs:19:45
+   |
+ 2 |     #[salsa::interned(field_view = read_fields)]
+   |     -------------------------------------------- private method defined here
+...
+19 |     let _: &u32 = value.read_fields(fields).hidden();
+   |                                             ^^^^^^ private method

@@ -1,0 +1,23 @@
+error: option `field_view` provided twice
+ --> tests/compile-fail/interned-field-view-options.rs:1:32
+  |
+1 | #[salsa::interned(field_view = read_fields, field_view = raw_fields)]
+  |                                ^^^^^^^^^^^
+
+error: `field_view` option not allowed here
+ --> tests/compile-fail/interned-field-view-options.rs:6:16
+  |
+6 | #[salsa::input(field_view = read_fields)]
+  |                ^^^^^^^^^^
+
+error: `field_view` option not allowed here
+  --> tests/compile-fail/interned-field-view-options.rs:11:18
+   |
+11 | #[salsa::tracked(field_view = read_fields)]
+   |                  ^^^^^^^^^^
+
+error: `field_view` option not allowed here
+  --> tests/compile-fail/interned-field-view-options.rs:16:18
+   |
+16 | #[salsa::tracked(field_view = read_fields)]
+   |                  ^^^^^^^^^^

@@ -1,0 +1,32 @@
+error[E0308]: mismatched types
+ --> tests/compile-fail/span-tracked-getter.rs:9:13
+  |
+9 |     x.field(22);
+  |       ----- ^^ expected `&_`, found integer
+  |       |
+  |       arguments to this method are incorrect
+  |
+  = note: expected reference `&_`
+                  found type `{integer}`
+note: method defined here
+ --> tests/compile-fail/span-tracked-getter.rs:3:5
+  |
+1 | #[salsa::tracked]
+  | -----------------
+2 | pub struct MyTracked<'db> {
+3 |     field: u32,
+  |     ^^^^^
+help: consider borrowing here
+  |
+9 |     x.field(&22);
+  |             +
+
+warning: variable does not need to be mutable
+  --> tests/compile-fail/span-tracked-getter.rs:13:9
+   |
+13 |     let mut db = salsa::DatabaseImpl::new();
+   |         ----^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default

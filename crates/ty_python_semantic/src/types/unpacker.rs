@@ -29,6 +29,14 @@ use ty_python_core::unpack::{UnpackKind, UnpackValue};
 use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
 
+pub(in crate::types) mod literal_sequence;
+
+use literal_sequence::{
+    LiteralSequenceFacts, MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE,
+    OrdinaryLiteralPrecisionEffects, OrdinaryLiteralSequenceEffects, remaining_budget_sync,
+    sequence_from_literal_elements_sync,
+};
+
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db, 'ast> {
     context: InferContext<'db, 'ast>,
@@ -409,9 +417,15 @@ impl<'db> UnpackResult<'db> {
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
 
         self
@@ -646,22 +660,14 @@ fn literal_sequence_elements(
 /// Other starred iterables count as one item because their elements are not recovered from
 /// literal syntax. Stop counting as soon as the limit is exceeded.
 pub(super) fn tuple_literal_needs_promotion(values: &[ast::Expr]) -> bool {
-    /// Limit literal precision in large tuple expressions to avoid pathological inference costs.
-    const MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE: usize = 64;
-
-    fn remaining_budget(values: &[ast::Expr], remaining: usize) -> Option<usize> {
-        values.iter().try_fold(remaining, |remaining, value| {
-            if let ast::Expr::Starred(starred) = value
-                && let Some(values) = sequence_elts(starred.value.expression_value())
-            {
-                remaining_budget(values, remaining)
-            } else {
-                remaining.checked_sub(1)
-            }
-        })
-    }
-
-    remaining_budget(values, MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE).is_none()
+    remaining_budget_sync(
+        values,
+        MAX_TUPLE_LENGTH_FOR_UNANNOTATED_LITERAL_INFERENCE,
+        LiteralSequenceFacts,
+        &OrdinaryLiteralPrecisionEffects,
+    )
+    .unwrap_or_else(|never| match never {})
+    .is_none()
 }
 
 /// Builds a literal's sequence shape from already-inferred elements and iterable shapes.
@@ -675,20 +681,17 @@ pub(super) fn sequence_from_literal_elements<'ast, T, V>(
     spread: &impl Fn(&'ast ast::Expr, bool, Option<usize>) -> Tuple<T, V>,
     concat: &impl Fn(TupleBuilder<T, V>, &Tuple<T, V>) -> TupleBuilder<T, V>,
 ) -> Tuple<T, V> {
-    let mut builder = TupleBuilder::with_capacity(values.len());
-    for value in values {
-        if let ast::Expr::Starred(starred) = value {
-            let unpacked = literal_sequence_elements(&starred.value, promote)
-                .map(|(values, promote)| {
-                    sequence_from_literal_elements(values, promote, element, spread, concat)
-                })
-                .unwrap_or_else(|| spread(value, promote, literal_iterable_length(&starred.value)));
-            builder = concat(builder, &unpacked);
-        } else {
-            builder.push(element(value, promote));
-        }
-    }
-    builder.build()
+    sequence_from_literal_elements_sync(
+        values,
+        promote,
+        LiteralSequenceFacts,
+        &OrdinaryLiteralSequenceEffects {
+            element,
+            spread,
+            concat,
+        },
+    )
+    .unwrap_or_else(|never| match never {})
 }
 
 /// The literal element count used when inferring expansions such as `(*{"key": 1},)`.

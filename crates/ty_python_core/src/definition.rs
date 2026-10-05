@@ -35,6 +35,7 @@ use crate::{Db, Program, SemanticIndex};
 #[salsa::tracked(
     debug,
     constructor = new_internal,
+    field_requests = read_fields,
     heap_size = ruff_memory_usage::heap_size
 )]
 #[derive(Ord, PartialOrd)]
@@ -48,7 +49,7 @@ pub struct Definition<'db> {
 
     /// The place ID and re-export state of the definition.
     #[returns(copy)]
-    place_info: DefinitionPlace,
+    pub place_info: DefinitionPlace,
 
     /// WARNING: Only access this field when doing type inference for the same
     /// file as where `Definition` is defined to avoid cross-file query dependencies.
@@ -209,14 +210,14 @@ impl DefinitionPlace {
         }
     }
 
-    fn place(self) -> ScopedPlaceId {
+    pub fn place(self) -> ScopedPlaceId {
         match self {
             Self::Symbol { id, .. } => ScopedPlaceId::Symbol(id),
             Self::Member { id, .. } => ScopedPlaceId::Member(id),
         }
     }
 
-    fn is_reexported(self) -> bool {
+    pub fn is_reexported(self) -> bool {
         match self {
             Self::Symbol { is_reexported, .. } | Self::Member { is_reexported, .. } => {
                 is_reexported

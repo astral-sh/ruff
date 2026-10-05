@@ -1,0 +1,41 @@
+error: `configuration` option not allowed here
+ --> tests/compile-fail/tracked-configuration-options.rs:1:16
+  |
+1 | #[salsa::input(configuration = (InputConfiguration))]
+  |                ^^^^^^^^^^^^^
+
+error: `configuration` option not allowed here
+ --> tests/compile-fail/tracked-configuration-options.rs:6:19
+  |
+6 | #[salsa::interned(configuration = (InternedConfiguration))]
+  |                   ^^^^^^^^^^^^^
+
+error: `configuration` option not allowed here
+  --> tests/compile-fail/tracked-configuration-options.rs:11:18
+   |
+11 | #[salsa::tracked(configuration = (StructConfiguration))]
+   |                  ^^^^^^^^^^^^^
+
+error: option `configuration` provided twice
+  --> tests/compile-fail/tracked-configuration-options.rs:16:35
+   |
+16 | #[salsa::tracked(configuration = (First), configuration = (Second))]
+   |                                   ^^^^^
+
+error: unexpected end of input, expected identifier
+  --> tests/compile-fail/tracked-configuration-options.rs:21:38
+   |
+21 | #[salsa::tracked(configuration = (pub))]
+   |                                      ^
+
+error: unexpected token, expected `)`
+  --> tests/compile-fail/tracked-configuration-options.rs:26:40
+   |
+26 | #[salsa::tracked(configuration = (Name extra))]
+   |                                        ^^^^^
+
+error: cannot compare function and configuration visibility; use matching or ancestor-related paths with the same `crate` or `super` base
+  --> tests/compile-fail/tracked-configuration-options.rs:33:43
+   |
+33 |         #[salsa::tracked(configuration = (pub(in crate::outer) QueryConfiguration))]
+   |                                           ^^^^^^^^^^^^^^^^^^^^

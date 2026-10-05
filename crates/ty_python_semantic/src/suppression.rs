@@ -1,8 +1,10 @@
 mod add_ignore;
 mod parser;
+pub(crate) mod selection;
+pub(crate) mod source;
 mod unused;
 
-use smallvec::{SmallVec, smallvec};
+use smallvec::SmallVec;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
@@ -22,7 +24,7 @@ pub(crate) use crate::suppression::add_ignore::{SuppressFix, suppress_all};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };
-use crate::suppression::unused::check_unused_suppressions;
+
 use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
 
@@ -75,7 +77,7 @@ pub(crate) fn is_unused_ignore_comment_lint(name: LintName) -> bool {
     name == UNUSED_IGNORE_COMMENT.name() || name == UNUSED_TYPE_IGNORE_COMMENT.name()
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn suppressions(db: &dyn Db, file: PythonFile<'_>) -> Suppressions {
     let source_file = file.file(db);
     let parsed = parsed_module(db, file).load(db);
@@ -143,72 +145,7 @@ pub(crate) fn check_suppressions(
     file: PythonFile<'_>,
     diagnostics: TypeCheckDiagnostics,
 ) -> Vec<Diagnostic> {
-    let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
-
-    check_unknown_rule(&mut context);
-    check_invalid_suppression(&mut context);
-    check_blanket_suppressions(&mut context);
-    check_unused_suppressions(&mut context);
-
-    context.diagnostics.into_inner().into_diagnostics()
-}
-
-fn check_blanket_suppressions(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&BLANKET_IGNORE_COMMENT) {
-        return;
-    }
-
-    for suppression in context.suppressions.iter().filter(|suppression| {
-        suppression.kind == SuppressionKind::Ty && suppression.target == SuppressionTarget::All
-    }) {
-        // A blanket suppression cannot suppress its own diagnostic, but a lint-specific
-        // suppression can.
-        if let Some(lint_suppression) = select_preferred_suppression(
-            context
-                .suppressions
-                .lint_suppressions(suppression.range, LintId::of(&BLANKET_IGNORE_COMMENT))
-                .filter(|candidate| candidate.target.is_lint()),
-            suppression.range,
-        ) {
-            context
-                .diagnostics
-                .borrow_mut()
-                .mark_used(lint_suppression.id());
-        } else if let Some(diag) =
-            context.report_unchecked(&BLANKET_IGNORE_COMMENT, suppression.range)
-        {
-            diag.into_diagnostic("Use specific rule codes in `ty: ignore`");
-        }
-    }
-}
-
-/// Checks for `ty: ignore` and `type: ignore[ty:<code>]` comments that reference unknown rules.
-fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&IGNORE_COMMENT_UNKNOWN_RULE) {
-        return;
-    }
-
-    for unknown in &context.suppressions.unknown {
-        if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
-            diag.into_diagnostic(&unknown.reason);
-        }
-    }
-}
-
-fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&INVALID_IGNORE_COMMENT) {
-        return;
-    }
-
-    for invalid in &context.suppressions.invalid {
-        if let Some(diag) = context.report_lint(&INVALID_IGNORE_COMMENT, invalid.error.range) {
-            diag.into_diagnostic(format_args!(
-                "Invalid `{kind}` comment: {reason}",
-                kind = invalid.kind,
-                reason = invalid.error
-            ));
-        }
-    }
+    source::check_suppressions(db, file, diagnostics)
 }
 
 struct CheckSuppressionsContext<'a> {
@@ -227,13 +164,6 @@ impl<'a> CheckSuppressionsContext<'a> {
             suppressions,
             diagnostics: diagnostics.into(),
         }
-    }
-
-    fn is_lint_disabled(&self, lint: &'static LintMetadata) -> bool {
-        !self
-            .db
-            .rule_selection(self.file)
-            .is_enabled(LintId::of(lint))
     }
 
     fn is_suppression_used(&self, id: FileSuppressionId) -> bool {
@@ -348,22 +278,32 @@ impl Suppressions {
     /// physical lines and separate suppressions cover its opening and closing lines, the
     /// opening-line suppression retains precedence.
     pub(crate) fn find_suppression(&self, range: TextRange, id: LintId) -> Option<&Suppression> {
-        select_preferred_suppression(self.lint_suppressions(range, id), range)
+        selection::select(self, range, id, selection::SelectionMode::All)
     }
 
     /// Returns applicable suppressions for `id`, with inline suppressions in reverse source order.
+    #[cfg(test)]
     fn lint_suppressions(
         &self,
         range: TextRange,
         id: LintId,
     ) -> impl Iterator<Item = &Suppression> + '_ {
-        self.file
-            .iter()
-            .chain(self.inline.intersecting_rev(
-                range,
-                SuppressionTarget::All.target_mask() | SuppressionTarget::Lint(id).target_mask(),
-            ))
-            .filter(move |suppression| suppression.matches(id) && suppression.applies_to(range))
+        let mut cursor =
+            selection::SelectionCursor::new(self, range, id, selection::SelectionMode::All);
+        std::iter::from_fn(move || {
+            while let Some(step) = cursor.advance() {
+                match step {
+                    selection::SelectionStep::Skipped => {}
+                    selection::SelectionStep::Descend(intervals) => cursor.descend(intervals),
+                    selection::SelectionStep::Candidate(candidate) => {
+                        if cursor.accepts(candidate) {
+                            return Some(candidate);
+                        }
+                    }
+                }
+            }
+            None
+        })
     }
 
     /// Returns applicable comments whose targets allow `--add-ignore` to append a code, in
@@ -384,10 +324,6 @@ impl Suppressions {
                 ) && suppression.applies_to(range)
             })
     }
-
-    fn iter(&self) -> impl Iterator<Item = &Suppression> {
-        self.file.iter().chain(self.inline.iter())
-    }
 }
 
 /// Selects between applicable suppressions yielded in reverse source order.
@@ -398,30 +334,16 @@ impl Suppressions {
 /// candidate wins only when its suppression range is nested within the opening-line candidate's
 /// range; otherwise the opening-line candidate retains precedence.
 fn select_preferred_suppression<'a>(
-    mut candidates: impl Iterator<Item = &'a Suppression>,
+    candidates: impl Iterator<Item = &'a Suppression>,
     diagnostic_range: TextRange,
 ) -> Option<&'a Suppression> {
-    let end_candidate = candidates.next()?;
-    let diagnostic_start = diagnostic_range.start();
-
-    if end_candidate.suppressed_range.contains(diagnostic_start) {
-        return Some(end_candidate);
-    }
-
-    let start_candidate =
-        candidates.find(|candidate| candidate.suppressed_range.contains(diagnostic_start));
-
-    match start_candidate {
-        Some(start_candidate)
-            if start_candidate
-                .suppressed_range
-                .contains_range(end_candidate.suppressed_range) =>
-        {
-            Some(end_candidate)
+    let mut preference = selection::Preference::default();
+    for candidate in candidates {
+        if let Some(selected) = preference.consider(candidate, diagnostic_range) {
+            return Some(selected);
         }
-        Some(start_candidate) => Some(start_candidate),
-        None => Some(end_candidate),
     }
+    preference.finish()
 }
 
 /// A `type: ignore` or `ty: ignore` suppression.
@@ -859,53 +781,17 @@ impl IntervalIndex {
         query: TextRange,
         wanted: u64,
     ) -> impl Iterator<Item = &Suppression> {
-        let mut pending: SmallVec<[&[IntervalEntry]; 16]> = smallvec![self.entries.as_ref()];
-
+        let mut cursor = selection::IntervalCursor::new(&self.entries, query, wanted);
         std::iter::from_fn(move || {
-            while let Some(entries) = pending.pop() {
-                match entries {
-                    [entry] => {
-                        let suppressed_range = entry.suppression.suppressed_range;
-                        if entry.subtree_target_mask & wanted != 0
-                            && suppressed_range.start() <= query.end()
-                            && suppressed_range.end() >= query.start()
-                        {
-                            return Some(&entry.suppression);
-                        }
-                    }
-                    entries => {
-                        let mid = entries.len() / 2;
-                        let (left, root_and_right) = entries.split_at(mid);
-                        let Some((root, right)) = root_and_right.split_first() else {
-                            continue;
-                        };
-
-                        if root.subtree_max_end < query.start()
-                            || root.subtree_target_mask & wanted == 0
-                        {
-                            continue;
-                        }
-
-                        if root.suppression.suppressed_range.start() > query.end() {
-                            pending.push(left);
-                            continue;
-                        }
-
-                        // The stack is last-in, first-out, so push in source order to visit the
-                        // right subtree first.
-                        pending.push(left);
-                        pending.push(std::slice::from_ref(root));
-                        pending.push(right);
-                    }
+            while let Some(step) = cursor.advance() {
+                match step {
+                    selection::SelectionStep::Skipped => {}
+                    selection::SelectionStep::Descend(intervals) => cursor.descend(intervals),
+                    selection::SelectionStep::Candidate(candidate) => return Some(candidate),
                 }
             }
-
             None
         })
-    }
-
-    fn iter(&self) -> impl Iterator<Item = &Suppression> {
-        self.entries.iter().map(|entry| &entry.suppression)
     }
 
     fn len(&self) -> usize {

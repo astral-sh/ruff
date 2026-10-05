@@ -60,7 +60,7 @@ pub mod watch;
 /// 2. Running `ruff check` with different target versions results in different programs (settings) but
 ///    it remains the same project. That's why program is a narrowed view of the project only
 ///    holding on to the most fundamental settings required for checking.
-#[salsa::input(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::input(field_requests = read_fields, heap_size=ruff_memory_usage::heap_size)]
 #[derive(Debug)]
 pub struct Project {
     /// The files that are open in the project.
@@ -272,7 +272,7 @@ impl Project {
         IndexedFiles::freeze(db, self);
     }
 
-    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
     pub fn program(self, db: &dyn Db) -> Program<'_> {
         Program::from_settings(db, self.program_settings(db))
     }
@@ -345,7 +345,7 @@ impl Project {
     /// This is a salsa query to prevent re-computing queries if other, unrelated
     /// settings change. For example, we don't want that changing the terminal settings
     /// invalidates any type checking queries.
-    #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = CompleteOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
     pub fn rules(self, db: &dyn Db) -> Arc<RuleSelection> {
         self.settings(db).to_rules()
     }
@@ -758,6 +758,9 @@ impl Project {
 
         match files.get() {
             Index::Lazy(vacant) => {
+                // Walking can switch databases. Controlled analysis prepares the file index
+                // before opening its attempt, so only indexed reads are valid during it.
+                salsa::prepared_source_probe::assert_no_active_attempt();
                 let _entered =
                     tracing::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
@@ -869,7 +872,7 @@ pub fn should_check_semantics(db: &dyn Db, file: File) -> bool {
 }
 
 /// Whether this is a first-party file, independently of which files receive diagnostics.
-#[salsa::tracked(returns(copy))]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy))]
 pub(crate) fn is_project_file(db: &dyn Db, file: File) -> bool {
     if file.path(db).is_vendored_path() {
         return false;
@@ -890,7 +893,7 @@ pub(crate) fn is_project_file(db: &dyn Db, file: File) -> bool {
 /// This query provides a per-file backdating boundary around the project-wide file sets. Updating
 /// either set still revalidates this query, but unchanged results are backdated before invalidation
 /// reaches semantic-index and type-inference queries.
-#[salsa::tracked(returns(copy))]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy))]
 pub(crate) fn should_check_file(db: &dyn Db, file: File) -> bool {
     let project = db.project();
     let path = file.path(db);

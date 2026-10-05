@@ -379,7 +379,7 @@ impl<'db> SuperOwnerKind<'db> {
 }
 
 /// Represent a bound super object like `super(PivotClass, owner)`
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct BoundSuperType<'db> {
     #[returns(copy)]
     pub pivot_class: ClassBase<'db>,
@@ -395,22 +395,33 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     bound_super: BoundSuperType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
-    match bound_super.owner(db) {
-        SuperOwnerKind::Dynamic(dynamic) => {
-            visitor.visit_type(db, Type::Dynamic(dynamic));
-        }
-        SuperOwnerKind::Divergent(divergent) => {
-            visitor.visit_type(db, Type::Divergent(divergent));
-        }
-        SuperOwnerKind::Resolved(resolved_owner) => {
-            visitor.visit_type(db, resolved_owner.owner_type);
-            visitor.visit_type(db, Type::from(resolved_owner.lookup_anchor));
-        }
+    for ty in bound_super.children_for_visitor(db).into_iter().flatten() {
+        visitor.visit_type(db, ty);
     }
 }
 
 impl<'db> BoundSuperType<'db> {
+    pub(super) fn children_for_visitor(self, db: &'db dyn Db) -> [Option<Type<'db>>; 3] {
+        self.children_with_fields(salsa::FieldReads::new(db))
+    }
+
+    pub(in crate::types) fn children_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> [Option<Type<'db>>; 3] {
+        let fields = self.read_fields(fields);
+        let pivot = Some(Type::from(*fields.pivot_class()));
+        match *fields.owner() {
+            SuperOwnerKind::Dynamic(dynamic) => [pivot, Some(Type::Dynamic(dynamic)), None],
+            SuperOwnerKind::Divergent(divergent) => [pivot, Some(Type::Divergent(divergent)), None],
+            SuperOwnerKind::Resolved(owner) => [
+                pivot,
+                Some(owner.owner_type),
+                Some(Type::from(owner.lookup_anchor)),
+            ],
+        }
+    }
+
     fn mro_contains_pivot(
         db: &'db dyn Db,
         class: ClassType<'db>,

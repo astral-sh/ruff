@@ -1,9 +1,14 @@
 use super::variance::{VarianceInferable, VarianceTerm};
 use super::{BoundTypeVarIdentity, CycleDetector, IntersectionType, Type, UnionType, visitor};
+#[cfg(any(test, feature = "experimental-analysis"))]
+use salsa::plumbing::interned::FiniteInternedConfiguration;
+#[cfg(any(test, feature = "experimental-analysis"))]
+use salsa::plumbing::{QuoteError, QuoteFuel};
+
 use crate::Db;
 use crate::ProgramEnvironment;
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct TypeFormType<'db> {
     #[returns(copy)]
     pub(crate) type_argument: Type<'db>,
@@ -106,5 +111,20 @@ impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         self.type_argument(db).variance_of(db, env, typevar)
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl FiniteInternedConfiguration for TypeFormType<'static> {
+    fn field_work(fields: &Self::Fields<'_>) -> Option<usize> {
+        1usize.checked_add(fields.0.inline_payload_bytes())
+    }
+
+    fn field_work_bounded(
+        fields: &Self::Fields<'_>,
+        fuel: &mut QuoteFuel,
+    ) -> Result<usize, QuoteError> {
+        fuel.consume(1)?;
+        Self::field_work(fields).ok_or(QuoteError::Overflow)
     }
 }

@@ -159,6 +159,58 @@ fn property_deprecations_do_not_infer_accessor_signatures() -> anyhow::Result<()
 }
 
 #[test]
+fn negative_intersection_expands_deep_alias_unions() -> anyhow::Result<()> {
+    const DEPTH: usize = 8192;
+    let mut source = String::from("from typing import Literal\ntype Alias0 = Literal[False]\n");
+    for index in 1..=DEPTH {
+        source.push_str(&format!(
+            "type Alias{index} = Alias{} | Literal[False]\n",
+            index - 1
+        ));
+    }
+    let mut db = setup_db();
+    db.write_file("/src/aliases.py", source)?;
+    let env = db.program_environment();
+    let file = system_path_to_file(&db, "/src/aliases.py")?;
+    let file = ProgramFile::new(&db, file, env.program(&db));
+
+    // Resolve definitions in source order to isolate intersection expansion from alias inference.
+    let mut previous = None;
+    let mut leaf = Type::Never;
+    for index in 0..=DEPTH {
+        let name = format!("Alias{index}");
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(&db, file, &name).place.expect_type()
+        else {
+            anyhow::bail!("expected `{name}` to be a type alias");
+        };
+        let value = alias.value_type(&db);
+        if let Some(previous) = previous {
+            let Type::Union(union) = value else {
+                anyhow::bail!("expected `{name}` to retain its aliased union element");
+            };
+            assert_eq!(union.elements(&db), &[previous, leaf]);
+        } else {
+            leaf = value;
+        }
+        previous = Some(Type::TypeAlias(alias));
+    }
+    let Some(last) = previous else {
+        anyhow::bail!("expected an alias chain");
+    };
+    let result = IntersectionBuilder::new(&db, &env)
+        .add_negative(last)
+        .build();
+    assert_eq!(
+        result,
+        IntersectionBuilder::new(&db, &env)
+            .add_negative(leaf)
+            .build()
+    );
+    Ok(())
+}
+
+#[test]
 fn bounded_intersection_preserves_late_union_elements() {
     let db = setup_db();
     let db = &db;

@@ -176,7 +176,7 @@ impl get_size2::GetSize for VarianceVariable<'_> {}
 impl<'db> VarianceVariable<'db> {
     /// Honor the protocol declaration attached to this reference even when its equation infers
     /// a different variance. References without a declaration are evaluated from their equations.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
     fn effective_variance(self, db: &'db dyn Db) -> TypeVarVariance {
         if let VarianceOrigin::ProtocolParameter(_, declared) = self.origin(db) {
             declared
@@ -188,7 +188,7 @@ impl<'db> VarianceVariable<'db> {
     /// Return the defining expression, or declared variance for an unsupported protocol.
     /// Recursive references remain symbolic, allowing the same equation to serve
     /// ordinary evaluation and declaration validation.
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| VarianceTerm::BIVARIANT, heap_size=ruff_memory_usage::heap_size)]
     fn equation(self, db: &'db dyn Db) -> VarianceTerm<'db> {
         let typevar = self.typevar(db);
         match self.origin(db) {
@@ -217,7 +217,7 @@ impl<'db> VarianceVariable<'db> {
 
     /// Return unique references that survive composition under ordinary, declaration-honoring
     /// evaluation. Component discovery and the solver's work queue share these cached edges.
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn dependencies(self, db: &'db dyn Db) -> Box<[Self]> {
         let mut dependencies = Vec::new();
         self.equation(db)
@@ -241,7 +241,7 @@ impl<'db> VarianceComponent<'db> {
     ///
     /// Results follow the component's canonical variable order. The empty Salsa cycle seed
     /// represents bivariance for every member until the solution is available.
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(ref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn solution(self, db: &'db dyn Db) -> Box<[TypeVarVariance]> {
         let variables = self.variables(db);
         let indices: FxHashMap<_, _> = variables
@@ -306,7 +306,7 @@ impl<'db> VarianceComponent<'db> {
 ///
 /// Callers select supported protocol parameters and normalize bivariance to covariance only
 /// after inference, so unused parameters do not introduce constraints into a recursive component.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _, _, _| TypeVarVariance::Bivariant, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn infer_protocol_variance<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,

@@ -1,41 +1,14 @@
-use super::{
-    Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode, generic_context_has_paramspec,
-};
+use super::checking_effects::CheckContext;
+use super::constructor_preparation::{InlineConstructorReturnEffects, constructor_return_with};
+use super::effects::InlineBinderEffects;
+use super::{Binding, Bindings, CallableBinding, CallableItem, CheckTypesMode};
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::cyclic::CallableRecursionGuard;
-use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::Parameter;
-use crate::types::typevar::TypeVarNonceGenerator;
-use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext,
-    TypeMapping,
-};
-
-impl<'db> CallableBinding<'db> {
-    pub(crate) fn typing_self_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.bound_type.map(|bound_type| match self.signature_type {
-            Type::BoundMethod(method) => method.typing_self_type(db),
-            _ => bound_type,
-        })
-    }
-
-    pub(crate) fn bind_unused_self(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        self_type: Type<'db>,
-    ) {
-        for overload in &mut self.overloads {
-            if let Some(signature) = overload.signature.bind_unused_self(db, env, self_type) {
-                overload.signature = signature;
-                overload.return_ty = overload.initial_return_type(db);
-            }
-        }
-    }
-}
+use crate::types::generics::Specialization;
+use crate::types::{ClassLiteral, DynamicType, Type, TypeContext, legacy_inline};
 
 /// Bindings for a constructor call.
 ///
@@ -91,157 +64,41 @@ impl<'db> ConstructorBinding<'db> {
         self.constructor_context = self.constructor_context.with_instance_type(instance_type);
     }
 
-    pub(super) fn set_downstream_constructor(&mut self, bindings: Bindings<'db>) {
-        self.downstream_constructor = Some(Box::new(bindings));
-    }
-
-    pub(super) fn freshen_generic_contexts_in_place(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        nonce_generator: &TypeVarNonceGenerator<'db>,
-    ) {
-        let instance_type = self.constructed_instance_type();
-        let Some((_, specialization)) = instance_type.class_specialization(db, env) else {
-            return;
-        };
-        let generic_context = specialization.generic_context(db);
-        if generic_context_has_paramspec(db, generic_context)
-            || !nonce_generator.should_freshen(db, generic_context)
-        {
-            return;
-        }
-
-        let delta = nonce_generator.next().value();
-        let type_mapping = TypeMapping::FreshenBoundTypeVars {
-            generic_context,
-            delta,
-        };
-        let fresh_instance_type =
-            instance_type.apply_type_mapping(db, env, &type_mapping, TypeContext::default());
-        // Only freshen a generic context that belongs to the constructed instance itself.
-        // `class_specialization` can also find a context through a class-object type variable's
-        // bound, but freshening that context would detach the constructor parameters from the
-        // receiver.
-        if fresh_instance_type == instance_type {
-            return;
-        }
-        self.freshen_class_typevars(db, env, generic_context, delta, fresh_instance_type);
-    }
-
-    fn freshen_class_typevars(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        generic_context: GenericContext<'db>,
-        delta: u32,
-        fresh_instance_type: Type<'db>,
-    ) {
-        let type_mapping = TypeMapping::FreshenBoundTypeVars {
-            generic_context,
-            delta,
-        };
-
-        // Keep the source-level instance on `ConstructorBinding`; the final return type applies
-        // the inferred specialization to that instance. Only the per-overload context is
-        // call-local, so its instance must use the same fresh type variables as the signature.
-        let constructor_context = self.context().with_instance_type(fresh_instance_type);
-        let visitor = ApplyTypeMappingVisitor::new(env);
-        self.entry.bound_type = self.entry.bound_type.map(|bound_type| {
-            bound_type.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
-        });
-        for overload in &mut self.entry.overloads {
-            // The constructor's `Self` bound must use the same fresh class type variables as
-            // its receiver. Include only `Self` variables owned by this signature, so a caller's
-            // `Self` used as an explicit class type argument retains its original bound.
-            let signature_context = GenericContext::from_typevar_instances(
-                db,
-                env,
-                generic_context.variables(db).chain(
-                    overload
-                        .signature
-                        .generic_context
-                        .into_iter()
-                        .flat_map(|context| context.variables(db))
-                        .filter(|typevar| typevar.typevar(db).is_self(db)),
-                ),
-            );
-            overload.signature = overload.signature.apply_type_mapping_impl(
-                db,
-                &TypeMapping::FreshenBoundTypeVars {
-                    generic_context: signature_context,
-                    delta,
-                },
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::new(env),
-            );
-            overload.set_constructor_context(db, constructor_context);
-        }
-
-        if let Some(downstream) = self.downstream_constructor_mut() {
-            for downstream_binding in downstream
-                .iter_callable_items_mut()
-                .filter_map(CallableItem::as_constructor_mut)
-            {
-                downstream_binding.freshen_class_typevars(
-                    db,
-                    env,
-                    generic_context,
-                    delta,
-                    fresh_instance_type,
-                );
-            }
-        }
-    }
-
-    /// Match parameters for this constructor method and downstream constructors.
-    pub(super) fn match_parameters(
-        &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        arguments: &CallArguments<'_, 'db>,
-    ) {
-        self.entry.match_parameters(db, env, arguments);
-
-        // We don't know at this point whether we'll need to check downstream constructors or not
-        // (since we can't resolve return types yet), so we match parameters for all downstream
-        // constructors; this may be needed for argument type contexts.
-        if let Some(downstream) = self.downstream_constructor.as_mut() {
-            downstream.match_parameters_in_place(db, env, arguments);
-        }
-    }
-
     /// Check types for all bindings in this constructor.
     ///
     /// If `CheckTypesMode::Finalize` is provided, inactive downstream constructors will be
     /// discarded. Otherwise, all constructor bindings are preserved after the check.
     pub(super) fn check_types(
         &mut self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        argument_types: &CallArguments<'_, 'db>,
-        call_expression_tcx: TypeContext<'db>,
+        context: CheckContext<'_, 'db>,
         mode: CheckTypesMode,
+        effects: &InlineBinderEffects<'_, 'db>,
     ) {
-        self.entry
-            .check_types(db, env, constraints, argument_types, call_expression_tcx);
+        legacy_inline(self.entry.check_types_with(
+            context.db,
+            context.env,
+            context.constraints,
+            context.arguments,
+            context.tcx,
+            effects,
+        ));
 
         // Now that we've fully checked our own callable, we can determine whether downstream
         // constructors should be checked or not.
         if mode.is_provisional() {
             if let Some(downstream) = self.downstream_constructor_mut() {
-                let _ = downstream.check_types_impl(
-                    db,
-                    env,
-                    constraints,
-                    argument_types,
-                    call_expression_tcx,
+                let _ = downstream.check_types_impl_with_recursion_guard(
+                    context.db,
+                    context.env,
+                    context.constraints,
+                    context.arguments,
+                    context.tcx,
                     &[],
                     mode,
+                    effects.recursion_guard,
                 );
             }
-        } else if !self.should_check_downstream(db, env) {
+        } else if !self.should_check_downstream(context.db, context.env) {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
         }
@@ -724,14 +581,14 @@ impl<'db> ConstructorContext<'db> {
         }
     }
 
-    fn with_instance_type(self, instance_type: Type<'db>) -> Self {
+    pub(super) fn with_instance_type(self, instance_type: Type<'db>) -> Self {
         Self {
             instance_type,
             ..self
         }
     }
 
-    fn instance_type(self) -> Type<'db> {
+    pub(super) fn instance_type(self) -> Type<'db> {
         self.instance_type
     }
 
@@ -796,47 +653,6 @@ fn constructor_returns_instance<'db>(
 }
 
 impl<'db> Binding<'db> {
-    /// Is a type variable returned from a constructor method a representation of the self type?
-    ///
-    /// Handles `typing.Self` annotations and `__new__` methods returning `T` where `self:
-    /// type[T]`.
-    fn is_self_like_constructor_return_typevar(
-        &self,
-        db: &'db dyn Db,
-        return_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
-        if return_typevar.typevar(db).is_self(db) {
-            return true;
-        }
-
-        let Some(cls_parameter_ty) = self
-            .signature
-            .parameters()
-            .get(0)
-            .map(Parameter::annotated_type)
-        else {
-            return false;
-        };
-
-        let Type::SubclassOf(subclass_of) = cls_parameter_ty.resolve_type_alias(db) else {
-            return false;
-        };
-        let Some(cls_typevar) = subclass_of.into_type_var() else {
-            return false;
-        };
-
-        cls_typevar.typevar(db).identity(db) == return_typevar.typevar(db).identity(db)
-    }
-
-    pub(super) fn set_constructor_context(
-        &mut self,
-        db: &'db dyn Db,
-        constructor_context: ConstructorContext<'db>,
-    ) {
-        self.constructor_context = Some(constructor_context);
-        self.return_ty = self.initial_return_type(db);
-    }
-
     pub(super) fn initial_return_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.unspecialized_return_type(db)
     }
@@ -869,22 +685,11 @@ impl<'db> Binding<'db> {
     /// Return `None` if this is not a constructor call.
     pub(crate) fn normalized_constructor_return(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_context = self.constructor_context?;
-        let instance_type = constructor_context.instance_type();
-
-        match (
+        Some(legacy_inline(constructor_return_with(
+            &self.signature,
             constructor_context.kind(),
-            self.signature.return_ty.resolve_type_alias(db),
-        ) {
-            (ConstructorCallableKind::Init, _) => Some(instance_type),
-            (_, ty) if ty.is_unknown() && !self.signature.is_recursion_recovery() => {
-                Some(instance_type)
-            }
-            (ConstructorCallableKind::New, Type::TypeVar(typevar))
-                if self.is_self_like_constructor_return_typevar(db, typevar) =>
-            {
-                Some(instance_type)
-            }
-            _ => Some(self.signature.return_ty),
-        }
+            constructor_context.instance_type(),
+            &InlineConstructorReturnEffects(db),
+        )))
     }
 }

@@ -9,7 +9,7 @@ use salsa::plumbing::AsId;
 
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetBuilder, ConstraintSetStorage, Node, NodeId,
-    SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
+    SourceOrderId, wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain, TypeVarSet};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
@@ -309,19 +309,11 @@ impl<'db> Constraint<'db> {
 
         let normalized_bound = Self::normalize_bound(db, typevar, bound);
         let constraint = match normalized_bound {
-            // Two identical typevars must always solve to the same type, so it is not useful to
-            // have an equivalence bound that is the typevar being constrained.
-            Type::TypeVar(bound_typevar) if typevar.is_same_typevar_as(db, bound_typevar) => None,
-
-            // Otherwise we construct the correct equivalence constraint.
-
             // Comparing two typevars
-            Type::TypeVar(bound_typevar) if typevar.domain(db) == bound_typevar.domain(db) => {
-                let constraint =
-                    TypeVarEquivalenceBound::new(db, provenance, typevar, bound_typevar).into();
-                Some(Ok(constraint))
+            Type::TypeVar(bound_typevar) => {
+                TypeVarEquivalenceBound::new_if_nontrivial(db, provenance, typevar, bound_typevar)
+                    .map(|constraint| constraint.map(Into::into))
             }
-            Type::TypeVar(_) => Some(Err(UnsatisfiableBound)),
 
             // Comparing a paramspec with a callable type
             Type::Callable(_) if typevar.domain(db) == TypeVarDomain::ParameterSignature => {
@@ -368,9 +360,20 @@ impl<'db> Constraint<'db> {
     }
 
     pub(super) fn is_reflexive_typevar_relation(self, db: &'db dyn Db) -> bool {
+        self.is_reflexive_typevar_relation_with_fields(salsa::FieldReads::new(db))
+    }
+
+    pub(super) fn is_reflexive_typevar_relation_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> bool {
         match self {
-            Constraint::TypeVarRange(this) => this.left.is_same_typevar_as(db, this.right),
-            Constraint::TypeVarEquivalence(this) => this.left.is_same_typevar_as(db, this.right),
+            Constraint::TypeVarRange(this) => {
+                this.left.identity_with_fields(fields) == this.right.identity_with_fields(fields)
+            }
+            Constraint::TypeVarEquivalence(this) => {
+                this.left.identity_with_fields(fields) == this.right.identity_with_fields(fields)
+            }
             Constraint::ConcreteLower(_)
             | Constraint::ConcreteUpper(_)
             | Constraint::ConcreteEquivalence(_) => false,
@@ -402,37 +405,13 @@ impl<'db> Constraint<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<BoundTypeVarInstance<'db>> {
-        let bound_is_concrete = |bound: Type<'db>| {
-            !bound.has_typevar(db, env)
-                && !bound.has_unspecialized_type_var(db, env)
-                && bound.bottom_materialization(db, env) == bound.top_materialization(db, env)
-        };
-        match self {
-            Constraint::ConcreteLower(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ConcreteUpper(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::ConcreteEquivalence(this) => {
-                bound_is_concrete(this.bound).then_some(this.typevar)
-            }
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => None,
-        }
-    }
-
-    pub(crate) fn bound_depth(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> (u16, u16) {
-        match self {
-            Constraint::ConcreteLower(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ConcreteUpper(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::ConcreteEquivalence(this) => {
-                max_constructor_and_typevar_depth(db, env, this.bound)
-            }
-            Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => (0, 0),
+        let result = super::type_analysis::constraint_as_concrete_sync(
+            self,
+            &mut super::type_analysis::OrdinaryConstraintTypes { db, env },
+        );
+        match result {
+            Ok(value) => value,
+            Err(never) => match never {},
         }
     }
 
@@ -481,8 +460,8 @@ impl<'db> Constraint<'db> {
         }
     }
 
-    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
-        let types = match self {
+    pub(super) fn type_pair(self) -> [Type<'db>; 2] {
+        match self {
             Constraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
             Constraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
             Constraint::ConcreteEquivalence(this) => [Type::TypeVar(this.typevar), this.bound],
@@ -490,8 +469,7 @@ impl<'db> Constraint<'db> {
             Constraint::TypeVarEquivalence(this) => {
                 [Type::TypeVar(this.left), Type::TypeVar(this.right)]
             }
-        };
-        types.into_iter()
+        }
     }
 
     pub(super) fn display<'a>(
@@ -925,7 +903,19 @@ impl<'db> TypeVarRangeBound<'db> {
         left: BoundTypeVarInstance<'db>,
         right: BoundTypeVarInstance<'db>,
     ) -> Self {
-        assert_eq!(left.domain(db), right.domain(db));
+        Self::new_with_fields(salsa::FieldReads::new(db), provenance, left, right)
+    }
+
+    pub(super) fn new_with_fields(
+        fields: salsa::FieldReads<'db>,
+        provenance: ConstraintProvenance,
+        left: BoundTypeVarInstance<'db>,
+        right: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        assert_eq!(
+            left.domain_with_fields(fields),
+            right.domain_with_fields(fields)
+        );
         Self {
             provenance,
             left,
@@ -1024,13 +1014,42 @@ pub(super) struct TypeVarEquivalenceBound<'db> {
 }
 
 impl<'db> TypeVarEquivalenceBound<'db> {
+    pub(super) fn new_if_nontrivial(
+        db: &'db dyn Db,
+        provenance: ConstraintProvenance,
+        requested: BoundTypeVarInstance<'db>,
+        bound: BoundTypeVarInstance<'db>,
+    ) -> Option<Result<Self, UnsatisfiableBound>> {
+        // Two identical typevars must always solve to the same type, so it is not useful to
+        // have an equivalence bound that is the typevar being constrained.
+        if requested.is_same_typevar_as(db, bound) {
+            return None;
+        }
+        if requested.domain(db) != bound.domain(db) {
+            return Some(Err(UnsatisfiableBound));
+        }
+        Some(Ok(Self::new(db, provenance, requested, bound)))
+    }
+
     pub(super) fn new(
         db: &'db dyn Db,
         provenance: ConstraintProvenance,
         left: BoundTypeVarInstance<'db>,
         right: BoundTypeVarInstance<'db>,
     ) -> Self {
-        assert_eq!(left.domain(db), right.domain(db));
+        Self::new_with_fields(salsa::FieldReads::new(db), provenance, left, right)
+    }
+
+    pub(super) fn new_with_fields(
+        fields: salsa::FieldReads<'db>,
+        provenance: ConstraintProvenance,
+        left: BoundTypeVarInstance<'db>,
+        right: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        assert_eq!(
+            left.domain_with_fields(fields),
+            right.domain_with_fields(fields)
+        );
         let left_id = left.as_id().as_bits();
         let right_id = right.as_id().as_bits();
         let (left, right) = if wobble_index(left_id) > wobble_index(right_id) {

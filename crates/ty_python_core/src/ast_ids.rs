@@ -33,6 +33,10 @@ pub(crate) struct AstIds {
 }
 
 impl AstIds {
+    pub(super) fn use_lookup_work(&self) -> usize {
+        self.uses_map.lookup_work()
+    }
+
     pub(super) fn from_builders(builders: IndexVec<FileScopeId, AstIdsBuilder>) -> Self {
         let capacity = builders.iter().map(|builder| builder.uses_map.len()).sum();
         let mut uses_map = Vec::with_capacity(capacity);
@@ -50,13 +54,9 @@ impl AstIds {
         Self { uses_map }
     }
 
-    fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+    pub(super) fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
     }
-}
-
-fn ast_ids<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> &'db AstIds {
-    semantic_index(db, file).ast_ids()
 }
 
 /// Uniquely identifies a use of a name in a [`crate::FileScopeId`].
@@ -71,8 +71,7 @@ pub trait HasScopedUseId {
 
 impl HasScopedUseId for ast::Identifier {
     fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(self)
+        semantic_index(db, file).scoped_use_id(self)
     }
 }
 
@@ -99,15 +98,13 @@ impl HasScopedUseId for ast::ExprSubscript {
 
 impl HasScopedUseId for ast::Keyword {
     fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(self)
+        semantic_index(db, file).scoped_use_id(self)
     }
 }
 
 impl HasScopedUseId for ast::ExprRef<'_> {
     fn scoped_use_id(&self, db: &dyn Db, file: ProgramFile<'_>) -> ScopedUseId {
-        let ast_ids = ast_ids(db, file);
-        ast_ids.use_id(*self)
+        semantic_index(db, file).scoped_use_id(*self)
     }
 }
 

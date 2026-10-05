@@ -1,0 +1,249 @@
+{
+  "baseline": "forwarding-public-file-validation16",
+  "current": "forwarding-public-file-validation17",
+  "comparison_valid": true,
+  "inputs_sha256": {
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16-status.json": "a241addf6ab5d4a2218b6864696c0304065578a7fc302a0ec66ec09552d140f2",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16.log": "668e3dda6721245451d66e33564be9bdee2ce3f3f3ebbe42a354b06f50b590e4",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/nominal-member-forwardingpublicfilevalidation16before-inventory.json": "a0ef8186fdbab965dc36e26f37c385932fe43ff467dd8b87a2d0d816aeeac77a",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/nominal-member-forwardingpublicfilevalidation16after-inventory.json": "a0ef8186fdbab965dc36e26f37c385932fe43ff467dd8b87a2d0d816aeeac77a",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/manifest.json": "f568a82a3479d154ff4807785782e1e7f72da8d74e16cd5220e665b7b0fc0ec8",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16-restoration-verified.json": "ed3215736d18fdd14ae3afec3e77a8965c9496b8ca0fd4cee917579638cc39dd",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16-command.json": "efc667c9047c8c4f433d2551939f237298998e45549efb7f04cb99f052f932c9",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/command.json": "d88b7af4e87d0f41aae2be0a0c9faa9f7daa0ca307f3c9f7b90daa5468756d5e",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/fixtures.json": "6d863abf850434a3195f4a29aa7ee7d328804de27d1a629bade07f8c700a6c64",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/fixtures/legacy.py.txt": "432580df37255345f1a9185e87e2bfa8468a3102f75040687a3dd37bb1e8fa93",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/fixtures/pep695.py.txt": "da5f38c5daed2f7e32f5c53e087ed0f1b23227824e46685c50f36ed3a792c2b7",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17-status.json": "2091338a936cb7745a93dd55c72a41a7ef33170ef90e1adac4adc6bdb239d005",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17.log": "3f8b0cb1e84d3c8b582fb6b18cada8630fa65fb86ab29dce248218508d4b76ac",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/nominal-member-forwardingpublicfilevalidation17before-inventory.json": "ab6fed1e42750368e05cc7d582560c796eba09fd2c9be2524abaa4e8cf35a062",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/nominal-member-forwardingpublicfilevalidation17after-inventory.json": "ab6fed1e42750368e05cc7d582560c796eba09fd2c9be2524abaa4e8cf35a062",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/manifest.json": "fbc91ae452047d052084df11ceb14be04f4114e3c77ceb3c67be49c1aaa04f00",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17-restoration-verified.json": "0a8ef88387a5b60a93206e110c30d411cd16a6ba6be9cfe8ba66a6b9472d2ad6",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17-command.json": "efc667c9047c8c4f433d2551939f237298998e45549efb7f04cb99f052f932c9",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/command.json": "d88b7af4e87d0f41aae2be0a0c9faa9f7daa0ca307f3c9f7b90daa5468756d5e",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/fixtures.json": "6d863abf850434a3195f4a29aa7ee7d328804de27d1a629bade07f8c700a6c64",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/fixtures/legacy.py.txt": "432580df37255345f1a9185e87e2bfa8468a3102f75040687a3dd37bb1e8fa93",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/fixtures/pep695.py.txt": "da5f38c5daed2f7e32f5c53e087ed0f1b23227824e46685c50f36ed3a792c2b7",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/driver.rs": "e08fb7977637711dd5e56a3469f03c6bf05b0118ecbd5b8edf9d7fe8237faa90",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/driver.rs": "e08fb7977637711dd5e56a3469f03c6bf05b0118ecbd5b8edf9d7fe8237faa90",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/proposal.patch": "7b5ce72066a985ef579e28e4feda9398c16f14a671f3b4e22dd1eb43b27b0704",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/proposal.patch": "7b5ce72066a985ef579e28e4feda9398c16f14a671f3b4e22dd1eb43b27b0704",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/original/crates/ty_python_semantic/tests/experimental_analysis_entry.rs": "37119e1d7a597d9709f498bdd0edf6ee43331ddcc275aa96f99afd1aba0131c3",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/original/crates/ty_python_semantic/tests/experimental_analysis_entry.rs": "37119e1d7a597d9709f498bdd0edf6ee43331ddcc275aa96f99afd1aba0131c3",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation16/proposed/crates/ty_python_semantic/tests/experimental_analysis_entry.rs": "dc2954407ea1f023795408b7d97c67f9b02645d90739be9868227dd541cd1b3a",
+    "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/forwarding-public-file-validation17/proposed/crates/ty_python_semantic/tests/experimental_analysis_entry.rs": "dc2954407ea1f023795408b7d97c67f9b02645d90739be9868227dd541cd1b3a"
+  },
+  "errors": [],
+  "driver_status": {
+    "forwarding-public-file-validation16": {
+      "exit_code": 0,
+      "time": 1791219964.699929
+    },
+    "forwarding-public-file-validation17": {
+      "exit_code": 0,
+      "time": 1791221922.020107
+    }
+  },
+  "nextest": {
+    "forwarding-public-file-validation16": {
+      "tests": [
+        {
+          "classification": "PASS",
+          "duration": "0.103s",
+          "index": 1,
+          "total": 2,
+          "binary": "ty_python_semantic::experimental_analysis_entry",
+          "test": "cold_forwarding_public_file_legacy",
+          "line": 2260
+        },
+        {
+          "classification": "PASS",
+          "duration": "0.104s",
+          "index": 2,
+          "total": 2,
+          "binary": "ty_python_semantic::experimental_analysis_entry",
+          "test": "cold_forwarding_public_file_pep695",
+          "line": 2276
+        }
+      ],
+      "summary": {
+        "duration": "0.106s",
+        "counts": "2 passed, 25 skipped",
+        "line": 2293
+      }
+    },
+    "forwarding-public-file-validation17": {
+      "tests": [
+        {
+          "classification": "PASS",
+          "duration": "0.106s",
+          "index": 1,
+          "total": 2,
+          "binary": "ty_python_semantic::experimental_analysis_entry",
+          "test": "cold_forwarding_public_file_legacy",
+          "line": 2262
+        },
+        {
+          "classification": "PASS",
+          "duration": "0.107s",
+          "index": 2,
+          "total": 2,
+          "binary": "ty_python_semantic::experimental_analysis_entry",
+          "test": "cold_forwarding_public_file_pep695",
+          "line": 2278
+        }
+      ],
+      "summary": {
+        "duration": "0.107s",
+        "counts": "2 passed, 25 skipped",
+        "line": 2295
+      }
+    }
+  },
+  "driver_passed": {
+    "forwarding-public-file-validation16": true,
+    "forwarding-public-file-validation17": true
+  },
+  "attempts": [
+    {
+      "fixture": "generics/legacy/callables.md#constructor-stopping-types-introduced-by-forwarding",
+      "attempt": "cold",
+      "baseline": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2270,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2271,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "current": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2272,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2273,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "outcome_equal": true,
+      "cleanup_equal": true
+    },
+    {
+      "fixture": "generics/legacy/callables.md#constructor-stopping-types-introduced-by-forwarding",
+      "attempt": "same_revision_retry",
+      "baseline": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2272,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2273,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "current": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2274,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2275,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "outcome_equal": true,
+      "cleanup_equal": true
+    },
+    {
+      "fixture": "generics/pep695/callables.md#constructor-stopping-types-introduced-by-forwarding",
+      "attempt": "cold",
+      "baseline": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2286,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2287,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "current": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2288,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2289,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "outcome_equal": true,
+      "cleanup_equal": true
+    },
+    {
+      "fixture": "generics/pep695/callables.md#constructor-stopping-types-introduced-by-forwarding",
+      "attempt": "same_revision_retry",
+      "baseline": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2288,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2289,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "current": {
+        "outcome": "Ok(Incomplete { reason: RequestedAllocationLimit, completed: () })",
+        "outcome_line": 2290,
+        "cleanup": "preparation=Ok(()) revision=R1 expected_revision=R1",
+        "cleanup_line": 2291,
+        "preparation": "Ok(())",
+        "revision": "R1",
+        "expected_revision": "R1",
+        "idle_preparation_and_unchanged_revision": true,
+        "public_file_check_completed": false
+      },
+      "outcome_equal": true,
+      "cleanup_equal": true
+    }
+  ],
+  "all_four_outcomes_equal": true,
+  "all_four_cleanup_records_equal": true,
+  "all_current_cleanup_checks_pass": true,
+  "all_current_public_file_checks_completed": false,
+  "reachability_records": {
+    "forwarding-public-file-validation16": {
+      "generics/legacy/callables.md#constructor-stopping-types-introduced-by-forwarding": {
+        "payload": "callable_consumer=unobserved resource_totals=unmeasured",
+        "line": 2274
+      },
+      "generics/pep695/callables.md#constructor-stopping-types-introduced-by-forwarding": {
+        "payload": "callable_consumer=unobserved resource_totals=unmeasured",
+        "line": 2290
+      }
+    },
+    "forwarding-public-file-validation17": {
+      "generics/legacy/callables.md#constructor-stopping-types-introduced-by-forwarding": {
+        "payload": "callable_consumer=unobserved resource_totals=unmeasured",
+        "line": 2276
+      },
+      "generics/pep695/callables.md#constructor-stopping-types-introduced-by-forwarding": {
+        "payload": "callable_consumer=unobserved resource_totals=unmeasured",
+        "line": 2292
+      }
+    }
+  },
+  "completed_diagnostics_validated": false
+}

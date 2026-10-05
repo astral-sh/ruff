@@ -10,6 +10,8 @@ use crate::metadata::options::{InnerOverrideOptions, OutputFormat};
 use crate::script::Script;
 use crate::{Db, glob::IncludeExcludeFilter};
 
+pub(crate) mod prepared_host;
+
 /// The resolved [`super::Options`] for the project.
 ///
 /// Unlike [`super::Options`], the struct has default values filled in and
@@ -124,7 +126,7 @@ impl Override {
 }
 
 /// Resolves the settings for a given file.
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     if let Some(script) = Script::for_file(db, file) {
         let settings = script.settings(db);
@@ -193,7 +195,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
 /// This is to make Salsa happy because it requires that queries with only a single argument
 /// take a salsa-struct as argument, which isn't the case here. The `()` enables salsa's
 /// automatic interning for the arguments.
-#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(clone), heap_size=ruff_memory_usage::heap_size)]
 fn merge_overrides(db: &dyn Db, overrides: Vec<Arc<InnerOverrideOptions>>, _: ()) -> FileSettings {
     let mut overrides = overrides.into_iter().rev();
     let mut merged = (*overrides.next().unwrap()).clone();

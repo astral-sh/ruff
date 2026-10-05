@@ -1,0 +1,5 @@
+error: the `specify` and `lru` options cannot be used together
+ --> tests/compile-fail/lru_can_not_be_used_with_specify.rs:7:27
+  |
+7 | #[salsa::tracked(lru = 3, specify)]
+  |                           ^^^^^^^

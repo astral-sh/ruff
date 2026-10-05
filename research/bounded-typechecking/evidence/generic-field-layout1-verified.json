@@ -1,0 +1,80 @@
+{
+  "status": "Full selected headers independently checked against pinned declarations, generated request macro, and call sites; all three exact matches verified.",
+  "pins": {
+    "generic-field-layout1-context.json": "380c602ea364a667466aff38d0425d078d3d52297eb21b69c39486a4f6e570a5",
+    "generic-field-layout1-identities.json": "53a376afabf82462417e2739c0140cfcee5b339d4ef34527447d4d5a9f021c68",
+    "generic-field-layout1/compiler-status.json": "bcfa40f29fa08088c374fe06568b5a74b1d2f76efc5648ef998bb54c59721e60",
+    "generic-field-layout1/source-preservation.json": "cfc36b96c04a1e9ab1923d08cc0facd9f713455aa9573bd41e7248943fc2ae12",
+    "generic-field-layout1-extracted/index.json": "9380920c638d6a51294089682bef4ef34ed806d9f3e9f0e5bf49c5cf71f5fde6",
+    "generic-field-layout1-extracted/outer-1.txt": "053830aaff6c882bfbc25ac7d7bfa103f248c283d1efad906558b598461c4c48",
+    "generic-field-layout1-extracted/outer-2.txt": "146475d6c3d29034cb37b2d2d1c4c39f476345eed7a205d0a330eb0059ba095e",
+    "generic-field-layout1-extracted/outer-3.txt": "407d8f43825f49f33f298a36f9cc54136755a9614df4ef070854f892a2f5a017",
+    "generic-field-layout1-extracted/child-1.txt": "39d365442e1f1f4625cda17b451f6b71df5574dbe880b7f5516783df17163043",
+    "generic-field-layout1-extracted/child-22.txt": "c7dc95cf114439a2d2deb40ab0c68ce330517d4feb3be1ed6106821e3045f786",
+    "generic-field-layout1-extracted/child-27.txt": "53b583c41f602ca3482b9faf30df8985084a3b249208a40a220ad049228d9889"
+  },
+  "measured_source_files_still_match": {
+    "vendor/salsa/src/function/execute/execution_run/field_run.rs": "43e661ef8d61ff04f0508825f2bbb7dfae8ed997257694559418123c5f44381b",
+    "vendor/salsa/src/function/execute/execution_run/read_run.rs": "e30977d9360898a62053ce9dc7f1df59a7b4c94a8ebdddb2c6e5ce4fc00bf146",
+    "vendor/salsa/src/function/execute/execution_run/callback.rs": "dd94a29ba0cfed882f938efbea0040b645e8e390354736ce8485e62ee5b59de7",
+    "vendor/salsa/local-macro-rules/src/setup_interned_struct.rs": "e88f8f818174ba89f091bb674acc4501aca8d834cb10ed3abf94c9b7fd583db4",
+    "crates/ty_python_semantic/src/types/typevar.rs": "e7a2034fd7c7b4438b549cf0e37909ea84916722c24d5493f748550d4fa7de69",
+    "crates/ty_python_semantic/src/types/infer/builder/source_definition/controlled/generics.rs": "8ca165b2f7a671bb2ec95b2b36a1583a03c284381de6ec38619ee3f70aa9c01d"
+  },
+  "outer_matches": [
+    {
+      "type": "{async fn body of salsa::function::execute::execution_run::field_run::read<'_, '_, '_, salsa::execution_probe::InternedFieldRequest<'_, types::typevar::BoundTypeVarInstance<'_>, types::typevar::TypeVarInstance<'_>, types::typevar::TypeVarInstance<'_>>, types::infer::builder::source_definition::controlled::class_selection::FixedFieldCopy>()}",
+      "getter_candidate": "BoundTypeVarInstance::typevar",
+      "file": "outer-1.txt",
+      "bytes": 616,
+      "alignment": 8,
+      "largest_variants": [
+        {
+          "name": "Suspend6",
+          "bytes": 615
+        }
+      ]
+    },
+    {
+      "type": "{async fn body of salsa::function::execute::execution_run::field_run::read<'_, '_, '_, salsa::execution_probe::InternedFieldRequest<'_, types::typevar::TypeVarIdentity<'_>, types::typevar::TypeVarKind, types::typevar::TypeVarKind>, types::infer::builder::source_definition::controlled::class_selection::FixedFieldCopy>()}",
+      "getter_candidate": "TypeVarIdentity::kind",
+      "file": "outer-2.txt",
+      "bytes": 616,
+      "alignment": 8,
+      "largest_variants": [
+        {
+          "name": "Suspend6",
+          "bytes": 615
+        }
+      ]
+    },
+    {
+      "type": "{async fn body of salsa::function::execute::execution_run::field_run::read<'_, '_, '_, salsa::execution_probe::InternedFieldRequest<'_, types::typevar::TypeVarInstance<'_>, types::typevar::TypeVarIdentity<'_>, types::typevar::TypeVarIdentity<'_>>, types::infer::builder::source_definition::controlled::class_selection::FixedFieldCopy>()}",
+      "getter_candidate": "TypeVarInstance::identity",
+      "file": "outer-3.txt",
+      "bytes": 616,
+      "alignment": 8,
+      "largest_variants": [
+        {
+          "name": "Suspend6",
+          "bytes": 615
+        }
+      ]
+    }
+  ],
+  "dominant_chain": {
+    "outer_variant": "Suspend6",
+    "outer_variant_bytes": 615,
+    "outer_discriminant_bytes": 1,
+    "dependency_future_bytes": 336,
+    "dependency_read_temporary_bytes": 32,
+    "transaction_future_bytes": 288,
+    "transaction_largest_variant": "Suspend1",
+    "transaction_largest_variant_bytes": 287,
+    "selection_commit_callback_bytes": 184,
+    "native_quotation_variant_bytes": 559
+  },
+  "interpretation": "The shared field-read representation includes dependency state even though each selected interned request always has no dependency. A type-directed capability is a candidate representation change, not a demonstrated saving.",
+  "source_execution_by_verifier": false,
+  "source_mutation_by_verifier": false
+}

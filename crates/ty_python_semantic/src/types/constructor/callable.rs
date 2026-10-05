@@ -2,16 +2,18 @@
 
 use smallvec::{SmallVec, smallvec_inline};
 
+use super::effects::{
+    ConstructorCallableRequest, ConstructorEffects, ConstructorError, LegacyInlineEffects,
+    inline_result,
+};
 use super::{ConstructorMember, ConstructorMembers, InitializerBinding};
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableConversionRequest;
 use crate::types::cyclic::CallableRecursionGuard;
-use crate::types::enums::enum_metadata;
 use crate::types::generics::GenericContext;
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::signatures::{CallableSignature, Parameters, Signature};
 use crate::types::{
-    BoundMethodType, CallableType, CallableTypes, ClassType, DescriptorOrigin, MemberLookupPolicy,
-    Type,
+    BoundMethodType, CallableType, CallableTypes, ClassType, DescriptorOrigin, Type,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -31,11 +33,70 @@ impl<'db> ConstructorCallableStep<'db> {
         env: &ProgramEnvironment<'db>,
         class: ClassType<'db>,
         receiver: Type<'db>,
-    ) -> Self {
-        Self::Member(PendingConstructorMember {
-            members: ConstructorMembers::new(db, env, class, receiver),
+    ) -> Result<Self, ConstructorError> {
+        inline_result(Self::start_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: None,
+            },
+            ConstructorCallableRequest { class, receiver },
+        ))
+    }
+
+    async fn start_with<E: ConstructorEffects<'db>>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+        request: ConstructorCallableRequest<'db>,
+    ) -> Result<Self, E::Error> {
+        let instance = effects
+            .instance_approximation(db, env, request.receiver)
+            .await?
+            .unwrap_or(Type::unknown());
+        Ok(Self::Member(PendingConstructorMember {
+            members: ConstructorMembers {
+                class: request.class,
+                receiver: request.receiver,
+                instance,
+            },
             stage: ConstructorMemberStage::MetaclassCall,
-        })
+        }))
+    }
+}
+
+/// The queued driver uses the same transitions as the synchronous conversion stack. Dependencies
+/// suspend this future; their providers determine whether they are admitted or explicitly incomplete.
+#[cfg(test)]
+pub(in crate::types) async fn constructor_callables_with<'db, E: ConstructorEffects<'db>>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    effects: &E,
+    request: ConstructorCallableRequest<'db>,
+) -> Result<CallableTypes<'db>, E::Error> {
+    let mut step = ConstructorCallableStep::start_with(db, env, effects, request).await?;
+    loop {
+        step = match step {
+            ConstructorCallableStep::Member(pending) => {
+                pending.evaluate_with(db, env, effects).await?
+            }
+            ConstructorCallableStep::Lookup(pending) => {
+                pending.evaluate_with(db, env, effects).await?
+            }
+            ConstructorCallableStep::BindInitializer(pending) => {
+                pending.evaluate_with(db, env, effects).await?
+            }
+            ConstructorCallableStep::Convert(pending) => {
+                let callables = effects
+                    .convert(db, env, pending.request(), pending.origin())
+                    .await?;
+                pending.resume_with(db, env, effects, callables).await?
+            }
+            ConstructorCallableStep::CheckNewReturn(pending) => {
+                pending.evaluate_with(db, env, effects).await?
+            }
+            ConstructorCallableStep::Complete(callables) => return Ok(callables),
+        };
     }
 }
 
@@ -55,22 +116,39 @@ impl<'db> PendingConstructorMember<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         recursion_guard: &CallableRecursionGuard<'db>,
-    ) -> ConstructorCallableStep<'db> {
-        let member = match self.stage {
-            ConstructorMemberStage::MetaclassCall => {
-                self.members.metaclass_call(db, env, recursion_guard)
-            }
-            ConstructorMemberStage::New => self.members.new_method(db, env, recursion_guard),
-        };
-        self.resume(db, &member)
+    ) -> Result<ConstructorCallableStep<'db>, ConstructorError> {
+        inline_result(self.evaluate_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: Some(recursion_guard),
+            },
+        ))
     }
 
-    fn resume(
+    async fn evaluate_with<E: ConstructorEffects<'db>>(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
+        let member = match self.stage {
+            ConstructorMemberStage::MetaclassCall => {
+                effects.metaclass_call(db, env, self.members).await?
+            }
+            ConstructorMemberStage::New => effects.new_method(db, env, self.members).await?,
+        };
+        self.resume_with(db, env, effects, &member).await
+    }
+
+    async fn resume_with<E: ConstructorEffects<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
         member: &ConstructorMember<'db>,
-    ) -> ConstructorCallableStep<'db> {
-        match self.stage {
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
+        Ok(match self.stage {
             ConstructorMemberStage::MetaclassCall => {
                 if let Place::Defined(DefinedPlace { ty, .. }) = member.place {
                     // TODO: this intentionally diverges from step 1 in
@@ -84,15 +162,20 @@ impl<'db> PendingConstructorMember<'db> {
                     // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
                     // for dynamic Enum creation.
                     let is_actual_enum =
-                        enum_metadata(db, self.members.class.class_literal(db)).is_some();
+                        effects.is_actual_enum(db, env, self.members.class).await?;
                     if !is_actual_enum {
-                        return ConstructorCallableStep::Convert(PendingConstructorConversion {
-                            request: CallableConversionRequest::from_descriptor(ty, member.origin),
-                            origin: member.origin,
-                            continuation: ConstructorConversionContinuation::MetaclassCall(
-                                self.members,
-                            ),
-                        });
+                        return Ok(ConstructorCallableStep::Convert(
+                            PendingConstructorConversion {
+                                request: CallableConversionRequest::from_descriptor(
+                                    ty,
+                                    member.origin,
+                                ),
+                                origin: member.origin,
+                                continuation: ConstructorConversionContinuation::MetaclassCall(
+                                    self.members,
+                                ),
+                            },
+                        ));
                     }
                 }
                 Self::new_method(self.members)
@@ -108,7 +191,7 @@ impl<'db> PendingConstructorMember<'db> {
                     PendingConstructorLookup::initializer(self.members, None)
                 }
             }
-        }
+        })
     }
 
     fn new_method(members: ConstructorMembers<'db>) -> ConstructorCallableStep<'db> {
@@ -136,21 +219,27 @@ impl<'db> PendingConstructorLookup<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         _recursion_guard: &CallableRecursionGuard<'db>,
-    ) -> ConstructorCallableStep<'db> {
+    ) -> Result<ConstructorCallableStep<'db>, ConstructorError> {
+        inline_result(self.evaluate_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: None,
+            },
+        ))
+    }
+
+    async fn evaluate_with<E: ConstructorEffects<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
         let place = match &self {
-            Self::Initializer { members, .. } => members.raw_initializer(db, env, false),
-            Self::ObjectNew { members, .. } => {
-                Type::from(members.class)
-                    .member_lookup_with_policy(
-                        db,
-                        env,
-                        "__new__",
-                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .place
-            }
+            Self::Initializer { members, .. } => effects.raw_initializer(db, env, *members).await?,
+            Self::ObjectNew { members, .. } => effects.object_new(db, env, *members).await?,
         };
-        self.resume(db, env, place)
+        self.resume_with(db, env, effects, place).await
     }
 
     fn initializer(
@@ -163,12 +252,13 @@ impl<'db> PendingConstructorLookup<'db> {
         })
     }
 
-    fn resume(
+    async fn resume_with<E: ConstructorEffects<'db>>(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        effects: &E,
         place: Place<'db>,
-    ) -> ConstructorCallableStep<'db> {
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
         match self {
             Self::Initializer {
                 members,
@@ -181,9 +271,10 @@ impl<'db> PendingConstructorLookup<'db> {
                         remaining: smallvec_inline![initializer],
                         callables: SmallVec::new(),
                     }
-                    .advance(db, env)
+                    .advance_with(db, env, effects)
+                    .await
                 } else {
-                    finish_constructor(db, env, members, new_callables, None)
+                    finish_constructor_with(db, env, effects, members, new_callables, None).await
                 }
             }
             Self::ObjectNew {
@@ -196,24 +287,29 @@ impl<'db> PendingConstructorLookup<'db> {
                 }) = place
                 {
                     if let Some(class_generic_context) = class_generic_context {
-                        new_function =
-                            new_function.with_inherited_generic_context(db, class_generic_context);
+                        new_function = effects
+                            .specialize_object_new(db, env, new_function, class_generic_context)
+                            .await?;
                     }
-                    if let Some(callable) = new_function
-                        .into_bound_method_type(db, members.instance)
-                        .into_callable_type(db)
+                    if let Some(callable) = effects
+                        .object_new_callable(db, env, new_function, members.instance)
+                        .await?
                     {
-                        return ConstructorCallableStep::Complete(CallableTypes::one(callable));
+                        return Ok(ConstructorCallableStep::Complete(CallableTypes::one(
+                            callable,
+                        )));
                     }
                 }
 
                 // Fallback if no `object.__new__` is found.
-                ConstructorCallableStep::Complete(CallableTypes::one(CallableType::single(
-                    db,
-                    Signature::new_generic(
-                        class_generic_context,
-                        Parameters::empty(),
-                        members.instance,
+                Ok(ConstructorCallableStep::Complete(CallableTypes::one(
+                    CallableType::single(
+                        db,
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::empty(),
+                            members.instance,
+                        ),
                     ),
                 )))
             }
@@ -250,29 +346,57 @@ impl<'db> PendingConstructorConversion<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         callables: Option<CallableTypes<'db>>,
-    ) -> ConstructorCallableStep<'db> {
+    ) -> Result<ConstructorCallableStep<'db>, ConstructorError> {
+        inline_result(self.resume_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: None,
+            },
+            callables,
+        ))
+    }
+
+    async fn resume_with<E: ConstructorEffects<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+        callables: Option<CallableTypes<'db>>,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
         match self.continuation {
             ConstructorConversionContinuation::MetaclassCall(members) => {
-                if let Some(callables) = callables {
+                Ok(if let Some(callables) = callables {
                     ConstructorCallableStep::Complete(callables)
                 } else {
                     PendingConstructorMember::new_method(members)
-                }
+                })
             }
             ConstructorConversionContinuation::New(members) => {
                 if let Some(callables) = callables {
-                    let bound_callables = callables.map(|callable| {
-                        callable.bind_self(db, env, members.receiver, members.instance)
-                    });
-                    CheckNewReturns {
+                    let mut bound_callables = SmallVec::with_capacity(callables.iter().len());
+                    for callable in &callables {
+                        bound_callables.push(
+                            effects
+                                .bind_new_self(
+                                    db,
+                                    env,
+                                    *callable,
+                                    members.receiver,
+                                    members.instance,
+                                )
+                                .await?,
+                        );
+                    }
+                    Ok(CheckNewReturns {
                         members,
-                        callables: bound_callables,
+                        callables: CallableTypes::new(bound_callables),
                         callable_index: 0,
                         signature_index: 0,
                     }
-                    .advance(db)
+                    .advance(db))
                 } else {
-                    PendingConstructorLookup::initializer(members, None)
+                    Ok(PendingConstructorLookup::initializer(members, None))
                 }
             }
             ConstructorConversionContinuation::Initializer {
@@ -280,17 +404,21 @@ impl<'db> PendingConstructorConversion<'db> {
                 bound_method,
             } => {
                 let Some(callables) = callables else {
-                    return finish_constructor(
+                    return finish_constructor_with(
                         db,
                         env,
+                        effects,
                         synthesis.members,
                         synthesis.new_callables,
                         None,
-                    );
+                    )
+                    .await;
                 };
-                let callables = synthesis.synthesize_signatures(db, env, bound_method, callables);
+                let callables = synthesis
+                    .synthesize_signatures_with(db, env, effects, bound_method, callables)
+                    .await?;
                 synthesis.callables.extend(callables.iter().copied());
-                synthesis.advance(db, env)
+                synthesis.advance_with(db, env, effects).await
             }
         }
     }
@@ -331,11 +459,31 @@ impl<'db> PendingNewReturn<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         _recursion_guard: &CallableRecursionGuard<'db>,
-    ) -> ConstructorCallableStep<'db> {
-        let is_assignable =
-            self.return_type
-                .is_assignable_to(db, env, self.continuation.members.instance);
-        self.resume(db, is_assignable)
+    ) -> Result<ConstructorCallableStep<'db>, ConstructorError> {
+        inline_result(self.evaluate_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: None,
+            },
+        ))
+    }
+
+    async fn evaluate_with<E: ConstructorEffects<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
+        let is_assignable = effects
+            .new_return_assignable(
+                db,
+                env,
+                self.return_type,
+                self.continuation.members.instance,
+            )
+            .await?;
+        Ok(self.resume(db, is_assignable))
     }
 
     fn resume(self, db: &'db dyn Db, is_assignable: bool) -> ConstructorCallableStep<'db> {
@@ -359,82 +507,81 @@ struct InitializerSynthesis<'db> {
 }
 
 impl<'db> InitializerSynthesis<'db> {
-    fn advance(
+    async fn advance_with<E: ConstructorEffects<'db>>(
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> ConstructorCallableStep<'db> {
+        effects: &E,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
         while let Some(initializer) = self.remaining.pop() {
-            if let Some(union) = initializer.as_union_like(db) {
+            if let Some(union) = effects.expand_initializer(db, env, initializer).await? {
                 // Expand alternatives in source order; a failed conversion discards the entire
                 // initializer union before any later alternative is evaluated.
                 self.remaining
                     .extend(union.elements(db).iter().rev().copied());
             } else {
-                return ConstructorCallableStep::BindInitializer(PendingInitializerBinding {
-                    synthesis: self,
-                    initializer,
-                });
+                return Ok(ConstructorCallableStep::BindInitializer(
+                    PendingInitializerBinding {
+                        synthesis: self,
+                        initializer,
+                    },
+                ));
             }
         }
-        finish_constructor(
+        finish_constructor_with(
             db,
             env,
+            effects,
             self.members,
             self.new_callables,
             Some(CallableTypes::new(self.callables)),
         )
+        .await
     }
 
-    fn synthesize_signatures(
+    async fn synthesize_signatures_with<E: ConstructorEffects<'db>>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        effects: &E,
         bound_method: Option<BoundMethodType<'db>>,
         callables: CallableTypes<'db>,
-    ) -> CallableTypes<'db> {
-        let class_generic_context = self.members.class.constructor_generic_context(db, env);
+    ) -> Result<CallableTypes<'db>, E::Error> {
+        let class_generic_context = effects
+            .class_generic_context(db, env, self.members.class)
+            .await?;
+        let mut synthesized = SmallVec::with_capacity(callables.iter().len());
+        for callable in &callables {
+            let signatures = callable.signatures(db);
+            let mut overloads = SmallVec::with_capacity(signatures.overloads.len());
+            for signature in signatures {
+                let self_annotation = effects
+                    .initializer_self_annotation(db, env, bound_method, signature)
+                    .await?;
+                let mut signature = signature.clone();
+                signature.generic_context = effects
+                    .merge_generic_context(
+                        db,
+                        env,
+                        class_generic_context,
+                        signature.generic_context,
+                    )
+                    .await?;
+                signature.return_ty = self_annotation.unwrap_or(self.members.instance);
 
-        let synthesized_signature = |signature: &Signature<'db>| {
-            let self_annotation = bound_method
-                .filter(|method| !method.class_method(db))
-                .and_then(|_| signature.parameters().get_positional(0))
-                .filter(|parameter| !parameter.inferred_annotation)
-                .map(Parameter::annotated_type)
-                .filter(|ty| {
-                    ty.as_typevar()
-                        .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
-                });
-
-            let mut signature = signature.clone();
-
-            signature.generic_context = GenericContext::merge_optional(
-                db,
-                class_generic_context,
-                signature.generic_context,
-            );
-
-            signature.return_ty = self_annotation.unwrap_or(self.members.instance);
-
-            if let Some(method) = bound_method {
-                // Constructor arguments determine the class's specialization, so
-                // preserve generic parameters and overloads until they are checked.
-                signature = signature.bind_self_with_receiver(
-                    db,
-                    env,
-                    Some(method.signature_receiver(db)),
-                    Some(method.typing_self_type(db)),
-                );
+                if let Some(method) = bound_method {
+                    // Constructor arguments determine the class's specialization, so
+                    // preserve generic parameters and overloads until they are checked.
+                    signature = effects
+                        .bind_initializer_signature(db, env, signature, method)
+                        .await?;
+                }
+                overloads.push(effects.remove_unused_typevars(db, env, signature).await?);
             }
-            signature.remove_unused_typevars(db, env)
-        };
-
-        callables.map(|callable| {
-            let signatures = CallableSignature::from_overloads(
-                callable.signatures(db).iter().map(synthesized_signature),
-            );
-            callable.with_signatures(db, signatures).into_regular(db)
-        })
+            let signatures = CallableSignature { overloads };
+            synthesized.push(callable.with_signatures(db, signatures).into_regular(db));
+        }
+        Ok(CallableTypes::new(synthesized))
     }
 }
 
@@ -449,15 +596,33 @@ impl<'db> PendingInitializerBinding<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         recursion_guard: &CallableRecursionGuard<'db>,
-    ) -> ConstructorCallableStep<'db> {
-        let binding =
-            self.synthesis
-                .members
-                .bind_initializer(db, env, self.initializer, recursion_guard);
-        self.resume(binding)
+    ) -> Result<ConstructorCallableStep<'db>, ConstructorError> {
+        inline_result(self.evaluate_with(
+            db,
+            env,
+            &LegacyInlineEffects {
+                recursion_guard: Some(recursion_guard),
+            },
+        ))
+    }
+
+    async fn evaluate_with<E: ConstructorEffects<'db>>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        effects: &E,
+    ) -> Result<ConstructorCallableStep<'db>, E::Error> {
+        let binding = effects
+            .bind_initializer(db, env, self.synthesis.members, self.initializer)
+            .await?;
+        Ok(self.resume(binding))
     }
 
     fn resume(self, binding: InitializerBinding<'db>) -> ConstructorCallableStep<'db> {
+        #[cfg(test)]
+        super::expansion_probe::observe(
+            super::expansion_probe::Observation::InitializerBindingResumed,
+        );
         ConstructorCallableStep::Convert(PendingConstructorConversion {
             request: CallableConversionRequest::from_descriptor(binding.callable, binding.origin),
             origin: binding.origin,
@@ -469,14 +634,15 @@ impl<'db> PendingInitializerBinding<'db> {
     }
 }
 
-fn finish_constructor<'db>(
+async fn finish_constructor_with<'db, E: ConstructorEffects<'db>>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    effects: &E,
     members: ConstructorMembers<'db>,
     new_callables: Option<CallableTypes<'db>>,
     init_callables: Option<CallableTypes<'db>>,
-) -> ConstructorCallableStep<'db> {
-    match (new_callables, init_callables) {
+) -> Result<ConstructorCallableStep<'db>, E::Error> {
+    Ok(match (new_callables, init_callables) {
         (Some(new_callables), Some(init_callables)) => {
             ConstructorCallableStep::Complete(CallableTypes::from_elements(
                 new_callables
@@ -489,7 +655,9 @@ fn finish_constructor<'db>(
             ConstructorCallableStep::Complete(constructors)
         }
         (None, None) => {
-            let class_generic_context = members.class.constructor_generic_context(db, env);
+            let class_generic_context = effects
+                .class_generic_context(db, env, members.class)
+                .await?;
             // If no `__new__` or `__init__` method is found, then we fall back to looking for
             // an `object.__new__` method.
             ConstructorCallableStep::Lookup(PendingConstructorLookup::ObjectNew {
@@ -497,5 +665,5 @@ fn finish_constructor<'db>(
                 class_generic_context,
             })
         }
-    }
+    })
 }

@@ -1,0 +1,17 @@
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+ --> tests/compile-fail/tracked_method_on_untracked_impl.rs:8:41
+  |
+8 |     fn tracked_method_on_untracked_impl(self, db: &dyn Db) -> u32 {
+  |                                         ^^^^
+
+error[E0405]: cannot find trait `Db` in this scope
+ --> tests/compile-fail/tracked_method_on_untracked_impl.rs:8:56
+  |
+8 |     fn tracked_method_on_untracked_impl(self, db: &dyn Db) -> u32 {
+  |                                                        ^^ not found in this scope
+
+error[E0425]: cannot find value `input` in this scope
+ --> tests/compile-fail/tracked_method_on_untracked_impl.rs:9:9
+  |
+9 |         input.field(db)
+  |         ^^^^^ not found in this scope

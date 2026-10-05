@@ -11,7 +11,14 @@ use ruff_db::system::{
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
 use salsa::Setter as _;
+use salsa::execution_probe::{
+    BorrowOrCopy, Demand, FieldReadProfile, FieldReturnMode, NativeValueQuote, PreparedSourceMemo,
+    RunError, RunResult, TaskEndpoint,
+};
+use salsa::prepared_source_probe::PreparationError;
 use std::borrow::Cow;
+use std::future::{Future, ready};
+use std::rc::Rc;
 use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::ModuleGlobSetBuilder;
@@ -19,6 +26,10 @@ use ty_python_core::program::ProgramSettings;
 use ty_python_core::{Db as _, ProgramFile, TestProgramDb};
 use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::prepared_host::{
+    PreparedHostFileReads, admit_host_task_setup, boxed_future_with_fixed_transfers_at,
+    generated_field_quote,
+};
 use ty_python_semantic::{
     AnalysisSettings, Db as SemanticDb, PythonVersionWithSource, check_file_unwrap,
     default_lint_registry,
@@ -163,6 +174,23 @@ impl SemanticDb for Db {
         file_settings(self, file).rules(self)
     }
 
+    fn prepare_analysis_host_reads(
+        &self,
+        file: File,
+    ) -> Result<Rc<dyn PreparedHostFileReads<'_> + '_>, PreparationError> {
+        let file_settings = file_settings::prepare_memo(self, file)
+            .map_err(|_| PreparationError::InvalidDependency)?;
+        let settings = self.settings.ok_or(PreparationError::InvalidDependency)?;
+        let prepared = PreparedMdtestHostFileReads {
+            db: self,
+            file,
+            settings,
+            file_settings,
+        };
+        prepared.check_current()?;
+        Ok(Rc::new(prepared))
+    }
+
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
     }
@@ -210,7 +238,7 @@ impl DbWithWritableSystem for Db {
     }
 }
 
-#[salsa::tracked(returns(ref))]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref))]
 fn file_settings(db: &dyn SemanticDb, file: File) -> FileSettings {
     let source = source_text(db, file);
     if source.is_notebook() {
@@ -253,7 +281,141 @@ impl FileSettings {
     }
 }
 
-#[salsa::input(debug)]
+struct PreparedMdtestHostFileReads<'db> {
+    db: &'db Db,
+    file: File,
+    settings: Settings,
+    file_settings: PreparedSourceMemo<'db, FileSettings>,
+}
+
+impl<'db> PreparedHostFileReads<'db> for PreparedMdtestHostFileReads<'db> {
+    fn check_current(&self) -> Result<(), PreparationError> {
+        self.file_settings
+            .check_current()
+            .map_err(|_| PreparationError::InvalidDependency)
+    }
+
+    fn should_check_file<'run>(
+        self: Rc<Self>,
+        endpoint: TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Demand<bool>>
+    where
+        'db: 'run,
+    {
+        // The factory retains this Rc and an endpoint handle; demand admits its storage.
+        endpoint.admit_work(16)?;
+        let child = endpoint.clone();
+        endpoint.demand(move || async move {
+            let request = child
+                .local_call(|| {
+                    child.admit_work(2)?;
+                    Ok(self.file.read_fields(self.db).path())
+                })
+                .await;
+            let path = child.read_field(request, &BorrowOrCopy).await;
+            Ok(child
+                .local_call(|| {
+                    child.admit_work(2)?;
+                    Ok(!path.is_vendored_path())
+                })
+                .await)
+        })
+    }
+
+    fn rule_selection<'run>(
+        self: Rc<Self>,
+        endpoint: TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Demand<&'db RuleSelection>>
+    where
+        'db: 'run,
+    {
+        endpoint.admit_work(16)?;
+        let child = endpoint.clone();
+        endpoint.demand(move || async move {
+            let request = child
+                .local_call(|| {
+                    child.admit_work(2)?;
+                    Ok(file_settings::prepared_read(&self.file_settings))
+                })
+                .await;
+            let settings = child.read_prepared_source(request).await;
+            child.local_call(|| child.admit_work(4)).await;
+            match settings {
+                FileSettings::Global => {
+                    let request = child
+                        .local_call(|| {
+                            child.admit_work(2)?;
+                            Ok(self.settings.read_fields(self.db).rule_selection())
+                        })
+                        .await;
+                    Ok(child.read_field(request, &MdtestRuleSelectionRead).await)
+                }
+                FileSettings::File { rules, .. } => Ok(&rules.0),
+            }
+        })
+    }
+
+    fn verbose<'run>(
+        self: Rc<Self>,
+        endpoint: TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Demand<bool>>
+    where
+        'db: 'run,
+    {
+        let make = |host: Rc<Self>, child: TaskEndpoint<'run, 'db>| move || async move {
+            let quote = generated_field_quote(
+                |settings: Settings, context| settings.read_fields(context),
+                |settings: Settings, context| settings.read_fields(context).verbose(),
+            );
+            let read = boxed_future_with_fixed_transfers_at(&child, quote, || {
+                child.read_field(
+                    host.settings.read_fields(child.field_request_context()).verbose(),
+                    &BorrowOrCopy,
+                )
+            })
+            .await?;
+            Ok(read.await)
+        };
+        admit_host_task_setup(&endpoint, &make)?;
+        let child = endpoint.clone();
+        endpoint.demand(make(self, child))
+    }
+
+    fn analysis_settings<'run>(
+        self: Rc<Self>,
+        endpoint: TaskEndpoint<'run, 'db>,
+    ) -> RunResult<Demand<&'db AnalysisSettings>>
+    where
+        'db: 'run,
+    {
+        endpoint.admit_work(16)?;
+        let child = endpoint.clone();
+        endpoint.demand(move || async move {
+            let request = child
+                .local_call(|| {
+                    child.admit_work(2)?;
+                    Ok(file_settings::prepared_read(&self.file_settings))
+                })
+                .await;
+            let settings = child.read_prepared_source(request).await;
+            child.local_call(|| child.admit_work(4)).await;
+            match settings {
+                FileSettings::Global => {
+                    let request = child
+                        .local_call(|| {
+                            child.admit_work(2)?;
+                            Ok(self.settings.read_fields(self.db).analysis())
+                        })
+                        .await;
+                    Ok(child.read_field(request, &BorrowOrCopy).await)
+                }
+                FileSettings::File { analysis, .. } => Ok(analysis),
+            }
+        })
+    }
+}
+
+#[salsa::input(debug, field_requests = read_fields)]
 struct Settings {
     #[returns(ref)]
     program: ProgramSettings,
@@ -285,6 +447,30 @@ impl std::ops::Deref for MdtestRuleSelection {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+struct MdtestRuleSelectionRead;
+
+impl FieldReadProfile<MdtestRuleSelection> for MdtestRuleSelectionRead {
+    fn quote<'call, 'run: 'call, 'db: 'run>(
+        &'call self,
+        _endpoint: &'call TaskEndpoint<'run, 'db>,
+        _stored: &'call MdtestRuleSelection,
+        mode: FieldReturnMode,
+    ) -> impl Future<Output = RunResult<NativeValueQuote>> + 'call {
+        ready(if mode == FieldReturnMode::Deref {
+            // MdtestRuleSelection::deref only borrows its stored rule selection.
+            Ok(NativeValueQuote {
+                work: 1 + size_of::<&RuleSelection>(),
+                requested_bytes: 0,
+                cleanup_work: 0,
+            })
+        } else {
+            Err(RunError::Contract(
+                "mdtest rule selection requires its deref return mode",
+            ))
+        })
     }
 }
 
@@ -599,5 +785,105 @@ impl WritableSystem for MdtestSystem {
 
     fn dyn_clone(&self) -> Box<dyn WritableSystem> {
         Box::new(self.clone())
+    }
+}
+
+#[cfg(test)]
+mod verbose_tests;
+
+#[cfg(test)]
+mod tests {
+    use salsa::attempt_probe::{AttemptOutcome, ExecutionLimits, try_with_execution_budget};
+    use salsa::execution_probe::RegistryBuilder;
+    use salsa::prepared_source_probe::{capture, try_with_preparation};
+
+    use super::*;
+    use ruff_db::files::system_path_to_file;
+
+    #[test]
+    fn host_sealing_rejects_unprepared_settings_without_reading_them() {
+        let db = Db::setup();
+        let path = SystemPath::new("/test.py");
+        db.system.write_file_bytes(path, b"").unwrap();
+        let file = system_path_to_file(&db, path).unwrap();
+        let captured = capture(&db, || db.prepare_analysis_host_reads(file)).unwrap();
+        assert!(matches!(
+            captured.value,
+            Err(PreparationError::InvalidDependency)
+        ));
+        assert!(captured.reads.is_empty());
+    }
+
+    #[test]
+    fn host_root_reads_borrow_global_and_file_rule_selections() {
+        for (source, global) in [
+            ("", true),
+            (
+                "# /// script\n# [tool.ty.rules]\n# division-by-zero = 'ignore'\n# ///\n",
+                false,
+            ),
+        ] {
+            let db = Db::setup();
+            let path = SystemPath::new("/test.py");
+            db.system.write_file_bytes(path, source.as_bytes()).unwrap();
+            let file = system_path_to_file(&db, path).unwrap();
+            try_with_preparation(&db, || db.prepare_analysis_file_settings(file)).unwrap();
+            assert_eq!(
+                matches!(file_settings(&db, file), FileSettings::Global),
+                global
+            );
+            let expected = db.rule_selection(file);
+            let prepared = db.prepare_analysis_host_reads(file).unwrap();
+            let prepared = &prepared;
+            let settings_key = file_settings::prepare_memo(&db, file)
+                .unwrap()
+                .database_key();
+            let captured = capture(&db, || {
+                try_with_execution_budget(
+                    &db,
+                    ExecutionLimits {
+                        semantic_work: 1_000_000,
+                        requested_bytes: 1_000_000,
+                    },
+                    |budget| {
+                        RegistryBuilder::with_budget(&db, &budget)?.seal()?.run(
+                            |endpoint| async move {
+                                let (child, host) = endpoint
+                                    .local_call(|| {
+                                        endpoint.admit_work(12)?;
+                                        Ok((endpoint.clone(), Rc::clone(prepared)))
+                                    })
+                                    .await;
+                                let eligible = endpoint
+                                    .child_call(|| async move {
+                                        host.should_check_file(child)?.await
+                                    })
+                                    .await;
+                                let (child, host) = endpoint
+                                    .local_call(|| {
+                                        endpoint.admit_work(12)?;
+                                        Ok((endpoint.clone(), Rc::clone(prepared)))
+                                    })
+                                    .await;
+                                let rules = endpoint
+                                    .child_call(|| async move { host.rule_selection(child)?.await })
+                                    .await;
+                                Ok((eligible, rules))
+                            },
+                        )
+                    },
+                )
+            })
+            .unwrap();
+            let AttemptOutcome::Complete(Ok((eligible, actual))) = captured.value.unwrap() else {
+                panic!("prepared host reads did not complete");
+            };
+            assert!(eligible);
+            assert!(std::ptr::eq(actual, expected));
+            assert_eq!(captured.reads.len(), 1);
+            assert_eq!(captured.reads[0].key, settings_key);
+            assert!(captured.reads[0].parent.is_none());
+            prepared.check_current().unwrap();
+        }
     }
 }

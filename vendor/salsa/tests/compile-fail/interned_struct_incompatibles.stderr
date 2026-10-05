@@ -1,0 +1,66 @@
+error: `returns` option not allowed here
+ --> tests/compile-fail/interned_struct_incompatibles.rs:1:19
+  |
+1 | #[salsa::interned(returns(ref))]
+  |                   ^^^^^^^
+
+error: `specify` option not allowed here
+ --> tests/compile-fail/interned_struct_incompatibles.rs:6:19
+  |
+6 | #[salsa::interned(specify)]
+  |                   ^^^^^^^
+
+error: `no_eq` option not allowed here
+  --> tests/compile-fail/interned_struct_incompatibles.rs:11:19
+   |
+11 | #[salsa::interned(no_eq)]
+   |                   ^^^^^
+
+error: `db` option not allowed here
+  --> tests/compile-fail/interned_struct_incompatibles.rs:16:19
+   |
+16 | #[salsa::interned(db = Db)]
+   |                   ^^
+
+error: unrecognized option `recover_fn`
+  --> tests/compile-fail/interned_struct_incompatibles.rs:21:19
+   |
+21 | #[salsa::interned(recover_fn = recover)]
+   |                   ^^^^^^^^^^
+
+error: `lru` option not allowed here
+  --> tests/compile-fail/interned_struct_incompatibles.rs:26:19
+   |
+26 | #[salsa::interned(lru = 12)]
+   |                   ^^^
+
+error: `#[tracked]` cannot be used with `#[salsa::interned]`
+  --> tests/compile-fail/interned_struct_incompatibles.rs:33:5
+   |
+33 | /     #[tracked]
+34 | |     field: u32,
+   | |______________^
+
+error: `no_lifetime` must be written as `unsafe(no_lifetime)`
+  --> tests/compile-fail/interned_struct_incompatibles.rs:42:19
+   |
+42 | #[salsa::interned(no_lifetime, revisions = usize::MAX)]
+   |                   ^^^^^^^^^^^
+
+error: `unsafe(no_lifetime)` requires `revisions = usize::MAX`
+  --> tests/compile-fail/interned_struct_incompatibles.rs:47:26
+   |
+47 | #[salsa::interned(unsafe(no_lifetime))]
+   |                          ^^^^^^^^^^^
+
+error: `unsafe(no_lifetime)` requires `revisions = usize::MAX`
+  --> tests/compile-fail/interned_struct_incompatibles.rs:52:52
+   |
+52 | #[salsa::interned(unsafe(no_lifetime), revisions = 3)]
+   |                                                    ^
+
+error: cannot find attribute `tracked` in this scope
+  --> tests/compile-fail/interned_struct_incompatibles.rs:33:7
+   |
+33 |     #[tracked]
+   |       ^^^^^^^

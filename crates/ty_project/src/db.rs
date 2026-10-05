@@ -70,9 +70,25 @@ fn program_file(db: &dyn Db, file: File) -> ProgramFile<'_> {
     program.program_file(db, file)
 }
 
+fn prepare_analysis_environment(db: &dyn Db, file: File) -> ProgramFile<'_> {
+    db.project().files(db);
+    let program_file = program_file(db, file);
+    prepare_analysis_file_settings(db, file);
+    program_file
+}
+
+fn prepare_analysis_file_settings(db: &dyn Db, file: File) {
+    let project = db.project();
+    project.files(db);
+    file_settings(db, file);
+    project.rules(db);
+    crate::should_check_file(db, file);
+    is_open_file_impl(db, file);
+}
+
 /// Tracked so that a change to the open-file set only invalidates queries
 /// for files whose open state actually changed.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size, returns(copy))]
+#[salsa::tracked(attempt = CompleteOnly, heap_size=ruff_memory_usage::heap_size, returns(copy))]
 fn is_open_file_impl(db: &dyn Db, file: File) -> bool {
     db.project().open_files(db).contains(&file)
 }
@@ -585,6 +601,30 @@ impl SemanticDb for ProjectDatabase {
         program_file(self, file)
     }
 
+    fn prepare_analysis_environment(&self, file: File) -> ProgramFile<'_> {
+        prepare_analysis_environment(self, file)
+    }
+
+    fn prepare_analysis_file_settings(&self, file: File) {
+        prepare_analysis_file_settings(self, file);
+    }
+
+    fn prepare_analysis_host_reads(
+        &self,
+        file: File,
+    ) -> Result<
+        std::rc::Rc<dyn ty_python_semantic::prepared_host::PreparedHostFileReads<'_> + '_>,
+        salsa::prepared_source_probe::PreparationError,
+    > {
+        crate::metadata::settings::prepared_host::prepare(
+            self,
+            file,
+            self.project,
+            true,
+            crate::metadata::settings::prepared_host::VerboseSource::Project,
+        )
+    }
+
     fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
         match Script::for_file(self, file) {
             None => &self.project().program_settings(self).python_version,
@@ -868,6 +908,30 @@ pub(crate) mod testing {
             super::program_file(self, file)
         }
 
+        fn prepare_analysis_environment(&self, file: File) -> ProgramFile<'_> {
+            super::prepare_analysis_environment(self, file)
+        }
+
+        fn prepare_analysis_file_settings(&self, file: File) {
+            super::prepare_analysis_file_settings(self, file);
+        }
+
+        fn prepare_analysis_host_reads(
+            &self,
+            file: File,
+        ) -> Result<
+            std::rc::Rc<dyn ty_python_semantic::prepared_host::PreparedHostFileReads<'_> + '_>,
+            salsa::prepared_source_probe::PreparationError,
+        > {
+            crate::metadata::settings::prepared_host::prepare(
+                self,
+                file,
+                self.project,
+                false,
+                crate::metadata::settings::prepared_host::VerboseSource::Disabled,
+            )
+        }
+
         fn python_version_with_source(&self, file: File) -> &PythonVersionWithSource {
             match Script::for_file(self, file) {
                 None => &self.project().program_settings(self).python_version,
@@ -938,17 +1002,24 @@ pub(crate) mod testing {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::{AssertUnwindSafe, catch_unwind};
+
     use ruff_db::Db as _;
+    use ruff_db::diagnostic::Severity;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf, TestSystem};
-    use ruff_db::testing::assert_function_query_was_not_run_by_name;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+        assert_function_query_was_run,
+    };
     use ruff_python_trivia::textwrap::dedent;
+    use salsa::prepared_source_probe::try_with_preparation;
     use ty_module_resolver::list_modules;
     use ty_python_semantic::Db as _;
 
     use crate::db::testing::TestDb;
     use crate::watch::ChangeEvent;
-    use crate::{Db, ProjectDatabase, ProjectMetadata, UseUv};
+    use crate::{CheckMode, Db, ProjectDatabase, ProjectMetadata, UseUv};
 
     #[test]
     fn checks_use_available_script_environment_without_running_uv() -> anyhow::Result<()> {
@@ -1054,7 +1125,197 @@ mod tests {
         let mut db = ProjectDatabase::fallible(metadata, system)?;
         db.freeze();
 
-        assert_eq!(db.check().len(), 1);
+        let diagnostics = db.check();
+        assert_eq!(diagnostics.len(), 1);
+        assert_eq!(diagnostics[0].id().as_str(), "invalid-assignment");
+
+        Ok(())
+    }
+
+    #[test]
+    fn file_settings_preparation_preserves_explicit_program() -> anyhow::Result<()> {
+        let root = SystemPathBuf::from("/project");
+        let mut db = TestDb::new(ProjectMetadata::new("app", root.clone()));
+        db.write_dedented(
+            root.join("script.py").as_str(),
+            r#"
+            # /// script
+            # [tool.ty.environment]
+            # python-version = "3.12"
+            # extra-paths = ["../external"]
+            # ///
+            "#,
+        )?;
+        let external_path = SystemPathBuf::from("/external/dependency.py");
+        db.write_file(&external_path, "value = True\n")?;
+        let script = system_path_to_file(&db, root.join("script.py"))?;
+        let external = system_path_to_file(&db, external_path)?;
+        db.take_salsa_events();
+
+        // Preparing an imported file's settings and syntax keeps the importing program without
+        // consulting the script environment that the host would choose for an independent check.
+        let explicit_program_file = db.project().program(&db).program_file(&db, external);
+        assert_eq!(
+            try_with_preparation(&db, || {
+                db.prepare_analysis_file_settings(external);
+                ty_python_core::semantic_index(&db, explicit_program_file);
+            }),
+            Ok(())
+        );
+        let events = db.take_salsa_events();
+        assert_function_query_was_run(
+            &db,
+            crate::metadata::settings::file_settings,
+            external,
+            &events,
+        );
+        assert_function_query_was_not_run(&db, crate::script::script, script, &events);
+
+        let host_program = db.program_file(external).program(&db);
+        assert_ne!(host_program, db.project().program(&db));
+        let events = db.take_salsa_events();
+        assert_function_query_was_run(&db, crate::script::script, script, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn cold_checks_apply_file_settings() -> anyhow::Result<()> {
+        // The first check must apply global settings and matching overrides, including
+        // their precedence and exclusions, without relying on earlier semantic queries.
+        for (path, expected_count, expected_severity) in [
+            ("main.py", 1, Severity::Error),
+            ("overridden/main.py", 2, Severity::Warning),
+            ("overridden/special.py", 1, Severity::Error),
+            ("overridden/excluded.py", 1, Severity::Error),
+        ] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/project");
+            system.memory_file_system().write_files_all([
+                (
+                    root.join("ty.toml"),
+                    r#"
+                    [analysis]
+                    respect-type-ignore-comments = true
+                    [rules]
+                    invalid-argument-type = "error"
+
+                    [[overrides]]
+                    include = ["overridden/**"]
+                    exclude = ["overridden/excluded.py"]
+                    [overrides.analysis]
+                    respect-type-ignore-comments = false
+                    [overrides.rules]
+                    invalid-argument-type = "warn"
+
+                    [[overrides]]
+                    include = ["overridden/special.py"]
+                    [overrides.analysis]
+                    respect-type-ignore-comments = true
+                    [overrides.rules]
+                    invalid-argument-type = "error"
+                    "#,
+                ),
+                (
+                    root.join(path),
+                    dedent(
+                        r"
+                        class Expected: pass
+                        class Actual: pass
+
+                        def outer(value: Actual):
+                            def inner(value: Expected): pass
+                            inner(value)
+                            inner(value)  # type: ignore
+                        ",
+                    )
+                    .as_ref(),
+                ),
+            ])?;
+            let metadata = ProjectMetadata::discover(&root, &system)?;
+            let db = ProjectDatabase::fallible(metadata, system)?;
+            let file = system_path_to_file(&db, root.join(path))?;
+
+            let diagnostics = db.check_file(file);
+            assert_eq!(diagnostics.len(), expected_count, "{path}");
+            for diagnostic in diagnostics {
+                assert_eq!(diagnostic.id().as_str(), "invalid-argument-type", "{path}");
+                assert_eq!(diagnostic.severity(), expected_severity, "{path}");
+                assert_eq!(
+                    diagnostic.concise_message().to_string(),
+                    "Argument to function `inner` is incorrect: Expected `Expected`, found `Actual`",
+                    "{path}"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn cold_semantic_syntax_errors_respect_check_mode() -> anyhow::Result<()> {
+        for mode in [CheckMode::AllFiles, CheckMode::OpenFiles] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/project");
+            system
+                .memory_file_system()
+                .write_file_all(root.join("main.py"), "return\n")?;
+            let metadata = ProjectMetadata::discover(&root, &system)?;
+            let mut db = ProjectDatabase::fallible(metadata, system)?;
+            let file = system_path_to_file(&db, root.join("main.py"))?;
+            db.set_check_mode(mode);
+
+            if mode == CheckMode::OpenFiles {
+                assert!(db.check_file(file).is_empty());
+                db.project().open_file(&mut db, file);
+            }
+
+            let diagnostics = db.check_file(file);
+            assert_eq!(diagnostics.len(), 1);
+            assert_eq!(diagnostics[0].id().as_str(), "invalid-syntax");
+            assert_eq!(
+                diagnostics[0].concise_message().to_string(),
+                "`return` statement outside of a function"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn controlled_analysis_cannot_start_lazy_project_indexing() -> anyhow::Result<()> {
+        for refused in [false, true] {
+            let system = TestSystem::default();
+            let root = SystemPathBuf::from("/project");
+            system
+                .memory_file_system()
+                .write_file_all(root.join("main.py"), "True\n")?;
+            let metadata = ProjectMetadata::discover(&root, &system)?;
+            let db = ProjectDatabase::fallible(metadata, system)?;
+            let project = db.project();
+            assert!(project.file_set(&db).is_lazy());
+
+            let bypass = catch_unwind(AssertUnwindSafe(|| {
+                salsa::attempt_probe::try_with_attempt(&db, 0, || {
+                    if refused {
+                        assert_eq!(
+                            salsa::attempt_probe::charge(&db, 1),
+                            Err(salsa::attempt_probe::Incomplete::Allowance)
+                        );
+                    }
+                    project.files(&db);
+                })
+            }));
+            assert!(bypass.is_err());
+            assert!(project.file_set(&db).is_lazy());
+
+            let count = project.files(&db).len();
+            assert_eq!(count, 1);
+            assert_eq!(
+                salsa::attempt_probe::try_with_attempt(&db, 0, || project.files(&db).len()),
+                Ok(salsa::attempt_probe::AttemptOutcome::Complete(count))
+            );
+        }
 
         Ok(())
     }

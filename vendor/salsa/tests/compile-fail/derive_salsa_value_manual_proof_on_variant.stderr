@@ -1,0 +1,5 @@
+error: unexpected `#[salsa_value]` attribute on variant
+ --> tests/compile-fail/derive_salsa_value_manual_proof_on_variant.rs:3:7
+  |
+3 |     #[salsa_value(unsafe(prove_safe_to_retain_manually))]
+  |       ^^^^^^^^^^^

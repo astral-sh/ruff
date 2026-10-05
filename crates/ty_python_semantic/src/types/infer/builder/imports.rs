@@ -1,15 +1,13 @@
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::{
-    ImportingFile, Module, ModuleName, ModuleNameResolutionError, ModuleResolveMode,
-    resolve_module, search_paths,
+    ImportingFile, Module, ModuleName, ModuleResolveMode, resolve_module, search_paths,
 };
 
 use crate::{
     TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
     dependency::{DependencyProjectKind, missing_direct_dependency},
     place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin},
-    reachability::evaluate_reachability_with_cache,
     types::{
         ModuleLiteralType, Type, TypeAndQualifiers,
         diagnostic::{
@@ -18,10 +16,15 @@ use crate::{
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
         infer::TypeInferenceBuilder,
-        infer_definition_types,
+        signatures::effects::legacy_inline,
     },
 };
 use ty_python_core::definition::Definition;
+
+pub(in crate::types::infer) mod source_effects;
+pub(in crate::types::infer) mod statement;
+
+use source_effects::{ImportFromEffects, ImportFromWork, LegacyInlineEffects};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Binds an imported value without declaring its type, while preserving inherited `Final`
@@ -40,28 +43,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// from values import VALUE
     /// VALUE = 2  # invalid-assignment
     /// ```
-    fn add_imported_binding(
+    async fn add_imported_binding_with<E: ImportFromEffects<'db>>(
         &mut self,
+        effects: &E,
         alias: &'ast ast::Alias,
         definition: Definition<'db>,
         ty: Type<'db>,
         qualifiers: TypeQualifiers,
         provenance: Provenance<'db>,
-    ) {
+    ) -> Result<(), E::Error> {
         // Check the imported value before assignment recovery can replace its type.
-        if definition.kind(self.db()).as_star_import().is_none() {
-            self.check_deprecated(alias, ty);
+        if effects
+            .definition_kind(self.db(), definition)
+            .await?
+            .as_star_import()
+            .is_none()
+        {
+            effects.check_deprecated(self, alias.range(), ty).await?;
         }
 
-        self.add_binding(alias.into(), definition).insert(self, ty);
+        effects.insert_binding(self, alias, definition, ty).await?;
 
         if qualifiers.contains(TypeQualifiers::FINAL) {
+            effects.checkpoint(ImportFromWork::FinalDeclaration).await?;
             self.declarations.insert(
                 definition,
                 TypeAndQualifiers::new(ty, TypeOrigin::Declared, qualifiers)
                     .with_provenance(provenance),
             );
         }
+        Ok(())
     }
 
     pub(super) fn infer_import_statement(&mut self, import: &ast::StmtImport) {
@@ -77,10 +88,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn check_direct_dependency(&self, module: Module<'db>, range: TextRange) {
-        if !self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
-            || self.in_stub()
-            || self.is_in_type_checking_block(self.scope(), range)
+    async fn check_direct_dependency_with<E: ImportFromEffects<'db>>(
+        &self,
+        effects: &E,
+        module: Module<'db>,
+        range: TextRange,
+    ) -> Result<(), E::Error> {
+        if !effects.direct_dependency_lint_enabled(self).await?
+            || effects.direct_dependency_in_stub(self).await?
+        {
+            return Ok(());
+        }
+
+        effects
+            .check_direct_dependency_tail(self, module, range)
+            .await
+    }
+
+    fn check_direct_dependency_tail(&self, module: Module<'db>, range: TextRange) {
+        if self.is_in_type_checking_block(self.scope(), range)
             || self
                 .settings()
                 .replace_imports_with_any
@@ -258,6 +284,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         alias: &'ast ast::Alias,
         definition: Definition<'db>,
     ) {
+        legacy_inline(self.infer_import_definition_with(&LegacyInlineEffects, alias, definition));
+    }
+
+    pub(in crate::types::infer) async fn infer_import_definition_with<E: ImportFromEffects<'db>>(
+        &mut self,
+        effects: &E,
+        alias: &'ast ast::Alias,
+        definition: Definition<'db>,
+    ) -> Result<(), E::Error> {
         let ast::Alias {
             range: _,
             node_index: _,
@@ -266,205 +301,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = alias;
 
         // The name of the module being imported
+        effects
+            .checkpoint(ImportFromWork::FullModuleName { bytes: name.len() })
+            .await?;
         let Some(full_module_name) = ModuleName::new(name) else {
-            tracing::debug!("Failed to resolve import due to invalid syntax");
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::unknown());
-            return;
+            effects.log_invalid_import_syntax().await?;
+            effects
+                .insert_binding(self, alias, definition, Type::unknown())
+                .await?;
+            return Ok(());
         };
 
-        if self
-            .settings()
-            .replace_imports_with_any
-            .matches(&full_module_name)
-            .is_include()
+        if effects
+            .replace_import_with_any(self, &full_module_name)
+            .await?
         {
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::any());
-            return;
+            effects
+                .insert_binding(self, alias, definition, Type::any())
+                .await?;
+            return Ok(());
         }
 
         // Resolve the module being imported.
-        let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(alias.range(), 0, Some(name), Some(&full_module_name));
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::unknown());
-            return;
+        let Some(full_module) = effects.resolve_module(self, &full_module_name).await? else {
+            effects
+                .report_unresolved_plain_import(self, alias, &full_module_name)
+                .await?;
+            effects
+                .insert_binding(self, alias, definition, Type::unknown())
+                .await?;
+            return Ok(());
         };
 
-        if let Type::ModuleLiteral(module) = full_module_ty {
-            self.check_direct_dependency(module.module(self.db()), alias.range());
-        }
+        let full_module_ty = Type::ModuleLiteral(effects.module_literal(self, full_module).await?);
+        self.check_direct_dependency_with(effects, full_module, alias.range())
+            .await?;
 
         let binding_ty = if asname.is_some() {
             // If we are renaming the imported module via an `as` clause, then we bind the resolved
             // module's type to that name, even if that module is nested.
             full_module_ty
-        } else if full_module_name.contains('.') {
-            // If there's no `as` clause and the imported module is nested, we're not going to bind
-            // the resolved module itself into the current scope; we're going to bind the top-most
-            // parent package of that module.
-            let topmost_parent_name =
-                ModuleName::new(full_module_name.components().next().unwrap()).unwrap();
-            let Some(topmost_parent_ty) = self.module_type_from_name(&topmost_parent_name) else {
-                self.add_binding(alias.into(), definition)
-                    .insert(self, Type::unknown());
-                return;
-            };
-            topmost_parent_ty
         } else {
-            // If there's no `as` clause and the imported module isn't nested, then the imported
-            // module _is_ what we bind into the current scope.
-            full_module_ty
+            effects
+                .checkpoint(ImportFromWork::TopmostParentName {
+                    bytes: full_module_name.as_str().len(),
+                })
+                .await?;
+            if full_module_name.contains('.') {
+                // If there's no `as` clause and the imported module is nested, we're not going to bind
+                // the resolved module itself into the current scope; we're going to bind the top-most
+                // parent package of that module.
+                let topmost_parent_name =
+                    ModuleName::new(full_module_name.first_component()).unwrap();
+                let Some(topmost_parent) =
+                    effects.resolve_module(self, &topmost_parent_name).await?
+                else {
+                    effects
+                        .insert_binding(self, alias, definition, Type::unknown())
+                        .await?;
+                    return Ok(());
+                };
+                Type::ModuleLiteral(effects.module_literal(self, topmost_parent).await?)
+            } else {
+                // If there's no `as` clause and the imported module isn't nested, then the imported
+                // module _is_ what we bind into the current scope.
+                full_module_ty
+            }
         };
 
-        self.add_binding(alias.into(), definition)
-            .insert(self, binding_ty);
+        effects
+            .insert_binding(self, alias, definition, binding_ty)
+            .await
     }
 
     pub(super) fn infer_import_from_statement(&mut self, import: &ast::StmtImportFrom) {
-        let ast::StmtImportFrom {
-            module: _,
-            names,
-            level: _,
-            is_lazy: _,
-            range: _,
-            node_index: _,
-        } = import;
-
-        let db = self.db();
-
-        let module = self.check_import_from_module_is_resolvable(import);
-        let import_range = import.module.as_ref().map_or(import.range(), Ranged::range);
-
-        for alias in names {
-            let mut checked_dependency = false;
-            for definition in self.index.definitions(alias) {
-                if let Some(star_import) = definition.kind(db).as_star_import() {
-                    let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
-                    if let Some(binding) = use_def
-                        .reachable_symbol_bindings(star_import.symbol_id())
-                        .find(|binding| {
-                            binding
-                                .binding
-                                .is_defined_and(|candidate| candidate == *definition)
-                        })
-                        && evaluate_reachability_with_cache(
-                            db,
-                            Some(self.reachability_cache()),
-                            use_def.reachability_constraints(),
-                            use_def.predicates(),
-                            binding.reachability_constraint,
-                        )
-                        .is_always_false()
-                    {
-                        continue;
-                    }
-                }
-
-                let inferred = infer_definition_types(self.db(), *definition);
-                // Check non-star imports for missing direct dependencies.
-                if definition.kind(db).as_star_import().is_none() {
-                    // Cycle recovery can omit bindings; the fallback below checks the parent module.
-                    for (_, ty) in inferred.bindings(*definition) {
-                        // `from namespace import child` can import a distribution other than the
-                        // namespace's other children. Use inference's attribute-versus-submodule
-                        // decision, and do not follow values re-exported from unrelated modules.
-                        if self.context.is_lint_enabled(&MISSING_DIRECT_DEPENDENCY)
-                            && let Some(parent) = module
-                        {
-                            let imported_module = if let Type::ModuleLiteral(literal) = ty
-                                && let child = literal.module(db)
-                                && let child_name = child.name(db)
-                                && child_name.parent().as_ref() == Some(parent.name(db))
-                                && child_name.components().next_back() == Some(alias.name.as_str())
-                            {
-                                child
-                            } else {
-                                parent
-                            };
-                            self.check_direct_dependency(imported_module, import_range);
-                            checked_dependency = true;
-                        }
-                    }
-                }
-                self.extend_definition(*definition, inferred);
-            }
-
-            // Star imports can have no definitions, and cycle recovery can omit bindings.
-            if !checked_dependency && let Some(parent) = module {
-                self.check_direct_dependency(parent, import_range);
-            }
-        }
-    }
-
-    /// Resolve and return the module referred to by the `from` clause of an
-    /// [`ast::StmtImportFrom`] node. For `from package import child`, this returns
-    /// `package`, not `child`. Relative imports are resolved to an absolute module name.
-    ///
-    /// Return `None` if the module name is invalid or the module cannot be resolved.
-    /// Emit an unresolved-import diagnostic for resolution failures; syntax errors are
-    /// reported elsewhere.
-    fn check_import_from_module_is_resolvable(
-        &mut self,
-        import_from: &ast::StmtImportFrom,
-    ) -> Option<Module<'db>> {
-        let ast::StmtImportFrom { module, level, .. } = import_from;
-
-        let db = self.db();
-
-        // For diagnostics, we want to highlight the unresolvable
-        // module and not the entire `from ... import ...` statement.
-        let module_ref = module
-            .as_ref()
-            .map(ast::AnyNodeRef::from)
-            .unwrap_or_else(|| ast::AnyNodeRef::from(import_from));
-        let module = module.as_deref();
-
-        tracing::trace!(
-            "Resolving import statement from module `{}` into file `{}`",
-            format_import_from_module(*level, module),
-            self.file().path(db),
-        );
-        let importing_file = ImportingFile::File(
-            self.file(),
-            self.program_environment().resolver_environment(db),
-        );
-        let module_name = ModuleName::from_import_statement(db, importing_file, import_from);
-
-        let module_name = match module_name {
-            Ok(module_name) => module_name,
-            Err(ModuleNameResolutionError::InvalidSyntax) => {
-                tracing::debug!("Failed to resolve import due to invalid syntax");
-                // Invalid syntax diagnostics are emitted elsewhere.
-                return None;
-            }
-            Err(ModuleNameResolutionError::TooManyDots) => {
-                tracing::debug!(
-                    "Relative module resolution `{}` failed: too many leading dots",
-                    format_import_from_module(*level, module),
-                );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
-                return None;
-            }
-            Err(ModuleNameResolutionError::UnknownCurrentModule) => {
-                tracing::debug!(
-                    "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
-                    (try adjusting configured search paths?)",
-                    format_import_from_module(*level, module),
-                    self.file().path(db)
-                );
-                self.report_unresolved_import(module_ref.range(), *level, module, None);
-                return None;
-            }
-        };
-
-        let resolved = resolve_module(db, importing_file, &module_name);
-        if resolved.is_none() {
-            self.report_unresolved_import(module_ref.range(), *level, module, Some(&module_name));
-        }
-
-        resolved
+        legacy_inline(self.infer_import_from_statement_with(&LegacyInlineEffects, import));
     }
 
     pub(super) fn infer_import_from_definition(
@@ -473,51 +384,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         alias: &'ast ast::Alias,
         definition: Definition<'db>,
     ) {
+        legacy_inline(self.infer_import_from_definition_with(
+            &LegacyInlineEffects,
+            import_from,
+            alias,
+            definition,
+        ));
+    }
+
+    pub(in crate::types::infer) async fn infer_import_from_definition_with<
+        E: ImportFromEffects<'db>,
+    >(
+        &mut self,
+        effects: &E,
+        import_from: &ast::StmtImportFrom,
+        alias: &'ast ast::Alias,
+        definition: Definition<'db>,
+    ) -> Result<(), E::Error> {
         let db = self.db();
 
-        let importing_file = ImportingFile::File(
-            self.file(),
-            self.program_environment().resolver_environment(db),
-        );
-        let Ok(module_name) = ModuleName::from_import_statement(db, importing_file, import_from)
-        else {
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::unknown());
-            return;
+        let Ok(module_name) = effects.module_name(self, import_from).await? else {
+            effects
+                .insert_binding(self, alias, definition, Type::unknown())
+                .await?;
+            return Ok(());
         };
 
-        if self
-            .settings()
-            .replace_imports_with_any
-            .matches(&module_name)
-            .is_include()
-        {
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::any());
-            return;
+        if effects.replace_import_with_any(self, &module_name).await? {
+            effects
+                .insert_binding(self, alias, definition, Type::any())
+                .await?;
+            return Ok(());
         }
 
-        let Some(module) = resolve_module(db, importing_file, &module_name) else {
-            self.add_binding(alias.into(), definition)
-                .insert(self, Type::unknown());
-            return;
+        let Some(module) = effects.resolve_module(self, &module_name).await? else {
+            effects
+                .insert_binding(self, alias, definition, Type::unknown())
+                .await?;
+            return Ok(());
         };
 
-        let module_literal = ModuleLiteralType::new(
-            db,
-            module,
-            module.kind(db).is_package().then_some(self.program_file()),
-        );
-        let module_ty = Type::ModuleLiteral(module_literal);
+        let module_literal = effects.module_literal(self, module).await?;
 
-        let name = if let Some(star_import) = definition.kind(db).as_star_import() {
+        let name = if let Some(star_import) = effects
+            .definition_kind(db, definition)
+            .await?
+            .as_star_import()
+        {
             self.index
-                .place_table(self.scope().file_scope_id(db))
+                .place_table(effects.file_scope_id(db, self.scope()).await?)
                 .symbol(star_import.symbol_id())
                 .name()
         } else {
             &alias.name.id
         };
+        effects
+            .checkpoint(ImportFromWork::ImportedName { bytes: name.len() })
+            .await?;
+        let name = name.clone();
 
         // Avoid looking up attributes on a module if a module imports from itself
         // at the module-global scope, where the import definition itself is one of the
@@ -526,8 +450,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // In nested scopes (e.g. function bodies), the module's global-scope definitions
         // are resolved independently, so there is no cycle risk and the lookup is safe.
         let skip_self_referential_member_lookup = Some(self.file())
-            == module_literal.module(db).file(db)
-            && self.scope().file_scope_id(db).is_global();
+            == effects.module_literal_file(db, module_literal).await?
+            && effects.file_scope_id(db, self.scope()).await?.is_global();
 
         // Although it isn't the runtime semantics, we go to some trouble to prioritize a submodule
         // over module `__getattr__`, because that's what other type checkers do.
@@ -535,7 +459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // First try loading the requested attribute from the module.
         if !skip_self_referential_member_lookup {
-            let result = module_literal.static_member(db, self.program_environment(), name);
+            let result = effects.static_member(self, module_literal, &name).await?;
             let error = result.err();
             if let PlaceAndQualifiers {
                 place:
@@ -553,6 +477,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if &alias.name != "*" && boundness == Definedness::PossiblyUndefined {
                     // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                     // together if the attribute exists but is possibly-unbound.
+                    effects
+                        .checkpoint(ImportFromWork::PossiblyMissingDiagnostic {
+                            module_bytes: module_name.as_str().len(),
+                            member_bytes: name.len(),
+                        })
+                        .await?;
                     if let Some(builder) = self
                         .context
                         .report_lint(&POSSIBLY_MISSING_IMPORT, ast::AnyNodeRef::Alias(alias))
@@ -565,8 +495,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
                     from_module_getattr = Some((ty, qualifiers, source_provenance, error));
                 } else {
-                    self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
-                    return;
+                    self.add_imported_binding_with(
+                        effects,
+                        alias,
+                        definition,
+                        ty,
+                        qualifiers,
+                        source_provenance,
+                    )
+                    .await?;
+                    return Ok(());
                 }
             }
         }
@@ -574,7 +512,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Evaluate whether `X.Y` would constitute a valid submodule name,
         // given a `from X import Y` statement. If it is valid, this will be `Some()`;
         // else, it will be `None`.
-        let full_submodule_name = ModuleName::new(name).map(|final_part| {
+        effects
+            .checkpoint(ImportFromWork::SubmoduleName {
+                module_bytes: module_name.as_str().len(),
+                member_bytes: name.len(),
+            })
+            .await?;
+        let full_submodule_name = ModuleName::new(&name).map(|final_part| {
             let mut ret = module_name.clone();
             ret.extend(&final_part);
             ret
@@ -595,35 +539,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
         // check here when inferring types for a `from...import` statement.
-        if let Some(submodule_type) = full_submodule_name
-            .as_ref()
-            .and_then(|submodule_name| self.module_type_from_name(submodule_name))
+        if let Some(submodule_name) = full_submodule_name.as_ref()
+            && let Some(submodule_type) = effects.submodule_type(self, submodule_name).await?
         {
-            self.add_binding(alias.into(), definition)
-                .insert(self, submodule_type);
-            return;
+            effects
+                .insert_binding(self, alias, definition, submodule_type)
+                .await?;
+            return Ok(());
         }
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
         if let Some((ty, qualifiers, source_provenance, error)) = from_module_getattr {
             if let Some(error) = error {
-                error.report_module_getattr_import_diagnostic(
-                    &self.context,
-                    module_literal,
-                    alias,
-                    name,
-                );
+                effects
+                    .report_getattr_error(self, error, module_literal, alias, &name)
+                    .await?;
             }
-            self.add_imported_binding(alias, definition, ty, qualifiers, source_provenance);
-            return;
+            self.add_imported_binding_with(
+                effects,
+                alias,
+                definition,
+                ty,
+                qualifiers,
+                source_provenance,
+            )
+            .await?;
+            return Ok(());
         }
 
-        self.add_binding(alias.into(), definition)
-            .insert(self, Type::unknown());
+        effects
+            .insert_binding(self, alias, definition, Type::unknown())
+            .await?;
 
         if &alias.name == "*" {
-            return;
+            return Ok(());
         }
 
         if self
@@ -632,9 +582,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .matches(full_submodule_name.as_ref().unwrap_or(&module_name))
             .is_include()
         {
-            return;
+            return Ok(());
         }
 
+        effects
+            .report_missing_import(
+                self,
+                module_literal,
+                &module_name,
+                &name,
+                alias,
+                full_submodule_name.as_ref(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    fn report_missing_import_member(
+        &self,
+        module_literal: ModuleLiteralType<'db>,
+        module_name: &ModuleName,
+        name: &str,
+        alias: &ast::Alias,
+        full_submodule_name: Option<&ModuleName>,
+    ) {
+        let db = self.db();
         let Some(builder) = self
             .context
             .report_lint(&UNRESOLVED_IMPORT, ast::AnyNodeRef::Alias(alias))
@@ -654,8 +626,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.file(),
                 self.program_environment(),
                 &mut diagnostic,
-                &full_submodule_name,
-                module,
+                full_submodule_name,
+                module_literal.module(db),
             );
         }
 
@@ -664,7 +636,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 db,
                 self.program_file(),
                 diagnostic,
-                module_ty,
+                Type::ModuleLiteral(module_literal),
                 name,
                 "resolving imports",
             );

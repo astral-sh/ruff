@@ -1,0 +1,21 @@
+[package]
+name = "salsa-macros"
+version = "0.28.2"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "Procedural macros for the salsa crate"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "3.0.0", features = ["extra-traits", "full", "visit", "visit-mut"] }
+
+[features]
+default = []
+persistence = []

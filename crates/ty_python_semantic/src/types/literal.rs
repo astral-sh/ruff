@@ -2,6 +2,12 @@ use crate::ProgramEnvironment;
 use bitflags::bitflags;
 use compact_str::CompactString;
 use ruff_python_ast::name::Name;
+use salsa::execution_probe::{
+    ExecutionWork, FieldReadProfile, FieldReturnMode, InternedValues, NativeValueQuote, RunError,
+    RunResult, TaskEndpoint,
+};
+use salsa::plumbing::interned::FiniteInternedConfiguration;
+use salsa::plumbing::{QuoteError, QuoteFuel};
 
 use crate::Db;
 use crate::types::enums::EnumClassLiteral;
@@ -88,6 +94,12 @@ pub(crate) enum LiteralValueTypeKind<'db> {
     LiteralString,
     /// A bytes literal
     Bytes(BytesLiteralType<'db>),
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum LiteralFallback<'db> {
+    Scalar(KnownClass),
+    Enum(EnumLiteralType<'db>),
 }
 
 impl<'db> LiteralValueType<'db> {
@@ -253,14 +265,21 @@ impl<'db> LiteralValueType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
+        match self.fallback_target() {
+            LiteralFallback::Scalar(class) => class.to_instance(db, env),
+            LiteralFallback::Enum(literal) => literal.enum_class_instance(db, env),
+        }
+    }
+
+    pub(super) fn fallback_target(self) -> LiteralFallback<'db> {
         match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-                KnownClass::Str.to_instance(db, env)
+                LiteralFallback::Scalar(KnownClass::Str)
             }
-            LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_instance(db, env),
-            LiteralValueTypeKind::Int(_) => KnownClass::Int.to_instance(db, env),
-            LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db, env),
-            LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db, env),
+            LiteralValueTypeKind::Bool(_) => LiteralFallback::Scalar(KnownClass::Bool),
+            LiteralValueTypeKind::Int(_) => LiteralFallback::Scalar(KnownClass::Int),
+            LiteralValueTypeKind::Bytes(_) => LiteralFallback::Scalar(KnownClass::Bytes),
+            LiteralValueTypeKind::Enum(literal) => LiteralFallback::Enum(literal),
         }
     }
 }
@@ -349,10 +368,33 @@ impl std::cmp::PartialOrd for IntLiteralType {
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: CompactString,
+}
+
+pub(in crate::types) struct StringLiteralValueDeref;
+
+impl FieldReadProfile<CompactString> for StringLiteralValueDeref {
+    async fn quote<'call, 'run: 'call, 'db: 'run>(
+        &'call self,
+        _endpoint: &'call TaskEndpoint<'run, 'db>,
+        _stored: &'call CompactString,
+        mode: FieldReturnMode,
+    ) -> RunResult<NativeValueQuote> {
+        if mode != FieldReturnMode::Deref {
+            return Err(RunError::Contract(
+                "string literal field conversion is not a dereference",
+            ));
+        }
+        // CompactString's dereference borrows its stored UTF-8 without copying or traversing it.
+        Ok(NativeValueQuote {
+            work: size_of::<&str>() + 1,
+            requested_bytes: 0,
+            cleanup_work: 0,
+        })
+    }
 }
 
 // The Salsa heap is tracked separately.
@@ -363,6 +405,42 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
     }
+}
+
+impl FiniteInternedConfiguration for StringLiteralType<'static> {
+    fn field_work(fields: &Self::Fields<'_>) -> Option<usize> {
+        1usize.checked_add(fields.0.len())
+    }
+
+    fn field_work_bounded(
+        fields: &Self::Fields<'_>,
+        fuel: &mut QuoteFuel,
+    ) -> Result<usize, QuoteError> {
+        fuel.consume(1)?;
+        Self::field_work(fields).ok_or(QuoteError::Overflow)
+    }
+}
+
+pub(in crate::types) async fn intern_member_name_literal<'call, 'run: 'call, 'db: 'run>(
+    endpoint: &'call TaskEndpoint<'run, 'db>,
+    values: &'call InternedValues<'db, StringLiteralType<'static>, ()>,
+    name: &'call str,
+) -> Type<'db> {
+    let value = endpoint
+        .local_call(|| {
+            let units = 1usize
+                .checked_add(name.len())
+                .ok_or(RunError::Contract("member literal copy quote overflow"))?;
+            let requested_bytes = size_of::<CompactString>()
+                .checked_add(name.len())
+                .ok_or(RunError::Contract("member literal copy quote overflow"))?;
+            endpoint.admit_work(units)?;
+            endpoint.admit(ExecutionWork::Resource { requested_bytes })?;
+            Ok(CompactString::new(name))
+        })
+        .await;
+    let literal = endpoint.intern_value(values, (value,)).await;
+    Type::LiteralValue(LiteralValueType::promotable(literal))
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -389,7 +467,7 @@ impl<'db> BytesLiteralType<'db> {
 ///     NO = 0
 ///     YES = 1
 /// ```
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumLiteralType<'db> {
     /// The enum class this literal belongs to.
     #[returns(copy)]

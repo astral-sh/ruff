@@ -2,12 +2,16 @@
 // not intended for rustdoc to render.
 #![expect(clippy::doc_link_with_quotes, clippy::doc_overindented_list_items)]
 
+pub(in crate::types) mod class_generics;
+pub(in crate::types) mod disjoint_bases;
+pub(in crate::types) mod generic_bases;
+
 use super::call::CallErrorKind;
 use super::context::InferContext;
 use super::mro::DuplicateBaseError;
 use super::{
-    CallArguments, CallDunderError, ClassBase, ClassLiteral, GenericAlias, KnownClass,
-    ModuleLiteralType, StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
+    CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass, ModuleLiteralType,
+    StaticClassLiteral, add_inferred_python_version_hint_to_diagnostic,
 };
 use crate::dependency::is_direct_dependency;
 use crate::diagnostic::{did_you_mean, format_enumeration};
@@ -54,7 +58,7 @@ use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, HasNodeIndex, PythonVersion, StringFlags};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{
     ImportingFile, KnownModule, Module, ModuleName, SearchPath, file_to_module,
@@ -834,53 +838,15 @@ pub(super) fn report_missing_type_arguments<'db>(
     ty: Type<'db>,
     annotation: &ast::Expr,
 ) {
-    match ty {
-        Type::ClassLiteral(class) => {
-            let db = context.db();
-
-            let Some(generic_context) = class.generic_context(db) else {
-                return;
-            };
-
-            // Don't warn if all type parameters have defaults (PEP 696).
-            if generic_context
-                .variables(db)
-                .all(|tv| tv.default_type(db).is_some())
-            {
-                return;
-            }
-
-            let required_count = generic_context
-                .variables(db)
-                .filter(|tv| tv.default_type(db).is_none())
-                .count();
-
-            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
-                let class_name = class.name(db);
-                if required_count == 1 {
-                    builder.into_diagnostic(format_args!(
-                        "Missing type argument for generic class `{class_name}` \
-                         (expected 1 type argument)"
-                    ));
-                } else {
-                    builder.into_diagnostic(format_args!(
-                        "Missing type arguments for generic class `{class_name}` \
-                         (expected {required_count} type arguments)"
-                    ));
-                }
-            }
-        }
-        Type::SpecialForm(
-            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
-        ) => {
-            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
-                builder.into_diagnostic(format_args!(
-                    "Missing type arguments for generic type `Callable` \
-                     (expected 2 type arguments)"
-                ));
-            }
-        }
-        _ => {}
+    match report_missing_type_arguments_sync(
+        context,
+        ty,
+        annotation,
+        MissingArgumentFacts,
+        &InlineMissingArguments,
+    ) {
+        Ok(()) => {}
+        Err(error) => match error {},
     }
 }
 
@@ -1440,8 +1406,24 @@ pub(crate) fn report_mismatched_type_name<'db>(
 }
 
 impl TypeCheckDiagnostics {
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) fn storage(&self) -> (usize, usize, usize, usize) {
+        (
+            self.diagnostics.len(),
+            self.diagnostics.capacity(),
+            self.used_suppressions.len(),
+            self.used_suppressions.capacity(),
+        )
+    }
+
     pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
         self.diagnostics.push(diagnostic);
+    }
+
+    /// Reserves slots before an admitted transfer of completed diagnostics.
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn reserve_diagnostics(&mut self, additional: usize) {
+        self.diagnostics.reserve_exact(additional);
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
@@ -3474,25 +3456,14 @@ impl<'db> IncompatibleBases<'db> {
     /// This method therefore removes any entry in `self` that is a subclass of one or more
     /// other entries also contained in `self`.
     pub(super) fn remove_redundant_entries(&mut self, db: &'db dyn Db) {
-        self.0 = self
-            .0
-            .iter()
-            .filter(|(disjoint_base, _)| {
-                self.0
-                    .keys()
-                    .filter(|other_base| other_base != disjoint_base)
-                    .all(|other_base| {
-                        // CPython's layout check operates on runtime classes. Type arguments are
-                        // irrelevant here: a generic disjoint base and any specialization of that
-                        // base share the same layout.
-                        !disjoint_base
-                            .class
-                            .default_specialization(db)
-                            .is_subtype_of_class_literal(db, other_base.class)
-                    })
-            })
-            .map(|(base, info)| (*base, *info))
-            .collect();
+        match disjoint_bases::prune_disjoint_bases_sync(
+            self,
+            disjoint_bases::DisjointBaseFacts,
+            &disjoint_bases::OrdinaryDisjointBaseEffects { db },
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
+        }
     }
 }
 
@@ -4657,87 +4628,25 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     }
 }
 
+/// Reports non-defaulted legacy class parameters that follow the first defaulted parameter.
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     node: &ast::StmtClassDef,
     typevar_with_default: TypeVarInstance<'db>,
-    invalid_later_typevars: &[TypeVarInstance<'db>],
+    first_offender: TypeVarInstance<'db>,
+    later_offenders: &[TypeVarInstance<'db>],
 ) {
-    let db = context.db();
-
-    let base_index = class
-        .explicit_bases(context.db())
-        .iter()
-        .position(|base| {
-            matches!(
-                base,
-                Type::KnownInstance(
-                    KnownInstanceType::SubscriptedProtocol(_)
-                        | KnownInstanceType::SubscriptedGeneric(_)
-                )
-            )
-        })
-        .expect(
-            "It should not be possible for a class to have \
-            a legacy generic context if it does \
-            not inherit from `Protocol[]` or `Generic[]`",
-        );
-
-    let base_node = &node.bases()[base_index];
-
-    let primary_diagnostic_range = base_node
-        .as_subscript_expr()
-        .map(|subscript| &*subscript.slice)
-        .unwrap_or(base_node)
-        .range();
-
-    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, primary_diagnostic_range)
-    else {
-        return;
-    };
-
-    let mut diagnostic = builder.into_diagnostic(
-        "Type parameters without defaults cannot follow type parameters with defaults",
-    );
-
-    diagnostic.set_concise_message(format_args!(
-        "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
-        invalid_later_typevars[0].name(db),
-        typevar_with_default.name(db),
-    ));
-
-    if let [single_typevar] = invalid_later_typevars {
-        diagnostic.set_primary_annotation_message(format_args!(
-            "Type variable `{}` does not have a default",
-            single_typevar.name(db),
-        ));
-    } else {
-        let later_typevars =
-            format_enumeration(invalid_later_typevars.iter().map(|tv| tv.name(db)));
-        diagnostic.set_primary_annotation_message(format_args!(
-            "Type variables {later_typevars} do not have defaults",
-        ));
-    }
-
-    diagnostic.annotate(
-        Annotation::primary(Span::from(context.file()).with_range(primary_diagnostic_range))
-            .message(format_args!(
-                "Earlier TypeVar `{}` does",
-                typevar_with_default.name(db)
-            )),
-    );
-
-    for tvar in [typevar_with_default, invalid_later_typevars[0]] {
-        let Some(definition) = tvar.definition(db) else {
-            continue;
-        };
-        diagnostic.annotate(
-            Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
-            ))
-            .message(format_args!("`{}` defined here", tvar.name(db))),
-        );
+    match class_generics::legacy_default_order_sync(
+        class,
+        node,
+        typevar_with_default,
+        first_offender,
+        later_offenders,
+        &class_generics::OrdinaryClassGenericReportEffects { context },
+    ) {
+        Ok(()) => {}
+        Err(never) => match never {},
     }
 }
 
@@ -4748,59 +4657,21 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
     referenced_typevar: TypeVarInstance<'db>,
     is_later_in_list: bool,
 ) {
-    let db = context.db();
-
-    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
-        return;
-    };
-
-    let mut diagnostic = if is_later_in_list {
-        builder.into_diagnostic(format_args!(
-            "Default of `{}` cannot reference later type parameter `{}`",
-            typevar_with_bad_default.name(db),
-            referenced_typevar.name(db),
-        ))
+    let reference = if is_later_in_list {
+        class_generics::DefaultReference::LaterParameter
     } else {
-        builder.into_diagnostic(format_args!(
-            "Default of `{}` cannot reference out-of-scope type variable `{}`",
-            typevar_with_bad_default.name(db),
-            referenced_typevar.name(db),
-        ))
+        class_generics::DefaultReference::OutOfScope
     };
-
-    let typevars_to_annotate = if is_later_in_list {
-        &[typevar_with_bad_default, referenced_typevar][..]
-    } else {
-        &[typevar_with_bad_default][..]
-    };
-
-    for tvar in typevars_to_annotate {
-        let Some(definition) = tvar.definition(db) else {
-            continue;
-        };
-        diagnostic.annotate(
-            Annotation::secondary(Span::from(
-                definition.full_range(db, &parsed_module(db, definition.python_file(db)).load(db)),
-            ))
-            .message(format_args!("`{}` defined here", tvar.name(db))),
-        );
+    match class_generics::invalid_default_reference_sync(
+        class,
+        typevar_with_bad_default,
+        referenced_typevar,
+        reference,
+        &class_generics::OrdinaryClassGenericReportEffects { context },
+    ) {
+        Ok(()) => {}
+        Err(never) => match never {},
     }
-}
-
-/// A type parameter of a generic ancestor, independent of its specialization.
-#[derive(PartialEq, Eq, Hash, Debug)]
-struct GenericBaseParameter<'db> {
-    origin: StaticClassLiteral<'db>,
-    parameter_index: usize,
-}
-
-/// A non-dynamic type argument and the inheritance path that supplies it.
-#[derive(Debug)]
-struct GenericBaseConstraint<'db> {
-    argument: Type<'db>,
-    alias: GenericAlias<'db>,
-    /// The index in the class's explicit bases list, used to locate the diagnostic annotation.
-    base_index: usize,
 }
 
 /// Report when separate bases contribute incompatible specializations of a generic ancestor.
@@ -4823,115 +4694,15 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
     explicit_bases: &[Type<'db>],
     base_nodes: Option<&[ast::Expr]>,
 ) -> bool {
-    let db = context.db();
-    let env = &context.program_environment();
-    // Track the first non-dynamic argument at each position, along with the alias and explicit
-    // base that supplied it. Compatibility with a gradual argument is not transitive: both
-    // `Base[int, str]` and `Base[int, bytes]` are compatible with `Base[int, Any]`, but conflict
-    // with each other.
-    let mut ancestor_constraints =
-        FxHashMap::<GenericBaseParameter<'db>, GenericBaseConstraint<'db>>::default();
-
-    for (base_index, base) in explicit_bases.iter().enumerate() {
-        let base_class = match base {
-            Type::GenericAlias(alias) => ClassType::Generic(*alias),
-            Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
-                ClassType::NonGeneric(*class)
-            }
-            _ => continue,
-        };
-
-        for supercls in base_class.iter_explicit_ancestors(db, env) {
-            let ClassType::Generic(supercls_alias) = supercls else {
-                continue;
-            };
-            let origin = supercls_alias.origin(db);
-
-            for (parameter_index, &argument) in supercls_alias
-                .specialization(db)
-                .types(db)
-                .iter()
-                .enumerate()
-            {
-                if argument.is_dynamic() {
-                    continue;
-                }
-                let earlier = ancestor_constraints
-                    .entry(GenericBaseParameter {
-                        origin,
-                        parameter_index,
-                    })
-                    .or_insert(GenericBaseConstraint {
-                        argument,
-                        alias: supercls_alias,
-                        base_index,
-                    });
-                if earlier.argument != argument {
-                    if earlier.base_index == base_index {
-                        return true;
-                    }
-                    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
-                    else {
-                        return true;
-                    };
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Inconsistent type arguments for `{}` among class bases",
-                        origin.name(db)
-                    ));
-                    let later_is_direct = matches!(
-                        base,
-                        Type::GenericAlias(alias) if alias.origin(db) == origin
-                    );
-
-                    if let (Some(earlier_base), Some(later_base)) = (
-                        base_nodes.and_then(|nodes| nodes.get(earlier.base_index)),
-                        base_nodes.and_then(|nodes| nodes.get(base_index)),
-                    ) {
-                        diagnostic.annotate(context.secondary(earlier_base).message(format_args!(
-                            "Earlier class base inherits from `{}`",
-                            earlier.alias.display(db, env)
-                        )));
-                        let later_annotation = context.secondary(later_base);
-                        diagnostic.annotate(if later_is_direct {
-                            later_annotation.message(format_args!(
-                                "Later class base is `{}`",
-                                supercls_alias.display(db, env)
-                            ))
-                        } else {
-                            later_annotation.message(format_args!(
-                                "Later class base inherits from `{}`",
-                                supercls_alias.display(db, env)
-                            ))
-                        });
-                    } else {
-                        diagnostic.info(format_args!(
-                            "Earlier class base inherits from `{}`",
-                            earlier.alias.display(db, env)
-                        ));
-                        if later_is_direct {
-                            diagnostic.info(format_args!(
-                                "Later class base is `{}`",
-                                supercls_alias.display(db, env)
-                            ));
-                        } else {
-                            diagnostic.info(format_args!(
-                                "Later class base inherits from `{}`",
-                                supercls_alias.display(db, env)
-                            ));
-                        }
-                    }
-                    diagnostic.set_concise_message(format_args!(
-                        "Inconsistent type arguments: class cannot inherit from both `{}` and `{}`",
-                        supercls_alias.display(db, env),
-                        earlier.alias.display(db, env)
-                    ));
-                    return true;
-                }
-            }
-        }
+    match generic_bases::report_inconsistent_generic_bases_sync(
+        header_range,
+        explicit_bases,
+        base_nodes,
+        &generic_bases::OrdinaryGenericBaseCheckEffects::new(context),
+    ) {
+        Ok(inconsistent) => inconsistent,
+        Err(never) => match never {},
     }
-
-    false
 }
 
 pub(crate) fn report_shadowed_type_variable<'db>(
@@ -4943,47 +4714,21 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     type_var_kind: TypeVarKind,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
-    let db = context.db();
-    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
-        return;
+    let report = class_generics::ShadowReport {
+        typevar_name,
+        owner_kind: kind,
+        owner_name: name,
+        range,
+        kind: type_var_kind,
+        other: other_typevar,
     };
-    let typevar_kind = match type_var_kind {
-        TypeVarKind::LegacyTypeVar
-        | TypeVarKind::Pep695TypeVar
-        | TypeVarKind::TypingSelf
-        | TypeVarKind::Pep613Alias => "type variable",
-        TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
-        TypeVarKind::LegacyTypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
-    };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
-        already bound by an enclosing scope",
-    ));
-    diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` \
-        already bound by an enclosing scope",
-    ));
-    diagnostic.set_primary_annotation_message(format_args!(
-        "`{typevar_name}` used in {kind} definition here"
-    ));
-    let Some(other_definition) = other_typevar.binding_context(db).definition() else {
-        return;
-    };
-    let span = match binding_type(context.db(), other_definition) {
-        Type::ClassLiteral(class) => class.header_span(db),
-        Type::FunctionLiteral(function) => function.spans(db).signature,
-        _ => return,
-    };
-    let other_typevar_kind = if other_typevar.is_paramspec(db) {
-        "ParamSpec"
-    } else if other_typevar.is_typevartuple(db) {
-        "TypeVarTuple"
-    } else {
-        "Type variable"
-    };
-    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "{other_typevar_kind} `{typevar_name}` is bound in this enclosing scope"
-    )));
+    match class_generics::shadow_report_sync(
+        report,
+        &class_generics::OrdinaryClassGenericReportEffects { context },
+    ) {
+        Ok(()) => {}
+        Err(never) => match never {},
+    }
 }
 
 // I tried refactoring this function to placate Clippy,
@@ -6059,5 +5804,305 @@ pub(super) fn report_subclass_of_class_with_non_callable_init_subclass<'db>(
         CallErrorKind::BindingError => {
             bindings.report_diagnostics(context, class_node.into());
         }
+    }
+}
+
+pub(in crate::types) struct MissingArgumentFacts;
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousMissingTypeArgumentEffects)]
+    pub(in crate::types) trait MissingTypeArgumentEffects<'db> {
+        type Error;
+        #[operation(child)]
+        async fn generic_context(&self, context: &InferContext<'db, '_>, class: ClassLiteral<'db>) -> Result<Option<crate::types::GenericContext<'db>>, Self::Error>;
+        #[operation(source)]
+        async fn variables(&self, context: &InferContext<'db, '_>, generic: crate::types::GenericContext<'db>) -> Result<&'db crate::types::generics::context_construction::ContextVariables<'db>, Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_variable(&self, variables: &'db crate::types::generics::context_construction::ContextVariables<'db>, index: &mut usize) -> Result<Option<BoundTypeVarInstance<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn default_type(&self, context: &InferContext<'db, '_>, variable: BoundTypeVarInstance<'db>) -> Result<Option<Type<'db>>, Self::Error>;
+        #[operation(local)]
+        async fn report_class(&self, context: &InferContext<'db, '_>, class: ClassLiteral<'db>, annotation: &ast::Expr, required_count: usize) -> Result<(), Self::Error>;
+        #[operation(local)]
+        async fn report_callable(&self, context: &InferContext<'db, '_>, annotation: &ast::Expr) -> Result<(), Self::Error>;
+    }
+    #[finite_capability]
+    impl MissingArgumentFacts {
+        fn increment(&self, count: usize) -> usize { count + 1 }
+        fn missing<'db>(&self, default: Option<Type<'db>>) -> bool { default.is_none() }
+    }
+    #[synchronous(report_missing_type_arguments_sync)]
+    #[capabilities(effects = MissingTypeArgumentEffects, facts = MissingArgumentFacts)]
+    #[passive_values()]
+    pub(in crate::types) async fn report_missing_type_arguments_core<'db, E: MissingTypeArgumentEffects<'db>>(
+        context: &InferContext<'db, '_>, ty: Type<'db>, annotation: &ast::Expr, facts: MissingArgumentFacts, effects: &E,
+    ) -> Result<(), E::Error> {
+        match ty {
+            Type::ClassLiteral(class) => {
+                let Some(generic) = effects.generic_context(context, class).await? else { return Ok(()); };
+                // Don't warn if all type parameters have defaults (PEP 696).
+                let variables = effects.variables(context, generic).await?;
+                #[passive_state]
+                let mut index = 0;
+                #[passive_state]
+                let mut all_defaults = true;
+                #[cursor_loop]
+                while let Some(variable) = effects.next_variable(variables, &mut index).await? {
+                    if facts.missing(effects.default_type(context, variable).await?) { all_defaults = false; break; }
+                }
+                if all_defaults { return Ok(()); }
+                let variables = effects.variables(context, generic).await?;
+                #[passive_state]
+                let mut index = 0;
+                #[passive_state]
+                let mut required_count = 0;
+                #[cursor_loop]
+                while let Some(variable) = effects.next_variable(variables, &mut index).await? {
+                    if facts.missing(effects.default_type(context, variable).await?) { required_count = facts.increment(required_count); }
+                }
+                effects.report_class(context, class, annotation, required_count).await?;
+            }
+            Type::SpecialForm(SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable) => effects.report_callable(context, annotation).await?,
+            _ => {},
+        }
+        Ok(())
+    }
+}
+
+pub(in crate::types) async fn report_missing_type_arguments_with<
+    'db,
+    E: MissingTypeArgumentEffects<'db>,
+>(
+    context: &InferContext<'db, '_>,
+    ty: Type<'db>,
+    annotation: &ast::Expr,
+    effects: &E,
+) -> Result<(), E::Error> {
+    report_missing_type_arguments_core(context, ty, annotation, MissingArgumentFacts, effects).await
+}
+
+struct InlineMissingArguments;
+
+impl<'db> SynchronousMissingTypeArgumentEffects<'db> for InlineMissingArguments {
+    type Error = std::convert::Infallible;
+    fn generic_context(
+        &self,
+        context: &InferContext<'db, '_>,
+        class: ClassLiteral<'db>,
+    ) -> Result<Option<crate::types::GenericContext<'db>>, Self::Error> {
+        Ok(class.generic_context(context.db()))
+    }
+    fn variables(
+        &self,
+        context: &InferContext<'db, '_>,
+        generic: crate::types::GenericContext<'db>,
+    ) -> Result<&'db crate::types::generics::context_construction::ContextVariables<'db>, Self::Error>
+    {
+        Ok(generic.variables_with_fields(salsa::FieldReads::new(context.db())))
+    }
+    fn next_variable(
+        &self,
+        variables: &'db crate::types::generics::context_construction::ContextVariables<'db>,
+        index: &mut usize,
+    ) -> Result<Option<BoundTypeVarInstance<'db>>, Self::Error> {
+        let result = crate::types::GenericContext::variable_at_in(variables, *index);
+        if result.is_some() {
+            *index += 1;
+        }
+        Ok(result)
+    }
+    fn default_type(
+        &self,
+        context: &InferContext<'db, '_>,
+        variable: BoundTypeVarInstance<'db>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        Ok(variable.default_type(context.db()))
+    }
+    fn report_class(
+        &self,
+        context: &InferContext<'db, '_>,
+        class: ClassLiteral<'db>,
+        annotation: &ast::Expr,
+        required_count: usize,
+    ) -> Result<(), Self::Error> {
+        let db = context.db();
+        if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+            let class_name = class.name(db);
+            if required_count == 1 {
+                builder.into_diagnostic(format_args!(
+                    "Missing type argument for generic class `{class_name}` \
+                         (expected 1 type argument)"
+                ));
+            } else {
+                builder.into_diagnostic(format_args!(
+                    "Missing type arguments for generic class `{class_name}` \
+                         (expected {required_count} type arguments)"
+                ));
+            }
+        }
+
+        Ok(())
+    }
+    fn report_callable(
+        &self,
+        context: &InferContext<'db, '_>,
+        annotation: &ast::Expr,
+    ) -> Result<(), Self::Error> {
+        if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+            builder.into_diagnostic(format_args!(
+                "Missing type arguments for generic type `Callable` \
+                     (expected 2 type arguments)"
+            ));
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod missing_type_argument_tests {
+    use std::cell::{Cell, RefCell};
+
+    use super::*;
+    use crate::db::tests::TestDbBuilder;
+    use crate::types::GenericContext;
+    use crate::types::generics::context_construction::ContextVariables;
+
+    struct Observed<'db> {
+        generic: GenericContext<'db>,
+        variables: [BoundTypeVarInstance<'db>; 3],
+        defaults: [bool; 3],
+        reads: RefCell<Vec<BoundTypeVarInstance<'db>>>,
+        views: Cell<usize>,
+        reported: Cell<Option<usize>>,
+    }
+
+    impl<'db> SynchronousMissingTypeArgumentEffects<'db> for Observed<'db> {
+        type Error = &'static str;
+        fn generic_context(
+            &self,
+            _context: &InferContext<'db, '_>,
+            _class: ClassLiteral<'db>,
+        ) -> Result<Option<GenericContext<'db>>, Self::Error> {
+            Ok(Some(self.generic))
+        }
+        fn variables(
+            &self,
+            context: &InferContext<'db, '_>,
+            generic: GenericContext<'db>,
+        ) -> Result<&'db ContextVariables<'db>, Self::Error> {
+            self.views.set(self.views.get() + 1);
+            Ok(generic.variables_with_fields(salsa::FieldReads::new(context.db())))
+        }
+        fn next_variable(
+            &self,
+            variables: &'db ContextVariables<'db>,
+            index: &mut usize,
+        ) -> Result<Option<BoundTypeVarInstance<'db>>, Self::Error> {
+            let result = GenericContext::variable_at_in(variables, *index);
+            if result.is_some() {
+                *index += 1;
+            }
+            Ok(result)
+        }
+        fn default_type(
+            &self,
+            _context: &InferContext<'db, '_>,
+            variable: BoundTypeVarInstance<'db>,
+        ) -> Result<Option<Type<'db>>, Self::Error> {
+            self.reads.borrow_mut().push(variable);
+            let index = self
+                .variables
+                .iter()
+                .position(|candidate| *candidate == variable)
+                .ok_or("foreign variable")?;
+            Ok(self.defaults[index].then_some(Type::unknown()))
+        }
+        fn report_class(
+            &self,
+            _context: &InferContext<'db, '_>,
+            _class: ClassLiteral<'db>,
+            _annotation: &ast::Expr,
+            required_count: usize,
+        ) -> Result<(), Self::Error> {
+            self.reported.set(Some(required_count));
+            Ok(())
+        }
+        fn report_callable(
+            &self,
+            _context: &InferContext<'db, '_>,
+            _annotation: &ast::Expr,
+        ) -> Result<(), Self::Error> {
+            Err("unexpected Callable")
+        }
+    }
+
+    #[test]
+    fn missing_arguments_preserve_short_circuit_then_second_default_pass() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file("/src/arguments.py", "class Leaf: ...\nvalue: Leaf\n")
+            .build()?;
+        let file = ruff_db::files::system_path_to_file(&db, "/src/arguments.py")?;
+        let program_file = db.program_file(file);
+        let env = db.program_environment();
+        let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
+        let Some(ast::Stmt::AnnAssign(assignment)) = module.syntax().body.last() else {
+            anyhow::bail!("missing annotated assignment");
+        };
+        let ty = crate::place::global_symbol(&db, program_file, "Leaf")
+            .place
+            .ignore_possibly_undefined()
+            .ok_or_else(|| anyhow::anyhow!("missing Leaf"))?;
+        let variables = ["T", "U", "V"].map(|name| {
+            BoundTypeVarInstance::synthetic(&db, &env, Name::new(name), TypeVarVariance::Invariant)
+        });
+        let generic = GenericContext::from_typevar_instances(&db, &env, variables);
+        for defaults in [[true, false, true], [true, true, true]] {
+            let context = InferContext::new(
+                &db,
+                &env,
+                global_scope(&db, program_file),
+                file,
+                program_file,
+                &module,
+            );
+            let effects = Observed {
+                generic,
+                variables,
+                defaults,
+                reads: RefCell::default(),
+                views: Cell::new(0),
+                reported: Cell::new(None),
+            };
+            let result = report_missing_type_arguments_sync(
+                &context,
+                ty,
+                &assignment.annotation,
+                MissingArgumentFacts,
+                &effects,
+            );
+            let _diagnostics = context.finish();
+            result.map_err(anyhow::Error::msg)?;
+            if defaults[1] {
+                assert_eq!(*effects.reads.borrow(), variables);
+                assert_eq!(effects.views.get(), 1);
+                assert_eq!(effects.reported.get(), None);
+            } else {
+                assert_eq!(
+                    *effects.reads.borrow(),
+                    [
+                        variables[0],
+                        variables[1],
+                        variables[0],
+                        variables[1],
+                        variables[2]
+                    ]
+                );
+                assert_eq!(effects.views.get(), 2);
+                assert_eq!(effects.reported.get(), Some(1));
+            }
+        }
+        Ok(())
     }
 }

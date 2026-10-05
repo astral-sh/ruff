@@ -10,7 +10,7 @@ use crate::{
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(debug, field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 pub struct ScopeId<'db> {
     #[returns(copy)]
     pub program_file: ProgramFile<'db>,
@@ -45,14 +45,7 @@ impl<'db> ScopeId<'db> {
 
     /// Returns `true` if this scope may require type context from its parent scope.
     pub fn accepts_type_context(self, db: &'db dyn Db) -> bool {
-        matches!(
-            self.node(db),
-            NodeWithScopeKind::Lambda(_)
-                | NodeWithScopeKind::ListComprehension(_)
-                | NodeWithScopeKind::SetComprehension(_)
-                | NodeWithScopeKind::DictComprehension(_)
-                | NodeWithScopeKind::GeneratorExpression(_)
-        )
+        self.scope(db).accepts_type_context()
     }
 
     pub fn scope(self, db: &'db dyn Db) -> &'db Scope {
@@ -110,8 +103,7 @@ impl FileScopeId {
     }
 
     pub fn to_scope_id<'db>(self, db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
-        let index = semantic_index(db, file);
-        index.scope_ids_by_scope[self]
+        semantic_index(db, file).scope_id(self)
     }
 
     pub fn is_generator_function(self, index: &SemanticIndex) -> bool {
@@ -174,6 +166,18 @@ impl Scope {
 
     pub fn is_eager(&self) -> bool {
         self.kind().is_eager()
+    }
+
+    /// Returns `true` if this scope may require type context from its parent scope.
+    pub fn accepts_type_context(&self) -> bool {
+        matches!(
+            self.node(),
+            NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+                | NodeWithScopeKind::GeneratorExpression(_)
+        )
     }
 }
 
@@ -271,7 +275,7 @@ impl ScopeKind {
         matches!(self, ScopeKind::Module)
     }
 
-    pub(crate) const fn is_annotation(self) -> bool {
+    pub const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 

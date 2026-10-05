@@ -31,7 +31,7 @@ use crate::{Db, PythonFile};
 /// The LRU capacity of 200 was picked without any empirical evidence that it's optimal,
 /// instead it's a wild guess that it should be unlikely that incremental changes involve
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
 pub fn parsed_module(db: &dyn Db, file: PythonFile<'_>) -> ParsedModule {
     let source_file = file.file(db);
     let python_version = file.python_version(db);

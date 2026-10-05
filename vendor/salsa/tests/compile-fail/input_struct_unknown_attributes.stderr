@@ -1,0 +1,5 @@
+error: cannot find attribute `anything` in this scope
+ --> tests/compile-fail/input_struct_unknown_attributes.rs:5:7
+  |
+5 |     #[anything]
+  |       ^^^^^^^^

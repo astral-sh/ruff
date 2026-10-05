@@ -1,0 +1,59 @@
+error: `returns` option not allowed here
+ --> tests/compile-fail/accumulator_incompatibles.rs:1:22
+  |
+1 | #[salsa::accumulator(returns(ref))]
+  |                      ^^^^^^^
+
+error: `specify` option not allowed here
+ --> tests/compile-fail/accumulator_incompatibles.rs:4:22
+  |
+4 | #[salsa::accumulator(specify)]
+  |                      ^^^^^^^
+
+error: `no_eq` option not allowed here
+ --> tests/compile-fail/accumulator_incompatibles.rs:7:22
+  |
+7 | #[salsa::accumulator(no_eq)]
+  |                      ^^^^^
+
+error: `data` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:10:22
+   |
+10 | #[salsa::accumulator(data = MyAcc)]
+   |                      ^^^^
+
+error: `db` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:13:22
+   |
+13 | #[salsa::accumulator(db = Db)]
+   |                      ^^
+
+error: unrecognized option `recover_fn`
+  --> tests/compile-fail/accumulator_incompatibles.rs:16:22
+   |
+16 | #[salsa::accumulator(recover_fn = recover)]
+   |                      ^^^^^^^^^^
+
+error: `lru` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:19:22
+   |
+19 | #[salsa::accumulator(lru = 12)]
+   |                      ^^^
+
+error: `revisions` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:22:22
+   |
+22 | #[salsa::accumulator(revisions = 12)]
+   |                      ^^^^^^^^^
+
+error: `constructor` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:25:22
+   |
+25 | #[salsa::accumulator(constructor = Constructor)]
+   |                      ^^^^^^^^^^^
+
+error: `heap_size` option not allowed here
+  --> tests/compile-fail/accumulator_incompatibles.rs:28:22
+   |
+28 | #[salsa::accumulator(heap_size = size)]
+   |                      ^^^^^^^^^

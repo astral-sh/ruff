@@ -65,6 +65,17 @@ impl Int {
         }
     }
 
+    /// Returns an upper bound on the byte length of this integer's display representation.
+    ///
+    /// Computing the bound takes constant time without formatting or allocating. Small integers
+    /// use at most 20 decimal digits; large integers display their stored text verbatim.
+    pub fn display_len_bound(&self) -> usize {
+        match &self.0 {
+            Number::Small(_) => 20,
+            Number::Big(value) => value.len(),
+        }
+    }
+
     /// Return the [`Int`] as an u8, if it can be represented as that data type.
     pub fn as_u8(&self) -> Option<u8> {
         match &self.0 {
@@ -231,5 +242,26 @@ impl std::fmt::Display for Number {
             Number::Small(value) => write!(f, "{value}"),
             Number::Big(value) => write!(f, "{value}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use super::Int;
+
+    #[test]
+    fn display_length_bound() -> Result<(), std::num::ParseIntError> {
+        for value in [
+            Int::ZERO,
+            Int::from(u64::MAX),
+            Int::from_str("184467440737095516160")?,
+            Int::from_str_radix("ffffffffffffffff", 16, "0xffffffffffffffff")?,
+            Int::from_str_radix("10000000000000000", 16, "0x1_0000_0000_0000_0000")?,
+        ] {
+            assert!(value.to_string().len() <= value.display_len_bound());
+        }
+        Ok(())
     }
 }

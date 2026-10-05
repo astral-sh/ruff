@@ -51,7 +51,7 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a call location anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
 pub struct DynamicClassLiteral<'db> {
     /// The name of the class (from the first argument).
     #[returns(ref)]
@@ -197,7 +197,7 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
         /// Inner cached function for deferred inference of bases.
         /// Only called for assigned calls where inference was deferred.
-        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(attempt = ReturnOnly, returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
         fn deferred_explicit_bases<'db>(
             db: &'db dyn Db,
             definition: Definition<'db>,
@@ -469,6 +469,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(ref),
         cycle_initial=|db, _, self_: DynamicClassLiteral<'db>| {
             Ok(Mro::from([

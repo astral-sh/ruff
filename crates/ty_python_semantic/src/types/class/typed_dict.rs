@@ -877,7 +877,7 @@ impl<'db> DynamicTypedDictAnchor<'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests = field_requests, heap_size = ruff_memory_usage::heap_size)]
 pub struct DynamicTypedDictLiteral<'db> {
     /// The name of the TypedDict (from the first argument).
     #[returns(ref)]
@@ -974,7 +974,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     ///
     /// Functional `TypedDict` classes have the same MRO as class-based ones:
     /// [self, `TypedDict`, object]
-    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(ref), heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn mro(self, db: &'db dyn Db) -> Mro<'db> {
         let self_base = ClassBase::Class(ClassType::NonGeneric(self.into()));
         let env = ProgramEnvironment::from_scope(self.scope(db));

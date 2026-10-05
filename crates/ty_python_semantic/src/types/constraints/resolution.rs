@@ -109,7 +109,7 @@ impl<'db> Resolver<'_, 'db> {
                     self.env,
                     &TypeMapping::ApplySpecialization(ApplySpecialization::Partial {
                         generic_context: context,
-                        types: &types,
+                        types: (&types[..]).into(),
                         skip: None,
                     }),
                     TypeContext::default(),

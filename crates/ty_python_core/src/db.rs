@@ -21,7 +21,7 @@ pub trait TestProgramDb: Db {
     where
         Self: Sized,
     {
-        #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
         fn program_inner(db: &dyn TestProgramDb) -> Program<'_> {
             Program::from_settings(db, db.program_settings())
         }

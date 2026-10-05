@@ -86,7 +86,9 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
-use std::cell::{Cell, RefCell};
+#[cfg(test)]
+use std::cell::Cell;
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::convert::Infallible;
 use std::fmt::{Debug, Display};
@@ -95,21 +97,33 @@ use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 use std::sync::{Arc, LazyLock};
 
+#[cfg(test)]
 use itertools::Itertools;
 use ruff_index::{Idx, IndexVec, newtype_index};
 use rustc_hash::{FxHashMap, FxHashSet};
+#[cfg(any(test, feature = "experimental-analysis"))]
+use salsa::plumbing::{QuoteError, QuoteFuel};
 use smallvec::SmallVec;
 use ty_python_core::Program;
 use ty_python_core::rank::RankBitBox;
 use ty_static::EnvVars;
 
-use crate::types::class::GenericAlias;
+use crate::types::constraints::control::{
+    AllocationKind, PathAdvance, PathTable, PathTypevarSet, PathWork, TddControl, TddError,
+    TddWork, Unrestricted, admit_path_work, receiver_seen_storage, reserve_smallvec,
+    reserve_vec, sequence_growth, unrestricted,
+};
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::satisfaction::{
+    OrdinarySatisfaction, SatisfactionKind, node_satisfaction_sync, path_assignments_sync,
+};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::typevar::{BoundTypeVarIdentity, TypeVarInstance, TypeVarSet};
+#[cfg(all(test, feature = "experimental-analysis"))]
+use crate::types::infer::legacy_callable_observations;
+use crate::types::typevar::{BoundTypeVarIdentity, TypeVarSet};
 use crate::types::visitor::{
-    NonAtomicType, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
-    walk_type_with_recursion_guard,
+    OrdinaryTypeWalk, SyncTypeSupportEffects, TypeWalkFacts, Unrestricted as UnrestrictedWalk,
+    support_type_sync,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, IntersectionType, Type, TypeContext,
@@ -117,13 +131,40 @@ use crate::types::{
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
+mod apply;
+mod combination;
+pub(in crate::types) mod control;
+mod fold;
 pub(crate) mod paths;
 pub(crate) mod projection;
 pub(crate) mod resolution;
+#[cfg(test)]
+pub(in crate::types) mod runtime;
+mod satisfaction;
 mod sequents;
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) mod source;
+#[cfg(test)]
+pub(in crate::types) use self::sequents::runtime::UnsupportedSequentOperation;
 mod solutions;
+mod source_order;
+mod storage;
 mod support;
+mod type_analysis;
+#[cfg(test)]
+pub(in crate::types) mod typevar_equivalence;
 mod variables;
+
+#[cfg(test)]
+mod fold_probe;
+#[cfg(test)]
+mod scheduling_probe;
+#[cfg(test)]
+pub(crate) use scheduling_probe::ConstraintHandleKey;
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) use combination::ConstraintCombination;
+pub(super) use fold::{ConstraintFold, ConstraintFoldKind};
 
 use paths::PathAssignments;
 use solutions::SolutionWalker;
@@ -260,6 +301,53 @@ pub struct OwnedConstraintSet<'db> {
     inner: Option<Arc<OwnedConstraintSetInner<'db>>>,
 }
 
+/// A constraint result that holds unconditionally or cannot hold, without stored conditions.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::types) enum TerminalConstraint {
+    Always,
+    Never,
+}
+
+impl TerminalConstraint {
+    const fn node(self) -> NodeId {
+        match self {
+            Self::Always => ALWAYS_TRUE,
+            Self::Never => ALWAYS_FALSE,
+        }
+    }
+}
+
+/// A query builder paired with the root whose compacted arenas it shares.
+pub(in crate::types) struct OwnedConstraintSetQuery<'db> {
+    builder: ConstraintSetBuilder<'db>,
+    node: NodeId,
+    source_order: Option<SourceOrderId>,
+}
+
+impl<'db> OwnedConstraintSetQuery<'db> {
+    pub(in crate::types) fn parts(&self) -> (&ConstraintSetBuilder<'db>, ConstraintSet<'db, '_>) {
+        (
+            &self.builder,
+            ConstraintSet::from_node(&self.builder, self.node, self.source_order),
+        )
+    }
+
+    #[cfg(test)]
+    pub(in crate::types) fn ownership_probe_matches(
+        &self,
+        owned: &OwnedConstraintSet<'db>,
+    ) -> bool {
+        let storage = self.builder.storage.borrow();
+        self.node == owned.node
+            && self.source_order == owned.source_order
+            && match (&storage.compacted, &owned.inner) {
+                (Some(actual), Some(expected)) => Arc::ptr_eq(actual, expected),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct OwnedConstraintSetInner<'db> {
     constraints: Box<[Constraint<'db>]>,
@@ -286,7 +374,99 @@ impl Default for OwnedConstraintSet<'_> {
     }
 }
 
+impl OwnedConstraintSetInner<'_> {
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    fn retirement_work(&self) -> Option<usize> {
+        // into_owned retains the complete typevar arena. Support insertion uses an interned
+        // typevar's word index, and merging only takes the maximum source length, so this
+        // bounds every support without scanning their SmallVecs before retirement admission.
+        let word_bits = usize::BITS as usize;
+        let support_words = (self.typevars.len() / word_bits)
+            .checked_add(usize::from(self.typevars.len() % word_bits != 0))?;
+        let support_word_work = self.supports.len().checked_mul(support_words)?;
+
+        // Quote possible final-Arc destruction even when another owner currently exists.
+        // RankBitBox owns bits and chunk ranks; twice its bit length bounds both arrays.
+        // Spare collection capacity has no initialized elements to destroy. The fixed work
+        // covers the outer ownership and inner containers, not allocator latency.
+        [
+            self.constraints.len(),
+            self.constraint_supports.len(),
+            self.typevars.len(),
+            self.nodes.len(),
+            self.node_supports.len(),
+            self.supports.len(),
+            self.source_orders.len(),
+            self.constraint_indices.len().checked_mul(2)?,
+            self.node_indices.len().checked_mul(2)?,
+            self.support_indices.len().checked_mul(2)?,
+            support_word_work,
+        ]
+        .into_iter()
+        .try_fold(12usize, usize::checked_add)
+    }
+}
+
 impl<'db> OwnedConstraintSet<'db> {
+    /// Classifies a terminal only when no backing graph or source-order data is retained.
+    pub(in crate::types) const fn source_free_terminal(&self) -> Option<TerminalConstraint> {
+        if self.inner.is_none() && self.source_order.is_none() {
+            self.terminal()
+        } else {
+            None
+        }
+    }
+
+    /// Classifies a terminal root without evaluating any stored type-variable conditions.
+    pub(in crate::types) const fn terminal(&self) -> Option<TerminalConstraint> {
+        match self.node {
+            ALWAYS_TRUE => Some(TerminalConstraint::Always),
+            ALWAYS_FALSE => Some(TerminalConstraint::Never),
+            _ => None,
+        }
+    }
+
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(in crate::types) fn retirement_work(&self) -> Option<usize> {
+        self.inner
+            .as_deref()
+            .map_or(Some(1), OwnedConstraintSetInner::retirement_work)
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn field_work_with(
+        &self,
+        admit: &mut impl FnMut() -> Result<(), QuoteError>,
+    ) -> Result<usize, QuoteError> {
+        admit()?;
+        let mut work = self.retirement_work().ok_or(QuoteError::Overflow)?;
+        if let Some(inner) = &self.inner {
+            // Hash/Eq include the complete retained arena, including constraints kept only
+            // for source ordering. The semantic `types()` iterator omits those entries.
+            for constraint in &inner.constraints {
+                admit()?;
+                for ty in constraint.type_pair() {
+                    work = work
+                        .checked_add(ty.inline_payload_bytes())
+                        .ok_or(QuoteError::Overflow)?;
+                }
+            }
+        }
+        Ok(work)
+    }
+
+    /// Visits the native equality payload, including constraints retained only for source order.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(in crate::types) fn native_comparison_type_pairs(
+        &self,
+    ) -> impl ExactSizeIterator<Item = [Type<'db>; 2]> + '_ {
+        let constraints = self
+            .inner
+            .as_deref()
+            .map_or([].as_slice(), |inner| inner.constraints.as_ref());
+        constraints.iter().map(|constraint| constraint.type_pair())
+    }
+
     pub(crate) fn always() -> Self {
         Self {
             node: ALWAYS_TRUE,
@@ -314,15 +494,26 @@ impl<'db> OwnedConstraintSet<'db> {
     where
         F: for<'c> FnOnce(&'c ConstraintSetBuilder<'db>, ConstraintSet<'db, 'c>) -> R,
     {
-        let storage = ConstraintSetStorage {
+        let view = self.query_view();
+        let (builder, set) = view.parts();
+        f(builder, set)
+    }
+
+    pub(in crate::types) fn query_view(&self) -> OwnedConstraintSetQuery<'db> {
+        OwnedConstraintSetQuery {
+            builder: ConstraintSetBuilder {
+                storage: RefCell::new(self.query_storage()),
+            },
+            node: self.node,
+            source_order: self.source_order,
+        }
+    }
+
+    fn query_storage(&self) -> ConstraintSetStorage<'db> {
+        ConstraintSetStorage {
             compacted: self.inner.clone(),
             ..ConstraintSetStorage::default()
-        };
-        let builder = ConstraintSetBuilder {
-            storage: RefCell::new(storage),
-        };
-        let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
-        f(&builder, set)
+        }
     }
 
     /// Returns the typevars and stored bound types still reachable from the decision diagram.
@@ -331,15 +522,135 @@ impl<'db> OwnedConstraintSet<'db> {
     /// variables must not participate in semantic walks or callable freshening.
     /// Synthetic defaults are not stored types and must not affect these walks either.
     pub(crate) fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
-        self.inner.iter().flat_map(|inner| {
-            inner
-                .nodes
-                .iter()
-                .map(|node| node.constraint)
-                .unique()
-                .map(|constraint| inner.constraints[inner.retained_constraint_index(constraint)])
-                .flat_map(Constraint::types)
-        })
+        self.type_steps().flatten().flatten()
+    }
+
+    /// Advances one retained decision node, including nodes with an already visited constraint.
+    /// Keeping skipped steps visible lets interruptible walks account for duplicate scanning.
+    pub(super) fn type_steps(&self) -> impl Iterator<Item = Option<[Type<'db>; 2]>> + '_ {
+        let mut cursor = OwnedConstraintTypeCursor::new(self);
+        std::iter::from_fn(move || unrestricted(cursor.next_with(&mut Unrestricted)))
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) struct OwnedConstraintSetProfile;
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<C> salsa::execution_probe::PassiveMemoProfile<C> for OwnedConstraintSetProfile
+where
+    C: for<'db> salsa::plumbing::function::Configuration<Output<'db> = OwnedConstraintSet<'db>>,
+{
+    fn retired_output_work<'db>(output: &C::Output<'db>) -> Option<usize> {
+        output.retirement_work()
+    }
+
+    fn retired_output_work_bounded<'db>(
+        output: &C::Output<'db>,
+        fuel: &mut QuoteFuel,
+    ) -> Result<usize, QuoteError> {
+        fuel.consume(1)?;
+        output.retirement_work().ok_or(QuoteError::Overflow)
+    }
+}
+
+/// Scalar cursor state for admission and retirement observations without retaining the cursor.
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::types) struct ReceiverCursorState {
+    pub(in crate::types) next: usize,
+    pub(in crate::types) seen_len: usize,
+    pub(in crate::types) seen_capacity: usize,
+    #[cfg(all(test, feature = "experimental-analysis"))]
+    pub(in crate::types) observation_id: Option<usize>,
+}
+
+/// A retained-node cursor whose duplicate checks and growth remain explicit to callers.
+#[derive(Debug)]
+pub(in crate::types) struct OwnedConstraintTypeCursor<'a, 'db> {
+    inner: Option<&'a OwnedConstraintSetInner<'db>>,
+    next: usize,
+    seen: FxHashSet<ConstraintId>,
+    #[cfg(all(test, feature = "experimental-analysis"))]
+    observation_id: Option<usize>,
+}
+
+impl<'a, 'db> OwnedConstraintTypeCursor<'a, 'db> {
+    pub(in crate::types) fn new(set: &'a OwnedConstraintSet<'db>) -> Self {
+        Self {
+            inner: set.inner.as_deref(),
+            next: 0,
+            seen: FxHashSet::default(),
+            #[cfg(all(test, feature = "experimental-analysis"))]
+            observation_id: legacy_callable_observations::receiver_cursor_created(),
+        }
+    }
+
+    /// Reports the cursor's position and seen-table size without transferring its ownership.
+    /// Experimental-analysis test builds include an optional ID to match this state with the
+    /// same cursor's destructor entry across moves.
+    #[cfg(test)]
+    pub(in crate::types) fn state(&self) -> ReceiverCursorState {
+        ReceiverCursorState {
+            next: self.next,
+            seen_len: self.seen.len(),
+            seen_capacity: self.seen.capacity(),
+            #[cfg(all(test, feature = "experimental-analysis"))]
+            observation_id: self.observation_id,
+        }
+    }
+
+    /// Visits one retained node and yields its stored type pair on the first visit to its
+    /// constraint. `Some(None)` marks a repeated constraint; outer `None` marks completion.
+    /// A refusal preserves the cursor's position and seen table, without refunding any earlier
+    /// accepted admission for the step.
+    pub(in crate::types) fn next_with<C: TddControl>(
+        &mut self,
+        control: &mut C,
+    ) -> Result<Option<Option<[Type<'db>; 2]>>, control::TddError<C::Error>> {
+        let Some(inner) = self.inner else {
+            return Ok(None);
+        };
+        let Some(node) = inner.nodes.get(self.next) else {
+            return Ok(None);
+        };
+        control.admit(TddWork::Advance)?;
+        let constraint = node.constraint;
+        if self.seen.contains(&constraint) {
+            self.next += 1;
+            return Ok(Some(None));
+        }
+        if self.seen.len() == self.seen.capacity() {
+            let required = self
+                .seen
+                .len()
+                .checked_add(1)
+                .ok_or(control::TddError::CapacityExhausted)?;
+            let mut plan =
+                sequence_growth::<ConstraintId, C::Error>(self.seen.capacity(), required)?;
+            plan.relocation_units = self.seen.len();
+            let storage = receiver_seen_storage::<C::Error>(self.seen.capacity(), plan)?;
+            control.admit(TddWork::Grow {
+                allocation: AllocationKind::TypeWalkReceiverSeen,
+                plan,
+            })?;
+            control.admit(storage)?;
+            self.seen.reserve(plan.requested_capacity - self.seen.len());
+        }
+        self.seen.insert(constraint);
+        self.next += 1;
+        Ok(Some(Some(
+            inner.constraints[inner.retained_constraint_index(constraint)].type_pair(),
+        )))
+    }
+}
+
+#[cfg(all(test, feature = "experimental-analysis"))]
+impl Drop for OwnedConstraintTypeCursor<'_, '_> {
+    fn drop(&mut self) {
+        // Fields are dropped after this callback; this observes destructor entry, not completed
+        // backing deallocation. The observer stores only the ID and scalar state.
+        legacy_callable_observations::receiver_cursor_drop(self.observation_id, self.state());
     }
 }
 
@@ -402,6 +713,85 @@ pub struct ConstraintSet<'db, 'c> {
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(in crate::types) fn is_source_free_terminal(self) -> bool {
+        self.node.is_terminal() && self.source_order.is_none()
+    }
+
+    /// Packages a terminal result without consuming the builder that produced it.
+    /// Nonterminal results require their reachable arenas to be compacted as well.
+    pub(in crate::types) fn to_owned_terminal(self) -> Option<OwnedConstraintSet<'db>> {
+        self.node.is_terminal().then_some(OwnedConstraintSet {
+            node: self.node,
+            source_order: None,
+            inner: None,
+        })
+    }
+
+    /// Compares the builder, decision node, and source ordering without traversing storage.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(in crate::types) fn has_same_identity(self, other: Self) -> bool {
+        std::ptr::eq(self.builder, other.builder)
+            && self.node == other.node
+            && self.source_order == other.source_order
+    }
+
+    #[cfg(test)]
+    pub(crate) fn ownership_probe_same_set(self, other: Self) -> bool {
+        self.has_same_identity(other)
+    }
+
+    #[cfg(test)]
+    pub(in crate::types) fn ownership_probe_single_equivalence(
+        self,
+        typevar: BoundTypeVarInstance<'db>,
+        bound: Type<'db>,
+    ) -> Option<([usize; 7], [usize; 2])> {
+        // Cleanup probes must observe missing or borrowed storage without panicking in Drop.
+        let storage = self.builder.storage.try_borrow().ok()?;
+        if self.node.is_terminal() || storage.compacted.is_some() {
+            return None;
+        }
+        let node = storage.nodes.get(self.node)?;
+        let Constraint::ConcreteEquivalence(constraint) =
+            storage.constraints.get(node.constraint)?
+        else {
+            return None;
+        };
+        let source = storage.source_orders.get(self.source_order?)?;
+        let node_support_id = *storage.node_supports.get(self.node)?;
+        let node_support = storage.supports.get(node_support_id)?;
+        let constraint_support_id = *storage.constraint_supports.get(node.constraint)?;
+        let constraint_support = storage.supports.get(constraint_support_id)?;
+        if constraint.provenance != ConstraintProvenance::Evidence
+            || constraint.typevar != typevar
+            || constraint.bound != bound
+            || node.if_true != ALWAYS_TRUE
+            || node.if_uncertain != ALWAYS_FALSE
+            || node.if_false != ALWAYS_FALSE
+            || *source != SourceOrder::Constraint(node.constraint)
+            || storage.typevars.get(TypeVarId::from_usize(0)) != Some(&typevar)
+            || constraint_support.words() != [1]
+            || !constraint_support.is_complete()
+            || node_support.words() != [1]
+            || !node_support.is_complete()
+        {
+            return None;
+        }
+        Some((
+            [
+                storage.constraints.len(),
+                storage.typevars.len(),
+                storage.nodes.len(),
+                storage.supports.len(),
+                storage.constraint_supports.len(),
+                storage.node_supports.len(),
+                storage.source_orders.len(),
+            ],
+            [constraint_support_id.index(), node_support_id.index()],
+        ))
+    }
+
     fn from_node(
         builder: &'c ConstraintSetBuilder<'db>,
         node: NodeId,
@@ -519,10 +909,25 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    /// Returns whether this constraint set uses `builder`'s arenas.
+    pub(in crate::types) fn is_from_builder(self, builder: &ConstraintSetBuilder<'db>) -> bool {
+        std::ptr::eq(self.builder, builder)
+    }
+
     /// Verifies that this constraint set was created by `builder`
     #[track_caller]
-    fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {
-        debug_assert!(std::ptr::eq(self.builder, builder));
+    pub(super) fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {
+        debug_assert!(self.is_from_builder(builder));
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn satisfaction_start(self, always: bool) -> Option<bool> {
+        let kind = if always {
+            satisfaction::SatisfactionKind::Always
+        } else {
+            satisfaction::SatisfactionKind::Never
+        };
+        satisfaction::node_satisfaction_start(self.node, kind).break_value()
     }
 
     /// Returns whether this constraint set never holds, without checking the type variables'
@@ -597,11 +1002,18 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     /// Returns whether this constraint set mentions the given type-variable identity.
-    pub(super) fn mentions_typevar(self, typevar: BoundTypeVarInstance<'db>) -> bool {
+    pub(super) fn mentions_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> bool {
+        let identity = typevar.identity(db);
         let storage = self.builder.storage.borrow();
-        storage
-            .node_support(self.node)
-            .is_some_and(|support| support.iter().any(|id| storage.typevar_data(id) == typevar))
+        storage.node_support(self.node).is_some_and(|support| {
+            support
+                .iter()
+                .any(|id| storage.typevar_data(id).identity(db) == identity)
+        })
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -635,8 +1047,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         let mut storage = builder.storage.borrow_mut();
-        self.node = self.node.or(&mut storage, other.node);
-        self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
+        (self.node, self.source_order) = combination::Combination::new(
+            ConstraintFoldKind::Any,
+            (self.node, self.source_order),
+            (other.node, other.source_order),
+        )
+        .finish(&mut storage);
         *self
     }
 
@@ -651,8 +1067,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> Self {
         self.verify_builder(builder);
         let mut storage = builder.storage.borrow_mut();
-        self.node = self.node.and(&mut storage, other.node);
-        self.source_order = storage.ordered_source_order(self.source_order, other.source_order);
+        (self.node, self.source_order) = combination::Combination::new(
+            ConstraintFoldKind::All,
+            (self.node, self.source_order),
+            (other.node, other.source_order),
+        )
+        .finish(&mut storage);
         *self
     }
 
@@ -966,6 +1386,7 @@ struct ConstraintSetStorage<'db> {
     /// IDs below the overlay split points are looked up in this storage; newly interned entries
     /// are stored in the dense local arenas below.
     compacted: Option<Arc<OwnedConstraintSetInner<'db>>>,
+    overlay_identity_state: storage::OverlayIdentityState,
 
     /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
     /// identity. Constraints are added to this arena as they are encountered when constructing
@@ -1021,35 +1442,9 @@ struct ConstraintSetStorage<'db> {
 
 impl<'db> ConstraintSetStorage<'db> {
     fn ensure_overlay_identity_caches(&mut self) {
-        let Some(compacted) = &self.compacted else {
-            return;
-        };
-        if !self.node_cache.is_empty() {
-            return;
-        }
-
-        self.constraint_cache.extend(
-            compacted
-                .constraint_indices
-                .iter_ones()
-                .zip(compacted.constraints.iter().copied())
-                .map(|(old_index, constraint)| (constraint, ConstraintId::from_usize(old_index))),
-        );
-        self.node_cache.extend(
-            compacted
-                .node_indices
-                .iter_ones()
-                .zip(compacted.nodes.iter().copied())
-                .map(|(old_index, node)| (node, NodeId::from_usize(old_index))),
-        );
-        self.source_order_cache.extend(
-            compacted
-                .source_orders
-                .iter()
-                .copied()
-                .enumerate()
-                .map(|(index, source_order)| (source_order, SourceOrderId::from_usize(index))),
-        );
+        while control::unrestricted(self.advance_identity_caches(&mut control::Unrestricted))
+            .is_continue()
+        {}
     }
 
     // This is a separate method from `ensure_overlay_identity_caches` because it requires a `db`.
@@ -1069,13 +1464,6 @@ impl<'db> ConstraintSetStorage<'db> {
         );
     }
 
-    fn adjusted_node_id(&self, id: NodeId) -> NodeId {
-        if let Some(compacted) = &self.compacted {
-            return id + compacted.node_indices.len();
-        }
-        id
-    }
-
     fn adjusted_constraint_id(&self, id: ConstraintId) -> ConstraintId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.constraint_indices.len();
@@ -1086,13 +1474,6 @@ impl<'db> ConstraintSetStorage<'db> {
     fn adjusted_support_id(&self, id: SupportId) -> SupportId {
         if let Some(compacted) = &self.compacted {
             return id + compacted.support_indices.len();
-        }
-        id
-    }
-
-    fn adjusted_source_order_id(&self, id: SourceOrderId) -> SourceOrderId {
-        if let Some(compacted) = &self.compacted {
-            return id + compacted.source_orders.len();
         }
         id
     }
@@ -1110,6 +1491,14 @@ impl<'db> ConstraintSetBuilder<'db> {
         Self::default()
     }
 
+    /// Loads an unconditional result without reading or changing either constraint arena.
+    pub(in crate::types) fn load_terminal<'c>(
+        &'c self,
+        terminal: TerminalConstraint,
+    ) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_node(self, terminal.node(), None)
+    }
+
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
     /// callback that constructs a [`ConstraintSet`]. We then package that constraint set up with
     /// the storage arenas from this builder.
@@ -1122,12 +1511,8 @@ impl<'db> ConstraintSetBuilder<'db> {
         // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
-        if node.is_terminal() {
-            return OwnedConstraintSet {
-                node,
-                source_order: None,
-                inner: None,
-            };
+        if let Some(owned) = constraint.to_owned_terminal() {
+            return owned;
         }
         let source_order = constraint
             .source_order
@@ -1272,9 +1657,30 @@ impl<'db> ConstraintSetBuilder<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if let Some(terminal) = other.terminal() {
+            return self.load_terminal(terminal);
+        }
         let mut storage = self.storage.borrow_mut();
         let (node, source_order) = storage.load(db, env, other);
         ConstraintSet::from_node(self, node, source_order)
+    }
+}
+
+struct OrdinaryConstraintSupport<'a, 'db> {
+    storage: &'a mut ConstraintSetStorage<'db>,
+    support: &'a mut Support,
+}
+impl<'db> SyncTypeSupportEffects<'db>
+    for OrdinaryTypeWalk<'_, '_, 'db, UnrestrictedWalk, OrdinaryConstraintSupport<'_, 'db>>
+{
+    fn record_occurrence(&mut self, typevar: BoundTypeVarInstance<'db>) -> Result<(), Infallible> {
+        let id = self.query.storage.intern_typevar(self.db, typevar);
+        self.query.support.insert(id);
+        Ok(())
+    }
+    fn skipped_lazy(&mut self) -> Result<(), Infallible> {
+        self.query.support.mark_incomplete();
+        Ok(())
     }
 }
 
@@ -1287,6 +1693,14 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.typevar_cache.get(&identity) {
             return *id;
         }
+        self.publish_typevar_miss(identity, typevar)
+    }
+
+    fn publish_typevar_miss(
+        &mut self,
+        identity: BoundTypeVarIdentity<'db>,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> TypeVarId {
         let id = self.typevars.push(typevar);
         let id = self.adjusted_typevar_id(id);
         self.typevar_cache.insert(identity, id);
@@ -1301,55 +1715,23 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
-        struct InternMentionedTypevars<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
-            support: RefCell<&'a mut Support>,
-            recursion_guard: TypeCollector<'db>,
+        let result = support_type_sync(
+            ty,
+            TypeWalkFacts,
+            &mut OrdinaryTypeWalk {
+                db,
+                env,
+                control: &mut UnrestrictedWalk,
+                query: OrdinaryConstraintSupport {
+                    storage: self,
+                    support,
+                },
+            },
+        );
+        match result {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
-
-        impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn notify_skipped_lazy_type_attributes(&self) {
-                self.support.borrow_mut().mark_incomplete();
-            }
-
-            fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {
-                // Declaration bounds, constraints, and defaults are not occurrences in the
-                // constraint itself and must not contribute to its support.
-            }
-
-            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if let Type::TypeVar(bound_typevar) = ty {
-                    let mut storage = self.storage.borrow_mut();
-                    let typevar = storage.intern_typevar(db, bound_typevar);
-                    let mut support = self.support.borrow_mut();
-                    support.insert(typevar);
-                }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        InternMentionedTypevars {
-            env,
-            storage: RefCell::new(self),
-            support: RefCell::new(support),
-            recursion_guard: TypeCollector::default(),
-        }
-        .visit_type(db, ty);
     }
 
     /// Interns all of the typevars mentioned in a constraint in a stable order.
@@ -1397,6 +1779,10 @@ impl<'db> ConstraintSetStorage<'db> {
         if let Some(id) = self.constraint_cache.get(&data) {
             return *id;
         }
+        self.publish_constraint_miss(data, support)
+    }
+
+    fn publish_constraint_miss(&mut self, data: Constraint<'db>, support: Support) -> ConstraintId {
         let support_id = self.intern_support(support);
         let id = self.constraints.push(data);
         self.constraint_supports.push(support_id);
@@ -1406,23 +1792,7 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn intern_interior_node(&mut self, data: InteriorNodeData) -> NodeId {
-        self.ensure_overlay_identity_caches();
-        if let Some(id) = self.node_cache.get(&data) {
-            return *id;
-        }
-
-        let mut support = Support::default();
-        support |= self.constraint_support(data.constraint);
-        support |= self.node_support(data.if_true);
-        support |= self.node_support(data.if_uncertain);
-        support |= self.node_support(data.if_false);
-        let support = self.intern_support(support);
-
-        let id = self.nodes.push(data);
-        self.node_supports.push(support);
-        let id = self.adjusted_node_id(id);
-        self.node_cache.insert(data, id);
-        id
+        storage::PendingNode::new(data, None, false).finish(self)
     }
 
     fn typevar_id(&mut self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
@@ -1454,13 +1824,18 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         constraint: ConstraintId,
     ) -> (u16, u16) {
-        if let Some(depth) = self.constraint_bound_depth_cache.get(&constraint) {
-            return *depth;
+        let result = type_analysis::cached_constraint_bound_depth_sync(
+            constraint,
+            &mut type_analysis::OrdinaryConstraintDepthCache {
+                db,
+                env,
+                storage: self,
+            },
+        );
+        match result {
+            Ok(depth) => depth,
+            Err(never) => match never {},
         }
-
-        let depth = self.constraint_data(constraint).bound_depth(db, env);
-        self.constraint_bound_depth_cache.insert(constraint, depth);
-        depth
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
@@ -1477,14 +1852,7 @@ impl<'db> ConstraintSetStorage<'db> {
     }
 
     fn intern_source_order(&mut self, data: SourceOrder) -> SourceOrderId {
-        self.ensure_overlay_identity_caches();
-        if let Some(id) = self.source_order_cache.get(&data) {
-            return *id;
-        }
-        let id = self.source_orders.push(data);
-        let id = self.adjusted_source_order_id(id);
-        self.source_order_cache.insert(data, id);
-        id
+        source_order::PendingSourceOrder::new(data).finish(self)
     }
 
     /// Repeating a source-order tree cannot change the first occurrence of any constraint, so
@@ -1494,14 +1862,7 @@ impl<'db> ConstraintSetStorage<'db> {
         left: Option<SourceOrderId>,
         right: Option<SourceOrderId>,
     ) -> Option<SourceOrderId> {
-        match (left, right) {
-            (None, None) => None,
-            (None, other) | (other, None) => other,
-            (Some(left), Some(right)) if left == right => Some(left),
-            (Some(left), Some(right)) => {
-                Some(self.intern_source_order(SourceOrder::Ordered(left, right)))
-            }
-        }
+        source_order::OrderedSource::new(left, right).finish(self)
     }
 
     fn constraint_source_order(&mut self, constraint: ConstraintId) -> SourceOrderId {
@@ -1524,25 +1885,12 @@ impl<'db> ConstraintSetStorage<'db> {
         &self,
         source_order: Option<SourceOrderId>,
     ) -> FxIndexSet<ConstraintId> {
-        // Source-order sidecars share interned subtrees. Revisiting a subtree cannot contribute
-        // an earlier occurrence of any constraint, and can expand a small DAG exponentially.
-        let mut pending = Vec::from_iter(source_order);
-        let mut visited = FxHashSet::default();
-        let mut result = FxIndexSet::default();
-        while let Some(current) = pending.pop() {
-            if !visited.insert(current) {
-                continue;
-            }
-            match self.source_order_data(current) {
-                SourceOrder::Ordered(left, right) => {
-                    pending.extend([right, left]);
-                }
-                SourceOrder::Constraint(constraint) => {
-                    result.insert(constraint);
-                }
+        let mut scan = SourceOrderScan::new(source_order);
+        loop {
+            if unrestricted(scan.advance_with(self, &mut Unrestricted)).is_break() {
+                return scan.result;
             }
         }
-        result
     }
 
     fn intern_support(&mut self, data: Support) -> SupportId {
@@ -1664,8 +2012,8 @@ impl<'db> ConstraintSetStorage<'db> {
             remapped
         }
 
-        if other.node.is_terminal() {
-            return (other.node, None);
+        if let Some(terminal) = other.terminal() {
+            return (terminal.node(), None);
         }
         let inner = other
             .inner
@@ -1959,78 +2307,20 @@ fn max_constructor_and_typevar_depth<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> (u16, u16) {
-    fn max_constructor_and_typevar_depth_impl<'db>(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        ty: Type<'db>,
-        _dummy: (),
-    ) -> (u16, u16) {
-        struct TypeDepthVisitor<'a, 'db> {
-            env: &'a ProgramEnvironment<'db>,
-            active: RefCell<FxHashSet<Type<'db>>>,
-            current_depth: Cell<u16>,
-            max_constructor_depth: Cell<u16>,
-            max_typevar_depth: Cell<u16>,
-        }
-
-        impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> {
-                self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if ty.is_type_var() {
-                    self.max_typevar_depth
-                        .set(self.max_typevar_depth.get().max(self.current_depth.get()));
-                    return;
-                }
-
-                let non_atomic = match TypeKind::from(ty) {
-                    TypeKind::Atomic => return,
-                    // A non-generic nominal instance is an opaque leaf. Its class literal
-                    // identifies the leaf but does not add nested type structure.
-                    TypeKind::NonAtomic(NonAtomicType::NominalInstance(instance))
-                        if !instance.class(db, self.env).is_generic() =>
-                    {
-                        return;
-                    }
-                    TypeKind::NonAtomic(non_atomic) => non_atomic,
-                };
-
-                if !self.active.borrow_mut().insert(ty) {
-                    return;
-                }
-
-                let current_depth = self.current_depth.get();
-                let nested_depth = current_depth.saturating_add(1);
-                self.current_depth.set(nested_depth);
-                self.max_constructor_depth
-                    .set(self.max_constructor_depth.get().max(nested_depth));
-                walk_non_atomic_type(db, non_atomic, self);
-                self.current_depth.set(current_depth);
-                self.active.borrow_mut().remove(&ty);
-            }
-        }
-
-        let visitor = TypeDepthVisitor {
+    let result = crate::types::visitor::type_depth_sync(
+        ty,
+        crate::types::visitor::TypeWalkFacts,
+        &mut crate::types::visitor::OrdinaryTypeWalk {
+            db,
             env,
-            active: RefCell::default(),
-            current_depth: Cell::default(),
-            max_constructor_depth: Cell::default(),
-            max_typevar_depth: Cell::default(),
-        };
-        visitor.visit_type(db, ty);
-        (
-            visitor.max_constructor_depth.get(),
-            visitor.max_typevar_depth.get(),
-        )
+            control: &mut crate::types::visitor::Unrestricted,
+            query: (),
+        },
+    );
+    match result {
+        Ok(depth) => depth,
+        Err(never) => match never {},
     }
-
-    max_constructor_and_typevar_depth_impl(db, env, ty, ())
 }
 
 impl ConstraintId {
@@ -2128,6 +2418,7 @@ enum Node {
 
 impl NodeId {
     /// Creates a new BDD node, applying local TDD reductions.
+    #[cfg(test)]
     fn new(
         storage: &mut ConstraintSetStorage<'_>,
         constraint: ConstraintId,
@@ -2141,10 +2432,34 @@ impl NodeId {
     fn with_uncertain(
         storage: &mut ConstraintSetStorage<'_>,
         constraint: ConstraintId,
-        mut if_true: NodeId,
+        if_true: NodeId,
         if_uncertain: NodeId,
-        mut if_false: NodeId,
+        if_false: NodeId,
     ) -> NodeId {
+        match Self::reduce_uncertain(
+            storage,
+            InteriorNodeData {
+                constraint,
+                if_true,
+                if_uncertain,
+                if_false,
+            },
+        ) {
+            storage::ReducedNode::Existing(node) => node,
+            storage::ReducedNode::Interior(data) => storage.intern_interior_node(data),
+        }
+    }
+
+    fn reduce_uncertain(
+        storage: &ConstraintSetStorage<'_>,
+        data: InteriorNodeData,
+    ) -> storage::ReducedNode {
+        let InteriorNodeData {
+            constraint,
+            mut if_true,
+            if_uncertain,
+            mut if_false,
+        } = data;
         debug_assert!(
             if_true
                 .root_constraint(storage)
@@ -2168,7 +2483,7 @@ impl NodeId {
         );
 
         if if_uncertain == ALWAYS_TRUE {
-            return ALWAYS_TRUE;
+            return storage::ReducedNode::Existing(ALWAYS_TRUE);
         }
 
         // A guarded branch covered by the uncertain branch adds no satisfying assignments.
@@ -2186,10 +2501,10 @@ impl NodeId {
 
         if if_true == if_false {
             if if_true == ALWAYS_FALSE {
-                return if_uncertain;
+                return storage::ReducedNode::Existing(if_uncertain);
             }
             if if_uncertain == ALWAYS_FALSE {
-                return if_true;
+                return storage::ReducedNode::Existing(if_true);
             }
 
             // TODO: A future reduction can handle this remaining `if_true == if_false` case by
@@ -2197,7 +2512,7 @@ impl NodeId {
             // the local equality check has already engaged.
         }
 
-        storage.intern_interior_node(InteriorNodeData {
+        storage::ReducedNode::Interior(InteriorNodeData {
             constraint,
             if_true,
             if_uncertain,
@@ -2343,44 +2658,12 @@ impl NodeId {
     /// Checks whether this BDD represents a single conjunction (of an arbitrary number of
     /// positive or negative constraints).
     fn is_single_conjunction(self, storage: &mut ConstraintSetStorage<'_>) -> bool {
-        // A BDD can be viewed as an encoding of the formula's DNF representation (OR of ANDs).
-        // Each path from the root node to the `always` terminals represents one of the disjoints.
-        // The constraints that we encounter on the path represent the conjoints. That means that a
-        // BDD can only represent a single conjunction if there is precisely one path from the root
-        // node to the `always` terminal.
-        //
-        // We can take advantage of local reductions. We never create an interior node whose true
-        // and false branches both lead to `never` while the uncertain branch also contributes
-        // nothing. That means that if we ever encounter a node with both true and false branches
-        // pointing to something other than `never`, that node must have at least two paths to the
-        // `always` terminal.
-        let mut current = self.node();
+        let mut scan = SingleConjunctionScan::new(self);
         loop {
-            match current {
-                Node::AlwaysTrue => return true,
-                Node::AlwaysFalse => return false,
-                Node::Interior(interior) => {
-                    let data = storage.interior_node_data(interior.node());
-
-                    // If both if_true and if_false point to non-never, there are multiple paths to
-                    // `always`, so this cannot be a simple conjunction.
-                    if data.if_true != ALWAYS_FALSE && data.if_false != ALWAYS_FALSE {
-                        return false;
-                    }
-
-                    // The uncertain branch must also be never for a simple conjunction, since it
-                    // contributes to all paths.
-                    if data.if_uncertain != ALWAYS_FALSE {
-                        return false;
-                    }
-
-                    // Follow the non-never branch.
-                    current = if data.if_true != ALWAYS_FALSE {
-                        data.if_true.node()
-                    } else {
-                        data.if_false.node()
-                    };
-                }
+            if let ControlFlow::Break(result) =
+                unrestricted(scan.advance_with(storage, &mut Unrestricted))
+            {
+                return result;
             }
         }
     }
@@ -2393,14 +2676,14 @@ impl NodeId {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
-        match self.node() {
-            Node::AlwaysTrue => true,
-            Node::AlwaysFalse => false,
-            Node::Interior(interior) => {
-                let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
-            }
+        match node_satisfaction_sync(
+            self,
+            source_order,
+            SatisfactionKind::Always,
+            &mut OrdinarySatisfaction { db, env, storage },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
     }
 
@@ -2412,204 +2695,60 @@ impl NodeId {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
-        /// Checks whether this BDD is a single conjunction, where either (a) every constraint is
-        /// positive lower-bound-only, or (b) every constraint is a positive upper-bound-only. If
-        /// so, `object` or `Never` respectively is a valid solution regardless of the contents of
-        /// the constraints.
-        fn simple_conjunction_is_satisfiable(
-            storage: &mut ConstraintSetStorage<'_>,
-            mut node: NodeId,
-        ) -> bool {
-            let mut found_lower = false;
-            let mut found_upper = false;
-            loop {
-                match node.node() {
-                    Node::AlwaysTrue => return true,
-                    Node::AlwaysFalse => return false,
-
-                    Node::Interior(_) => {
-                        let interior = storage.interior_node_data(node);
-
-                        if interior.if_false != ALWAYS_FALSE
-                            || interior.if_uncertain != ALWAYS_FALSE
-                        {
-                            // Not a single conjunction
-                            return false;
-                        }
-
-                        let constraint = storage.constraint_data(interior.constraint);
-                        found_lower |= constraint.provides_lower();
-                        found_upper |= constraint.provides_upper();
-                        if found_lower && found_upper {
-                            // Might be a single conjunction, but doesn't contain _only_
-                            // lower-bound-only or upper-bound-only constraints
-                            return false;
-                        }
-
-                        node = interior.if_true;
-                    }
-                }
-            }
-        }
-
-        match self.node() {
-            Node::AlwaysTrue => false,
-            Node::AlwaysFalse => true,
-            Node::Interior(interior) => {
-                if let Some(result) = storage.never_satisfied_cache.get(&self) {
-                    return *result;
-                }
-
-                let result = if simple_conjunction_is_satisfiable(storage, self) {
-                    false
-                } else {
-                    let mut path = interior.path_assignments(db, env, storage, source_order);
-                    path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                        .is_continue()
-                };
-                storage.never_satisfied_cache.insert(self, result);
-                result
-            }
+        match node_satisfaction_sync(
+            self,
+            source_order,
+            SatisfactionKind::Never,
+            &mut OrdinarySatisfaction { db, env, storage },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
     }
 
     /// Returns the negation of this BDD.
     fn negate(self, storage: &mut ConstraintSetStorage<'_>) -> Self {
-        match self.node() {
-            Node::AlwaysTrue => ALWAYS_FALSE,
-            Node::AlwaysFalse => ALWAYS_TRUE,
-            Node::Interior(interior) => interior.negate(storage),
-        }
+        apply::Operation::Negate(self).apply(storage)
     }
 
     /// Returns the `or` or union of two BDDs.
     fn or(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> Self {
-        match (self.node(), other.node()) {
-            (Node::AlwaysTrue, _) | (_, Node::AlwaysTrue) => ALWAYS_TRUE,
-            (Node::AlwaysFalse, _) => other,
-            (_, Node::AlwaysFalse) => self,
-            (Node::Interior(self_interior), Node::Interior(other_interior)) => {
-                self_interior.or(storage, other_interior)
-            }
-        }
+        apply::Operation::Or(self, other).apply(storage)
     }
 
-    /// Combine an iterator of nodes into a single node using an associative operator.
-    ///
-    /// Because the operator is associative, we don't have to combine the nodes left to right; we
-    /// can instead combine them in a "tree-like" way:
-    ///
-    /// ```text
-    /// linear:  (((((a ∨ b) ∨ c) ∨ d) ∨ e) ∨ f) ∨ g
-    /// tree:    ((a ∨ b) ∨ (c ∨ d)) ∨ ((e ∨ f) ∨ g)
-    /// ```
-    ///
-    /// We have to invoke the operator the same number of times. But BDD operators are often much
-    /// cheaper when the operands are small, and with the tree shape, many more of the invocations
-    /// are performed on small BDDs.
-    ///
-    /// You must also provide the "zero" and "one" units of the operator. The "zero" is the value
-    /// that has no effect (`0 ∨ a = a`). It is returned if the iterator is empty. The "one" is the
-    /// value that saturates (`1 ∨ a = 1`). We use this to short-circuit; if any element BDD or any
-    /// intermediate result is the "one" terminal, we can return early.
     fn tree_fold(
         builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = (Self, Option<SourceOrderId>)>,
-        zero: Self,
-        one: Self,
-        mut combine: impl FnMut(Self, &mut ConstraintSetStorage<'_>, Self) -> Self,
+        kind: ConstraintFoldKind,
     ) -> (Self, Option<SourceOrderId>) {
-        // To implement the "linear" shape described above, we could collect the iterator elements
-        // into a vector, and then use the fold at the bottom of this method to combine the
-        // elements using the operator.
-        //
-        // To implement the "tree" shape, we also maintain a "depth" for each element of the
-        // vector, which indicates how many times the operator has been applied to the element.
-        // As we collect elements into the vector, we keep it capped at a length `O(log n)` of the
-        // number of elements seen so far. To do that, whenever the last two elements of the vector
-        // have the same depth, we apply the operator once to combine those two elements, adding
-        // the result back to the vector with an incremented depth. (That might let us combine the
-        // result with the _next_ intermediate result in the vector, and so on.)
-        //
-        // Walking through the example above, our vector ends up looking like:
-        //
-        //                                a/0
-        //                     a/0 b/0 => ab/1
-        //                                ab/1 c/0
-        //   ab/1 c/0 d/0 => ab/1 cd/1 => abcd/2
-        //                                abcd/2 e/0
-        //              abcd/2 e/0 f/0 => abcd/2 ef/1
-        //                                abcd/2 ef/1 g/0
-        //
-        // We use a SmallVec for the accumulator so that we don't have to spill over to the heap
-        // until the iterator passes 256 elements.
-        let mut accumulator: SmallVec<[(NodeId, Option<SourceOrderId>, u8); 8]> =
-            SmallVec::default();
+        let mut fold = ConstraintFold::new(builder, kind);
         for (node, source_order) in nodes {
-            if node == one {
-                return (node, source_order);
+            let next = ConstraintSet::from_node(builder, node, source_order);
+            if let ControlFlow::Break(result) = fold.push(next) {
+                return (result.node, result.source_order);
             }
-
-            let (mut node, mut source_order, mut depth) = (node, source_order, 0);
-            while accumulator
-                .last()
-                .is_some_and(|(_, _, existing)| *existing == depth)
-            {
-                let (existing_node, existing_source_order, _) =
-                    accumulator.pop().expect("accumulator should not be empty");
-                let mut storage = builder.storage.borrow_mut();
-                node = combine(existing_node, &mut storage, node);
-                source_order = storage.ordered_source_order(existing_source_order, source_order);
-                if node == one {
-                    return (node, source_order);
-                }
-                depth += 1;
-            }
-            accumulator.push((node, source_order, depth));
         }
-
-        // At this point, we've consumed all of the iterator. The length of the accumulator will be
-        // the same as the number of 1 bits in the length of the iterator. We do a final fold to
-        // produce the overall result.
-        let mut storage = builder.storage.borrow_mut();
-        accumulator.into_iter().fold(
-            (zero, None),
-            |(result_node, result_source_order), (node, source_order, _)| {
-                (
-                    combine(result_node, &mut storage, node),
-                    storage.ordered_source_order(result_source_order, source_order),
-                )
-            },
-        )
+        let result = fold.finish();
+        (result.node, result.source_order)
     }
 
     fn distributed_or(
         builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = (NodeId, Option<SourceOrderId>)>,
     ) -> (Self, Option<SourceOrderId>) {
-        Self::tree_fold(builder, nodes, ALWAYS_FALSE, ALWAYS_TRUE, Self::or)
+        Self::tree_fold(builder, nodes, ConstraintFoldKind::Any)
     }
 
     fn distributed_and(
         builder: &ConstraintSetBuilder<'_>,
         nodes: impl Iterator<Item = (NodeId, Option<SourceOrderId>)>,
     ) -> (Self, Option<SourceOrderId>) {
-        Self::tree_fold(builder, nodes, ALWAYS_TRUE, ALWAYS_FALSE, Self::and)
+        Self::tree_fold(builder, nodes, ConstraintFoldKind::All)
     }
 
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> Self {
-        if self == other {
-            return self;
-        }
-        match (self.node(), other.node()) {
-            (Node::AlwaysFalse, _) | (_, Node::AlwaysFalse) => ALWAYS_FALSE,
-            (Node::AlwaysTrue, _) => other,
-            (_, Node::AlwaysTrue) => self,
-            (Node::Interior(self_interior), Node::Interior(other_interior)) => {
-                self_interior.and(storage, other_interior)
-            }
-        }
+        apply::Operation::And(self, other).apply(storage)
     }
 
     fn implies(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> Self {
@@ -2785,23 +2924,14 @@ impl NodeId {
         storage: &ConstraintSetStorage<'_>,
         f: &mut dyn FnMut(ConstraintId),
     ) {
-        fn walk(
-            node: NodeId,
-            storage: &ConstraintSetStorage<'_>,
-            seen: &mut FxHashSet<NodeId>,
-            f: &mut dyn FnMut(ConstraintId),
-        ) {
-            if node.is_terminal() || !seen.insert(node) {
-                return;
+        let mut scan = UniqueConstraintScan::new(self);
+        loop {
+            match unrestricted(scan.advance_with(storage, &mut Unrestricted)) {
+                ControlFlow::Continue(()) => {}
+                ControlFlow::Break(Some(constraint)) => f(constraint),
+                ControlFlow::Break(None) => return,
             }
-            let interior = storage.interior_node_data(node);
-            f(interior.constraint);
-            walk(interior.if_true, storage, seen, f);
-            walk(interior.if_uncertain, storage, seen, f);
-            walk(interior.if_false, storage, seen, f);
         }
-
-        walk(self, storage, &mut FxHashSet::default(), f);
     }
 
     /// Returns clauses describing all of the variable assignments that cause this BDD to evaluate
@@ -3304,7 +3434,7 @@ impl<'db> Type<'db> {
     }
 }
 
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) IsPossiblyConstraintSetAssignableConfiguration), attempt = ReturnOnly,
     returns(copy),
     cycle_initial = |_, _, _| true,
     heap_size = get_size2::GetSize::get_heap_size
@@ -3316,6 +3446,13 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
         .first(db)
         .when_constraint_set_assignable_to_owned(db, env, types.second(db))
         .query(|_storage, when| !when.is_never_satisfied(db, env))
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) fn possible_assignability_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<IsPossiblyConstraintSetAssignableConfiguration> {
+    is_possibly_constraint_set_assignable::fn_ingredient_(db, db.zalsa())
 }
 
 /// Candidate solutions for a constraint set
@@ -4015,163 +4152,6 @@ impl InteriorNode {
         self.0
     }
 
-    fn negate(self, storage: &mut ConstraintSetStorage<'_>) -> NodeId {
-        let key = self.node();
-        if let Some(result) = storage.negate_cache.get(&key) {
-            return *result;
-        }
-
-        // negate(n ? C : U : D) = n ? negate(or(C, U)) : 0 : negate(or(D, U))
-        //
-        // The uncertain branch U is absorbed into C and D via union before negation. The result's
-        // uncertain branch is always zero. When U = 0 (the common case), this degenerates to the
-        // standard binary BDD leaf-swap: n ? negate(C) : 0 : negate(D).
-        let interior = storage.interior_node_data(self.node());
-        let not_true = interior.if_true.negate(storage);
-        let not_uncertain = interior.if_uncertain.negate(storage);
-        let not_false = interior.if_false.negate(storage);
-        let if_true = not_true.and(storage, not_uncertain);
-        let if_false = not_false.and(storage, not_uncertain);
-        let result = NodeId::new(storage, interior.constraint, if_true, if_false);
-
-        storage.negate_cache.insert(key, result);
-        result
-    }
-
-    fn or(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> NodeId {
-        let key = (self.node(), other.node());
-        if let Some(result) = storage.or_cache.get(&key) {
-            return *result;
-        }
-
-        let self_interior = storage.interior_node_data(self.node());
-        let self_ordering = self_interior.constraint.ordering();
-        let other_interior = storage.interior_node_data(other.node());
-        let other_ordering = other_interior.constraint.ordering();
-        let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => {
-                let if_true = self_interior.if_true.or(storage, other_interior.if_true);
-                let if_uncertain = self_interior
-                    .if_uncertain
-                    .or(storage, other_interior.if_uncertain);
-                let if_false = self_interior.if_false.or(storage, other_interior.if_false);
-                NodeId::with_uncertain(
-                    storage,
-                    self_interior.constraint,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                )
-            }
-            // This is from Frisch's original description of TDDs. If self < other, we check self
-            // first. Instead of distributing other into the if_true and if_false branches, we
-            // "park" it in the if_uncertain branch. That causes us to only evaluate other "lazily"
-            // when needed.
-            Ordering::Less => {
-                let if_uncertain = self_interior.if_uncertain.or(storage, other.node());
-                NodeId::with_uncertain(
-                    storage,
-                    self_interior.constraint,
-                    self_interior.if_true,
-                    if_uncertain,
-                    self_interior.if_false,
-                )
-            }
-            // Ditto above but for the other variable ordering
-            Ordering::Greater => {
-                let if_uncertain = self.node().or(storage, other_interior.if_uncertain);
-                NodeId::with_uncertain(
-                    storage,
-                    other_interior.constraint,
-                    other_interior.if_true,
-                    if_uncertain,
-                    other_interior.if_false,
-                )
-            }
-        };
-
-        storage.or_cache.insert(key, result);
-        result
-    }
-
-    fn and(self, storage: &mut ConstraintSetStorage<'_>, other: Self) -> NodeId {
-        let key = (self.node(), other.node());
-        if let Some(result) = storage.and_cache.get(&key) {
-            return *result;
-        }
-
-        let self_interior = storage.interior_node_data(self.node());
-        let self_ordering = self_interior.constraint.ordering();
-        let other_interior = storage.interior_node_data(other.node());
-        let other_ordering = other_interior.constraint.ordering();
-        let result = match self_ordering.cmp(&other_ordering) {
-            // This is one of Duboc's optimizations over Frisch's original TDD operators. Frisch
-            // always sets the if_uncertain branch to ALWAYS_FALSE, and always distributes both
-            // input if_uncertain branches into the corresponding if_true and if_false branches.
-            // Duboc propagates the input if_uncertain branches into the result's if_uncertain
-            // branch.
-            //
-            //     n ? (C1 ∧ (C2 ∨ U2)) ∨ (U1 ∧ C2) : U1 ∧ U2 : (D1 ∧ (U2 ∨ D2)) ∨ (U1 ∧ D2)
-            //
-            // See [Duboc2026], §11.2 for more details.
-            Ordering::Equal => {
-                let other_if_true = other_interior
-                    .if_true
-                    .or(storage, other_interior.if_uncertain);
-                let true_from_true = self_interior.if_true.and(storage, other_if_true);
-                let true_from_uncertain = self_interior
-                    .if_uncertain
-                    .and(storage, other_interior.if_true);
-                let if_true = true_from_true.or(storage, true_from_uncertain);
-                let if_uncertain = self_interior
-                    .if_uncertain
-                    .and(storage, other_interior.if_uncertain);
-                let other_if_false = other_interior
-                    .if_uncertain
-                    .or(storage, other_interior.if_false);
-                let false_from_false = self_interior.if_false.and(storage, other_if_false);
-                let false_from_uncertain = self_interior
-                    .if_uncertain
-                    .and(storage, other_interior.if_false);
-                let if_false = false_from_false.or(storage, false_from_uncertain);
-                NodeId::with_uncertain(
-                    storage,
-                    self_interior.constraint,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                )
-            }
-            Ordering::Less => {
-                let if_true = self_interior.if_true.and(storage, other.node());
-                let if_uncertain = self_interior.if_uncertain.and(storage, other.node());
-                let if_false = self_interior.if_false.and(storage, other.node());
-                NodeId::with_uncertain(
-                    storage,
-                    self_interior.constraint,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                )
-            }
-            Ordering::Greater => {
-                let if_true = self.node().and(storage, other_interior.if_true);
-                let if_uncertain = self.node().and(storage, other_interior.if_uncertain);
-                let if_false = self.node().and(storage, other_interior.if_false);
-                NodeId::with_uncertain(
-                    storage,
-                    other_interior.constraint,
-                    if_true,
-                    if_uncertain,
-                    if_false,
-                )
-            }
-        };
-
-        storage.and_cache.insert(key, result);
-        result
-    }
-
     fn exists_inner<'db>(
         self,
         db: &'db dyn Db,
@@ -4414,42 +4394,14 @@ impl InteriorNode {
         storage: &mut ConstraintSetStorage<'db>,
         source_order: Option<SourceOrderId>,
     ) -> PathAssignments {
-        let mut constraints: SmallVec<[_; 8]> = SmallVec::new();
-        self.node()
-            .for_each_unique_constraint(storage, &mut |constraint| {
-                constraints.push(constraint);
-            });
-        let source_orders = storage.calculate_source_orders(source_order);
-        // `PathAssignments` seeds its insertion-ordered discovered-constraint map from this list,
-        // and uses that order when constructing non-commutative sequent pairs. Do not replace this
-        // with TDD traversal order: doing so can change inference and lose gradual constraints.
-        // Every constraint in the TDD must appear in the sidecar. If an operation introduces new
-        // constraints, it must preserve their source orders rather than invent an order here.
-        constraints.sort_by_key(|constraint| {
-            source_orders
-                .get_index_of(constraint)
-                .expect("every BDD constraint should have a source-order entry")
-        });
-
-        if !self.node().is_single_conjunction(storage) {
-            return PathAssignments::new(constraints, FxHashSet::default());
+        match path_assignments_sync(
+            self,
+            source_order,
+            &mut OrdinarySatisfaction { db, env, storage },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
-
-        let mut independent_typevars = FxHashSet::default();
-        let mut dependent_typevars = FxHashSet::default();
-        for constraint_id in &constraints {
-            let constraint = storage.constraint_data(*constraint_id);
-            if let Some(typevar) = constraint.as_concrete(db, env) {
-                let typevar = storage.typevar_id(db, typevar);
-                independent_typevars.insert(typevar);
-            } else {
-                dependent_typevars.extend(storage.constraint_support(*constraint_id).iter());
-            }
-        }
-
-        independent_typevars.retain(|typevar| !dependent_typevars.contains(typevar));
-
-        PathAssignments::new(constraints, independent_typevars)
     }
 }
 
@@ -4979,6 +4931,7 @@ mod tests {
     use crate::types::tuple::TupleType;
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+        TypeVarInstance,
     };
     use crate::types::{BoundTypeVarInstance, KnownClass, SubclassOfType, TypeVarVariance};
     use ruff_db::files::system_path_to_file;
@@ -5026,6 +4979,50 @@ mod tests {
                 ConstraintSet::constrain_typevar(db, env, builder, typevar, lower, upper)
             }
         }
+    }
+
+    #[test]
+    fn owned_constraint_type_steps_include_duplicate_nodes() -> anyhow::Result<()> {
+        let db = setup_db();
+        let db = &db;
+        let t = create_typevar(db, "T");
+        let u = create_typevar(db, "U");
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            let t_int = create_constraint(db, builder, t, KnownClass::Int);
+            let u_str = create_constraint(db, builder, u, KnownClass::Str);
+            t_int.iff(db, builder, u_str).negate(db, builder)
+        });
+
+        // XOR retains positive and negative nodes for one constraint below a distinct root.
+        // Inspect their IDs to keep this test independent of variable ordering.
+        let Some(inner) = owned.inner.as_deref() else {
+            anyhow::bail!("the XOR of independent constraints must retain a diagram");
+        };
+        assert_eq!(inner.nodes.len(), 3);
+        assert_eq!(inner.nodes[0].constraint, inner.nodes[1].constraint);
+        assert_ne!(inner.nodes[0].constraint, inner.nodes[2].constraint);
+        let leaf_pair = inner.constraints
+            [inner.retained_constraint_index(inner.nodes[0].constraint)]
+        .type_pair();
+        let root_pair = inner.constraints
+            [inner.retained_constraint_index(inner.nodes[2].constraint)]
+        .type_pair();
+        let mut steps = owned.type_steps();
+        assert_eq!(steps.next(), Some(Some(leaf_pair)));
+        assert_eq!(steps.next(), Some(None));
+        assert_eq!(steps.next(), Some(Some(root_pair)));
+        assert_eq!(steps.next(), None);
+
+        // Stopping after two steps reaches the duplicate without scanning ahead to the root.
+        assert_eq!(
+            owned.type_steps().take(2).collect::<Vec<_>>(),
+            [Some(leaf_pair), None],
+        );
+        assert_eq!(
+            owned.types().collect::<Vec<_>>(),
+            leaf_pair.into_iter().chain(root_pair).collect::<Vec<_>>(),
+        );
+        Ok(())
     }
 
     fn known_instance(db: &TestDb, class: KnownClass) -> Type<'_> {
@@ -5152,9 +5149,9 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let constraint =
             ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, actual_bound);
-        assert!(constraint.mentions_typevar(t));
-        assert!(constraint.mentions_typevar(u));
-        assert!(!constraint.mentions_typevar(metadata));
+        assert!(constraint.mentions_typevar(db, t));
+        assert!(constraint.mentions_typevar(db, u));
+        assert!(!constraint.mentions_typevar(db, metadata));
     }
 
     #[test]
@@ -6925,6 +6922,82 @@ class E: ...
     }
 
     #[test]
+    fn owned_retirement_profile_bounds_merged_supports_and_shared_arenas() -> anyhow::Result<()> {
+        let db = setup_db();
+        let env = db.program_environment();
+        let word_bits = usize::BITS as usize;
+        for count in [
+            1,
+            word_bits - 1,
+            word_bits,
+            word_bits + 1,
+            2 * word_bits + 1,
+        ] {
+            let typevars: Vec<_> = (0..count)
+                .map(|index| {
+                    BoundTypeVarInstance::synthetic(
+                        &db,
+                        &env,
+                        Name::new(format!("T{index}")),
+                        TypeVarVariance::Invariant,
+                    )
+                })
+                .collect();
+            let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+                let mut combined = ConstraintSet::from_bool(builder, true);
+                for typevar in &typevars {
+                    let next = create_constraint(&db, builder, *typevar, KnownClass::Int);
+                    combined = combined.and(&db, builder, || next);
+                }
+                combined
+            });
+            let inner = owned
+                .inner
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("ordinary conjunction must remain nonterminal"))?;
+            assert_eq!(inner.typevars.len(), count);
+            let words_per_support = count.div_ceil(word_bits);
+            assert!(
+                inner
+                    .supports
+                    .iter()
+                    .all(|support| support.words().len() <= words_per_support)
+            );
+            assert!(
+                inner
+                    .supports
+                    .iter()
+                    .any(|support| support.iter().count() == count)
+            );
+            let scanned_words: usize = inner
+                .supports
+                .iter()
+                .map(|support| support.words().len())
+                .sum();
+            let support_bound = inner.supports.len() * words_per_support;
+            assert!(support_bound >= scanned_words);
+            let quote = owned
+                .retirement_work()
+                .ok_or_else(|| anyhow::anyhow!("fixture retirement quote must fit"))?;
+            assert!(quote >= support_bound);
+
+            let shared = owned.clone();
+            assert!(
+                shared
+                    .inner
+                    .as_ref()
+                    .is_some_and(|other| Arc::ptr_eq(inner, other))
+            );
+            assert_eq!(shared.retirement_work(), Some(quote));
+            drop(owned);
+            assert_eq!(shared.retirement_work(), Some(quote));
+        }
+        assert_eq!(OwnedConstraintSet::always().retirement_work(), Some(1));
+        assert_eq!(OwnedConstraintSet::default().retirement_work(), Some(1));
+        Ok(())
+    }
+
+    #[test]
     fn owned_constraint_set_compacts_unreachable_storage() {
         let db = setup_db();
         let owned = create_compacted_owned_set(&db);
@@ -7355,4 +7428,384 @@ class E: ...
             "#},
         );
     }
+}
+
+struct UniqueConstraintScan {
+    seen: FxHashSet<NodeId>,
+    pending: SmallVec<[NodeId; 8]>,
+    phase: UniqueConstraintPhase,
+}
+
+#[derive(Clone, Copy)]
+enum UniqueConstraintPhase {
+    Pop,
+    Check { node: NodeId },
+    Read { node: NodeId },
+    Emit { data: InteriorNodeData },
+    Push { data: InteriorNodeData },
+    Done,
+}
+
+impl UniqueConstraintScan {
+    fn new(root: NodeId) -> Self {
+        Self {
+            seen: FxHashSet::default(),
+            pending: SmallVec::from_slice(&[root]),
+            phase: UniqueConstraintPhase::Pop,
+        }
+    }
+
+    fn advance_with<C: TddControl>(
+        &mut self,
+        storage: &ConstraintSetStorage<'_>,
+        control: &mut C,
+    ) -> Result<ControlFlow<Option<ConstraintId>>, TddError<C::Error>> {
+        admit_path_work(PathWork::Advance(PathAdvance::UniqueNode), control)?;
+        match self.phase {
+            UniqueConstraintPhase::Pop => {
+                self.phase = self
+                    .pending
+                    .pop()
+                    .map_or(UniqueConstraintPhase::Done, |node| {
+                        UniqueConstraintPhase::Check { node }
+                    });
+            }
+            UniqueConstraintPhase::Check { node } => {
+                if node.is_terminal() {
+                    self.phase = UniqueConstraintPhase::Pop;
+                } else {
+                    admit_path_work(PathWork::Access(PathTable::UniqueNodes), control)?;
+                    if self.seen.contains(&node) {
+                        self.phase = UniqueConstraintPhase::Pop;
+                    } else {
+                        if self.seen.len() == self.seen.capacity() {
+                            let required = self
+                                .seen
+                                .len()
+                                .checked_add(1)
+                                .ok_or(TddError::CapacityExhausted)?;
+                            let mut plan = sequence_growth::<NodeId, C::Error>(
+                                self.seen.capacity(),
+                                required,
+                            )?;
+                            plan.relocation_units = self.seen.len();
+                            control.admit(TddWork::Grow {
+                                allocation: AllocationKind::UniqueConstraintSeen,
+                                plan,
+                            })?;
+                            self.seen.reserve(plan.requested_capacity - self.seen.len());
+                        }
+                        self.seen.insert(node);
+                        self.phase = UniqueConstraintPhase::Read { node };
+                    }
+                }
+            }
+            UniqueConstraintPhase::Read { node } => {
+                self.phase = UniqueConstraintPhase::Emit {
+                    data: storage.interior_node_data(node),
+                };
+            }
+            UniqueConstraintPhase::Emit { data } => {
+                // The ordinary callback runs before extending the child stack.
+                self.phase = UniqueConstraintPhase::Push { data };
+                return Ok(ControlFlow::Break(Some(data.constraint)));
+            }
+            UniqueConstraintPhase::Push { data } => {
+                reserve_smallvec(
+                    &mut self.pending,
+                    3,
+                    AllocationKind::UniqueConstraintStack,
+                    control,
+                )?;
+                self.pending
+                    .extend([data.if_false, data.if_uncertain, data.if_true]);
+                self.phase = UniqueConstraintPhase::Pop;
+            }
+            UniqueConstraintPhase::Done => return Ok(ControlFlow::Break(None)),
+        }
+        Ok(ControlFlow::Continue(()))
+    }
+}
+
+// Source-order sidecars share interned subtrees. Revisiting a subtree cannot contribute
+// an earlier occurrence of any constraint, and can expand a small DAG exponentially.
+struct SourceOrderScan {
+    visited: FxHashSet<SourceOrderId>,
+    pending: Vec<SourceOrderId>,
+    result: FxIndexSet<ConstraintId>,
+    phase: SourceOrderPhase,
+}
+
+#[derive(Clone, Copy)]
+enum SourceOrderPhase {
+    Seed {
+        root: Option<SourceOrderId>,
+    },
+    Pop,
+    Check {
+        current: SourceOrderId,
+    },
+    Read {
+        current: SourceOrderId,
+    },
+    Push {
+        left: SourceOrderId,
+        right: SourceOrderId,
+    },
+    Insert {
+        constraint: ConstraintId,
+    },
+    Done,
+}
+
+impl SourceOrderScan {
+    fn new(root: Option<SourceOrderId>) -> Self {
+        Self {
+            visited: FxHashSet::default(),
+            pending: Vec::new(),
+            result: FxIndexSet::default(),
+            phase: SourceOrderPhase::Seed { root },
+        }
+    }
+
+    fn advance_with<C: TddControl>(
+        &mut self,
+        storage: &ConstraintSetStorage<'_>,
+        control: &mut C,
+    ) -> Result<ControlFlow<()>, TddError<C::Error>> {
+        admit_path_work(PathWork::Advance(PathAdvance::SourceOrder), control)?;
+        match self.phase {
+            SourceOrderPhase::Seed { root } => {
+                if let Some(root) = root {
+                    reserve_vec(
+                        &mut self.pending,
+                        1,
+                        AllocationKind::SourceOrderScanStack,
+                        control,
+                    )?;
+                    self.pending.push(root);
+                }
+                self.phase = SourceOrderPhase::Pop;
+            }
+            SourceOrderPhase::Pop => {
+                self.phase = self
+                    .pending
+                    .pop()
+                    .map_or(SourceOrderPhase::Done, |current| SourceOrderPhase::Check {
+                        current,
+                    });
+            }
+            SourceOrderPhase::Check { current } => {
+                admit_path_work(PathWork::Access(PathTable::SourceOrderSeen), control)?;
+                if self.visited.contains(&current) {
+                    self.phase = SourceOrderPhase::Pop;
+                } else {
+                    if self.visited.len() == self.visited.capacity() {
+                        let required = self
+                            .visited
+                            .len()
+                            .checked_add(1)
+                            .ok_or(TddError::CapacityExhausted)?;
+                        let mut plan = sequence_growth::<SourceOrderId, C::Error>(
+                            self.visited.capacity(),
+                            required,
+                        )?;
+                        plan.relocation_units = self.visited.len();
+                        control.admit(TddWork::Grow {
+                            allocation: AllocationKind::SourceOrderScanSeen,
+                            plan,
+                        })?;
+                        self.visited
+                            .reserve(plan.requested_capacity - self.visited.len());
+                    }
+                    self.visited.insert(current);
+                    self.phase = SourceOrderPhase::Read { current };
+                }
+            }
+            SourceOrderPhase::Read { current } => {
+                self.phase = match storage.source_order_data(current) {
+                    SourceOrder::Ordered(left, right) => SourceOrderPhase::Push { left, right },
+                    SourceOrder::Constraint(constraint) => SourceOrderPhase::Insert { constraint },
+                };
+            }
+            SourceOrderPhase::Push { left, right } => {
+                reserve_vec(
+                    &mut self.pending,
+                    2,
+                    AllocationKind::SourceOrderScanStack,
+                    control,
+                )?;
+                self.pending.extend([right, left]);
+                self.phase = SourceOrderPhase::Pop;
+            }
+            SourceOrderPhase::Insert { constraint } => {
+                admit_path_work(PathWork::Access(PathTable::SourceOrderResult), control)?;
+                if !self.result.contains(&constraint) {
+                    if self.result.len() == self.result.capacity() {
+                        let required = self
+                            .result
+                            .len()
+                            .checked_add(1)
+                            .ok_or(TddError::CapacityExhausted)?;
+                        let mut plan = sequence_growth::<ConstraintId, C::Error>(
+                            self.result.capacity(),
+                            required,
+                        )?;
+                        plan.relocation_units = self.result.len();
+                        control.admit(TddWork::Grow {
+                            allocation: AllocationKind::SourceOrderScanResult,
+                            plan,
+                        })?;
+                        self.result
+                            .reserve(plan.requested_capacity - self.result.len());
+                    }
+                    self.result.insert(constraint);
+                }
+                self.phase = SourceOrderPhase::Pop;
+            }
+            SourceOrderPhase::Done => return Ok(ControlFlow::Break(())),
+        }
+        Ok(ControlFlow::Continue(()))
+    }
+}
+
+// A BDD can be viewed as an encoding of the formula's DNF representation (OR of ANDs).
+// Each path from the root node to the `always` terminals represents one of the disjoints.
+// The constraints that we encounter on the path represent the conjoints. That means that a
+// BDD can only represent a single conjunction if there is precisely one path from the root
+// node to the `always` terminal.
+//
+// We can take advantage of local reductions. We never create an interior node whose true
+// and false branches both lead to `never` while the uncertain branch also contributes
+// nothing. That means that if we ever encounter a node with both true and false branches
+// pointing to something other than `never`, that node must have at least two paths to the
+// `always` terminal.
+struct SingleConjunctionScan {
+    phase: SingleConjunctionPhase,
+}
+
+#[derive(Clone, Copy)]
+enum SingleConjunctionPhase {
+    Current(NodeId),
+    Done(bool),
+}
+
+impl SingleConjunctionScan {
+    fn new(root: NodeId) -> Self {
+        Self {
+            phase: SingleConjunctionPhase::Current(root),
+        }
+    }
+
+    fn advance_with<C: TddControl>(
+        &mut self,
+        storage: &ConstraintSetStorage<'_>,
+        control: &mut C,
+    ) -> Result<ControlFlow<bool>, TddError<C::Error>> {
+        admit_path_work(PathWork::Advance(PathAdvance::ConjunctionShape), control)?;
+        match self.phase {
+            SingleConjunctionPhase::Done(result) => return Ok(ControlFlow::Break(result)),
+            SingleConjunctionPhase::Current(node) => {
+                self.phase = match node.node() {
+                    Node::AlwaysTrue => SingleConjunctionPhase::Done(true),
+                    Node::AlwaysFalse => SingleConjunctionPhase::Done(false),
+                    Node::Interior(_) => {
+                        let data = storage.interior_node_data(node);
+                        if (data.if_true != ALWAYS_FALSE && data.if_false != ALWAYS_FALSE)
+                            || data.if_uncertain != ALWAYS_FALSE
+                        {
+                            SingleConjunctionPhase::Done(false)
+                        } else {
+                            SingleConjunctionPhase::Current(if data.if_true != ALWAYS_FALSE {
+                                data.if_true
+                            } else {
+                                data.if_false
+                            })
+                        }
+                    }
+                };
+            }
+        }
+        Ok(ControlFlow::Continue(()))
+    }
+}
+
+fn independent_pair_skip_with<C: TddControl>(
+    storage: &ConstraintSetStorage<'_>,
+    existing: ConstraintId,
+    current: ConstraintId,
+    independent: &FxHashSet<TypeVarId>,
+    control: &mut C,
+) -> Result<bool, TddError<C::Error>> {
+    let existing = storage.constraint_support(existing);
+    let current = storage.constraint_support(current);
+    admit_path_work(
+        PathWork::SupportScan {
+            words: existing.words().len().min(current.words().len()),
+            typevars: 0,
+        },
+        control,
+    )?;
+    if existing.overlaps_with(current) {
+        return Ok(false);
+    }
+    admit_path_work(
+        PathWork::SupportScan {
+            words: existing.words().len(),
+            typevars: 0,
+        },
+        control,
+    )?;
+    admit_path_work(
+        PathWork::SupportScan {
+            words: current.words().len(),
+            typevars: 0,
+        },
+        control,
+    )?;
+    for typevar in existing.iter().chain(current.iter()) {
+        admit_path_work(
+            PathWork::SupportScan {
+                words: 0,
+                typevars: 1,
+            },
+            control,
+        )?;
+        admit_path_work(PathWork::Access(PathTable::IndependentTypevars), control)?;
+        if independent.contains(&typevar) {
+            return Ok(existing.is_complete() && current.is_complete());
+        }
+    }
+    Ok(false)
+}
+
+fn extend_dependent_support_with<C: TddControl>(
+    storage: &ConstraintSetStorage<'_>,
+    constraint: ConstraintId,
+    dependent: &mut FxHashSet<TypeVarId>,
+    control: &mut C,
+) -> Result<(), TddError<C::Error>> {
+    let support = storage.constraint_support(constraint);
+    admit_path_work(
+        PathWork::SupportScan {
+            words: support.words().len(),
+            typevars: 0,
+        },
+        control,
+    )?;
+    for typevar in support.iter() {
+        admit_path_work(
+            PathWork::SupportScan {
+                words: 0,
+                typevars: 1,
+            },
+            control,
+        )?;
+        admit_path_work(PathWork::Access(PathTable::DependentTypevars), control)?;
+        if !dependent.contains(&typevar) {
+            paths::reserve_path_typevars_with(dependent, PathTypevarSet::Dependent, control)?;
+            dependent.insert(typevar);
+        }
+    }
+    Ok(())
 }

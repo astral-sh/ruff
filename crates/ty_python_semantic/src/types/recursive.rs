@@ -152,7 +152,7 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// references with closed types, then applies that substitution before exposing the
 /// result to ordinary type operations.
 /// Use the binding operations in this module to construct recursive types.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
     /// The defining symbol of the implicit alias, including for qualified references.
     #[returns(copy)]
@@ -178,6 +178,7 @@ impl<'db> RecursiveType<'db> {
     /// Summarize the open constructor body without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
+            attempt = ReturnOnly,
             returns(ref),
             cycle_initial=|db, id, _, ()| AliasCycleSummary::from_type(db, Type::divergent_alias(id)),
             heap_size=ruff_memory_usage::heap_size
@@ -369,6 +370,7 @@ impl<'db> RecursiveType<'db> {
 
     /// Share the closed, specialized body across mappings with different visitors.
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(copy),
         cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
         heap_size=ruff_memory_usage::heap_size
@@ -703,6 +705,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 /// before it has finished materializing. Returning the marked binder closes that cycle while
 /// preserving the requested materialization polarity.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial=|_, _, recursive: RecursiveType<'db>| Type::Recursive(recursive),
     heap_size=ruff_memory_usage::heap_size
@@ -746,5 +749,125 @@ impl Type<'_> {
             !matches!(self, Self::RecursiveVar(_)),
             "semantic operation on an unbound recursive variable"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem;
+    use salsa::plumbing::AsId;
+    use ty_python_core::ProgramFile;
+    use ty_python_core::platform::PythonPlatform;
+
+    use super::*;
+    use crate::FxOrderSet;
+    use crate::Program;
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
+    use crate::types::KnownInstanceType;
+    use crate::types::set_theoretic::{
+        IntersectionType, NegativeIntersectionElements, RecursivelyDefined, UnionType,
+    };
+    use crate::types::tuple::buffer::{fixed_spec, variable_spec};
+    use crate::types::tuple::{TupleType, VariableSegment};
+
+    #[test]
+    fn structural_set_mapping_substitutes_members_without_semantic_reduction() {
+        let mut db = setup_db();
+        db.write_dedented("/src/anchor.py", "type Anchor = int")
+            .unwrap();
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/anchor.py").unwrap();
+        let file = ProgramFile::new(&db, file, env.program(&db));
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(&db, file, "Anchor").place.expect_type()
+        else {
+            panic!("expected a type alias");
+        };
+        let definition = alias.definition(&db);
+        let recursive = RecursiveType::initial(&db, definition, definition.as_id(), None);
+        let reference = recursive.body(&db);
+        let replacement = Type::Recursive(recursive);
+        let mapping = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+            RecursiveSubstitution::Unfold(recursive),
+        ));
+
+        let union = UnionType::new(
+            &db,
+            vec![Type::Never, reference, reference].into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        );
+        let mapped =
+            Type::Union(union).apply_type_mapping(&db, &env, &mapping, TypeContext::default());
+        let expected = UnionType::new(
+            &db,
+            vec![Type::Never, replacement, replacement].into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        );
+        assert_eq!(mapped, Type::Union(expected));
+        assert_ne!(mapped, Type::Union(union));
+
+        let intersection = IntersectionType::new(
+            &db,
+            FxOrderSet::from_iter([Type::any(), reference]),
+            NegativeIntersectionElements::Multiple(FxOrderSet::from_iter([Type::Never, reference])),
+        );
+        let mapped = Type::Intersection(intersection).apply_type_mapping(
+            &db,
+            &env,
+            &mapping,
+            TypeContext::default(),
+        );
+        let expected = IntersectionType::new(
+            &db,
+            FxOrderSet::from_iter([Type::any(), replacement]),
+            NegativeIntersectionElements::Multiple(FxOrderSet::from_iter([
+                Type::Never,
+                replacement,
+            ])),
+        );
+        assert_eq!(mapped, Type::Intersection(expected));
+        assert_ne!(mapped, Type::Intersection(intersection));
+    }
+
+    #[test]
+    fn structural_tuple_mapping_retains_the_original_program_and_unnormalized_spec() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let program = env.program(&db);
+        let other_platform = if *program.python_platform(&db) == PythonPlatform::All {
+            PythonPlatform::Identifier("linux".into())
+        } else {
+            PythonPlatform::All
+        };
+        let other_program = Program::new(&db, &other_platform, program.resolver_environment(&db));
+        assert_ne!(program, other_program);
+        let other_env = ProgramEnvironment::from_program(other_program);
+        let fixed = Type::int_literal(1);
+        let spec = variable_spec(vec![fixed], 1, VariableSegment::Homogeneous(Type::Never));
+        let original = TupleType::new_internal(&db, program, &spec);
+
+        let structural = Type::tuple(original).apply_type_mapping(
+            &db,
+            &other_env,
+            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Bind(RecursiveCycle(original.as_id())),
+            )),
+            TypeContext::default(),
+        );
+        assert_eq!(structural, Type::tuple(original));
+        assert_eq!(original.program(&db), program);
+        assert_eq!(original.tuple(&db), &spec);
+
+        let normalized = Type::tuple(original).apply_type_mapping(
+            &db,
+            &other_env,
+            &TypeMapping::Materialize(MaterializationKind::Top),
+            TypeContext::default(),
+        );
+        let expected = TupleType::new_internal(&db, other_program, fixed_spec(vec![fixed]));
+        assert_eq!(normalized, Type::tuple(expected));
+        assert_ne!(normalized, structural);
     }
 }

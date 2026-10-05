@@ -1,24 +1,20 @@
-use crate::{
-    reachability::is_reachable,
-    types::{
-        BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
-        TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-        context::InferContext,
-        diagnostic::{
-            INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_BOUND,
-            INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-            report_mismatched_type_name,
-        },
-        infer::{
-            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
-            builder::{BoundOrConstraintsNodes, DeclaredAndInferredType, DeferredExpressionState},
-        },
-        typevar::{
-            TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-            TypeVarIdentity, TypeVarInstance,
-        },
-        visitor::find_over_type,
+pub(super) mod legacy;
+pub(in crate::types::infer) mod pep695;
+
+use crate::types::{
+    BindingContext, KnownClass, KnownInstanceType, LintDiagnosticGuard, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
+    context::InferContext,
+    diagnostic::{
+        INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMSPEC, INVALID_TYPE_VARIABLE_DEFAULT,
+        report_mismatched_type_name,
     },
+    infer::{
+        TypeInferenceBuilder,
+        builder::BoundOrConstraintsNodes,
+    },
+    typevar::{TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance},
+    visitor::find_over_type,
 };
 use ruff_db::{
     diagnostic::{Annotation, Span},
@@ -26,10 +22,7 @@ use ruff_db::{
 };
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{
-    definition::{Definition, DefinitionKind},
-    scope::NodeWithScopeKind,
-};
+use ty_python_core::{definition::Definition, scope::NodeWithScopeKind};
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_typevar_definition(
@@ -37,129 +30,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         node: &ast::TypeParamTypeVar,
         definition: Definition<'db>,
     ) {
-        let ast::TypeParamTypeVar {
-            range: _,
-            node_index: _,
-            name,
-            bound,
-            default,
-        } = node;
-
-        let db = self.db();
-
-        let bound_or_constraint = match bound.as_deref() {
-            Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                if elts.len() < 2 {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
-                    {
-                        builder.into_diagnostic("TypeVar must have at least two constrained types");
-                    }
-                    None
-                } else {
-                    Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints)
-                }
-            }
-            Some(_) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
-            None => None,
-        };
-        if bound_or_constraint.is_some() || default.is_some() {
-            self.deferred.insert(definition);
-        }
-        let identity =
-            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695TypeVar);
-        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db,
-            identity,
-            bound_or_constraint,
-            None, // explicit_variance
-            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-        )));
-        self.add_declaration_with_binding(
-            node.into(),
+        pep695::infer_type_parameter_definition(
+            self,
             definition,
-            &DeclaredAndInferredType::are_the_same_type(ty),
+            ast::TypeParamRef::from(node),
         );
     }
 
     pub(super) fn infer_typevar_deferred(&mut self, node: &'ast ast::TypeParamTypeVar) {
-        let env = self.program_environment();
-        let ast::TypeParamTypeVar {
-            range: _,
-            node_index: _,
-            name,
-            bound,
-            default,
-        } = node;
-
-        let db = self.db();
-
-        let previous_deferred_state =
-            self.replace_deferred_state(DeferredExpressionState::Deferred);
-        let bound_node = bound.as_deref();
-        let bound_or_constraints = match bound_node {
-            Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints`
-                // in `TypeVarInstance::lazy_constraints`.
-                let constraint_tys: Box<[Type<'_>]> = elts
-                    .iter()
-                    .map(|expr| {
-                        let constraint = self.infer_type_expression(expr);
-                        if constraint.has_typevar_or_typevar_instance(db, env)
-                            && let Some(builder) = self
-                                .context
-                                .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
-                        {
-                            builder.into_diagnostic("TypeVar constraint cannot be generic");
-                        }
-                        constraint
-                    })
-                    .collect();
-
-                let tuple_ty = Type::heterogeneous_tuple(db, env, constraint_tys.clone());
-                self.store_expression_type(expr, tuple_ty);
-                // Mirror the `< 2` guard from `infer_typevar_definition` to avoid
-                // a cascading `invalid-type-variable-default` diagnostic for tuples
-                // that have already been flagged as invalid constraints.
-                if elts.len() < 2 {
-                    None
-                } else {
-                    Some(TypeVarBoundOrConstraints::Constraints(
-                        TypeVarConstraints::new(db, constraint_tys),
-                    ))
-                }
-            }
-            Some(expr) => {
-                let bound_ty = self.infer_type_expression(expr);
-                if bound_ty.has_typevar_or_typevar_instance(db, env)
-                    && let Some(builder) =
-                        self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
-                {
-                    builder.into_diagnostic("TypeVar upper bound cannot be generic");
-                }
-
-                Some(TypeVarBoundOrConstraints::UpperBound(bound_ty))
-            }
-            None => None,
-        };
-        if let Some(default_expr) = default.as_deref() {
-            let default_ty = self.infer_type_expression(default_expr);
-            if !self.check_default_for_outer_scope_typevars(default_ty, default_expr, &name.id) {
-                let bound_node = bound_node.map(|n| match n {
-                    ast::Expr::Tuple(tuple) => BoundOrConstraintsNodes::Constraints(&tuple.elts),
-                    _ => BoundOrConstraintsNodes::Bound(n),
-                });
-                self.validate_typevar_default(
-                    Some(&name.id),
-                    bound_or_constraints,
-                    default_ty,
-                    default_expr,
-                    bound_node,
-                );
-            }
+        match super::deferred::type_parameter::infer_type_parameter_deferred_sync(
+            self,
+            ast::TypeParamRef::TypeVar(node),
+            super::deferred::type_parameter::DeferredTypeParameterFacts,
+            &super::deferred::type_parameter::OrdinaryDeferredTypeParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
-        self.deferred_state = previous_deferred_state;
     }
 
     /// Validate that a `TypeVar`'s default is compatible with its bound or constraints.
@@ -171,11 +58,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         default_node: &ast::Expr,
         bound_or_constraints_nodes: Option<BoundOrConstraintsNodes<'ast>>,
     ) {
-        let env = self.program_environment();
-        let Some(bound_or_constraints) = bound_or_constraints else {
-            return;
-        };
+        let Ok(()) = super::deferred::assignment::validate_typevar_default_sync(
+            self,
+            name,
+            bound_or_constraints,
+            default_ty,
+            default_node,
+            bound_or_constraints_nodes,
+            &super::deferred::assignment::OrdinaryDeferredAssignmentEffects,
+        );
+    }
 
+    pub(super) fn validate_bound_typevar_default(
+        &mut self,
+        name: Option<&str>,
+        bound_or_constraints: TypeVarBoundOrConstraints<'db>,
+        default_ty: Type<'db>,
+        default_node: &ast::Expr,
+        bound_or_constraints_nodes: Option<BoundOrConstraintsNodes<'ast>>,
+    ) {
+        let env = self.program_environment();
         let db = self.db();
 
         // Normalize both typevar representations into a `TypeVarInstance` so they
@@ -468,7 +370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Class type parameter scopes are skipped here because out-of-scope references
     /// are validated at the class level via `report_invalid_typevar_default_reference`.
     /// Legacy `TypeVar`s are validated by `check_legacy_typevar_defaults`.
-    fn check_default_for_outer_scope_typevars(
+    pub(super) fn check_default_for_outer_scope_typevars(
         &self,
         default_ty: Type<'db>,
         default_node: &ast::Expr,
@@ -540,48 +442,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         node: &ast::TypeParamParamSpec,
         definition: Definition<'db>,
     ) {
-        let ast::TypeParamParamSpec {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = node;
-
-        let db = self.db();
-
-        if default.is_some() {
-            self.deferred.insert(definition);
-        }
-        let identity =
-            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695ParamSpec);
-        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db,
-            identity,
-            None, // ParamSpec, when declared using PEP 695 syntax, has no bounds or constraints
-            None, // explicit_variance
-            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-        )));
-        self.add_declaration_with_binding(
-            node.into(),
+        pep695::infer_type_parameter_definition(
+            self,
             definition,
-            &DeclaredAndInferredType::are_the_same_type(ty),
+            ast::TypeParamRef::from(node),
         );
     }
 
-    pub(super) fn infer_paramspec_deferred(&mut self, node: &ast::TypeParamParamSpec) {
-        let ast::TypeParamParamSpec {
-            range: _,
-            node_index: _,
-            name,
-            default: Some(default),
-        } = node
-        else {
-            return;
-        };
-        let previous_deferred_state =
-            self.replace_deferred_state(DeferredExpressionState::Deferred);
-        self.infer_paramspec_default(default, Some(&name.id));
-        self.deferred_state = previous_deferred_state;
+    pub(super) fn infer_paramspec_deferred(&mut self, node: &'ast ast::TypeParamParamSpec) {
+        match super::deferred::type_parameter::infer_type_parameter_deferred_sync(
+            self,
+            ast::TypeParamRef::ParamSpec(node),
+            super::deferred::type_parameter::DeferredTypeParameterFacts,
+            &super::deferred::type_parameter::OrdinaryDeferredTypeParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
+        }
     }
 
     pub(super) fn infer_paramspec_default(
@@ -589,128 +466,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         default_expr: &ast::Expr,
         paramspec_name: Option<&str>,
     ) {
-        let previously_allowed_paramspec = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, true);
-        self.infer_paramspec_default_impl(default_expr, paramspec_name);
-        self.context.inference_flags.set(
-            InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-            previously_allowed_paramspec,
-        );
-    }
-
-    fn infer_paramspec_default_impl(
-        &mut self,
-        default_expr: &ast::Expr,
-        paramspec_name: Option<&str>,
-    ) {
-        let db = self.db();
-
-        match default_expr {
-            ast::Expr::EllipsisLiteral(ellipsis) => {
-                let ty = self.infer_ellipsis_literal_expression(ellipsis);
-                self.store_expression_type(default_expr, ty);
-                return;
-            }
-            ast::Expr::List(ast::ExprList { elts, .. }) => {
-                let previously_allowed_paramspec = self
-                    .context
-                    .inference_flags
-                    .replace(InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR, false);
-                let types = elts
-                    .iter()
-                    .map(|elt| self.infer_type_expression(elt))
-                    .collect::<Vec<_>>();
-                self.context.inference_flags.set(
-                    InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
-                    previously_allowed_paramspec,
-                );
-                // N.B. We cannot represent a heterogeneous list of types in our type system, so we
-                // use a heterogeneous tuple type to represent the list of types instead.
-                let ty = Type::heterogeneous_tuple(db, self.program_environment(), types);
-                self.store_expression_type(default_expr, ty);
-                return;
-            }
-            ast::Expr::Name(_) => {
-                let ty = self.infer_type_expression(default_expr);
-                if let Some(name) = paramspec_name
-                    && self.check_default_for_outer_scope_typevars(ty, default_expr, name)
-                {
-                    return;
-                }
-                let is_paramspec = match ty {
-                    Type::TypeVar(typevar) => typevar.is_paramspec(db),
-                    Type::KnownInstance(known_instance) => {
-                        known_instance.class(db) == KnownClass::ParamSpec
-                    }
-                    _ => false,
-                };
-                if is_paramspec {
-                    return;
-                }
-            }
-            _ => {}
-        }
-        if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default_expr) {
-            builder.into_diagnostic(
-                "The default value to `ParamSpec` must be either \
-                    a list of types, `ParamSpec`, or `...`",
-            );
+        match super::deferred::type_parameter::infer_paramspec_default_sync(
+            self,
+            default_expr,
+            paramspec_name,
+            &super::deferred::type_parameter::OrdinaryDeferredTypeParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
     }
+
+
 
     pub(super) fn infer_typevartuple_definition(
         &mut self,
         node: &ast::TypeParamTypeVarTuple,
         definition: Definition<'db>,
     ) {
-        let ast::TypeParamTypeVarTuple {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = node;
-
-        let db = self.db();
-
-        if default.is_some() {
-            self.deferred.insert(definition);
-        }
-        let identity = TypeVarIdentity::new(
-            db,
-            &name.id,
-            Some(definition),
-            TypeVarKind::Pep695TypeVarTuple,
-        );
-        let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db,
-            identity,
-            None,
-            None, // explicit_variance
-            default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
-        )));
-        self.add_declaration_with_binding(
-            node.into(),
+        pep695::infer_type_parameter_definition(
+            self,
             definition,
-            &DeclaredAndInferredType::are_the_same_type(ty),
+            ast::TypeParamRef::from(node),
         );
     }
 
-    pub(super) fn infer_typevartuple_deferred(&mut self, node: &ast::TypeParamTypeVarTuple) {
-        let ast::TypeParamTypeVarTuple {
-            range: _,
-            node_index: _,
-            name,
-            default: Some(default),
-        } = node
-        else {
-            return;
-        };
-        let previous_deferred_state =
-            self.replace_deferred_state(DeferredExpressionState::Deferred);
-        self.infer_typevartuple_default(default, Some(&name.id));
-        self.deferred_state = previous_deferred_state;
+    pub(super) fn infer_typevartuple_deferred(&mut self, node: &'ast ast::TypeParamTypeVarTuple) {
+        match super::deferred::type_parameter::infer_type_parameter_deferred_sync(
+            self,
+            ast::TypeParamRef::TypeVarTuple(node),
+            super::deferred::type_parameter::DeferredTypeParameterFacts,
+            &super::deferred::type_parameter::OrdinaryDeferredTypeParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
+        }
     }
 
     pub(super) fn infer_typevartuple_default(
@@ -718,37 +508,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         default_expr: &ast::Expr,
         typevartuple_name: Option<&str>,
     ) {
-        let previously_in_valid_unpack_context = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
-        let default_ty = self.infer_type_expression(default_expr);
-        self.context.inference_flags.set(
-            InferenceFlags::IN_VALID_UNPACK_CONTEXT,
-            previously_in_valid_unpack_context,
-        );
-
-        if let Some(name) = typevartuple_name
-            && self.check_default_for_outer_scope_typevars(default_ty, default_expr, name)
-        {
-            return;
-        }
-
-        if !self
-            .type_expression_flags(default_expr)
-            .contains(TypeExpressionFlags::UNPACK)
-            && !matches!(
-                default_ty,
-                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-            )
-            && let Some(builder) = self
-                .context
-                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, default_expr)
-        {
-            builder.into_diagnostic(
-                "The default value for `TypeVarTuple` must be an unpacked tuple type \
-                    or another TypeVarTuple",
-            );
+        match super::deferred::type_parameter::infer_typevartuple_default_sync(
+            self,
+            default_expr,
+            typevartuple_name,
+            &super::deferred::type_parameter::OrdinaryDeferredTypeParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
     }
 
@@ -1268,350 +1035,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, variance, default,
-        )))
-    }
-
-    pub(super) fn infer_legacy_typevar(
-        &mut self,
-        target: &ast::Expr,
-        call_expr: &ast::ExprCall,
-        definition: Definition<'db>,
-        known_class: KnownClass,
-    ) -> Type<'db> {
-        fn error<'db>(
-            context: &InferContext<'db, '_>,
-            message: impl std::fmt::Display,
-            node: impl Ranged,
-        ) -> Type<'db> {
-            let db = context.db();
-            if let Some(builder) = context.report_lint(&INVALID_LEGACY_TYPE_VARIABLE, node) {
-                builder.into_diagnostic(message);
-            }
-            // If the call doesn't create a valid typevar, we'll emit diagnostics and fall back to
-            // just creating a regular instance of `typing.TypeVar`.
-            KnownClass::TypeVar.to_instance(db, context.program_environment())
-        }
-
-        let env = self.program_environment();
-        let db = self.db();
-        let arguments = &call_expr.arguments;
-        let is_typing_extensions = known_class == KnownClass::ExtensionsTypeVar;
-        let assume_all_features = self.in_stub() || is_typing_extensions;
-
-        let mut has_bound = false;
-        let mut default = None;
-        let mut covariant = false;
-        let mut contravariant = false;
-        let mut infer_variance = false;
-        let mut name_param_ty = None;
-        let mut name_param_node = None;
-
-        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
-            return error(
-                &self.context,
-                "Starred arguments are not supported in `TypeVar` creation",
-                starred,
-            );
-        }
-
-        for kwarg in &arguments.keywords {
-            let Some(identifier) = kwarg.arg.as_ref() else {
-                return error(
-                    &self.context,
-                    "Starred arguments are not supported in `TypeVar` creation",
-                    kwarg,
-                );
-            };
-            match identifier.id().as_str() {
-                "name" => {
-                    // Duplicate keyword argument is a syntax error, so we don't have to check if
-                    // `name_param_ty.is_some()` here.
-                    if !arguments.args.is_empty() {
-                        return error(
-                            &self.context,
-                            "The `name` parameter of `TypeVar` can only be provided once.",
-                            kwarg,
-                        );
-                    }
-                    name_param_node = Some(&kwarg.value);
-                    name_param_ty =
-                        Some(self.infer_expression(&kwarg.value, TypeContext::default()));
-                }
-                "bound" => has_bound = true,
-                "covariant" => {
-                    match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db, env)
-                    {
-                        Truthiness::AlwaysTrue => covariant = true,
-                        Truthiness::AlwaysFalse => {}
-                        Truthiness::Ambiguous => {
-                            return error(
-                                &self.context,
-                                "The `covariant` parameter of `TypeVar` \
-                                cannot have an ambiguous truthiness",
-                                &kwarg.value,
-                            );
-                        }
-                    }
-                }
-                "contravariant" => {
-                    match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db, env)
-                    {
-                        Truthiness::AlwaysTrue => contravariant = true,
-                        Truthiness::AlwaysFalse => {}
-                        Truthiness::Ambiguous => {
-                            return error(
-                                &self.context,
-                                "The `contravariant` parameter of `TypeVar` \
-                                cannot have an ambiguous truthiness",
-                                &kwarg.value,
-                            );
-                        }
-                    }
-                }
-                "default" => {
-                    if !assume_all_features
-                        && self.program_environment().python_version(db) < PythonVersion::PY313
-                    {
-                        // We don't return here; this error is informational since this will error
-                        // at runtime, but the user's intent is plain, we may as well respect it.
-                        error(
-                            &self.context,
-                            "The `default` parameter of `typing.TypeVar` was added in Python 3.13",
-                            kwarg,
-                        );
-                    }
-
-                    default = Some(TypeVarDefaultEvaluation::Lazy);
-                }
-                "infer_variance" => {
-                    if !assume_all_features
-                        && self.program_environment().python_version(db) < PythonVersion::PY312
-                    {
-                        // We don't return here; this error is informational since this will error
-                        // at runtime, but the user's intent is plain, we may as well respect it.
-                        error(
-                            &self.context,
-                            "The `infer_variance` parameter of `typing.TypeVar` was added in Python 3.12",
-                            kwarg,
-                        );
-                    }
-                    match self
-                        .infer_expression(&kwarg.value, TypeContext::default())
-                        .bool(db, env)
-                    {
-                        Truthiness::AlwaysTrue => infer_variance = true,
-                        Truthiness::AlwaysFalse => {}
-                        Truthiness::Ambiguous => {
-                            return error(
-                                &self.context,
-                                "The `infer_variance` parameter of `TypeVar` \
-                                cannot have an ambiguous truthiness",
-                                &kwarg.value,
-                            );
-                        }
-                    }
-                }
-                name => {
-                    // We don't return here; this error is informational since this will error
-                    // at runtime, but it will likely cause fewer cascading errors if we just
-                    // ignore the unknown keyword and still understand as much of the typevar as we
-                    // can.
-                    error(
-                        &self.context,
-                        format_args!("Unknown keyword argument `{name}` in `TypeVar` creation"),
-                        kwarg,
-                    );
-                    self.infer_expression(&kwarg.value, TypeContext::default());
-                }
-            }
-        }
-
-        let variance = match (covariant, contravariant, infer_variance) {
-            (true, true, _) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot be both covariant and contravariant",
-                    call_expr,
-                );
-            }
-            (true, false, true) | (false, true, true) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot specify variance when `infer_variance=True`",
-                    call_expr,
-                );
-            }
-            (true, false, false) => Some(TypeVarVariance::Covariant),
-            (false, true, false) => Some(TypeVarVariance::Contravariant),
-            (false, false, false) => Some(TypeVarVariance::Invariant),
-            (false, false, true) => None,
-        };
-
-        let Some(name_param_ty) = name_param_ty.or_else(|| {
-            arguments
-                .find_positional(0)
-                .map(|arg| self.infer_expression(arg, TypeContext::default()))
-        }) else {
-            return error(
-                &self.context,
-                "The `name` parameter of `TypeVar` is required.",
-                call_expr,
-            );
-        };
-
-        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
-            return error(
-                &self.context,
-                "The first argument to `TypeVar` must be a string literal.",
-                call_expr,
-            );
-        };
-        let name_param_node = name_param_node.or_else(|| arguments.find_positional(0));
-
-        let ast::Expr::Name(ast::ExprName {
-            id: target_name, ..
-        }) = target
-        else {
-            return error(
-                &self.context,
-                "A `TypeVar` definition must be a simple variable assignment",
-                target,
-            );
-        };
-
-        if name_param != target_name {
-            report_mismatched_type_name(
-                &self.context,
-                name_param_node
-                    .map(Ranged::range)
-                    .unwrap_or_else(|| call_expr.range()),
-                "TypeVar",
-                target_name,
-                Some(name_param),
-                name_param_ty,
-            );
-        }
-        let previous_definition_in = |scope, place, before| {
-            let use_def = self.index.use_def_map(scope);
-            use_def
-                .reachable_bindings(place)
-                .map(|binding| {
-                    (
-                        binding.binding_order,
-                        binding.binding,
-                        binding.reachability_constraint,
-                    )
-                })
-                .chain(use_def.reachable_declarations(place).map(|declaration| {
-                    (
-                        declaration.declaration_order,
-                        declaration.declaration,
-                        declaration.reachability_constraint,
-                    )
-                }))
-                .filter(|(order, _, _)| *order < before)
-                .filter(|(_, _, reachability)| is_reachable(db, use_def, *reachability))
-                .filter_map(|(order, definition, _)| {
-                    definition
-                        .definition()
-                        .map(|definition| (order, definition))
-                })
-                .filter(|(_, definition)| definition.kind(db).is_user_visible())
-                .max_by_key(|(order, _)| *order)
-                .map(|(_, definition)| definition)
-        };
-
-        let scope = definition.file_scope(db);
-        let place = definition.place(db);
-        let use_def = self.index.use_def_map(scope);
-        let definition_order = use_def.reachable_bindings(place).find_map(|binding| {
-            (binding.binding.definition() == Some(definition)).then_some(binding.binding_order)
-        });
-        debug_assert!(definition_order.is_some());
-
-        let previous_definition = definition_order
-            .and_then(|before| previous_definition_in(scope, place, before))
-            .or_else(|| {
-                self.forwarded_assignment_owner(scope, place.expect_symbol())
-                    .and_then(|(owner_scope, owner_place)| {
-                        let owner_use_def = self.index.use_def_map(owner_scope);
-                        let before = owner_use_def
-                            .reachable_bindings(owner_place.into())
-                            .find_map(|binding| {
-                                let definition = binding.binding.definition()?;
-                                let DefinitionKind::NestedBindings(nested) = definition.kind(db)
-                                else {
-                                    return None;
-                                };
-                                nested
-                                    .nested_declarations
-                                    .iter()
-                                    .any(|declaration| declaration.file_scope_id == scope)
-                                    .then_some(binding.binding_order)
-                            })?;
-                        previous_definition_in(owner_scope, owner_place.into(), before)
-                    })
-            });
-        if let Some(previous_definition) = previous_definition
-            && let Some(builder) = self
-                .context
-                .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, target)
-        {
-            let mut diagnostic = builder.into_diagnostic(format_args!(
-                "Cannot redefine `{target_name}` as a type variable"
-            ));
-            diagnostic.annotate(
-                self.context
-                    .secondary(previous_definition.focus_range(db, self.module()))
-                    .message("Previously defined here"),
-            );
-        }
-
-        // Inference of bounds, constraints, and defaults must be deferred, to avoid cycles. So we
-        // only check presence/absence/number here.
-
-        let num_constraints = arguments.args.len().saturating_sub(1);
-
-        let bound_or_constraints = match (has_bound, num_constraints) {
-            (false, 0) => None,
-            (true, 0) => Some(TypeVarBoundOrConstraintsEvaluation::LazyUpperBound),
-            (true, _) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot have both a bound and constraints",
-                    call_expr,
-                );
-            }
-            (_, 1) => {
-                return error(
-                    &self.context,
-                    "A `TypeVar` cannot have exactly one constraint",
-                    &arguments.args[1],
-                );
-            }
-            (false, _) => Some(TypeVarBoundOrConstraintsEvaluation::LazyConstraints),
-        };
-
-        if bound_or_constraints.is_some() || default.is_some() {
-            self.deferred.insert(definition);
-        }
-
-        let identity = TypeVarIdentity::new(
-            db,
-            target_name,
-            Some(definition),
-            TypeVarKind::LegacyTypeVar,
-        );
-        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
-            db,
-            identity,
-            bound_or_constraints,
-            variance,
-            default,
         )))
     }
 }

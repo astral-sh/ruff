@@ -1,5 +1,6 @@
 [workspace]
 members = ["crates/*"]
+exclude = ["vendor/salsa", "vendor/salsa/local-macros", "vendor/salsa/local-macro-rules"]
 resolver = "2"
 
 [workspace.package]
@@ -119,7 +120,9 @@ get-size2 = { version = "0.11.0", default-features = false, features = [
 glob = { version = "0.3.1", default-features = false }
 globset = { version = "0.4.14", default-features = false, features = ["log"] }
 globwalk = { version = "0.9.1", default-features = false }
-hashbrown = { version = "0.17.0", default-features = false, features = [
+# FrozenHashTable certificates depend on this exact lookup implementation.
+# Re-audit control tags and candidate visitation before updating hashbrown.
+hashbrown = { version = "=0.17.1", default-features = false, features = [
     "inline-more",
 ] }
 heck = { version = "0.5.0", default-features = false }
@@ -185,7 +188,7 @@ regex-syntax = { version = "0.8.8", default-features = false }
 rustc-hash = { version = "2.0.0", default-features = false, features = ["std"] }
 rustc-stable-hash = { version = "0.1.2", default-features = false }
 # When updating salsa, make sure to also update the version in `fuzz/Cargo.toml`
-salsa = { version = "0.28.2", default-features = false, features = [
+salsa = { version = "0.28.2", path = "vendor/salsa", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

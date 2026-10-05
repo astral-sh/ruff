@@ -1,9 +1,12 @@
+use std::convert::Infallible;
+
 use ruff_db::{
     diagnostic::{Annotation, Span},
     parsed::parsed_module,
 };
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
+use ty_mapping_probe_macros::shared_semantic_family;
 
 use crate::{
     Db,
@@ -38,25 +41,120 @@ pub(crate) fn check_overloaded_function<'db>(
     seen_overloaded_places: &mut FxHashSet<ScopedPlaceId>,
     seen_public_functions: &mut FxHashSet<FunctionType<'db>>,
 ) {
+    match check_overloaded_function_sync(
+        context,
+        ty,
+        definition,
+        scope,
+        index,
+        seen_overloaded_places,
+        seen_public_functions,
+        &OrdinaryOverloadedFunctionEffects,
+    ) {
+        Ok(()) => {}
+        Err(error) => match error {},
+    }
+}
+
+struct OrdinaryOverloadedFunctionEffects;
+
+shared_semantic_family! {
+    #[synchronous(SynchronousOverloadedFunctionEffects)]
+    pub(in crate::types::infer::builder) trait OverloadedFunctionEffects<'db> {
+        type Error;
+        #[operation(source)]
+        async fn is_same_file(&self, context: &InferContext<'db, '_>, function: FunctionType<'db>) -> Result<bool, Self::Error>;
+        #[operation(source)]
+        async fn has_overload_decorator(&self, context: &InferContext<'db, '_>, function: FunctionType<'db>) -> Result<bool, Self::Error>;
+        #[operation(source)]
+        async fn check_overloads(&self, context: &InferContext<'db, '_>, function: FunctionType<'db>, definition: Definition<'db>, scope: &NodeWithScopeKind, index: &SemanticIndex<'db>, seen_overloaded_places: &mut FxHashSet<ScopedPlaceId>, seen_public_functions: &mut FxHashSet<FunctionType<'db>>) -> Result<(), Self::Error>;
+    }
+
+    #[synchronous(check_overloaded_function_sync)]
+    #[capabilities(effects = OverloadedFunctionEffects)]
+    #[passive_values()]
+    pub(in crate::types::infer::builder) async fn check_overloaded_function_with<'db, E: OverloadedFunctionEffects<'db>>(
+        context: &InferContext<'db, '_>,
+        ty: Type<'db>,
+        definition: Definition<'db>,
+        scope: &NodeWithScopeKind,
+        index: &SemanticIndex<'db>,
+        seen_overloaded_places: &mut FxHashSet<ScopedPlaceId>,
+        seen_public_functions: &mut FxHashSet<FunctionType<'db>>,
+        effects: &E,
+    ) -> Result<(), E::Error> {
+        let Type::FunctionLiteral(function) = ty else {
+            return Ok(());
+        };
+
+        if !effects.is_same_file(context, function).await? {
+            // Cross-file functions are checked where they are defined.
+            // https://github.com/astral-sh/ruff/pull/17609#issuecomment-2839445740
+            return Ok(());
+        }
+
+        if !effects.has_overload_decorator(context, function).await? {
+            return Ok(());
+        }
+
+        effects.check_overloads(context, function, definition, scope, index, seen_overloaded_places, seen_public_functions).await
+    }
+}
+
+impl<'db> SynchronousOverloadedFunctionEffects<'db> for OrdinaryOverloadedFunctionEffects {
+    type Error = Infallible;
+
+    fn is_same_file(
+        &self,
+        context: &InferContext<'db, '_>,
+        function: FunctionType<'db>,
+    ) -> Result<bool, Self::Error> {
+        Ok(function.file(context.db()) == context.file())
+    }
+
+    fn has_overload_decorator(
+        &self,
+        context: &InferContext<'db, '_>,
+        function: FunctionType<'db>,
+    ) -> Result<bool, Self::Error> {
+        Ok(function.has_known_decorator(context.db(), FunctionDecorators::OVERLOAD))
+    }
+
+    fn check_overloads(
+        &self,
+        context: &InferContext<'db, '_>,
+        _function: FunctionType<'db>,
+        definition: Definition<'db>,
+        scope: &NodeWithScopeKind,
+        index: &SemanticIndex<'db>,
+        seen_overloaded_places: &mut FxHashSet<ScopedPlaceId>,
+        seen_public_functions: &mut FxHashSet<FunctionType<'db>>,
+    ) -> Result<(), Self::Error> {
+        check_local_overloads(
+            context,
+            definition,
+            scope,
+            index,
+            seen_overloaded_places,
+            seen_public_functions,
+        );
+        Ok(())
+    }
+}
+
+fn check_local_overloads<'db>(
+    context: &InferContext<'db, '_>,
+    definition: Definition<'db>,
+    scope: &NodeWithScopeKind,
+    index: &SemanticIndex<'db>,
+    seen_overloaded_places: &mut FxHashSet<ScopedPlaceId>,
+    seen_public_functions: &mut FxHashSet<FunctionType<'db>>,
+) {
     // Collect all the unique overloaded function places in this scope. This requires a set
     // because an overloaded function uses the same place for each of the overloads and the
     // implementation.
-    let Type::FunctionLiteral(function) = ty else {
-        return;
-    };
-
     let db = context.db();
     let env = context.program_environment();
-
-    if function.file(db) != context.file() {
-        // If the function is not in this file, we don't need to check it.
-        // https://github.com/astral-sh/ruff/pull/17609#issuecomment-2839445740
-        return;
-    }
-
-    if !function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-        return;
-    }
 
     let place = definition.place(db);
 

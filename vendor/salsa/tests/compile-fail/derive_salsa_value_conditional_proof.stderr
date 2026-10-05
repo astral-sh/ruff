@@ -1,0 +1,43 @@
+error[E0277]: `NotSalsaValue<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/derive_salsa_value_conditional_proof.rs:22:26
+   |
+22 |     assert_salsa_value::<ConditionallySafe<NotSalsaValue<'db>>>();
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `NotSalsaValue<'db>`
+  --> tests/compile-fail/derive_salsa_value_conditional_proof.rs:17:1
+   |
+17 | struct NotSalsaValue<'db>(PhantomData<&'db ()>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `NotSalsaValue<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required for `ConditionallySafe<NotSalsaValue<'db>>` to implement `SalsaValue`
+  --> tests/compile-fail/derive_salsa_value_conditional_proof.rs:6:8
+   |
+ 6 | struct ConditionallySafe<T> {
+   |        ^^^^^^^^^^^^^^^^^^^^
+ 7 |     #[salsa_value(unsafe(prove(T: salsa::SalsaValue)))]
+   |                                   ----------------- unsatisfied trait bound
+   = help: consider manually implementing `SalsaValue` to avoid undesired bounds
+note: required by a bound in `assert_salsa_value`
+  --> tests/compile-fail/derive_salsa_value_conditional_proof.rs:19:26
+   |
+19 | fn assert_salsa_value<T: salsa::SalsaValue>() {}
+   |                          ^^^^^^^^^^^^^^^^^ required by this bound in `assert_salsa_value`
+
+error: lifetime may not live long enough
+  --> tests/compile-fail/derive_salsa_value_conditional_proof.rs:26:5
+   |
+25 | fn rejects_unsatisfied_static_proof<'db>() {
+   |                                     --- lifetime `'db` defined here
+26 |     assert_salsa_value::<ConditionallyStatic<&'db ()>>();
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ requires that `'db` must outlive `'static`

@@ -1,0 +1,150 @@
+[package]
+name = "salsa"
+version = "0.28.2"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+description = "A generic framework for on-demand, incrementalized computation (experimental)"
+exclude = [
+    "/.devcontainer/",
+    "/.dir-locals.el",
+    "/.github/",
+    "/.gitignore",
+    "/book/",
+    "/justfile",
+    "/release-plz.toml",
+]
+
+[dependencies]
+salsa-macro-rules = { version = "0.28.2", path = "components/salsa-macro-rules" }
+salsa-macros = { version = "0.28.2", path = "components/salsa-macros", optional = true }
+
+boxcar = "0.2.14"
+crossbeam-queue = "0.3.12"
+crossbeam-utils = "0.8.21"
+hashbrown = "0.17"
+hashlink = "0.12"
+indexmap = "2"
+intrusive-collections = "0.10.1"
+parking_lot = "0.12"
+pin-project-lite = "0.2.17"
+portable-atomic = "1"
+rustc-hash = "2"
+smallvec = { version = "1", features = ["const_new"] }
+thin-vec = { version = "0.2.14" }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+typeid = "1.0"
+
+# Automatic ingredient registration.
+inventory = { version = "0.3.24", optional = true }
+
+# parallel map
+rayon = { version = "1.10.0", optional = true }
+
+# Stuff we want SalsaValue impls for by default
+compact_str = { version = "0.10", optional = true }
+triomphe = { version = "0.1", optional = true }
+
+shuttle = { version = "0.9.1", optional = true }
+
+# Persistent caching
+erased-serde = { version = "0.4.6", optional = true }
+serde = { version = "1.0.219", features = ["derive"], optional = true }
+
+ordermap = { version = "1", optional = true }
+
+[features]
+default = ["salsa_unstable", "rayon", "macros", "inventory", "accumulator"]
+inventory = ["dep:inventory"]
+
+# Enables Salsa's `DEBUG` and `TRACE` tracing events and spans. Disabled by default.
+detailed-trace = []
+persistence = [
+    "dep:serde",
+    "dep:erased-serde",
+    "salsa-macros/persistence",
+    "thin-vec/serde",
+]
+shuttle = ["dep:shuttle"]
+accumulator = ["salsa-macro-rules/accumulator"]
+macros = ["dep:salsa-macros"]
+
+# FIXME: remove `salsa_unstable` before 1.0.
+salsa_unstable = []
+
+# This interlocks the `salsa-macros` and `salsa` versions together
+# preventing scenarios where they could diverge in a given project
+# which may ultimately result in odd issues due to the proc-macro
+# output mismatching with the declarative macro inputs
+[target.'cfg(any())'.dependencies]
+salsa-macros = { version = "=0.28.2", path = "components/salsa-macros" }
+
+[dev-dependencies]
+# examples
+crossbeam-channel = "=0.5.16"
+dashmap = { version = "=6.2.1", features = ["raw-api"] }
+eyre = "=0.6.12"
+notify-debouncer-mini = "=0.7.0"
+ordered-float = "=5.3.0"
+
+# tests/benches
+annotate-snippets = "=0.12.16"
+divan = { package = "codspeed-divan-compat", version = "=5.0.1" }
+expect-test = "=1.5.1"
+rustversion = "=1.0.23"
+test-log = { version = "=0.2.21", features = ["trace"] }
+trybuild = "=1.0.118"
+serde_json = "=1.0.151"
+
+[[bench]]
+name = "creation"
+path = "benches/creation.rs"
+harness = false
+
+[[bench]]
+name = "field_access"
+path = "benches/field_access.rs"
+harness = false
+
+[[bench]]
+name = "query_fetch"
+path = "benches/query_fetch.rs"
+harness = false
+
+[[bench]]
+name = "accumulator"
+harness = false
+required-features = ["accumulator"]
+
+[[bench]]
+name = "dataflow"
+harness = false
+
+[[bench]]
+name = "eviction"
+harness = false
+
+[[bench]]
+name = "eviction_walltime"
+harness = false
+required-features = ["rayon"]
+
+[[example]]
+name = "lazy-input"
+required-features = ["accumulator"]
+
+[[example]]
+name = "calc"
+required-features = ["accumulator"]
+
+[workspace]
+members = ["components/salsa-macro-rules", "components/salsa-macros"]
+
+[workspace.package]
+authors = ["Salsa developers"]
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/salsa-rs/salsa"
+rust-version = "1.85"

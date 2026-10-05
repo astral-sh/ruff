@@ -3,9 +3,12 @@ use crate::types::relation::TypeRelation;
 /// This module defines a tree structure for collecting contextual information about type relation errors
 /// (for example, why two types are not assignable or cannot overlap).
 use std::cell::{Cell, RefCell};
+use std::fmt;
+use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use ruff_python_ast::name::Name;
+use rustc_hash::{FxHashSet, FxHasher};
 use ty_python_core::definition::Definition;
 use ty_python_core::semantic_index;
 
@@ -39,7 +42,7 @@ impl ErrorRelation {
 }
 
 /// Identifies a parameter, either by name or by position.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ParameterDescription {
     Named(Name),
     /// 0-based index
@@ -245,6 +248,170 @@ pub(crate) enum ErrorContext<'db> {
     ProtocolMemberWriteTypeIncompatible {
         target: Type<'db>,
     },
+}
+
+impl Hash for ErrorContext<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Empty
+            | Self::MissingVariadicPositionalParameter
+            | Self::MissingVariadicKeywordParameter
+            | Self::ProtocolSpecialMethodNotDefinedOnMetaType
+            | Self::ProtocolMemberNotWritable => {}
+            Self::DisjointTypes { left, right }
+            | Self::InvariantTypeArgument { left, right }
+            | Self::DisjointReturnTypes { left, right } => (left, right).hash(state),
+            Self::DisjointUnion { union, other } => (union, other).hash(state),
+            Self::FinalClassDisjoint { final_type, other } => (final_type, other).hash(state),
+            Self::FinalTypeMissingProtocolMembers {
+                final_type,
+                protocol,
+            } => {
+                (final_type, protocol).hash(state);
+            }
+            Self::IncompatibleClassLayouts { left, right } => (left, right).hash(state),
+            Self::DisjointTupleElement {
+                left,
+                right,
+                index,
+                from_end,
+            } => {
+                (left, right, index, from_end).hash(state);
+            }
+            Self::DisjointTupleLengths { left, right } => {
+                hash_tuple_length(*left, state);
+                hash_tuple_length(*right, state);
+            }
+            Self::TypedDictFieldTypeConflict {
+                field_name,
+                left,
+                right,
+            } => {
+                (field_name, left, right).hash(state);
+            }
+            Self::TypedDictRequirednessConflict {
+                field_name,
+                required,
+                not_required,
+            } => {
+                (field_name, required, not_required).hash(state);
+            }
+            Self::NotAllUnionElementsAssignable {
+                element,
+                union,
+                target,
+            } => {
+                (element, union, target).hash(state);
+            }
+            Self::NotAssignableToAnyUnionElement { source, union } => (source, union).hash(state),
+            Self::NotAssignableToNOtherUnionElements { n } => n.hash(state),
+            Self::NotAssignableToIntersectionElement {
+                source,
+                element,
+                intersection,
+            } => {
+                (source, element, intersection).hash(state);
+            }
+            Self::NoIntersectionElementAssignableToTarget {
+                intersection,
+                target,
+            } => {
+                (intersection, target).hash(state);
+            }
+            Self::TypedDictFieldMissing { field_name, source } => (field_name, source).hash(state),
+            Self::TypedDictFieldNotRequiredInSource {
+                source,
+                target,
+                field_name,
+            }
+            | Self::TypedDictFieldNotRequiredAndMutableInTarget {
+                source,
+                target,
+                field_name,
+            }
+            | Self::TypedDictFieldReadOnlyInSource {
+                source,
+                target,
+                field_name,
+            } => {
+                (source, target, field_name).hash(state);
+            }
+            Self::TypedDictFieldIncompatible {
+                field_name,
+                source,
+                target,
+                source_field,
+                target_field,
+            } => (field_name, source, target, source_field, target_field).hash(state),
+            Self::TypedDictNotAssignableToDict(ty) => ty.hash(state),
+            Self::OpenTypedDictNotAssignableToMapping { source, target } => {
+                (source, target).hash(state);
+            }
+            Self::IncompatibleReturnTypes {
+                source,
+                target,
+                source_definition,
+                target_definition,
+            } => (source, target, source_definition, target_definition).hash(state),
+            Self::IncompatibleParameterTypes {
+                source,
+                target,
+                parameter,
+            } => {
+                (source, target, parameter).hash(state);
+            }
+            Self::InferredCallableType { source, callable } => (source, callable).hash(state),
+            Self::ExtraRequiredParameter { parameter }
+            | Self::MissingParameter { parameter }
+            | Self::RequiredParameterMustHaveDefault { parameter } => parameter.hash(state),
+            Self::TopCallableAssignedToNonTop { return_type } => return_type.hash(state),
+            Self::ParameterNameMismatch {
+                source_name,
+                target_name,
+            } => {
+                (source_name, target_name).hash(state);
+            }
+            Self::ParameterMustAcceptKeywordArguments {
+                source_name,
+                target_name,
+            } => {
+                (source_name, target_name).hash(state);
+            }
+            Self::ParameterMustAcceptPositionalArguments { name } => name.hash(state),
+            Self::TupleLengthMismatch {
+                source_len,
+                target_len,
+            } => {
+                source_len.hash(state);
+                hash_tuple_length(*target_len, state);
+            }
+            Self::TupleElementNotCompatible {
+                source,
+                target,
+                element_index,
+                element_count,
+            } => (source, target, element_index, element_count).hash(state),
+            Self::TypeNotCompatibleWithProtocol { ty, protocol } => (ty, protocol).hash(state),
+            Self::ProtocolMemberNotDefined { member_name, ty }
+            | Self::ProtocolMemberClassVarMismatch { member_name, ty } => {
+                (member_name, ty).hash(state);
+            }
+            Self::ProtocolMemberIncompatible { member_name } => member_name.hash(state),
+            Self::ProtocolMemberReadTypeIncompatible { source, target } => {
+                (source, target).hash(state);
+            }
+            Self::ProtocolMemberWriteTypeIncompatible { target } => target.hash(state),
+        }
+    }
+}
+
+fn hash_tuple_length<H: Hasher>(length: TupleLength, state: &mut H) {
+    std::mem::discriminant(&length).hash(state);
+    match length {
+        TupleLength::Fixed(length) => length.hash(state),
+        TupleLength::Variable(prefix, suffix) => (prefix, suffix).hash(state),
+    }
 }
 
 impl<'db> ErrorContext<'db> {
@@ -824,24 +991,100 @@ impl<'db> HelpMessages<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
 struct ErrorContextNode<'db> {
     context: ErrorContext<'db>,
-    children: Vec<ErrorContextNode<'db>>,
+    children: Box<[Rc<ErrorContextNode<'db>>]>,
     relation: ErrorRelation,
+    fingerprint: u64,
 }
 
 impl Default for ErrorContextNode<'_> {
     fn default() -> Self {
-        Self {
-            context: ErrorContext::Empty,
-            children: Vec::new(),
-            relation: TypeRelation::Assignability.into(),
+        Self::new(
+            ErrorContext::Empty,
+            TypeRelation::Assignability.into(),
+            Box::default(),
+        )
+    }
+}
+
+impl fmt::Debug for ErrorContextNode<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ErrorContextNode")
+            .field("context", &self.context)
+            .field("relation", &self.relation)
+            .field("children", &self.children.len())
+            .field("fingerprint", &self.fingerprint)
+            .finish()
+    }
+}
+
+impl PartialEq for ErrorContextNode<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pending = vec![(self, other)];
+        let mut seen = FxHashSet::default();
+        while let Some((left, right)) = pending.pop() {
+            if std::ptr::eq(left, right)
+                || !seen.insert((std::ptr::from_ref(left), std::ptr::from_ref(right)))
+            {
+                continue;
+            }
+            if left.fingerprint != right.fingerprint
+                || left.context != right.context
+                || left.relation != right.relation
+                || left.children.len() != right.children.len()
+            {
+                return false;
+            }
+            pending.extend(
+                left.children
+                    .iter()
+                    .zip(&right.children)
+                    .map(|(left, right)| (left.as_ref(), right.as_ref())),
+            );
+        }
+        true
+    }
+}
+
+impl Eq for ErrorContextNode<'_> {}
+
+impl Hash for ErrorContextNode<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.fingerprint.hash(state);
+    }
+}
+
+impl Drop for ErrorContextNode<'_> {
+    fn drop(&mut self) {
+        // A frozen result or a parent edge can be the last owner, so reclamation must be
+        // iterative at the node itself rather than only when dropping a mutable root.
+        let mut pending = std::mem::take(&mut self.children).into_vec();
+        while let Some(child) = pending.pop() {
+            if let Ok(mut child) = Rc::try_unwrap(child) {
+                pending.extend(std::mem::take(&mut child.children));
+            }
         }
     }
 }
 
 impl<'db> ErrorContextNode<'db> {
+    fn new(context: ErrorContext<'db>, relation: ErrorRelation, children: Box<[Rc<Self>]>) -> Self {
+        let mut hasher = FxHasher::default();
+        context.hash(&mut hasher);
+        relation.hash(&mut hasher);
+        children.len().hash(&mut hasher);
+        for child in &children {
+            child.fingerprint.hash(&mut hasher);
+        }
+        Self {
+            context,
+            children,
+            relation,
+            fingerprint: hasher.finish(),
+        }
+    }
+
     /// Returns `true` if this node has no renderable content.
     fn is_empty(&self) -> bool {
         matches!(self.context, ErrorContext::Empty) && self.children.is_empty()
@@ -856,6 +1099,34 @@ impl<'db> ErrorContextNode<'db> {
         prefix: &str,
         continuation: &str,
     ) {
+        self.render_node(db, env, output_lines, help_messages, prefix);
+        let mut continuation = continuation.to_owned();
+        let mut pending = vec![(self, 0, continuation.len())];
+        while let Some((node, next_child, restore_length)) = pending.last_mut() {
+            let node = *node;
+            let Some(child) = node.children.get(*next_child) else {
+                continuation.truncate(*restore_length);
+                pending.pop();
+                continue;
+            };
+            *next_child += 1;
+            let is_last = *next_child == node.children.len();
+            let prefix = format!("{continuation}{}", if is_last { "└── " } else { "├── " });
+            child.render_node(db, env, output_lines, help_messages, &prefix);
+            let restore_length = continuation.len();
+            continuation.push_str(if is_last { "    " } else { "│   " });
+            pending.push((child.as_ref(), 0, restore_length));
+        }
+    }
+
+    fn render_node(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        output_lines: &mut Vec<String>,
+        help_messages: &mut FxOrderSet<(ErrorRelation, HelpMessages<'db>)>,
+        prefix: &str,
+    ) {
         let mut node_help_messages = FxOrderSet::default();
         if let Some(line) = self
             .context
@@ -866,9 +1137,9 @@ impl<'db> ErrorContextNode<'db> {
 
         if let ErrorContext::TypeNotCompatibleWithProtocol { ty, protocol } = &self.context
             && let Type::ProtocolInstance(proto_instance) = protocol
-            && let [single_child] = self.children.as_slice()
+            && let [single_child] = self.children.as_ref()
             && let ErrorContext::ProtocolMemberIncompatible { member_name } = &single_child.context
-            && let [single_grandchild] = single_child.children.as_slice()
+            && let [single_grandchild] = single_child.children.as_ref()
             && let ErrorContext::ParameterNameMismatch { target_name, .. }
             | ErrorContext::ParameterMustAcceptKeywordArguments { target_name, .. } =
                 &single_grandchild.context
@@ -895,43 +1166,139 @@ impl<'db> ErrorContextNode<'db> {
                 .into_iter()
                 .map(|message| (self.relation, message)),
         );
-
-        let num_children = self.children.len();
-        for (index, child) in self.children.iter().enumerate() {
-            let is_last = index == num_children - 1;
-            let (child_prefix, child_continuation) = if is_last {
-                (format!("{continuation}└── "), format!("{continuation}    "))
-            } else {
-                (format!("{continuation}├── "), format!("{continuation}│   "))
-            };
-            child.render_tree(
-                db,
-                env,
-                output_lines,
-                help_messages,
-                &child_prefix,
-                &child_continuation,
-            );
-        }
     }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct ErrorContextTree<'db> {
-    root: Rc<RefCell<ErrorContextNode<'db>>>,
+    root: Rc<RefCell<ErrorContextRoot<'db>>>,
     enabled: Cell<bool>,
     relation: ErrorRelation,
 }
 
+#[derive(Debug, Default)]
+struct ErrorContextRoot<'db> {
+    node: Rc<ErrorContextNode<'db>>,
+    version: u64,
+}
+
+impl<'db> ErrorContextRoot<'db> {
+    fn replace(&mut self, node: Rc<ErrorContextNode<'db>>) -> Rc<ErrorContextNode<'db>> {
+        // A saturated version rejects all subsequent commits rather than admitting an ABA.
+        self.version = self.version.saturating_add(1);
+        std::mem::replace(&mut self.node, node)
+    }
+
+    fn take(&mut self) -> Rc<ErrorContextNode<'db>> {
+        self.replace(Rc::default())
+    }
+}
+
+/// Completed diagnostic evidence whose clones cannot mutate one another.
+#[cfg(test)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct FrozenErrorContextTree<'db> {
+    root: Rc<ErrorContextNode<'db>>,
+    enabled: bool,
+    relation: ErrorRelation,
+}
+
+#[cfg(test)]
+impl<'db> FrozenErrorContextTree<'db> {
+    /// Creates an independent mutable root sharing the completed immutable nodes.
+    pub(crate) fn instantiate(&self) -> ErrorContextTree<'db> {
+        ErrorContextTree {
+            root: Rc::new(RefCell::new(ErrorContextRoot {
+                node: Rc::clone(&self.root),
+                version: 0,
+            })),
+            enabled: Cell::new(self.enabled),
+            relation: self.relation,
+        }
+    }
+}
+
+/// A suspended caller's root identity and version, without a live `RefCell` borrow.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct ErrorContextLease<'db> {
+    root: Rc<RefCell<ErrorContextRoot<'db>>>,
+    version: u64,
+    enabled: bool,
+    relation: ErrorRelation,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ContextCommitConflict;
+
 impl PartialEq for ErrorContextTree<'_> {
     fn eq(&self, other: &Self) -> bool {
-        *self.root.borrow() == *other.root.borrow() && self.relation == other.relation
+        self.root.borrow().node == other.root.borrow().node && self.relation == other.relation
     }
 }
 
 impl Eq for ErrorContextTree<'_> {}
 
 impl<'db> ErrorContextTree<'db> {
+    /// Retains the completed immutable nodes independently of any mutable root aliases.
+    #[cfg(test)]
+    pub(crate) fn freeze(self) -> FrozenErrorContextTree<'db> {
+        self.snapshot()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot(&self) -> FrozenErrorContextTree<'db> {
+        FrozenErrorContextTree {
+            root: Rc::clone(&self.root.borrow().node),
+            enabled: self.enabled.get(),
+            relation: self.relation,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn snapshot_with_lease(
+        &self,
+    ) -> (FrozenErrorContextTree<'db>, ErrorContextLease<'db>) {
+        let root = self.root.borrow();
+        (
+            FrozenErrorContextTree {
+                root: Rc::clone(&root.node),
+                enabled: self.enabled.get(),
+                relation: self.relation,
+            },
+            ErrorContextLease {
+                root: Rc::clone(&self.root),
+                version: root.version,
+                enabled: self.enabled.get(),
+                relation: self.relation,
+            },
+        )
+    }
+
+    /// Publishes a completed private evaluation only to its unchanged original caller root.
+    #[cfg(test)]
+    pub(crate) fn commit(
+        &self,
+        completed: &FrozenErrorContextTree<'db>,
+        lease: &ErrorContextLease<'db>,
+    ) -> Result<(), ContextCommitConflict> {
+        if !Rc::ptr_eq(&self.root, &lease.root)
+            || self.enabled.get() != lease.enabled
+            || self.relation != lease.relation
+            || completed.enabled != lease.enabled
+            || completed.relation != lease.relation
+        {
+            return Err(ContextCommitConflict);
+        }
+        let mut root = self.root.borrow_mut();
+        if root.version != lease.version || root.version == u64::MAX {
+            return Err(ContextCommitConflict);
+        }
+        root.replace(Rc::clone(&completed.root));
+        Ok(())
+    }
+
     /// Create a new, empty error context tree with collection enabled.
     pub(crate) fn new(relation: impl Into<ErrorRelation>) -> Self {
         Self {
@@ -947,10 +1314,9 @@ impl<'db> ErrorContextTree<'db> {
     ) -> Self {
         let relation = relation.into();
         Self {
-            root: Rc::new(RefCell::new(ErrorContextNode {
-                context,
-                children: Vec::new(),
-                relation,
+            root: Rc::new(RefCell::new(ErrorContextRoot {
+                node: Rc::new(ErrorContextNode::new(context, relation, Box::default())),
+                version: 0,
             })),
             enabled: Cell::new(true),
             relation,
@@ -962,12 +1328,14 @@ impl<'db> ErrorContextTree<'db> {
     }
 
     pub(crate) fn set_enabled(&self, enabled: bool) {
+        let mut root = self.root.borrow_mut();
+        root.version = root.version.saturating_add(1);
         self.enabled.set(enabled);
     }
 
     /// Returns `true` if the tree has no renderable content.
     pub(crate) fn is_empty(&self) -> bool {
-        self.root.borrow().is_empty()
+        self.root.borrow().node.is_empty()
     }
 
     /// Push a new error context node, making the existing tree a child of the new context.
@@ -975,13 +1343,15 @@ impl<'db> ErrorContextTree<'db> {
         if !self.is_enabled() {
             return;
         }
-        let root = self.root.take();
+        let root = Rc::clone(&self.root.borrow().node);
         let children = if root.is_empty() { vec![] } else { vec![root] };
-        *self.root.borrow_mut() = ErrorContextNode {
-            context,
-            children,
-            relation: self.relation,
-        };
+        self.root
+            .borrow_mut()
+            .replace(Rc::new(ErrorContextNode::new(
+                context,
+                self.relation,
+                children.into_boxed_slice(),
+            )));
     }
 
     /// Overwrite the error context tree with a new root context and child nodes.
@@ -993,21 +1363,27 @@ impl<'db> ErrorContextTree<'db> {
         if !self.is_enabled() {
             return;
         }
-        *self.root.borrow_mut() = ErrorContextNode {
-            context,
-            relation: self.relation,
-            children: children
-                .into_iter()
-                .map(|child_context| child_context.root.take())
-                .filter(|child| !child.is_empty())
-                .collect(),
-        };
+        let children = children
+            .into_iter()
+            .map(|child_context| child_context.root.borrow_mut().take())
+            .filter(|child| !child.is_empty())
+            .collect();
+        self.root
+            .borrow_mut()
+            .replace(Rc::new(ErrorContextNode::new(
+                context,
+                self.relation,
+                children,
+            )));
     }
 
     /// Return the full tree, replacing it with an empty tree.
     pub(crate) fn take(&self) -> Self {
         ErrorContextTree {
-            root: Rc::new(RefCell::new(std::mem::take(&mut *self.root.borrow_mut()))),
+            root: Rc::new(RefCell::new(ErrorContextRoot {
+                node: self.root.borrow_mut().take(),
+                version: 0,
+            })),
             enabled: Cell::new(self.enabled.get()),
             relation: self.relation,
         }
@@ -1016,7 +1392,8 @@ impl<'db> ErrorContextTree<'db> {
     /// Replace this tree with another tree, preserving each node's relation.
     pub(crate) fn replace(&self, other: &Self) {
         if self.is_enabled() {
-            *self.root.borrow_mut() = other.root.take();
+            let node = other.root.borrow_mut().take();
+            self.root.borrow_mut().replace(node);
         }
     }
 
@@ -1031,6 +1408,7 @@ impl<'db> ErrorContextTree<'db> {
         let mut help_messages = FxOrderSet::default();
         self.root
             .borrow()
+            .node
             .render_tree(db, env, &mut output_lines, &mut help_messages, "", "");
         for line in output_lines {
             diag.info(line);
@@ -1040,3 +1418,6 @@ impl<'db> ErrorContextTree<'db> {
         }
     }
 }
+
+#[cfg(test)]
+mod frozen_probe;

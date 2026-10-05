@@ -1,0 +1,41 @@
+error: `returns` option not allowed here
+ --> tests/compile-fail/tracked_struct_incompatibles.rs:1:18
+  |
+1 | #[salsa::tracked(returns(ref))]
+  |                  ^^^^^^^
+
+error: `specify` option not allowed here
+ --> tests/compile-fail/tracked_struct_incompatibles.rs:6:18
+  |
+6 | #[salsa::tracked(specify)]
+  |                  ^^^^^^^
+
+error: `no_eq` option not allowed here
+  --> tests/compile-fail/tracked_struct_incompatibles.rs:11:18
+   |
+11 | #[salsa::tracked(no_eq)]
+   |                  ^^^^^
+
+error: `db` option not allowed here
+  --> tests/compile-fail/tracked_struct_incompatibles.rs:16:18
+   |
+16 | #[salsa::tracked(db = Db)]
+   |                  ^^
+
+error: unrecognized option `recover_fn`
+  --> tests/compile-fail/tracked_struct_incompatibles.rs:21:18
+   |
+21 | #[salsa::tracked(recover_fn = recover)]
+   |                  ^^^^^^^^^^
+
+error: `lru` option not allowed here
+  --> tests/compile-fail/tracked_struct_incompatibles.rs:26:18
+   |
+26 | #[salsa::tracked(lru = 12)]
+   |                  ^^^
+
+error: `revisions` option not allowed here
+  --> tests/compile-fail/tracked_struct_incompatibles.rs:31:18
+   |
+31 | #[salsa::tracked(revisions = 12)]
+   |                  ^^^^^^^^^

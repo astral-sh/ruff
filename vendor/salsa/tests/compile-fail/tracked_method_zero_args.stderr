@@ -1,0 +1,11 @@
+error: tracked functions must have at least a database argument
+  --> tests/compile-fail/tracked_method_zero_args.rs:19:8
+   |
+19 |     fn no_args() {}
+   |        ^^^^^^^
+
+error: tracked methods must have a database parameter after `self`
+  --> tests/compile-fail/tracked_method_zero_args.rs:19:5
+   |
+19 |     fn no_args() {}
+   |     ^^^^^^^^^^^^

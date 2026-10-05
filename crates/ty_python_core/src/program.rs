@@ -12,7 +12,7 @@ use crate::ProgramFile;
 // Re-export the misconfiguration strategy types from ty_module_resolver.
 pub use ty_module_resolver::{FallibleStrategy, MisconfigurationStrategy, UseDefaultStrategy};
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=field_requests, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program<'db> {
     #[returns(ref)]
     pub python_platform: PythonPlatform,

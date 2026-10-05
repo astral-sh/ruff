@@ -1,0 +1,61 @@
+error: multiple `#[salsa_value]` attributes on field
+ --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:3:5
+  |
+3 | /     #[salsa_value(unsafe(prove_safe_to_retain_manually))]
+4 | |     #[salsa_value(unsafe(prove_safe_to_retain_manually))]
+5 | |     field: String,
+  | |_________________^
+
+error: expected `unsafe`
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:10:19
+   |
+10 |     #[salsa_value(prove_safe_to_retain_manually)]
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `prove(...)` must be wrapped in `unsafe(...)`
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:16:19
+   |
+16 |     #[salsa_value(prove(T: salsa::SalsaValue))]
+   |                   ^^^^^
+
+error: unexpected end of input, `prove(...)` requires at least one predicate
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:22:32
+   |
+22 |     #[salsa_value(unsafe(prove()))]
+   |                                ^
+
+error: expected `:`
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:28:34
+   |
+28 |     #[salsa_value(unsafe(prove(T salsa::SalsaValue)))]
+   |                                  ^^^^^
+
+error: `#[salsa_value(...)]` cannot be used with `#[salsa::input]`
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:34:5
+   |
+34 | /     #[salsa_value(unsafe(prove_safe_to_retain_manually))]
+35 | |     field: String,
+   | |_________________^
+
+error: `#[salsa_value(...)]` cannot be used with `#[salsa::input]`
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:40:5
+   |
+40 | /     #[salsa_value(unsafe(prove(String: salsa::SalsaValue)))]
+41 | |     field: String,
+   | |_________________^
+
+error: cannot find attribute `salsa_value` in this scope
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:40:7
+   |
+40 |     #[salsa_value(unsafe(prove(String: salsa::SalsaValue)))]
+   |       ^^^^^^^^^^^
+   |
+   = note: `salsa_value` is an attribute that can be used by the derive macro `SalsaValue`, you might be missing a `derive` attribute
+
+error: cannot find attribute `salsa_value` in this scope
+  --> tests/compile-fail/salsa_value_invalid_field_attributes.rs:34:7
+   |
+34 |     #[salsa_value(unsafe(prove_safe_to_retain_manually))]
+   |       ^^^^^^^^^^^
+   |
+   = note: `salsa_value` is an attribute that can be used by the derive macro `SalsaValue`, you might be missing a `derive` attribute

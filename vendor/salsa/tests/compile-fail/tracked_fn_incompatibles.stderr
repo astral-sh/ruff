@@ -1,0 +1,103 @@
+error: `data` option not allowed here
+ --> tests/compile-fail/tracked_fn_incompatibles.rs:8:18
+  |
+8 | #[salsa::tracked(data = Data)]
+  |                  ^^^^
+
+error: `db` option not allowed here
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:13:18
+   |
+13 | #[salsa::tracked(db = Db)]
+   |                  ^^
+
+error: `revisions` option not allowed here
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:18:18
+   |
+18 | #[salsa::tracked(revisions = 12)]
+   |                  ^^^^^^^^^
+
+error: `constructor` option not allowed here
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:23:18
+   |
+23 | #[salsa::tracked(constructor = TrackedFn3)]
+   |                  ^^^^^^^^^^^
+
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:32:55
+   |
+32 | fn tracked_fn_with_receiver_not_applied_to_impl_block(&self, db: &dyn Db) -> u32 {}
+   |                                                       ^^^^^
+
+error: only functions with a single salsa struct as their input can be specified
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:34:18
+   |
+34 | #[salsa::tracked(specify)]
+   |                  ^^^^^^^
+
+error: must have a `'db` lifetime
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:49:9
+   |
+49 |     db: &dyn Db,
+   |         ^
+
+error: must have a `'db_lifetime` lifetime
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:57:9
+   |
+57 |     db: &dyn Db,
+   |         ^
+
+error: only a single lifetime parameter is accepted
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:72:39
+   |
+72 | fn tracked_fn_with_multiple_lts<'db1, 'db2>(db: &'db1 dyn Db, interned: MyInterned<'db2>) -> u32 {
+   |                                       ^^^^
+
+error: `self` parameter is only allowed in associated functions
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:32:55
+   |
+32 | fn tracked_fn_with_receiver_not_applied_to_impl_block(&self, db: &dyn Db) -> u32 {}
+   |                                                       ^^^^^ not semantically valid as function parameter
+   |
+   = note: associated functions are those in `impl` or `trait` definitions
+
+error[E0415]: identifier `input` is bound more than once in this parameter list
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:38:5
+   |
+38 |     input: MyInput,
+   |     ^^^^^ used as parameter more than once
+
+error[E0106]: missing lifetime specifier
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:66:15
+   |
+66 |     interned: MyInterned,
+   |               ^^^^^^^^^^ expected named lifetime parameter
+   |
+help: consider using the `'db` lifetime
+   |
+66 |     interned: MyInterned<'db>,
+   |                         +++++
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:29:46
+   |
+28 | #[salsa::tracked]
+   | ----------------- implicitly returns `()` as its body has no tail or `return` expression
+29 | fn tracked_fn_with_one_input(db: &dyn Db) -> u32 {}
+   |                                              ^^^ expected `u32`, found `()`
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:32:78
+   |
+32 | fn tracked_fn_with_receiver_not_applied_to_impl_block(&self, db: &dyn Db) -> u32 {}
+   |    --------------------------------------------------                        ^^^ expected `u32`, found `()`
+   |    |
+   |    implicitly returns `()` as its body has no tail or `return` expression
+
+error[E0308]: mismatched types
+  --> tests/compile-fail/tracked_fn_incompatibles.rs:39:6
+   |
+35 | fn tracked_fn_with_too_many_arguments_for_specify(
+   |    ---------------------------------------------- implicitly returns `()` as its body has no tail or `return` expression
+...
+39 | ) -> u32 {
+   |      ^^^ expected `u32`, found `()`

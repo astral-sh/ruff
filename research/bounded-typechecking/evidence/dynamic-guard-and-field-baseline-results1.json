@@ -1,0 +1,39 @@
+[
+  {
+    "label": "dynamic-guard-preparation-library1",
+    "status": {
+      "exit_code": 0,
+      "time": 1791224597.805753
+    },
+    "test_statuses": [
+      "PASS [   0.043s] (1/3) ty_python_semantic::experimental_analysis_entry cancelled_file_check_retries_through_the_library_entry",
+      "PASS [   0.049s] (2/3) ty_python_semantic::experimental_analysis_entry cold_file_check_completes_through_the_library_entry",
+      "PASS [   0.106s] (3/3) ty_python_semantic::experimental_analysis_entry refused_file_check_retries_in_the_same_revision"
+    ],
+    "summary": [
+      "Summary [   0.106s] 3 tests run: 3 passed, 22 skipped"
+    ],
+    "log_sha256": "57077dfa3682e512e3e22f2efc64779359b1e4580fdf48cf78a50a0b865bf027"
+  },
+  {
+    "label": "typed-field-dependency-baseline1",
+    "status": {
+      "exit_code": 0,
+      "time": 1791224893.714272
+    },
+    "test_statuses": [
+      "PASS [   0.024s] (1/8) salsa function::execute::execution_run::tests::field_reads::interned_requests_preserve_canonical_borrows_without_adding_edges",
+      "PASS [   0.027s] (2/8) salsa function::execute::execution_run::tests::explicit_reads::admitted_fields_select_input_tracked_and_interned_values",
+      "PASS [   0.031s] (3/8) salsa function::execute::execution_run::tests::field_reads::ordinary_requests_preserve_metadata_before_conversion_and_after_input_changes",
+      "PASS [   0.034s] (4/8) salsa function::execute::execution_run::tests::field_reads::generated_requests_preserve_values_and_canonical_field_edges",
+      "PASS [   0.038s] (5/8) salsa function::execute::execution_run::tests::field_reads::native_conversion_refusal_preserves_metadata_and_same_revision_retry",
+      "PASS [   0.048s] (6/8) salsa function::execute::execution_run::tests::explicit_reads::ordinary_fields_requests_and_views_reject_before_conversion",
+      "PASS [   0.056s] (7/8) salsa function::execute::execution_run::tests::field_reads::interned_conversion_refusal_and_cancellation_allow_same_revision_retry",
+      "PASS [   0.082s] (8/8) salsa function::execute::execution_run::tests::field_reads::queued_children_drain_before_field_read_owners_on_refusal_and_cancellation"
+    ],
+    "summary": [
+      "Summary [   0.083s] 8 tests run: 8 passed, 483 skipped"
+    ],
+    "log_sha256": "d1129a7829964572af18947e280dceb9ab6670407320a87751fdbfa3d5fb54bb"
+  }
+]

@@ -25,7 +25,23 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 
+pub(super) enum AliasResolutionStep<'db> {
+    Alias(TypeAliasType<'db>),
+    Recursive(super::recursive::RecursiveType<'db>),
+    UnboundRecursiveVariable,
+    Resolved(Type<'db>),
+}
+
 impl<'db> Type<'db> {
+    pub(super) fn alias_resolution_step(self) -> AliasResolutionStep<'db> {
+        match self {
+            Type::TypeAlias(alias) => AliasResolutionStep::Alias(alias),
+            Type::Recursive(recursive) => AliasResolutionStep::Recursive(recursive),
+            Type::RecursiveVar(_) => AliasResolutionStep::UnboundRecursiveVariable,
+            ty => AliasResolutionStep::Resolved(ty),
+        }
+    }
+
     /// Returns whether expanding aliases and unions can return to the same alias without entering
     /// another type. For example, `type A = int | A` is invalid, but
     /// `type A = int | list[A]` is a valid recursive alias.
@@ -163,7 +179,7 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
     }
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: Name,
@@ -205,7 +221,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
-    #[salsa::tracked(
+    #[salsa::tracked(attempt = ReturnOnly,
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: PEP695TypeAliasType<'db>| {
@@ -251,7 +267,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         }
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.rhs_scope(db);
         let program_file = scope.program_file(db);
@@ -275,7 +291,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 ///
 /// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
 /// to avoid cycle non-convergence for mutually recursive definitions.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: Name,
@@ -318,6 +334,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(copy),
         cycle_initial=|_, id, _| Type::divergent_alias(id),
         cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, value: Type<'db>, alias: ManualPEP695TypeAliasType<'db>| {
@@ -362,7 +379,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         )
     }
 
-    #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let definition = self.definition(db);
         let file = definition.program_file(db);
@@ -464,7 +481,7 @@ impl<'db> TypeAliasType<'db> {
     /// Summarize an alias's raw definition once, sharing the result across references.
     /// Specializations reuse this summary and check their exposed arguments separately.
     fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
-        #[salsa::tracked(
+        #[salsa::tracked(attempt = ReturnOnly,
             returns(ref),
             cycle_initial=|_, id, _, ()| AliasCycleSummary { cycle: Some(Type::divergent_alias(id)), ..AliasCycleSummary::default() },
             heap_size=ruff_memory_usage::heap_size
@@ -580,6 +597,7 @@ impl<'db> TypeAliasType<'db> {
     /// before it has finished materializing. Returning the already-marked alias closes that cycle
     /// without losing its materialization polarity.
     #[salsa::tracked(
+        attempt = ReturnOnly,
         returns(copy),
         cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
         heap_size=ruff_memory_usage::heap_size
@@ -680,9 +698,18 @@ impl<'db> TypeAliasType<'db> {
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.specialization_with_fields(salsa::FieldReads::new(db))
+    }
+
+    pub(in crate::types) fn specialization_with_fields(
+        self,
+        fields: salsa::FieldReads<'db>,
+    ) -> Option<Specialization<'db>> {
         match self {
-            TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.specialization(db),
+            TypeAliasType::PEP695(type_alias) => *type_alias.read_fields(fields).specialization(),
+            TypeAliasType::ManualPEP695(type_alias) => {
+                *type_alias.read_fields(fields).specialization()
+            }
         }
     }
 

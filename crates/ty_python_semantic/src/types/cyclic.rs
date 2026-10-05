@@ -20,9 +20,10 @@
 //! avoid this is to prefer always calling `visitor.visit` only in the main recursive method on
 //! `Type`.
 
-use std::cell::{Cell, OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, Ref, RefCell};
 use std::cmp::Eq;
 use std::collections::hash_map::Entry;
+use std::convert::Infallible;
 use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -33,6 +34,13 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::place::Place;
+#[cfg(any(test, feature = "experimental-analysis"))]
+use crate::types::DynamicType;
+#[cfg(test)]
+use crate::types::constraints::ConstraintSet;
+#[cfg(any(test, feature = "experimental-analysis"))]
+use crate::types::constraints::control::hash_slots;
+use crate::types::constraints::control::{GrowthPlan, TddError, map_growth, sequence_growth};
 use crate::types::constructor::ConstructorMembers;
 use crate::types::function::{FunctionLiteral, FunctionType};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
@@ -40,6 +48,8 @@ use crate::types::instance::walk_protocol_instance_type;
 use crate::types::known_instance::MethodWrapperKind;
 use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_instance_interface};
 use crate::types::relation::RelationObservation;
+#[cfg(test)]
+use crate::types::relation::{TypeRelation, TypeVarEvaluation};
 use crate::types::signatures::{Signature, walk_signature};
 use crate::types::typevar::{TypeVarInstance, TypeVarSet};
 use crate::types::visitor::{
@@ -53,6 +63,15 @@ use crate::types::{
     TypeVarBoundOrConstraints, TypedDictType,
 };
 use crate::{Db, Program, ProgramEnvironment};
+
+pub(in crate::types) mod entry;
+pub(in crate::types) mod guard_storage;
+pub(in crate::types) mod identity;
+
+use guard_storage::{ActiveSet, CallableActiveSet, CallableGuardEntry, CallableGuardStorage};
+
+#[cfg(test)]
+mod transformation_tests;
 
 /// The type identity used for recursive checks/transformations.
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -77,62 +96,16 @@ impl<'db> Type<'db> {
     /// A `true` result is only a candidate match and must be confirmed with
     /// [`Type::to_type_identity`].
     pub(crate) fn may_share_type_identity(self, db: &'db dyn Db, other: Self) -> bool {
-        if self == other {
-            return true;
-        }
-        match (self, other) {
-            (Type::FunctionLiteral(a), Type::FunctionLiteral(b)) => a.literal(db) == b.literal(db),
-            (Type::NewTypeInstance(a), Type::NewTypeInstance(b)) => {
-                a.definition(db) == b.definition(db)
-            }
-            (Type::ProtocolInstance(a), Type::ProtocolInstance(b)) => {
-                a.definition(db) == b.definition(db)
-            }
-            (Type::TypeAlias(a), Type::TypeAlias(b)) => a.definition(db) == b.definition(db),
-            (Type::TypedDict(a), Type::TypedDict(b)) => a.definition(db) == b.definition(db),
-            (Type::Recursive(a), Type::Recursive(b)) => a.definition(db) == b.definition(db),
-            _ => false,
-        }
+        identity::TypeIdentityCandidate::new(self, other).resolve(db)
     }
 
     #[allow(clippy::inline_always)]
     #[inline(always)]
     fn recursive_identity(self, db: &'db dyn Db) -> Option<TypeIdentity<'db>> {
-        match self {
-            // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
-            // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
-            Type::FunctionLiteral(function) => {
-                Some(TypeIdentity::FunctionLiteral(function.literal(db)))
-            }
-            // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
-            Type::NewTypeInstance(newtype) => {
-                Some(TypeIdentity::NewTypeInstance(newtype.definition(db)))
-            }
-            // Recursive aliases, protocols, and TypedDicts whose specialization can keep changing
-            // (e.g. `type Growing[T] = T | Growing[list[T]]`) are collapsed to their definition so
-            // that visits stop even though no exact type repeats. Recursion that revisits one
-            // exact specialization (e.g. `type RecursiveT = int | tuple[RecursiveT, ...]`) needs
-            // no definition-level identity: the detectors stop on the repeated type itself.
-            Type::TypeAlias(_)
-            | Type::ProtocolInstance(_)
-            | Type::TypedDict(_)
-            | Type::Recursive(_) => {
-                let target = RecursiveDefinition::from_type(db, self)?.target;
-                if !target.may_have_unbounded_specialization(db) {
-                    return None;
-                }
-                let definition = target.definition(db);
-                Some(match target {
-                    RecursiveDefinition::TypeAlias(_) => TypeIdentity::GrowingTypeAlias(definition),
-                    RecursiveDefinition::Protocol(_) => TypeIdentity::GrowingProtocol(definition),
-                    RecursiveDefinition::TypedDict(_) => TypeIdentity::GrowingTypedDict(definition),
-                    RecursiveDefinition::Structural(_) => {
-                        TypeIdentity::GrowingRecursive(definition)
-                    }
-                    RecursiveDefinition::Callable(_, _) => return None,
-                })
-            }
-            _ => None,
+        match entry::recursive_identity_sync(self, &entry::OrdinaryRecursiveIdentityEffects { db })
+        {
+            Ok(identity) => identity,
+            Err(never) => match never {},
         }
     }
 }
@@ -149,7 +122,7 @@ impl<'db> RecursiveType<'db> {
 
 /// A definition whose formal parameters can flow through recursive type references.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum RecursiveDefinition<'db> {
+pub(in crate::types) enum RecursiveDefinition<'db> {
     TypeAlias(TypeAliasType<'db>),
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
@@ -171,7 +144,7 @@ pub(super) enum CallableExpansion {
 /// Constructor expansion and `__call__` expansion have different dependencies, even on the same class.
 /// Exact class objects and subclass types can also select different descriptor overloads.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-enum CallableDefinition<'db> {
+pub(in crate::types) enum CallableDefinition<'db> {
     Constructor(StaticClassLiteral<'db>),
     SubclassConstructor(StaticClassLiteral<'db>),
     Instance(StaticClassLiteral<'db>),
@@ -184,30 +157,15 @@ impl<'db> CallableDefinition<'db> {
         ty: Type<'db>,
         mode: CallableExpansion,
     ) -> Option<DefinitionUse<'db>> {
-        let (class, is_constructor) = match ty {
-            Type::ClassLiteral(class) => (class.identity_specialization(db), true),
-            Type::GenericAlias(alias) => (super::ClassType::Generic(alias), true),
-            Type::SubclassOf(subclass) => match subclass.subclass_of() {
-                SubclassOfInner::Class(class) => (class, true),
-                SubclassOfInner::Protocol(protocol) => (*protocol.class_origin(db)?, true),
-                _ => return None,
-            },
-            Type::NominalInstance(instance) => (instance.class(db, env), false),
-            Type::ProtocolInstance(protocol) => (*protocol.class_origin(db)?, false),
-            _ => return None,
-        };
-        let (origin, specialization) = class.static_class_literal(db)?;
-        let definition = if matches!(ty, Type::SubclassOf(_)) {
-            Self::SubclassConstructor(origin)
-        } else if is_constructor {
-            Self::Constructor(origin)
-        } else {
-            Self::Instance(origin)
-        };
-        Some(DefinitionUse {
-            target: RecursiveDefinition::Callable(definition, mode),
-            specialization,
-        })
+        match entry::callable_definition_sync(
+            ty,
+            mode,
+            entry::CallableEntryFacts,
+            &entry::OrdinaryCallableDefinitionEffects { db, env },
+        ) {
+            Ok(reference) => reference,
+            Err(never) => match never {},
+        }
     }
 
     fn origin(self) -> StaticClassLiteral<'db> {
@@ -266,7 +224,7 @@ struct FlowEdge<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-struct DefinitionUse<'db> {
+pub(in crate::types) struct DefinitionUse<'db> {
     target: RecursiveDefinition<'db>,
     specialization: Option<Specialization<'db>>,
 }
@@ -453,7 +411,7 @@ impl<'db> RecursiveDefinition<'db> {
         db: &'db dyn Db,
         mode: SpecializationFlowMode,
     ) -> bool {
-        #[salsa::tracked(
+        #[salsa::tracked(attempt = ReturnOnly,
             returns(copy),
             cycle_initial=|_, _, _, _| true,
             heap_size=ruff_memory_usage::heap_size,
@@ -472,6 +430,10 @@ impl<'db> RecursiveDefinition<'db> {
 }
 
 impl<'db> DefinitionUse<'db> {
+    pub(in crate::types) fn target(self) -> RecursiveDefinition<'db> {
+        self.target
+    }
+
     /// Compare corresponding arguments, retaining their structure and positions. Every argument
     /// must embed its previous value, and at least one must have acquired additional structure.
     fn structurally_expands(
@@ -1168,9 +1130,25 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
+/// Whether distinct cycle-detector keys can have the same cycle identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CycleIdentityMode {
+    /// Distinct keys can share an identity, requiring a second scan after exact equality misses.
+    Abstract,
+    /// Cycle identities compare equal if and only if the complete keys compare equal.
+    Exact,
+}
+
 /// An item that provides the identity used to detect active recursive cycles.
 pub trait HasIdentity<'db> {
     type Id: PartialEq;
+
+    /// Describes whether an exact-key scan also establishes the absence of an identity cycle.
+    ///
+    /// `Exact` promises that `to_identity` results compare equal if and only if the complete
+    /// keys compare equal. The detector can then skip `may_share_identity` and `to_identity`
+    /// after an exact-key miss, so neither call may be needed for a semantic read or effect.
+    const CYCLE_IDENTITY_MODE: CycleIdentityMode = CycleIdentityMode::Abstract;
 
     /// Returns `false` if `self` and `other` cannot have the same identity.
     ///
@@ -1231,6 +1209,133 @@ where
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+#[cfg_attr(
+    not(any(test, feature = "experimental-analysis")),
+    expect(
+        dead_code,
+        reason = "the admitted work consumer requires experimental analysis"
+    )
+)]
+pub(super) enum RelationGuardWork {
+    CacheAccess {
+        capacity: Option<usize>,
+        probes: usize,
+    },
+    ExactScan {
+        len: usize,
+    },
+    CandidateScan {
+        len: usize,
+    },
+    Candidate,
+    Identity,
+    ActivePush,
+    Relocate {
+        plan: GrowthPlan,
+    },
+    Resource {
+        requested_bytes: usize,
+    },
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    Finish,
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    KeyCheck,
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    CacheKeyScan {
+        capacity: Option<usize>,
+    },
+}
+
+/// Inline caches compare at most two keys; spilled caches use the hash-table scan bound.
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) fn cycle_cache_scan_slots<E>(capacity: Option<usize>) -> Result<usize, TddError<E>> {
+    capacity.map_or(Ok(2), hash_slots)
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct CycleCacheLayout {
+    variant: u8,
+    len: usize,
+    capacity: usize,
+}
+
+impl CycleCacheLayout {
+    fn hash_capacity(self) -> Option<usize> {
+        (self.variant == 3).then_some(self.capacity)
+    }
+
+    fn needs_growth(self) -> bool {
+        self.variant == 2 || (self.variant == 3 && self.len == self.capacity)
+    }
+}
+
+fn progress_cache_growth<K, V, E>(
+    layout: CycleCacheLayout,
+) -> Result<Option<GrowthPlan>, TddError<E>> {
+    match layout.variant {
+        2 => map_growth::<K, V, E>(2, 0, 3).map(Some),
+        3 if layout.len == layout.capacity => {
+            let required = layout
+                .len
+                .checked_add(1)
+                .ok_or(TddError::CapacityExhausted)?;
+            map_growth::<K, V, E>(layout.len, layout.capacity, required).map(Some)
+        }
+        _ => Ok(None),
+    }
+}
+
+#[derive(Eq, PartialEq)]
+struct CycleSnapshot<T> {
+    depth: usize,
+    active_capacity: usize,
+    top: Option<T>,
+    cache: CycleCacheLayout,
+}
+
+// Admitted adapters below promise bounded key operations. Ordinary generic users retain their
+// existing Hash, Eq, Clone, and identity implementations.
+trait CycleVisitControl<'db, T: HasIdentity<'db>> {
+    type Error;
+    const ADMITTED: bool;
+
+    fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error>;
+    fn unchanged(&self, same: bool) -> Result<(), Self::Error>;
+    fn candidate(&mut self, db: &'db dyn Db, item: &T, active: &T) -> Result<bool, Self::Error>;
+    fn identity(&mut self, db: &'db dyn Db, item: &T) -> Result<T::Id, Self::Error>;
+    fn active_growth(&self, len: usize, capacity: usize)
+    -> Result<Option<GrowthPlan>, Self::Error>;
+}
+
+struct UnrestrictedCycleVisit;
+
+impl<'db, T: HasIdentity<'db>> CycleVisitControl<'db, T> for UnrestrictedCycleVisit {
+    type Error = Infallible;
+    const ADMITTED: bool = false;
+
+    #[inline]
+    fn admit(&mut self, _: RelationGuardWork) -> Result<(), Infallible> {
+        Ok(())
+    }
+    #[inline]
+    fn unchanged(&self, _: bool) -> Result<(), Infallible> {
+        Ok(())
+    }
+    #[inline]
+    fn candidate(&mut self, db: &'db dyn Db, item: &T, active: &T) -> Result<bool, Infallible> {
+        Ok(item.may_share_identity(db, active))
+    }
+    #[inline]
+    fn identity(&mut self, db: &'db dyn Db, item: &T) -> Result<T::Id, Infallible> {
+        Ok(item.to_identity(db))
+    }
+    #[inline]
+    fn active_growth(&self, _: usize, _: usize) -> Result<Option<GrowthPlan>, Infallible> {
+        Ok(None)
+    }
+}
+
 /// `CycleDetector` is temporary, so callers should choose the capacity that keeps observed cycle
 /// paths inline even when that makes `seen` slightly larger than an `FxIndexSet<T>`.
 #[derive(Debug)]
@@ -1247,6 +1352,16 @@ pub struct CycleDetector<'db, Tag, T: HasIdentity<'db>, R, const INLINE_CAPACITY
     _tag: PhantomData<fn() -> &'db Tag>,
 }
 
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CycleDetectorStorageProbe {
+    pub(crate) active_len: usize,
+    pub(crate) active_capacity: usize,
+    pub(crate) active_entry_bytes: usize,
+    pub(crate) cache_len: usize,
+    pub(crate) cache_capacity: Option<usize>,
+}
+
 impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
 where
     T: HasIdentity<'db>,
@@ -1257,6 +1372,63 @@ where
             cache: RefCell::new(CycleDetectorCache::new()),
             fallback,
             _tag: PhantomData,
+        }
+    }
+
+    /// Returns the active-entry layout used by admitted stack relocation.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) const fn admitted_active_entry_bytes() -> usize {
+        size_of::<ActiveCycleDetectorVisit<'db, T>>()
+    }
+
+    /// Returns the complete `mem::replace` argument width for moving this detector's cache.
+    /// The mutable reference and owned cache are transferred together during insertion.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) const fn cache_replacement_width() -> usize {
+        size_of::<(&mut CycleDetectorCache<T, R>, CycleDetectorCache<T, R>)>()
+    }
+
+    /// Bounds one copied scan entry's construction and iterator/Option transfers.
+    /// A scan admits this amount for every entry before constructing its iterator.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) const fn admitted_scan_transfer_bytes() -> usize {
+        size_of::<CopiedScanEntry<'_, 'db, T, INLINE_CAPACITY>>() * 4
+            + size_of::<Option<CopiedScanEntry<'_, 'db, T, INLINE_CAPACITY>>>() * 2
+    }
+
+    /// Bounds the private fixed representations copied during one admitted guard step.
+    /// Four snapshots cover saved/current values and comparison operands; two scan views,
+    /// copied entries, and active entries cover construction, forwarding, and removal.
+    /// The caller separately quotes key operations, callback results, and heap backing.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(super) const fn admitted_transient_bytes() -> usize {
+        size_of::<Option<CycleSnapshot<T>>>() * 4
+            + size_of::<AdmittedScan<'_, 'db, T, INLINE_CAPACITY>>() * 2
+            + size_of::<CopiedScanEntry<'_, 'db, T, INLINE_CAPACITY>>() * 2
+            + size_of::<ActiveCycleDetectorVisit<'db, T>>() * 2
+    }
+
+    #[cfg(test)]
+    pub(crate) fn ownership_probe_counts(&self) -> (usize, usize) {
+        let cached = match &*self.cache.borrow() {
+            CycleDetectorCache::Empty => 0,
+            CycleDetectorCache::One(_) => 1,
+            CycleDetectorCache::Two(_) => 2,
+            CycleDetectorCache::Spilled(entries) => entries.len(),
+        };
+        (self.seen.borrow().len(), cached)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn ownership_probe_storage(&self) -> CycleDetectorStorageProbe {
+        let active = self.seen.borrow();
+        let cache = self.cache.borrow().layout();
+        CycleDetectorStorageProbe {
+            active_len: active.len(),
+            active_capacity: active.capacity(),
+            active_entry_bytes: size_of::<ActiveCycleDetectorVisit<'db, T>>(),
+            cache_len: cache.len,
+            cache_capacity: cache.hash_capacity(),
         }
     }
 }
@@ -1308,15 +1480,100 @@ where
         item: T,
         reuse_cached: impl FnOnce(&R) -> bool,
     ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>> {
-        let cached_result = self.cache.borrow().get(&item).cloned();
-        let was_cached = cached_result.is_some();
-        if let Some(result) = cached_result
-            && reuse_cached(&result)
-        {
-            return CycleDetectorVisit::Ready(result);
+        match self.lookup_visit(db, item) {
+            CycleDetectorLookup::Cached(cached) => {
+                if reuse_cached(cached.result()) {
+                    CycleDetectorVisit::Ready(cached.into_result())
+                } else {
+                    cached.recompute(db)
+                }
+            }
+            CycleDetectorLookup::Visit(visit) => visit,
         }
+    }
 
-        self.begin_active_visit(db, item, !was_cached)
+    /// Looks up a visit without evaluating the caller's cache-acceptance condition.
+    ///
+    /// A cached entry holds no active visit or storage borrow. Its acceptance condition can
+    /// therefore suspend for semantic work before deciding whether to recompute the entry.
+    #[inline]
+    pub(super) fn lookup_visit(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+    ) -> CycleDetectorLookup<'_, 'db, Tag, T, R, INLINE_CAPACITY> {
+        self.lookup_visit_controlled(db, item, &mut UnrestrictedCycleVisit)
+            .unwrap_or_else(|never| match never {})
+    }
+
+    fn snapshot<C: CycleVisitControl<'db, T>>(&self) -> Option<CycleSnapshot<T>> {
+        C::ADMITTED.then(|| self.snapshot_values())
+    }
+
+    fn snapshot_values(&self) -> CycleSnapshot<T> {
+        // Canonical scopes are LIFO: a callback cannot replace an enclosing active prefix.
+        // Cache entries and capacities can still change during nested completed visits.
+        let seen = self.seen.borrow();
+        CycleSnapshot {
+            depth: seen.len(),
+            active_capacity: seen.capacity(),
+            top: seen.last().map(|active| active.item.clone()),
+            cache: self.cache.borrow().layout(),
+        }
+    }
+
+    fn validate_snapshot<C: CycleVisitControl<'db, T>>(
+        &self,
+        snapshot: &Option<CycleSnapshot<T>>,
+        control: &C,
+    ) -> Result<(), C::Error> {
+        if C::ADMITTED {
+            control.unchanged(*snapshot == self.snapshot::<C>())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn admit_visit<C: CycleVisitControl<'db, T>>(
+        &self,
+        snapshot: &Option<CycleSnapshot<T>>,
+        control: &mut C,
+        work: RelationGuardWork,
+    ) -> Result<(), C::Error> {
+        control.admit(work)?;
+        self.validate_snapshot(snapshot, control)
+    }
+
+    fn lookup_visit_controlled<C: CycleVisitControl<'db, T>>(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        control: &mut C,
+    ) -> Result<CycleDetectorLookup<'_, 'db, Tag, T, R, INLINE_CAPACITY>, C::Error> {
+        if C::ADMITTED {
+            let snapshot = self.snapshot::<C>();
+            let capacity = self.cache.borrow().layout().hash_capacity();
+            self.admit_visit(
+                &snapshot,
+                control,
+                RelationGuardWork::CacheAccess {
+                    capacity,
+                    probes: 1,
+                },
+            )?;
+        }
+        let cached_result = self.cache.borrow().get(&item).cloned();
+        if let Some(result) = cached_result {
+            Ok(CycleDetectorLookup::Cached(CycleDetectorCachedVisit {
+                detector: self,
+                item,
+                result,
+            }))
+        } else {
+            Ok(CycleDetectorLookup::Visit(
+                self.begin_active_visit_controlled(db, item, true, control)?,
+            ))
+        }
     }
 
     fn begin_visit(
@@ -1333,39 +1590,430 @@ where
         item: T,
         cache_result: bool,
     ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>> {
-        let seen = self.seen.borrow();
-        if seen.iter().any(|active| active.item == item) {
-            return CycleDetectorVisit::Ready(self.fallback.clone());
-        }
+        self.begin_active_visit_controlled(db, item, cache_result, &mut UnrestrictedCycleVisit)
+            .unwrap_or_else(|never| match never {})
+    }
 
-        let mut candidates = seen
-            .iter()
-            .filter(|active| item.may_share_identity(db, &active.item))
-            .peekable();
-        let identity = if candidates.peek().is_none() {
-            OnceCell::new()
+    #[inline]
+    fn begin_active_visit_controlled<C: CycleVisitControl<'db, T>>(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        cache_result: bool,
+        control: &mut C,
+    ) -> Result<
+        CycleDetectorVisit<T, R, CycleDetectorScope<'_, 'db, Tag, T, R, INLINE_CAPACITY>>,
+        C::Error,
+    > {
+        let snapshot = self.snapshot::<C>();
+        if C::ADMITTED {
+            let len = self.seen.borrow().len();
+            let view = AdmittedScan {
+                seen: &self.seen,
+                len,
+            };
+            self.begin_active_visit_in_view(db, item, cache_result, control, snapshot, view)
         } else {
-            // Deriving an identity can require a structural definition walk. Defer it until a
-            // cheap candidate match shows that another active item could form a cycle.
-            let identity = item.to_identity(db);
-            if candidates.any(|active| {
-                active.identity.get_or_init(|| active.item.to_identity(db)) == &identity
-            }) {
-                return CycleDetectorVisit::Cycle(item);
-            }
-            OnceCell::from(identity)
-        };
-        drop(seen);
+            self.begin_active_visit_in_view(
+                db,
+                item,
+                cache_result,
+                control,
+                snapshot,
+                Ref::map(self.seen.borrow(), |seen| seen.as_slice()),
+            )
+        }
+    }
 
+    /// Checks the active stack for recursion and starts a pending visit when neither cycle matches.
+    ///
+    /// The caller has selected active evaluation after a cache miss or for recomputation.
+    /// An exact active-key match returns the fallback; distinct keys sharing an abstract identity
+    /// report a cycle.
+    fn begin_active_visit_in_view<'detector, C, V>(
+        &'detector self,
+        db: &'db dyn Db,
+        item: T,
+        cache_result: bool,
+        control: &mut C,
+        snapshot: Option<CycleSnapshot<T>>,
+        view: V,
+    ) -> Result<
+        CycleDetectorVisit<T, R, CycleDetectorScope<'detector, 'db, Tag, T, R, INLINE_CAPACITY>>,
+        C::Error,
+    >
+    where
+        C: CycleVisitControl<'db, T>,
+        V: ActiveScanView<'db, T>,
+    {
+        let len = view.len();
+        self.admit_visit(&snapshot, control, RelationGuardWork::ExactScan { len })?;
+        if view.with_entries(|entries| entries.iter().any(|active| active.item == item)) {
+            return Ok(CycleDetectorVisit::Ready(self.fallback.clone()));
+        }
+        let mut identity = None;
+        match T::CYCLE_IDENTITY_MODE {
+            CycleIdentityMode::Exact => {}
+            CycleIdentityMode::Abstract => {
+                self.admit_visit(&snapshot, control, RelationGuardWork::CandidateScan { len })?;
+                for active in view.iter() {
+                    self.admit_visit(&snapshot, control, RelationGuardWork::Candidate)?;
+                    let candidate = control.candidate(db, &item, active.item())?;
+                    self.validate_snapshot(&snapshot, control)?;
+                    if !candidate {
+                        continue;
+                    }
+                    let incoming = if let Some(ref identity) = identity {
+                        identity
+                    } else {
+                        self.admit_visit(&snapshot, control, RelationGuardWork::Identity)?;
+                        let incoming = control.identity(db, &item)?;
+                        self.validate_snapshot(&snapshot, control)?;
+                        identity.insert(incoming)
+                    };
+                    if !active.has_identity() {
+                        self.admit_visit(&snapshot, control, RelationGuardWork::Identity)?;
+                        let active_identity = control.identity(db, active.item())?;
+                        self.validate_snapshot(&snapshot, control)?;
+                        active.initialize_identity(active_identity);
+                    }
+                    if active.identity_matches(incoming) {
+                        return Ok(CycleDetectorVisit::Cycle(item));
+                    }
+                }
+            }
+        }
+        drop(view);
+        self.admit_visit(&snapshot, control, RelationGuardWork::ActivePush)?;
+        let growth = if C::ADMITTED {
+            let capacity = self.seen.borrow().capacity();
+            control.active_growth(len, capacity)?
+        } else {
+            None
+        };
+        if let Some(plan) = growth {
+            self.admit_visit(&snapshot, control, RelationGuardWork::Relocate { plan })?;
+            self.admit_visit(
+                &snapshot,
+                control,
+                RelationGuardWork::Resource {
+                    requested_bytes: plan.requested_payload_bytes,
+                },
+            )?;
+            self.seen
+                .borrow_mut()
+                .reserve_exact(plan.requested_capacity - len);
+        }
         self.seen.borrow_mut().push(ActiveCycleDetectorVisit {
             item: item.clone(),
-            identity,
+            identity: identity.map_or_else(OnceCell::new, OnceCell::from),
         });
-        CycleDetectorVisit::Pending(CycleDetectorScope {
+        Ok(CycleDetectorVisit::Pending(CycleDetectorScope {
             detector: self,
             item: Some(item),
             cache_result,
-        })
+        }))
+    }
+}
+
+pub(super) enum CycleDetectorLookup<
+    'a,
+    'db,
+    Tag,
+    T: Eq + HasIdentity<'db>,
+    R,
+    const INLINE_CAPACITY: usize,
+> {
+    Cached(CycleDetectorCachedVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>),
+    Visit(CycleDetectorVisit<T, R, CycleDetectorScope<'a, 'db, Tag, T, R, INLINE_CAPACITY>>),
+}
+
+pub(super) struct CycleDetectorCachedVisit<
+    'a,
+    'db,
+    Tag,
+    T: HasIdentity<'db>,
+    R,
+    const INLINE_CAPACITY: usize,
+> {
+    detector: &'a CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>,
+    item: T,
+    result: R,
+}
+
+impl<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
+    CycleDetectorCachedVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Hash + Eq + Clone + HasIdentity<'db>,
+    R: Clone,
+{
+    pub(super) fn result(&self) -> &R {
+        &self.result
+    }
+
+    pub(super) fn into_result(self) -> R {
+        self.result
+    }
+
+    /// Recomputes a rejected cached value without replacing its completed cache entry.
+    pub(super) fn recompute(
+        self,
+        db: &'db dyn Db,
+    ) -> CycleDetectorVisit<T, R, CycleDetectorScope<'a, 'db, Tag, T, R, INLINE_CAPACITY>> {
+        self.detector.begin_active_visit(db, self.item, false)
+    }
+}
+
+#[cfg(test)]
+pub(super) type RelationKey<'db> = (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation);
+
+#[cfg(test)]
+pub(super) type RelationIdentity<'db> = <RelationKey<'db> as HasIdentity<'db>>::Id;
+
+#[cfg(test)]
+pub(super) trait RelationGuardControl<'db> {
+    type Error;
+    fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error>;
+    fn candidate(
+        &mut self,
+        db: &'db dyn Db,
+        item: RelationKey<'db>,
+        active: RelationKey<'db>,
+    ) -> Result<bool, Self::Error>;
+    fn identity(
+        &mut self,
+        db: &'db dyn Db,
+        item: RelationKey<'db>,
+    ) -> Result<RelationIdentity<'db>, Self::Error>;
+}
+
+/// Controls visits whose key and result operations have bounded cost.
+///
+/// `key_has_fixed_cost` must establish that copying, cloning, hashing, and comparing the key are
+/// bounded. Results must also have bounded cloning and identity comparisons. The caller must
+/// ensure every active or cached key satisfies this check. Identity discovery remains a
+/// separate controlled operation because it can require semantic work.
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) trait CycleGuardControl<'db, T: HasIdentity<'db>> {
+    type Error;
+    fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error>;
+    fn key_has_fixed_cost(key: &T) -> bool;
+    fn candidate(&mut self, db: &'db dyn Db, item: &T, active: &T) -> Result<bool, Self::Error>;
+    fn identity(&mut self, db: &'db dyn Db, item: &T) -> Result<T::Id, Self::Error>;
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum RelationGuardError<E> {
+    Refused(E),
+    CapacityExhausted,
+    Changed,
+    UnsupportedKey,
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) fn cycle_type_has_fixed_cost(ty: Type<'_>) -> bool {
+    // Debug Todo labels hash their text, including through the inline subclass wrapper.
+    // Other type payloads contain only fixed fields or interned handles on this route.
+    !matches!(ty, Type::Dynamic(DynamicType::Todo(_)))
+        && !matches!(ty, Type::SubclassOf(subclass) if matches!(subclass.subclass_of(), SubclassOfInner::Dynamic(DynamicType::Todo(_))))
+}
+
+#[cfg(test)]
+pub(super) fn relation_key_has_fixed_cost(key: RelationKey<'_>) -> bool {
+    cycle_type_has_fixed_cost(key.0) && cycle_type_has_fixed_cost(key.1)
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<E> From<TddError<E>> for RelationGuardError<E> {
+    fn from(error: TddError<E>) -> Self {
+        match error {
+            TddError::Refused(error) => Self::Refused(error),
+            TddError::CapacityExhausted => Self::CapacityExhausted,
+        }
+    }
+}
+
+#[cfg(test)]
+struct AdmittedRelation<'a, C>(&'a mut C);
+
+#[cfg(test)]
+impl<'db, C: RelationGuardControl<'db>> CycleGuardControl<'db, RelationKey<'db>>
+    for AdmittedRelation<'_, C>
+{
+    type Error = C::Error;
+
+    fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error> {
+        self.0.admit(work)
+    }
+    fn key_has_fixed_cost(key: &RelationKey<'db>) -> bool {
+        relation_key_has_fixed_cost(*key)
+    }
+    fn candidate(
+        &mut self,
+        db: &'db dyn Db,
+        item: &RelationKey<'db>,
+        active: &RelationKey<'db>,
+    ) -> Result<bool, Self::Error> {
+        self.0.candidate(db, *item, *active)
+    }
+    fn identity(
+        &mut self,
+        db: &'db dyn Db,
+        item: &RelationKey<'db>,
+    ) -> Result<RelationIdentity<'db>, Self::Error> {
+        self.0.identity(db, *item)
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+struct AdmittedCycleVisit<'a, C>(&'a mut C);
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<'db, T: HasIdentity<'db>, C: CycleGuardControl<'db, T>> CycleVisitControl<'db, T>
+    for AdmittedCycleVisit<'_, C>
+{
+    type Error = RelationGuardError<C::Error>;
+    const ADMITTED: bool = true;
+
+    fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error> {
+        self.0.admit(work).map_err(RelationGuardError::Refused)
+    }
+    fn unchanged(&self, same: bool) -> Result<(), Self::Error> {
+        if same {
+            Ok(())
+        } else {
+            Err(RelationGuardError::Changed)
+        }
+    }
+    fn candidate(&mut self, db: &'db dyn Db, item: &T, active: &T) -> Result<bool, Self::Error> {
+        self.0
+            .candidate(db, item, active)
+            .map_err(RelationGuardError::Refused)
+    }
+    fn identity(&mut self, db: &'db dyn Db, item: &T) -> Result<T::Id, Self::Error> {
+        self.0
+            .identity(db, item)
+            .map_err(RelationGuardError::Refused)
+    }
+    fn active_growth(
+        &self,
+        len: usize,
+        capacity: usize,
+    ) -> Result<Option<GrowthPlan>, Self::Error> {
+        let required = len
+            .checked_add(1)
+            .ok_or(RelationGuardError::CapacityExhausted)?;
+        if required > capacity {
+            Ok(Some(sequence_growth::<
+                ActiveCycleDetectorVisit<'db, T>,
+                C::Error,
+            >(capacity, required)?))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+#[cfg(test)]
+impl<'db, 'c> CycleDetector<'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1> {
+    pub(crate) fn ownership_probe_cached(
+        &self,
+        key: RelationKey<'db>,
+    ) -> Option<ConstraintSet<'db, 'c>> {
+        self.cache.borrow().get(&key).copied()
+    }
+
+    pub(super) fn lookup_visit_with<C: RelationGuardControl<'db>>(
+        &self,
+        db: &'db dyn Db,
+        item: RelationKey<'db>,
+        control: &mut C,
+    ) -> Result<
+        CycleDetectorLookup<'_, 'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1>,
+        RelationGuardError<C::Error>,
+    > {
+        self.lookup_visit_admitted(db, item, &mut AdmittedRelation(control))
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<'db, Tag, T, R, const INLINE_CAPACITY: usize> CycleDetector<'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Copy + Hash + Eq + HasIdentity<'db>,
+    R: Copy,
+{
+    fn validate_admitted_key<C: CycleGuardControl<'db, T>>(
+        &self,
+        item: T,
+        control: &mut C,
+    ) -> Result<(), RelationGuardError<C::Error>> {
+        control
+            .admit(RelationGuardWork::KeyCheck)
+            .map_err(RelationGuardError::Refused)?;
+        let top = self.seen.borrow().last().map(|active| active.item);
+        if !C::key_has_fixed_cost(&item) || top.is_some_and(|top| !C::key_has_fixed_cost(&top)) {
+            return Err(RelationGuardError::UnsupportedKey);
+        }
+        Ok(())
+    }
+
+    pub(super) fn lookup_visit_admitted<C: CycleGuardControl<'db, T>>(
+        &self,
+        db: &'db dyn Db,
+        item: T,
+        control: &mut C,
+    ) -> Result<
+        CycleDetectorLookup<'_, 'db, Tag, T, R, INLINE_CAPACITY>,
+        RelationGuardError<C::Error>,
+    > {
+        self.validate_admitted_key(item, control)?;
+        self.lookup_visit_controlled(db, item, &mut AdmittedCycleVisit(control))
+    }
+}
+
+#[cfg(test)]
+impl<'a, 'db, 'c>
+    CycleDetectorCachedVisit<'a, 'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1>
+{
+    pub(super) fn recompute_with<C: RelationGuardControl<'db>>(
+        &self,
+        db: &'db dyn Db,
+        control: &mut C,
+    ) -> Result<
+        CycleDetectorVisit<
+            RelationKey<'db>,
+            ConstraintSet<'db, 'c>,
+            CycleDetectorScope<'a, 'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1>,
+        >,
+        RelationGuardError<C::Error>,
+    > {
+        self.recompute_admitted(db, &mut AdmittedRelation(control))
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
+    CycleDetectorCachedVisit<'a, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Copy + Hash + Eq + HasIdentity<'db>,
+    R: Copy,
+{
+    pub(super) fn recompute_admitted<C: CycleGuardControl<'db, T>>(
+        &self,
+        db: &'db dyn Db,
+        control: &mut C,
+    ) -> Result<
+        CycleDetectorVisit<T, R, CycleDetectorScope<'a, 'db, Tag, T, R, INLINE_CAPACITY>>,
+        RelationGuardError<C::Error>,
+    > {
+        self.detector.validate_admitted_key(self.item, control)?;
+        self.detector.begin_active_visit_controlled(
+            db,
+            self.item,
+            false,
+            &mut AdmittedCycleVisit(control),
+        )
     }
 }
 
@@ -1423,7 +2071,224 @@ where
     T: Eq + HasIdentity<'db>,
 {
     fn drop(&mut self) {
+        #[cfg(test)]
+        let had_item = self.item.is_some();
+        #[cfg(test)]
+        let observed = guard_storage::observations::relation_drop_before(
+            std::ptr::from_ref(self.detector).addr(),
+            had_item,
+            || self.detector.ownership_probe_counts(),
+        );
         self.take_active();
+        #[cfg(test)]
+        if observed {
+            guard_storage::observations::relation_drop_after(
+                std::ptr::from_ref(self.detector).addr(),
+                self.detector.ownership_probe_counts(),
+                had_item,
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+pub(super) type PreparedRelationFinish<'a, 'db, 'c> =
+    PreparedCycleFinish<'a, 'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1>;
+
+// Borrow the detector rather than the scope so accepted preparation permits mutable commit.
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) struct PreparedCycleFinish<'a, 'db, Tag, T: HasIdentity<'db>, R, const N: usize> {
+    detector: &'a CycleDetector<'db, Tag, T, R, N>,
+    item: T,
+    result: R,
+    cache_result: bool,
+    snapshot: Option<CycleSnapshot<T>>,
+    cached: Option<R>,
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(super) struct StaleRelationFinish;
+
+#[cfg(test)]
+impl<'a, 'db, 'c>
+    CycleDetectorScope<'a, 'db, TypeRelation, RelationKey<'db>, ConstraintSet<'db, 'c>, 1>
+{
+    pub(super) fn prepare_finish_with<C: RelationGuardControl<'db>>(
+        &self,
+        result: &ConstraintSet<'db, 'c>,
+        control: &mut C,
+    ) -> Result<PreparedRelationFinish<'a, 'db, 'c>, RelationGuardError<C::Error>> {
+        self.prepare_finish_admitted(result, &mut AdmittedRelation(control))
+    }
+
+    pub(super) fn commit_prepared(
+        &mut self,
+        prepared: PreparedRelationFinish<'a, 'db, 'c>,
+        result: ConstraintSet<'db, 'c>,
+    ) -> Result<ConstraintSet<'db, 'c>, StaleRelationFinish> {
+        self.commit_prepared_admitted(prepared, result, ConstraintSet::ownership_probe_same_set)
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+impl<'a, 'db, Tag, T, R, const INLINE_CAPACITY: usize>
+    CycleDetectorScope<'a, 'db, Tag, T, R, INLINE_CAPACITY>
+where
+    T: Copy + Hash + Eq + HasIdentity<'db>,
+    R: Copy,
+{
+    /// Prepares all storage and work before the runtime accepts this result. Refusal leaves the
+    /// active scope intact, so the owner can destroy suspended children before dropping the scope.
+    pub(super) fn prepare_finish_admitted<C: CycleGuardControl<'db, T>>(
+        &self,
+        result: &R,
+        control: &mut C,
+    ) -> Result<
+        PreparedCycleFinish<'a, 'db, Tag, T, R, INLINE_CAPACITY>,
+        RelationGuardError<C::Error>,
+    > {
+        let item = self.item.ok_or(RelationGuardError::Changed)?;
+        let detector = self.detector;
+        detector.validate_admitted_key(item, control)?;
+        let mut control = AdmittedCycleVisit(control);
+        let mut snapshot = detector.snapshot::<AdmittedCycleVisit<'_, C>>();
+        if snapshot.as_ref().and_then(|state| state.top) != Some(item) {
+            return Err(RelationGuardError::Changed);
+        }
+        detector.admit_visit(&snapshot, &mut control, RelationGuardWork::Finish)?;
+        let layout = detector.cache.borrow().layout();
+        detector.admit_visit(
+            &snapshot,
+            &mut control,
+            RelationGuardWork::CacheAccess {
+                capacity: layout.hash_capacity(),
+                probes: 1,
+            },
+        )?;
+        let cached = detector.cache.borrow().get(&item).copied();
+        if self.cache_result == cached.is_some() {
+            return Err(RelationGuardError::Changed);
+        }
+        if self.cache_result {
+            let plan = progress_cache_growth::<T, R, C::Error>(layout)?;
+            if let Some(plan) = plan {
+                detector.admit_visit(
+                    &snapshot,
+                    &mut control,
+                    RelationGuardWork::CacheKeyScan {
+                        capacity: layout.hash_capacity(),
+                    },
+                )?;
+                let fixed_keys = match &*detector.cache.borrow() {
+                    CycleDetectorCache::Two(entries) => {
+                        entries.iter().all(|(key, _)| C::key_has_fixed_cost(key))
+                    }
+                    CycleDetectorCache::Spilled(entries) => {
+                        entries.keys().all(C::key_has_fixed_cost)
+                    }
+                    _ => return Err(RelationGuardError::Changed),
+                };
+                if !fixed_keys {
+                    return Err(RelationGuardError::UnsupportedKey);
+                }
+                detector.admit_visit(
+                    &snapshot,
+                    &mut control,
+                    RelationGuardWork::Relocate { plan },
+                )?;
+                detector.admit_visit(
+                    &snapshot,
+                    &mut control,
+                    RelationGuardWork::Resource {
+                        requested_bytes: plan.requested_payload_bytes,
+                    },
+                )?;
+                if layout.variant == 2 {
+                    let mut reserved = FxHashMap::default();
+                    reserved.reserve(plan.requested_capacity);
+                    let mut cache = detector.cache.borrow_mut();
+                    let CycleDetectorCache::Two(entries) = &*cache else {
+                        return Err(RelationGuardError::Changed);
+                    };
+                    // Fixed keys and Copy results move into preallocated capacity.
+                    for (key, value) in *entries {
+                        reserved.insert(key, value);
+                    }
+                    *cache = CycleDetectorCache::Spilled(reserved);
+                } else {
+                    let mut cache = detector.cache.borrow_mut();
+                    let CycleDetectorCache::Spilled(entries) = &mut *cache else {
+                        return Err(RelationGuardError::Changed);
+                    };
+                    entries.reserve(plan.requested_capacity - entries.len());
+                }
+                snapshot = detector.snapshot::<AdmittedCycleVisit<'_, C>>();
+            }
+        }
+        let capacity = detector.cache.borrow().layout().hash_capacity();
+        // Passive freshness, the debug duplicate check, and insertion each probe the table.
+        detector.admit_visit(
+            &snapshot,
+            &mut control,
+            RelationGuardWork::CacheAccess {
+                capacity,
+                probes: if self.cache_result { 3 } else { 1 },
+            },
+        )?;
+        detector.admit_visit(&snapshot, &mut control, RelationGuardWork::Finish)?;
+        Ok(PreparedCycleFinish {
+            detector,
+            item,
+            result: *result,
+            cache_result: self.cache_result,
+            snapshot,
+            cached,
+        })
+    }
+
+    /// Commits without allocation or admission callbacks. `same_result` must compare result
+    /// identity with bounded work and no mutation or semantic queries; preparation has already
+    /// admitted these freshness checks and cache probes.
+    pub(super) fn commit_prepared_admitted(
+        &mut self,
+        prepared: PreparedCycleFinish<'a, 'db, Tag, T, R, INLINE_CAPACITY>,
+        result: R,
+        same_result: fn(R, R) -> bool,
+    ) -> Result<R, StaleRelationFinish> {
+        if !std::ptr::eq(self.detector, prepared.detector)
+            || self.item != Some(prepared.item)
+            || self.cache_result != prepared.cache_result
+            || !same_result(result, prepared.result)
+            || Some(self.detector.snapshot_values()) != prepared.snapshot
+        {
+            return Err(StaleRelationFinish);
+        }
+        {
+            let cache = self.detector.cache.borrow();
+            let current = cache.get(&prepared.item).copied();
+            let same = match (current, prepared.cached) {
+                (None, None) => true,
+                (Some(current), Some(expected)) => same_result(current, expected),
+                _ => false,
+            };
+            let layout = cache.layout();
+            if !same
+                || (self.cache_result
+                    && (layout.variant == 2
+                        || (layout.variant == 3 && layout.len == layout.capacity)))
+            {
+                return Err(StaleRelationFinish);
+            }
+        }
+        if let Some(item) = self.take_active()
+            && self.cache_result
+        {
+            self.detector
+                .cache
+                .borrow_mut()
+                .insert_completed(item, result);
+        }
+        Ok(result)
     }
 }
 
@@ -1438,6 +2303,124 @@ impl<'db, T: fmt::Debug + HasIdentity<'db>> fmt::Debug for ActiveCycleDetectorVi
     }
 }
 
+trait ActiveScanEntry<'db, T: HasIdentity<'db>> {
+    fn item(&self) -> &T;
+    fn has_identity(&self) -> bool;
+    fn initialize_identity(&self, identity: T::Id);
+    fn identity_matches(&self, identity: &T::Id) -> bool;
+}
+
+// Each implementation chooses one concrete entry representation for the shared scan.
+// Ordinary entries remain borrowed; admitted entries contain no Ref across callouts.
+trait ActiveScanView<'db, T: HasIdentity<'db>> {
+    fn len(&self) -> usize;
+
+    fn with_entries<U>(&self, read: impl FnOnce(&[ActiveCycleDetectorVisit<'db, T>]) -> U) -> U;
+
+    fn iter<'view>(&'view self) -> impl Iterator<Item: ActiveScanEntry<'db, T> + 'view> + 'view;
+}
+
+impl<'db, T: HasIdentity<'db>> ActiveScanEntry<'db, T> for &ActiveCycleDetectorVisit<'db, T> {
+    #[inline]
+    fn item(&self) -> &T {
+        &self.item
+    }
+
+    #[inline]
+    fn has_identity(&self) -> bool {
+        self.identity.get().is_some()
+    }
+
+    #[inline]
+    fn initialize_identity(&self, identity: T::Id) {
+        self.identity.get_or_init(|| identity);
+    }
+
+    #[inline]
+    fn identity_matches(&self, identity: &T::Id) -> bool {
+        self.identity.get() == Some(identity)
+    }
+}
+
+impl<'db, T: HasIdentity<'db>> ActiveScanView<'db, T>
+    for Ref<'_, [ActiveCycleDetectorVisit<'db, T>]>
+{
+    #[inline]
+    fn len(&self) -> usize {
+        (**self).len()
+    }
+
+    #[inline]
+    fn with_entries<U>(&self, read: impl FnOnce(&[ActiveCycleDetectorVisit<'db, T>]) -> U) -> U {
+        read(self)
+    }
+
+    #[inline]
+    fn iter<'view>(&'view self) -> impl Iterator<Item: ActiveScanEntry<'db, T> + 'view> + 'view {
+        (**self).iter()
+    }
+}
+
+struct AdmittedScan<'scan, 'db, T: HasIdentity<'db>, const N: usize> {
+    seen: &'scan RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; N]>>,
+    len: usize,
+}
+
+impl<'db, T: Clone + HasIdentity<'db>, const N: usize> ActiveScanView<'db, T>
+    for AdmittedScan<'_, 'db, T, N>
+{
+    #[inline]
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    fn with_entries<U>(&self, read: impl FnOnce(&[ActiveCycleDetectorVisit<'db, T>]) -> U) -> U {
+        read(self.seen.borrow().as_slice())
+    }
+
+    #[inline]
+    fn iter<'view>(&'view self) -> impl Iterator<Item: ActiveScanEntry<'db, T> + 'view> + 'view {
+        let seen = self.seen;
+        (0..self.len).map(move |index| {
+            let item = seen.borrow()[index].item.clone();
+            CopiedScanEntry { seen, index, item }
+        })
+    }
+}
+
+struct CopiedScanEntry<'view, 'db, T: HasIdentity<'db>, const N: usize> {
+    seen: &'view RefCell<SmallVec<[ActiveCycleDetectorVisit<'db, T>; N]>>,
+    index: usize,
+    item: T,
+}
+
+impl<'db, T: HasIdentity<'db>, const N: usize> ActiveScanEntry<'db, T>
+    for CopiedScanEntry<'_, 'db, T, N>
+{
+    #[inline]
+    fn item(&self) -> &T {
+        &self.item
+    }
+
+    #[inline]
+    fn has_identity(&self) -> bool {
+        self.seen.borrow()[self.index].identity.get().is_some()
+    }
+
+    #[inline]
+    fn initialize_identity(&self, identity: T::Id) {
+        self.seen.borrow()[self.index]
+            .identity
+            .get_or_init(|| identity);
+    }
+
+    #[inline]
+    fn identity_matches(&self, identity: &T::Id) -> bool {
+        self.seen.borrow()[self.index].identity.get() == Some(identity)
+    }
+}
+
 /// Result of starting a cycle-detector visit.
 pub(super) enum CycleDetectorVisit<T, R, Pending> {
     /// The item already has a completed result or hit an exact recursive edge.
@@ -1446,6 +2429,183 @@ pub(super) enum CycleDetectorVisit<T, R, Pending> {
     Cycle(T),
     /// The caller should compute the result and finish the pending visit.
     Pending(Pending),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::types) enum TypeTransformationWork {
+    CacheLookup {
+        len: usize,
+    },
+    AncestorComparison,
+    ActiveStorage {
+        len: usize,
+        capacity: usize,
+    },
+    CacheStorage {
+        len: usize,
+        capacity: usize,
+    },
+    InlinePayload {
+        bytes: [usize; 4],
+    },
+    RehashKey {
+        inline_payload_bytes: usize,
+    },
+    Grow {
+        storage: TypeTransformationStorage,
+        requested_capacity: usize,
+        requested_payload_bytes: usize,
+        relocation_units: usize,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::types) enum TypeTransformationStorage {
+    Active,
+    Cache,
+}
+
+pub(in crate::types) struct TypeTransformationQuote {
+    pub(in crate::types) work_units: usize,
+    pub(in crate::types) requested_payload_bytes: usize,
+}
+
+impl TypeTransformationWork {
+    /// Logical accesses advance once. Growth and inline text are separate; native collision
+    /// comparisons and allocation latency are not bounded by this progress quote.
+    pub(in crate::types) fn quote(self) -> Option<TypeTransformationQuote> {
+        let (work_units, requested_payload_bytes) = match self {
+            Self::CacheLookup { .. }
+            | Self::AncestorComparison
+            | Self::ActiveStorage { .. }
+            | Self::CacheStorage { .. } => (1, 0),
+            Self::InlinePayload { bytes } => {
+                (bytes.into_iter().try_fold(0usize, usize::checked_add)?, 0)
+            }
+            Self::RehashKey {
+                inline_payload_bytes,
+            } => (inline_payload_bytes.checked_add(1)?, 0),
+            Self::Grow {
+                requested_payload_bytes,
+                relocation_units,
+                ..
+            } => (relocation_units, requested_payload_bytes),
+        };
+        Some(TypeTransformationQuote {
+            work_units,
+            requested_payload_bytes,
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum TransformationLayout {
+    Active { len: usize, capacity: usize },
+    Cache(CycleCacheLayout),
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(in crate::types) struct TypeTransformationGrowth {
+    layout: TransformationLayout,
+}
+
+impl TypeTransformationGrowth {
+    pub(in crate::types) fn checked_plan(self) -> Option<GrowthPlan> {
+        match self.layout {
+            TransformationLayout::Active { len, capacity } => {
+                let mut plan = sequence_growth::<ActiveTypeTransformation<'_>, Infallible>(
+                    capacity,
+                    len.checked_add(1)?,
+                )
+                .ok()?;
+                plan.relocation_units = len;
+                Some(plan)
+            }
+            TransformationLayout::Cache(layout) => {
+                progress_cache_growth::<Type<'_>, Type<'_>, Infallible>(layout)
+                    .ok()
+                    .flatten()
+            }
+        }
+    }
+
+    pub(in crate::types) fn work(self, plan: GrowthPlan) -> TypeTransformationWork {
+        TypeTransformationWork::Grow {
+            storage: match self.layout {
+                TransformationLayout::Active { .. } => TypeTransformationStorage::Active,
+                TransformationLayout::Cache(_) => TypeTransformationStorage::Cache,
+            },
+            requested_capacity: plan.requested_capacity,
+            requested_payload_bytes: plan.requested_payload_bytes,
+            relocation_units: plan.relocation_units,
+        }
+    }
+}
+
+fn transformation_payload<C: TypeTransformationControl>(
+    control: &C,
+    bytes: [usize; 4],
+) -> Result<(), C::Error> {
+    if bytes.iter().any(|bytes| *bytes != 0) {
+        control.checkpoint(TypeTransformationWork::InlinePayload { bytes })?;
+    }
+    Ok(())
+}
+
+impl TypeIdentity<'_> {
+    fn inline_payload_bytes(self) -> usize {
+        match self {
+            Self::Other(ty) => ty.inline_payload_bytes(),
+            _ => 0,
+        }
+    }
+}
+
+/// Controls semantic progress and the potentially semantic identity operation. An admitted
+/// growth plan permits reservation only after the owner has also admitted retained key work.
+pub(in crate::types) trait TypeTransformationControl {
+    type Error;
+
+    fn checkpoint(&self, work: TypeTransformationWork) -> Result<(), Self::Error>;
+
+    fn prepare_growth(
+        &self,
+        request: TypeTransformationGrowth,
+    ) -> Result<Option<GrowthPlan>, Self::Error>;
+
+    fn identity<'db>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Result<TypeIdentity<'db>, Self::Error>;
+}
+
+pub(in crate::types) struct InlineTypeTransformationControl;
+
+impl TypeTransformationControl for InlineTypeTransformationControl {
+    type Error = Infallible;
+
+    #[inline]
+    fn checkpoint(&self, _work: TypeTransformationWork) -> Result<(), Infallible> {
+        Ok(())
+    }
+
+    #[inline]
+    fn prepare_growth(
+        &self,
+        _request: TypeTransformationGrowth,
+    ) -> Result<Option<GrowthPlan>, Infallible> {
+        Ok(None)
+    }
+
+    #[inline]
+    fn identity<'db>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Result<TypeIdentity<'db>, Infallible> {
+        Ok(ty.to_type_identity(db))
+    }
 }
 
 /// Guards recursive type transformations.
@@ -1478,41 +2638,262 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
         ty: Type<'db>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match self.begin_visit(db, ty) {
+        let visit = match self.begin_visit_with(db, ty, &InlineTypeTransformationControl) {
+            Ok(visit) => visit,
+            Err(never) => match never {},
+        };
+        match visit {
             TypeTransformerVisit::Ready(result) => result,
-            TypeTransformerVisit::Pending(ty) => {
-                let result = compute();
-                self.finish_visit(ty, result)
+            TypeTransformerVisit::Pending(scope) => {
+                match scope.finish_with(compute(), &InlineTypeTransformationControl) {
+                    Ok(result) => result,
+                    Err(never) => match never {},
+                }
             }
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
-        if let Some(result) = self.cache.borrow().get(&ty) {
-            return TypeTransformerVisit::Ready(*result);
+    /// Starts a visit that can remain active while a child transformation is suspended.
+    /// Scopes must finish or be dropped in reverse nesting order.
+    pub(in crate::types) fn begin_visit_with<C: TypeTransformationControl>(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        control: &C,
+    ) -> Result<TypeTransformerVisit<'db, TypeTransformationScope<'_, 'db, Tag>>, C::Error> {
+        if let Some(result) = self.cached_result_with(ty, control)? {
+            return Ok(TypeTransformerVisit::Ready(result));
         }
-
-        let identity = ty.to_type_identity(db);
-        let seen = self.seen.borrow();
-        if seen
-            .iter()
-            .any(|active| active.ty == ty || active.identity == identity)
-        {
-            return TypeTransformerVisit::Ready(ty);
-        }
-        drop(seen);
-
-        self.seen
-            .borrow_mut()
-            .push(ActiveTypeTransformation { ty, identity });
-        TypeTransformerVisit::Pending(ty)
+        let identity = control.identity(db, ty)?;
+        self.begin_uncached_visit_with(ty, identity, control)
     }
 
-    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
-        let active = self.seen.borrow_mut().pop();
+    /// Looks up a completed transformation before its recursive identity is requested.
+    /// The returned handle retains no cache borrow, so an identity field read may suspend.
+    pub(in crate::types) fn cached_result_with<C: TypeTransformationControl>(
+        &self,
+        ty: Type<'db>,
+        control: &C,
+    ) -> Result<Option<Type<'db>>, C::Error> {
+        control.checkpoint(TypeTransformationWork::CacheLookup {
+            len: self.cache.borrow().len(),
+        })?;
+        transformation_payload(control, [ty.inline_payload_bytes(), 0, 0, 0])?;
+        Ok(self.cache.borrow().get(&ty).copied())
+    }
+
+    /// Starts an uncached transformation using the identity obtained for `ty`.
+    /// Callers first use `cached_result_with`, then obtain the ordinary recursive identity.
+    /// No entry for this visit exists during that identity read; enclosing visits remain active.
+    /// This method admits the new entry's creation.
+    pub(in crate::types) fn begin_uncached_visit_with<C: TypeTransformationControl>(
+        &self,
+        ty: Type<'db>,
+        identity: TypeIdentity<'db>,
+        control: &C,
+    ) -> Result<TypeTransformerVisit<'db, TypeTransformationScope<'_, 'db, Tag>>, C::Error> {
+        let seen = self.seen.borrow();
+        for active in seen.iter() {
+            control.checkpoint(TypeTransformationWork::AncestorComparison)?;
+            transformation_payload(
+                control,
+                [
+                    ty.inline_payload_bytes(),
+                    active.ty.inline_payload_bytes(),
+                    identity.inline_payload_bytes(),
+                    active.identity.inline_payload_bytes(),
+                ],
+            )?;
+            if active.ty == ty || active.identity == identity {
+                return Ok(TypeTransformerVisit::Ready(ty));
+            }
+        }
+        control.checkpoint(TypeTransformationWork::ActiveStorage {
+            len: seen.len(),
+            capacity: seen.capacity(),
+        })?;
+        let growth = if seen.len() == seen.capacity() {
+            control.prepare_growth(TypeTransformationGrowth {
+                layout: TransformationLayout::Active {
+                    len: seen.len(),
+                    capacity: seen.capacity(),
+                },
+            })?
+        } else {
+            None
+        };
+        drop(seen);
+        let mut seen = self.seen.borrow_mut();
+        if let Some(plan) = growth {
+            let additional = plan.requested_capacity - seen.len();
+            seen.reserve_exact(additional);
+        }
+        seen.push(ActiveTypeTransformation { ty, identity });
+        Ok(TypeTransformerVisit::Pending(TypeTransformationScope {
+            transformer: self,
+            ty: Some(ty),
+        }))
+    }
+}
+
+/// An unfinished transformation owns only its active entry, never a cached result.
+pub(crate) struct TypeTransformationScope<'a, 'db, Tag> {
+    transformer: &'a TypeTransformer<'db, Tag>,
+    ty: Option<Type<'db>>,
+}
+
+impl<'visitor, 'db, Tag> TypeTransformationScope<'visitor, 'db, Tag> {
+    fn take_active(&mut self) -> Option<Type<'db>> {
+        let ty = self.ty.take()?;
+        let active = self.transformer.seen.borrow_mut().pop();
         debug_assert_eq!(active.map(|active| active.ty), Some(ty));
-        self.cache.borrow_mut().insert_completed(ty, result);
-        result
+        Some(ty)
+    }
+
+    pub(in crate::types) fn finish_with<C: TypeTransformationControl>(
+        mut self,
+        result: Type<'db>,
+        control: &C,
+    ) -> Result<Type<'db>, C::Error> {
+        self.finish_in_place_with(result, control)
+    }
+
+    /// Leaves an unfinished scope with its owner if admission refuses, so suspended children can
+    /// be destroyed before the owner drops the scope and removes its active entry.
+    pub(in crate::types) fn finish_in_place_with<C: TypeTransformationControl>(
+        &mut self,
+        result: Type<'db>,
+        control: &C,
+    ) -> Result<Type<'db>, C::Error> {
+        Ok(self
+            .prepare_finish_with(result, control)?
+            .commit_immediately())
+    }
+
+    /// Prepares storage without retiring the scope, so a suspended owner keeps its active entry
+    /// until the runtime accepts the local callback that performed this work.
+    pub(in crate::types) fn prepare_finish_with<'scope, C: TypeTransformationControl>(
+        &'scope mut self,
+        result: Type<'db>,
+        control: &C,
+    ) -> Result<PreparedTypeTransformationFinish<'scope, 'visitor, 'db, Tag>, C::Error> {
+        #[cfg(any(test, feature = "experimental-analysis"))]
+        let active_len = self.transformer.seen.borrow().len();
+        let cache = self.transformer.cache.borrow();
+        control.checkpoint(TypeTransformationWork::CacheStorage {
+            len: cache.len(),
+            capacity: cache.capacity(),
+        })?;
+        let growth = if let Some(ty) = self.ty {
+            transformation_payload(control, [ty.inline_payload_bytes(), 0, 0, 0])?;
+            let layout = cache.layout();
+            if layout.needs_growth() {
+                control.prepare_growth(TypeTransformationGrowth {
+                    layout: TransformationLayout::Cache(layout),
+                })?
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if growth.is_some() {
+            let rehash = |ty: Type<'db>| {
+                control.checkpoint(TypeTransformationWork::RehashKey {
+                    inline_payload_bytes: ty.inline_payload_bytes(),
+                })
+            };
+            match &*cache {
+                CycleDetectorCache::Two(entries) => {
+                    for (ty, _) in entries {
+                        rehash(*ty)?;
+                    }
+                }
+                CycleDetectorCache::Spilled(entries) => {
+                    for ty in entries.keys() {
+                        rehash(*ty)?;
+                    }
+                }
+                _ => {}
+            }
+        }
+        drop(cache);
+        if let Some(plan) = growth {
+            let mut cache = self.transformer.cache.borrow_mut();
+            match &mut *cache {
+                CycleDetectorCache::Two(entries) => {
+                    let mut reserved = FxHashMap::default();
+                    reserved.reserve(plan.requested_capacity);
+                    for (ty, value) in *entries {
+                        reserved.insert(ty, value);
+                    }
+                    *cache = CycleDetectorCache::Spilled(reserved);
+                }
+                CycleDetectorCache::Spilled(entries) => {
+                    entries.reserve(plan.requested_capacity - entries.len())
+                }
+                _ => {}
+            }
+        }
+        #[cfg(any(test, feature = "experimental-analysis"))]
+        let cache_layout = self.transformer.cache.borrow().layout();
+        Ok(PreparedTypeTransformationFinish {
+            scope: self,
+            result,
+            #[cfg(any(test, feature = "experimental-analysis"))]
+            active_len,
+            #[cfg(any(test, feature = "experimental-analysis"))]
+            cache_layout,
+        })
+    }
+}
+
+/// A prepared result borrows its actual scope, but holds no cache or active-stack borrow.
+pub(in crate::types) struct PreparedTypeTransformationFinish<'scope, 'visitor, 'db, Tag> {
+    scope: &'scope mut TypeTransformationScope<'visitor, 'db, Tag>,
+    result: Type<'db>,
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    active_len: usize,
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    cache_layout: CycleCacheLayout,
+}
+
+impl<'db, Tag> PreparedTypeTransformationFinish<'_, '_, 'db, Tag> {
+    fn commit_immediately(self) -> Type<'db> {
+        if let Some(ty) = self.scope.take_active() {
+            self.scope
+                .transformer
+                .cache
+                .borrow_mut()
+                .insert_completed(ty, self.result);
+        }
+        self.result
+    }
+
+    /// Commits without allocation or callouts, returning ownership unchanged if preparation is stale.
+    #[cfg(any(test, feature = "experimental-analysis"))]
+    pub(in crate::types) fn try_commit(self) -> Result<Type<'db>, Self> {
+        if self.scope.ty.is_none() {
+            return Ok(self.result);
+        }
+        // Correctly nested scopes cannot replace this exclusively borrowed scope's active entry,
+        // and completed cache entries are never removed or replaced. A live child changes depth;
+        // a completed child changes cache length. An aborted child restores a valid preparation.
+        // Comparing capacity also detects storage changes, without retaining collection borrows
+        // across the runtime's acceptance check or queued-child cleanup.
+        if self.scope.transformer.seen.borrow().len() != self.active_len
+            || self.scope.transformer.cache.borrow().layout() != self.cache_layout
+            || self.cache_layout.needs_growth()
+        {
+            return Err(self);
+        }
+        Ok(self.commit_immediately())
+    }
+}
+
+impl<Tag> Drop for TypeTransformationScope<'_, '_, Tag> {
+    fn drop(&mut self) {
+        self.take_active();
     }
 }
 
@@ -1522,9 +2903,9 @@ struct ActiveTypeTransformation<'db> {
     identity: TypeIdentity<'db>,
 }
 
-enum TypeTransformerVisit<'db> {
+pub(crate) enum TypeTransformerVisit<'db, Scope> {
     Ready(Type<'db>),
-    Pending(Type<'db>),
+    Pending(Scope),
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default
@@ -1551,8 +2932,48 @@ enum CycleDetectorCache<T, R> {
 }
 
 impl<T, R> CycleDetectorCache<T, R> {
+    fn layout(&self) -> CycleCacheLayout {
+        match self {
+            Self::Empty => CycleCacheLayout {
+                variant: 0,
+                len: 0,
+                capacity: 0,
+            },
+            Self::One(_) => CycleCacheLayout {
+                variant: 1,
+                len: 1,
+                capacity: 1,
+            },
+            Self::Two(_) => CycleCacheLayout {
+                variant: 2,
+                len: 2,
+                capacity: 2,
+            },
+            Self::Spilled(cache) => CycleCacheLayout {
+                variant: 3,
+                len: cache.len(),
+                capacity: cache.capacity(),
+            },
+        }
+    }
     const fn new() -> Self {
         Self::Empty
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::One(_) => 1,
+            Self::Two(_) => 2,
+            Self::Spilled(entries) => entries.len(),
+        }
+    }
+
+    fn capacity(&self) -> usize {
+        match self {
+            Self::Empty | Self::One(_) | Self::Two(_) => 2,
+            Self::Spilled(entries) => entries.capacity(),
+        }
     }
 
     fn get(&self, item: &T) -> Option<&R>
@@ -1637,29 +3058,33 @@ impl<T: Hash + Eq + Clone> ActiveRecursionDetector<T> {
         on_cycle: impl FnOnce() -> R,
         func: impl FnOnce() -> R,
     ) -> R {
-        if !self.seen.borrow_mut().insert(item.clone()) {
+        let Some(_guard) = self.begin(item.clone()) else {
             return on_cycle();
-        }
+        };
+        func()
+    }
 
-        // Keep the active-recursion state scoped even if `func` unwinds. In some cases, we catch
-        // panics and continue handling later work on the same thread.
-        let _guard = ActiveRecursionGuard {
+    /// Enter an active visit without retaining the insertion borrow. The returned guard removes
+    /// the entry on completion, cancellation, or unwinding; an active revisit returns `None`.
+    pub(crate) fn begin(&self, item: T) -> Option<ActiveRecursionGuard<'_, T>> {
+        if !self.seen.borrow_mut().insert(item.clone()) {
+            return None;
+        }
+        Some(ActiveRecursionGuard {
             seen: &self.seen,
             item,
-        };
-
-        func()
+        })
     }
 }
 
-struct ActiveRecursionGuard<'a, T: Hash + Eq> {
+pub(crate) struct ActiveRecursionGuard<'a, T: Hash + Eq> {
     seen: &'a RefCell<FxHashSet<T>>,
-    item: &'a T,
+    item: T,
 }
 
 impl<T: Hash + Eq> Drop for ActiveRecursionGuard<'_, T> {
     fn drop(&mut self) {
-        self.seen.borrow_mut().remove(self.item);
+        self.seen.borrow_mut().remove(&self.item);
     }
 }
 
@@ -1974,10 +3399,11 @@ impl<'db> CallableDependencies<'db> {
 /// a changing specialization needs a gradual approximation.
 #[derive(Debug, Default)]
 pub(super) struct CallableRecursionGuard<'db> {
-    active: ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
-    identities: ActiveRecursionDetector<(CallableExpansion, TypeIdentity<'db>)>,
+    active: CallableActiveSet<(CallableExpansion, Type<'db>)>,
+    identities: CallableActiveSet<(CallableExpansion, TypeIdentity<'db>)>,
     growth: CallableGrowthDetector<'db>,
     cache: ConstructorCallableCache<'db>,
+    storage_admission: Option<Box<RefCell<CallableGuardStorage>>>,
 }
 
 /// Memoizes constructor expansion under the active-cycle assumptions it actually used.
@@ -1998,7 +3424,7 @@ impl<'db> ConstructorCallableCache<'db> {
         &'a self,
         class: ClassType<'db>,
         receiver: Type<'db>,
-        active: &'a ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
+        active: &'a CallableActiveSet<(CallableExpansion, Type<'db>)>,
     ) -> ConstructorEntry<'a, 'db> {
         if self.use_shared_cache
             && active
@@ -2044,7 +3470,7 @@ pub(super) enum ConstructorEntry<'a, 'db> {
 /// scope without finishing still contributes those dependencies to the enclosing computation.
 pub(super) struct ConstructorCacheScope<'a, 'db> {
     cache: &'a ConstructorCallableCache<'db>,
-    active: &'a ActiveRecursionDetector<(CallableExpansion, Type<'db>)>,
+    active: &'a CallableActiveSet<(CallableExpansion, Type<'db>)>,
     key: (ClassType<'db>, Type<'db>),
     recoveries: usize,
     _dependencies: RecursionDependencyScope<'a, (CallableExpansion, Type<'db>)>,
@@ -2054,12 +3480,26 @@ impl<'db> ConstructorCacheScope<'_, 'db> {
     /// Publish before leaving the enclosing callable expansion: active ancestors determine
     /// which later expansions can reuse this result.
     pub(super) fn finish(self, callables: &CallableTypes<'db>) {
+        #[cfg(test)]
+        super::constructor::expansion_probe::observe_constructor_callable_completed(self.key.0);
         if self.cache.growth_recoveries.get() == self.recoveries {
             let dependencies = self.cache.dependencies.borrow().clone();
-            let active_dependencies = dependencies
-                .intersection(&self.active.seen.borrow())
-                .copied()
-                .collect();
+            let active_dependencies = {
+                let active = self.active.seen.borrow();
+                if dependencies.len() <= active.len() {
+                    dependencies
+                        .iter()
+                        .filter(|key| active.contains(key))
+                        .copied()
+                        .collect()
+                } else {
+                    active
+                        .iter()
+                        .filter(|key| dependencies.contains(*key))
+                        .copied()
+                        .collect()
+                }
+            };
             self.cache.constructors.borrow_mut().insert(
                 self.key,
                 CachedConstructor {
@@ -2080,11 +3520,26 @@ struct CachedConstructor<'db> {
 }
 
 impl<'db> CachedConstructor<'db> {
-    fn can_reuse(&self, active: &FxHashSet<(CallableExpansion, Type<'db>)>) -> bool {
-        self.active_dependencies.is_subset(active)
-            && active
-                .intersection(&self.dependencies)
-                .all(|ty| self.active_dependencies.contains(ty))
+    fn can_reuse(&self, active: &ActiveSet<(CallableExpansion, Type<'db>)>) -> bool {
+        if self.active_dependencies.len() > active.len()
+            || !self
+                .active_dependencies
+                .iter()
+                .all(|key| active.contains(key))
+        {
+            return false;
+        }
+        if active.len() <= self.dependencies.len() {
+            active
+                .iter()
+                .filter(|key| self.dependencies.contains(*key))
+                .all(|key| self.active_dependencies.contains(key))
+        } else {
+            self.dependencies
+                .iter()
+                .filter(|key| active.contains(key))
+                .all(|key| self.active_dependencies.contains(key))
+        }
     }
 }
 
@@ -2118,14 +3573,14 @@ impl<T: Eq + Hash> Drop for RecursionDependencyScope<'_, T> {
 /// getter or a descriptor that selects `__call__` can distinguish progress towards termination.
 #[derive(Debug, Default)]
 struct CallableGrowthDetector<'db> {
-    active: ActiveRecursionDetector<(DefinitionUse<'db>, DescriptorOrigin<'db>)>,
+    active: CallableActiveSet<(DefinitionUse<'db>, DescriptorOrigin<'db>)>,
     embedding: TypeEmbedding<'db>,
     dispatch: Cell<DescriptorOrigin<'db>>,
     anchors: RefCell<Vec<(RecursiveDefinition<'db>, DescriptorDispatches<'db>)>>,
 }
 
 impl<'db> CallableGrowthDetector<'db> {
-    fn should_approximate(
+    fn should_approximate_repeated(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -2135,9 +3590,7 @@ impl<'db> CallableGrowthDetector<'db> {
         let previous = active
             .iter()
             .filter(|(previous, _)| previous.target == reference.target);
-        if previous.clone().next().is_none()
-            || !reference.target.may_have_unbounded_specialization(db)
-        {
+        if !reference.target.may_have_unbounded_specialization(db) {
             return false;
         }
         let current = self.dispatch.get();
@@ -2206,20 +3659,36 @@ fn compare_descriptor_observations<'db>(
     }
 }
 
-#[salsa::tracked]
 impl<'db> DescriptorDispatches<'db> {
     /// Source declarations form a finite vocabulary even when unions or parameter lists grow.
     /// Anonymous signatures share an entry here, but retain separate argument observations.
-    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-    fn declarations(self, db: &'db dyn Db) -> FxHashSet<Option<Definition<'db>>> {
-        let mut declarations = self
-            .elements(db)
-            .iter()
-            .flat_map(|dispatch| dispatch.signatures(db).iter().map(Signature::definition))
-            .collect::<FxHashSet<_>>();
-        declarations.shrink_to_fit();
-        declarations
+    pub(in crate::types) fn declarations(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db FxHashSet<Option<Definition<'db>>> {
+        declarations_(db, self)
     }
+}
+
+#[salsa::tracked(configuration = (pub(in crate::types) DeclarationsConfiguration), attempt = ReturnOnly, self_ty = DescriptorDispatches<'db>, returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn declarations_<'db>(
+    db: &'db dyn Db,
+    dispatches: DescriptorDispatches<'db>,
+) -> FxHashSet<Option<Definition<'db>>> {
+    let mut declarations = dispatches
+        .elements(db)
+        .iter()
+        .flat_map(|dispatch| dispatch.signatures(db).iter().map(Signature::definition))
+        .collect::<FxHashSet<_>>();
+    declarations.shrink_to_fit();
+    declarations
+}
+
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) fn descriptor_dispatch_declarations_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<DeclarationsConfiguration> {
+    declarations_::fn_ingredient_(db, db.zalsa())
 }
 
 #[derive(Debug, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
@@ -2236,7 +3705,7 @@ impl<'db> DescriptorDispatch<'db> {
     /// A fixed vocabulary of types from the first invocation bounds the observations even when
     /// both the arguments and the signatures change. Nested obligations still distinguish progress
     /// towards a later match, such as list nesting that eventually satisfies a Sequence annotation.
-    #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(attempt = ReturnOnly, returns(ref), cycle_initial=|_, _, _, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn observations(
         self,
         db: &'db dyn Db,
@@ -2285,7 +3754,7 @@ impl<'db> DescriptorDispatch<'db> {
 /// unspecialized declaration. Return annotations also matter: they can introduce a new descriptor
 /// specialization farther down the chain. Include every alternative of this initial invocation so
 /// union ordering cannot determine which specialization contributes the observation vocabulary.
-#[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _| FxHashSet::default(), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = ReturnOnly, returns(ref), cycle_initial=|_, _, _, _| FxHashSet::default(), heap_size=ruff_memory_usage::heap_size)]
 fn descriptor_observation_patterns<'db>(
     db: &'db dyn Db,
     program: Program<'db>,
@@ -2510,12 +3979,9 @@ impl<'db> CallableRecursionGuard<'db> {
         &self,
         origin: DescriptorOrigin<'db>,
     ) -> DescriptorDispatchScope<'_, 'db> {
-        let previous =
-            (origin != DescriptorOrigin::default()).then(|| self.growth.dispatch.replace(origin));
-        DescriptorDispatchScope {
-            current: &self.growth.dispatch,
-            previous,
-        }
+        let mut scope = self.begin_dependency_scope();
+        scope.replace_storage(origin);
+        scope
     }
 
     /// Follow a resolved callable dependency with the dispatch state that produced it.
@@ -2538,13 +4004,14 @@ impl<'db> CallableRecursionGuard<'db> {
         env: &ProgramEnvironment<'db>,
         receiver: Type<'db>,
     ) -> Self {
-        let use_shared_cache =
-            CallableDefinition::from_type(db, env, receiver, CallableExpansion::Upcast).is_none_or(
-                |reference| {
-                    reference.specialization.is_none()
-                        || !reference.target.may_have_unbounded_specialization(db)
-                },
-            );
+        let use_shared_cache = match entry::constructor_guard_cache_sync(
+            receiver,
+            entry::CallableEntryFacts,
+            &entry::OrdinaryCallableGuardEntryEffects { db, env },
+        ) {
+            Ok(use_shared_cache) => use_shared_cache,
+            Err(never) => match never {},
+        };
         Self {
             cache: ConstructorCallableCache {
                 use_shared_cache,
@@ -2566,6 +4033,13 @@ impl<'db> CallableRecursionGuard<'db> {
         self.cache.enter(class, receiver, &self.active)
     }
 
+    #[cfg_attr(
+        test,
+        expect(
+            clippy::too_many_arguments,
+            reason = "operational recovery is separate from semantic cycle recovery"
+        )
+    )]
     pub(super) fn visit<R>(
         &self,
         db: &'db dyn Db,
@@ -2573,11 +4047,14 @@ impl<'db> CallableRecursionGuard<'db> {
         key: (CallableExpansion, Type<'db>),
         on_cycle: impl FnOnce() -> R,
         on_growth: impl FnOnce() -> R,
+        #[cfg(test)] on_incomplete: impl FnOnce() -> R,
         func: impl FnOnce() -> R,
     ) -> R {
         match self.enter(db, env, key) {
             CallableEntry::ExactCycle => on_cycle(),
             CallableEntry::Growth => on_growth(),
+            #[cfg(test)]
+            CallableEntry::Incomplete => on_incomplete(),
             CallableEntry::Entered(_scope) => func(),
         }
     }
@@ -2588,68 +4065,28 @@ impl<'db> CallableRecursionGuard<'db> {
         env: &ProgramEnvironment<'db>,
         key: (CallableExpansion, Type<'db>),
     ) -> CallableEntry<'_, 'db> {
-        let (mode, ty) = key;
-        self.cache.dependencies.borrow_mut().insert(key);
-        let on_growth = || {
-            self.cache
-                .growth_recoveries
-                .set(self.cache.growth_recoveries.get() + 1);
-            CallableEntry::Growth
-        };
-        if self.active.seen.borrow().contains(&key) {
-            return CallableEntry::ExactCycle;
+        let mut scope = self.begin_scope();
+        match entry::callable_enter_in_place_sync(
+            key,
+            &mut scope,
+            entry::CallableEntryFacts,
+            &entry::OrdinaryCallableGuardEntryEffects { db, env },
+        ) {
+            Ok(entry::CallableEntryDecision::ExactCycle) => CallableEntry::ExactCycle,
+            Ok(entry::CallableEntryDecision::Growth) => CallableEntry::Growth,
+            #[cfg(test)]
+            Ok(entry::CallableEntryDecision::Incomplete) => CallableEntry::Incomplete,
+            Ok(entry::CallableEntryDecision::Entered) => CallableEntry::Entered(scope),
+            Err(never) => match never {},
         }
-
-        let mut scope = CallableVisitScope {
-            guard: self,
-            key: None,
-            identity: None,
-            dispatch_reference: None,
-            anchor_introduced: false,
-        };
-        if let Some(reference) = CallableDefinition::from_type(db, env, ty, mode) {
-            if self.growth.should_approximate(db, env, reference) {
-                return on_growth();
-            }
-            if let Some(dispatches) = self.growth.dispatch.get().dispatches {
-                let mut anchors = self.growth.anchors.borrow_mut();
-                if !anchors.iter().any(|(target, initial)| {
-                    *target == reference.target
-                        && dispatches.declarations(db) == initial.declarations(db)
-                }) {
-                    anchors.push((reference.target, dispatches));
-                    scope.anchor_introduced = true;
-                }
-            }
-            let dispatch_reference = (reference, self.growth.dispatch.get());
-            if self
-                .growth
-                .active
-                .seen
-                .borrow_mut()
-                .insert(dispatch_reference)
-            {
-                scope.dispatch_reference = Some(dispatch_reference);
-            }
-        } else if let Some(identity) = ty.recursive_identity(db) {
-            let identity = (mode, identity);
-            if !self.identities.seen.borrow_mut().insert(identity) {
-                return on_growth();
-            }
-            scope.identity = Some(identity);
-        }
-
-        if !self.active.seen.borrow_mut().insert(key) {
-            return CallableEntry::ExactCycle;
-        }
-        scope.key = Some(key);
-        CallableEntry::Entered(scope)
     }
 }
 
 pub(super) enum CallableEntry<'a, 'db> {
     ExactCycle,
     Growth,
+    #[cfg(test)]
+    Incomplete,
     Entered(CallableVisitScope<'a, 'db>),
 }
 
@@ -2657,31 +4094,22 @@ pub(super) enum CallableEntry<'a, 'db> {
 /// reverse entry order so descriptor anchors remain available until their descendants finish.
 pub(super) struct CallableVisitScope<'a, 'db> {
     guard: &'a CallableRecursionGuard<'db>,
-    key: Option<(CallableExpansion, Type<'db>)>,
-    identity: Option<(CallableExpansion, TypeIdentity<'db>)>,
-    dispatch_reference: Option<(DefinitionUse<'db>, DescriptorOrigin<'db>)>,
+    key: Option<CallableGuardEntry<(CallableExpansion, Type<'db>)>>,
+    identity: Option<CallableGuardEntry<(CallableExpansion, TypeIdentity<'db>)>>,
+    dispatch_reference: Option<CallableGuardEntry<(DefinitionUse<'db>, DescriptorOrigin<'db>)>>,
     anchor_introduced: bool,
 }
 
 impl Drop for CallableVisitScope<'_, '_> {
     fn drop(&mut self) {
-        if let Some(key) = self.key {
-            self.guard.active.seen.borrow_mut().remove(&key);
-        }
-        if let Some(identity) = self.identity {
-            self.guard.identities.seen.borrow_mut().remove(&identity);
-        }
-        if let Some(reference) = self.dispatch_reference {
-            self.guard
-                .growth
-                .active
-                .seen
-                .borrow_mut()
-                .remove(&reference);
-        }
+        #[cfg(test)]
+        guard_storage::observations::scope_drop_before(self.guard);
+        self.remove_storage_entries();
         if self.anchor_introduced {
             self.guard.growth.anchors.borrow_mut().pop();
         }
+        #[cfg(test)]
+        guard_storage::observations::scope_drop_after(self.guard);
     }
 }
 
@@ -2884,25 +4312,21 @@ mod tests {
 
         // While A is active, B's edge back to A contributes no integer-returning overload.
         // Forward consumes a cache hit for B and must inherit that dependency on A.
-        guard.active.visit(
-            &(CallableExpansion::Upcast, a),
-            || (),
-            || {
-                assert!(!returns_integer("b"));
-                assert!(!returns_integer("forward"));
-            },
-        );
+        {
+            let mut scope = guard.begin_scope();
+            assert!(scope.insert_exact_ordinary((CallableExpansion::Upcast, a)));
+            assert!(!returns_integer("b"));
+            assert!(!returns_integer("forward"));
+        }
         // Once A leaves the stack, both cached results must be recomputed.
         assert!(returns_integer("forward"));
         assert!(returns_integer("b"));
         // A newly active dependency also invalidates a previously complete result.
-        guard.active.visit(
-            &(CallableExpansion::Upcast, a),
-            || (),
-            || {
-                assert!(!returns_integer("forward"));
-            },
-        );
+        {
+            let mut scope = guard.begin_scope();
+            assert!(scope.insert_exact_ordinary((CallableExpansion::Upcast, a)));
+            assert!(!returns_integer("forward"));
+        }
         Ok(())
     }
 
@@ -3666,5 +5090,304 @@ class RecursivePropertySetter[T](Protocol):
             panic!("the second identity should be ready after the pending visit is finished");
         };
         assert_eq!(seen, 2);
+    }
+
+    mod exact_cycle_identity {
+        //! Check admissions and identity callbacks that Python mdtests cannot observe.
+
+        use std::hash::Hash;
+
+        use super::super::{
+            CycleDetector, CycleDetectorLookup, CycleDetectorScope, CycleDetectorVisit,
+            CycleGuardControl, CycleIdentityMode, Db, HasIdentity, RelationGuardError,
+            RelationGuardWork,
+        };
+        use super::{TestVisit, setup_db};
+
+        /// A key whose cycle identity is its entire value.
+        #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+        struct ExactIdentityItem(u8);
+
+        impl<'db> HasIdentity<'db> for ExactIdentityItem {
+            type Id = Self;
+            const CYCLE_IDENTITY_MODE: CycleIdentityMode = CycleIdentityMode::Exact;
+
+            fn to_identity(&self, _db: &'db dyn Db) -> Self::Id {
+                *self
+            }
+        }
+
+        /// Records candidate and identity discovery admissions and callbacks.
+        #[derive(Debug)]
+        struct DiscoveryControl<F> {
+            on_admit: F,
+            candidate_scan: bool,
+            candidate: bool,
+            identity: bool,
+        }
+
+        impl<F> DiscoveryControl<F> {
+            const fn new(on_admit: F) -> Self {
+                Self {
+                    on_admit,
+                    candidate_scan: false,
+                    candidate: false,
+                    identity: false,
+                }
+            }
+        }
+
+        impl<'db, T, F> CycleGuardControl<'db, T> for DiscoveryControl<F>
+        where
+            T: HasIdentity<'db>,
+            F: FnMut(RelationGuardWork) -> Result<(), ()>,
+        {
+            type Error = ();
+
+            fn admit(&mut self, work: RelationGuardWork) -> Result<(), Self::Error> {
+                match work {
+                    RelationGuardWork::CandidateScan { .. } => self.candidate_scan = true,
+                    RelationGuardWork::Candidate => self.candidate = true,
+                    RelationGuardWork::Identity => self.identity = true,
+                    RelationGuardWork::CacheAccess { .. }
+                    | RelationGuardWork::ExactScan { .. }
+                    | RelationGuardWork::ActivePush
+                    | RelationGuardWork::Relocate { .. }
+                    | RelationGuardWork::Resource { .. }
+                    | RelationGuardWork::Finish
+                    | RelationGuardWork::KeyCheck
+                    | RelationGuardWork::CacheKeyScan { .. } => {}
+                }
+                (self.on_admit)(work)
+            }
+
+            fn key_has_fixed_cost(_key: &T) -> bool {
+                true
+            }
+
+            fn candidate(&mut self, db: &'db dyn Db, item: &T, active: &T) -> Result<bool, ()> {
+                self.candidate = true;
+                Ok(item.may_share_identity(db, active))
+            }
+
+            fn identity(&mut self, db: &'db dyn Db, item: &T) -> Result<T::Id, ()> {
+                self.identity = true;
+                Ok(item.to_identity(db))
+            }
+        }
+
+        /// Starts an uncached visit and requires a new pending scope, rejecting other outcomes.
+        fn begin_pending<'a, 'db, T, C>(
+            db: &'db dyn Db,
+            detector: &'a CycleDetector<'db, TestVisit, T, u8, 2>,
+            item: T,
+            control: &mut C,
+        ) -> anyhow::Result<CycleDetectorScope<'a, 'db, TestVisit, T, u8, 2>>
+        where
+            T: Copy + Eq + Hash + HasIdentity<'db>,
+            C: CycleGuardControl<'db, T, Error = ()>,
+        {
+            match detector.lookup_visit_admitted(db, item, control) {
+                Ok(CycleDetectorLookup::Visit(CycleDetectorVisit::Pending(scope))) => Ok(scope),
+                Ok(CycleDetectorLookup::Cached(_)) => anyhow::bail!("expected an uncached visit"),
+                Ok(CycleDetectorLookup::Visit(CycleDetectorVisit::Ready(_))) => {
+                    anyhow::bail!("expected a new visit, not exact reentry")
+                }
+                Ok(CycleDetectorLookup::Visit(CycleDetectorVisit::Cycle(_))) => {
+                    anyhow::bail!("distinct full keys must have distinct identities")
+                }
+                Err(error) => anyhow::bail!("visit was rejected: {error:?}"),
+            }
+        }
+
+        /// Verifies full-key recursion, distinct-key entry, and cache ownership in either identity mode.
+        fn full_key_visits<'db, T>(
+            db: &'db dyn Db,
+            root_key: T,
+            child_key: T,
+            expected_mode: CycleIdentityMode,
+        ) -> anyhow::Result<()>
+        where
+            T: Copy + Eq + Hash + HasIdentity<'db>,
+        {
+            let detector = CycleDetector::<TestVisit, T, u8, 2>::new(0);
+            let mut control = DiscoveryControl::new(|_| Ok(()));
+            let root = begin_pending(db, &detector, root_key, &mut control)?;
+            assert_eq!(detector.ownership_probe_counts(), (1, 0));
+            assert_eq!(
+                control.candidate_scan,
+                expected_mode == CycleIdentityMode::Abstract
+            );
+            assert!(!control.candidate);
+            assert!(!control.identity);
+
+            let Ok(CycleDetectorLookup::Visit(CycleDetectorVisit::Ready(fallback))) =
+                detector.lookup_visit_admitted(db, root_key, &mut control)
+            else {
+                anyhow::bail!("exact reentry must return the fallback");
+            };
+            assert_eq!(fallback, 0);
+            assert_eq!(detector.ownership_probe_counts(), (1, 0));
+            let child = begin_pending(db, &detector, child_key, &mut control)?;
+            assert_eq!(detector.ownership_probe_counts(), (2, 0));
+            assert_eq!(
+                control.candidate_scan,
+                expected_mode == CycleIdentityMode::Abstract
+            );
+            assert_eq!(control.candidate, expected_mode == CycleIdentityMode::Abstract);
+            assert_eq!(control.identity, expected_mode == CycleIdentityMode::Abstract);
+            assert_eq!(child.finish(20), 20);
+            assert_eq!(detector.ownership_probe_counts(), (1, 1));
+            assert_eq!(root.finish(10), 10);
+            assert_eq!(detector.ownership_probe_counts(), (0, 2));
+
+            assert_eq!(detector.visit(db, root_key, || 99), 10);
+            assert_eq!(detector.visit(db, child_key, || 99), 20);
+            assert_eq!(detector.ownership_probe_counts(), (0, 2));
+            Ok(())
+        }
+
+        /// Exact mode skips discovery while preserving the results and ownership of full-key visits.
+        #[test]
+        fn exact_identity_omits_discovery() -> anyhow::Result<()> {
+            let db = setup_db();
+            full_key_visits(
+                &db,
+                ExactIdentityItem(1),
+                ExactIdentityItem(2),
+                CycleIdentityMode::Exact,
+            )?;
+            full_key_visits(&db, 1_u8, 2_u8, CycleIdentityMode::Abstract)
+        }
+
+        /// Entry admissions whose callbacks must finish before an active item is inserted.
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        enum EntryAdmission {
+            CacheAccess,
+            ExactScan,
+            ActivePush,
+        }
+
+        impl EntryAdmission {
+            const fn matches(self, work: RelationGuardWork) -> bool {
+                match work {
+                    RelationGuardWork::CacheAccess { .. } => match self {
+                        Self::CacheAccess => true,
+                        Self::ExactScan | Self::ActivePush => false,
+                    },
+                    RelationGuardWork::ExactScan { .. } => match self {
+                        Self::ExactScan => true,
+                        Self::CacheAccess | Self::ActivePush => false,
+                    },
+                    RelationGuardWork::ActivePush => match self {
+                        Self::ActivePush => true,
+                        Self::CacheAccess | Self::ExactScan => false,
+                    },
+                    RelationGuardWork::CandidateScan { .. }
+                    | RelationGuardWork::Candidate
+                    | RelationGuardWork::Identity
+                    | RelationGuardWork::Relocate { .. }
+                    | RelationGuardWork::Resource { .. }
+                    | RelationGuardWork::Finish
+                    | RelationGuardWork::KeyCheck
+                    | RelationGuardWork::CacheKeyScan { .. } => false,
+                }
+            }
+        }
+
+        /// Refusal leaves the enclosing scope and storage unchanged, so the same child can retry.
+        #[test_case::test_case(EntryAdmission::CacheAccess; "cache access")]
+        #[test_case::test_case(EntryAdmission::ExactScan; "exact scan")]
+        #[test_case::test_case(EntryAdmission::ActivePush; "active push")]
+        fn exact_identity_entry_refusal(admission: EntryAdmission) -> anyhow::Result<()> {
+            let db = setup_db();
+            let detector = CycleDetector::<TestVisit, ExactIdentityItem, u8, 2>::new(0);
+            let mut accepting = DiscoveryControl::new(|_| Ok(()));
+            let root = begin_pending(&db, &detector, ExactIdentityItem(1), &mut accepting)?;
+            let before = detector.ownership_probe_storage();
+            let mut refusing = DiscoveryControl::new(|work| {
+                if admission.matches(work) {
+                    Err(())
+                } else {
+                    Ok(())
+                }
+            });
+            let Err(RelationGuardError::Refused(())) =
+                detector.lookup_visit_admitted(&db, ExactIdentityItem(2), &mut refusing)
+            else {
+                anyhow::bail!("entry admission must refuse the visit");
+            };
+            assert_eq!(detector.ownership_probe_storage(), before);
+            assert_eq!(detector.visit(&db, ExactIdentityItem(1), || 99), 0);
+            let retry = begin_pending(&db, &detector, ExactIdentityItem(2), &mut accepting)?;
+            assert_eq!(retry.finish(20), 20);
+            assert_eq!(detector.ownership_probe_counts(), (1, 1));
+            assert_eq!(root.finish(10), 10);
+            assert_eq!(detector.ownership_probe_counts(), (0, 2));
+            Ok(())
+        }
+
+        /// Completing a new cache entry during admission invalidates the snapshot but retains the enclosing scope.
+        #[test_case::test_case(EntryAdmission::CacheAccess; "cache access")]
+        #[test_case::test_case(EntryAdmission::ExactScan; "exact scan")]
+        #[test_case::test_case(EntryAdmission::ActivePush; "active push")]
+        fn exact_identity_rejects_callback_mutation(admission: EntryAdmission) -> anyhow::Result<()> {
+            let db = setup_db();
+            let detector = CycleDetector::<TestVisit, ExactIdentityItem, u8, 2>::new(0);
+            let mut accepting = DiscoveryControl::new(|_| Ok(()));
+            let root = begin_pending(&db, &detector, ExactIdentityItem(1), &mut accepting)?;
+            let mut mutating = DiscoveryControl::new(|work| {
+                if admission.matches(work) {
+                    assert_eq!(detector.visit(&db, ExactIdentityItem(3), || 30), 30);
+                }
+                Ok(())
+            });
+            let Err(RelationGuardError::Changed) =
+                detector.lookup_visit_admitted(&db, ExactIdentityItem(2), &mut mutating)
+            else {
+                anyhow::bail!("cache mutation must invalidate the entry snapshot");
+            };
+            assert_eq!(detector.ownership_probe_counts(), (1, 1));
+            assert_eq!(detector.visit(&db, ExactIdentityItem(1), || 99), 0);
+            assert_eq!(detector.visit(&db, ExactIdentityItem(3), || 99), 30);
+            let retry = begin_pending(&db, &detector, ExactIdentityItem(2), &mut accepting)?;
+            assert_eq!(retry.finish(20), 20);
+            assert_eq!(root.finish(10), 10);
+            assert_eq!(detector.ownership_probe_counts(), (0, 3));
+            Ok(())
+        }
+
+        /// Dropping an inline nested callback visit restores the snapshot and permits entry.
+        #[test_case::test_case(EntryAdmission::CacheAccess; "cache access")]
+        #[test_case::test_case(EntryAdmission::ExactScan; "exact scan")]
+        #[test_case::test_case(EntryAdmission::ActivePush; "active push")]
+        fn exact_identity_accepts_restored_callback_snapshot(
+            admission: EntryAdmission,
+        ) -> anyhow::Result<()> {
+            let db = setup_db();
+            let detector = CycleDetector::<TestVisit, ExactIdentityItem, u8, 2>::new(0);
+            let mut accepting = DiscoveryControl::new(|_| Ok(()));
+            let root = begin_pending(&db, &detector, ExactIdentityItem(1), &mut accepting)?;
+            let before = detector.ownership_probe_storage();
+            let mut reentrant = DiscoveryControl::new(|work| {
+                if admission.matches(work) {
+                    let CycleDetectorVisit::Pending(nested) =
+                        detector.begin_visit(&db, ExactIdentityItem(3))
+                    else {
+                        return Err(());
+                    };
+                    drop(nested);
+                    assert_eq!(detector.ownership_probe_storage(), before);
+                }
+                Ok(())
+            });
+            let child = begin_pending(&db, &detector, ExactIdentityItem(2), &mut reentrant)?;
+            assert_eq!(detector.ownership_probe_counts(), (2, 0));
+            drop(child);
+            assert_eq!(detector.ownership_probe_storage(), before);
+            assert_eq!(root.finish(10), 10);
+            assert_eq!(detector.ownership_probe_counts(), (0, 1));
+            Ok(())
+        }
     }
 }

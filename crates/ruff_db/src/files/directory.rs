@@ -99,7 +99,7 @@ pub fn directory_listing<'db>(
     directory_listing_query(db, directory).map_err(Clone::clone)
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn directory_listing_query(
     db: &dyn Db,
     directory: File,

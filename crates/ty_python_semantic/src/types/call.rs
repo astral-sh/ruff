@@ -10,6 +10,11 @@ use ruff_python_ast as ast;
 
 mod arguments;
 pub(crate) mod bind;
+pub(in crate::types) mod bindings;
+pub(in crate::types) mod dunder;
+pub(in crate::types) mod function_bindings;
+pub(in crate::types) mod invocation;
+pub(in crate::types) mod preparation;
 pub(super) use arguments::{Argument, CallArguments};
 pub(super) use bind::{
     Binding, Bindings, CallDiagnosticOverride, CallableBinding, MatchedArgument,
@@ -168,7 +173,7 @@ impl<'db> Type<'db> {
         op: ast::Operator,
         right_ty: Type<'db>,
     ) -> Option<&'db BinaryOperationResult<'db>> {
-        #[salsa::tracked(returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(attempt = ReturnOnly, returns(ref), cycle_initial=|_, _, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_bin_op_result_impl<'db>(
             db: &'db dyn Db,
             program: Program<'db>,

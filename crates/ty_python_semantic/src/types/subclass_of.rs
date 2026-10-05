@@ -1,19 +1,26 @@
 use crate::Db;
-use crate::FxOrderSet;
 use crate::ProgramEnvironment;
+use self::metaclass::{
+    OrdinaryMetaclassInstance, OrdinarySubclassMetaclass, SubclassMetaclassFacts,
+    subclass_meta_type_sync, subclass_to_instance_sync,
+};
 use crate::place::PlaceAndQualifiers;
 use crate::types::class::{DynamicClassLiteral, metaclass_instance_type};
 use crate::types::constraints::ConstraintSet;
+use crate::types::mapping::effects::{MappingEffects, MappingOperation};
+use crate::types::member_lookup::mro_dispatch::{
+    MroLookupFacts, OrdinaryMroLookupEffects, subclass_find_name_in_mro_sync,
+};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral, ClassType,
-    DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
-    MemberLookupPolicy, ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping,
-    TypeQualifiers, TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
-    todo_type,
+    DynamicType, IntersectionBuilder, KnownClass, MaterializationKind, MemberLookupPolicy,
+    ProtocolInstanceType, SpecialFormType, Type, TypeContext, TypeMapping, TypeQualifiers,
+    TypeRecursionContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder, todo_type,
 };
-use ty_python_core::definition::Definition;
+
+pub(in crate::types) mod metaclass;
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
@@ -47,20 +54,13 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         subclass_of: impl Into<SubclassOfInner<'db>>,
     ) -> Type<'db> {
-        let subclass_of = subclass_of.into();
-        match subclass_of {
-            SubclassOfInner::Class(class) => {
-                if class.is_final(db) {
-                    Type::from(class)
-                } else if class.is_object(db) {
-                    Self::subclass_of_object(db, env)
-                } else {
-                    Type::SubclassOf(Self { subclass_of })
-                }
-            }
-            SubclassOfInner::Dynamic(_)
-            | SubclassOfInner::Protocol(_)
-            | SubclassOfInner::TypeVar(_) => Type::SubclassOf(Self { subclass_of }),
+        match subclass_from_sync(
+            subclass_of.into(),
+            SubclassConstructionFacts,
+            &InlineSubclassConstruction { db, env },
+        ) {
+            Ok(ty) => ty,
+            Err(error) => match error {},
         }
     }
 
@@ -100,31 +100,20 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> Result<Type<'db>, Type<'db>> {
-        // Handle unions and intersections by distributing `type[]` over each element:
-        // `type[A | B]` -> `type[A] | type[B]`
-        // `type[A & B]` -> `type[A] & type[B]`
-        match ty {
-            Type::Never => Ok(Type::Never),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .try_fold(UnionBuilder::new(db, env), |builder, element| {
-                    Ok(builder.add(Self::try_from_instance(db, env, *element)?))
-                })
-                .map(UnionBuilder::build),
-            Type::Intersection(intersection) if intersection.negative(db).is_empty() => {
-                intersection
-                    .iter_positive(db)
-                    .try_fold(IntersectionBuilder::new(db, env), |builder, element| {
-                        Ok(builder.add_positive(Self::try_from_instance(db, env, element)?))
-                    })
-                    .map(IntersectionBuilder::build)
-            }
-            Type::ProtocolInstance(protocol) => Ok(protocol.to_meta_type(db, env)),
-            _ => SubclassOfInner::try_from_instance(db, env, ty)
-                .map(|subclass_of| Self::from(db, env, subclass_of))
-                .ok_or(ty),
+        match subclass_instance_sync(env, ty, &InlineSubclassInstance { db }) {
+            Ok(result) => result,
+            Err(error) => match error {},
         }
+    }
+
+    pub(in crate::types) async fn try_from_instance_with<E: SubclassInstanceEffects<'db>>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        effects: &E,
+    ) -> Result<Result<Type<'db>, Type<'db>>, E::Error> {
+        let _ = db;
+        subclass_instance_with(env, ty, effects).await
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
@@ -204,66 +193,51 @@ impl<'db> SubclassOfType<'db> {
             })
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    #[ty_mapping_probe_macros::dual_mapping]
+    pub(super) async fn apply_type_mapping_with<'a, E: MappingEffects<'db>>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Type<'db> {
-        match self.subclass_of {
+        effects: &E,
+    ) -> Result<Type<'db>, E::Error> {
+        Ok(match self.subclass_of {
             SubclassOfInner::Class(class) => Type::SubclassOf(Self {
-                subclass_of: SubclassOfInner::Class(class.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                )),
+                subclass_of: SubclassOfInner::Class(
+                    class
+                        .apply_type_mapping_with(db, type_mapping, tcx, visitor, effects)
+                        .await?,
+                ),
             }),
-            SubclassOfInner::Protocol(protocol) => protocol
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                .to_meta_type(db, visitor.env),
+            SubclassOfInner::Protocol(protocol) => {
+                effects.legacy(MappingOperation::Protocol, || {
+                    protocol
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                        .to_meta_type(db, visitor.env)
+                })?
+            }
             SubclassOfInner::Dynamic(_) => match type_mapping {
-                TypeMapping::Materialize(materialization_kind) => match materialization_kind {
-                    MaterializationKind::Top => KnownClass::Type.to_instance(db, visitor.env),
-                    MaterializationKind::Bottom => Type::Never,
-                },
+                TypeMapping::Materialize(materialization_kind) => {
+                    effects.legacy(MappingOperation::MaterializationOrPolarity, || {
+                        match materialization_kind {
+                            MaterializationKind::Top => {
+                                KnownClass::Type.to_instance(db, visitor.env)
+                            }
+                            MaterializationKind::Bottom => Type::Never,
+                        }
+                    })?
+                }
                 _ => Type::SubclassOf(self),
             },
             SubclassOfInner::TypeVar(typevar) => {
-                let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                Self::try_from_instance(db, visitor.env, mapped)
-                    .unwrap_or_else(|_| visitor.project_meta_type(db, mapped))
+                effects.legacy(MappingOperation::SubclassTypeVar, || {
+                    let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
+                    Self::try_from_instance(db, visitor.env, mapped)
+                        .unwrap_or_else(|_| visitor.project_meta_type(db, mapped))
+                })?
             }
-        }
-    }
-
-    pub(super) fn find_legacy_typevars_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
-    ) {
-        match self.subclass_of {
-            SubclassOfInner::Dynamic(_) => {}
-            SubclassOfInner::Class(class) => {
-                class.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
-            }
-            SubclassOfInner::Protocol(protocol) => {
-                protocol.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
-            }
-            SubclassOfInner::TypeVar(typevar) => {
-                Type::TypeVar(typevar).find_legacy_typevars_impl(
-                    db,
-                    env,
-                    binding_context,
-                    typevars,
-                    visitor,
-                );
-            }
-        }
+        })
     }
 
     pub(crate) fn find_name_in_mro_with_policy(
@@ -273,28 +247,17 @@ impl<'db> SubclassOfType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
-        {
-            return Some(member);
+        match subclass_find_name_in_mro_sync(
+            self,
+            env,
+            name,
+            policy,
+            MroLookupFacts,
+            &OrdinaryMroLookupEffects { db },
+        ) {
+            Ok(member) => member,
+            Err(never) => match never {},
         }
-
-        let class_like = match self.subclass_of.with_transposed_type_var(db, env) {
-            SubclassOfInner::Class(class) => Type::from(class),
-            SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SubclassOfInner::Protocol(protocol) => Type::from(*protocol.class_origin(db)?),
-            SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.as_type(db, env)
-                    }
-                }
-            }
-        };
-
-        class_like.find_name_in_mro_with_policy(db, env, name, policy)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -312,11 +275,9 @@ impl<'db> SubclassOfType<'db> {
     }
 
     pub(crate) fn to_instance(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self.subclass_of {
-            SubclassOfInner::Class(class) => Type::instance(db, env, class),
-            SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
-            SubclassOfInner::Protocol(protocol) => Type::ProtocolInstance(protocol),
-            SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
+        match subclass_to_instance_sync(self.subclass_of, &OrdinaryMetaclassInstance { db, env }) {
+            Ok(instance) => instance,
+            Err(never) => match never {},
         }
     }
 
@@ -350,41 +311,13 @@ impl<'db> SubclassOfType<'db> {
         env: &ProgramEnvironment<'db>,
         context: &TypeRecursionContext<'db>,
     ) -> Type<'db> {
-        match self
-            .subclass_of
-            .with_transposed_type_var_with_recursion(db, env, context)
-        {
-            SubclassOfInner::Dynamic(dynamic) => {
-                SubclassOfType::from(db, env, SubclassOfInner::Dynamic(dynamic))
-            }
-            // A metaclass selected at runtime can already have a type such as `type[M]`,
-            // rather than being a class literal. Projecting to instances preserves this
-            // constraint when computing its possible subclasses.
-            SubclassOfInner::Class(class) => class
-                .inferred_metaclass(db)
-                .for_inheritance(db, env)
-                .to_instance_approximation(db, env)
-                .map(|instance| instance.to_meta_type_with_recursion(db, env, context))
-                .unwrap_or(SubclassOfType::subclass_of_unknown()),
-            // Structural implementations of a protocol can have arbitrary metaclasses. The only
-            // guaranteed upper bound is therefore `type`, not the protocol origin's metaclass.
-            SubclassOfInner::Protocol(_) => KnownClass::Type.to_subclass_of(db, env),
-            // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
-            // the bounds from instance types to `type[]` types. For example, `type[T]` where
-            // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
-            // then the metatype of that bound.
-            SubclassOfInner::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db, env) {
-                    // `with_transposed_type_var` always adds a bound for unbounded TypeVars
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.to_meta_type_with_recursion(db, env, context)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .as_type(db, env)
-                        .to_meta_type_with_recursion(db, env, context),
-                }
-            }
+        match subclass_meta_type_sync(
+            self.subclass_of,
+            SubclassMetaclassFacts,
+            &OrdinarySubclassMetaclass { db, env, context },
+        ) {
+            Ok(metaclass) => metaclass,
+            Err(never) => match never {},
         }
     }
 
@@ -545,19 +478,9 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassType<'db>> {
-        match self {
-            Self::Dynamic(_) | Self::Protocol(_) => None,
-            Self::Class(class) => Some(class),
-            Self::TypeVar(bound_typevar) => {
-                match bound_typevar.require_bound_or_constraints(db, env) {
-                    TypeVarBoundOrConstraints::UpperBound(bound) => {
-                        Self::try_from_instance(db, env, bound)
-                            .and_then(|subclass_of| subclass_of.into_class(db, env))
-                    }
-                    // TODO this is quite imprecise
-                    TypeVarBoundOrConstraints::Constraints(_) => Some(ClassType::object(db, env)),
-                }
-            }
+        match subclass_inner_into_class_sync(self, &InlineSubclassInnerClass { db, env }) {
+            Ok(class) => class,
+            Err(error) => match error {},
         }
     }
 
@@ -580,19 +503,15 @@ impl<'db> SubclassOfInner<'db> {
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
     ) -> Option<Self> {
-        Some(match ty {
-            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db, env)),
-            Type::TypedDict(typed_dict) => match typed_dict {
-                TypedDictType::Class(class) => SubclassOfInner::Class(class),
-                TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
-                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
-                ),
-            },
-            Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
-            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
-            _ => return None,
-        })
+        match subclass_instance_inner_sync(
+            env,
+            ty,
+            SubclassInstanceFacts,
+            &InlineSubclassInstance { db },
+        ) {
+            Ok(inner) => inner,
+            Err(error) => match error {},
+        }
     }
 
     /// Converts `type[T]` with a type variable `T` into a type variable whose bound or
@@ -703,5 +622,291 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
 impl<'db> From<DynamicClassLiteral<'db>> for SubclassOfInner<'db> {
     fn from(value: DynamicClassLiteral<'db>) -> Self {
         SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Dynamic(value)))
+    }
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousSubclassInnerClassEffects)]
+    pub(in crate::types) trait SubclassInnerClassEffects<'db> {
+        type Error;
+
+        #[operation(checkpoint)]
+        async fn checkpoint(&self) -> Result<(), Self::Error>;
+        #[operation(child)]
+        async fn require_bound_or_constraints(
+            &self,
+            typevar: BoundTypeVarInstance<'db>,
+        ) -> Result<TypeVarBoundOrConstraints<'db>, Self::Error>;
+        #[operation(child)]
+        async fn bound_into_class(&self, bound: Type<'db>) -> Result<Option<ClassType<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn object_class(&self) -> Result<ClassType<'db>, Self::Error>;
+    }
+
+    #[synchronous(subclass_inner_into_class_sync)]
+    #[capabilities(effects = SubclassInnerClassEffects)]
+    #[passive_values()]
+    pub(in crate::types) async fn subclass_inner_into_class_with<'db, E: SubclassInnerClassEffects<'db>>(
+        subclass_of: SubclassOfInner<'db>,
+        effects: &E,
+    ) -> Result<Option<ClassType<'db>>, E::Error> {
+        effects.checkpoint().await?;
+        match subclass_of {
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) => Ok(None),
+            SubclassOfInner::Class(class) => Ok(Some(class)),
+            SubclassOfInner::TypeVar(typevar) => {
+                match effects.require_bound_or_constraints(typevar).await? {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => effects.bound_into_class(bound).await,
+                    // TODO this is quite imprecise
+                    TypeVarBoundOrConstraints::Constraints(_) => Ok(Some(effects.object_class().await?)),
+                }
+            }
+        }
+    }
+}
+
+struct InlineSubclassInnerClass<'env, 'db> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+}
+
+impl<'db> SynchronousSubclassInnerClassEffects<'db> for InlineSubclassInnerClass<'_, 'db> {
+    type Error = std::convert::Infallible;
+
+    fn checkpoint(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn require_bound_or_constraints(
+        &self,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Result<TypeVarBoundOrConstraints<'db>, Self::Error> {
+        Ok(typevar.require_bound_or_constraints(self.db, self.env))
+    }
+
+    fn bound_into_class(&self, bound: Type<'db>) -> Result<Option<ClassType<'db>>, Self::Error> {
+        Ok(SubclassOfInner::try_from_instance(self.db, self.env, bound)
+            .and_then(|subclass_of| subclass_of.into_class(self.db, self.env)))
+    }
+
+    fn object_class(&self) -> Result<ClassType<'db>, Self::Error> {
+        Ok(ClassType::object(self.db, self.env))
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(in crate::types) struct SubclassConstructionFacts;
+
+ty_mapping_probe_macros::shared_semantic_family! {
+#[synchronous(SynchronousSubclassConstructionEffects)]
+pub(in crate::types) trait SubclassConstructionEffects<'db> {
+    type Error;
+    #[operation(checkpoint)]
+    async fn checkpoint(&self) -> Result<(), Self::Error>;
+    #[operation(child)]
+    async fn is_final(&self, class: ClassType<'db>) -> Result<bool, Self::Error>;
+    #[operation(source)]
+    async fn is_object(&self, class: ClassType<'db>) -> Result<bool, Self::Error>;
+    #[operation(child)]
+    async fn subclass_of_object(&self) -> Result<Type<'db>, Self::Error>;
+}
+
+#[finite_capability]
+impl SubclassConstructionFacts {
+    fn class_type<'db>(&self, class: ClassType<'db>) -> Type<'db> {
+        Type::from(class)
+    }
+    fn subclass<'db>(&self, subclass_of: SubclassOfInner<'db>) -> Type<'db> {
+        Type::SubclassOf(SubclassOfType { subclass_of })
+    }
+}
+
+#[synchronous(subclass_from_sync)]
+#[capabilities(effects = SubclassConstructionEffects, facts = SubclassConstructionFacts)]
+#[passive_values(SubclassOfInner::Class, SubclassOfInner::Dynamic, SubclassOfInner::Protocol, SubclassOfInner::TypeVar)]
+pub(in crate::types) async fn subclass_from_with<'db, E: SubclassConstructionEffects<'db>>(
+    subclass_of: SubclassOfInner<'db>,
+    facts: SubclassConstructionFacts,
+    effects: &E,
+) -> Result<Type<'db>, E::Error> {
+    effects.checkpoint().await?;
+    match subclass_of {
+        SubclassOfInner::Class(class) => {
+            if effects.is_final(class).await? {
+                Ok(facts.class_type(class))
+            } else if effects.is_object(class).await? {
+                effects.subclass_of_object().await
+            } else {
+                Ok(facts.subclass(subclass_of))
+            }
+        }
+        SubclassOfInner::Dynamic(_) | SubclassOfInner::Protocol(_) | SubclassOfInner::TypeVar(_) => Ok(facts.subclass(subclass_of)),
+    }
+}
+}
+
+struct InlineSubclassConstruction<'env, 'db> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+}
+
+impl<'db> SynchronousSubclassConstructionEffects<'db> for InlineSubclassConstruction<'_, 'db> {
+    type Error = std::convert::Infallible;
+    fn checkpoint(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn is_final(&self, class: ClassType<'db>) -> Result<bool, Self::Error> {
+        Ok(class.is_final(self.db))
+    }
+    fn is_object(&self, class: ClassType<'db>) -> Result<bool, Self::Error> {
+        Ok(class.is_object(self.db))
+    }
+    fn subclass_of_object(&self) -> Result<Type<'db>, Self::Error> {
+        Ok(SubclassOfType::subclass_of_object(self.db, self.env))
+    }
+}
+
+pub(in crate::types) struct SubclassInstanceFacts;
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousSubclassInstanceEffects)]
+    pub(in crate::types) trait SubclassInstanceEffects<'db> {
+        type Error;
+        #[operation(source)]
+        async fn nominal_class(&self, env: &ProgramEnvironment<'db>, instance: crate::types::NominalInstanceType<'db>) -> Result<ClassType<'db>, Self::Error>;
+        #[operation(source)]
+        async fn negative_empty(&self, intersection: crate::types::IntersectionType<'db>) -> Result<bool, Self::Error>;
+        #[operation(child)]
+        async fn union_conversion(&self, env: &ProgramEnvironment<'db>, union: crate::types::UnionType<'db>) -> Result<Result<Type<'db>, Type<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn intersection_conversion(&self, env: &ProgramEnvironment<'db>, intersection: crate::types::IntersectionType<'db>) -> Result<Result<Type<'db>, Type<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn protocol_meta(&self, env: &ProgramEnvironment<'db>, protocol: ProtocolInstanceType<'db>) -> Result<Type<'db>, Self::Error>;
+        #[operation(child)]
+        async fn inner(&self, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Result<Option<SubclassOfInner<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn subclass(&self, env: &ProgramEnvironment<'db>, inner: SubclassOfInner<'db>) -> Result<Type<'db>, Self::Error>;
+    }
+
+    #[finite_capability]
+    impl SubclassInstanceFacts {
+        fn typed_dict<'db>(&self, typed_dict: TypedDictType<'db>) -> SubclassOfInner<'db> {
+            match typed_dict {
+                TypedDictType::Class(class) => SubclassOfInner::Class(class),
+                TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
+                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
+                ),
+            }
+        }
+    }
+
+    #[synchronous(subclass_instance_inner_sync)]
+    #[capabilities(effects = SubclassInstanceEffects, facts = SubclassInstanceFacts)]
+    #[passive_values(SubclassOfInner::Class, SubclassOfInner::TypeVar, SubclassOfInner::Dynamic, DynamicType::Any, DynamicType::Unknown)]
+    pub(in crate::types) async fn subclass_instance_inner_with<'db, E: SubclassInstanceEffects<'db>>(
+        env: &ProgramEnvironment<'db>, ty: Type<'db>, facts: SubclassInstanceFacts, effects: &E,
+    ) -> Result<Option<SubclassOfInner<'db>>, E::Error> {
+        let inner = match ty {
+            Type::NominalInstance(instance) => SubclassOfInner::Class(effects.nominal_class(env, instance).await?),
+            Type::TypedDict(typed_dict) => facts.typed_dict(typed_dict),
+            Type::TypeVar(typevar) => SubclassOfInner::TypeVar(typevar),
+            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
+            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
+            _ => return Ok(None),
+        };
+        Ok(Some(inner))
+    }
+
+    #[synchronous(subclass_instance_sync)]
+    #[capabilities(effects = SubclassInstanceEffects)]
+    #[passive_values(Type::Never, Err)]
+    pub(in crate::types) async fn subclass_instance_with<'db, E: SubclassInstanceEffects<'db>>(
+        env: &ProgramEnvironment<'db>, ty: Type<'db>, effects: &E,
+    ) -> Result<Result<Type<'db>, Type<'db>>, E::Error> {
+        // Handle unions and intersections by distributing `type[]` over each element:
+        // `type[A | B]` -> `type[A] | type[B]`
+        // `type[A & B]` -> `type[A] & type[B]`
+        match ty {
+            Type::Never => return Ok(Ok(Type::Never)),
+            Type::Union(union) => return effects.union_conversion(env, union).await,
+            Type::Intersection(intersection) if effects.negative_empty(intersection).await? => return effects.intersection_conversion(env, intersection).await,
+            Type::ProtocolInstance(protocol) => return Ok(Ok(effects.protocol_meta(env, protocol).await?)),
+            _ => {}
+        }
+        match effects.inner(env, ty).await? {
+            Some(inner) => Ok(Ok(effects.subclass(env, inner).await?)),
+            None => Ok(Err(ty)),
+        }
+    }
+}
+
+struct InlineSubclassInstance<'db> {
+    db: &'db dyn Db,
+}
+
+impl<'db> SynchronousSubclassInstanceEffects<'db> for InlineSubclassInstance<'db> {
+    type Error = std::convert::Infallible;
+    fn nominal_class(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        instance: crate::types::NominalInstanceType<'db>,
+    ) -> Result<ClassType<'db>, Self::Error> {
+        Ok(instance.class(self.db, env))
+    }
+    fn negative_empty(
+        &self,
+        intersection: crate::types::IntersectionType<'db>,
+    ) -> Result<bool, Self::Error> {
+        Ok(intersection.negative(self.db).is_empty())
+    }
+    fn union_conversion(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        union: crate::types::UnionType<'db>,
+    ) -> Result<Result<Type<'db>, Type<'db>>, Self::Error> {
+        Ok(union
+            .elements(self.db)
+            .iter()
+            .try_fold(UnionBuilder::new(self.db, env), |builder, element| {
+                Ok(builder.add(SubclassOfType::try_from_instance(self.db, env, *element)?))
+            })
+            .map(UnionBuilder::build))
+    }
+    fn intersection_conversion(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        intersection: crate::types::IntersectionType<'db>,
+    ) -> Result<Result<Type<'db>, Type<'db>>, Self::Error> {
+        Ok(intersection
+            .iter_positive(self.db)
+            .try_fold(
+                IntersectionBuilder::new(self.db, env),
+                |builder, element| {
+                    Ok(builder
+                        .add_positive(SubclassOfType::try_from_instance(self.db, env, element)?))
+                },
+            )
+            .map(IntersectionBuilder::build))
+    }
+    fn protocol_meta(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> Result<Type<'db>, Self::Error> {
+        Ok(protocol.to_meta_type(self.db, env))
+    }
+    fn inner(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> Result<Option<SubclassOfInner<'db>>, Self::Error> {
+        subclass_instance_inner_sync(env, ty, SubclassInstanceFacts, self)
+    }
+    fn subclass(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        inner: SubclassOfInner<'db>,
+    ) -> Result<Type<'db>, Self::Error> {
+        Ok(SubclassOfType::from(self.db, env, inner))
     }
 }

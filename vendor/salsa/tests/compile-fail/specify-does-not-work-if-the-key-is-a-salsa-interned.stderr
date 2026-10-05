@@ -1,0 +1,25 @@
+error[E0277]: the trait bound `MyInterned<'_>: salsa::plumbing::TrackedStructInDb` is not satisfied
+  --> tests/compile-fail/specify-does-not-work-if-the-key-is-a-salsa-interned.rs:15:1
+   |
+15 | #[salsa::tracked(specify)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `salsa::plumbing::TrackedStructInDb` is not implemented for `MyInterned<'_>`
+  --> tests/compile-fail/specify-does-not-work-if-the-key-is-a-salsa-interned.rs:5:1
+   |
+ 5 | #[salsa::interned]
+   | ^^^^^^^^^^^^^^^^^^
+help: the trait `salsa::plumbing::TrackedStructInDb` is implemented for `MyTracked<'_>`
+  --> tests/compile-fail/specify-does-not-work-if-the-key-is-a-salsa-interned.rs:10:1
+   |
+10 | #[salsa::tracked]
+   | ^^^^^^^^^^^^^^^^^
+note: required by a bound in `salsa::function::specify::<impl salsa::function::IngredientImpl<C>>::specify_and_record`
+  --> src/function/specify.rs
+   |
+   |     pub fn specify_and_record<'db>(&'db self, db: &'db C::DbView, key: Id, value: C::Output<'db>)
+   |            ------------------ required by a bound in this associated function
+   |     where
+   |         C::Input<'db>: TrackedStructInDb,
+   |                        ^^^^^^^^^^^^^^^^^ required by this bound in `salsa::function::specify::<impl IngredientImpl<C>>::specify_and_record`
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,26 +1,70 @@
-mod conversion;
+pub(in crate::types) mod conversion;
 pub(super) mod evaluation;
+pub(in crate::types) mod function_descriptor;
+#[cfg(feature = "experimental-analysis")]
+mod runtime;
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use runtime::register_callable_values;
+#[cfg(test)]
+pub(crate) mod scheduled_probe;
 
+use self::function_descriptor::{
+    FunctionBindingFacts, OrdinaryFunctionBinding, bind_function_descriptor_sync,
+    function_like_kind_sync, underlying_function_sync,
+};
 use crate::ProgramEnvironment;
+use crate::types::signatures::effects::{
+    LegacyInlineEffects, SignatureEffects, SignatureResult, legacy_inline,
+};
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
+use std::ops::ControlFlow;
 
 use crate::{
-    Db, FxOrderSet,
+    Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, DescriptorOrigin, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownClass, KnownInstanceType, Parameters, Signature, Type,
+        ApplyTypeMappingVisitor, DescriptorOrigin, FunctionType, InternedType, KnownClass,
+        KnownInstanceType, Parameters, Signature, Type,
         TypeContext, TypeMapping, UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{ConstraintFold, ConstraintFoldKind, ConstraintSet},
         cyclic::{CallableExpansion, CallableRecursionGuard},
         function::OverloadLiteral,
-        known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
+        known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
     },
 };
 use ty_python_core::definition::Definition;
+
+/// Semantic dependencies reached while converting a type into its callable signatures.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CallableConversionOperation {
+    RecursionGuard,
+    GuardCycle,
+    RecursiveReference,
+    DynamicSignature,
+    RecursiveTypeUnfold,
+    ClassIdentity,
+    NewTypeBase,
+    SubclassInstance,
+    ProtocolConstructor,
+    TypeVarBoundOrConstraints,
+    EnumInstance,
+    TypeAliasValue,
+    KnownBoundMethod,
+    WrapperSignature,
+    MethodWrapper,
+    PartialSignature,
+    NewTypeSignature,
+    IntersectionAlternatives,
+    EnumComplement,
+    Continuation,
+    RuntimeUnion,
+    Constructor,
+    CallMember,
+    BoundMethod,
+}
 
 /// The semantic inputs to callable conversion, independent of its evaluation stack.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -33,6 +77,11 @@ pub(super) struct CallableConversionRequest<'db> {
 }
 
 impl<'db> CallableConversionRequest<'db> {
+    #[cfg(test)]
+    pub(super) fn source_type(self) -> Type<'db> {
+        self.ty
+    }
+
     pub(super) fn new(ty: Type<'db>, policy: UpcastPolicy) -> Self {
         Self {
             ty,
@@ -40,6 +89,13 @@ impl<'db> CallableConversionRequest<'db> {
             recursive_definition: None,
             unknown_is_recovery: false,
         }
+    }
+
+    pub(in crate::types) fn requires_recursion_guard(self) -> bool {
+        matches!(
+            self.ty,
+            Type::NominalInstance(_) | Type::ProtocolInstance(_)
+        )
     }
 
     fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
@@ -75,34 +131,18 @@ impl<'db> CallableConversionRequest<'db> {
 
 impl<'db> Type<'db> {
     pub(super) fn function_like_kind(self, db: &'db dyn Db) -> Option<CallableTypeKind> {
-        match self {
-            Type::FunctionLiteral(function) => Some(function.callable_type_kind(db)),
-            Type::Callable(callable) if callable.is_method_like(db) => Some(callable.kind(db)),
-            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => {
-                Some(match wrapper.kind(db) {
-                    MethodWrapperKind::Staticmethod => CallableTypeKind::StaticMethodLike,
-                    MethodWrapperKind::Classmethod => CallableTypeKind::ClassMethodLike,
-                })
-            }
-            _ => None,
+        match function_like_kind_sync(self, FunctionBindingFacts, &OrdinaryFunctionBinding { db }) {
+            Ok(kind) => kind,
+            Err(error) => match error {},
         }
-    }
-
-    pub(super) fn is_classmethod(self, db: &'db dyn Db) -> bool {
-        self.function_like_kind(db) == Some(CallableTypeKind::ClassMethodLike)
     }
 
     /// Returns the function exposed by descriptor access or a bound method's `__func__`.
     pub(super) fn underlying_function(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Type::FunctionLiteral(function) => {
-                Type::FunctionLiteral(function.underlying_function(db))
-            }
-            Type::Callable(callable) if callable.is_method_like(db) => {
-                Type::Callable(callable.into_function_like(db))
-            }
-            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => wrapper.wrapped(db),
-            _ => self,
+        match underlying_function_sync(self, FunctionBindingFacts, &OrdinaryFunctionBinding { db })
+        {
+            Ok(function) => function,
+            Err(error) => match error {},
         }
     }
 
@@ -118,39 +158,35 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        // ParamSpec specialization can produce a union of function descriptors.
-        match self {
-            Type::Union(union) => {
-                return union.try_map(db, env, |alternative| {
-                    alternative.function_like_dunder_get(db, env, instance, owner)
-                });
-            }
-            Type::TypeAlias(alias) => {
-                return alias
-                    .value_type(db)
-                    .function_like_dunder_get(db, env, instance, owner);
-            }
-            _ => {}
+        match function_descriptor_sync(
+            self,
+            env,
+            instance,
+            owner,
+            &InlineFunctionDescriptor { db, env },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
-        let kind = self.function_like_kind(db)?;
-        let receiver = match kind {
-            CallableTypeKind::StaticMethodLike => return Some(self.underlying_function(db)),
-            CallableTypeKind::ClassMethodLike => owner
-                .filter(|owner| !owner.is_none(db))
-                .or_else(|| instance.map(|instance| instance.to_meta_type(db, env))),
-            _ => instance,
-        };
-        Some(receiver.map_or_else(
-            || self.underlying_function(db),
-            |receiver| {
-                Type::BoundMethod(super::BoundMethodType::from_callable(
-                    db,
-                    self,
-                    env.program(db),
-                    receiver,
-                ))
-            },
-        ))
+    }
+
+    fn bind_function_descriptor(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        match bind_function_descriptor_sync(
+            self,
+            env,
+            instance,
+            owner,
+            &OrdinaryFunctionBinding { db },
+        ) {
+            Ok(bound) => bound,
+            Err(error) => match error {},
+        }
     }
 
     /// Create a callable type with a single non-overloaded signature.
@@ -235,7 +271,7 @@ impl<'db> Type<'db> {
         context: CallableUpcastContext<'_, 'db>,
     ) -> Option<CallableTypes<'db>> {
         if context.recursion_guard.is_none()
-            && matches!(self, Type::NominalInstance(_) | Type::ProtocolInstance(_))
+            && CallableConversionRequest::new(self, policy).requires_recursion_guard()
         {
             let recursion_guard = CallableRecursionGuard::for_constructor(db, env, self);
             return self.try_upcast_to_callable_with_policy_and_context(
@@ -258,6 +294,13 @@ impl<'db> Type<'db> {
                     Some(CallableTypes::one(CallableType::single(
                         db,
                         Signature::recursion_recovery(),
+                    )))
+                },
+                #[cfg(test)]
+                || {
+                    Some(CallableTypes::one(CallableType::single(
+                        db,
+                        Signature::unknown(),
                     )))
                 },
                 || self.try_upcast_to_callable_impl(db, env, policy, context),
@@ -528,6 +571,17 @@ pub(crate) enum UpcastPolicy {
     Unsound,
 }
 
+impl CallableTypeKind {
+    pub(in crate::types) fn runtime_class(self) -> Option<KnownClass> {
+        match self {
+            CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),
+            CallableTypeKind::StaticMethodLike => Some(KnownClass::Staticmethod),
+            CallableTypeKind::ClassMethodLike => Some(KnownClass::Classmethod),
+            _ => None,
+        }
+    }
+}
+
 impl From<TypeRelation> for UpcastPolicy {
     fn from(relation: TypeRelation) -> Self {
         match relation {
@@ -545,7 +599,7 @@ impl From<TypeRelation> for UpcastPolicy {
 /// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
 /// inferred directly as `CallableType`s; all function-literal types are subtypes of a
 /// `CallableType`.
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableType<'db> {
     #[returns(ref)]
     pub(crate) signatures: CallableSignature<'db>,
@@ -672,12 +726,7 @@ impl<'db> CallableType<'db> {
     }
 
     pub(super) fn runtime_class(self, db: &'db dyn Db) -> Option<KnownClass> {
-        match self.kind(db) {
-            CallableTypeKind::FunctionLike => Some(KnownClass::FunctionType),
-            CallableTypeKind::StaticMethodLike => Some(KnownClass::Staticmethod),
-            CallableTypeKind::ClassMethodLike => Some(KnownClass::Classmethod),
-            _ => None,
-        }
+        self.kind(db).runtime_class()
     }
 
     pub(super) fn is_dunder_paramspec(self, db: &'db dyn Db) -> bool {
@@ -698,12 +747,7 @@ impl<'db> CallableType<'db> {
 
     /// Returns `true` if this callable represents a function used as a class member.
     pub fn is_method_like(self, db: &'db dyn Db) -> bool {
-        matches!(
-            self.kind(db),
-            CallableTypeKind::FunctionLike
-                | CallableTypeKind::StaticMethodLike
-                | CallableTypeKind::ClassMethodLike
-        )
+        FunctionBindingFacts.is_method_like(self.kind(db))
     }
 
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
@@ -773,10 +817,6 @@ impl<'db> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::FunctionLike)
     }
 
-    pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
-        self.with_kind(db, CallableTypeKind::DunderParamSpec)
-    }
-
     pub(crate) fn apply_self_with_receiver(
         self,
         db: &'db dyn Db,
@@ -822,27 +862,14 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
-            return replacements.get(&self).copied().unwrap_or(self);
-        }
-
-        self.with_signatures(
+        legacy_inline(crate::types::signatures::mapping::map_callable_type_with(
             db,
-            self.signatures(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
-    }
-
-    pub(super) fn find_legacy_typevars_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        binding_context: Option<Definition<'db>>,
-        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
-        visitor: &FindLegacyTypeVarsVisitor<'db>,
-    ) {
-        self.signatures(db)
-            .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            self,
+            type_mapping,
+            tcx,
+            visitor,
+            &crate::types::signatures::mapping::InlineSignatureMappingEffects,
+        ))
     }
 }
 
@@ -951,7 +978,7 @@ impl<'a, 'db> IntoIterator for &'a CallableTypes<'db> {
     }
 }
 
-impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+impl<'state, 'c, 'db> TypeRelationChecker<'state, 'c, 'db> {
     /// Check whether one callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
@@ -961,12 +988,40 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.runtime_class(db).is_some()
-            && target.runtime_class(db) != source.runtime_class(db)
+        legacy_inline(self.check_callable_pair_with(db, &LegacyInlineEffects, source, target))
+    }
+
+    pub(crate) async fn check_callable_pair_with<E: SignatureEffects<'state, 'db, 'c>>(
+        &self,
+        db: &'db dyn Db,
+        effects: &E,
+        source: CallableType<'db>,
+        target: CallableType<'db>,
+    ) -> SignatureResult<'db, 'c, E::Error> {
+        effects
+            .local(
+                Some(4),
+                size_of::<CallableType<'db>>().checked_mul(2),
+                || (),
+            )
+            .await?;
+        let target_class = effects.callable_runtime_class(db, target).await?;
+        if target_class.is_some()
+            && target_class != effects.callable_runtime_class(db, source).await?
         {
-            return self.never();
+            return effects.local(Some(1), Some(0), || self.never()).await;
         }
-        self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+        let source = effects.callable_signatures(db, source).await?;
+        let target = effects.callable_signatures(db, target).await?;
+        effects
+            .local(
+                Some(2),
+                size_of::<&CallableSignature<'db>>().checked_mul(2),
+                || (),
+            )
+            .await?;
+        self.check_callable_signature_pair_with(db, effects, source, target)
+            .await
     }
 
     pub(super) fn check_callables_vs_callable(
@@ -975,9 +1030,43 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableTypes<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        source.iter().when_all(db, self.constraints, |element| {
-            self.check_callable_pair(db, *element, target)
-        })
+        legacy_inline(self.check_callables_vs_callable_with(
+            db,
+            &LegacyInlineEffects,
+            source,
+            target,
+        ))
+    }
+
+    pub(crate) async fn check_callables_vs_callable_with<E: SignatureEffects<'state, 'db, 'c>>(
+        &self,
+        db: &'db dyn Db,
+        effects: &E,
+        source: &CallableTypes<'db>,
+        target: CallableType<'db>,
+    ) -> SignatureResult<'db, 'c, E::Error> {
+        let (mut fold, mut elements) = effects
+            .local(Some(2), Some(0), || {
+                (
+                    ConstraintFold::new(self.constraints, ConstraintFoldKind::All),
+                    source.into_iter(),
+                )
+            })
+            .await?;
+        while let Some(element) = effects
+            .local(Some(4), Some(0), || {
+                elements.next().copied()
+            })
+            .await?
+        {
+            let when = self
+                .check_callable_pair_with(db, effects, element, target)
+                .await?;
+            if let ControlFlow::Break(when) = effects.push_constraints(db, &mut fold, when).await? {
+                return Ok(when);
+            }
+        }
+        effects.finish_constraints(db, &mut fold).await
     }
 }
 
@@ -1002,5 +1091,72 @@ mod tests {
         assert_eq!(paramspec_value, bottom);
         let top = paramspec_value.top_materialization(&db, &env);
         assert_eq!(paramspec_value, top);
+    }
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+#[synchronous(SynchronousFunctionDescriptorEffects)]
+pub(in crate::types) trait FunctionDescriptorEffects<'db> {
+ type Error;
+ #[operation(checkpoint)]
+ async fn checkpoint(&self) -> Result<(), Self::Error>;
+ #[operation(child)]
+ async fn union(&self, union: UnionType<'db>, instance: Option<Type<'db>>, owner: Option<Type<'db>>) -> Result<Option<Type<'db>>, Self::Error>;
+ #[operation(child)]
+ async fn alias(&self, alias: crate::types::TypeAliasType<'db>, instance: Option<Type<'db>>, owner: Option<Type<'db>>) -> Result<Option<Type<'db>>, Self::Error>;
+ #[operation(child)]
+ async fn bind(&self, ty: Type<'db>, env: &ProgramEnvironment<'db>, instance: Option<Type<'db>>, owner: Option<Type<'db>>) -> Result<Option<Type<'db>>, Self::Error>;
+}
+#[synchronous(function_descriptor_sync)]
+#[capabilities(effects = FunctionDescriptorEffects)]
+#[passive_values(Type::Union, Type::TypeAlias, Type::FunctionLiteral, Type::Callable, Type::KnownInstance, KnownInstanceType::MethodWrapper)]
+pub(in crate::types) async fn function_descriptor_with<'db, E: FunctionDescriptorEffects<'db>>(ty: Type<'db>, env: &ProgramEnvironment<'db>, instance: Option<Type<'db>>, owner: Option<Type<'db>>, effects: &E) -> Result<Option<Type<'db>>, E::Error> {
+ effects.checkpoint().await?;
+ match ty {
+  // ParamSpec specialization can produce a union of function descriptors.
+  Type::Union(union) => effects.union(union, instance, owner).await,
+  Type::TypeAlias(alias) => effects.alias(alias, instance, owner).await,
+  Type::FunctionLiteral(_) | Type::Callable(_) | Type::KnownInstance(KnownInstanceType::MethodWrapper(_)) => effects.bind(ty, env, instance, owner).await,
+  _ => Ok(None),
+ }
+}
+}
+struct InlineFunctionDescriptor<'env, 'db> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+}
+impl<'db> SynchronousFunctionDescriptorEffects<'db> for InlineFunctionDescriptor<'_, 'db> {
+    type Error = std::convert::Infallible;
+    fn checkpoint(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn union(
+        &self,
+        union: UnionType<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        Ok(union.try_map(self.db, self.env, |alternative| {
+            alternative.function_like_dunder_get(self.db, self.env, instance, owner)
+        }))
+    }
+    fn alias(
+        &self,
+        alias: crate::types::TypeAliasType<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        Ok(alias
+            .value_type(self.db)
+            .function_like_dunder_get(self.db, self.env, instance, owner))
+    }
+    fn bind(
+        &self,
+        ty: Type<'db>,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        Ok(ty.bind_function_descriptor(self.db, env, instance, owner))
     }
 }

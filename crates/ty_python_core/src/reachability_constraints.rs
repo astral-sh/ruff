@@ -152,6 +152,18 @@ pub struct ReachabilityConstraints {
 }
 
 impl ReachabilityConstraints {
+    /// Bounds structural equality using only fixed-size retained metadata.
+    pub(crate) fn comparison_work(&self) -> Option<usize> {
+        // Each interior consists of four scoped IDs. The optional rank index compares
+        // both its bit slice and its separately retained chunk ranks.
+        let interiors = self.used_interiors.len().checked_add(2)?;
+        let indices = self
+            .used_indices
+            .as_ref()
+            .map_or(Some(0), RankBitBox::comparison_work)?;
+        interiors.checked_add(indices)
+    }
+
     /// Look up an interior node by its constraint ID.
     pub fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());

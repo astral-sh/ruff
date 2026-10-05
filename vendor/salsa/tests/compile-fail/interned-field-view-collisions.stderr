@@ -1,0 +1,29 @@
+error: field view method conflicts with another generated method
+ --> tests/compile-fail/interned-field-view-collisions.rs:1:52
+  |
+1 | #[salsa::interned(constructor = make, field_view = make)]
+  |                                                    ^^^^
+
+error: field view method conflicts with another generated method
+ --> tests/compile-fail/interned-field-view-collisions.rs:6:32
+  |
+6 | #[salsa::interned(field_view = r#read_fields)]
+  |                                ^^^^^^^^^^^^^
+
+error: field view method conflicts with another generated method
+  --> tests/compile-fail/interned-field-view-collisions.rs:12:32
+   |
+12 | #[salsa::interned(field_view = ingredient)]
+   |                                ^^^^^^^^^^
+
+error: field view method conflicts with another generated method
+  --> tests/compile-fail/interned-field-view-collisions.rs:17:32
+   |
+17 | #[salsa::interned(field_view = default_debug_fmt)]
+   |                                ^^^^^^^^^^^^^^^^^
+
+error: cannot find attribute `get` in this scope
+ --> tests/compile-fail/interned-field-view-collisions.rs:8:7
+  |
+8 |     #[get(read_fields)]
+  |       ^^^

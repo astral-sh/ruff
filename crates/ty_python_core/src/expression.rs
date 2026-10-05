@@ -123,7 +123,7 @@ pub enum ExpressionKind {
 /// * a return type of a cross-module query
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(debug, field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 pub struct Expression<'db> {
     /// The scope in which the expression occurs.
     ///

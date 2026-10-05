@@ -7,7 +7,6 @@ use crate::suppression::{
     BLANKET_IGNORE_COMMENT, IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT,
     UNUSED_TYPE_IGNORE_COMMENT,
 };
-use crate::types::check_types;
 pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
@@ -16,7 +15,7 @@ use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceTextError, source_text};
+use ruff_db::source::SourceTextError;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
@@ -51,6 +50,9 @@ pub use types::{
     pytest_global_plugin_files, pytest_tests_in_file,
 };
 
+#[cfg(feature = "experimental-analysis")]
+pub mod analysis;
+
 mod db;
 pub mod dependency;
 mod dunder_all;
@@ -60,6 +62,7 @@ mod lexical_name_path;
 pub mod lint;
 pub(crate) mod place;
 pub(crate) mod place_load;
+pub mod prepared_host;
 mod reachability;
 mod semantic_model;
 mod subscript;
@@ -202,46 +205,7 @@ pub fn check_file_unwrap(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> 
 }
 
 pub fn check_file(db: &dyn Db, file: ProgramFile<'_>) -> Result<Box<[Diagnostic]>, Diagnostic> {
-    let source_file = file.file(db);
-    let mut diagnostics: Vec<Diagnostic> = Vec::new();
-
-    // Abort checking if there are IO errors.
-    let source = source_text(db, source_file);
-
-    if let Some(read_error) = source.read_error() {
-        return Err(IOErrorDiagnostic {
-            file: source_file,
-            error: read_error.clone(),
-        }
-        .to_diagnostic());
-    }
-
-    let parsed = parsed_module(db, file.python_file(db));
-
-    let parsed_ref = parsed.load(db);
-    diagnostics.extend(
-        parsed_ref
-            .errors()
-            .iter()
-            .map(|error| Diagnostic::invalid_syntax(source_file, &error.error, error)),
-    );
-
-    diagnostics.extend(parsed_ref.unsupported_syntax_errors().iter().map(|error| {
-        let mut error = Diagnostic::invalid_syntax(source_file, error, error);
-        add_inferred_python_version_hint_to_diagnostic(
-            db,
-            source_file,
-            &mut error,
-            "parsing syntax",
-        );
-        error
-    }));
-
-    diagnostics.extend(check_types(db, file));
-
-    diagnostics.sort_unstable_by(|a, b| a.rendering_sort_key(db).cmp(&b.rendering_sort_key(db)));
-
-    Ok(diagnostics.into_boxed_slice())
+    types::check::check_file(db, file)
 }
 
 #[derive(Debug, Clone, get_size2::GetSize)]

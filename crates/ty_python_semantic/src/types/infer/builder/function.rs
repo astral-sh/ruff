@@ -1,36 +1,35 @@
+use std::ops::ControlFlow;
+
 use crate::{
     Db, ProgramEnvironment,
     reachability::ReachabilityConstraintsExtension,
     types::{
         DynamicType, KnownClass, KnownInstanceType, ParamSpecAttrKind, SubclassOfInner,
-        SubclassOfType, Type, TypeContext, TypeVarKind, UnionType,
-        callable::CallableTypeKind,
+        Type, TypeContext, UnionType,
         constraints::ConstraintSetBuilder,
         diagnostic::{
             ABSTRACT_AND_FINAL_METHOD, FINAL_ON_NON_METHOD, INVALID_PARAMETER_DEFAULT,
             INVALID_PARAMSPEC, INVALID_TYPE_FORM, UNSOUND_RETURN_STATEMENT, USELESS_OVERLOAD_BODY,
             add_type_expression_reference_link, is_invalid_typed_dict_literal,
             report_implicit_return_type, report_invalid_generator_function_return_type,
-            report_invalid_return_type, report_shadowed_type_variable,
+            report_invalid_return_type,
             report_unsound_return_statement,
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
-            OverloadLiteral, function_body_kind, is_implicit_classmethod,
-            same_module_uncached_raw_signature,
+            function_body_kind, is_implicit_classmethod, same_module_uncached_raw_signature,
         },
-        generics::{enclosing_generic_contexts, typing_self},
+        generics::shadowing::{
+            OrdinaryFunctionShadowEffects, check_function_type_parameter_shadowing_sync,
+        },
         infer::{
-            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
-            builder::{
-                DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
-                validate_paramspec_components,
-            },
-            function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            FunctionDecoratorInference, InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
+            builder::{DeclaredAndInferredType, TypeAndRange},
+            function_known_decorator_flags,
+            infer_statement_types, nearest_enclosing_function,
         },
         relation::TypeRelation,
+        signatures::effects::legacy_inline,
         signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
@@ -39,20 +38,32 @@ use crate::{
 };
 use ty_python_core::{
     UseDefMap,
-    definition::{Definition, DefinitionKind},
+    ast_node_ref::AstNodeRef,
+    definition::Definition,
     scope::NodeWithScopeRef,
 };
 
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
-fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
+pub(in crate::types::infer) mod annotations;
+pub(in crate::types::infer) mod application;
+pub(in crate::types::infer) mod decorators;
+pub(in crate::types::infer) mod receiver;
+pub(in crate::types::infer) mod source_effects;
+
+use source_effects::{
+    FunctionDecoratorRequest, FunctionDefinitionEffects, FunctionDefinitionWork,
+    LegacyFunctionDefinitionEffects, OverloadIdentity,
+};
+
+pub(super) fn parameters_have_defaults(parameters: &ast::Parameters) -> bool {
     parameters
         .iter_non_variadic_params()
         .any(|param| param.default.is_some())
 }
 
-fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
+pub(super) fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
     function.type_params.is_none()
         && (function.returns.is_some()
             || function
@@ -63,38 +74,16 @@ fn function_has_deferred_annotations(function: &ast::StmtFunctionDef) -> bool {
 
 /// Whether a non-static method receives an instance or the class itself.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum MethodReceiverKind {
+pub(in crate::types::infer) enum MethodReceiverKind {
     Instance,
     Class,
 }
 
 impl MethodReceiverKind {
-    /// Classifies methods by their decorators and implicit class-receiver rules.
-    ///
-    /// Free functions and ordinary static methods have no receiver; `__new__` receives the class.
-    ///
-    /// ```python
-    /// class Example:
-    ///     def instance(self): ...
-    ///     @classmethod
-    ///     def class_method(cls): ...
-    ///     @staticmethod
-    ///     def static_method(): ...
-    /// ```
-    fn from_function<'db>(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
+    pub(in crate::types::infer) fn from_decorators(
         function: &ast::StmtFunctionDef,
+        decorators: FunctionDecorators,
     ) -> Option<Self> {
-        if !definition.scope(db).scope(db).kind().is_class() {
-            return None;
-        }
-
-        let decorators = if function.decorator_list.is_empty() {
-            FunctionDecorators::empty()
-        } else {
-            function_known_decorator_flags(db, definition)
-        };
         if decorators.contains(FunctionDecorators::STATICMETHOD) && function.name.id != "__new__" {
             return None;
         }
@@ -192,6 +181,18 @@ impl<'db> ExpectedReturnType<'db> {
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
+        match super::source_function_body::infer_function_body_sync(
+            self,
+            function,
+            super::source_function_body::FunctionBodyFacts,
+            &super::source_function_body::OrdinaryFunctionBodyEffects,
+        ) {
+            Ok(()) => {}
+            Err(error) => match error {},
+        }
+    }
+
+    pub(super) fn infer_function_return_types(&mut self, function: &ast::StmtFunctionDef) {
         fn can_implicitly_return_none<'db>(db: &'db dyn Db, use_def: &UseDefMap<'db>) -> bool {
             !use_def
                 .reachability_constraints()
@@ -205,20 +206,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let env = self.program_environment();
         let db = self.db();
-
-        // Parameters are odd: they are Definitions in the function body scope, but have no
-        // constituent nodes that are part of the function body. In order to get diagnostics
-        // merged/emitted for them, we need to explicitly infer their definitions here.
-        for parameter in &function.parameters {
-            self.infer_definition(parameter);
-        }
-
-        validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
-            self.file_expression_type(expr)
-        });
-        self.validate_unpacked_typed_dict_kwargs(&function.parameters);
-
-        self.infer_body(&function.body);
 
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
@@ -411,6 +398,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) {
+        legacy_inline(self.infer_function_definition_with(
+            &LegacyFunctionDefinitionEffects,
+            function,
+            definition,
+        ));
+    }
+
+    pub(in crate::types::infer) async fn infer_function_definition_with<
+        E: FunctionDefinitionEffects<'db>,
+    >(
+        &mut self,
+        effects: &E,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Result<(), E::Error> {
+        let previous_flags = self.context.inference_flags;
+        let result = self
+            .infer_function_definition_inner_with(effects, function, definition)
+            .await;
+        if result.is_err() {
+            self.context.inference_flags = previous_flags;
+        }
+        result
+    }
+
+    async fn infer_function_definition_inner_with<E: FunctionDefinitionEffects<'db>>(
+        &mut self,
+        effects: &E,
+        function: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+    ) -> Result<(), E::Error> {
         let ast::StmtFunctionDef {
             range: _,
             node_index: _,
@@ -425,54 +443,50 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference =
-            (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
+        effects
+            .checkpoint(FunctionDefinitionWork::Definition)
+            .await?;
+        let decorator_inference = if decorator_list.is_empty() {
+            None
+        } else {
+            Some(effects.known_decorators(self, definition).await?)
+        };
         if let Some(decorator_inference) = decorator_inference.as_ref() {
-            self.context.extend(decorator_inference.diagnostics());
-            self.expressions
-                .extend(decorator_inference.expression_types());
-            self.bindings.extend(decorator_inference.bindings());
-            self.called_functions
-                .extend(decorator_inference.called_functions().iter().copied());
-            self.implicit_aliases
-                .extend(decorator_inference.implicit_aliases().iter().copied());
+            effects
+                .merge_decorator_results(self, decorator_inference)
+                .await?;
         }
 
-        let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
+        let mut decorator_types_and_nodes =
+            effects.decorator_candidates(decorator_list.len()).await?;
         let mut has_transforming_decorators = false;
         let mut function_decorators = FunctionDecorators::empty();
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
         for decorator in decorator_list {
-            let decorator_type = decorator_inference
-                .as_ref()
-                .and_then(|decorator_inference| {
-                    decorator_inference.expression_type(&decorator.expression)
-                })
-                .unwrap_or_else(Type::unknown);
+            effects
+                .checkpoint(FunctionDefinitionWork::ClassifyDecorator)
+                .await?;
+            let decorator_type = effects
+                .decorator_type(decorator_inference, decorator)
+                .await?;
             let decorator_function_decorator =
-                FunctionDecorators::from_decorator_type(db, decorator_type);
+                effects.classify_decorator(self, decorator_type).await?;
             function_decorators |= decorator_function_decorator;
 
-            match decorator_type {
-                Type::FunctionLiteral(function) => match function.known(db) {
-                    Some(KnownFunction::NoTypeCheck) => {
-                        // If the function is decorated with the `no_type_check` decorator,
-                        // we need to suppress any errors that come after the decorators.
-                        self.context.inference_flags |= InferenceFlags::IN_NO_TYPE_CHECK;
-                        continue;
-                    }
-                    Some(KnownFunction::Final) => {
-                        final_decorator = Some(decorator);
-                        continue;
-                    }
-                    _ => {}
-                },
-                Type::DataclassTransformer(params) => {
-                    dataclass_transformer_params = Some(params);
-                }
-                _ => {}
+            if decorator_function_decorator.contains(FunctionDecorators::NO_TYPE_CHECK) {
+                // If the function is decorated with the `no_type_check` decorator,
+                // we need to suppress any errors that come after the decorators.
+                self.context.inference_flags |= InferenceFlags::IN_NO_TYPE_CHECK;
+                continue;
+            }
+            if decorator_function_decorator.contains(FunctionDecorators::FINAL) {
+                final_decorator = Some(decorator);
+                continue;
+            }
+            if let Type::DataclassTransformer(params) = decorator_type {
+                dataclass_transformer_params = Some(params);
             }
             if !decorator_function_decorator.is_empty()
                 && !decorator_function_decorator
@@ -487,8 +501,220 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !has_transforming_decorators {
             // With only known decorators, use the complete overload set's declaration
             // flags, including its recovery for inconsistently decorated overloads.
+            effects
+                .checkpoint(FunctionDefinitionWork::DecoratorStorage(
+                    decorator_types_and_nodes.len(),
+                ))
+                .await?;
             decorator_types_and_nodes.clear();
         }
+
+        effects
+            .checkpoint(FunctionDefinitionWork::DecoratorsClassified {
+                definition,
+                decorators: function_decorators,
+                inference_flags: self.context.inference_flags,
+                has_transforming_decorators,
+                candidates: &decorator_types_and_nodes,
+            })
+            .await?;
+        effects
+            .check_final_decorators(self, function, final_decorator, function_decorators)
+            .await?;
+
+        // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
+        // we defer the inference of any parameter and return annotations. That ensures that we do
+        // not add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // requires getting the signature of this function definition, which in turn requires
+        // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
+        // they can be inferred once with type context in the enclosing scope.
+        effects
+            .checkpoint(FunctionDefinitionWork::Parameters(parameters.len()))
+            .await?;
+        if function_has_deferred_annotations(function) || parameters_have_defaults(parameters) {
+            effects.record_deferred(self, definition).await?;
+        }
+
+        let known_function = effects.known_function(db, definition, name).await?;
+
+        // `type_check_only` is itself not available at runtime
+        if known_function == Some(KnownFunction::TypeCheckOnly) {
+            function_decorators |= FunctionDecorators::TYPE_CHECK_ONLY;
+        }
+
+        let body_scope = effects
+            .function_body_scope(
+                db,
+                self.program_file(),
+                self.index.node_scope(NodeWithScopeRef::Function(function)),
+            )
+            .await?;
+
+        let overload_literal = effects
+            .overload_literal(
+                db,
+                OverloadIdentity {
+                    name: &name.id,
+                    known: known_function,
+                    body_scope,
+                    decorators: function_decorators,
+                    dataclass_transformer: dataclass_transformer_params,
+                    has_return_annotation: function.returns.is_some(),
+                },
+            )
+            .await?;
+        let function_literal = effects.function_literal(db, overload_literal).await?;
+        let function_type = effects.function_type(db, function_literal).await?;
+        let is_decorated_overload_implementation = has_transforming_decorators
+            && effects
+                .has_separate_implementation(db, function_literal)
+                .await?;
+        let is_decorated_overload =
+            has_transforming_decorators && effects.is_overload(db, overload_literal).await?;
+
+        let mut inferred_ty = Type::FunctionLiteral(
+            if is_decorated_overload_implementation || is_decorated_overload {
+                effects
+                    .function_type(db, function_literal.without_overloads())
+                    .await?
+            } else {
+                function_type
+            },
+        );
+        // Explicit method wrappers apply in decorator order. Their declaration flags
+        // must not make the input to an inner decorator look already wrapped.
+        if has_transforming_decorators
+            && function_decorators
+                .intersects(FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD)
+        {
+            inferred_ty = effects.underlying_function(db, inferred_ty).await?;
+        }
+        if !decorator_list.is_empty() {
+            self.undecorated_type = Some(inferred_ty);
+        }
+
+        if function.type_params.is_some() {
+            effects
+                .check_type_parameter_shadowing(self, function)
+                .await?;
+        }
+
+        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            effects
+                .checkpoint(FunctionDefinitionWork::ApplyDecorator)
+                .await?;
+            inferred_ty = effects
+                .apply_function_decorator(
+                    self,
+                    FunctionDecoratorRequest {
+                        function,
+                        definition,
+                        overload_literal,
+                        decorator_ty: *decorator_ty,
+                        decorator_node,
+                        inferred_ty,
+                        is_decorated_overload_implementation,
+                    },
+                )
+                .await?;
+        }
+
+        if is_decorated_overload_implementation || is_decorated_overload {
+            inferred_ty = effects
+                .finish_decorated_overload(
+                    self,
+                    function_literal,
+                    function_type,
+                    inferred_ty,
+                    is_decorated_overload_implementation,
+                    is_decorated_overload,
+                )
+                .await?;
+        }
+
+        effects
+            .bind_function(self, function, definition, inferred_ty)
+            .await?;
+
+        if function_decorators.contains(FunctionDecorators::OVERLOAD) {
+            for stmt in &function.body {
+                effects
+                    .checkpoint(FunctionDefinitionWork::OverloadStatement {
+                        definition,
+                        statement: stmt,
+                    })
+                    .await?;
+                match stmt {
+                    ast::Stmt::Pass(_) => continue,
+                    ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                        if matches!(
+                            &**value,
+                            ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
+                        ) {
+                            continue;
+                        }
+                    }
+                    _ => {}
+                }
+                if effects
+                    .report_useless_overload_body(self, function, stmt)
+                    .await?
+                    .is_break()
+                {
+                    break;
+                }
+            }
+        }
+        effects
+            .checkpoint(FunctionDefinitionWork::DecoratorStorage(
+                decorator_types_and_nodes.len(),
+            ))
+            .await?;
+        Ok(())
+    }
+
+    fn report_useless_overload_body(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        statement: &ast::Stmt,
+    ) -> ControlFlow<()> {
+        let Some(builder) = self.context.report_lint(&USELESS_OVERLOAD_BODY, statement) else {
+            return ControlFlow::Continue(());
+        };
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Useless body for `@overload`-decorated function `{}`",
+            function.name
+        ));
+        diagnostic.set_primary_annotation_message("This statement will never be executed");
+        diagnostic.info(
+            "`@overload`-decorated functions are solely for type checkers \
+            and must be overwritten at runtime by a non-`@overload`-decorated implementation",
+        );
+        diagnostic.help("Consider replacing this function body with `...` or `pass`");
+        ControlFlow::Break(())
+    }
+
+    pub(in crate::types::infer) fn extend_function_decorator_inference(
+        &mut self,
+        inference: &FunctionDecoratorInference<'db>,
+    ) {
+        self.context.extend(inference.diagnostics());
+        self.expressions.extend(inference.expression_types());
+        self.bindings.extend(inference.bindings());
+        self.called_functions
+            .extend(inference.called_functions().iter().copied());
+        self.implicit_aliases
+            .extend(inference.implicit_aliases().iter().copied());
+    }
+
+    fn check_function_final_decorators(
+        &mut self,
+        function: &ast::StmtFunctionDef,
+        final_decorator: Option<&ast::Decorator>,
+        function_decorators: FunctionDecorators,
+    ) {
+        let db = self.db();
+        let name = &function.name;
 
         // Check for `@final` applied to non-method functions.
         // `@final` is only meaningful on methods and classes.
@@ -521,164 +747,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 "Method `{name}` cannot be both `@abstractmethod` and `@final`",
             ));
         }
+    }
 
-        // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
-        // we defer the inference of any parameter and return annotations. That ensures that we do
-        // not add any spurious salsa cycles when applying decorators below. (Applying a decorator
-        // requires getting the signature of this function definition, which in turn requires
-        // (lazily) inferring the parameter and return types.) If defaults exist, we also defer so
-        // they can be inferred once with type context in the enclosing scope.
-        if function_has_deferred_annotations(function) || parameters_have_defaults(parameters) {
-            self.deferred.insert(definition);
-        }
-
-        let known_function = KnownFunction::try_from_definition_and_name(db, definition, name);
-
-        // `type_check_only` is itself not available at runtime
-        if known_function == Some(KnownFunction::TypeCheckOnly) {
-            function_decorators |= FunctionDecorators::TYPE_CHECK_ONLY;
-        }
-
-        let body_scope = self
-            .index
-            .node_scope(NodeWithScopeRef::Function(function))
-            .to_scope_id(db, self.program_file());
-
-        let overload_literal = OverloadLiteral::new(
-            db,
-            &name.id,
-            known_function,
-            body_scope,
-            function_decorators,
-            None,
-            dataclass_transformer_params,
-            function.returns.is_some(),
-        );
-        let function_literal = FunctionLiteral::new(db, overload_literal);
-        let function_type = FunctionType::new(db, function_literal, None);
-        let is_decorated_overload_implementation =
-            has_transforming_decorators && function_literal.has_separate_implementation(db);
-        let is_decorated_overload = has_transforming_decorators && overload_literal.is_overload(db);
-
-        let mut inferred_ty = Type::FunctionLiteral(
-            if is_decorated_overload_implementation || is_decorated_overload {
-                FunctionType::new(db, function_literal.without_overloads(), None)
-            } else {
-                function_type
-            },
-        );
-        // Explicit method wrappers apply in decorator order. Their declaration flags
-        // must not make the input to an inner decorator look already wrapped.
-        if has_transforming_decorators
-            && function_decorators
-                .intersects(FunctionDecorators::STATICMETHOD | FunctionDecorators::CLASSMETHOD)
-        {
-            inferred_ty = inferred_ty.underlying_function(db);
-        }
-        if !decorator_list.is_empty() {
-            self.undecorated_type = Some(inferred_ty);
-        }
-
+    fn check_function_type_parameter_shadowing(&mut self, function: &ast::StmtFunctionDef) {
+        let db = self.db();
         // Check that the function's own type parameters don't shadow
         // type variables from enclosing scopes (by name).
-        if let Some(type_params) = &function.type_params {
-            let current_scope = self.scope().file_scope_id(db);
-            for type_param in type_params.iter() {
-                let param_name = type_param.name();
-                for enclosing in enclosing_generic_contexts(self.db(), self.index, current_scope) {
-                    if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
-                        let kind = match type_param {
-                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
-                            ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
-                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVarTuple,
-                        };
-                        report_shadowed_type_variable(
-                            &self.context,
-                            &param_name.id,
-                            "function",
-                            &function.name.id,
-                            function.name.range(),
-                            kind,
-                            other_typevar,
-                        );
-                    }
-                }
-            }
+        match check_function_type_parameter_shadowing_sync(
+            self.index,
+            self.scope().file_scope_id(db),
+            function,
+            &OrdinaryFunctionShadowEffects { context: &self.context },
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
+    }
 
-        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            let descriptor_kind = match decorator_ty {
-                Type::ClassLiteral(class) => match class.known(db) {
-                    Some(KnownClass::Staticmethod) => Some(CallableTypeKind::StaticMethodLike),
-                    Some(KnownClass::Classmethod) => Some(CallableTypeKind::ClassMethodLike),
-                    _ => None,
-                },
-                _ => None,
-            };
-            if let Some(kind) = descriptor_kind {
-                let wrap = |ty: Type<'db>| match ty.resolve_type_alias(db) {
-                    Type::FunctionLiteral(function)
-                        if function.callable_type_kind(db) == CallableTypeKind::FunctionLike
-                            || function.callable_type_kind(db) == kind =>
-                    {
-                        Some(Type::FunctionLiteral(
-                            function.with_descriptor_kind(db, kind),
-                        ))
-                    }
-                    Type::Callable(callable)
-                        if matches!(
-                            callable.kind(db),
-                            CallableTypeKind::Regular | CallableTypeKind::FunctionLike
-                        ) || callable.kind(db) == kind =>
-                    {
-                        Some(Type::Callable(callable.with_kind(db, kind)))
-                    }
-                    _ => None,
-                };
-                let wrapped = if let Some(union) = inferred_ty.as_union_like(db) {
-                    union.try_map(db, self.program_environment(), |ty| wrap(*ty))
-                } else {
-                    wrap(inferred_ty)
-                };
-                if let Some(wrapped) = wrapped {
-                    inferred_ty = wrapped;
-                    continue;
-                }
-            }
-            if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) = decorator_ty {
-                match inferred_ty {
-                    Type::FunctionLiteral(function) => {
-                        inferred_ty =
-                            Type::FunctionLiteral(function.with_deprecated(db, *deprecated));
-                        continue;
-                    }
-                    Type::Callable(callable) => {
-                        inferred_ty = Type::Callable(callable.with_deprecated(
-                            db,
-                            overload_literal.with_deprecated(db, *deprecated),
-                        ));
-                        continue;
-                    }
-                    _ => {}
-                }
-            }
-            let decorated_ty = inferred_ty;
-            inferred_ty = self.apply_decorator(
-                *decorator_ty,
-                inferred_ty,
-                decorator_node,
-                (!is_decorated_overload_implementation).then_some(function),
-            );
-            if let Type::PropertyInstance(property) = inferred_ty {
-                inferred_ty = Type::PropertyInstance(property.with_accessor_definition(
-                    db,
-                    *decorator_ty,
-                    decorated_ty,
-                    definition,
-                ));
-            }
-        }
+    fn apply_function_definition_decorator(
+        &mut self,
+        request: FunctionDecoratorRequest<'_, 'db>,
+    ) -> Type<'db> {
+        let effects = application::OrdinaryDecoratorApplicationEffects {
+            db: self.db(),
+            env: self.program_environment(),
+        };
+        let Ok(result) = application::apply_function_decorator_sync(
+            self,
+            request,
+            application::DecoratorApplicationFacts,
+            &effects,
+        );
+        result
+    }
 
+    fn finish_function_definition_overload(
+        &mut self,
+        function_literal: FunctionLiteral<'db>,
+        function_type: FunctionType<'db>,
+        mut inferred_ty: Type<'db>,
+        is_decorated_overload_implementation: bool,
+        is_decorated_overload: bool,
+    ) -> Type<'db> {
+        let db = self.db();
         if is_decorated_overload_implementation {
             // Overloads describe the exposed function. The implementation check compares the
             // unbound callable, before classmethod or staticmethod descriptor binding.
@@ -725,56 +836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ));
         }
 
-        self.add_declaration_with_binding(
-            function.into(),
-            definition,
-            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
-        );
-
-        if function_decorators.contains(FunctionDecorators::OVERLOAD) {
-            for stmt in &function.body {
-                match stmt {
-                    ast::Stmt::Pass(_) => continue,
-                    ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                        if matches!(
-                            &**value,
-                            ast::Expr::StringLiteral(_) | ast::Expr::EllipsisLiteral(_)
-                        ) {
-                            continue;
-                        }
-                    }
-                    _ => {}
-                }
-                let Some(builder) = self.context.report_lint(&USELESS_OVERLOAD_BODY, stmt) else {
-                    continue;
-                };
-                let mut diagnostic = builder.into_diagnostic(format_args!(
-                    "Useless body for `@overload`-decorated function `{}`",
-                    function.name
-                ));
-                diagnostic.set_primary_annotation_message("This statement will never be executed");
-                diagnostic.info(
-                    "`@overload`-decorated functions are solely for type checkers \
-                    and must be overwritten at runtime by a non-`@overload`-decorated implementation",
-                );
-                diagnostic.help("Consider replacing this function body with `...` or `pass`");
-                break;
-            }
-        }
-    }
-
-    pub(super) fn extend_function_deferred(
-        &mut self,
-        definition: Definition<'db>,
-        function: &ast::StmtFunctionDef,
-    ) {
-        let db = self.db();
-        if function_has_deferred_annotations(function) {
-            self.extend_definition(definition, infer_deferred_types(db, definition));
-        }
-        if parameters_have_defaults(&function.parameters) {
-            self.extend_definition(definition, infer_function_default_types(db, definition));
-        }
+        inferred_ty
     }
 
     pub(super) fn infer_function_annotations(
@@ -782,15 +844,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
-        // PEP 695 annotations are inferred in the function's type-parameter scope.
-        if !function_has_deferred_annotations(function) {
-            return;
+        match annotations::function_annotations_sync(
+            self,
+            definition,
+            function,
+            annotations::AnnotationFacts,
+            &annotations::OrdinaryAnnotationEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
-
-        self.suppress_errors_for_no_type_check(definition, function);
-        let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
-        self.infer_function_signature_annotations(function, definition);
-        self.typevar_binding_context = previous_typevar_binding_context;
     }
 
     pub(super) fn infer_function_defaults(
@@ -840,25 +903,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_return_type_annotation(&mut self, returns: Option<&ast::Expr>) {
-        if let Some(returns) = returns {
-            self.context.inference_flags |= InferenceFlags::IN_RETURN_TYPE;
-            self.infer_type_expression_with_state(
-                returns,
-                DeferredExpressionState::from(self.defer_annotations()),
-            );
-            self.context
-                .inference_flags
-                .remove(InferenceFlags::IN_RETURN_TYPE);
-        }
-    }
-
+    /// Infers the complete function signature's annotations in its PEP 695 type-parameter scope.
     pub(super) fn infer_function_type_params(&mut self, function: &ast::StmtFunctionDef) {
-        let binding_context = self.index.expect_single_definition(function);
-        let previous_typevar_binding_context =
-            self.typevar_binding_context.replace(binding_context);
-        self.infer_function_signature_annotations(function, binding_context);
-        self.typevar_binding_context = previous_typevar_binding_context;
+        let Ok(()) = annotations::function_type_parameters_sync(
+            self,
+            function,
+            annotations::AnnotationFacts,
+            &annotations::OrdinaryAnnotationEffects,
+        );
     }
 
     /// Infer an annotated method receiver before the rest of its signature so `Self` can be
@@ -873,22 +925,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) {
-        let receiver_is_incompatible = self.infer_method_receiver_annotation(function, definition);
-        let previous_incompatible_receiver = self.context.inference_flags.replace(
-            InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
-            receiver_is_incompatible == Some(true),
-        );
-
-        self.infer_return_type_annotation(function.returns.as_deref());
-        if let Some(type_params) = function.type_params.as_deref() {
-            self.infer_type_parameters(type_params);
+        match annotations::signature_annotations_sync(
+            self,
+            definition,
+            function,
+            annotations::AnnotationFacts,
+            &annotations::OrdinaryAnnotationEffects,
+        ) {
+            Ok(()) => {}
+            Err(never) => match never {},
         }
-        self.infer_parameters(&function.parameters, receiver_is_incompatible.is_some());
-
-        self.context.inference_flags.set(
-            InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
-            previous_incompatible_receiver,
-        );
     }
 
     /// Infers an explicitly annotated method receiver before the rest of its signature.
@@ -900,81 +946,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) -> Option<bool> {
-        let receiver = function
-            .parameters
-            .posonlyargs
-            .first()
-            .or_else(|| function.parameters.args.first())?;
-        let annotation = receiver.parameter.annotation.as_deref()?;
-        let receiver_kind = MethodReceiverKind::from_function(self.db(), definition, function)?;
-
-        let previously_in_parameter_annotation = self
-            .context
-            .inference_flags
-            .replace(InferenceFlags::IN_PARAMETER_ANNOTATION, true);
-        let previously_in_init_receiver = self.context.inference_flags.replace(
-            InferenceFlags::IN_INIT_RECEIVER_ANNOTATION,
-            function.name.id == "__init__" && receiver_kind == MethodReceiverKind::Instance,
-        );
-        let annotation_type = self.infer_type_expression_with_state(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
-        self.context.inference_flags.set(
-            InferenceFlags::IN_PARAMETER_ANNOTATION,
-            previously_in_parameter_annotation,
-        );
-
-        self.context.inference_flags.set(
-            InferenceFlags::IN_INIT_RECEIVER_ANNOTATION,
-            previously_in_init_receiver,
-        );
-
-        Some(!receiver_kind.accepts_annotation(self.db(), annotation_type))
+        match annotations::receiver_annotation_sync(
+            self,
+            definition,
+            function,
+            annotations::AnnotationFacts,
+            &annotations::OrdinaryAnnotationEffects,
+        ) {
+            Ok(value) => value,
+            Err(never) => match never {},
+        }
     }
 
-    fn infer_parameters(
-        &mut self,
-        parameters: &ast::Parameters,
-        first_annotation_already_inferred: bool,
-    ) {
-        let ast::Parameters {
-            range: _,
-            node_index: _,
-            posonlyargs: _,
-            args: _,
-            vararg,
-            kwonlyargs: _,
-            kwarg,
-        } = parameters;
-
-        self.context.inference_flags |= InferenceFlags::IN_PARAMETER_ANNOTATION;
-        for param_with_default in parameters
-            .iter_non_variadic_params()
-            .skip(usize::from(first_annotation_already_inferred))
-        {
-            self.infer_parameter_with_default(param_with_default);
-        }
-        if let Some(vararg) = vararg {
-            self.context.inference_flags |= InferenceFlags::IN_VARARG_ANNOTATION;
-            self.infer_parameter(vararg);
-            self.context
-                .inference_flags
-                .remove(InferenceFlags::IN_VARARG_ANNOTATION);
-        }
-        if let Some(kwarg) = kwarg {
-            self.context.inference_flags |= InferenceFlags::IN_KWARG_ANNOTATION;
-            self.infer_parameter(kwarg);
-            self.context
-                .inference_flags
-                .remove(InferenceFlags::IN_KWARG_ANNOTATION);
-        }
-        self.context
-            .inference_flags
-            .remove(InferenceFlags::IN_PARAMETER_ANNOTATION);
-    }
-
-    fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
+    pub(super) fn validate_unpacked_typed_dict_kwargs(&mut self, parameters: &ast::Parameters) {
         let db = self.db();
         let env = self.program_environment();
         let Some(kwargs) = parameters.kwarg.as_ref() else {
@@ -1056,38 +1040,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
-        let ast::ParameterWithDefault {
-            range: _,
-            node_index: _,
-            parameter,
-            default: _,
-        } = parameter_with_default;
-
-        if let Some(annotation) = parameter.annotation.as_deref() {
-            self.infer_type_expression_with_state(
-                annotation,
-                DeferredExpressionState::from(self.defer_annotations()),
-            );
-        }
-    }
-
-    fn infer_parameter(&mut self, parameter: &ast::Parameter) {
-        let ast::Parameter {
-            range: _,
-            node_index: _,
-            name: _,
-            annotation,
-        } = parameter;
-
-        if let Some(annotation) = annotation.as_deref() {
-            self.infer_type_expression_with_state(
-                annotation,
-                DeferredExpressionState::from(self.defer_annotations()),
-            );
-        }
-    }
-
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
     /// in the function body scope.
     ///
@@ -1108,6 +1060,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// here, because an outer scope can't depend on a definition from an inner scope, so we
     /// shouldn't be in-process of inferring the outer scope here.
     pub(super) fn infer_parameter_definition(
+        &mut self,
+        parameter_with_default: &'ast ast::ParameterWithDefault,
+        definition: Definition<'db>,
+    ) {
+        match super::source_parameter::infer_parameter_definition_sync(
+            self,
+            parameter_with_default,
+            definition,
+            super::source_parameter::ParameterFacts,
+            &super::source_parameter::OrdinaryParameterEffects,
+        ) {
+            Ok(()) => {}
+            Err(error) => match error {},
+        }
+    }
+
+    pub(super) fn infer_annotated_parameter_definition(
         &mut self,
         parameter_with_default: &'ast ast::ParameterWithDefault,
         definition: Definition<'db>,
@@ -1185,18 +1154,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 definition,
                 &DeclaredAndInferredType::are_the_same_type(declared_ty),
             );
-        } else {
-            let ty = if let Some(default_expr) = default_expr {
-                let default_ty = self.file_expression_type(default_expr);
-                UnionType::from_two_elements(db, env, Type::unknown(), default_ty)
-            } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
-                ty
-            } else {
-                Type::unknown()
-            };
-
-            self.add_binding(parameter.into(), definition)
-                .insert(self, ty);
         }
     }
 
@@ -1280,57 +1237,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Special case for unannotated `cls` and `self` arguments to class methods and instance methods.
-    fn special_first_method_parameter_type(
+    pub(super) fn infer_method_receiver_parameter_type(
         &mut self,
         parameter: &ast::Parameter,
+        function: &AstNodeRef<ast::StmtFunctionDef>,
+        class: &AstNodeRef<ast::StmtClassDef>,
     ) -> Option<Type<'db>> {
-        let env = self.program_environment();
-        let db = self.db();
-        let file = self.program_file();
-
-        let function_scope_id = self.scope();
-        let function_scope = function_scope_id.scope(db);
-        let function = function_scope.node().as_function()?;
-
-        let parent_file_scope_id = function_scope.parent()?;
-        let mut parent_scope_id = parent_file_scope_id.to_scope_id(db, file);
-
-        // Skip type parameter scopes, if the method itself is generic.
-        if parent_scope_id.is_annotation(db) {
-            let parent_scope = parent_scope_id.scope(db);
-            parent_scope_id = parent_scope.parent()?.to_scope_id(db, file);
-        }
-
-        // Return early if this is not a method inside a class.
-        let class = parent_scope_id.scope(db).node().as_class()?;
-
-        let method_definition = self.index.expect_single_definition(function);
-        let DefinitionKind::Function(function_definition) = method_definition.kind(db) else {
-            return None;
-        };
-
-        if function_definition
-            .node(self.module())
-            .parameters
-            .index(parameter.name())
-            .is_none_or(|index| index != 0)
-        {
-            return None;
-        }
-
-        let function_node = function_definition.node(self.module());
-        let receiver_kind =
-            MethodReceiverKind::from_function(db, method_definition, function_node)?;
-
-        let class_definition = self.index.expect_single_definition(class);
-        let class_literal = original_class_type(db, class_definition)?;
-        let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
-        match receiver_kind {
-            MethodReceiverKind::Class => typing_self.map(|typing_self| {
-                SubclassOfType::from(db, env, SubclassOfInner::TypeVar(typing_self))
-            }),
-            MethodReceiverKind::Instance => typing_self.map(Type::TypeVar),
-        }
+        legacy_inline(receiver::infer_method_receiver_with(
+            self,
+            parameter,
+            function,
+            class,
+            &receiver::OrdinaryMethodReceiverEffects,
+        ))
     }
 
     /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.

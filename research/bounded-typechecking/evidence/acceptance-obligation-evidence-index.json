@@ -1,0 +1,756 @@
+{
+  "schema": "acceptance-obligation-evidence-index/v1",
+  "created_date": "2026-10-05",
+  "root": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1",
+  "authoritative_checkpoint_ref": "checkpoint",
+  "scope": {
+    "source_edits": false,
+    "builds_tests_or_reproductions": false,
+    "git_commands": false,
+    "process_or_target_scans": false,
+    "broad_conversation_reconstruction": false,
+    "acceptance_assessed_or_discharged": false,
+    "method": "Read linked checkpoints/archives, named artifacts and directly referenced fixture/source files; hash available evidence.",
+    "limitations": [
+      "A fixture hash does not establish a complete restorable historical runtime.",
+      "Later passing runs do not discharge original failures.",
+      "Quoted work is not total root cost; failed-prefix receipts are not complete costs."
+    ],
+    "checkpoint_mutability": "CHECKPOINT.md changed during collection. This index pins the version read at assembly; the detailed LEAK fragment retains its earlier observed hash. No immutable copy of the whole checkpoint was created."
+  },
+  "obligations": {
+    "finite4098": {
+      "recovery": "secondary specification and reported totals only",
+      "acceptance": "unresolved; no discharge assessed",
+      "obligation_refs": [
+        "checkpoint",
+        "older_acceptance",
+        "finite_plan",
+        "finite_status"
+      ],
+      "obligation": "Preserve the exact 4098-entry conversion selection and original two-million-work threshold, matched ordinary-cost comparison and production receipt provenance. The archived plan says merely shaving the gap is insufficient; a separately sized Call pilot does not waive it.",
+      "fixture": {
+        "entry_count": 4098,
+        "variants": [
+          "repeated-value",
+          "all-distinct"
+        ],
+        "exact_constructor_or_source": null,
+        "fixture_hash": null
+      },
+      "conditions": {
+        "work_cap": 2000000,
+        "byte_cap": null,
+        "argv": null,
+        "toolchain_profile_platform": null,
+        "baseline_inventory": null,
+        "known_cap_ref": "finite_plan:14,36"
+      },
+      "secondary_results": [
+        {
+          "variant": "repeated-value",
+          "reported_work": 1755563,
+          "completion_independently_recovered": false
+        },
+        {
+          "variant": "all-distinct",
+          "reported_work": 2009994,
+          "reported_result": "fails fixed work allowance"
+        }
+      ],
+      "result_refs": [
+        "finite_plan",
+        "finite_status"
+      ],
+      "missing_direct_links": [
+        "/tmp/ty-capacity-ready1/validation-report.md",
+        "/tmp/ty-capacity-ready1/next-step-assessment.md"
+      ],
+      "absence_checks": "Exact linked paths, /private/tmp validation-report alias, and ty-capacity-ready1 members in both archive indexes were absent.",
+      "missing": [
+        "Exact fixture bytes/construction and value distribution",
+        "Raw measurement/result/debit trace",
+        "Executed command/environment, byte cap and compilation conditions",
+        "Complete baseline and matched ordinary-cost data",
+        "Production receipt provenance"
+      ]
+    },
+    "dnf_8x8": {
+      "recovery": "original fixture/source pin and raw result recovered",
+      "acceptance": "Known failed finite-work acceptance: the historical test PASS asserts WorkLimit, not resolution. No discharge assessed.",
+      "obligation_refs": [
+        "checkpoint",
+        "older_acceptance",
+        "dnf_results",
+        "dnf_review"
+      ],
+      "obligation": "Preserve the 8-by-8 DNF performance issue at the original one-million-work policy. The recorded plan conditionally requires shared actual candidate/deduplication checkpoints if conservatism obstructs required work, without raised quotas or duplicate-specific branches.",
+      "selector": "types::narrow::admission::merge::tests::merge_bounds_charge_discarded_candidates_inline_payloads_and_retained_backing",
+      "fixture_ref": "dnf_fixture",
+      "source_pin_ref": "dnf_source_pin",
+      "fixture": {
+        "setup": "setup_db(); src/main.py = pass\n; prepare_file before roots. Same database/prepared file reused across counts [1,2,4,8,16] and both variants.",
+        "operands": "constraint(8, 3, duplicates) on both sides; empty replacement disjunction; constructed outside roots.",
+        "operation_order": [
+          "Intersection(Int)",
+          "GenericFiltering(Int)",
+          "Intersection(Int)"
+        ],
+        "duplicate_values_per_conjunction": [
+          0,
+          1,
+          2
+        ],
+        "distinct_values": "Conjunction i in 0..8 uses 3*i, 3*i+1, 3*i+2.",
+        "ordinary_retained_disjuncts": {
+          "duplicate": 1,
+          "distinct": 64
+        },
+        "controlled_entry": "with_analysis_session -> budget registry seal/run -> admitted right clone -> merge_and"
+      },
+      "conditions": {
+        "work_cap": 1000000,
+        "requested_bytes_cap": 16777216,
+        "raw_log_profile": "optimized + debuginfo",
+        "exact_argv": null,
+        "toolchain_platform": null
+      },
+      "raw_result_ref": "dnf_raw_run",
+      "raw_results": [
+        {
+          "line": 2828,
+          "verbatim": "duplicate merge: disjuncts=8, work=1496000, requested_bytes=72896, complete=false",
+          "source_asserted_result": "WorkLimit"
+        },
+        {
+          "line": 2833,
+          "verbatim": "distinct merge: disjuncts=8, retained=64, work=1496000, requested_bytes=72896, complete=false",
+          "source_asserted_result": "WorkLimit"
+        }
+      ],
+      "measurement_kind": "1496000 work / 72896 bytes is the merge quote, excluding metadata scans and admitted right clone, not accepted-prefix or complete-root cost.",
+      "missing": [
+        "Exact historical argv/environment/toolchain/architecture",
+        "Complete baseline beyond the three source hashes",
+        "Root accepted work/byte receipt and matched ordinary runtime cost",
+        "Evidence that this bound obstructs a required real-source consumer"
+      ]
+    },
+    "constrained_signature_equal_owner": {
+      "recovery": "measurement handoff/specification recovered; earlier measurement receipt unlocated",
+      "acceptance": "unresolved",
+      "obligation_refs": [
+        "checkpoint",
+        "signature_return_debt",
+        "signature_return_older_debt",
+        "receiver_handoff"
+      ],
+      "obligation": "Measure a constrained nested Signature and independently constructed equal owners through the native field/comparison scanner. An always constraint or legacy-variable traversal is insufficient. Recover the earlier receipt before claiming resolution.",
+      "fixture": {
+        "handoff_ref": "receiver_handoff",
+        "current_source_ref": "current_signature_fixture",
+        "builder": "StoredCallable::new",
+        "nested_levels": 4,
+        "retained_receiver_constraints_per_nested_signature": 12,
+        "outer_wrapper": "Three unconstrained overloads; its native equality does not follow nested callable handles.",
+        "inputs": "Select a nested constrained signature and independently construct equal signatures/owned constraint content before entering the metered comparison.",
+        "intended_path": "OutputProfile<Signature>::comparison_work -> field scanners -> DynamicComparisonQuote::receiver_constraints; admit quote then perform native signature equality.",
+        "historical_fixture_pin": null
+      },
+      "execution_status": "Handoff explicitly says the comparison entry did not exist yet; no selector or result for that measurement is supplied.",
+      "handoff_caps": {
+        "work": 1000000,
+        "requested_bytes": 16777216
+      },
+      "candidate_ref": "receiver_candidate",
+      "candidate_patch_sha256": "fe7b090630e0278e11951836f845f882b172c2183abc6d1935b7e5a2b008748d",
+      "candidate_baseline_overlay": "constructor-generic-signature-stage3-integrated1",
+      "related_strict_constructor": {
+        "selector": "types::infer::source_runtime::tests::constructor_preparation::stored_callable_initializer_matches_ordinary_preparation",
+        "source": "from typing import Callable\n\nclass Product:\n    __init__: Callable[[int], None]\n",
+        "command_ref": "receiver_handoff",
+        "template_source_ref": "receiver_command_model",
+        "command_status": "Planned narrowed constructor command, not a signature-comparison execution receipt.",
+        "expected": "Cold completion, one overload, drained guards and ordinary-binding parity."
+      },
+      "required_receipt_fields": [
+        "Selected signature/constraint count",
+        "Quotation and native equality completion",
+        "Equality quote separately from accepted root work/bytes",
+        "Baseline/candidate/harness pins and argv/output/status; refused roots identified as prefixes"
+      ],
+      "missing": [
+        "Earlier measurement receipt identity/location",
+        "Original measurement harness/selector and exact fixture pin",
+        "Raw comparison/equal-owner trace and accepted receipt",
+        "Matched baseline and execution evidence"
+      ]
+    },
+    "populated_return_map_real_pending": {
+      "recovery": "explicit requirement and related work-refusal control recovered",
+      "acceptance": "unresolved",
+      "obligation_refs": [
+        "checkpoint",
+        "signature_return_debt",
+        "signature_return_older_debt"
+      ],
+      "obligation": "Actual Pending and cancellation with populated return-scoping renaming/replacement maps, plus individual owner retirement. Work-refusal/retry alone is insufficient.",
+      "implementation_ref": "current_return_scoping",
+      "related_current_control": {
+        "ref": "current_signature_fixture",
+        "selector": "types::infer::source_runtime::tests::signature_annotations::return_scope_work_refusal_keeps_signature_unpublished_before_retry",
+        "source": "from typing import Callable\ndef choose[T]() -> Callable[[T], T]: ...\n",
+        "python_version": "3.13",
+        "stages": [
+          "Locations",
+          "MovedVariable",
+          "RetainedRenamings",
+          "RetainedReplacements"
+        ],
+        "procedure": "A separate database measures the stage. A fresh database receives the calibrated work cap, then one funded same-revision retry. Assertions distinguish the missing unfinished signature memo from a completed binding memo.",
+        "policy_ref": "current_funded_policy",
+        "provenance_limit": "Current pointer only; not an original execution receipt for the missing Pending/cancel requirement."
+      },
+      "missing": [
+        "Original Pending/cancel fixture or evidence one existed",
+        "Original executed conditions/caps and baseline",
+        "Real suspension/cancellation trace tied to populated map owners",
+        "Individual physical retirement completion and comparable retry/result receipt"
+      ]
+    },
+    "historical_leaks": {
+      "recovery": "eight named original events across six runs; six fixtures pinned to run inventories, two older fixtures unlocated",
+      "acceptance": "unresolved; no later clean result substituted",
+      "obligation_refs": [
+        "checkpoint",
+        "older_acceptance"
+      ],
+      "obligation": "Investigate every original LEAK classification/cause, retain its trace, and demonstrate relevant cleanup/retirement and the failed case under comparable conditions.",
+      "detail_refs": [
+        "leak_details",
+        "leak_archive_details"
+      ],
+      "events": {
+        "lazy-guard-baseline-controls1::alias_and_recursive_arguments_precede_shared_body_deduplication": {
+          "test": "types::typevar::default::self_reference::tests::alias_and_recursive_arguments_precede_shared_body_deduplication",
+          "classification": "LEAK",
+          "libtest_result": "ok",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/lazy-guard-baseline-controls1.log",
+            "sha256": "e7fcad978923f2f988c5fc21c2b04dd17e5811401585edff06bae927b4eb0fad",
+            "lines": {
+              "start": 2862,
+              "end": 2871
+            }
+          },
+          "run_id": "12da9c89-df21-4955-8e68-fc35fa5a1a01",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-guard-baseline-controls1::alias_and_recursive_arguments_precede_shared_body_deduplication"
+          },
+          "fixture_sha256": "b3839f69b2909bdeda21c67368b38859a1bdbff41a2fed50e747bf0cc63f060c",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-guard-baseline-controls1::alias_and_recursive_arguments_precede_shared_body_deduplication",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "lazy-guard-baseline-controls1"
+          }
+        },
+        "lazy-guard-baseline-controls1::ordinary_stored_defaults_return_absent_or_eager_values": {
+          "test": "types::typevar::default::evaluation::tests::ordinary_stored_defaults_return_absent_or_eager_values",
+          "classification": "LEAK",
+          "libtest_result": "ok",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/lazy-guard-baseline-controls1.log",
+            "sha256": "e7fcad978923f2f988c5fc21c2b04dd17e5811401585edff06bae927b4eb0fad",
+            "lines": {
+              "start": 2873,
+              "end": 2882
+            }
+          },
+          "run_id": "12da9c89-df21-4955-8e68-fc35fa5a1a01",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-guard-baseline-controls1::ordinary_stored_defaults_return_absent_or_eager_values"
+          },
+          "fixture_sha256": "6e4c8ca90eb1a9d46251bca3778e56a35dd15c8d21d621548ff94239dd04b4de",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-guard-baseline-controls1::ordinary_stored_defaults_return_absent_or_eager_values",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "lazy-guard-baseline-controls1"
+          }
+        },
+        "class-generic-focused2::present_lazy_default_publishes_and_reuses_its_canonical_value": {
+          "test": "types::infer::source_runtime::tests::bound_defaults::present_lazy_default_publishes_and_reuses_its_canonical_value",
+          "classification": "LEAK",
+          "libtest_result": "ok",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/class-generic-focused2.log",
+            "sha256": "8ce57b67565ee6e4724ec4a786467bb2621a8e9dfef6da15cad6bab0a362ebce",
+            "lines": {
+              "start": 3376,
+              "end": 3385
+            }
+          },
+          "run_id": "526cd63b-59e8-4018-b531-c613169238ba",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "class-generic-focused2::present_lazy_default_publishes_and_reuses_its_canonical_value"
+          },
+          "fixture_sha256": "4f597ac4c96fb305edb20d134d7df1353dde2a998f6bc6ad0cd988dd8d42c5dc",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "class-generic-focused2::present_lazy_default_publishes_and_reuses_its_canonical_value",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "class-generic-focused2"
+          }
+        },
+        "lazy-default-focused12::function_literal_mapping_keeps_its_precise_refusal::partial": {
+          "test": "types::infer::source_runtime::tests::default_binding::callables::function_literal_mapping_keeps_its_precise_refusal::partial",
+          "classification": "LEAK",
+          "libtest_result": "ok",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/lazy-default-focused12.log",
+            "sha256": "c5ac5daad9c4775cc0ae3cc265b2b8605d2bc4399fec99ecbcb02a053fdb1abe",
+            "lines": {
+              "start": 3115,
+              "end": 3124
+            }
+          },
+          "run_id": "8350d3f7-edc1-42a4-8851-0a779fc36a73",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-default-focused12::function_literal_mapping_keeps_its_precise_refusal::partial"
+          },
+          "fixture_sha256": "3bab6fe5a6f2aa1f0ddeb4de7d4907a0db779342a26706192dd5356af4e928d3",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-default-focused12::function_literal_mapping_keeps_its_precise_refusal::partial",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "lazy-default-focused12"
+          }
+        },
+        "lazy-default-focused10::deferred_parameter_work_refusal_restores_and_retries::typevar": {
+          "test": "types::infer::builder::local::tests::deferred_parameters::deferred_parameter_work_refusal_restores_and_retries::typevar",
+          "classification": "LEAK",
+          "libtest_result": "ok",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/lazy-default-focused10.log",
+            "sha256": "ddcbbd94e411b209eb93c496a0d6e85343b0fe81b104a802a48681240511e329",
+            "lines": {
+              "start": 3169,
+              "end": 3178
+            }
+          },
+          "run_id": "df8f2fca-09a5-474c-a58e-94114b934f11",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-default-focused10::deferred_parameter_work_refusal_restores_and_retries::typevar"
+          },
+          "fixture_sha256": "31da13e6d997f7e7b0c591b42558f37e487a8931f0898feb6e98041f1691584c",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "lazy-default-focused10::deferred_parameter_work_refusal_restores_and_retries::typevar",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "lazy-default-focused10"
+          }
+        },
+        "deferred-parameter-focused4::cold_parameter_checks_finish_before_later_class_refusal::single_default": {
+          "test": "types::infer::source_runtime::tests::pep695_parameter_validation::cold_parameter_checks_finish_before_later_class_refusal::single_default",
+          "classification": "FAIL + LEAK",
+          "libtest_result": "FAILED",
+          "raw_trace": {
+            "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/deferred-parameter-focused4.log",
+            "sha256": "49986efe6c667850e3adbaa2107078fc1e41ee5ee79589b13dff223777fd5df2",
+            "lines": {
+              "start": 2917,
+              "end": 2936
+            }
+          },
+          "run_id": "38a68be4-10ea-4b10-a0f9-90aef10dd42b",
+          "details": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "deferred-parameter-focused4::cold_parameter_checks_finish_before_later_class_refusal::single_default"
+          },
+          "fixture_sha256": "bf8e9a976a060ba6d6a55cd744876e40264b1d5fb0f791600db27d141968f0ca",
+          "fixture_inventory_match_verified": true,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_details",
+            "object": "historical_cases",
+            "key": "deferred-parameter-focused4::cold_parameter_checks_finish_before_later_class_refusal::single_default",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_details",
+            "object": "runs",
+            "key": "deferred-parameter-focused4"
+          }
+        },
+        "intersection-inner-check1::build_intersection_discards_never_dnf_branches": {
+          "test": "types::set_theoretic::builder::tests::build_intersection_discards_never_dnf_branches",
+          "classification": "LEAK",
+          "result": "Counted among 27 passed by nextest summary; no per-test libtest stdout recorded in this log span",
+          "raw_trace": {
+            "archive": {
+              "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/source-and-logs.tar.gz",
+              "sha256": "577482c5df0f2005d15f64be164ed7ca5d8aae2eaf161158c3e21b58bd1834e6"
+            },
+            "member": "./intersection-inner-check1.log",
+            "member_sha256": "044872891ec677f3a5b4219254033799ec8bdbd68369d5b8bb2715d879333082",
+            "lines": {
+              "start": 2975,
+              "end": 2975
+            }
+          },
+          "caps": null,
+          "run_id": "62405ecc-9b4b-4151-9987-27ddc4143c65",
+          "details": {
+            "ref": "leak_archive_details",
+            "object": "historical_cases",
+            "key": "intersection-inner-check1::build_intersection_discards_never_dnf_branches"
+          },
+          "fixture_sha256": null,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_archive_details",
+            "object": "historical_cases",
+            "key": "intersection-inner-check1::build_intersection_discards_never_dnf_branches",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_archive_details",
+            "object": "runs",
+            "key": "intersection-inner-check1"
+          }
+        },
+        "intersection-inner-check1::bounded_intersection_preserves_late_union_elements": {
+          "test": "types::tests::bounded_intersection_preserves_late_union_elements",
+          "classification": "LEAK",
+          "result": "Counted among 27 passed by nextest summary; no per-test libtest stdout recorded in this log span",
+          "raw_trace": {
+            "archive": {
+              "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/source-and-logs.tar.gz",
+              "sha256": "577482c5df0f2005d15f64be164ed7ca5d8aae2eaf161158c3e21b58bd1834e6"
+            },
+            "member": "./intersection-inner-check1.log",
+            "member_sha256": "044872891ec677f3a5b4219254033799ec8bdbd68369d5b8bb2715d879333082",
+            "lines": {
+              "start": 2977,
+              "end": 2977
+            }
+          },
+          "caps": null,
+          "run_id": "62405ecc-9b4b-4151-9987-27ddc4143c65",
+          "details": {
+            "ref": "leak_archive_details",
+            "object": "historical_cases",
+            "key": "intersection-inner-check1::bounded_intersection_preserves_late_union_elements"
+          },
+          "fixture_sha256": null,
+          "conditions_fixture_and_command_reference": {
+            "ref": "leak_archive_details",
+            "object": "historical_cases",
+            "key": "intersection-inner-check1::bounded_intersection_preserves_late_union_elements",
+            "fields": [
+              "fixture",
+              "input",
+              "resource_caps",
+              "execution_conditions"
+            ]
+          },
+          "run_command_and_status_reference": {
+            "ref": "leak_archive_details",
+            "object": "runs",
+            "key": "intersection-inner-check1"
+          }
+        }
+      },
+      "common_missing": [
+        "Effective nextest executable/version and timeout/user overrides",
+        "Full inherited environment",
+        "Output-handle owner and close timing",
+        "Cause and comparable causal reproduction",
+        "Sufficient cleanup/physical retirement evidence",
+        "Still-unlocated earlier event names/fixtures/receipts"
+      ],
+      "classification_limit": "Five detailed raw events explicitly say test passed with leaked handles; one is FAIL + LEAK; two older events are counted among passed (leaky). None establishes a heap leak or cause by itself.",
+      "unlocated_earlier_bucket_retained": true
+    }
+  },
+  "references": {
+    "checkpoint": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/CHECKPOINT.md",
+      "sha256": "1387f8442a52c21ca4636d6c51f77cf34505e04af5c973b215f3654620266152",
+      "lines": [
+        [
+          50,
+          56
+        ]
+      ]
+    },
+    "historical_archive": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/historical-evidence.tar.gz",
+      "sha256": "9b9310d65133ae4a5bb9199423169133bee8bd67c8e955273f3790695d627879"
+    },
+    "source_archive": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/source-and-logs.tar.gz",
+      "sha256": "577482c5df0f2005d15f64be164ed7ca5d8aae2eaf161158c3e21b58bd1834e6"
+    },
+    "dnf_results": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/ORDERED_NARROWING_CONSTRAINTS_RESULTS.md",
+      "sha256": "7556bbf18d4d9d587a6c10370053351dbb6043b8b6f0d306a906ed5e0660e74f",
+      "lines": [
+        [
+          24,
+          36
+        ]
+      ]
+    },
+    "older_acceptance": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/checkpoint-before-function-promotion-20261004.md",
+      "sha256": "a3c188c16aa4d81298a4c2cfa721051a40750a973fb7528db30c8dc3bf946159",
+      "lines": [
+        [
+          66,
+          70
+        ]
+      ]
+    },
+    "signature_return_debt": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/checkpoint-detail-before-inherited-context-focused-oct5.md",
+      "sha256": "eb6d738c6edb253d56f7728b550bcb920c0fc86da2ba608a3b84422422e6cead",
+      "lines": [
+        [
+          72,
+          72
+        ]
+      ]
+    },
+    "signature_return_older_debt": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-checkpoint-2026-09-25/checkpoint-detail-before-identity-controls-oct5.md",
+      "sha256": "910ca4dbbf1dff6993e6b5ca33ea0f12e36db1e4df10e3f8f9149a93a0c0b506",
+      "lines": [
+        [
+          47,
+          47
+        ]
+      ]
+    },
+    "receiver_handoff": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/receiver-constraint-cost-measurement.md",
+      "sha256": "7a0c552cd13de9ed9c1ac43402ca283d98a889a7c7cf7b02b9bae9afb99d1912"
+    },
+    "receiver_candidate": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/constructor-receiver-constraint-proposal1/candidate2/manifest.json",
+      "sha256": "e28062a8ce1e0f166e4f98b9bb8e471fb73eb3cb9e75646bce419be051eed363"
+    },
+    "receiver_command_model": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/constructor-self-mapping-semantic4-command.json",
+      "sha256": "8880bf4dade4efe4cca30fe559c0a9293cfbd9f4bd49565213430b3cf5213603"
+    },
+    "current_signature_fixture": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/source/crates/ty_python_semantic/src/types/infer/source_runtime/tests/signature_annotations.rs",
+      "sha256": "c8f80d3df2f2dc786d7247d0ced2ad981db696133bfc5f8dcf3345e690488c02",
+      "lines": [
+        [
+          757,
+          840
+        ],
+        [
+          3097,
+          3159
+        ],
+        [
+          3378,
+          3464
+        ]
+      ],
+      "provenance_limit": "Current source pointer only; not established as the original historical measurement baseline."
+    },
+    "current_return_scoping": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/source/crates/ty_python_semantic/src/types/infer/builder/source_definition/controlled/return_scoping.rs",
+      "sha256": "51f3dd9f7da330199c3e94ad2d8721c9d14981646d018d6e3cc622cac0c7b4f0",
+      "provenance_limit": "Current source pointer only; not established as the original historical measurement baseline."
+    },
+    "current_funded_policy": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/source/crates/ty_python_semantic/src/types/infer/source_runtime/tests.rs",
+      "sha256": "0ab16a3f7e8935cc47f8b82e3380e0a2ffe957aefb493265ab9bafc96621d13b",
+      "lines": [
+        [
+          4059,
+          4063
+        ]
+      ],
+      "provenance_limit": "Current source pointer only; not established as the original historical measurement baseline."
+    },
+    "leak_details": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/acceptance-leak-evidence-recovery.json",
+      "sha256": "aea76097ec62bab8f01505d2a01519d535dc5850fa53fdf71beb848c4ff2138d"
+    },
+    "leak_archive_details": {
+      "path": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/acceptance-leak-archive-evidence-recovery.json",
+      "sha256": "6653d9992c3e8d1057328ec325e786f07c9ddc3d8b4e5ed674bb4cd813131d21"
+    },
+    "finite_plan": {
+      "archive_ref": "historical_archive",
+      "member": "private/tmp/ty-recursion-rewrite-plan.md",
+      "content_sha256": "3f620f7c5eab1fa6b46627298ec43cb08178f184629c439468f359e80779b309",
+      "lines": [
+        [
+          14,
+          14
+        ],
+        [
+          36,
+          36
+        ]
+      ]
+    },
+    "finite_status": {
+      "archive_ref": "historical_archive",
+      "member": "private/tmp/ty-recursion-status-current.md",
+      "content_sha256": "3379133cf0379659f3d9cbd1f961c9d749915a8fd285439b2171404fb5d580f3",
+      "lines": [
+        [
+          26,
+          26
+        ],
+        [
+          60,
+          60
+        ]
+      ]
+    },
+    "dnf_fixture": {
+      "archive_ref": "source_archive",
+      "member": "./source/crates/ty_python_semantic/src/types/narrow/admission/merge/tests.rs",
+      "content_sha256": "6d313b26ac2159aa5f52fdfe9176211bd4d50890bf2dafbb3508e0f4ba660200",
+      "lines": [
+        [
+          16,
+          61
+        ],
+        [
+          86,
+          98
+        ],
+        [
+          119,
+          146
+        ],
+        [
+          192,
+          247
+        ]
+      ]
+    },
+    "dnf_source_pin": {
+      "archive_ref": "source_archive",
+      "member": "./constraint-merge-source.sha256",
+      "content_sha256": "7ae8430e3e5280a5b413eb3a4e177602310fd1035cbefe5ebe168fca3664bcd4",
+      "lines": [
+        [
+          1,
+          3
+        ]
+      ]
+    },
+    "dnf_raw_run": {
+      "archive_ref": "source_archive",
+      "member": "./constraint-merge-check3.log",
+      "content_sha256": "de8aeb9891ca32063a4c050aeeda18e67aaa98c231f029cbd78fcb8248862f4a",
+      "lines": [
+        [
+          2797,
+          2801
+        ],
+        [
+          2815,
+          2833
+        ]
+      ]
+    },
+    "dnf_review": {
+      "archive_ref": "source_archive",
+      "member": "./constraint-merge-review.md",
+      "content_sha256": "84846cc1b36bd9f736b6ab421e35ebc0a2651fdd3d44840d28b4d471a91475c2",
+      "lines": [
+        [
+          1,
+          7
+        ]
+      ]
+    }
+  }
+}

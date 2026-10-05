@@ -1,0 +1,95 @@
+error[E0277]: `NotSalsaValue<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:9:1
+   |
+ 9 | #[salsa::interned]
+   | ^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `NotSalsaValue<'db>`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:7:1
+   |
+ 7 | struct NotSalsaValue<'db>(PhantomData<&'db ()>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `NotSalsaValue<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required by a bound in `_::_assert_fields_are_salsa_values::_assert_manual_retention_proof`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:11:52
+   |
+ 9 | #[salsa::interned]
+   | ------------------ required by a bound in this function
+10 | struct ConditionalInterned<'db> {
+11 |     #[salsa_value(unsafe(prove(NotSalsaValue<'db>: salsa::SalsaValue)))]
+   |                                                    ^^^^^^^^^^^^^^^^^ required by this bound in `_assert_manual_retention_proof`
+   = note: this error originates in the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `NotSalsaValue<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:15:1
+   |
+15 | #[salsa::interned(unsafe(non_salsa_values))]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `NotSalsaValue<'db>`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:7:1
+   |
+ 7 | struct NotSalsaValue<'db>(PhantomData<&'db ()>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `NotSalsaValue<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required by a bound in `_::_assert_fields_are_salsa_values::_assert_manual_retention_proof`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:17:52
+   |
+15 | #[salsa::interned(unsafe(non_salsa_values))]
+   | -------------------------------------------- required by a bound in this function
+16 | struct ConditionalInternedWithItemEscape<'db> {
+17 |     #[salsa_value(unsafe(prove(NotSalsaValue<'db>: salsa::SalsaValue)))]
+   |                                                    ^^^^^^^^^^^^^^^^^ required by this bound in `_assert_manual_retention_proof`
+   = note: this error originates in the attribute macro `salsa::interned` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `NotSalsaValue<'db>` doesn't implement `SalsaValue`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:21:1
+   |
+21 | #[salsa::tracked]
+   | ^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `SalsaValue` is not implemented for `NotSalsaValue<'db>`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:7:1
+   |
+ 7 | struct NotSalsaValue<'db>(PhantomData<&'db ()>);
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: add `#[derive(salsa::SalsaValue)]` to `NotSalsaValue<'db>`
+   = help: the following other types implement trait `SalsaValue`:
+             &'static T
+             ()
+             (A, B)
+             (A, B, C)
+             (A, B, C, D)
+             (A, B, C, D, E)
+             (A, B, C, D, E, F)
+             (A, B, C, D, E, F, G)
+           and $N others
+note: required by a bound in `_::_assert_fields_are_salsa_values::_assert_manual_retention_proof`
+  --> tests/compile-fail/salsa_struct_conditional_proof.rs:23:52
+   |
+21 | #[salsa::tracked]
+   | ----------------- required by a bound in this function
+22 | struct ConditionalTracked<'db> {
+23 |     #[salsa_value(unsafe(prove(NotSalsaValue<'db>: salsa::SalsaValue)))]
+   |                                                    ^^^^^^^^^^^^^^^^^ required by this bound in `_assert_manual_retention_proof`
+   = note: this error originates in the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)

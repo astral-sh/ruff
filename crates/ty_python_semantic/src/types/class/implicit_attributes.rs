@@ -1,6 +1,18 @@
 //! Implicit instance and class attributes inferred from method assignments.
 
+use std::cmp::Ordering;
+use std::convert::Infallible;
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+use salsa::plumbing::function::IngredientImpl;
+
+use super::member_source::{
+    ImplicitAttributeEffects, InlineMemberSourceEffects, MemberSourceWork,
+    SynchronousImplicitAttributeEffects,
+};
+
 use super::{MethodDecorator, static_literal::StaticClassLiteral};
+use crate::types::fallible_sort::{OrdinarySort, heapsort_with};
 use crate::{
     Db, ProgramEnvironment, TypeQualifiers, attribute_assignments, attribute_declarations,
     place::{Place, Provenance},
@@ -16,10 +28,10 @@ use crate::{
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    attribute_scopes,
+    AttributeScopesCursor, PlaceTable, ScopeStep, SemanticIndex,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
-    scope::{Scope, ScopeId},
+    scope::{FileScopeId, Scope, ScopeId},
     semantic_index, use_def_map,
 };
 
@@ -29,7 +41,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of this class.
     /// The `target_method_decorator` parameter is used to skip methods that do not have the
     /// expected decorator.
-    pub(super) fn implicit_attribute(
+    pub(in crate::types) fn implicit_attribute(
         self,
         db: &'db dyn Db,
         name: &str,
@@ -55,27 +67,15 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> ImplicitAttribute<'db> {
-        let class_body_scope = self.body_scope(db);
-        // Collect names in a tracked query so unrelated edits can preserve dependent member
-        // lookups, and avoid retaining query entries for names that no method can define.
-        let names = implicit_attribute_names(db, class_body_scope);
-        let Ok(name_index) = names.binary_search_by(|candidate| candidate.as_str().cmp(name))
-        else {
-            return ImplicitAttribute {
-                member: Member::unbound(),
-                augmented_bindings: None,
-            };
-        };
-
-        Self::implicit_attribute_inner(
-            db,
-            ImplicitAttributeName::new(
-                db,
-                class_body_scope,
-                &names[name_index],
-                target_method_decorator,
-            ),
-        )
+        match implicit_attribute_bindings_sync(
+            self,
+            name,
+            target_method_decorator,
+            &InlineMemberSourceEffects::new(db),
+        ) {
+            Ok(attribute) => attribute,
+            Err(never) => match never {},
+        }
     }
 
     #[salsa::tracked(
@@ -331,16 +331,22 @@ impl<'db> StaticClassLiteral<'db> {
 /// directly. Augmented assignments first require an existing instance or class attribute to supply
 /// the value they read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) struct ImplicitAttribute<'db> {
+pub(in crate::types) struct ImplicitAttribute<'db> {
     /// The attribute established by assignments that do not depend on an existing value.
     pub(super) member: Member<'db>,
     /// Augmented assignments that require an existing instance or class attribute.
     pub(super) augmented_bindings: Option<AugmentedBindings<'db>>,
 }
 
+impl<'db> ImplicitAttribute<'db> {
+    pub(in crate::types) fn member(self) -> Member<'db> {
+        self.member
+    }
+}
+
 /// Augmented assignments deferred until MRO lookup finds the attribute they read.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct AugmentedBindings<'db> {
+pub(in crate::types) struct AugmentedBindings<'db> {
     #[returns(deref)]
     pub(super) definitions: Box<[Definition<'db>]>,
 }
@@ -458,26 +464,200 @@ fn implicit_attribute_binding_type<'db>(
     }
 }
 
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub(in super::super) ImplicitAttributeNamesConfiguration), attempt = CompleteOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
-    let index = semantic_index(db, class_body_scope.program_file(db));
-    let mut names = Vec::new();
+    match implicit_attribute_names_sync(class_body_scope, &InlineMemberSourceEffects::new(db)) {
+        Ok(names) => names,
+        Err(never) => match never {},
+    }
+}
 
-    for function_scope_id in attribute_scopes(db, class_body_scope) {
-        names.extend(
-            index
-                .place_table(function_scope_id)
-                .members()
-                .filter_map(|member| member.as_instance_attribute().map(Name::new)),
-        );
+pub(in crate::types) struct ImplicitMembersCursor<'table> {
+    table: &'table PlaceTable,
+    next: usize,
+}
+
+impl<'table> ImplicitMembersCursor<'table> {
+    pub(in crate::types) fn new(table: &'table PlaceTable) -> Self {
+        Self { table, next: 0 }
     }
 
-    names.sort_unstable();
-    names.dedup();
-    names.into_boxed_slice()
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn step_work(&self) -> usize {
+        // Exhausted cursors perform only the member lookup and return Done; they do not
+        // decode any segment metadata.
+        const MEMBER_LOOKUP_AND_ADVANCE: usize = 8;
+        let lookup = size_of::<usize>() * MEMBER_LOOKUP_AND_ADVANCE + size_of::<ScopeStep<&str>>();
+        if self.next >= self.table.members().len() {
+            return lookup;
+        }
+
+        // Instance-attribute classification inspects at most two segments. Including the
+        // debug assertions, it checks that candidate three times. Each check initializes
+        // two segment metadata entries and advances at most twice; none scans name bytes.
+        // Each packed metadata step has at most 32 scalar reads, bit operations and updates.
+        const CANDIDATE_CHECKS: usize = 3;
+        const METADATA_STEPS: usize = 4;
+        const METADATA_SCALARS: usize = 32;
+        const SEGMENT_SLICES_AND_CHECKS: usize = 16;
+        lookup
+            + size_of::<usize>()
+                * CANDIDATE_CHECKS
+                * (METADATA_STEPS * METADATA_SCALARS + SEGMENT_SLICES_AND_CHECKS)
+    }
+
+    pub(in crate::types) fn step(&mut self) -> ScopeStep<&'table str> {
+        let Some(member) = self.table.members().as_slice().get(self.next) else {
+            return ScopeStep::Done;
+        };
+        self.next += 1;
+        match member.as_instance_attribute() {
+            Some(name) => ScopeStep::Yield(name),
+            None => ScopeStep::Continue,
+        }
+    }
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+    #[synchronous(SynchronousImplicitNamesEffects)]
+    pub(in crate::types) trait ImplicitNamesEffects<'db> {
+        type Error;
+        type Source;
+        type Buffer;
+
+        #[operation(source)]
+        async fn source(&self, scope: ScopeId<'db>) -> Result<Self::Source, Self::Error>;
+        #[operation(local)]
+        async fn scopes<'source>(&self, source: &'source Self::Source) -> Result<AttributeScopesCursor<'source>, Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_scope(&self, cursor: &mut AttributeScopesCursor<'_>) -> Result<Option<ScopeStep<FileScopeId>>, Self::Error>;
+        #[operation(local)]
+        async fn members<'source>(&self, source: &'source Self::Source, scope: FileScopeId) -> Result<ImplicitMembersCursor<'source>, Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_member<'table>(&self, cursor: &mut ImplicitMembersCursor<'table>) -> Result<Option<ScopeStep<&'table str>>, Self::Error>;
+        #[operation(local)]
+        async fn buffer(&self, scope: ScopeId<'db>) -> Result<Self::Buffer, Self::Error>;
+        #[operation(local)]
+        async fn append(&self, buffer: &mut Self::Buffer, name: &str) -> Result<(), Self::Error>;
+        #[operation(local)]
+        async fn sort(&self, buffer: &mut Self::Buffer) -> Result<(), Self::Error>;
+        #[operation(local)]
+        async fn dedup(&self, buffer: &mut Self::Buffer) -> Result<(), Self::Error>;
+        #[operation(local)]
+        async fn finish(&self, buffer: Self::Buffer) -> Result<Box<[Name]>, Self::Error>;
+    }
+
+    #[synchronous(implicit_attribute_names_sync)]
+    #[capabilities(effects = ImplicitNamesEffects)]
+    #[passive_values(ScopeStep::Continue, ScopeStep::Yield, ScopeStep::Done)]
+    pub(in crate::types) async fn implicit_attribute_names_with<'db, E: ImplicitNamesEffects<'db>>(
+        scope: ScopeId<'db>,
+        effects: &E,
+    ) -> Result<Box<[Name]>, E::Error> {
+        let source = effects.source(scope).await?;
+        let mut scopes = effects.scopes(&source).await?;
+        let mut names = effects.buffer(scope).await?;
+        #[cursor_loop]
+        while let Some(step) = effects.next_scope(&mut scopes).await? {
+            let scope = match step {
+                ScopeStep::Continue => continue,
+                ScopeStep::Yield(scope) => scope,
+                ScopeStep::Done => break,
+            };
+            let mut members = effects.members(&source, scope).await?;
+            #[cursor_loop]
+            while let Some(step) = effects.next_member(&mut members).await? {
+                match step {
+                    ScopeStep::Continue => continue,
+                    ScopeStep::Yield(name) => effects.append(&mut names, name).await?,
+                    ScopeStep::Done => break,
+                }
+            }
+        }
+        effects.sort(&mut names).await?;
+        effects.dedup(&mut names).await?;
+        effects.finish(names).await
+    }
+}
+
+pub(in crate::types) struct OrdinaryImplicitNamesSource<'db> {
+    index: &'db SemanticIndex<'db>,
+    scope: FileScopeId,
+}
+
+impl<'db> SynchronousImplicitNamesEffects<'db> for InlineMemberSourceEffects<'db> {
+    type Error = Infallible;
+    type Source = OrdinaryImplicitNamesSource<'db>;
+    type Buffer = Vec<Name>;
+
+    fn source(&self, scope: ScopeId<'db>) -> Result<Self::Source, Infallible> {
+        Ok(OrdinaryImplicitNamesSource {
+            index: semantic_index(self.db, scope.program_file(self.db)),
+            scope: scope.file_scope_id(self.db),
+        })
+    }
+
+    fn scopes<'source>(
+        &self,
+        source: &'source Self::Source,
+    ) -> Result<AttributeScopesCursor<'source>, Infallible> {
+        Ok(source.index.attribute_scopes_cursor(source.scope))
+    }
+
+    fn next_scope(
+        &self,
+        cursor: &mut AttributeScopesCursor<'_>,
+    ) -> Result<Option<ScopeStep<FileScopeId>>, Infallible> {
+        Ok(match cursor.step() {
+            ScopeStep::Done => None,
+            step => Some(step),
+        })
+    }
+
+    fn members<'source>(
+        &self,
+        source: &'source Self::Source,
+        scope: FileScopeId,
+    ) -> Result<ImplicitMembersCursor<'source>, Infallible> {
+        Ok(ImplicitMembersCursor::new(source.index.place_table(scope)))
+    }
+
+    fn next_member<'table>(
+        &self,
+        cursor: &mut ImplicitMembersCursor<'table>,
+    ) -> Result<Option<ScopeStep<&'table str>>, Infallible> {
+        Ok(match cursor.step() {
+            ScopeStep::Done => None,
+            step => Some(step),
+        })
+    }
+
+    fn buffer(&self, _scope: ScopeId<'db>) -> Result<Self::Buffer, Infallible> {
+        Ok(Vec::new())
+    }
+
+    fn append(&self, buffer: &mut Self::Buffer, name: &str) -> Result<(), Infallible> {
+        buffer.push(Name::new(name));
+        Ok(())
+    }
+
+    fn sort(&self, buffer: &mut Self::Buffer) -> Result<(), Infallible> {
+        heapsort_with(buffer, &OrdinarySort)
+    }
+
+    fn dedup(&self, buffer: &mut Self::Buffer) -> Result<(), Infallible> {
+        buffer.dedup();
+        Ok(())
+    }
+
+    fn finish(&self, buffer: Self::Buffer) -> Result<Box<[Name]>, Infallible> {
+        Ok(buffer.into_boxed_slice())
+    }
 }
 
 fn implicit_attribute_cycle_recover<'db>(
@@ -497,4 +677,114 @@ fn implicit_attribute_cycle_recover<'db>(
         member: Member { inner },
         ..attribute_member
     }
+}
+
+#[ty_mapping_probe_macros::dual_member_source]
+pub(in crate::types) async fn implicit_attribute_bindings_with<
+    'a,
+    'db,
+    E: ImplicitAttributeEffects<'db>,
+>(
+    class: StaticClassLiteral<'db>,
+    name: &'a str,
+    target: MethodDecorator,
+    effects: &E,
+) -> Result<ImplicitAttribute<'db>, E::Error> {
+    effects.checkpoint(MemberSourceWork::Begin).await?;
+    effects.checkpoint(MemberSourceWork::ClassHeader).await?;
+    let scope = effects.body_scope(class).await?;
+    // Collect names in a tracked query so unrelated edits can preserve dependent member
+    // lookups, and avoid retaining query entries for names that no method can define.
+    effects.checkpoint(MemberSourceWork::ImplicitNames).await?;
+    let names = effects.names(scope).await?;
+    effects.checkpoint(MemberSourceWork::ImplicitSearch).await?;
+    let Some(index) = effects.find_name(names, name).await? else {
+        effects.checkpoint(MemberSourceWork::Publish).await?;
+        return Ok(ImplicitAttribute {
+            member: Member::unbound(),
+            augmented_bindings: None,
+        });
+    };
+    effects
+        .checkpoint(MemberSourceWork::ImplicitInference)
+        .await?;
+    let attribute = effects
+        .infer_named_attribute(scope, &names[index], target)
+        .await?;
+    effects.checkpoint(MemberSourceWork::Publish).await?;
+    Ok(attribute)
+}
+
+pub(in crate::types) trait ImplicitNameSearchControl {
+    type Error;
+    fn comparison(&self, candidate_bytes: usize, requested_bytes: usize)
+    -> Result<(), Self::Error>;
+}
+
+pub(in crate::types) fn implicit_name_index_with<C: ImplicitNameSearchControl>(
+    names: &[Name],
+    name: &str,
+    control: &C,
+) -> Result<Option<usize>, C::Error> {
+    let mut failure = None;
+    let result = names.binary_search_by(|candidate| {
+        // A refused comparison must not inspect further bytes or replace the first error.
+        // The native search may invoke its callback again after an Equal result.
+        if failure.is_some() {
+            return Ordering::Equal;
+        }
+        if let Err(error) = control.comparison(candidate.len(), name.len()) {
+            failure = Some(error);
+            return Ordering::Equal;
+        }
+        candidate.as_str().cmp(name)
+    });
+    match failure {
+        Some(error) => Err(error),
+        None => Ok(result.ok()),
+    }
+}
+
+impl ImplicitNameSearchControl for InlineMemberSourceEffects<'_> {
+    type Error = Infallible;
+    fn comparison(
+        &self,
+        _candidate_bytes: usize,
+        _requested_bytes: usize,
+    ) -> Result<(), Infallible> {
+        Ok(())
+    }
+}
+impl<'db> SynchronousImplicitAttributeEffects<'db> for InlineMemberSourceEffects<'db> {
+    fn body_scope(&self, class: StaticClassLiteral<'db>) -> Result<ScopeId<'db>, Self::Error> {
+        Ok(class.body_scope(self.db))
+    }
+    type Error = Infallible;
+    fn checkpoint(&self, _work: MemberSourceWork) -> Result<(), Infallible> {
+        Ok(())
+    }
+    fn names(&self, scope: ScopeId<'db>) -> Result<&'db [Name], Infallible> {
+        Ok(implicit_attribute_names(self.db, scope))
+    }
+    fn find_name(&self, names: &'db [Name], name: &str) -> Result<Option<usize>, Infallible> {
+        implicit_name_index_with(names, name, self)
+    }
+    fn infer_named_attribute(
+        &self,
+        scope: ScopeId<'db>,
+        name: &'db Name,
+        target: MethodDecorator,
+    ) -> Result<ImplicitAttribute<'db>, Infallible> {
+        Ok(StaticClassLiteral::implicit_attribute_inner(
+            self.db,
+            ImplicitAttributeName::new(self.db, scope, name, target),
+        ))
+    }
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn implicit_attribute_names_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<ImplicitAttributeNamesConfiguration> {
+    implicit_attribute_names::fn_ingredient_(db, db.zalsa())
 }

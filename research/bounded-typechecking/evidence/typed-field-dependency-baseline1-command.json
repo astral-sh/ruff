@@ -1,0 +1,31 @@
+{
+  "cwd": "/Users/alexwaygood/.codex/worktrees/f501/architecture-work/ty-cold-boolean1/source",
+  "argv": [
+    "env",
+    "RUSTUP_TOOLCHAIN=ohm-1.98.1-5",
+    "CARGO_TARGET_DIR=/tmp/ty-cold-boolean1/target",
+    "INSTA_FORCE_PASS=1",
+    "INSTA_UPDATE=always",
+    "MDTEST_UPDATE_SNAPSHOTS=1",
+    "RUST_BACKTRACE=0",
+    "cargo",
+    "nextest",
+    "run",
+    "--offline",
+    "--locked",
+    "--manifest-path",
+    "vendor/salsa/Cargo.toml",
+    "--lib",
+    "--profile",
+    "default",
+    "--no-fail-fast",
+    "--failure-output",
+    "immediate",
+    "--success-output",
+    "immediate",
+    "--color",
+    "never",
+    "-E",
+    "test(=function::execute::execution_run::tests::field_reads::ordinary_requests_preserve_metadata_before_conversion_and_after_input_changes) | test(=function::execute::execution_run::tests::field_reads::generated_requests_preserve_values_and_canonical_field_edges) | test(=function::execute::execution_run::tests::field_reads::interned_requests_preserve_canonical_borrows_without_adding_edges) | test(=function::execute::execution_run::tests::field_reads::native_conversion_refusal_preserves_metadata_and_same_revision_retry) | test(=function::execute::execution_run::tests::field_reads::queued_children_drain_before_field_read_owners_on_refusal_and_cancellation) | test(=function::execute::execution_run::tests::field_reads::interned_conversion_refusal_and_cancellation_allow_same_revision_retry) | test(=function::execute::execution_run::tests::explicit_reads::ordinary_fields_requests_and_views_reject_before_conversion) | test(=function::execute::execution_run::tests::explicit_reads::admitted_fields_select_input_tracked_and_interned_values)"
+  ]
+}

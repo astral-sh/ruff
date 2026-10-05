@@ -90,7 +90,7 @@ impl<'db> Script<'db> {
 impl get_size2::GetSize for Script<'_> {}
 
 /// Resolve the `Script` for `file` if it has a PEP 723 metadata block or `None` otherwise.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
     // Files without script metadata must not depend on the low-durability open-file set.
     let tag = script_tag(db, file)?;
@@ -153,7 +153,7 @@ pub(crate) fn script(db: &dyn Db, file: File) -> Option<Script<'_>> {
 /// Returns the PEP 723 script tag embedded in `file`.
 ///
 /// Most files have no script tag. Boxing keeps the cached result compact when it is `None`.
-#[salsa::tracked(returns(as_deref))]
+#[salsa::tracked(attempt = CompleteOnly, returns(as_deref))]
 pub fn script_tag(db: &dyn SourceDb, file: File) -> Option<Box<ScriptTag>> {
     let path = file.path(db);
     if path.is_vendored_path() {

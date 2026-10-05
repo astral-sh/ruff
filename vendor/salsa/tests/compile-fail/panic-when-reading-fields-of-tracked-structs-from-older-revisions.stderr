@@ -1,0 +1,9 @@
+error[E0502]: cannot borrow `db` as mutable because it is also borrowed as immutable
+  --> tests/compile-fail/panic-when-reading-fields-of-tracked-structs-from-older-revisions.rs:22:21
+   |
+21 |     let tracked = tracked_fn(&db, input);
+   |                              --- immutable borrow occurs here
+22 |     input.set_field(&mut db).to(24);
+   |                     ^^^^^^^ mutable borrow occurs here
+23 |     tracked.field(&db); // tracked comes from prior revision
+   |     ------- immutable borrow later used here

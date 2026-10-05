@@ -1,3 +1,8 @@
+pub(in crate::types) mod class_construction;
+pub(in crate::types) mod inheritance;
+pub(in crate::types) mod intersection;
+pub(in crate::types) mod metadata;
+
 use crate::ProgramEnvironment;
 use compact_str::ToCompactString;
 use ruff_db::parsed::parsed_module;
@@ -6,6 +11,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::FxOrderSet;
+use crate::types::class::DynamicEnumLiteral;
 use crate::{
     Db, FxIndexMap,
     place::{
@@ -256,6 +262,22 @@ pub(crate) struct EnumMetadata<'db> {
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
+#[cfg(feature = "experimental-analysis")]
+impl EnumMetadata<'_> {
+    pub(in crate::types) fn aliases(&self) -> &FxHashMap<Name, Name> {
+        &self.aliases
+    }
+
+    pub(in crate::types) fn retirement_work(&self) -> Option<usize> {
+        // Hash collections may scan empty buckets while dropping their entries. Names and
+        // types contain fixed-size handles, so retiring them does not traverse their contents.
+        8usize
+            .checked_add(self.members.len().checked_mul(2)?)?
+            .checked_add(self.aliases.capacity().checked_mul(3)?)?
+            .checked_add(self.auto_members.capacity().checked_mul(2)?)
+    }
+}
+
 pub(super) fn class_defines_property<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -299,7 +321,7 @@ pub(super) fn class_defines_property<'db>(
 ///
 /// This keeps the enum-specific information used by enum literals and enum complements alongside
 /// the underlying class literal.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumClassLiteral<'db> {
     #[returns(copy)]
     pub(crate) class_literal: ClassLiteral<'db>,
@@ -327,43 +349,18 @@ impl<'db> ClassLiteral<'db> {
     }
 }
 
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub(in crate::types) EnumClassLiteralConfiguration), attempt = ReturnOnly, returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 fn enum_class_literal<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumClassLiteral<'db>> {
-    let env = ProgramEnvironment::from_file(class.program_file(db));
-    let metadata = enum_metadata(db, class)?;
-    let members = metadata
-        .members
-        .keys()
-        .map(|name| {
-            metadata
-                .value_type(db, &env, name)
-                .map(|ty| (name.clone(), ty))
-        })
-        .collect::<Option<Box<[_]>>>()?;
-    let mut aliases: Vec<_> = metadata
-        .aliases
-        .iter()
-        .map(|(alias, member)| (alias.clone(), member.clone()))
-        .collect();
-    aliases.sort_unstable();
-    let members_are_exhaustive = !metadata.value_construction.metaclass_may_transform_values
-        && !Type::ClassLiteral(class).is_subtype_of(
-            db,
-            &env,
-            KnownClass::Flag.to_subclass_of(db, &env),
-        );
-
-    Some(EnumClassLiteral::new(
-        db,
+    match class_construction::enum_class_literal_sync(
         class,
-        members,
-        aliases.into_boxed_slice(),
-        metadata.aliases_are_known,
-        members_are_exhaustive,
-    ))
+        &class_construction::InlineEnumClassEffects::new(db),
+    ) {
+        Ok(result) => result,
+        Err(never) => match never {},
+    }
 }
 
 impl<'db> EnumClassLiteral<'db> {
@@ -376,17 +373,15 @@ impl<'db> EnumClassLiteral<'db> {
     }
 
     fn resolve_member_entry(self, db: &'db dyn Db, name: &Name) -> Option<&'db (Name, Type<'db>)> {
-        let members = self.members(db);
-        if let Some(member) = members.iter().find(|(member, _)| member == name) {
-            return Some(member);
+        match intersection::resolve_member_entry_sync(
+            self,
+            name,
+            intersection::EnumIntersectionFacts,
+            &intersection::OrdinaryEnumIntersectionEffects { db },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
-
-        let aliases = self.aliases(db);
-        let alias_index = aliases
-            .binary_search_by(|(alias, _)| alias.cmp(name))
-            .ok()?;
-        let canonical_name = &aliases[alias_index].1;
-        members.iter().find(|(member, _)| member == canonical_name)
     }
 
     pub(crate) fn resolve_member(self, db: &'db dyn Db, name: &Name) -> Option<&'db Name> {
@@ -517,7 +512,7 @@ fn value_has_exact_known_class<'db>(
 }
 
 impl<'db> EnumMetadata<'db> {
-    fn empty() -> Self {
+    pub(in crate::types) fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
@@ -680,7 +675,7 @@ impl<'db> EnumMetadata<'db> {
 ///     if color is not Color.RED:
 ///         reveal_type(color)  # Color, excluding Color.RED
 /// ```
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_view = read_fields, field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct EnumComplementType<'db> {
     #[returns(copy)]
     pub(crate) enum_class_literal: EnumClassLiteral<'db>,
@@ -707,50 +702,16 @@ impl<'db> EnumComplementType<'db> {
         positive: &FxOrderSet<Type<'db>>,
         negative: &NegativeIntersectionElements<'db>,
     ) -> Option<Self> {
-        let mut enum_class = None;
-        let mut rest = SmallVec::<[Type<'db>; 1]>::default();
-        for positive in positive {
-            let Type::NominalInstance(instance) = positive else {
-                rest.push(*positive);
-                continue;
-            };
-
-            let Some(enum_class_literal) = instance.class_literal(db, env).into_enum_class(db)
-            else {
-                rest.push(*positive);
-                continue;
-            };
-
-            if enum_class.replace(enum_class_literal).is_some() {
-                return None;
-            }
+        match intersection::from_intersection_parts_sync(
+            env,
+            positive,
+            negative,
+            intersection::EnumIntersectionFacts,
+            &intersection::OrdinaryEnumIntersectionEffects { db },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
-
-        let enum_class_literal = enum_class?;
-        if !enum_class_literal.members_are_exhaustive(db) {
-            return None;
-        }
-        let mut excluded_names = FxHashSet::default();
-        for negative in negative {
-            let enum_literal = negative.as_enum_literal()?;
-            if enum_literal.enum_class_literal(db) != enum_class_literal {
-                return None;
-            }
-
-            let name = enum_literal.name(db);
-            let canonical_name = enum_class_literal.resolve_member(db, name)?;
-            excluded_names.insert(canonical_name.clone());
-        }
-
-        (!excluded_names.is_empty()).then(|| {
-            let excluded_names: FxOrderSet<Name> = enum_class_literal
-                .member_names(db)
-                .filter(|name| excluded_names.contains(*name))
-                .cloned()
-                .collect();
-            let rest: FxOrderSet<Type<'db>> = rest.into_iter().collect();
-            Self::new(db, enum_class_literal, excluded_names, rest)
-        })
     }
 
     pub(crate) fn enum_class(self, db: &'db dyn Db) -> ClassLiteral<'db> {
@@ -773,7 +734,14 @@ impl<'db> EnumComplementType<'db> {
     /// Complements with rest components are not singletons, because those positive intersection
     /// components must still be preserved even when only one enum member remains.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
-        self.rest(db).is_empty() && self.remaining_member_count(db) == 1
+        match intersection::is_singleton_sync(
+            self,
+            intersection::EnumIntersectionFacts,
+            &intersection::OrdinaryEnumIntersectionEffects { db },
+        ) {
+            Ok(result) => result,
+            Err(never) => match never {},
+        }
     }
 
     /// Expand this complement to the enum literals that remain possible.
@@ -1001,81 +969,64 @@ fn try_register_alias<'db>(
 }
 
 /// List all members of an enum.
-#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub(in crate::types) EnumMetadataConfiguration), attempt = ReturnOnly, returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
-    let class = match class {
-        ClassLiteral::Static(class) => class,
-        ClassLiteral::Dynamic(..) => {
-            // Classes created via `type` cannot be enums; the following fails at runtime:
-            // ```python
-            // import enum
-            //
-            // class BaseEnum(enum.Enum):
-            //     pass
-            //
-            // MyEnum = type("MyEnum", (BaseEnum,), {"A": 1, "B": 2})
-            // ```
-            return None;
-        }
-        ClassLiteral::DynamicNamedTuple(..) | ClassLiteral::DynamicTypedDict(..) => return None,
-        ClassLiteral::DynamicEnum(enum_lit) => {
-            let spec = enum_lit.spec(db);
-            if !spec.has_known_members(db) {
-                return None;
-            }
-            let env = ProgramEnvironment::from_scope(enum_lit.scope(db));
-            let value_construction = EnumValueConstruction {
-                data_type: inherited_enum_data_type(db, &env, ClassLiteral::DynamicEnum(enum_lit)),
-                ..EnumValueConstruction::default()
-            };
-            let mut members = FxIndexMap::default();
-            let mut aliases = FxHashMap::default();
-            let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
-            for (name, ty) in spec.members(db) {
-                if value_construction
-                    .alias_detection_value(db, &env, *ty, false)
-                    .and_then(|alias_value_ty| {
-                        try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
-                            // Identical raw literals remain aliases even when normalization widens.
-                            .or_else(|| {
-                                try_register_alias(*ty, name, &mut enum_values, &mut aliases)
-                            })
-                    })
-                    == Some(true)
-                {
-                    continue;
-                }
-                members.insert(name.clone(), *ty);
-            }
-            members.shrink_to_fit();
+    match metadata::enum_metadata_sync(class, &metadata::InlineEnumMetadataEffects::new(db)) {
+        Ok(metadata) => metadata,
+        Err(never) => match never {},
+    }
+}
 
-            return Some(EnumMetadata {
-                members,
-                aliases,
-                aliases_are_known: true,
-                auto_members: FxHashSet::default(),
-                value_annotation: None,
-                value_construction,
-            });
-        }
+fn dynamic_enum_metadata<'db>(
+    db: &'db dyn Db,
+    enum_lit: DynamicEnumLiteral<'db>,
+) -> Option<EnumMetadata<'db>> {
+    let spec = enum_lit.spec(db);
+    if !spec.has_known_members(db) {
+        return None;
+    }
+    let env = ProgramEnvironment::from_scope(enum_lit.scope(db));
+    let value_construction = EnumValueConstruction {
+        data_type: inherited_enum_data_type(db, &env, ClassLiteral::DynamicEnum(enum_lit)),
+        ..EnumValueConstruction::default()
     };
-    // This is a fast path to avoid traversing the MRO of known classes
-    if class
-        .known(db)
-        .is_some_and(|known_class| !known_class.is_enum_subclass_with_members())
-    {
-        return None;
+    let mut members = FxIndexMap::default();
+    let mut aliases = FxHashMap::default();
+    let mut enum_values: FxHashMap<LiteralValueTypeKind<'db>, Name> = FxHashMap::default();
+    for (name, ty) in spec.members(db) {
+        if value_construction
+            .alias_detection_value(db, &env, *ty, false)
+            .and_then(|alias_value_ty| {
+                try_register_alias(alias_value_ty, name, &mut enum_values, &mut aliases)
+                    // Identical raw literals remain aliases even when normalization widens.
+                    .or_else(|| try_register_alias(*ty, name, &mut enum_values, &mut aliases))
+            })
+            == Some(true)
+        {
+            continue;
+        }
+        members.insert(name.clone(), *ty);
     }
+    members.shrink_to_fit();
 
-    let env = ProgramEnvironment::from_file(class.program_file(db));
+    Some(EnumMetadata {
+        members,
+        aliases,
+        aliases_are_known: true,
+        auto_members: FxHashSet::default(),
+        value_annotation: None,
+        value_construction,
+    })
+}
 
-    if !is_enum_class_by_inheritance(db, &env, class) {
-        return None;
-    }
-
+fn static_enum_member_metadata<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    env: ProgramEnvironment<'db>,
+) -> Option<EnumMetadata<'db>> {
     let scope_id = class.body_scope(db);
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
@@ -1660,13 +1611,13 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
     env: &ProgramEnvironment<'db>,
     class: StaticClassLiteral<'db>,
 ) -> bool {
-    Type::ClassLiteral(ClassLiteral::Static(class)).is_subtype_of(
-        db,
-        env,
-        KnownClass::Enum.to_subclass_of(db, env),
-    ) || class
-        .metaclass(db)
-        .is_subtype_of(db, env, KnownClass::EnumType.to_subclass_of(db, env))
+    match inheritance::is_enum_class_by_inheritance_sync(
+        class,
+        &inheritance::OrdinaryEnumInheritanceEffects { db, env },
+    ) {
+        Ok(result) => result,
+        Err(never) => match never {},
+    }
 }
 
 /// Extracts the inner value type from an `enum.nonmember()` wrapper.
@@ -1680,15 +1631,70 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
 ) -> Option<Type<'db>> {
-    match ty {
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
-            Some(
-                ty.member(db, env, "value")
-                    .place
-                    .ignore_possibly_undefined()
-                    .unwrap_or(Type::unknown()),
-            )
-        }
-        _ => None,
+    match nonmember_value_sync(ty, &InlineNonmemberValue { db, env }) {
+        Ok(value) => value,
+        Err(never) => match never {},
     }
+}
+
+pub(in crate::types) fn enum_metadata_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<EnumMetadataConfiguration> {
+    enum_metadata::fn_ingredient_(db, db.zalsa())
+}
+
+pub(in crate::types) fn enum_class_literal_ingredient(
+    db: &dyn Db,
+) -> &salsa::plumbing::function::IngredientImpl<EnumClassLiteralConfiguration> {
+    enum_class_literal::fn_ingredient_(db, db.zalsa())
+}
+
+ty_mapping_probe_macros::shared_semantic_family! {
+#[synchronous(SynchronousNonmemberValueEffects)]
+pub(in crate::types) trait NonmemberValueEffects<'db> {
+    type Error;
+    #[operation(checkpoint)]
+    async fn checkpoint(&self) -> Result<(), Self::Error>;
+    #[operation(local)]
+    async fn is_nonmember(&self, ty: Type<'db>) -> Result<bool, Self::Error>;
+    #[operation(child)]
+    async fn value(&self, ty: Type<'db>) -> Result<Type<'db>, Self::Error>;
+}
+#[synchronous(nonmember_value_sync)]
+#[capabilities(effects = NonmemberValueEffects)]
+#[passive_values()]
+pub(in crate::types) async fn nonmember_value_with<'db, E: NonmemberValueEffects<'db>>(
+    ty: Type<'db>, effects: &E,
+) -> Result<Option<Type<'db>>, E::Error> {
+    effects.checkpoint().await?;
+    if effects.is_nonmember(ty).await? { Ok(Some(effects.value(ty).await?)) } else { Ok(None) }
+}
+}
+struct InlineNonmemberValue<'env, 'db> {
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+}
+impl<'db> SynchronousNonmemberValueEffects<'db> for InlineNonmemberValue<'_, 'db> {
+    type Error = std::convert::Infallible;
+    fn checkpoint(&self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+    fn is_nonmember(&self, ty: Type<'db>) -> Result<bool, Self::Error> {
+        Ok(ty.is_instance_of(self.db, KnownClass::Nonmember))
+    }
+    fn value(&self, ty: Type<'db>) -> Result<Type<'db>, Self::Error> {
+        Ok(ty
+            .member(self.db, self.env, "value")
+            .place
+            .ignore_possibly_undefined()
+            .unwrap_or(Type::unknown()))
+    }
+}
+
+#[cfg(feature = "experimental-analysis")]
+crate::types::class::runtime::class_memo_schema! {
+    pub(in crate::types) type ClassMemoSchema<'db> = crate::types::StaticClassLiteral<'static>;
+    pub(in crate::types) fn register_class_memos;
+    (enum_class_literal, salsa::execution_probe::FixedQueryKeyProfile),
+            (enum_metadata, crate::types::class::runtime::EnumMetadataProfile)
 }

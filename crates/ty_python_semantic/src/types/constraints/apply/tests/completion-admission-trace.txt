@@ -1,0 +1,92 @@
+TRACE new_node result=Node(2)
+0000 Advance
+0001 HashAccess { table: And, slots: 36 }
+0002 Advance
+0003 Advance
+0004 Advance
+0005 CoverageReduction
+0006 Advance
+0007 Advance
+0008 HashAccess { table: Nodes, slots: 64 }
+0009 Advance
+0010 Advance
+0011 SupportWords { words: 1 }
+0012 Advance
+0013 Advance
+0014 SupportWords { words: 1 }
+0015 Advance
+0016 Advance
+0017 SupportWords { words: 1 }
+0018 Advance
+0019 Advance
+0020 Advance
+0021 Advance
+0022 Advance
+0023 Advance
+0024 Advance
+0025 Advance
+0026 HashAccess { table: Nodes, slots: 64 }
+0027 Grow { allocation: Supports, plan: GrowthPlan { requested_capacity: 8, requested_payload_bytes: 256, relocation_units: 4 } }
+0028 Grow { allocation: Nodes, plan: GrowthPlan { requested_capacity: 4, requested_payload_bytes: 64, relocation_units: 2 } }
+0029 Grow { allocation: NodeSupports, plan: GrowthPlan { requested_capacity: 4, requested_payload_bytes: 16, relocation_units: 2 } }
+0030 HashAccess { table: Nodes, slots: 64 }
+0031 Grow { allocation: Table(And), plan: GrowthPlan { requested_capacity: 4, requested_payload_bytes: 48, relocation_units: 68 } }
+0032 HashAccess { table: And, slots: 64 }
+0033 Commit
+0034 Advance
+0035 Advance
+0036 Advance
+END new_node
+TRACE warm_identity result=Node(2)
+0000 Advance
+0001 HashAccess { table: And, slots: 64 }
+0002 Advance
+0003 Advance
+0004 Advance
+0005 CoverageReduction
+0006 Advance
+0007 Advance
+0008 HashAccess { table: Nodes, slots: 64 }
+0009 Advance
+0010 Advance
+0011 HashAccess { table: And, slots: 64 }
+0012 Commit
+0013 Advance
+0014 Advance
+0015 Advance
+END warm_identity
+TRACE existing_inverse result=Node(2)
+0000 Advance
+0001 HashAccess { table: Negate, slots: 36 }
+0002 Advance
+0003 Advance
+0004 Advance
+0005 CoverageReduction
+0006 Advance
+0007 Advance
+0008 HashAccess { table: Nodes, slots: 64 }
+0009 Advance
+0010 Advance
+0011 Grow { allocation: Table(Negate), plan: GrowthPlan { requested_capacity: 4, requested_payload_bytes: 32, relocation_units: 68 } }
+0012 HashAccess { table: Negate, slots: 64 }
+0013 Commit
+0014 Advance
+0015 Advance
+0016 Advance
+END existing_inverse
+TRACE terminal_reduction result=Node(AlwaysFalse)
+0000 Advance
+0001 HashAccess { table: And, slots: 36 }
+0002 Advance
+0003 Advance
+0004 Advance
+0005 CoverageReduction
+0006 Advance
+0007 Advance
+0008 Grow { allocation: Table(And), plan: GrowthPlan { requested_capacity: 4, requested_payload_bytes: 48, relocation_units: 68 } }
+0009 HashAccess { table: And, slots: 64 }
+0010 Commit
+0011 Advance
+0012 Advance
+0013 Advance
+END terminal_reduction

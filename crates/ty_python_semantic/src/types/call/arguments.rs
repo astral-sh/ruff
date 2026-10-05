@@ -56,6 +56,38 @@ pub(crate) struct CallArgumentTypes<'db> {
 }
 
 impl<'db> CallArgumentTypes<'db> {
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn lookup_metadata_work(&self) -> Option<usize> {
+        crate::types::constraints::control::hash_slots::<std::convert::Infallible>(
+            self.types.capacity(),
+        )
+        .ok()?
+        .checked_mul(4)?
+        .checked_add(4)
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn lookup_work(&self, declared: Type<'db>) -> Option<usize> {
+        let slots = crate::types::constraints::control::hash_slots::<std::convert::Infallible>(
+            self.types.capacity(),
+        )
+        .ok()?;
+        let payloads = self.types.iter().try_fold(
+            declared.inline_payload_bytes(),
+            |bytes, (key, value)| {
+                bytes
+                    .checked_add(key.inline_payload_bytes())?
+                    .checked_add(value.inline_payload_bytes())
+            },
+        )?;
+        // A failed declared-type lookup also compares the retained values for a common fallback.
+        // Include debug Todo labels: copying a Type is constant, but equality can inspect its text.
+        slots
+            .checked_add(1)?
+            .checked_mul(payloads.checked_add(8)?)?
+            .checked_add(4)
+    }
+
     fn new(fallback_ty: Option<Type<'db>>) -> Self {
         Self {
             fallback_type: fallback_ty,
@@ -115,6 +147,156 @@ impl<'db> CallArgumentTypes<'db> {
 }
 
 impl<'a, 'db> CallArguments<'a, 'db> {
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn clone_storage_quote(&self) -> Option<(usize, usize)> {
+        self.cloned_storage_quote(0)
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn with_self_storage_quote(
+        &self,
+        bound_type: Option<Type<'db>>,
+    ) -> Option<(usize, usize)> {
+        if bound_type.is_some() {
+            self.cloned_storage_quote(1)
+        } else {
+            Some((1, 0))
+        }
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    fn cloned_storage_quote(&self, additional: usize) -> Option<(usize, usize)> {
+        let count = self.items.len().checked_add(additional)?;
+        let mut work = count.checked_mul(4)?.checked_add(4)?;
+        let mut bytes = Self::capacity_bytes(count)?;
+        for item in &self.items {
+            let capacity = item.types.types.capacity();
+            if capacity != 0 {
+                // These maps are insert-only; clearing an argument replaces its whole map.
+                // Cloning copies the table and scalar Type handles without following them.
+                let slots = crate::types::constraints::control::hash_slots::<
+                    std::convert::Infallible,
+                >(capacity)
+                .ok()?;
+                work = work.checked_add(slots.checked_mul(2)?)?;
+                bytes = bytes.checked_add(
+                    slots.checked_mul(size_of::<(Type<'db>, Type<'db>)>().checked_add(1)?)?,
+                )?;
+            }
+        }
+        (bytes <= isize::MAX as usize).then_some((work, bytes))
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn insert_types_storage_quote(
+        &self,
+        index: usize,
+        contexts: &[Option<Type<'db>>],
+    ) -> Option<(usize, usize)> {
+        let types = &self.items.get(index)?.types.types;
+        let count = contexts.iter().filter(|context| context.is_some()).count();
+        if count == 0 {
+            return Some((contexts.len().checked_add(1)?, 0));
+        }
+        let hash_slots = crate::types::constraints::control::hash_slots::<std::convert::Infallible>;
+        let slots = hash_slots(types.capacity()).ok()?;
+        let required = types.len().checked_add(count)?;
+        let growth = required > types.capacity();
+        let new_slots = if growth {
+            hash_slots(
+                types
+                    .capacity()
+                    .checked_mul(2)?
+                    .max(required)
+                    .max(4)
+                    .checked_mul(2)?,
+            )
+            .ok()?
+        } else {
+            0
+        };
+        let mut key_bytes = 1usize;
+        for context in contexts.iter().flatten() {
+            key_bytes = key_bytes.checked_add(context.inline_payload_bytes())?;
+        }
+        for key in types.keys() {
+            key_bytes = key_bytes.checked_add(key.inline_payload_bytes())?;
+        }
+        // Include collision comparisons and rehashing of retained keys. Type handles are
+        // shallow, but debug Todo labels participate in their derived Hash/Eq implementations.
+        let work = slots
+            .checked_add(new_slots)?
+            .checked_mul(count.checked_add(1)?)?
+            .checked_mul(key_bytes)?
+            .checked_add(8)?;
+        // Multiple insertions may allocate successive tables; twice the final backing bound
+        // covers their cumulative requested storage as well as control bytes.
+        let bytes = new_slots
+            .checked_mul(2)?
+            .checked_mul(size_of::<(Type<'db>, Type<'db>)>().checked_add(1)?)?;
+        (bytes <= isize::MAX as usize).then_some((work, bytes))
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn capacity_bytes(capacity: usize) -> Option<usize> {
+        let bytes = capacity.checked_mul(size_of::<CallArgument<'a, 'db>>())?;
+        (bytes <= isize::MAX as usize).then_some(bytes)
+    }
+
+    #[cfg(feature = "experimental-analysis")]
+    pub(in crate::types) fn push_preallocated_argument(
+        &mut self,
+        argument: Argument<'a>,
+    ) -> salsa::execution_probe::RunResult<()> {
+        if self.items.len() == self.items.capacity() {
+            return Err(salsa::execution_probe::RunError::Contract(
+                "argument preparation exceeded its reserved storage",
+            ));
+        }
+        self.push_argument(argument, None);
+        Ok(())
+    }
+
+    pub(in crate::types) fn with_capacity(capacity: usize) -> Self {
+        Self {
+            items: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Classify an AST argument and identify any splatted expression that needs inference before
+    /// parameter matching.
+    pub(in crate::types) fn classify_argument(
+        arg_or_keyword: &ast::ArgOrKeyword<'a>,
+    ) -> (Argument<'a>, Option<&'a ast::Expr>) {
+        match *arg_or_keyword {
+            ast::ArgOrKeyword::Arg(arg) => match arg {
+                ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                    (Argument::Variadic, Some(value))
+                }
+                _ => (Argument::Positional, None),
+            },
+            ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                if let Some(arg) = arg {
+                    (Argument::Keyword(&arg.id), None)
+                } else {
+                    (Argument::Keywords, Some(value))
+                }
+            }
+        }
+    }
+
+    /// Append a classified argument with its optional inferred type.
+    pub(in crate::types) fn push_argument(
+        &mut self,
+        argument: Argument<'a>,
+        ty: Option<Type<'db>>,
+    ) {
+        self.items.push(CallArgument {
+            argument,
+            types: CallArgumentTypes::new(ty),
+        });
+    }
+
     /// Create `CallArguments` from AST arguments. We will use the provided callback to obtain the
     /// type of each splatted argument, so that we can determine its length. All other arguments
     /// will remain uninitialized.
@@ -122,32 +304,12 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::ArgOrKeyword, &ast::Expr) -> Type<'db>,
     ) -> Self {
-        let mut call_arguments = Self {
-            items: Vec::with_capacity(arguments.len()),
-        };
+        let mut call_arguments = Self::with_capacity(arguments.len());
 
         for arg_or_keyword in arguments.iter_source_order() {
-            let (argument, ty) = match arg_or_keyword {
-                ast::ArgOrKeyword::Arg(arg) => match arg {
-                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Variadic, Some(ty))
-                    }
-                    _ => (Argument::Positional, None),
-                },
-                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
-                    if let Some(arg) = arg {
-                        (Argument::Keyword(&arg.id), None)
-                    } else {
-                        let ty = infer_argument_type(&arg_or_keyword, value);
-                        (Argument::Keywords, Some(ty))
-                    }
-                }
-            };
-            call_arguments.items.push(CallArgument {
-                argument,
-                types: CallArgumentTypes::new(ty),
-            });
+            let (argument, splatted_value) = Self::classify_argument(&arg_or_keyword);
+            let ty = splatted_value.map(|value| infer_argument_type(&arg_or_keyword, value));
+            call_arguments.push_argument(argument, ty);
         }
 
         call_arguments

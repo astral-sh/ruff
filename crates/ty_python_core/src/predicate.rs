@@ -104,7 +104,7 @@ impl PredicateOrLiteral<'_> {
 
 /// A stable key for call-completion queries. Creating it while building predicates lets cached
 /// queries use its ID directly, without looking up its components in Salsa's intern table again.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 pub struct CallableAndCallExpr<'db> {
     #[returns(copy)]
     pub callable: Expression<'db>,
@@ -308,7 +308,7 @@ pub enum PatternPredicateKind<'db> {
     Star(Option<Name>),
 }
 
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(debug, field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
     #[returns(copy)]
     pub program_file: ProgramFile<'db>,
@@ -391,7 +391,7 @@ impl<'db> PatternPredicate<'db> {
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
 ///
 /// [Truthiness]: [crate::types::Truthiness]
-#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(debug, field_requests=read_fields, heap_size=ruff_memory_usage::heap_size)]
 pub struct StarImportPlaceholderPredicate<'db> {
     #[returns(copy)]
     pub importing_file: ProgramFile<'db>,

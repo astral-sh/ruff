@@ -11,6 +11,10 @@ use crate::types::{
 };
 use crate::{Db, FxOrderMap, FxOrderSet, ProgramEnvironment};
 
+use super::enum_source::{
+    OrdinaryEqualityEnumEffects, enum_domain_set_from_type_sync, enum_value_from_resolved_sync,
+    enum_value_set_from_type_sync, evaluate_enum_comparison_sync, evaluate_enum_domains_sync,
+};
 use super::{
     ComparisonBranch, ComparisonEvaluator, ComparisonGoal, ComparisonOperator, ComparisonResult,
     KnownComparisonSemantics, combine_definite_truthiness, enum_literal_value,
@@ -31,18 +35,15 @@ pub(super) fn evaluate_enum_comparison<'db>(
 ) -> Option<ComparisonResult<'db>> {
     let db = evaluator.db;
     let env = evaluator.env.clone();
-    evaluate_enum_domains(db, &env, target, other, branch, operator).or_else(|| {
-        PartitionedEnumComparison::new(db, &env, target, other, branch, operator).map(
-            |comparison| match comparison.evaluate(evaluator, branch, operator) {
-                ComparisonResult::CanNarrow(narrowed)
-                    if narrowed == target.resolve_type_alias(db) =>
-                {
-                    ComparisonResult::Ambiguous
-                }
-                result => result,
-            },
-        )
-    })
+    evaluate_enum_comparison_sync(
+        evaluator,
+        target,
+        other,
+        branch,
+        operator,
+        &OrdinaryEqualityEnumEffects { db, env: &env },
+    )
+    .unwrap_or_else(|never| match never {})
 }
 
 /// Compare values that are all enum members.
@@ -57,8 +58,24 @@ fn evaluate_enum_domains<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> Option<ComparisonResult<'db>> {
-    let target = EnumDomainSet::from_type(db, env, target)?;
-    let other = EnumDomainSet::from_type(db, env, other)?;
+    evaluate_enum_domains_sync(
+        target,
+        other,
+        branch,
+        operator,
+        &OrdinaryEqualityEnumEffects { db, env },
+    )
+    .unwrap_or_else(|never| match never {})
+}
+
+pub(super) fn compare_enum_domains<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    target: EnumDomainSet<'db>,
+    other: EnumDomainSet<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+) -> Option<ComparisonResult<'db>> {
     if let (Some(target), Some(other)) = (target.single(), other.single())
         && target.enum_class == other.enum_class
     {
@@ -92,7 +109,7 @@ fn evaluate_enum_domains<'db>(
 ///         reveal_type(left)   # Literal[Left.SHARED] | None
 ///         reveal_type(right)  # Literal[Right.SHARED] | None
 /// ```
-struct PartitionedEnumComparison<'db> {
+pub(in crate::types) struct PartitionedEnumComparison<'db> {
     target: EnumDomainPartition<'db>,
     other: EnumDomainPartition<'db>,
     other_type: Type<'db>,
@@ -104,7 +121,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// another value.
     ///
     /// Return `None` if either enum has unsupported comparison behavior.
-    fn new(
+    pub(super) fn from_unions(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         target: Type<'db>,
@@ -112,12 +129,6 @@ impl<'db> PartitionedEnumComparison<'db> {
         branch: ComparisonBranch,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        if !matches!(target.resolve_type_alias(db), Type::Union(_))
-            && !matches!(other.resolve_type_alias(db), Type::Union(_))
-        {
-            return None;
-        }
-
         let target = EnumDomainPartition::from_type(db, env, target)?;
         let other_type = other;
         let other = EnumDomainPartition::from_type(db, env, other)?;
@@ -201,7 +212,7 @@ impl<'db> PartitionedEnumComparison<'db> {
     /// If no member of an enum can match, exclude it from the other possible values.
     ///
     /// Return whether the result is certain or which values can still match.
-    fn evaluate(
+    pub(super) fn evaluate(
         &self,
         evaluator: &mut ComparisonEvaluator<'db>,
         branch: ComparisonBranch,
@@ -363,14 +374,14 @@ impl<'db> SameEnumComparison<'db> {
 /// make the operand more specific, but they must never be transferred to the other operand by an
 /// equality constraint.
 #[derive(Clone)]
-struct EnumValueSet<'db> {
-    enum_class: EnumClassLiteral<'db>,
-    members: EnumValueSetMembers<'db>,
+pub(in crate::types) struct EnumValueSet<'db> {
+    pub(super) enum_class: EnumClassLiteral<'db>,
+    pub(super) members: EnumValueSetMembers<'db>,
 }
 
 /// Compact representation of the member names admitted by an [`EnumValueSet`].
 #[derive(Clone)]
-enum EnumValueSetMembers<'db> {
+pub(super) enum EnumValueSetMembers<'db> {
     /// The entire enum domain, including undeclared runtime values when the enum is open.
     All,
     /// One canonical member name after resolving aliases, and whether its literal is promotable.
@@ -392,62 +403,32 @@ impl<'db> EnumValueSet<'db> {
         ty: Type<'db>,
         active_types: &mut FxHashSet<Type<'db>>,
     ) -> Option<Self> {
-        fn from_type_inner<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            active_types: &mut FxHashSet<Type<'db>>,
-        ) -> Option<EnumValueSet<'db>> {
-            let value_set = match ty.resolve_type_alias(db) {
-                Type::LiteralValue(literal) => {
-                    let LiteralValueTypeKind::Enum(enum_literal) = literal.kind() else {
-                        return None;
-                    };
-                    let enum_class = enum_literal.enum_class_literal(db);
-                    let name = enum_class.resolve_member(db, enum_literal.name(db))?;
-                    EnumValueSet {
-                        enum_class,
-                        members: EnumValueSetMembers::One {
-                            name,
-                            promotable: literal.is_promotable(),
-                        },
-                    }
-                }
-                Type::NominalInstance(instance) => EnumValueSet {
-                    enum_class: instance.class_literal(db, env).into_enum_class(db)?,
-                    members: EnumValueSetMembers::All,
-                },
-                Type::NewTypeInstance(newtype) => {
-                    EnumValueSet::from_type(db, env, newtype.concrete_base_type(db), active_types)?
-                }
-                Type::EnumComplement(complement) => EnumValueSet {
-                    enum_class: complement.enum_class_literal(db),
-                    members: EnumValueSetMembers::AllExcept(complement),
-                },
-                Type::Union(union) => {
-                    EnumValueSet::from_union(db, env, union.elements(db), active_types)?
-                }
-                Type::Intersection(intersection) => {
-                    EnumValueSet::from_intersection(db, env, intersection, active_types)?
-                }
-                _ => return None,
-            };
-            (value_set.member_count(db) > 0).then_some(value_set)
-        }
+        enum_value_set_from_type_sync(ty, active_types, &OrdinaryEqualityEnumEffects { db, env })
+            .unwrap_or_else(|never| match never {})
+    }
 
-        // A cycle prevents extracting a finite enum domain, so fall back to general comparison.
-        if !active_types.insert(ty) {
-            return None;
+    pub(super) fn from_resolved_type(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        active_types: &mut FxHashSet<Type<'db>>,
+    ) -> Option<Self> {
+        enum_value_from_resolved_sync(ty, active_types, &OrdinaryEqualityEnumEffects { db, env })
+            .unwrap_or_else(|never| match never {})
+    }
+
+    /// Represents every member of an enum before checking whether the domain is empty.
+    pub(in crate::types) const fn all_members(enum_class: EnumClassLiteral<'db>) -> Self {
+        Self {
+            enum_class,
+            members: EnumValueSetMembers::All,
         }
-        let value_set = from_type_inner(db, env, ty, active_types);
-        active_types.remove(&ty);
-        value_set
     }
 
     /// Extract an exact included-member set from a union of enum domains.
     ///
     /// Whole-domain and complement arms are rejected because they are not exact included sets.
-    fn from_union(
+    pub(super) fn from_union(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         elements: &[Type<'db>],
@@ -515,7 +496,7 @@ impl<'db> EnumValueSet<'db> {
     }
 
     /// Extract the enum restriction while discarding unrelated positive intersection state.
-    fn from_intersection(
+    pub(super) fn from_intersection(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         intersection: IntersectionType<'db>,
@@ -547,7 +528,7 @@ impl<'db> EnumValueSet<'db> {
             .then_some(value_set)
     }
 
-    fn member_count(&self, db: &'db dyn Db) -> usize {
+    pub(super) fn member_count(&self, db: &'db dyn Db) -> usize {
         match &self.members {
             EnumValueSetMembers::All => self.enum_class.member_count(db),
             EnumValueSetMembers::One { .. } => 1,
@@ -773,52 +754,14 @@ impl<'db> EnumDomainPartition<'db> {
 }
 
 /// One or more enum-class domains represented by an operand.
-struct EnumDomainSet<'db> {
-    domains: Vec<EnumValueSet<'db>>,
+pub(in crate::types) struct EnumDomainSet<'db> {
+    pub(in crate::types) domains: Vec<EnumValueSet<'db>>,
 }
 
 impl<'db> EnumDomainSet<'db> {
     fn from_type(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> Option<Self> {
-        fn collect<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            domains: &mut Vec<EnumValueSet<'db>>,
-            active_types: &mut FxHashSet<Type<'db>>,
-        ) -> Option<()> {
-            if let Some(domain) = EnumValueSet::from_type(db, env, ty, active_types) {
-                domains.push(domain);
-                return Some(());
-            }
-
-            if !active_types.insert(ty) {
-                return None;
-            }
-            let result = collect_union(db, env, ty, domains, active_types);
-            active_types.remove(&ty);
-            result
-        }
-
-        fn collect_union<'db>(
-            db: &'db dyn Db,
-            env: &ProgramEnvironment<'db>,
-            ty: Type<'db>,
-            domains: &mut Vec<EnumValueSet<'db>>,
-            active_types: &mut FxHashSet<Type<'db>>,
-        ) -> Option<()> {
-            let Type::Union(union) = ty.resolve_type_alias(db) else {
-                return None;
-            };
-            for element in union.elements(db) {
-                collect(db, env, *element, domains, active_types)?;
-            }
-            Some(())
-        }
-
-        let mut domains = Vec::new();
-        let mut active_types = FxHashSet::default();
-        collect(db, env, ty, &mut domains, &mut active_types)?;
-        (!domains.is_empty()).then_some(Self { domains })
+        enum_domain_set_from_type_sync(ty, &OrdinaryEqualityEnumEffects { db, env })
+            .unwrap_or_else(|never| match never {})
     }
 
     fn single(&self) -> Option<&EnumValueSet<'db>> {

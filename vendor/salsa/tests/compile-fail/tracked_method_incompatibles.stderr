@@ -1,0 +1,73 @@
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+ --> tests/compile-fail/tracked_method_incompatibles.rs:9:17
+  |
+9 |     fn ref_self(&self, db: &dyn salsa::Database) {}
+  |                 ^^^^^
+
+error: tracked methods's first argument must be declared as `self`, not `&self` or `&mut self`
+ --> tests/compile-fail/tracked_method_incompatibles.rs:9:17
+  |
+9 |     fn ref_self(&self, db: &dyn salsa::Database) {}
+  |                 ^
+
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+  --> tests/compile-fail/tracked_method_incompatibles.rs:15:21
+   |
+15 |     fn ref_mut_self(&mut self, db: &dyn salsa::Database) {}
+   |                     ^^^^^^^^^
+
+error: tracked methods's first argument must be declared as `self`, not `&self` or `&mut self`
+  --> tests/compile-fail/tracked_method_incompatibles.rs:15:21
+   |
+15 |     fn ref_mut_self(&mut self, db: &dyn salsa::Database) {}
+   |                     ^
+
+error: #[salsa::tracked] must also be applied to the impl block for tracked methods
+  --> tests/compile-fail/tracked_method_incompatibles.rs:21:33
+   |
+21 |     fn multiple_lifetimes<'db1>(&mut self, db: &'db1 dyn salsa::Database) {}
+   |                                 ^^^^^^^^^
+
+error: tracked method already has a lifetime parameter in scope
+  --> tests/compile-fail/tracked_method_incompatibles.rs:21:27
+   |
+21 |     fn multiple_lifetimes<'db1>(&mut self, db: &'db1 dyn salsa::Database) {}
+   |                           ^^^^
+
+error: only a single lifetime parameter is accepted
+  --> tests/compile-fail/tracked_method_incompatibles.rs:27:22
+   |
+27 |     fn type_generics<T>(&mut self, db: &dyn salsa::Database) -> T {
+   |                      ^
+
+error: tracked methods cannot have non-lifetime generic parameters
+  --> tests/compile-fail/tracked_method_incompatibles.rs:27:22
+   |
+27 |     fn type_generics<T>(&mut self, db: &dyn salsa::Database) -> T {
+   |                      ^
+
+warning: unused variable: `db`
+ --> tests/compile-fail/tracked_method_incompatibles.rs:9:24
+  |
+9 |     fn ref_self(&self, db: &dyn salsa::Database) {}
+  |                        ^^ help: if this is intentional, prefix it with an underscore: `_db`
+  |
+  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `db`
+  --> tests/compile-fail/tracked_method_incompatibles.rs:15:32
+   |
+15 |     fn ref_mut_self(&mut self, db: &dyn salsa::Database) {}
+   |                                ^^ help: if this is intentional, prefix it with an underscore: `_db`
+
+warning: unused variable: `db`
+  --> tests/compile-fail/tracked_method_incompatibles.rs:21:44
+   |
+21 |     fn multiple_lifetimes<'db1>(&mut self, db: &'db1 dyn salsa::Database) {}
+   |                                            ^^ help: if this is intentional, prefix it with an underscore: `_db`
+
+warning: unused variable: `db`
+  --> tests/compile-fail/tracked_method_incompatibles.rs:27:36
+   |
+27 |     fn type_generics<T>(&mut self, db: &dyn salsa::Database) -> T {
+   |                                    ^^ help: if this is intentional, prefix it with an underscore: `_db`

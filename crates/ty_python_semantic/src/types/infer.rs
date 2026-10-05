@@ -51,9 +51,16 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
+#[cfg(any(test, feature = "experimental-analysis"))]
+use salsa::plumbing::function::IngredientImpl;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+#[cfg(test)]
+use crate::types::constructor::expansion_probe::{
+    self as constructor_probe, FallbackSide, NormalizationOwner, NormalizationPhaseKind,
+    Observation,
+};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -65,6 +72,25 @@ use crate::types::{
 use crate::{Db, FxIndexSet};
 
 use builder::TypeInferenceBuilder;
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use builder::source_definition::controlled::local_transfer::{
+    local_quoted_with_fixed_transfers_at, local_with_fixed_transfers_at,
+};
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub use builder::source_definition::SourceDefinitionEffect;
+#[cfg(test)]
+pub(crate) use builder::source_definition::evaluate_scheduled_definition;
+#[cfg(test)]
+pub(crate) use builder::source_definition::{
+    scheduled_definition_builder_counts, scheduled_definition_live_builders,
+};
+#[cfg(feature = "experimental-analysis")]
+pub use builder::source_expression::SourceExpressionOperation;
+#[cfg(feature = "experimental-analysis")]
+pub use builder::{
+    AnnotatedAssignmentOperation, AttributeOperation, ChainedComparisonOperation,
+    DecoratorApplicationOperation,
+};
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
@@ -74,11 +100,31 @@ use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
+pub(in crate::types) mod type_context;
+#[cfg(all(test, feature = "experimental-analysis"))]
+pub(in crate::types) use builder::source_definition::controlled::legacy_callable_observations;
+mod enclosing_class;
+pub(in crate::types) mod complete_scope;
+#[cfg(feature = "experimental-analysis")]
+mod expression_context;
+#[cfg(feature = "experimental-analysis")]
+mod native_values;
+#[cfg(feature = "experimental-analysis")]
+mod source_runtime;
+#[cfg(feature = "experimental-analysis")]
+pub(crate) use source_runtime::{
+    run_expression as run_source_expression, run_file as run_source_file,
+};
 mod implicit_alias;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
+#[cfg(feature = "experimental-analysis")]
+pub use comparisons::source::TypeComparisonOperation;
+#[cfg(test)]
+mod finalized_source_tests;
 #[cfg(test)]
 mod tests;
+pub(super) mod type_parameter_header;
 
 /// The inferred alias type, or a cycle error retaining a type for recovery.
 pub(super) type ImplicitAliasResult<'db> = Result<Type<'db>, CyclicTypeAliasError<'db>>;
@@ -104,6 +150,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
 /// Validation examines the inferred constructor before recovery, so diagnostics do not depend on
 /// which recursive references remain in the recovered type.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
@@ -112,7 +159,10 @@ pub(super) struct CyclicTypeAliasError<'db> {
             implicit_aliases: Box::default(),
         }
     },
-    cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return result;
+        }
         let recover = |ty| RecursiveType::recover(db, definition, cycle.id(), parameters, ty);
         result.ty = result.ty.map(recover).map_err(|error| CyclicTypeAliasError {
             fallback_type: recover(error.fallback_type),
@@ -216,28 +266,70 @@ fn normalize_collection_use_constraints<'db>(
     constraints: &mut CollectionUseConstraints<'db>,
     cycle: &salsa::Cycle,
 ) {
+    if salsa::attempt_probe::is_incomplete(db) {
+        return;
+    }
     #[expect(
         clippy::iter_over_hash_type,
         reason = "constraints for distinct collection definitions are normalized independently"
     )]
     for types in constraints.values_mut() {
+        // Retain the unprocessed constraints if a dependency refuses partway through this set.
         *types = std::mem::take(types)
             .into_iter()
-            .map(|ty| ty.recursive_type_normalized(db, env, cycle))
+            .map(|ty| {
+                if salsa::attempt_probe::is_incomplete(db) {
+                    ty
+                } else {
+                    ty.recursive_type_normalized(db, env, cycle)
+                }
+            })
             .collect();
+        if salsa::attempt_probe::is_incomplete(db) {
+            return;
+        }
         types.shrink_to_fit();
     }
 }
 
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) InferDefinitionTypesConfiguration),
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        let inference = DefinitionInference::cycle_initial(db, definition, Type::divergent(id));
+        #[cfg(test)]
+        constructor_probe::observe(Observation::DefinitionSeed {
+            query: id,
+            definition: definition.as_id(),
+            canonical: inference.fallback_type() == Some(Type::divergent(id)),
+        });
+        inference
     },
-    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
-        inference.cycle_normalized(db, previous, cycle, definition)
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+        #[cfg(test)]
+        constructor_probe::observe(Observation::DefinitionRecovery(cycle.id()));
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
+        #[cfg(test)]
+        let _normalizer = constructor_probe::observe_normalizer(
+            cycle, "infer_definition_types", NormalizationOwner::Definition(definition.as_id()),
+        );
+        #[cfg(test)]
+        constructor_probe::observe(Observation::DefinitionNormalization(cycle.id()));
+        let inference = inference.cycle_normalized(db, previous, cycle, definition);
+        #[cfg(test)]
+        if constructor_probe::observing() {
+            constructor_probe::observe(Observation::DefinitionNormalized {
+                query: cycle.id(),
+                binding_changed: previous.types.binding_type(definition, definition).or_else(|| previous.fallback_type())
+                    != inference.types.binding_type(definition, definition).or_else(|| inference.fallback_type()),
+                result_changed: *previous != inference,
+            });
+        }
+        inference
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -271,6 +363,25 @@ pub(crate) fn infer_definition_types<'db>(
     .finish_definition(definition)
 }
 
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn definition_inference_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<InferDefinitionTypesConfiguration> {
+    infer_definition_types::fn_ingredient_(db, db.zalsa())
+}
+
+#[cfg(feature = "experimental-analysis")]
+fn scope_inference_ingredient(db: &dyn Db) -> &IngredientImpl<InferScopeTypesImplConfiguration> {
+    infer_scope_types_impl::fn_ingredient_(db, db.zalsa())
+}
+
+#[cfg(feature = "experimental-analysis")]
+fn expression_inference_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<InferExpressionTypesImplConfiguration> {
+    infer_expression_types_impl::fn_ingredient_(db, db.zalsa())
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:
@@ -298,7 +409,8 @@ pub(crate) fn is_discarded_dict_key_assignment<'db>(
 /// `infer_definition_types` when we need to check decorators while
 /// already inside definition inference (e.g. checking `Self` in a
 /// `@staticmethod`).
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) FunctionKnownDecoratorsConfiguration),
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|_, _, _| FunctionDecoratorInference {
         has_unknown_decorators: true,
@@ -327,6 +439,13 @@ pub(crate) fn function_known_decorators<'db>(
         &module,
     )
     .finish_function_decorator_inference()
+}
+
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn function_decorator_inference_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<FunctionKnownDecoratorsConfiguration> {
+    function_known_decorators::fn_ingredient_(db, db.zalsa())
 }
 
 pub(crate) fn function_known_decorator_flags<'db>(
@@ -397,12 +516,20 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// Deferred expressions are type expressions (annotations, base classes, aliases...) in a stub
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
 /// Function parameter defaults are inferred separately by [`infer_function_default_types`].
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) InferDeferredTypesConfiguration),
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
-    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
+        #[cfg(test)]
+        let _normalizer = constructor_probe::observe_normalizer(
+            cycle, "infer_deferred_types", NormalizationOwner::Definition(definition.as_id()),
+        );
         inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -438,17 +565,32 @@ pub(crate) fn infer_deferred_types<'db>(
     .finish_definition(definition)
 }
 
+#[cfg(any(test, feature = "experimental-analysis"))]
+pub(in crate::types) fn deferred_definition_inference_ingredient(
+    db: &dyn Db,
+) -> &IngredientImpl<InferDeferredTypesConfiguration> {
+    infer_deferred_types::fn_ingredient_(db, db.zalsa())
+}
+
 /// Infer a function's parameter defaults without retaining its annotation types.
 ///
 /// Callable signature checking only needs to know which parameters are optional. Inferring their
 /// default values while inferring annotations can re-enter the decorated function's own signature.
 /// Keeping the results separate also avoids caching annotation expressions twice.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
-    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
+        #[cfg(test)]
+        let _normalizer = constructor_probe::observe_normalizer(
+            cycle, "infer_function_default_types", NormalizationOwner::Definition(definition.as_id()),
+        );
         inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -485,20 +627,13 @@ pub(crate) fn infer_complete_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
 ) -> &'db ScopeInference<'db> {
-    // Scopes that may require type context are inferred during the inference of
-    // their outer scope.
-    if scope.accepts_type_context(db) {
-        let program_file = scope.program_file(db);
-        let index = semantic_index(db, program_file);
-
-        if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
-            // Note that nested lambdas or comprehensions may require recursing until we reach
-            // an outer scope that is independent of any type context.
-            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, program_file));
-        }
+    match complete_scope::complete_scope_sync(
+        scope,
+        &complete_scope::OrdinaryCompleteScopeEffects(db),
+    ) {
+        Ok(inference) => inference,
+        Err(never) => match never {},
     }
-
-    infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -517,17 +652,21 @@ pub(crate) fn infer_scope_types<'db>(
     infer_scope_types_impl(db, InferScope::new(db, scope, tcx))
 }
 
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) InferScopeTypesImplConfiguration),
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
-    cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, input: InferScope<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
         let (scope, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(scope);
         inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn infer_scope_types_impl<'db>(
+pub(in crate::types) fn infer_scope_types_impl<'db>(
     db: &'db dyn Db,
     input: InferScope<'db>,
 ) -> ScopeInference<'db> {
@@ -569,12 +708,20 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(super) InferExpressionTypesImplConfiguration),
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=expression_cycle_initial,
-    cycle_fn=|db, cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, previous: &ExpressionInference<'db>, inference: ExpressionInference<'db>, input: InferExpression<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
+        #[cfg(test)]
+        let _normalizer = constructor_probe::observe_normalizer(
+            cycle, "infer_expression_types_impl", NormalizationOwner::Expression(expression.as_id()),
+        );
         inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -651,10 +798,14 @@ pub(crate) fn infer_expression_type<'db>(
     infer_expression_type_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-#[salsa::tracked(
+#[salsa::tracked(configuration = (pub(in crate::types) InferExpressionTypeImplConfiguration),
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial=|_, id, _| Type::divergent(id),
-    cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, input: InferExpression<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return result;
+        }
         let (expression, _) = input.into_inner(db);
         let env = ProgramEnvironment::from_scope(expression.scope(db));
         result.cycle_normalized(db, &env, *previous, cycle)
@@ -692,12 +843,20 @@ pub(super) fn infer_statement_types<'db>(
 }
 
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|db, id, statement: StatementInner<'db>| {
         StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
     },
-    cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle: &salsa::Cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, statement: StatementInner<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return inference;
+        }
         let env = ProgramEnvironment::from_file(statement.program_file(db));
+        #[cfg(test)]
+        let _normalizer = constructor_probe::observe_normalizer(
+            cycle, "infer_statement_types_impl", NormalizationOwner::Statement(statement.as_id()),
+        );
         inference.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
@@ -743,7 +902,7 @@ pub(super) enum InferExpression<'db> {
     WithContext(ExpressionWithContext<'db>),
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(field_requests = field_requests, debug, heap_size=ruff_memory_usage::heap_size)]
 pub(super) struct ExpressionWithContext<'db> {
     #[returns(copy)]
     expression: Expression<'db>,
@@ -855,23 +1014,13 @@ impl<'db> TypeContext<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<Cow<'db, [Type<'db>]>> {
-        let union = self.annotation?.as_union_like(db)?;
-
-        let targets = if union.has_aliases(db) {
-            let expanded = union.expand_aliases(db, env);
-            if let Some(union) = expanded.as_union_like(db) {
-                Cow::Borrowed(union.elements(db))
-            } else {
-                Cow::Owned(vec![expanded])
-            }
-        } else {
-            Cow::Borrowed(union.elements(db))
-        };
-
-        // TODO: We could theoretically attempt to narrow to every element of
-        // the power set of this union. However, this leads to an exponential
-        // explosion of inference attempts, and is rarely needed in practice.
-        Some(targets)
+        match type_context::narrow_targets_sync(
+            self.annotation,
+            &type_context::OrdinaryTypeContextEffects { db, env },
+        ) {
+            Ok(targets) => targets,
+            Err(never) => match never {},
+        }
     }
 }
 
@@ -888,9 +1037,13 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(ref),
     cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
-    cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return result;
+        }
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
     },
@@ -927,13 +1080,14 @@ pub(crate) fn nearest_enclosing_class<'db>(
     semantic: &SemanticIndex<'db>,
     scope: ScopeId,
 ) -> Option<StaticClassLiteral<'db>> {
-    semantic
-        .ancestor_scopes(scope.file_scope_id(db))
-        .find_map(|(_, ancestor_scope)| {
-            let class = ancestor_scope.node().as_class()?;
-            let definition = semantic.expect_single_definition(class);
-            original_class_type(db, definition).and_then(ClassLiteral::as_static)
-        })
+    match enclosing_class::nearest_enclosing_class_sync(
+        semantic,
+        scope.file_scope_id(db),
+        &enclosing_class::InlineEnclosingClassEffects { db },
+    ) {
+        Ok(class) => class,
+        Err(never) => match never {},
+    }
 }
 
 /// Return the original class literal for a class definition.
@@ -956,11 +1110,7 @@ pub(crate) fn original_class_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    let inference = infer_definition_types(db, definition);
-    inference
-        .undecorated_type()
-        .unwrap_or_else(|| inference.binding_type(definition))
-        .as_class_literal()
+    infer_definition_types(db, definition).original_class_type(definition)
 }
 
 /// Returns the type of the nearest enclosing function for the given scope.
@@ -1071,9 +1221,19 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
+            if salsa::attempt_probe::is_incomplete(db) {
+                ty
+            } else {
+                ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
+            }
         });
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
             && let Some(previous_extra) = previous_inference.extra.as_deref()
@@ -1278,6 +1438,9 @@ impl<'db> DefinitionTypes<'db> {
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return ty;
+        }
         if let Some(previous_ty) = previous.binding_type(owner, definition) {
             ty.cycle_normalized(db, env, previous_ty, cycle)
         } else {
@@ -1294,6 +1457,9 @@ impl<'db> DefinitionTypes<'db> {
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return ty;
+        }
         if let Some(previous_ty) = previous.declaration_type(owner, definition) {
             ty.map_type(|inner| inner.cycle_normalized(db, env, previous_ty.inner_type(), cycle))
         } else {
@@ -1309,6 +1475,9 @@ impl<'db> DefinitionTypes<'db> {
         cycle: &salsa::Cycle,
         owner: Definition<'db>,
     ) -> Self {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
         match self {
             Self::Empty => Self::Empty,
             Self::Binding(ty) => Self::Binding(Self::normalize_binding(
@@ -1327,7 +1496,10 @@ impl<'db> DefinitionTypes<'db> {
                     owner,
                     declaration_ty.inner_type(),
                 );
-                let declaration_ty = Self::normalize_declaration(
+                if salsa::attempt_probe::is_incomplete(db) {
+                    return Self::BindingAndDeclaration(declaration_ty);
+                }
+                let normalized_declaration_ty = Self::normalize_declaration(
                     db,
                     env,
                     previous,
@@ -1336,13 +1508,16 @@ impl<'db> DefinitionTypes<'db> {
                     owner,
                     declaration_ty,
                 );
+                if salsa::attempt_probe::is_incomplete(db) {
+                    return Self::BindingAndDeclaration(declaration_ty);
+                }
 
-                if binding_ty == declaration_ty.inner_type() {
-                    Self::BindingAndDeclaration(declaration_ty)
+                if binding_ty == normalized_declaration_ty.inner_type() {
+                    Self::BindingAndDeclaration(normalized_declaration_ty)
                 } else {
                     Self::Other(Box::new(OtherDefinitionTypes {
                         bindings: Box::new([(owner, binding_ty)]),
-                        declarations: Box::new([(owner, declaration_ty)]),
+                        declarations: Box::new([(owner, normalized_declaration_ty)]),
                     }))
                 }
             }
@@ -1350,6 +1525,9 @@ impl<'db> DefinitionTypes<'db> {
                 for (definition, ty) in &mut other.bindings {
                     *ty =
                         Self::normalize_binding(db, env, previous, cycle, owner, *definition, *ty);
+                    if salsa::attempt_probe::is_incomplete(db) {
+                        return Self::Other(other);
+                    }
                 }
                 for (definition, ty) in &mut other.declarations {
                     *ty = Self::normalize_declaration(
@@ -1361,6 +1539,9 @@ impl<'db> DefinitionTypes<'db> {
                         *definition,
                         *ty,
                     );
+                    if salsa::attempt_probe::is_incomplete(db) {
+                        return Self::Other(other);
+                    }
                 }
 
                 match (&*other.bindings, &*other.declarations) {
@@ -1553,6 +1734,21 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    /// Reads only the binding stored by a completed source transaction.
+    #[cfg(test)]
+    pub(crate) fn completed_binding(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        self.types.binding_type(definition, definition)
+    }
+
+    /// A completed transaction without a declaration supplies no declared type.
+    #[cfg(test)]
+    pub(crate) fn completed_declaration(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        self.types.declaration_type(definition, definition)
+    }
+
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1641,14 +1837,32 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
+        // A dependency can refuse during normalization. Keep the current result well formed;
+        // the attempt runtime prevents it from being published as a completed inference result.
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
         let env = ProgramEnvironment::from_definition(definition);
         if cycle.iteration() > crate::TAINTED_CYCLES {
+            #[cfg(test)]
+            let _comparison = constructor_probe::observe_normalization_phase(
+                NormalizationPhaseKind::ComparisonWidening,
+            );
             self.widen_comparison_truthiness(db, &env, previous_inference);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
 
+        #[cfg(test)]
+        let _type_fields =
+            constructor_probe::observe_normalization_phase(NormalizationPhaseKind::TypeFields);
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
@@ -1657,6 +1871,9 @@ impl<'db> DefinitionInference<'db> {
             cycle,
             definition,
         );
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
 
         if let Some(DefinitionInferenceExtra::Other(extra)) = self.extra.as_deref_mut() {
             for (expression, ty) in &mut extra.deferred_decorator_calls {
@@ -1667,6 +1884,9 @@ impl<'db> DefinitionInference<'db> {
                 } else {
                     ty.recursive_type_normalized(db, &env, cycle)
                 };
+                if salsa::attempt_probe::is_incomplete(db) {
+                    return self;
+                }
             }
         }
 
@@ -1708,7 +1928,8 @@ impl<'db> DefinitionInference<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &Self,
     ) {
-        let comparison_truthiness = widen_comparison_truthiness(
+        let Some(comparison_truthiness) = widen_comparison_truthiness(
+            db,
             self.extra
                 .as_deref()
                 .and_then(DefinitionInferenceExtra::comparison_truthiness),
@@ -1716,9 +1937,33 @@ impl<'db> DefinitionInference<'db> {
                 .extra
                 .as_deref()
                 .and_then(DefinitionInferenceExtra::comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
-        );
+            |expression| {
+                let ty = self.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Current,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+            |expression| {
+                let ty = previous.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Previous,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+        ) else {
+            return;
+        };
         if comparison_truthiness.iter().next().is_some() {
             let mut extra = self
                 .extra
@@ -1799,6 +2044,16 @@ impl<'db> DefinitionInference<'db> {
             )
     }
 
+    #[cfg(test)]
+    pub(in crate::types) fn binding_scan_len(&self, definition: Definition<'db>) -> usize {
+        self.types.bindings(definition).len()
+    }
+
+    #[cfg(test)]
+    pub(in crate::types) fn declaration_scan_len(&self, definition: Definition<'db>) -> usize {
+        self.types.declarations(definition).len()
+    }
+
     fn bindings(
         &self,
         owner: Definition<'db>,
@@ -1862,6 +2117,16 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
+    /// Returns the class before decorators replace its public binding, when present.
+    pub(crate) fn original_class_type(
+        &self,
+        definition: Definition<'db>,
+    ) -> Option<ClassLiteral<'db>> {
+        self.undecorated_type()
+            .unwrap_or_else(|| self.binding_type(definition))
+            .as_class_literal()
+    }
+
     fn deferred_decorator_input_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
@@ -1895,32 +2160,47 @@ impl<'db> DefinitionInference<'db> {
 /// a condition alternate between definite outcomes. The fallbacks use each iteration's value
 /// types before those types are themselves widened.
 fn widen_comparison_truthiness(
+    db: &dyn Db,
     current: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
     previous: Option<&FrozenMap<ExpressionNodeKey, Truthiness>>,
     current_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
     previous_fallback: impl Fn(ExpressionNodeKey) -> Truthiness,
-) -> FrozenMap<ExpressionNodeKey, Truthiness> {
+) -> Option<FrozenMap<ExpressionNodeKey, Truthiness>> {
+    if salsa::attempt_probe::is_incomplete(db) {
+        return None;
+    }
+    #[cfg(test)]
+    constructor_probe::observe_comparison_maps(current, previous);
     current
         .into_iter()
         .chain(previous)
         .flatten()
         .map(|(expression, _)| {
+            if salsa::attempt_probe::is_incomplete(db) {
+                return None;
+            }
             let truthiness = current
                 .and_then(|overrides| overrides.get(expression))
                 .copied()
                 .unwrap_or_else(|| current_fallback(*expression));
+            if salsa::attempt_probe::is_incomplete(db) {
+                return None;
+            }
             let previous_truthiness = previous
                 .and_then(|overrides| overrides.get(expression))
                 .copied()
                 .unwrap_or_else(|| previous_fallback(*expression));
-            (
+            if salsa::attempt_probe::is_incomplete(db) {
+                return None;
+            }
+            Some((
                 *expression,
                 if truthiness == previous_truthiness {
                     truthiness
                 } else {
                     Truthiness::Ambiguous
                 },
-            )
+            ))
         })
         .collect()
 }
@@ -2019,6 +2299,19 @@ impl<'db> ExpressionInference<'db> {
         previous: &ExpressionInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ExpressionInference<'db> {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
+        #[cfg(test)]
+        constructor_probe::observe_comparison_maps(
+            self.extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+            previous
+                .extra
+                .as_deref()
+                .map(|extra| &extra.comparison_truthiness),
+        );
         if let Some(extra) = self.extra.as_mut() {
             for (binding, binding_ty) in &mut extra.bindings {
                 if let Some((_, previous_binding)) = previous.extra.as_deref().and_then(|extra| {
@@ -2031,16 +2324,32 @@ impl<'db> ExpressionInference<'db> {
                 } else {
                     *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
                 }
+                if salsa::attempt_probe::is_incomplete(db) {
+                    return self;
+                }
             }
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
+            #[cfg(test)]
+            let _comparison = constructor_probe::observe_normalization_phase(
+                NormalizationPhaseKind::ComparisonWidening,
+            );
             self.widen_comparison_truthiness(db, env, previous);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
 
+        #[cfg(test)]
+        let _type_fields =
+            constructor_probe::observe_normalization_phase(NormalizationPhaseKind::TypeFields);
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -2072,7 +2381,8 @@ impl<'db> ExpressionInference<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &Self,
     ) {
-        let comparison_truthiness = widen_comparison_truthiness(
+        let Some(comparison_truthiness) = widen_comparison_truthiness(
+            db,
             self.extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
@@ -2080,9 +2390,33 @@ impl<'db> ExpressionInference<'db> {
                 .extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
-        );
+            |expression| {
+                let ty = self.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Current,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+            |expression| {
+                let ty = previous.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Previous,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+        ) else {
+            return;
+        };
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
@@ -2249,13 +2583,29 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
+        if salsa::attempt_probe::is_incomplete(db) {
+            return self;
+        }
         if cycle.iteration() > crate::TAINTED_CYCLES {
+            #[cfg(test)]
+            let _comparison = constructor_probe::observe_normalization_phase(
+                NormalizationPhaseKind::ComparisonWidening,
+            );
             self.widen_comparison_truthiness(db, env, previous_inference);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
 
+        #[cfg(test)]
+        let _type_fields =
+            constructor_probe::observe_normalization_phase(NormalizationPhaseKind::TypeFields);
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
+            }
         }
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
@@ -2266,6 +2616,9 @@ impl<'db> StatementInferenceInner<'db> {
                 *binding_ty = binding_ty.cycle_normalized(db, env, *previous_binding, cycle);
             } else {
                 *binding_ty = binding_ty.recursive_type_normalized(db, env, cycle);
+            }
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
             }
         }
         for (declaration, declaration_ty) in &mut self.declarations {
@@ -2280,6 +2633,9 @@ impl<'db> StatementInferenceInner<'db> {
             } else {
                 *declaration_ty = declaration_ty
                     .map_type(|decl_ty| decl_ty.recursive_type_normalized(db, env, cycle));
+            }
+            if salsa::attempt_probe::is_incomplete(db) {
+                return self;
             }
         }
 
@@ -2312,7 +2668,8 @@ impl<'db> StatementInferenceInner<'db> {
         env: &ProgramEnvironment<'db>,
         previous: &Self,
     ) {
-        let comparison_truthiness = widen_comparison_truthiness(
+        let Some(comparison_truthiness) = widen_comparison_truthiness(
+            db,
             self.extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
@@ -2320,9 +2677,33 @@ impl<'db> StatementInferenceInner<'db> {
                 .extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
-        );
+            |expression| {
+                let ty = self.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Current,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+            |expression| {
+                let ty = previous.expression_type(expression);
+                #[cfg(test)]
+                let _fallback = constructor_probe::observe_normalization_phase(
+                    NormalizationPhaseKind::AbsentOverride {
+                        expression,
+                        side: FallbackSide::Previous,
+                        nominal_instance: ty.is_nominal_instance(),
+                    },
+                );
+                ty.bool(db, env)
+            },
+        ) else {
+            return;
+        };
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }

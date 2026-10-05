@@ -1,8 +1,114 @@
+use std::convert::Infallible;
+
 use ruff_python_ast::{self as ast};
+use ty_mapping_probe_macros::shared_semantic_family;
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType, UnionType};
+
+pub(super) struct OrdinaryTypeFormEffects;
+
+shared_semantic_family! {
+    #[synchronous(SynchronousTypeFormEffects)]
+    pub(super) trait TypeFormEffects<'db, 'ast> {
+        type Error;
+        #[operation(child)]
+        async fn resolve_alias(&self, builder: &TypeInferenceBuilder<'db, 'ast>, ty: Type<'db>) -> Result<Type<'db>, Self::Error>;
+        #[operation(child)]
+        async fn union_elements(&self, builder: &TypeInferenceBuilder<'db, 'ast>, union: UnionType<'db>) -> Result<&'db [Type<'db>], Self::Error>;
+        #[operation(local)]
+        #[progress]
+        async fn next_element(&self, elements: &[Type<'db>], cursor: &mut usize) -> Result<Option<Type<'db>>, Self::Error>;
+        #[operation(child)]
+        async fn non_type_form_fallback(&self, builder: &TypeInferenceBuilder<'db, 'ast>, target: Type<'db>) -> Result<Type<'db>, Self::Error>;
+        #[operation(source)]
+        async fn positive_interpretation(&self, builder: &mut TypeInferenceBuilder<'db, 'ast>, expression: &ast::Expr, target: Type<'db>, fallback: Option<Type<'db>>) -> Result<Option<Type<'db>>, Self::Error>;
+    }
+
+    #[synchronous(contextual_type_form_sync)]
+    #[capabilities(effects = TypeFormEffects)]
+    #[passive_values()]
+    pub(super) async fn contextual_type_form_with<'db, 'ast, E: TypeFormEffects<'db, 'ast>>(
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        expression: &ast::Expr,
+        target: Type<'db>,
+        effects: &E,
+    ) -> Result<Option<Type<'db>>, E::Error> {
+        match effects.resolve_alias(builder, target).await? {
+            Type::TypeForm(_) => effects.positive_interpretation(builder, expression, target, None).await,
+            Type::Union(union) => {
+                let elements = effects.union_elements(builder, union).await?;
+                let mut cursor = 0;
+                #[cursor_loop]
+                while let Some(element) = effects.next_element(elements, &mut cursor).await? {
+                    let resolved = effects.resolve_alias(builder, element).await?;
+                    if let Type::TypeForm(_) = resolved {
+                        let fallback = effects.non_type_form_fallback(builder, target).await?;
+                        return effects.positive_interpretation(builder, expression, target, Some(fallback)).await;
+                    }
+                }
+                Ok(None)
+            }
+            _ => Ok(None),
+        }
+    }
+}
+
+impl<'db, 'ast> SynchronousTypeFormEffects<'db, 'ast> for OrdinaryTypeFormEffects {
+    type Error = Infallible;
+
+    fn resolve_alias(
+        &self,
+        builder: &TypeInferenceBuilder<'db, 'ast>,
+        ty: Type<'db>,
+    ) -> Result<Type<'db>, Self::Error> {
+        Ok(ty.resolve_type_alias(builder.db()))
+    }
+
+    fn union_elements(
+        &self,
+        builder: &TypeInferenceBuilder<'db, 'ast>,
+        union: UnionType<'db>,
+    ) -> Result<&'db [Type<'db>], Self::Error> {
+        Ok(union.elements(builder.db()))
+    }
+
+    fn next_element(
+        &self,
+        elements: &[Type<'db>],
+        cursor: &mut usize,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        let element = elements.get(*cursor).copied();
+        if element.is_some() {
+            *cursor += 1;
+        }
+        Ok(element)
+    }
+
+    fn non_type_form_fallback(
+        &self,
+        builder: &TypeInferenceBuilder<'db, 'ast>,
+        target: Type<'db>,
+    ) -> Result<Type<'db>, Self::Error> {
+        let db = builder.db();
+        Ok(
+            target.filter_union(db, builder.program_environment(), |element| {
+                !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
+            }),
+        )
+    }
+
+    fn positive_interpretation(
+        &self,
+        builder: &mut TypeInferenceBuilder<'db, 'ast>,
+        expression: &ast::Expr,
+        target: Type<'db>,
+        fallback: Option<Type<'db>>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        Ok(builder.infer_type_form_contextual_positive(expression, target, fallback))
+    }
+}
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -18,23 +124,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         target: Type<'db>,
     ) -> Option<Type<'db>> {
+        match contextual_type_form_sync(self, expression, target, &OrdinaryTypeFormEffects) {
+            Ok(ty) => ty,
+            Err(never) => match never {},
+        }
+    }
+
+    fn infer_type_form_contextual_positive(
+        &mut self,
+        expression: &ast::Expr,
+        target: Type<'db>,
+        non_type_form_fallback: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
         let db = self.db();
         let env = self.program_environment();
-        let non_type_form_fallback = match target.resolve_type_alias(db) {
-            Type::TypeForm(_) => None,
-            Type::Union(union)
-                if union
-                    .elements(self.db())
-                    .iter()
-                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))) =>
-            {
-                Some(target.filter_union(db, env, |element| {
-                    !matches!(element.resolve_type_alias(db), Type::TypeForm(_))
-                }))
-            }
-            _ => return None,
-        };
-
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
         // produces a type-form value or satisfies the non-`TypeForm` arm of the union.
         let value_ty = self

@@ -479,6 +479,7 @@ impl<'db> ConditionDefinitionInfo<'db> {
 /// quadratic in the number of assignments. Caching only the per-definition traversal does not
 /// avoid collecting and resolving those bindings again.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial = |_, _, _, _| ConditionDefinitionInfo::default(),
     heap_size = ruff_memory_usage::heap_size
@@ -540,6 +541,7 @@ fn attribute_condition_definition_info<'db>(
 /// callers do not depend directly on another file's syntax tree. Cyclic aliases recover as `false`.
 /// `reachability` belongs to the use-def map of the definition's scope.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial = |_, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
@@ -646,6 +648,7 @@ fn definition_contains_special_cased_condition<'db>(
 /// summary so checking another definition does not traverse the shared portion again.
 /// All three branches contribute, regardless of the configured environment's truthiness.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial = |_, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size
@@ -680,6 +683,7 @@ fn reachability_contains_special_cased_condition<'db>(
 /// completing inference of the scope containing the definition. Cache the result because many
 /// definitions can share the same guard, and recover as `false` if the guard refers to the definition.
 #[salsa::tracked(
+    attempt = ReturnOnly,
     returns(copy),
     cycle_initial = |_, _, _, _| false,
     heap_size = ruff_memory_usage::heap_size

@@ -42,6 +42,10 @@ use std::sync::LazyLock;
 use compact_str::format_compact;
 use memchr::memmem::Finder;
 use rustc_hash::{FxBuildHasher, FxHashSet};
+#[cfg(feature = "experimental-analysis")]
+use salsa::execution_probe::{ExecutionWork, PreparedSourceError, PreparedSourceMemo, TaskEndpoint};
+#[cfg(feature = "experimental-analysis")]
+use salsa::prepared_source_probe::PreparationError;
 
 use ruff_db::PythonFile;
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
@@ -110,6 +114,114 @@ pub fn resolve_module_confident<'db>(
     );
 
     resolve_module_query(db, interned_name)
+}
+
+/// Canonical typing-resolution memos certified after ordinary idle preparation.
+#[cfg(feature = "experimental-analysis")]
+#[derive(Clone, Debug)]
+pub struct PreparedModuleResolution<'db> {
+    primary: PreparedSourceMemo<'db, Option<Module<'db>>>,
+    fallback: Option<PreparedSourceMemo<'db, Option<Module<'db>>>>,
+}
+
+#[cfg(feature = "experimental-analysis")]
+impl<'db> PreparedModuleResolution<'db> {
+    /// Certifies existing resolution results without executing either resolver query.
+    /// An absent importing file selects confident resolution; a present file permits the
+    /// importing-file-relative fallback only when the primary result is `None`.
+    pub fn prepare(
+        db: &'db dyn Db,
+        resolver_environment: ResolverEnvironment<'db>,
+        module_name: &ModuleName,
+        importing_file: Option<File>,
+    ) -> Result<Self, PreparationError> {
+        PreparedSourceMemo::<Option<Module<'db>>>::check_idle(db)
+            .map_err(resolution_preparation_error)?;
+        let interned_name = ModuleNameIngredient::new(
+            db,
+            module_name,
+            ModuleResolveMode::Typing,
+            resolver_environment,
+        );
+        let primary = resolve_module_query::prepare_memo(db, interned_name)
+            .map_err(resolution_preparation_error)?;
+        let fallback = if primary
+            .value()
+            .map_err(resolution_preparation_error)?
+            .is_none()
+            && let Some(importing_file) = importing_file
+        {
+            Some(
+                desperately_resolve_module::prepare_memo(db, importing_file, interned_name)
+                    .map_err(resolution_preparation_error)?,
+            )
+        } else {
+            None
+        };
+        let result = Self { primary, fallback };
+        result.check_current()?;
+        Ok(result)
+    }
+
+    pub fn check_current(&self) -> Result<(), PreparationError> {
+        self.primary
+            .check_current()
+            .map_err(resolution_preparation_error)?;
+        if let Some(fallback) = &self.fallback {
+            fallback
+                .check_current()
+                .map_err(resolution_preparation_error)?;
+        }
+        Ok(())
+    }
+
+    pub fn value(&self) -> Result<Option<Module<'db>>, PreparationError> {
+        let primary = self.primary.value().map_err(resolution_preparation_error)?;
+        match (primary, &self.fallback) {
+            (None, Some(fallback)) => fallback
+                .value()
+                .copied()
+                .map_err(resolution_preparation_error),
+            _ => Ok(*primary),
+        }
+    }
+
+    /// Records the primary read, including `None`, before any prepared fallback read.
+    pub async fn read(&self, endpoint: &TaskEndpoint<'_, 'db>) -> Option<Module<'db>> {
+        let primary = endpoint
+            .read_prepared_source(resolve_module_query::prepared_read(&self.primary))
+            .await;
+        let result = match (primary, &self.fallback) {
+            (None, Some(fallback)) => {
+                endpoint
+                    .read_prepared_source(desperately_resolve_module::prepared_read(fallback))
+                    .await
+            }
+            _ => primary,
+        };
+        endpoint
+            .local_call(|| {
+                endpoint.admit_work(1)?;
+                endpoint.admit(ExecutionWork::Resource {
+                    requested_bytes: size_of::<Option<Module<'db>>>(),
+                })?;
+                endpoint.check_completion()?;
+                Ok(*result)
+            })
+            .await
+    }
+}
+
+#[cfg(feature = "experimental-analysis")]
+fn resolution_preparation_error(error: PreparedSourceError) -> PreparationError {
+    match error {
+        PreparedSourceError::ActiveAttempt => PreparationError::ActiveAttempt,
+        PreparedSourceError::ActiveQuery => PreparationError::ActiveQuery,
+        PreparedSourceError::ActiveOperation => PreparationError::ActiveOperation,
+        PreparedSourceError::StaleStamp => PreparationError::ChangedDatabaseStamp,
+        PreparedSourceError::UnsupportedPolicy => PreparationError::UnsupportedDependency,
+        _ => PreparationError::InvalidDependency,
+    }
 }
 
 /// Resolves a module name to a module (stubs not allowed).
@@ -254,7 +366,7 @@ impl ModuleResolveMode {
 ///
 /// This query should not be called directly. Instead, use [`resolve_module`]. It only exists
 /// because Salsa requires the module name to be an ingredient.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn resolve_module_query<'db>(
     db: &'db dyn Db,
     module_name: ModuleNameIngredient<'db>,
@@ -287,7 +399,7 @@ fn resolve_module_query<'db>(
 ///
 /// Cache desperate resolution because repeated unresolved imports in a project can otherwise
 /// re-walk the same importing-file-relative search paths many times.
-#[salsa::tracked(returns(copy))]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy))]
 fn desperately_resolve_module<'db>(
     db: &'db dyn Db,
     importing_file: File,
@@ -347,7 +459,7 @@ pub(crate) fn path_to_module<'db>(
 /// and indeed, one of its primary jobs is resolving `.<self>` to derive the module name of `.`.
 /// This intuition is particularly useful for understanding why it's correct that we pass
 /// the file itself as `importing_file` to various subroutines.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub fn file_to_module<'db>(
     db: &'db dyn Db,
     resolver_file: ResolverFile<'db>,
@@ -550,7 +662,7 @@ impl StubPackageIndex {
 
 /// Returns an index of search paths that may contain a top-level stub package, preserving their
 /// resolution order relative to stdlib.
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn stub_package_index(
     db: &dyn Db,
     resolver_environment: ResolverEnvironment<'_>,
@@ -579,7 +691,7 @@ fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -
 /// valid desperate search-paths, but don't worry about that.)
 ///
 /// We exclude `__init__.py(i)` dirs to avoid truncating packages.
-#[salsa::tracked(returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(as_deref), heap_size=ruff_memory_usage::heap_size)]
 fn absolute_desperate_search_paths(
     db: &dyn Db,
     importing_file: ResolverFile<'_>,
@@ -648,7 +760,7 @@ fn absolute_desperate_search_paths(
 /// Being so strict minimizes concerns about this going off a lot and doing random
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
-#[salsa::tracked(returns(clone), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(clone), heap_size=ruff_memory_usage::heap_size)]
 fn relative_desperate_search_paths(
     db: &dyn Db,
     importing_file: ResolverFile<'_>,
@@ -985,7 +1097,7 @@ struct SitePackagesEditables {
 }
 
 /// Discover editable roots without discarding entries that overlap static search paths.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
 fn site_packages_editables<'db>(
     db: &'db dyn Db,
     environment: ResolverEnvironment<'db>,
@@ -1085,7 +1197,7 @@ fn site_packages_editables<'db>(
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn dynamic_resolution_paths<'db>(
     db: &'db dyn Db,
     mode: ModuleResolveModeIngredient<'db>,

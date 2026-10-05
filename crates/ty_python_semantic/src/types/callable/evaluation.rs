@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use super::conversion::{self, ConversionStep, PendingConversion};
 use super::{CallableConversionRequest, CallableType, CallableTypes};
 use crate::types::constructor::callable::{ConstructorCallableStep, PendingConstructorConversion};
+use crate::types::constructor::effects::ConstructorError;
 use crate::types::cyclic::{
     CallableEntry, CallableExpansion, CallableRecursionGuard, CallableVisitScope,
     ConstructorCacheScope, ConstructorEntry, DescriptorDispatchScope,
@@ -12,12 +13,42 @@ use crate::types::cyclic::{
 use crate::types::{ClassType, DescriptorOrigin, Signature, Type};
 use crate::{Db, ProgramEnvironment};
 
+#[cfg(test)]
+fn check_stopped(db: &dyn Db) -> Result<(), ConstructorError> {
+    if crate::types::constructor::expansion_probe::stopped(db) {
+        crate::types::constructor::expansion_probe::continue_work(db)
+            .map_err(ConstructorError::Incomplete)
+    } else {
+        Ok(())
+    }
+}
+
 pub(super) fn conversion<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     request: CallableConversionRequest<'db>,
     recursion_guard: Option<&CallableRecursionGuard<'db>>,
 ) -> Option<CallableTypes<'db>> {
+    match try_conversion(db, env, request, recursion_guard) {
+        Ok(callables) => callables,
+        #[cfg(test)]
+        Err(ConstructorError::Incomplete(_)) => Some(CallableTypes::one(CallableType::single(
+            db,
+            Signature::unknown(),
+        ))),
+        #[cfg(not(test))]
+        Err(never) => match never {},
+    }
+}
+
+fn try_conversion<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    request: CallableConversionRequest<'db>,
+    recursion_guard: Option<&CallableRecursionGuard<'db>>,
+) -> Result<Option<CallableTypes<'db>>, ConstructorError> {
+    #[cfg(test)]
+    check_stopped(db)?;
     // The caller has already entered the root's recursion guard. Child conversions enter
     // their guards here and leave them before their parent's continuation resumes.
     let mut suspended = Suspended::default();
@@ -30,7 +61,23 @@ pub(super) fn conversion<'db>(
     ));
 
     loop {
+        #[cfg(test)]
+        check_stopped(db)?;
         step = match step {
+            EvaluationStep::Conversion(ConversionStep::Function(pending)) => {
+                let callable = pending.function.into_callable_type(db);
+                #[cfg(test)]
+                check_stopped(db)?;
+                EvaluationStep::Conversion(pending.resume(callable))
+            }
+            EvaluationStep::Conversion(ConversionStep::SubclassInstance(subclass)) => {
+                EvaluationStep::Conversion(ConversionStep::Complete(Some(
+                    conversion::subclass_callable(db, &context.env, subclass),
+                )))
+            }
+            EvaluationStep::Conversion(ConversionStep::RuntimeUnion(union)) => {
+                EvaluationStep::Conversion(union.sequential(db, &context.env))
+            }
             EvaluationStep::Conversion(ConversionStep::Convert(pending)) => {
                 let request = pending.request;
                 let child = context.child(recursion_guard, pending.origin);
@@ -38,7 +85,7 @@ pub(super) fn conversion<'db>(
                     .0
                     .push(SuspendedFrame::Conversion { pending, context });
                 context = child;
-                start_child(db, request, recursion_guard, &mut context)
+                start_child(db, request, recursion_guard, &mut context)?
             }
             EvaluationStep::Conversion(ConversionStep::Constructor { class, receiver }) => {
                 let Some(guard) = recursion_guard else {
@@ -62,7 +109,7 @@ pub(super) fn conversion<'db>(
                             class.class_literal(db).program_file(db),
                         ));
                         EvaluationStep::Constructor(
-                            ConstructorCallableStep::start(db, &context.env, class, receiver),
+                            ConstructorCallableStep::start(db, &context.env, class, receiver)?,
                             guard,
                         )
                     }
@@ -77,9 +124,9 @@ pub(super) fn conversion<'db>(
             EvaluationStep::Conversion(ConversionStep::Complete(callables)) => {
                 context.close();
                 let Some(parent) = suspended.0.pop() else {
-                    return callables;
+                    return Ok(callables);
                 };
-                (context, step) = parent.resume(db, callables);
+                (context, step) = parent.resume(db, callables)?;
                 continue;
             }
             EvaluationStep::Constructor(ConstructorCallableStep::Convert(pending), guard) => {
@@ -91,7 +138,7 @@ pub(super) fn conversion<'db>(
                     guard,
                 });
                 context = child;
-                start_child(db, request, Some(guard), &mut context)
+                start_child(db, request, Some(guard), &mut context)?
             }
             EvaluationStep::Constructor(ConstructorCallableStep::Complete(callables), _) => {
                 if let Some(scope) = context.constructor.take() {
@@ -100,19 +147,19 @@ pub(super) fn conversion<'db>(
                 EvaluationStep::Conversion(ConversionStep::Complete(Some(callables)))
             }
             EvaluationStep::Constructor(ConstructorCallableStep::Member(pending), guard) => {
-                EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard), guard)
+                EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard)?, guard)
             }
             EvaluationStep::Constructor(ConstructorCallableStep::Lookup(pending), guard) => {
-                EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard), guard)
+                EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard)?, guard)
             }
             EvaluationStep::Constructor(
                 ConstructorCallableStep::BindInitializer(pending),
                 guard,
-            ) => EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard), guard),
+            ) => EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard)?, guard),
             EvaluationStep::Constructor(
                 ConstructorCallableStep::CheckNewReturn(pending),
                 guard,
-            ) => EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard), guard),
+            ) => EvaluationStep::Constructor(pending.evaluate(db, &context.env, guard)?, guard),
         };
     }
 }
@@ -125,42 +172,86 @@ pub(in crate::types) fn constructor_callables<'db>(
     receiver: Type<'db>,
     guard: &CallableRecursionGuard<'db>,
 ) -> CallableTypes<'db> {
-    let mut step = ConstructorCallableStep::start(db, env, class, receiver);
+    match try_constructor_callables(db, env, class, receiver, guard) {
+        Ok(callables) => callables,
+        #[cfg(test)]
+        Err(ConstructorError::Incomplete(_)) => {
+            CallableTypes::one(CallableType::single(db, Signature::unknown()))
+        }
+        #[cfg(not(test))]
+        Err(never) => match never {},
+    }
+}
+
+fn try_constructor_callables<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    receiver: Type<'db>,
+    guard: &CallableRecursionGuard<'db>,
+) -> Result<CallableTypes<'db>, ConstructorError> {
+    #[cfg(test)]
+    check_stopped(db)?;
+    let mut step = ConstructorCallableStep::start(db, env, class, receiver)?;
     loop {
+        #[cfg(test)]
+        check_stopped(db)?;
         step = match step {
             ConstructorCallableStep::Convert(pending) => {
                 let callables = guard.with_dependency(db, pending.origin(), || {
                     pending.request().evaluate(db, env, Some(guard))
                 });
-                pending.resume(db, env, callables)
+                #[cfg(test)]
+                check_stopped(db)?;
+                pending.resume(db, env, callables)?
             }
-            ConstructorCallableStep::Member(pending) => pending.evaluate(db, env, guard),
-            ConstructorCallableStep::Lookup(pending) => pending.evaluate(db, env, guard),
-            ConstructorCallableStep::BindInitializer(pending) => pending.evaluate(db, env, guard),
-            ConstructorCallableStep::CheckNewReturn(pending) => pending.evaluate(db, env, guard),
-            ConstructorCallableStep::Complete(callables) => return callables,
+            ConstructorCallableStep::Member(pending) => pending.evaluate(db, env, guard)?,
+            ConstructorCallableStep::Lookup(pending) => pending.evaluate(db, env, guard)?,
+            ConstructorCallableStep::BindInitializer(pending) => {
+                pending.evaluate(db, env, guard)?
+            }
+            ConstructorCallableStep::CheckNewReturn(pending) => pending.evaluate(db, env, guard)?,
+            ConstructorCallableStep::Complete(callables) => {
+                #[cfg(test)]
+                crate::types::constructor::expansion_probe::observe_constructor_callable_completed(
+                    class,
+                );
+                return Ok(callables);
+            }
         };
     }
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        clippy::unnecessary_wraps,
+        reason = "The experimental analysis attempt can refuse in test builds."
+    )
+)]
 fn start_child<'a, 'db>(
     db: &'db dyn Db,
     request: CallableConversionRequest<'db>,
     guard: Option<&'a CallableRecursionGuard<'db>>,
     context: &mut EvaluationContext<'a, 'db>,
-) -> EvaluationStep<'a, 'db> {
+) -> Result<EvaluationStep<'a, 'db>, ConstructorError> {
     if let Some(guard) = guard {
         match guard.enter(db, &context.env, (CallableExpansion::Upcast, request.ty)) {
             CallableEntry::Entered(scope) => context.visit = Some(scope),
+            #[cfg(test)]
+            CallableEntry::Incomplete => {
+                crate::types::constructor::expansion_probe::continue_work(db)
+                    .map_err(ConstructorError::Incomplete)?;
+            }
             CallableEntry::ExactCycle => {
-                return EvaluationStep::Conversion(ConversionStep::Complete(Some(
+                return Ok(EvaluationStep::Conversion(ConversionStep::Complete(Some(
                     CallableTypes::one(CallableType::bottom(db)),
-                )));
+                ))));
             }
             CallableEntry::Growth => {
-                return EvaluationStep::Conversion(ConversionStep::Complete(Some(
+                return Ok(EvaluationStep::Conversion(ConversionStep::Complete(Some(
                     CallableTypes::one(CallableType::single(db, Signature::recursion_recovery())),
-                )));
+                ))));
             }
         }
     } else if matches!(
@@ -169,18 +260,16 @@ fn start_child<'a, 'db>(
     ) {
         // This boundary creates a fresh guard. Keep that query/guard boundary while its
         // dependencies still use the existing recursion and caching policy.
-        return EvaluationStep::Conversion(ConversionStep::Complete(request.evaluate(
-            db,
-            &context.env,
-            None,
+        return Ok(EvaluationStep::Conversion(ConversionStep::Complete(
+            request.evaluate(db, &context.env, None),
         )));
     }
-    EvaluationStep::Conversion(conversion::start(
+    Ok(EvaluationStep::Conversion(conversion::start(
         db,
         &context.env,
         request,
         guard.is_some(),
-    ))
+    )))
 }
 
 enum EvaluationStep<'a, 'db> {
@@ -252,19 +341,19 @@ impl<'a, 'db> SuspendedFrame<'a, 'db> {
         self,
         db: &'db dyn Db,
         callables: Option<CallableTypes<'db>>,
-    ) -> (EvaluationContext<'a, 'db>, EvaluationStep<'a, 'db>) {
+    ) -> Result<(EvaluationContext<'a, 'db>, EvaluationStep<'a, 'db>), ConstructorError> {
         match self {
             Self::Conversion { pending, context } => {
                 let step = pending.resume(db, &context.env, callables);
-                (context, EvaluationStep::Conversion(step))
+                Ok((context, EvaluationStep::Conversion(step)))
             }
             Self::Constructor {
                 pending,
                 context,
                 guard,
             } => {
-                let step = pending.resume(db, &context.env, callables);
-                (context, EvaluationStep::Constructor(step, guard))
+                let step = pending.resume(db, &context.env, callables)?;
+                Ok((context, EvaluationStep::Constructor(step, guard)))
             }
         }
     }

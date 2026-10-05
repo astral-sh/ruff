@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use ruff_python_ast as ast;
-use std::iter::{FusedIterator, once};
+use std::iter::FusedIterator;
 use std::sync::Arc;
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -20,8 +20,8 @@ use ty_module_resolver::ModuleName;
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};
-use ast_ids::AstIds;
 pub use ast_ids::ExpressionNodeKey;
+use ast_ids::{AstIds, ScopedUseId};
 use builder::SemanticIndexBuilder;
 use definition::{Definition, DefinitionNodeKey, Definitions};
 use expression::Expression;
@@ -45,7 +45,11 @@ mod builder;
 mod db;
 pub mod definition;
 pub mod expression;
+#[cfg(test)]
+mod finalized_source_tests;
+pub mod finalized_sources;
 pub mod frozen;
+mod hash_certificate;
 mod interned_nodes;
 pub(crate) mod member;
 pub mod narrowing_constraints;
@@ -72,7 +76,7 @@ pub use program_file::ProgramFile;
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
-#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size)]
 pub fn semantic_index<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> SemanticIndex<'db> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
@@ -86,12 +90,12 @@ pub fn semantic_index<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> SemanticI
 /// Using [`place_table`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's place table
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub PlaceTableConfiguration), attempt = ReturnOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable> {
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("place_table", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.place_tables[scope.file_scope_id(db)])
+    index.place_table_arc(scope.file_scope_id(db))
 }
 
 /// Returns the use-def map for a specific `scope`.
@@ -99,12 +103,12 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(configuration = (pub UseDefMapConfiguration), attempt = ReturnOnly, returns(deref), heap_size=ruff_memory_usage::heap_size)]
 pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
     let program_file = scope.program_file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?program_file).entered();
     let index = semantic_index(db, program_file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    index.use_def_map_arc(scope.file_scope_id(db))
 }
 
 /// All the bindings made in a loop, which are visible to the entire loop via "loop header
@@ -180,53 +184,11 @@ pub fn attribute_scopes<'db>(
 ) -> impl Iterator<Item = FileScopeId> + 'db {
     let index = semantic_index(db, class_body_scope.program_file(db));
     let class_scope_id = class_body_scope.file_scope_id(db);
-    ChildrenIter::new(&index.scopes, class_scope_id)
-        .filter_map(move |(child_scope_id, scope)| {
-            let (function_scope_id, function_scope) =
-                if scope.node().scope_kind() == ScopeKind::TypeParams {
-                    // This could be a generic method with a type-params scope.
-                    // Go one level deeper to find the function scope. The first
-                    // descendant is the (potential) function scope.
-                    let function_scope_id = scope.descendants().start;
-                    (function_scope_id, index.scope(function_scope_id))
-                } else {
-                    (child_scope_id, scope)
-                };
-            function_scope.node().as_function()?;
-            Some(function_scope_id)
-        })
-        .flat_map(move |func_id| {
-            // Add any descendent scope that is eager and have eager scopes between the scope
-            // and the method scope. Since attributes can be defined in this scope.
-            let nested = index.descendent_scopes(func_id).filter_map(move |(id, s)| {
-                let is_eager = s.kind().is_eager();
-                let parents_are_eager = {
-                    let mut all_parents_eager = true;
-                    let mut current = Some(id);
-
-                    while let Some(scope_id) = current {
-                        if scope_id == func_id {
-                            break;
-                        }
-                        let scope = index.scope(scope_id);
-                        if !scope.is_eager() {
-                            all_parents_eager = false;
-                            break;
-                        }
-                        current = scope.parent();
-                    }
-
-                    all_parents_eager
-                };
-
-                (parents_are_eager && is_eager).then_some(id)
-            });
-            once(func_id).chain(nested)
-        })
+    index.attribute_scopes_cursor(class_scope_id)
 }
 
 /// Returns the module global scope of `file`.
-#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(attempt = CompleteOnly, returns(copy), heap_size=ruff_memory_usage::heap_size)]
 pub fn global_scope<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> ScopeId<'db> {
     let _span = tracing::trace_span!("global_scope", ?file).entered();
 
@@ -365,6 +327,60 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Bounds the fixed-size comparisons needed to find an expression's use ID.
+    pub fn scoped_use_lookup_work(&self) -> usize {
+        self.ast_ids.use_lookup_work()
+    }
+
+    /// Bounds the fixed-size comparisons for the snapshot index, excluding scope traversal.
+    pub fn enclosing_snapshot_lookup_work(&self) -> usize {
+        self.enclosing_snapshots.lookup_work()
+    }
+
+    /// Bounds both searches used to find the definitions associated with an AST node.
+    pub fn definition_lookup_work(&self) -> usize {
+        self.definitions_by_node.single.lookup_work()
+            + self.definitions_by_node.non_single.lookup_work()
+    }
+
+    /// Bounds fixed-size key hashing, comparisons, and bucket probes for an expression lookup.
+    pub fn expression_lookup_work(&self) -> Option<usize> {
+        let capacity = self.expressions_by_node.capacity();
+        // The builder only inserts into this table, so capacity bounds its backing slots.
+        let slots = if capacity == 0 {
+            0
+        } else {
+            capacity.checked_add(1)?.checked_mul(4)?.checked_add(32)?
+        };
+        self.expressions_by_node
+            .len()
+            .checked_add(1)?
+            .checked_add(slots)?
+            .checked_mul(4)
+    }
+
+    /// Bounds fixed-key hashing, comparisons and bucket probes when selecting a node's scope.
+    pub fn node_scope_lookup_work(&self) -> Option<usize> {
+        let capacity = self.scopes_by_node.capacity();
+        // The builder only inserts into this table. A scope key contains only a variant and
+        // a node index, so each hash/comparison has bounded scalar work.
+        let slots = if capacity == 0 {
+            0
+        } else {
+            capacity.checked_add(1)?.checked_mul(4)?.checked_add(32)?
+        };
+        self.scopes_by_node
+            .len()
+            .checked_add(1)?
+            .checked_add(slots)?
+            .checked_mul(4)
+    }
+
+    /// Bounds fixed-size key comparisons when looking up an unpacking target.
+    pub fn unpack_lookup_work(&self) -> usize {
+        self.unpacks_by_target.lookup_work()
+    }
+
     /// Returns the place table for a specific scope.
     ///
     /// Use the Salsa cached [`place_table()`] query if you only need the
@@ -372,6 +388,16 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub fn place_table(&self, scope_id: FileScopeId) -> &PlaceTable {
         &self.place_tables[scope_id]
+    }
+
+    /// Clones the index-owned table for the canonical scope query.
+    pub fn place_table_arc(&self, scope_id: FileScopeId) -> Arc<PlaceTable> {
+        Arc::clone(&self.place_tables[scope_id])
+    }
+
+    /// Bounds fixed-size key comparisons when looking up a narrowing alias.
+    pub fn narrowing_alias_lookup_work(&self) -> usize {
+        self.narrowing_alias_predicates.lookup_work()
     }
 
     /// Returns alias metadata for an alias Name node in a predicate, if one exists.
@@ -391,6 +417,11 @@ impl<'db> SemanticIndex<'db> {
         &self.use_def_maps[scope_id]
     }
 
+    /// Clones the index-owned table for the canonical scope query.
+    pub fn use_def_map_arc(&self, scope_id: FileScopeId) -> Arc<UseDefMap<'db>> {
+        Arc::clone(&self.use_def_maps[scope_id])
+    }
+
     /// Returns the set of modules that are imported anywhere in this file.
     ///
     /// This set only considers `import` statements, not `from...import` statements.
@@ -400,9 +431,10 @@ impl<'db> SemanticIndex<'db> {
         self.imported_modules.iter()
     }
 
+    /// Returns the ID of a use in its scope from this file's index.
     #[track_caller]
-    fn ast_ids(&self) -> &AstIds {
-        &self.ast_ids
+    pub fn scoped_use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
+        self.ast_ids.use_id(key)
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
@@ -472,6 +504,12 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn scope_ids(&self) -> impl Iterator<Item = ScopeId<'db>> + '_ {
         self.scope_ids_by_scope.iter().copied()
+    }
+
+    /// Returns the cross-module scope identity for a scope in this file.
+    #[track_caller]
+    pub fn scope_id(&self, id: FileScopeId) -> ScopeId<'db> {
+        self.scope_ids_by_scope[id]
     }
 
     pub fn symbol_is_global_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
@@ -625,8 +663,21 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
+    #[cfg(test)]
     fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter<'_> {
         DescendantsIter::new(&self.scopes, scope)
+    }
+
+    /// Returns a cursor over methods and eager descendant scopes that can define implicit attributes.
+    ///
+    /// The cursor exposes skipped scopes and ancestor checks through its bounded
+    /// [`step`](AttributeScopesCursor::step) operation. Its ordinary iterator yields only the
+    /// selected scope IDs. The caller must supply a class body scope from this index.
+    pub fn attribute_scopes_cursor(
+        &self,
+        class_body_scope: FileScopeId,
+    ) -> AttributeScopesCursor<'_> {
+        AttributeScopesCursor::new(&self.scopes, class_body_scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
@@ -770,6 +821,11 @@ impl<'db> SemanticIndex<'db> {
         self.scopes_by_node[&key]
     }
 
+    /// Returns the scope created by an existing node key without loading its parsed module.
+    pub fn try_node_scope_by_key(&self, key: NodeWithScopeKey) -> Option<FileScopeId> {
+        self.scopes_by_node.get(&key).copied()
+    }
+
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
     /// the logic for type inference.
     pub fn has_future_annotations(&self) -> bool {
@@ -831,6 +887,7 @@ impl<'db> SemanticIndex<'db> {
     }
 }
 
+#[derive(Clone)]
 pub struct AncestorsIter<'a> {
     scopes: &'a IndexSlice<FileScopeId, Scope>,
     next_id: Option<FileScopeId>,
@@ -913,7 +970,14 @@ pub(crate) struct DescendantsIter<'a> {
 
 impl<'a> DescendantsIter<'a> {
     fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, scope_id: FileScopeId) -> Self {
-        let scope = &scopes[scope_id];
+        Self::from_scope(scopes, scope_id, &scopes[scope_id])
+    }
+
+    fn from_scope(
+        scopes: &'a IndexSlice<FileScopeId, Scope>,
+        scope_id: FileScopeId,
+        scope: &Scope,
+    ) -> Self {
         let scopes = &scopes[scope.descendants()];
 
         Self {
@@ -957,18 +1021,201 @@ impl<'a> ChildrenIter<'a> {
             descendants,
         }
     }
+
+    fn step(&mut self) -> ScopeStep<(FileScopeId, &'a Scope)> {
+        match self.descendants.next() {
+            Some((id, scope)) if scope.parent() == Some(self.parent) => {
+                ScopeStep::Yield((id, scope))
+            }
+            Some(_) => ScopeStep::Continue,
+            None => ScopeStep::Done,
+        }
+    }
 }
 
 impl<'a> Iterator for ChildrenIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.descendants
-            .find(|(_, scope)| scope.parent() == Some(self.parent))
+        loop {
+            match self.step() {
+                ScopeStep::Continue => {}
+                ScopeStep::Yield(scope) => return Some(scope),
+                ScopeStep::Done => return None,
+            }
+        }
     }
 }
 
 impl FusedIterator for ChildrenIter<'_> {}
+
+/// The outcome of one bounded scope-traversal transition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScopeStep<T> {
+    /// Traversal advanced without yielding a selected scope.
+    Continue,
+    /// Traversal selected a scope.
+    Yield(T),
+    /// Traversal is complete.
+    Done,
+}
+
+/// Visits method scopes and their eager descendants when collecting a class's implicit attributes.
+///
+/// Each method is yielded before its eager descendants. A descendant is included only when every
+/// intervening scope up to the method is eager. Generic methods are selected through their type
+/// parameter scope; the type parameter scope itself is not yielded as a method.
+///
+/// [`step`](Self::step) exposes skipped scopes and individual ancestor checks so callers can budget
+/// for each transition before advancing. [`Iterator::next`] can perform many transitions to find the
+/// next selected scope. The cursor borrows the semantic index and allocates no storage.
+pub struct AttributeScopesCursor<'a> {
+    scopes: &'a IndexSlice<FileScopeId, Scope>,
+    children: ChildrenIter<'a>,
+    state: AttributeScopesState<'a>,
+}
+
+impl<'a> AttributeScopesCursor<'a> {
+    fn new(scopes: &'a IndexSlice<FileScopeId, Scope>, class_body_scope: FileScopeId) -> Self {
+        Self {
+            scopes,
+            children: ChildrenIter::new(scopes, class_body_scope),
+            state: AttributeScopesState::Children,
+        }
+    }
+
+    /// Returns conservative `(work, bytes)` quotations for one call to [`step`](Self::step).
+    ///
+    /// Work counts scalar tests and updates, state/result construction and scope metadata reads.
+    /// Bytes cover fixed state/result transfers and up to two scope metadata reads. Callers with
+    /// a budget deduct both amounts before each step, even when existing storage is reused.
+    /// This excludes cursor construction and work on the yielded scope's members. Rejected scopes
+    /// and ancestor checks each require their own step.
+    pub const fn step_cost() -> (usize, usize) {
+        const STATE_CONSTRUCTION_AND_STORE: usize = 2;
+        const SCOPE_READS: usize = 2;
+        const SCALAR_TESTS_AND_UPDATES: usize = 32;
+
+        let work = SCALAR_TESTS_AND_UPDATES + STATE_CONSTRUCTION_AND_STORE + SCOPE_READS + 1;
+        let bytes = size_of::<AttributeScopesState<'a>>() * STATE_CONSTRUCTION_AND_STORE
+            + size_of::<Scope>() * SCOPE_READS
+            + size_of::<ScopeStep<FileScopeId>>();
+        (work, bytes)
+    }
+
+    /// Advances one bounded transition when selecting scopes for implicit attribute collection.
+    ///
+    /// A transition scans and classifies one possible child, advances one descendant, or checks
+    /// one ancestor. It performs at most two scope lookups and never scans a variable-length
+    /// sequence internally. Callers controlling work and bytes must deduct [`step_cost`](Self::step_cost)
+    /// from their budgets before this call, including calls returning [`ScopeStep::Continue`].
+    /// Once traversal completes, later calls return [`ScopeStep::Done`].
+    pub fn step(&mut self) -> ScopeStep<FileScopeId> {
+        match &mut self.state {
+            AttributeScopesState::Children => match self.children.step() {
+                ScopeStep::Continue => ScopeStep::Continue,
+                ScopeStep::Yield((child_scope_id, scope)) => {
+                    let (method, scope) = if scope.node().scope_kind() == ScopeKind::TypeParams {
+                        // This could be a generic method with a type-params scope.
+                        // Go one level deeper to find the function scope. The first
+                        // descendant is the (potential) function scope.
+                        let method = scope.descendants().start;
+                        (method, &self.scopes[method])
+                    } else {
+                        (child_scope_id, scope)
+                    };
+                    if scope.node().as_function().is_none() {
+                        return ScopeStep::Continue;
+                    }
+                    // Add any descendent scope that is eager and have eager scopes between the scope
+                    // and the method scope. Since attributes can be defined in this scope.
+                    if !scope.descendants().is_empty() {
+                        self.state = AttributeScopesState::Descendants {
+                            method,
+                            descendants: DescendantsIter::from_scope(self.scopes, method, scope),
+                            pending: None,
+                        };
+                    }
+                    ScopeStep::Yield(method)
+                }
+                ScopeStep::Done => {
+                    self.state = AttributeScopesState::Done;
+                    ScopeStep::Done
+                }
+            },
+            AttributeScopesState::Descendants {
+                method,
+                descendants,
+                pending,
+            } => {
+                let Some(ancestors) = pending.as_mut() else {
+                    let Some((candidate, scope)) = descendants.next() else {
+                        self.state = AttributeScopesState::Children;
+                        return ScopeStep::Continue;
+                    };
+                    *pending = Some(AttributeScopesAncestors {
+                        candidate,
+                        candidate_is_eager: scope.kind().is_eager(),
+                        current: Some(candidate),
+                    });
+                    return ScopeStep::Continue;
+                };
+                if let Some(current) = ancestors.current
+                    && current != *method
+                {
+                    let scope = &self.scopes[current];
+                    if scope.is_eager() {
+                        ancestors.current = scope.parent();
+                    } else {
+                        *pending = None;
+                    }
+                    ScopeStep::Continue
+                } else {
+                    let step = if ancestors.candidate_is_eager {
+                        ScopeStep::Yield(ancestors.candidate)
+                    } else {
+                        ScopeStep::Continue
+                    };
+                    *pending = None;
+                    step
+                }
+            }
+            AttributeScopesState::Done => ScopeStep::Done,
+        }
+    }
+}
+
+impl Iterator for AttributeScopesCursor<'_> {
+    type Item = FileScopeId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            match self.step() {
+                ScopeStep::Continue => {}
+                ScopeStep::Yield(scope) => return Some(scope),
+                ScopeStep::Done => return None,
+            }
+        }
+    }
+}
+
+impl FusedIterator for AttributeScopesCursor<'_> {}
+
+enum AttributeScopesState<'a> {
+    Children,
+    Descendants {
+        method: FileScopeId,
+        descendants: DescendantsIter<'a>,
+        pending: Option<AttributeScopesAncestors>,
+    },
+    Done,
+}
+
+struct AttributeScopesAncestors {
+    candidate: FileScopeId,
+    candidate_is_eager: bool,
+    current: Option<FileScopeId>,
+}
 
 /// Interval map that maps a range of expression node ids to their corresponding scopes.
 ///
@@ -2093,6 +2340,172 @@ def x():
         assert_eq!(
             scope_names(ancestors, &db, file, db.program(), &module),
             vec!["bar", "foo", "Test", "<module>"]
+        );
+    }
+
+    #[test]
+    fn child_scope_steps_include_rejected_descendants() {
+        let TestCase { db, file } = test_case(
+            r"
+class Outer:
+    class Nested:
+        class Inner:
+            pass
+    def method(self):
+        pass",
+        );
+        let index = semantic_index(&db, program_file(&db, file));
+        let mut children = index.child_scopes(FileScopeId::from_u32(1));
+
+        assert_matches!(children.step(), ScopeStep::Yield((id, _)) if id == FileScopeId::from_u32(2));
+        assert_matches!(children.step(), ScopeStep::Continue);
+        assert_matches!(children.step(), ScopeStep::Yield((id, _)) if id == FileScopeId::from_u32(4));
+        assert_matches!(children.step(), ScopeStep::Done);
+        assert_matches!(children.step(), ScopeStep::Done);
+
+        let mut cursor = index.attribute_scopes_cursor(FileScopeId::from_u32(1));
+        assert_eq!(
+            (0..5).map(|_| cursor.step()).collect::<Vec<_>>(),
+            vec![
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Yield(FileScopeId::from_u32(4)),
+                ScopeStep::Done,
+                ScopeStep::Done,
+            ]
+        );
+    }
+
+    #[test]
+    fn attribute_scope_steps_scan_each_ancestor() {
+        let TestCase { db, file } = test_case(
+            r"
+class Outer:
+    def method(self):
+        class Nested:
+            class Inner:
+                pass",
+        );
+        let index = semantic_index(&db, program_file(&db, file));
+        let class_scope = FileScopeId::from_u32(1);
+        let mut cursor = index.attribute_scopes_cursor(class_scope);
+        let steps: Vec<_> = (0..13).map(|_| cursor.step()).collect();
+
+        assert_eq!(
+            steps,
+            vec![
+                ScopeStep::Yield(FileScopeId::from_u32(2)),
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Yield(FileScopeId::from_u32(3)),
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Yield(FileScopeId::from_u32(4)),
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Continue,
+                ScopeStep::Done,
+                ScopeStep::Done,
+            ]
+        );
+        assert_eq!(
+            attribute_scopes(&db, index.scope_id(class_scope)).collect::<Vec<_>>(),
+            vec![
+                FileScopeId::from_u32(2),
+                FileScopeId::from_u32(3),
+                FileScopeId::from_u32(4),
+            ]
+        );
+    }
+
+    #[test]
+    fn attribute_scopes_skip_generic_aliases_and_nested_classes() {
+        let TestCase { db, file } = test_case(
+            r"
+class Outer:
+    type Alias[T] = list[T]
+    class Nested[T]:
+        def excluded(self):
+            pass
+    def generic[T](self, value: T):
+        self.generic = value
+    def ordinary(self):
+        self.ordinary = 0",
+        );
+        let program_file = program_file(&db, file);
+        let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
+        let index = semantic_index(&db, program_file);
+        let class_scope = FileScopeId::from_u32(1);
+        let scope_ids: Vec<_> = index.attribute_scopes_cursor(class_scope).collect();
+        let selected: Vec<_> = scope_ids
+            .iter()
+            .map(|&scope| {
+                (
+                    index.scope(scope).kind(),
+                    index.scope_id(scope).name(&db, &module),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            selected,
+            vec![
+                (ScopeKind::Function, "generic"),
+                (ScopeKind::Function, "ordinary"),
+            ]
+        );
+        assert_eq!(
+            attribute_scopes(&db, index.scope_id(class_scope)).collect::<Vec<_>>(),
+            scope_ids
+        );
+    }
+
+    #[test]
+    fn attribute_scopes_require_eager_ancestry() {
+        let TestCase { db, file } = test_case(
+            r"
+class Outer:
+    def method(self):
+        eager = [self.first for item in ()]
+        class Eager:
+            nested = [self.second for item in ()]
+            def lazy(self):
+                excluded = [self.third for item in ()]
+        def lazy():
+            excluded = [self.fourth for item in ()]
+        deferred = lambda: [self.fifth for item in ()]
+    def after(self):
+        pass",
+        );
+        let program_file = program_file(&db, file);
+        let module = parsed_module(&db, program_file.python_file(&db)).load(&db);
+        let index = semantic_index(&db, program_file);
+        let class_scope = FileScopeId::from_u32(1);
+        let scope_ids: Vec<_> = index.attribute_scopes_cursor(class_scope).collect();
+        let selected: Vec<_> = scope_ids
+            .iter()
+            .map(|&scope| {
+                (
+                    index.scope(scope).kind(),
+                    index.scope_id(scope).name(&db, &module),
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            selected,
+            vec![
+                (ScopeKind::Function, "method"),
+                (ScopeKind::Comprehension, "<listcomp>"),
+                (ScopeKind::Class, "Eager"),
+                (ScopeKind::Comprehension, "<listcomp>"),
+                (ScopeKind::Function, "after"),
+            ]
+        );
+        assert_eq!(
+            attribute_scopes(&db, index.scope_id(class_scope)).collect::<Vec<_>>(),
+            scope_ids
         );
     }
 

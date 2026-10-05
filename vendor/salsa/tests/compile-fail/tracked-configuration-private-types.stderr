@@ -1,0 +1,43 @@
+error[E0446]: private type `Input` in public interface
+ --> tests/compile-fail/tracked-configuration-private-types.rs:8:5
+  |
+2 |     #[salsa::input]
+  |     --------------- `Input` declared as private
+...
+8 |     #[salsa::tracked(returns(copy), configuration = (pub QueryConfiguration))]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ can't leak private type
+  |
+  = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0446]: private type `Input` in public interface
+ --> tests/compile-fail/tracked-configuration-private-types.rs:8:5
+  |
+2 |     #[salsa::input]
+  |     --------------- `Input` declared as private
+...
+8 |     #[salsa::tracked(returns(copy), configuration = (pub QueryConfiguration))]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ can't leak private type
+  |
+  = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0446]: private type `private_output::Output` in public interface
+  --> tests/compile-fail/tracked-configuration-private-types.rs:18:5
+   |
+16 |     struct Output(u32);
+   |     ------------- `private_output::Output` declared as private
+17 |
+18 |     #[salsa::tracked(returns(copy), configuration = (pub QueryConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ can't leak private type
+   |
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0446]: private type `public_marker::Output` in public interface
+  --> tests/compile-fail/tracked-configuration-private-types.rs:28:5
+   |
+26 |     struct Output(u32);
+   |     ------------- `public_marker::Output` declared as private
+27 |
+28 |     #[salsa::tracked(returns(copy), configuration = (PrivateConfiguration))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ can't leak private type
+   |
+   = note: this error originates in the macro `salsa::plumbing::setup_tracked_fn` which comes from the expansion of the attribute macro `salsa::tracked` (in Nightly builds, run with -Z macro-backtrace for more info)

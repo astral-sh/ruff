@@ -1,0 +1,206 @@
+--- a/vendor/salsa/src/function/execute/execution_run/field_run.rs
++++ b/vendor/salsa/src/function/execute/execution_run/field_run.rs
+@@ -1,13 +1,14 @@
+ use std::convert::Infallible;
+ use std::future::{Future, pending, ready};
+ use std::ops::ControlFlow;
+-use std::task::Poll;
++use std::pin::Pin;
++use std::task::{Context, Poll};
+ 
+ use super::callback::{self, CallbackKind};
+ use super::frame_free::EntryScope;
+ use super::native_values::{self, NativeValueQuote};
+ use super::registration::TaskEndpoint;
+-use super::{RunError, RunResult, read_run};
++use super::{ExecutionWork, RunError, RunResult, read_run};
+ use crate::id::AsId;
+ use crate::zalsa::Zalsa;
+ use crate::zalsa_local::ZalsaLocal;
+@@ -141,7 +142,6 @@
+     read: D,
+ }
+ 
+-
+ /// Borrows the existing field-read owner while its dependency is recorded.
+ #[doc(hidden)]
+ #[derive(Clone, Copy)]
+@@ -151,30 +151,35 @@
+     local: &'call ZalsaLocal,
+ }
+ 
+-/// Keeps the request's dependency capability in its concrete recording future.
++/// Records a selected field dependency while preserving whether the request can have one.
+ #[doc(hidden)]
+ pub trait FieldDependencyState: sealed::Sealed + Sized + 'static {
++    // Admitted before selection constructs the capability or recording constructs its future.
+     const RECORDING_QUOTE: Option<(usize, usize)>;
+ 
++    /// Records the selected dependency synchronously for an ordinary getter.
+     fn record_ordinary(self, local: &ZalsaLocal);
+ 
++    /// Constructs a passive future that records the dependency using the existing field-read owner.
+     fn record<'call, 'run: 'call, 'db: 'run>(
+         &'call self,
+         context: FieldRecordingContext<'call, 'run, 'db>,
+     ) -> impl Future<Output = ()> + 'call;
+ }
+ 
+-#[doc(hidden)]
++/// An interned field needs no dependency edge.
++#[doc(hidden)]
++#[derive(Debug)]
+ pub struct NoFieldDependency;
+ 
+ impl sealed::Sealed for NoFieldDependency {}
+ 
+ impl FieldDependencyState for NoFieldDependency {
+-    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _, 8, 170>(
++    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _>(
+         &|state: &'static Self, context: FieldRecordingContext<'static, 'static, 'static>| {
+             state.record(context)
+         },
+-        true,
++        RecordingKind::Ready,
+     );
+ 
+     fn record_ordinary(self, _local: &ZalsaLocal) {}
+@@ -187,17 +192,19 @@
+     }
+ }
+ 
+-#[doc(hidden)]
++/// The canonical dependency selected for an input or tracked field, when present.
++#[doc(hidden)]
++#[derive(Debug)]
+ pub struct OptionalFieldDependency(Option<FieldDependency>);
+ 
+ impl sealed::Sealed for OptionalFieldDependency {}
+ 
+ impl FieldDependencyState for OptionalFieldDependency {
+-    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _, 7, 84>(
++    const RECORDING_QUOTE: Option<(usize, usize)> = recording_quote::<Self, _, _>(
+         &|state: &'static Self, context: FieldRecordingContext<'static, 'static, 'static>| {
+             state.record(context)
+         },
+-        false,
++        RecordingKind::Optional,
+     );
+ 
+     fn record_ordinary(self, local: &ZalsaLocal) {
+@@ -222,23 +229,70 @@
+     }
+ }
+ 
+-// The borrowed constructor identifies the future type without creating a context or a future.
+-// Its static lifetimes are a type witness; recording uses the actual field-read borrow lifetimes.
+-const fn recording_quote<D: 'static, F: Future<Output = ()>, M, const TRANSFERS: usize, const WORK: usize>(
++#[derive(Clone, Copy, Debug, Eq, PartialEq)]
++enum RecordingKind {
++    Ready,
++    Optional,
++}
++
++/// Quotes the recording future's construction, transfers, single poll and shallow retirement.
++/// The borrowed constructor identifies its type without creating a context or a future.
++/// Its static lifetimes are only a type witness; recording uses the actual field-read borrows.
++const fn recording_quote<D: 'static, F: Future<Output = ()>, M>(
+     _constructor: &M,
+-    ready: bool,
++    kind: RecordingKind,
+ ) -> Option<(usize, usize)>
+ where
+     M: FnOnce(&'static D, FieldRecordingContext<'static, 'static, 'static>) -> F,
+ {
++    // Calls count three argument carriers plus call and return. Work is independent of widths.
++    // Common: six calls (36) and 23 direct events. Ready adds 54 call and 24 direct events;
++    // optional recording adds three captures/construction events and four branch events.
++    let (transfers, work, ready, optional) = match kind {
++        RecordingKind::Ready => (8, 59 + 54 + 24, 1, 0),
++        RecordingKind::Optional => (7, 59 + 3 + 4, 0, 1),
++    };
++    let control_widths = [
++        size_of::<&()>(),
++        size_of::<usize>(),
++        size_of::<bool>(),
++        size_of::<Poll<()>>(),
++    ];
++    let mut control_width = 0;
++    let mut index = 0;
++    while index < control_widths.len() {
++        if control_widths[index] > control_width {
++            control_width = control_widths[index];
++        }
++        index += 1;
++    }
+     let groups = [
+-        (TRANSFERS, size_of::<F>()),
+-        (4, size_of::<FieldRecordingContext<'static, 'static, 'static>>()),
+-        (16, size_of::<&()>()),
+-        (2, size_of::<(&Zalsa, &ZalsaLocal)>()),
+-        (if ready { 3 } else { 0 }, size_of::<&str>()),
+-        (if ready { 12 } else { 0 }, size_of::<Option<()>>()),
+-        (8, size_of::<Poll<()>>()),
++        (transfers, size_of::<F>()),
++        // Storage receiver, returned pair and field access.
++        (3, size_of::<&()>()),
++        (3, size_of::<(&Zalsa, &ZalsaLocal)>()),
++        // Context construction and the complete record(self, context) argument groups.
++        (6, size_of::<&()>()),
++        (2, size_of::<FieldRecordingContext<'static, 'static, 'static>>()),
++        (3, size_of::<(&D, FieldRecordingContext<'static, 'static, 'static>)>()),
++        // Pin construction, poll, shallow retirement, and their scalar state transitions.
++        (6, size_of::<&()>()),
++        (3, size_of::<(Pin<&mut F>, &mut Context<'_>)>()),
++        (1, size_of::<Poll<()>>()),
++        (3, size_of::<&()>()),
++        (11, control_width),
++        // Ready::poll uses Pin dereferencing, Option::take/expect and mem::replace intrinsics.
++        (ready * 27, size_of::<&()>()),
++        (ready * 3, size_of::<(&mut Option<()>, Option<()>)>()),
++        (ready * 3, size_of::<(*mut Option<()>, Option<()>)>()),
++        (ready * 3, size_of::<(Option<()>, &'static str)>()),
++        (ready * 14, size_of::<Option<()>>()),
++        (ready, size_of::<Poll<()>>()),
++        // The optional future captures references/context and dispatches its selected dependency.
++        (optional, size_of::<&()>()),
++        (optional, size_of::<FieldRecordingContext<'static, 'static, 'static>>()),
++        (optional * 3, size_of::<&()>()),
++        (optional, size_of::<bool>()),
+     ];
+     let mut bytes = 0usize;
+     let mut index = 0;
+@@ -253,7 +307,7 @@
+         bytes = total;
+         index += 1;
+     }
+-    Some((WORK, bytes))
++    Some((work, bytes))
+ }
+ 
+ const RECORDING_PREPARATION_WORK: usize = 3 * (3 * 5 + 4 * 4) + 10;
+@@ -266,6 +320,7 @@
+     + 3 * size_of::<(usize, usize)>()
+     + 8 * size_of::<usize>();
+ 
++#[derive(Debug)]
+ struct FieldDependency {
+     input: DatabaseKeyIndex,
+     durability: Durability,
+@@ -524,14 +579,14 @@
+                 // fields) the canonical revision read lock. Interned fields retain the canonical
+                 // reusable-value check under their shard lock. Selection performs no user conversion.
+     endpoint.admit_work(16 + RECORDING_PREPARATION_WORK)?;
+-            endpoint.admit(super::ExecutionWork::Resource {
++            endpoint.admit(ExecutionWork::Resource {
+                 requested_bytes: RECORDING_PREPARATION_BYTES,
+             })?;
+             let Some((work, requested_bytes)) = R::Dependency::RECORDING_QUOTE else {
+                 return Err(RunError::Contract("field recording quotation overflow"));
+             };
+             endpoint.admit_work(work)?;
+-            endpoint.admit(super::ExecutionWork::Resource { requested_bytes })
++            endpoint.admit(ExecutionWork::Resource { requested_bytes })
+             })())
+         },
+     )

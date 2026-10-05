@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use ruff_python_ast as ast;
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::place_table;
@@ -6,8 +8,81 @@ use ty_python_core::scope::ScopeId;
 use crate::Db;
 use crate::types::Type;
 use crate::types::call::{Binding, Bindings};
+use crate::types::signatures::effects::legacy_inline;
+
+pub(super) trait TypeGuardReturnEffects<'db> {
+    type Error;
+
+    async fn bind_positive(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        return_ty: Type<'db>,
+        bindings: &Bindings<'db>,
+        arguments: &ast::Arguments,
+    ) -> Result<Type<'db>, Self::Error>;
+}
+
+pub(super) async fn bind_type_guard_return_type_with<'db, E: TypeGuardReturnEffects<'db>>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    return_ty: Type<'db>,
+    bindings: &Bindings<'db>,
+    arguments: &ast::Arguments,
+    effects: &E,
+) -> Result<Type<'db>, E::Error> {
+    match return_ty {
+        Type::TypeIs(_) => {
+            effects
+                .bind_positive(db, scope, return_ty, bindings, arguments)
+                .await
+        }
+        Type::TypeGuard(_) => {
+            effects
+                .bind_positive(db, scope, return_ty, bindings, arguments)
+                .await
+        }
+        _ => Ok(return_ty),
+    }
+}
+
+struct OrdinaryTypeGuardReturnEffects;
+
+impl<'db> TypeGuardReturnEffects<'db> for OrdinaryTypeGuardReturnEffects {
+    type Error = Infallible;
+
+    async fn bind_positive(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        return_ty: Type<'db>,
+        bindings: &Bindings<'db>,
+        arguments: &ast::Arguments,
+    ) -> Result<Type<'db>, Self::Error> {
+        Ok(bind_type_guard_return_type_positive(
+            db, scope, return_ty, bindings, arguments,
+        ))
+    }
+}
 
 pub(super) fn bind_type_guard_return_type<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    return_ty: Type<'db>,
+    bindings: &Bindings<'db>,
+    arguments: &ast::Arguments,
+) -> Type<'db> {
+    legacy_inline(bind_type_guard_return_type_with(
+        db,
+        scope,
+        return_ty,
+        bindings,
+        arguments,
+        &OrdinaryTypeGuardReturnEffects,
+    ))
+}
+
+fn bind_type_guard_return_type_positive<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     return_ty: Type<'db>,

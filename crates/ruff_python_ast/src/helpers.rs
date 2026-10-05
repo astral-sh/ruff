@@ -17,6 +17,10 @@ use crate::{
 };
 use crate::{AnyNodeRef, ExprContext};
 
+mod expression_search;
+
+pub use expression_search::{ExpressionSearchFrame, ExpressionSearchStep};
+
 /// Return `true` if the `Stmt` is a compound statement (as opposed to a simple statement).
 pub const fn is_compound_statement(stmt: &Stmt) -> bool {
     matches!(
@@ -258,190 +262,26 @@ pub fn any_over_expr<F>(expr: &Expr, mut func: F) -> bool
 where
     F: FnMut(&Expr) -> bool,
 {
-    fn inner(expr: &Expr, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
-        if func(expr) {
-            return true;
-        }
-        match expr {
-            Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-                values.iter().any(|expr| any_over_expr(expr, &mut *func))
+    fn inner(mut frame: ExpressionSearchFrame<'_>, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
+        loop {
+            match frame.step() {
+                ExpressionSearchStep::Visit(expression) => {
+                    if func(expression) {
+                        return true;
+                    }
+                }
+                ExpressionSearchStep::Enter(child) => {
+                    if inner(child, func) {
+                        return true;
+                    }
+                }
+                ExpressionSearchStep::Progress => {}
+                ExpressionSearchStep::Done => return false,
             }
-            Expr::FString(ast::ExprFString { value, .. }) => value
-                .elements()
-                .any(|expr| any_over_interpolated_string_element(expr, &mut *func)),
-            Expr::TString(ast::ExprTString { value, .. }) => value
-                .elements()
-                .any(|expr| any_over_interpolated_string_element(expr, &mut *func)),
-            Expr::Named(ast::ExprNamed {
-                target,
-                value,
-                range: _,
-                node_index: _,
-            }) => any_over_expr(target, &mut *func) || any_over_expr(value, &mut *func),
-            Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-                any_over_expr(left, &mut *func) || any_over_expr(right, &mut *func)
-            }
-            Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => any_over_expr(operand, func),
-            Expr::Lambda(ast::ExprLambda {
-                body, parameters, ..
-            }) => {
-                parameters
-                    .iter()
-                    .flat_map(|parameters| parameters.iter_non_variadic_params())
-                    .filter_map(|parameter| parameter.default.as_deref())
-                    .any(|default| any_over_expr(default, &mut *func))
-                    || any_over_expr(body, func)
-            }
-            Expr::If(ast::ExprIf {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
-                any_over_expr(test, &mut *func)
-                    || any_over_expr(body, &mut *func)
-                    || any_over_expr(orelse, &mut *func)
-            }
-            Expr::Dict(ast::ExprDict {
-                items,
-                range: _,
-                node_index: _,
-            }) => items.iter().any(|ast::DictItem { key, value }| {
-                any_over_expr(value, &mut *func)
-                    || key
-                        .as_ref()
-                        .is_some_and(|key| any_over_expr(key, &mut *func))
-            }),
-            Expr::Set(ast::ExprSet {
-                elts,
-                range: _,
-                node_index: _,
-            })
-            | Expr::List(ast::ExprList { elts, .. })
-            | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                elts.iter().any(|expr| any_over_expr(expr, &mut *func))
-            }
-            Expr::ListComp(ast::ExprListComp {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-            })
-            | Expr::SetComp(ast::ExprSetComp {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-            })
-            | Expr::Generator(ast::ExprGenerator {
-                elt,
-                generators,
-                range: _,
-                node_index: _,
-                parenthesized: _,
-            }) => {
-                any_over_expr(elt, &mut *func)
-                    || generators.iter().any(|generator| {
-                        any_over_expr(&generator.target, &mut *func)
-                            || any_over_expr(&generator.iter, &mut *func)
-                            || generator
-                                .ifs
-                                .iter()
-                                .any(|expr| any_over_expr(expr, &mut *func))
-                    })
-            }
-            Expr::DictComp(ast::ExprDictComp {
-                key,
-                value,
-                generators,
-                range: _,
-                node_index: _,
-            }) => {
-                key.as_deref()
-                    .is_some_and(|key| any_over_expr(key, &mut *func))
-                    || any_over_expr(value, &mut *func)
-                    || generators.iter().any(|generator| {
-                        any_over_expr(&generator.target, &mut *func)
-                            || any_over_expr(&generator.iter, &mut *func)
-                            || generator
-                                .ifs
-                                .iter()
-                                .any(|expr| any_over_expr(expr, &mut *func))
-                    })
-            }
-            Expr::Await(ast::ExprAwait {
-                value,
-                range: _,
-                node_index: _,
-            })
-            | Expr::YieldFrom(ast::ExprYieldFrom {
-                value,
-                range: _,
-                node_index: _,
-            })
-            | Expr::Attribute(ast::ExprAttribute { value, .. })
-            | Expr::Starred(ast::ExprStarred { value, .. }) => any_over_expr(value, func),
-            Expr::Yield(ast::ExprYield {
-                value,
-                range: _,
-                node_index: _,
-            }) => value
-                .as_ref()
-                .is_some_and(|value| any_over_expr(value, func)),
-            Expr::Compare(ast::ExprCompare { operands, .. }) => {
-                operands.iter().any(|expr| any_over_expr(expr, &mut *func))
-            }
-            Expr::Call(ast::ExprCall {
-                func: call_func,
-                arguments,
-                range_start: _,
-                node_index: _,
-            }) => {
-                // Note that this is the evaluation order but not necessarily the declaration order
-                // (e.g. for `f(*args, a=2, *args2, **kwargs)` it's not)
-                any_over_expr(call_func, &mut *func)
-                    || arguments
-                        .args
-                        .iter()
-                        .any(|expr| any_over_expr(expr, &mut *func))
-                    || arguments
-                        .keywords
-                        .iter()
-                        .any(|keyword| any_over_expr(&keyword.value, &mut *func))
-            }
-            Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
-                any_over_expr(value, &mut *func) || any_over_expr(slice, &mut *func)
-            }
-            Expr::Slice(ast::ExprSlice {
-                lower,
-                upper,
-                step,
-                range: _,
-                node_index: _,
-            }) => {
-                lower
-                    .as_ref()
-                    .is_some_and(|value| any_over_expr(value, &mut *func))
-                    || upper
-                        .as_ref()
-                        .is_some_and(|value| any_over_expr(value, &mut *func))
-                    || step
-                        .as_ref()
-                        .is_some_and(|value| any_over_expr(value, &mut *func))
-            }
-            Expr::Name(_)
-            | Expr::StringLiteral(_)
-            | Expr::BytesLiteral(_)
-            | Expr::NumberLiteral(_)
-            | Expr::BooleanLiteral(_)
-            | Expr::NoneLiteral(_)
-            | Expr::EllipsisLiteral(_)
-            | Expr::IpyEscapeCommand(_) => false,
         }
     }
 
-    inner(expr, &mut func)
+    inner(ExpressionSearchFrame::expression(expr), &mut func)
 }
 
 fn any_over_type_param(type_param: &TypeParam, func: &mut dyn FnMut(&Expr) -> bool) -> bool {
@@ -506,27 +346,6 @@ fn any_over_pattern(pattern: &Pattern, func: &mut dyn FnMut(&Expr) -> bool) -> b
         }) => patterns
             .iter()
             .any(|pattern| any_over_pattern(pattern, &mut *func)),
-    }
-}
-
-fn any_over_interpolated_string_element(
-    element: &ast::InterpolatedStringElement,
-    func: &mut dyn FnMut(&Expr) -> bool,
-) -> bool {
-    match element {
-        ast::InterpolatedStringElement::Literal(_) => false,
-        ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
-            expression,
-            format_spec,
-            ..
-        }) => {
-            any_over_expr(expression, &mut *func)
-                || format_spec.as_ref().is_some_and(|spec| {
-                    spec.elements.iter().any(|spec_element| {
-                        any_over_interpolated_string_element(spec_element, &mut *func)
-                    })
-                })
-        }
     }
 }
 

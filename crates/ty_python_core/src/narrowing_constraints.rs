@@ -99,6 +99,18 @@ pub struct NarrowingConstraints {
 }
 
 impl NarrowingConstraints {
+    /// Bounds structural equality using only fixed-size retained metadata.
+    pub(crate) fn comparison_work(&self) -> Option<usize> {
+        // Each interior consists of four scoped IDs. The optional rank index compares
+        // both its bit slice and its separately retained chunk ranks.
+        let interiors = self.used_interiors.len().checked_add(2)?;
+        let indices = self
+            .used_indices
+            .as_ref()
+            .map_or(Some(0), RankBitBox::comparison_work)?;
+        interiors.checked_add(indices)
+    }
+
     /// Creates a constraint graph from compacted interior nodes for use by downstream tests.
     ///
     /// The nodes must satisfy the same ordering and allocation invariants as graphs produced by

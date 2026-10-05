@@ -1,16 +1,167 @@
-//! Descriptor `__get__` evaluation with owned continuations for its semantic dependencies.
+//! Descriptor `__get__` evaluation with explicit semantic dependencies.
 
 use crate::place::{DefinedPlace, Definedness, Place};
-use crate::types::call::{Bindings, CallArguments, CallError};
 use crate::types::cyclic::CallableRecursionGuard;
+use crate::types::signatures::effects::legacy_inline;
 use crate::types::{
-    AttributeKind, DescriptorGetCallContext, DescriptorGetError, DescriptorGetResult,
-    DescriptorOrigin, IntersectionBuilder, MemberLookupPolicy, Type, UnionBuilder, UnionType,
-    descriptor_get_result,
+    AttributeKind, DescriptorGetError, DescriptorGetResult, DescriptorOrigin, MemberLookupPolicy,
+    Type, descriptor_get_result,
 };
 use crate::{Db, Program, ProgramEnvironment};
 
-type DescriptorResult<'db> = Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>>;
+pub(super) mod effects;
+
+#[cfg(feature = "experimental-analysis")]
+mod runtime;
+#[cfg(feature = "experimental-analysis")]
+pub(in crate::types) use runtime::{
+    DescriptorDispatchesMemoSchema, register_descriptor_dispatch_values,
+    register_descriptor_dispatches_values, register_descriptor_get_call_context_values,
+};
+
+#[cfg(test)]
+pub(super) mod scheduled_effects;
+
+use effects::{DescriptorEffects, LegacyInlineEffects};
+
+pub(crate) type DescriptorResult<'db> =
+    Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>>;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct DescriptorRequest<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) instance: Option<Type<'db>>,
+    pub(crate) owner: Type<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct DescriptorMemberRequest<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) policy: MemberLookupPolicy,
+}
+
+/// A complete implicit `__get__` invocation, including argument checking and overload selection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub(crate) struct DescriptorInvocationRequest<'db> {
+    pub(crate) callable: Type<'db>,
+    pub(crate) arguments: [Type<'db>; 3],
+}
+
+pub(super) fn evaluate_entry<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    request: DescriptorRequest<'db>,
+    recursion_guard: Option<&CallableRecursionGuard<'db>>,
+) -> DescriptorResult<'db> {
+    legacy_inline(evaluate_entry_with_effects(
+        db,
+        env,
+        request,
+        &LegacyInlineEffects { recursion_guard },
+    ))
+}
+
+/// Dependencies used before a descriptor needs a Python `__get__` invocation.
+/// Guarded callers can retain their guard at the protocol boundary while sharing native binding.
+pub(in crate::types) trait DescriptorEntryEffects<'db> {
+    type Error;
+
+    async fn checkpoint_entry(&self) -> Result<(), Self::Error>;
+
+    async fn slot_value_entry(
+        &self,
+        db: &'db dyn Db,
+        descriptor: super::SlotDescriptorType<'db>,
+    ) -> Result<Type<'db>, Self::Error>;
+
+    async fn function_like_entry(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        request: DescriptorRequest<'db>,
+    ) -> Result<Option<Type<'db>>, Self::Error>;
+
+    async fn protocol_entry(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        request: DescriptorRequest<'db>,
+    ) -> Result<DescriptorResult<'db>, Self::Error>;
+}
+
+impl<'db, E: DescriptorEffects<'db>> DescriptorEntryEffects<'db> for E {
+    type Error = E::Error;
+
+    async fn checkpoint_entry(&self) -> Result<(), Self::Error> {
+        DescriptorEffects::checkpoint(self).await
+    }
+
+    async fn slot_value_entry(
+        &self,
+        db: &'db dyn Db,
+        descriptor: super::SlotDescriptorType<'db>,
+    ) -> Result<Type<'db>, Self::Error> {
+        DescriptorEffects::slot_value(self, db, descriptor).await
+    }
+
+    async fn function_like_entry(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        request: DescriptorRequest<'db>,
+    ) -> Result<Option<Type<'db>>, Self::Error> {
+        DescriptorEffects::function_like(self, db, env, request).await
+    }
+
+    async fn protocol_entry(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        request: DescriptorRequest<'db>,
+    ) -> Result<DescriptorResult<'db>, Self::Error> {
+        DescriptorEffects::protocol(self, db, env, request).await
+    }
+}
+
+/// Keeps native descriptor access outside the cached protocol lookup. In particular, native
+/// function binding can revisit a protocol receiver; a protocol query's cycle value would leave
+/// that receiver unbound if it were applied to the native binding operation.
+pub(super) async fn evaluate_entry_with_effects<'db, E: DescriptorEntryEffects<'db>>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    request: DescriptorRequest<'db>,
+    effects: &E,
+) -> Result<DescriptorResult<'db>, E::Error> {
+    effects.checkpoint_entry().await?;
+    if matches!(request.ty, Type::BoundMethod(_)) {
+        // A stored bound method keeps its receiver. In Python 3.13+ its native `__get__`
+        // returns the method itself; older versions have no descriptor slot on MethodType.
+        return Ok(Ok(None));
+    }
+    if let Some(return_type) = effects.function_like_entry(db, env, request).await? {
+        return Ok(Ok(Some(DescriptorGetResult {
+            return_type,
+            origin: DescriptorOrigin::default(),
+            kind: AttributeKind::NormalOrNonDataDescriptor,
+        })));
+    }
+
+    // The interpreter returns the descriptor itself on class access and its stored value on
+    // instance access; no Python property accessors participate in either operation.
+    if let Type::SlotDescriptor(descriptor) = request.ty {
+        return Ok(Ok(Some(DescriptorGetResult {
+            return_type: if request.instance.is_some() {
+                effects.slot_value_entry(db, descriptor).await?
+            } else {
+                request.ty
+            },
+            origin: DescriptorOrigin::default(),
+            kind: AttributeKind::DataDescriptor,
+        })));
+    }
+
+    effects.protocol_entry(db, env, request).await
+}
 
 pub(super) fn evaluate<'db>(
     db: &'db dyn Db,
@@ -20,397 +171,204 @@ pub(super) fn evaluate<'db>(
     owner: Type<'db>,
     recursion_guard: Option<&CallableRecursionGuard<'db>>,
 ) -> DescriptorResult<'db> {
-    let env = &ProgramEnvironment::from_program(program);
-    let mut step = DescriptorStep::start(
+    legacy_inline(evaluate_with_effects(
         db,
-        env,
+        &ProgramEnvironment::from_program(program),
         DescriptorRequest {
             ty,
             instance,
             owner,
         },
-    );
-    loop {
-        step = match step {
-            DescriptorStep::Descriptor(pending) => {
-                let request = pending.request;
-                let result = request.ty.try_call_dunder_get_with_recursion_guard(
-                    db,
-                    env,
-                    request.instance,
-                    request.owner,
-                    recursion_guard,
-                );
-                pending.resume(db, result)
-            }
-            DescriptorStep::Lookup(pending) => {
-                let place = pending
-                    .request
-                    .ty
-                    .class_member_with_policy(db, env, "__get__", pending.policy())
-                    .place;
-                pending.resume(db, env, place)
-            }
-            DescriptorStep::DataDescriptor(pending) => {
-                let is_data_descriptor = pending.request.ty.is_data_descriptor(db, env);
-                pending.resume(db, is_data_descriptor)
-            }
-            DescriptorStep::Invoke(pending) => {
-                let result = pending.callable.try_call_with_recursion_guard(
-                    db,
-                    env,
-                    &CallArguments::positional(pending.arguments),
-                    recursion_guard,
-                );
-                pending.resume(db, env, result)
-            }
-            DescriptorStep::Complete(result) => return result,
-        };
-    }
+        &LegacyInlineEffects { recursion_guard },
+    ))
 }
 
-#[derive(Clone, Copy)]
-struct DescriptorRequest<'db> {
-    ty: Type<'db>,
-    instance: Option<Type<'db>>,
-    owner: Type<'db>,
-}
-
-enum DescriptorStep<'db> {
-    Descriptor(PendingDescriptor<'db>),
-    Lookup(PendingLookup<'db>),
-    DataDescriptor(PendingDataDescriptor<'db>),
-    Invoke(PendingInvocation<'db>),
-    Complete(DescriptorResult<'db>),
-}
-
-impl<'db> DescriptorStep<'db> {
-    fn start(
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        request: DescriptorRequest<'db>,
-    ) -> Self {
-        if let Some(fallback) = request.ty.materialized_divergent_fallback() {
-            return Self::Descriptor(PendingDescriptor {
-                request: DescriptorRequest {
+/// Effect failures are unfinished analysis. The inner result separately retains Python descriptor
+/// absence or an invalid call with its declared return type, attribute kind and diagnostic context.
+pub(super) async fn evaluate_with_effects<'db, E: DescriptorEffects<'db>>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    request: DescriptorRequest<'db>,
+    effects: &E,
+) -> Result<DescriptorResult<'db>, E::Error> {
+    effects.checkpoint().await?;
+    if let Some(fallback) = request.ty.materialized_divergent_fallback() {
+        return effects
+            .descriptor(
+                db,
+                env,
+                DescriptorRequest {
                     ty: fallback,
                     ..request
                 },
-                continuation: DescriptorContinuation::Identity,
-            });
-        }
-
-        if let Some(dynamic) = request.ty.dynamic_descriptor_type() {
-            return Self::Complete(Ok(Some(DescriptorGetResult {
-                return_type: dynamic,
-                origin: DescriptorOrigin::default(),
-                kind: AttributeKind::DataDescriptor,
-            })));
-        }
-
-        if let Some(union) = request.ty.as_union_like(db) {
-            let return_types =
-                UnionBuilder::new(db, env).or_recursively_defined(union.recursively_defined(db));
-            return UnionDescriptors {
-                request,
-                remaining: union.elements(db),
-                return_types,
-                error: None,
-                any_descriptor: false,
-                all_data_descriptors: true,
-                origin: DescriptorOrigin::default(),
-            }
-            .advance();
-        }
-
-        if let Type::Intersection(intersection) = request.ty {
-            let return_types = IntersectionBuilder::new(db, env);
-            return IntersectionDescriptors {
-                request,
-                remaining: intersection.positive(db).iter(),
-                return_types,
-                origin: DescriptorOrigin::default(),
-                error: None,
-                any_descriptor: false,
-            }
-            .advance();
-        }
-
-        Self::Lookup(PendingLookup {
-            request,
-            stage: LookupStage::Concrete,
-        })
+            )
+            .await;
     }
-}
 
-struct PendingDescriptor<'db> {
-    request: DescriptorRequest<'db>,
-    continuation: DescriptorContinuation<'db>,
-}
-
-impl<'db> PendingDescriptor<'db> {
-    fn resume(self, db: &'db dyn Db, result: DescriptorResult<'db>) -> DescriptorStep<'db> {
-        match self.continuation {
-            DescriptorContinuation::Identity => DescriptorStep::Complete(result),
-            DescriptorContinuation::Union(state) => state.resume(db, self.request.ty, result),
-            DescriptorContinuation::Intersection(state) => {
-                state.resume(db, self.request.ty, result)
-            }
-        }
+    if let Some(dynamic) = request.ty.dynamic_descriptor_type() {
+        return Ok(Ok(Some(DescriptorGetResult {
+            return_type: dynamic,
+            origin: DescriptorOrigin::default(),
+            kind: AttributeKind::DataDescriptor,
+        })));
     }
-}
 
-/// Builders stay live across nested requests so each result is normalized before the next
-/// descriptor is evaluated. Their eager simplifications can themselves perform type relations.
-enum DescriptorContinuation<'db> {
-    Identity,
-    Union(UnionDescriptors<'db>),
-    Intersection(IntersectionDescriptors<'db>),
-}
-
-struct UnionDescriptors<'db> {
-    request: DescriptorRequest<'db>,
-    remaining: &'db [Type<'db>],
-    return_types: UnionBuilder<'db>,
-    error: Option<DescriptorGetCallContext<'db>>,
-    any_descriptor: bool,
-    all_data_descriptors: bool,
-    origin: DescriptorOrigin<'db>,
-}
-
-impl<'db> UnionDescriptors<'db> {
-    fn advance(mut self) -> DescriptorStep<'db> {
-        if let Some((&alternative, remaining)) = self.remaining.split_first() {
-            self.remaining = remaining;
-            return DescriptorStep::Descriptor(PendingDescriptor {
-                request: DescriptorRequest {
-                    ty: alternative,
-                    ..self.request
-                },
-                continuation: DescriptorContinuation::Union(self),
-            });
+    if let Some(union) = effects.union_like(db, env, request.ty).await? {
+        let (mut return_types, elements) = effects.union_parts(db, env, union).await?;
+        let mut requests = elements
+            .iter()
+            .map(|&ty| DescriptorRequest { ty, ..request });
+        effects
+            .declare_descriptors(db, env, requests.clone())
+            .await?;
+        let mut error = None;
+        let mut any_descriptor = false;
+        let mut all_data_descriptors = true;
+        let mut origin = DescriptorOrigin::default();
+        while let Some(child) = effects.next_descriptor(&mut requests).await? {
+            let result = effects
+                .descriptor(db, env, child)
+                .await?
+                .unwrap_or_else(|failure| {
+                    error = error.or(Some(failure.context));
+                    Some(failure.fallback())
+                });
+            let return_type = if let Some(result) = result {
+                origin = effects.merge_origins(db, origin, result.origin).await?;
+                any_descriptor = true;
+                all_data_descriptors &= result.kind.is_data();
+                result.return_type
+            } else {
+                all_data_descriptors = false;
+                child.ty
+            };
+            // Normalize each result before consuming the next alternative. Independent child
+            // evaluations may already be running, but their results are combined in source order.
+            return_types = effects.union_add(return_types, return_type).await?;
         }
-
-        DescriptorStep::Complete(if self.any_descriptor {
+        return Ok(if any_descriptor {
             descriptor_get_result(
-                self.return_types.build(),
-                self.origin,
-                if self.all_data_descriptors {
+                effects.union_build(return_types).await?,
+                origin,
+                if all_data_descriptors {
                     AttributeKind::DataDescriptor
                 } else {
                     AttributeKind::NormalOrNonDataDescriptor
                 },
-                self.error,
+                error,
             )
         } else {
             Ok(None)
-        })
-    }
-
-    fn resume(
-        mut self,
-        db: &'db dyn Db,
-        alternative: Type<'db>,
-        result: DescriptorResult<'db>,
-    ) -> DescriptorStep<'db> {
-        let result = result.unwrap_or_else(|failure| {
-            self.error = self.error.or(Some(failure.context));
-            Some(failure.fallback())
         });
-        if let Some(DescriptorGetResult {
-            return_type,
-            kind,
-            origin,
-        }) = result
-        {
-            self.origin = self.origin.merge(db, origin);
-            self.any_descriptor = true;
-            self.all_data_descriptors &= kind.is_data();
-            self.return_types = self.return_types.add(return_type);
-        } else {
-            self.all_data_descriptors = false;
-            self.return_types = self.return_types.add(alternative);
-        }
-        self.advance()
     }
-}
 
-struct IntersectionDescriptors<'db> {
-    request: DescriptorRequest<'db>,
-    remaining: ordermap::set::Iter<'db, Type<'db>>,
-    return_types: IntersectionBuilder<'db>,
-    origin: DescriptorOrigin<'db>,
-    error: Option<DescriptorGetCallContext<'db>>,
-    any_descriptor: bool,
-}
-
-impl<'db> IntersectionDescriptors<'db> {
-    fn advance(mut self) -> DescriptorStep<'db> {
-        if let Some(&element) = self.remaining.next() {
-            return DescriptorStep::Descriptor(PendingDescriptor {
-                request: DescriptorRequest {
-                    ty: element,
-                    ..self.request
-                },
-                continuation: DescriptorContinuation::Intersection(self),
-            });
+    if let Type::Intersection(intersection) = request.ty {
+        let (mut return_types, elements) = effects.intersection_parts(db, env, intersection).await?;
+        let mut requests = elements
+            .iter()
+            .map(|&ty| DescriptorRequest { ty, ..request });
+        effects
+            .declare_descriptors(db, env, requests.clone())
+            .await?;
+        let mut origin = DescriptorOrigin::default();
+        let mut error = None;
+        let mut any_descriptor = false;
+        while let Some(child) = effects.next_descriptor(&mut requests).await? {
+            let result = effects
+                .descriptor(db, env, child)
+                .await?
+                .unwrap_or_else(|failure| {
+                    error = error.or(Some(failure.context));
+                    Some(failure.fallback())
+                });
+            let (return_type, element_origin) = if let Some(result) = result {
+                any_descriptor = true;
+                (result.return_type, result.origin)
+            } else {
+                (child.ty, DescriptorOrigin::default())
+            };
+            return_types = effects.intersection_add(return_types, return_type).await?;
+            origin = effects.merge_origins(db, origin, element_origin).await?;
         }
-
-        DescriptorStep::Complete(if self.any_descriptor {
+        return Ok(if any_descriptor {
             descriptor_get_result(
-                self.return_types.build(),
-                self.origin,
+                effects.intersection_build(return_types).await?,
+                origin,
                 // TODO: Discover data descriptors in intersections without decomposing
                 // the descriptor return type into an unsound intersection.
                 AttributeKind::NormalOrNonDataDescriptor,
-                self.error,
+                error,
             )
         } else {
             Ok(None)
-        })
-    }
-
-    fn resume(
-        mut self,
-        db: &'db dyn Db,
-        element: Type<'db>,
-        result: DescriptorResult<'db>,
-    ) -> DescriptorStep<'db> {
-        let result = result.unwrap_or_else(|failure| {
-            self.error = self.error.or(Some(failure.context));
-            Some(failure.fallback())
         });
-        let (return_type, element_origin) = if let Some(result) = result {
-            self.any_descriptor = true;
-            (result.return_type, result.origin)
-        } else {
-            (element, DescriptorOrigin::default())
-        };
-        self.return_types.add_positive_in_place(return_type);
-        self.origin = self.origin.merge(db, element_origin);
-        self.advance()
-    }
-}
-
-enum LookupStage {
-    Concrete,
-    IncludeDynamic,
-}
-
-struct PendingLookup<'db> {
-    request: DescriptorRequest<'db>,
-    stage: LookupStage,
-}
-
-impl<'db> PendingLookup<'db> {
-    fn policy(&self) -> MemberLookupPolicy {
-        match self.stage {
-            LookupStage::Concrete => MemberLookupPolicy::REQUIRE_CONCRETE,
-            LookupStage::IncludeDynamic => MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-        }
     }
 
-    fn resume(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        place: Place<'db>,
-    ) -> DescriptorStep<'db> {
-        let Place::Defined(DefinedPlace {
-            ty: descr_get,
-            definedness,
-            ..
-        }) = place
-        else {
-            return DescriptorStep::Complete(Ok(None));
-        };
-
-        match self.stage {
-            LookupStage::Concrete => {
-                // A recursive member lookup can yield the internal cycle marker. It does not
-                // represent a concrete descriptor method and must not escape through the access.
-                if descr_get.is_divergent() {
-                    return DescriptorStep::Complete(Ok(None));
-                }
-
-                // Descriptor special-method lookup checks the descriptor's type, so instance storage
-                // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
-                DescriptorStep::Lookup(Self {
-                    request: self.request,
-                    stage: LookupStage::IncludeDynamic,
-                })
-            }
-            LookupStage::IncludeDynamic => {
-                let instance_ty = self.request.instance.unwrap_or_else(|| Type::none(db, env));
-                DescriptorStep::DataDescriptor(PendingDataDescriptor {
-                    request: self.request,
-                    callable: descr_get,
-                    definedness,
-                    instance_ty,
-                })
-            }
-        }
-    }
-}
-
-struct PendingDataDescriptor<'db> {
-    request: DescriptorRequest<'db>,
-    callable: Type<'db>,
-    definedness: Definedness,
-    instance_ty: Type<'db>,
-}
-
-impl<'db> PendingDataDescriptor<'db> {
-    fn resume(self, db: &'db dyn Db, is_data_descriptor: bool) -> DescriptorStep<'db> {
-        let kind = if is_data_descriptor {
-            AttributeKind::DataDescriptor
-        } else {
-            AttributeKind::NormalOrNonDataDescriptor
-        };
-        let call = DescriptorGetCallContext::new(
+    let concrete = effects
+        .class_member(
             db,
-            self.request.ty,
-            self.callable,
-            self.request.instance,
-            self.request.owner,
-        );
-        DescriptorStep::Invoke(PendingInvocation {
-            callable: self.callable,
-            arguments: [self.request.ty, self.instance_ty, self.request.owner],
-            call,
-            kind,
-            definedness: self.definedness,
-        })
+            env,
+            DescriptorMemberRequest {
+                ty: request.ty,
+                policy: MemberLookupPolicy::REQUIRE_CONCRETE,
+            },
+        )
+        .await?;
+    let Place::Defined(DefinedPlace { ty: descr_get, .. }) = concrete else {
+        return Ok(Ok(None));
+    };
+    // A recursive member lookup can yield the internal cycle marker. It does not
+    // represent a concrete descriptor method and must not escape through the access.
+    if descr_get.is_divergent() {
+        return Ok(Ok(None));
     }
-}
 
-struct PendingInvocation<'db> {
-    callable: Type<'db>,
-    arguments: [Type<'db>; 3],
-    call: DescriptorGetCallContext<'db>,
-    kind: AttributeKind,
-    definedness: Definedness,
-}
-
-impl<'db> PendingInvocation<'db> {
-    fn resume(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        result: Result<Bindings<'db>, CallError<'db>>,
-    ) -> DescriptorStep<'db> {
-        let (bindings, error) = match result {
-            Ok(bindings) => (bindings, None),
-            Err(error) => (*error.1, Some(self.call)),
-        };
-        let origin = bindings.descriptor_origin(db, env, &self.arguments);
-        let return_type = bindings.return_type(db, env);
-        let return_type = if self.definedness == Definedness::AlwaysDefined {
-            return_type
-        } else {
-            UnionType::from_two_elements(db, env, return_type, self.arguments[0])
-        };
-
-        DescriptorStep::Complete(descriptor_get_result(return_type, origin, self.kind, error))
-    }
+    // Descriptor special-method lookup checks the descriptor's type, so instance storage
+    // cannot shadow `__get__`. Dynamic MRO entries still participate in the lookup.
+    let place = effects
+        .class_member(
+            db,
+            env,
+            DescriptorMemberRequest {
+                ty: request.ty,
+                policy: MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            },
+        )
+        .await?;
+    let Place::Defined(DefinedPlace {
+        ty: descr_get,
+        definedness,
+        ..
+    }) = place
+    else {
+        return Ok(Ok(None));
+    };
+    let instance_ty = match request.instance {
+        Some(instance) => instance,
+        None => effects.none_type(db, env).await?,
+    };
+    let kind = if effects.data_descriptor(db, env, request.ty).await? {
+        AttributeKind::DataDescriptor
+    } else {
+        AttributeKind::NormalOrNonDataDescriptor
+    };
+    let call = effects.call_context(db, request, descr_get).await?;
+    let invocation = DescriptorInvocationRequest {
+        callable: descr_get,
+        arguments: [request.ty, instance_ty, request.owner],
+    };
+    let (bindings, error) = match effects.invoke(db, env, invocation).await? {
+        Ok(bindings) => (bindings, None),
+        Err(error) => (*error.1, Some(call)),
+    };
+    let origin = effects
+        .bindings_origin(db, env, &bindings, &invocation.arguments)
+        .await?;
+    let return_type = effects.bindings_return_type(db, env, &bindings).await?;
+    let return_type = if definedness == Definedness::AlwaysDefined {
+        return_type
+    } else {
+        effects.union_pair(db, env, return_type, request.ty).await?
+    };
+    Ok(descriptor_get_result(return_type, origin, kind, error))
 }

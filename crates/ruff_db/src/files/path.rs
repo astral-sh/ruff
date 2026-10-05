@@ -4,6 +4,8 @@ use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualP
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use std::fmt::{Display, Formatter};
 
+use ruff_python_ast::PySourceType;
+
 /// Path to a file.
 ///
 /// The path abstracts that files in Ruff can come from different sources:
@@ -74,6 +76,19 @@ impl FilePath {
             FilePath::System(path) => path.as_str(),
             FilePath::Vendored(path) => path.as_str(),
             FilePath::SystemVirtual(path) => path.as_str(),
+        }
+    }
+
+    /// Returns the Python source type for this path.
+    pub fn source_type(&self) -> PySourceType {
+        match self {
+            FilePath::System(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::SystemVirtual(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
         }
     }
 
