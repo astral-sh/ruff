@@ -2139,7 +2139,14 @@ impl<'db> DiscardDisjointUnionElementsResult<'db> {
 /// `type[Base]` projects to `Base` exactly: both admit `Child`. In contrast,
 /// `TypeOf[Base]` (the type of the expression `Base`) admits only the `Base` class object, but
 /// also projects to `Base`, which admits `Child` instances. That projection is an
-/// over-approximation.
+/// over-approximation. For a final, non-generic nominal class, the projection is exact because
+/// there are no subclasses. For a final generic class `C[T = int]`, projecting the bare class `C`
+/// to the instance type `C[int]` is still an over-approximation: `type[C[int]]` also admits the
+/// distinct alias object `C[int]`.
+///
+/// Protocol and `TypedDict` instance types admit structural subtypes whose class objects need not
+/// inherit from the original class. Projecting their class literals or generic aliases is therefore
+/// an over-approximation even when the class is final.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InstanceProjection<T> {
     Exact(T),
@@ -8653,12 +8660,22 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
                 Some(InstanceProjection::Exact(self))
             }
-            Type::ClassLiteral(class) => Some(InstanceProjection::OverApproximation(
-                Type::instance(db, env, class.default_specialization(db)),
-            )),
-            Type::GenericAlias(alias) => Some(InstanceProjection::OverApproximation(
-                Type::instance(db, env, ClassType::from(alias)),
-            )),
+            Type::ClassLiteral(class) => {
+                let instance = Type::instance(db, env, class.default_specialization(db));
+                Some(InstanceProjection::new(
+                    instance,
+                    instance.is_nominal_instance()
+                        && class.is_final(db)
+                        && class.generic_context(db).is_none(),
+                ))
+            }
+            Type::GenericAlias(alias) => {
+                let instance = Type::instance(db, env, ClassType::from(alias));
+                Some(InstanceProjection::new(
+                    instance,
+                    instance.is_nominal_instance() && alias.origin(db).is_final(db),
+                ))
+            }
             Type::SubclassOf(subclass_of_ty) => Some(InstanceProjection::Exact(
                 subclass_of_ty.to_instance(db, env),
             )),

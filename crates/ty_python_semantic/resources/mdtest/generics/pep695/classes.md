@@ -275,6 +275,115 @@ reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
+## Narrowing class objects of final generic classes
+
+A specialized alias is distinct from the bare class object, even when the specialization matches the
+default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
+check the return type in that branch.
+
+```py
+from typing import final
+
+@final
+class P[U = str]: ...
+
+def create[T: P[str]](cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(P[str])
+```
+
+## Narrowing class objects against a final protocol
+
+A class can implement a final protocol without being the protocol class itself. Excluding the
+protocol class leaves the implementing class reachable.
+
+```py
+from typing import Protocol, final
+
+@final
+class P(Protocol):
+    value: int
+
+class Impl:
+    value: int
+
+def create[T: Impl](cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(Impl)
+```
+
+## Class objects and specialized final protocols
+
+Implementing a specialized protocol does not make the implementing class object the protocol's
+specialized alias.
+
+```py
+from typing import Protocol, final
+from ty_extensions._internal import TypeOf
+
+@final
+class P[U](Protocol):
+    value: U
+
+class Impl:
+    value: int
+
+def as_protocol_class[T: Impl](cls: type[T]) -> TypeOf[P[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
+## Narrowing class objects against a final TypedDict
+
+Two TypedDicts can have compatible fields without being the same class object. Excluding one class
+leaves the other reachable.
+
+```py
+from typing import TypedDict, final
+
+@final
+class Shape(TypedDict):
+    value: int
+
+class Other(TypedDict):
+    value: int
+
+def create[T: Other](cls: type[T]) -> int:
+    if cls is not Shape:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
+        return "wrong"  # error: [invalid-return-type]
+    return 0
+
+create(Other)
+```
+
+## Class objects and specialized final TypedDicts
+
+Compatible TypedDict fields do not make another class object a specialized alias of the final
+TypedDict.
+
+```py
+from typing import TypedDict, final
+from ty_extensions._internal import TypeOf
+
+@final
+class Shape[U](TypedDict):
+    value: U
+
+class Other(TypedDict):
+    value: int
+
+def as_shape_class[T: Other](cls: type[T]) -> TypeOf[Shape[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't

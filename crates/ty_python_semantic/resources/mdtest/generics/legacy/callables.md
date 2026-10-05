@@ -1036,6 +1036,71 @@ reveal_type(callback)  # revealed: (*args: Any, **kwargs: Any) -> None
 static_assert(is_subtype_of(TypeOf[callback], Callable[[], None]))
 ```
 
+## Callbacks that accept final classes
+
+When a callback accepts `type[Closed]`, we infer `T` in `Callable[[type[T]], None]` as the instance
+type `Closed`. Declaring the class as final does not change this: `T` describes instances of
+`Closed`, not the class object itself.
+
+```py
+from typing import Callable, TypeVar, final
+
+T = TypeVar("T")
+
+def solve(callback: Callable[[type[T]], None]) -> T:
+    raise NotImplementedError
+
+@final
+class Closed: ...
+
+def takes_closed(cls: type[Closed]) -> None: ...
+
+reveal_type(solve(takes_closed))  # revealed: Closed
+```
+
+For a final generic class, the inferred instance type includes the class's type arguments:
+
+```py
+from typing import Generic
+
+@final
+class GenericClosed(Generic[T]): ...
+
+def takes_generic_closed(cls: type[GenericClosed[int]]) -> None: ...
+
+reveal_type(solve(takes_generic_closed))  # revealed: GenericClosed[int]
+```
+
+## Decorating classmethods of final classes
+
+This decorator accepts a method whose first argument is a class object and leaves the remaining
+parameters unchanged:
+
+```py
+from typing import Callable, Concatenate, ParamSpec, TypeVar, final
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+def decorate(
+    f: Callable[Concatenate[type[T], P], None],
+) -> Callable[Concatenate[type[T], P], None]:
+    return f
+```
+
+For a classmethod on a final class, the inferred `cls` type is the class object itself. We accept
+the decorator by inferring `T` as the instance type `Closed`.
+
+Regression test for <https://github.com/astral-sh/ty/issues/4664>.
+
+```py
+@final
+class Closed:
+    @decorate  # no diagnostic
+    @classmethod
+    def method(cls, value: int) -> None: ...
+```
+
 ## Gradual class parameters
 
 A callback that accepts `type[Any]` or `type[Unknown]` can accept any class object.

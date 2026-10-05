@@ -595,6 +595,132 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## Narrowing class objects of final generic classes
+
+A specialized alias is distinct from the bare class object, even when the specialization matches the
+default type argument. Excluding the bare class with `is not` keeps the alias reachable, so we still
+check the return type in that branch.
+
+```py
+from typing import final
+from typing_extensions import Generic, TypeVar
+
+U = TypeVar("U", default=str)
+
+@final
+class P(Generic[U]): ...
+
+T = TypeVar("T", bound=P[str])
+
+def create(cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(P[str])
+```
+
+## Narrowing class objects against a final protocol
+
+A class can implement a final protocol without being the protocol class itself. Excluding the
+protocol class leaves the implementing class reachable.
+
+```py
+from typing import Protocol, TypeVar, final
+
+@final
+class P(Protocol):
+    value: int
+
+class Impl:
+    value: int
+
+T = TypeVar("T", bound=Impl)
+
+def create(cls: type[T]) -> int:
+    if cls is not P:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'P'>
+        return cls()  # error: [invalid-return-type]
+    return 0
+
+create(Impl)
+```
+
+## Class objects and specialized final protocols
+
+Implementing a specialized protocol does not make the implementing class object the protocol's
+specialized alias.
+
+```py
+from typing import Protocol, TypeVar, final
+from ty_extensions._internal import TypeOf
+
+U = TypeVar("U")
+
+@final
+class P(Protocol[U]):
+    value: U
+
+class Impl:
+    value: int
+
+T = TypeVar("T", bound=Impl)
+
+def as_protocol_class(cls: type[T]) -> TypeOf[P[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
+## Narrowing class objects against a final TypedDict
+
+Two TypedDicts can have compatible fields without being the same class object. Excluding one class
+leaves the other reachable.
+
+```py
+from typing import TypeVar, TypedDict, final
+
+@final
+class Shape(TypedDict):
+    value: int
+
+class Other(TypedDict):
+    value: int
+
+T = TypeVar("T", bound=Other)
+
+def create(cls: type[T]) -> int:
+    if cls is not Shape:
+        reveal_type(cls)  # revealed: type[T@create] & ~<class 'Shape'>
+        return "wrong"  # error: [invalid-return-type]
+    return 0
+
+create(Other)
+```
+
+## Class objects and specialized final TypedDicts
+
+Compatible TypedDict fields do not make another class object a specialized alias of the final
+TypedDict.
+
+```py
+from typing import Generic, TypeVar, TypedDict, final
+from ty_extensions._internal import TypeOf
+
+U = TypeVar("U")
+
+@final
+class Shape(TypedDict, Generic[U]):
+    value: U
+
+class Other(TypedDict):
+    value: int
+
+T = TypeVar("T", bound=Other)
+
+def as_shape_class(cls: type[T]) -> TypeOf[Shape[int]]:
+    return cls  # error: [invalid-return-type]
+```
+
 ## A subclass of a fully specialized generic is not generic
 
 A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a
