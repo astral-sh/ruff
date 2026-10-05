@@ -36,9 +36,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      issues: write
     outputs:
-      issue-created: ${{ steps.create_issue.outputs.created }}
+      issue-report: ${{ steps.upload_report.outputs.artifact-id }}
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
@@ -78,40 +77,60 @@ jobs:
             "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)
           )
-      - name: Create an issue for parser bugs
-        id: create_issue
+      - name: Upload the fuzz report
+        id: upload_report
         if: ${{ failure() && github.event_name == 'schedule' && steps.fuzz.outcome == 'failure' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if [[ -f "$RUNNER_TEMP/fuzz-issue.md" ]]; then
-            gh issue create \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Daily parser fuzz failed on $(date -u '+%a %b %d %Y')" \
-              --label bug --label parser --label fuzzer \
-              --body-file "$RUNNER_TEMP/fuzz-issue.md"
-            echo 'created=true' >> "$GITHUB_OUTPUT"
-          fi
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: daily-fuzz-issue
+          path: ${{ runner.temp }}/fuzz-issue.md
+          if-no-files-found: ignore
 
-  # If a scheduled fuzz job fails before creating an issue (for example, on a
-  # timeout), report the failure with a link to the run. The `issue-created`
-  # output prevents a second issue when the fuzz job already created one.
+  # The fuzz job runs third-party code, including build dependencies. Keep the
+  # issue-writing token in a separate job so that code cannot access it. That code
+  # could also alter the report, so use it only as issue text and never execute it.
   create-issue-on-failure:
-    name: Create a fallback issue if the fuzz job fails
+    name: Report a failed fuzz run
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     needs: fuzz
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result != 'success' && needs.fuzz.outputs.issue-created != 'true' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result != 'success' }}
     permissions:
       issues: write
     steps:
-      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      - name: Download the fuzz report
+        id: download_report
+        if: ${{ needs.fuzz.outputs.issue-report != '' }}
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: daily-fuzz-issue
+          path: ${{ runner.temp }}/fuzz-report
+      - name: Create an issue for the failed fuzz run
+        if: ${{ !cancelled() }}
+        env:
+          REPORT_DOWNLOAD_OUTCOME: ${{ steps.download_report.outcome }}
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            await github.rest.issues.create({
+            const issue = {
               owner: "astral-sh",
               repo: "ruff",
               title: `Daily parser fuzz failed on ${new Date().toDateString()}`,
-              body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
               labels: ["bug", "parser", "fuzzer"],
-            })
+            };
+            const fallbackBody = "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}";
+            const createIssue = (body) => github.rest.issues.create({ ...issue, body });
+
+            if (process.env.REPORT_DOWNLOAD_OUTCOME === "success") {
+              try {
+                const report = require("node:fs").readFileSync(`${process.env.RUNNER_TEMP}/fuzz-report/fuzz-issue.md`, "utf8");
+                await createIssue(report);
+                return;
+              } catch (error) {
+                core.error(error);
+                await createIssue(fallbackBody);
+                throw error;
+              }
+            }
+            await createIssue(fallbackBody);
