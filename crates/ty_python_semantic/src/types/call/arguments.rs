@@ -578,6 +578,17 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
     /// Retain the elements of collections constructed directly at an unpacking site.
     ///
+    /// ```py
+    /// def pair(x: int, y: str) -> None: ...
+    ///
+    /// pair(*[1, "two"])  # VariadicArgument::Sequence
+    /// pair(**{"x": 1, "y": "two"})  # KeywordArgument::Known
+    /// ```
+    ///
+    /// The sequence records each element's type in order. The keyword collection associates each
+    /// name with its value's type, so `1` binds to `x` and `"two"` binds to `y` in both calls.
+    /// Aliases retain ordinary type-based unpacking, since their contents may have changed.
+    ///
     /// Ordinary tuple types already describe their elements. List and dictionary types do not
     /// retain the contents needed for call binding, even when those contents are known here.
     /// The callback reads types inferred while checking the enclosing collection expression.

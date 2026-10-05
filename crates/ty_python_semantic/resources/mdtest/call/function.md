@@ -513,10 +513,89 @@ def pair(x: int, y: str) -> None: ...
 pair(*[1, "two"])
 pair(*[1], *["two"])
 pair(*(1, "two"))
-pair(*[])  # error: [missing-argument]
-pair(*[1])  # error: [missing-argument]
-pair(*[1, "two", 3, 4])  # error: [too-many-positional-arguments] "expected 2, got 4"
-pair(*["one", "two"])  # error: [invalid-argument-type]
+```
+
+Missing arguments, extra arguments, and incompatible element types are rejected. These diagnostics
+currently highlight the call or unpacked list rather than individual list elements.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+# snapshot: missing-argument
+pair(*[])
+```
+
+```snapshot
+error[missing-argument]: No arguments provided for required parameters `x`, `y` of function `pair`
+ --> src/mdtest_snippet.py:9:1
+  |
+9 | pair(*[])
+  | ^^^^^^^^^
+info: Parameters declared here
+ --> src/mdtest_snippet.py:6:9
+  |
+6 | def pair(x: int, y: str) -> None: ...
+  |         ^^^^^^^^^^^^^^^^
+```
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+# snapshot: missing-argument
+pair(*[1])
+```
+
+```snapshot
+error[missing-argument]: No argument provided for required parameter `y` of function `pair`
+  --> src/mdtest_snippet.py:13:1
+   |
+13 | pair(*[1])
+   | ^^^^^^^^^^
+info: Parameter declared here
+  --> src/mdtest_snippet.py:10:18
+   |
+10 | def pair(x: int, y: str) -> None: ...
+   |                  ^^^^^^
+```
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+# snapshot: too-many-positional-arguments
+pair(*[1, "two", 3, 4])
+```
+
+```snapshot
+error[too-many-positional-arguments]: Too many positional arguments to function `pair`: expected 2, got 4
+  --> src/mdtest_snippet.py:17:6
+   |
+17 | pair(*[1, "two", 3, 4])
+   |      ^^^^^^^^^^^^^^^^^
+info: Function signature here
+  --> src/mdtest_snippet.py:14:5
+   |
+14 | def pair(x: int, y: str) -> None: ...
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+```
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+# snapshot: invalid-argument-type
+pair(*["one", "two"])
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+  --> src/mdtest_snippet.py:21:6
+   |
+21 | pair(*["one", "two"])
+   |      ^^^^^^^^^^^^^^^ Expected `int`, found `Literal["one"]`
+info: Function defined here
+  --> src/mdtest_snippet.py:18:5
+   |
+18 | def pair(x: int, y: str) -> None: ...
+   |     ^^^^ ------ Parameter declared here
 ```
 
 An exact positional unpack still supplies a parameter that also has an explicit keyword, whether
@@ -545,10 +624,26 @@ pair(**{"x": 1}, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
 pair(**{"z": 3, "x": 1, "y": "two"})  # error: [unknown-argument]
 ```
 
-### Mutable argument aliases
+### Aliased list arguments
 
-A list passed through a name keeps its ordinary variable-length type, even when initialized from a
-literal.
+Assigning a list literal to a variable loses the per-position types used for immediate unpacking.
+This call is valid at runtime, but ty currently reports errors because `args` has type
+`list[int | str]`.
+
+```py
+def pair(x: int, y: str) -> None: ...
+
+args = [1, "two"]
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+pair(*args)
+```
+
+### Mutated list arguments
+
+After a list is mutated, its original literal contents may no longer describe the arguments. This
+call raises `TypeError` at runtime because `clear()` empties the list. ty does not report this error
+because it treats `values` as a variable-length `list[int]`.
 
 ```py
 def pair(x: int, y: int) -> None: ...
