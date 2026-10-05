@@ -1486,6 +1486,34 @@ def negative_finite_noninferable[I, N: (int, str)]() -> None:
     reveal_type(constraints.solutions(inferable=tuple[I]))  # revealed: tuple[()]
 ```
 
+### Alternatives with different declared-domain validity
+
+An invalid alternative must not prevent another alternative from producing a solution, even when
+both reach the same remaining constraints. The non-inferable variable's declared domain matters
+regardless of the order of the alternatives.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def bounded_alternatives[I, N: str]() -> None:
+    inferred = ConstraintSet.equality(I, bytes)
+    good = ConstraintSet.equality(N, str)
+    bad = ConstraintSet.equality(N, int)
+    # revealed: tuple[Solution[I=bytes]]
+    reveal_type((inferred & (good | bad)).solutions(inferable=tuple[I]))
+    # revealed: tuple[Solution[I=bytes]]
+    reveal_type((inferred & (bad | good)).solutions(inferable=tuple[I]))
+
+def constrained_alternatives[I, N: (int, str)]() -> None:
+    inferred = ConstraintSet.equality(I, bytes)
+    good = ConstraintSet.equality(N, str)
+    bad = ConstraintSet.equality(N, bytes)
+    # revealed: tuple[Solution[I=bytes]]
+    reveal_type((inferred & (good | bad)).solutions(inferable=tuple[I]))
+    # revealed: tuple[Solution[I=bytes]]
+    reveal_type((inferred & (bad | good)).solutions(inferable=tuple[I]))
+```
+
 ### Negative inferable decisions and correlated outputs
 
 Negative inferable decisions alone provide no positive inference evidence, while a negative-only

@@ -236,6 +236,12 @@ impl<'db> SolutionWalker<'db> {
                 // consider the typevars that can affect the solutions we'd find if we were to
                 // continue walking down the node.
                 let mut relevant_typevars = this.inferable_support.clone();
+                // Declared domains can invalidate a path even when their typevars neither
+                // contribute a solution nor occur in the remaining subtree. Such paths must
+                // not share a cache entry with paths that satisfy those domains.
+                if let Some(validations) = validations {
+                    relevant_typevars |= &validations.support;
+                }
                 let node_support = storage.node_support(node);
                 if let Some(node_support) = node_support {
                     relevant_typevars |= node_support;
@@ -1514,6 +1520,8 @@ impl<'db> SolutionWalker<'db> {
 /// Validations that must be verified for each candidate solution.
 #[derive(Default)]
 struct Validations<'db> {
+    /// Type variables whose assignments can affect declared-domain validation.
+    support: Support,
     upper_bounds: FxIndexMap<BoundTypeVarInstance<'db>, UpperBound>,
     constrained: FxIndexMap<BoundTypeVarInstance<'db>, Constrained<'db>>,
 }
@@ -1568,9 +1576,13 @@ impl<'db> Validations<'db> {
         seen_typevars: &mut Support,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) {
-        let bound_or_constraints = bound_typevar.typevar(db).bound_or_constraints(db, env);
+        let Some(bound_or_constraints) = bound_typevar.typevar(db).bound_or_constraints(db, env)
+        else {
+            return;
+        };
+        self.support.insert(storage.typevar_id(db, bound_typevar));
         match bound_or_constraints {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => self.add_upper_bound(
+            TypeVarBoundOrConstraints::UpperBound(bound) => self.add_upper_bound(
                 db,
                 env,
                 storage,
@@ -1579,17 +1591,15 @@ impl<'db> Validations<'db> {
                 bound_typevar,
                 bound,
             ),
-            Some(TypeVarBoundOrConstraints::Constraints(declared_constraints)) => self
-                .add_constrained(
-                    db,
-                    env,
-                    storage,
-                    typevar_queue,
-                    seen_typevars,
-                    bound_typevar,
-                    declared_constraints,
-                ),
-            None => {}
+            TypeVarBoundOrConstraints::Constraints(declared_constraints) => self.add_constrained(
+                db,
+                env,
+                storage,
+                typevar_queue,
+                seen_typevars,
+                bound_typevar,
+                declared_constraints,
+            ),
         }
     }
 
@@ -1599,6 +1609,7 @@ impl<'db> Validations<'db> {
         storage: &mut ConstraintSetStorage<'db>,
         typevar_queue: &mut Support,
         seen_typevars: &mut Support,
+        support: &mut Support,
         constraints: impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>>,
     ) -> ValidationConstraints {
         let constraints: ValidationConstraints = constraints
@@ -1613,6 +1624,7 @@ impl<'db> Validations<'db> {
         // set of typevars to check.
         for constraint in constraints.iter().flatten() {
             let constraint_support = storage.constraint_support(*constraint);
+            *support |= constraint_support;
             let new_typevars = constraint_support - &*seen_typevars;
             *typevar_queue |= &new_typevars;
         }
@@ -1645,6 +1657,7 @@ impl<'db> Validations<'db> {
                 storage,
                 typevar_queue,
                 seen_typevars,
+                &mut self.support,
                 constraints,
             );
             UpperBound { constraints }
@@ -1680,6 +1693,7 @@ impl<'db> Validations<'db> {
                         storage,
                         typevar_queue,
                         seen_typevars,
+                        &mut self.support,
                         constraints,
                     );
                     DeclaredConstraint {
