@@ -1,13 +1,17 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::whitespace::trailing_comment_start_offset;
 use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_text_size::Ranged;
+use ruff_python_index::Indexer;
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange};
 
+use crate::Edit;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix;
-use crate::{AlwaysFixableViolation, Fix};
+use crate::{AlwaysFixableViolation, Fix, Locator};
 
 /// ## What it does
 /// Checks for functions that end with an unnecessary `return` or
@@ -107,8 +111,34 @@ pub(crate) fn useless_return(
     }
 
     let mut diagnostic = checker.report_diagnostic(UselessReturn, last_stmt.range());
-    let edit = fix::edits::delete_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
+    let edit = delete_return_stmt(last_stmt, Some(stmt), checker.locator(), checker.indexer());
     diagnostic.set_fix(Fix::safe_edit(edit).isolate(Checker::isolation(
         checker.semantic().current_statement_id(),
     )));
+}
+
+/// Delete a useless `return` statement, retaining any comment that trails it
+/// on the same line.
+///
+/// The default statement deletion removes the statement's full lines, which
+/// would take such a comment with it. When the `return` ends its line with
+/// only a comment following it, delete only up to the start of the comment
+/// instead, so that the comment and its indentation survive. In all other
+/// cases, this defers to [`fix::edits::delete_stmt`]. The trailing-comment
+/// detection mirrors PIE790 and PYI013.
+fn delete_return_stmt(
+    stmt: &Stmt,
+    parent: Option<&Stmt>,
+    locator: &Locator,
+    indexer: &Indexer,
+) -> Edit {
+    let line_range = locator.line_range(stmt.start());
+
+    if line_range.contains_range(stmt.range()) {
+        if let Some(index) = trailing_comment_start_offset(stmt, locator.contents()) {
+            return Edit::range_deletion(TextRange::new(stmt.start(), stmt.end() + index));
+        }
+    }
+
+    fix::edits::delete_stmt(stmt, parent, locator, indexer)
 }

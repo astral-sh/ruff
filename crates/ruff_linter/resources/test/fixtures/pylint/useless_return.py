@@ -58,3 +58,14 @@ class BaseCache:
     def get(self, key: str) -> None:
         print(f"{key} not found")
         return None
+
+
+def with_trailing_comment():
+    print(sys.version)
+    return None  # subSchema.__init__()
+
+
+def with_bare_return_and_comment():
+    if 2 * 2 == 4:
+        pass
+    return  # done
