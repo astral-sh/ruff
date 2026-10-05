@@ -481,7 +481,7 @@ fn is_only<T: PartialEq>(vec: &[T], value: &T) -> bool {
 }
 
 /// Determine if a child is the only statement in its body.
-fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
+pub(crate) fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
         Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
         | Stmt::ClassDef(ast::StmtClassDef { body, .. })
