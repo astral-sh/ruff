@@ -864,7 +864,8 @@ from typing_extensions import Self, TypeVar
 
 class Client:
     def no_argument(self) -> EmptyBox[Self]:
-        return EmptyBox()
+        # revealed: EmptyBox[Self@no_argument]
+        return reveal_type(EmptyBox())
 
 T = TypeVar("T", bound=Client, default=Client, covariant=True)
 
