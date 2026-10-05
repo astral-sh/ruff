@@ -385,7 +385,7 @@ jobs:
           curl --proto '=https' --tlsv1.2 -LsSf \
             "https://github.com/astral-sh/hawk/releases/download/${HAWK_VERSION}/cargo-hawk-installer.sh" | sh
       - name: "Hawk"
-        run: cargo +1.99.0 hawk check --target-dir target/hawk -D warnings
+        run: cargo +1.99.0 hawk check --target-dir target/hawk --color=always -D warnings
 
   cargo-publish-dry-run:
     name: "cargo publish dry-run"
