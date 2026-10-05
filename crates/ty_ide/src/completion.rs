@@ -95,13 +95,15 @@ pub fn completion<'db>(
             }
             CompletionTargetAst::Scoped(scoped) => {
                 let env = model.program_environment();
-                for semantic_completion in model.scoped_completions(scoped.node) {
+                for semantic_completion in
+                    model.scoped_completions(scoped.node, &|name| completions.query.is_match(name))
+                {
                     let module_dependency_kind = if semantic_completion.builtin {
                         ModuleDependencyKind::Builtin
                     } else {
                         ModuleDependencyKind::Current
                     };
-                    completions.add(
+                    completions.add_skip_query(
                         CompletionBuilder::from_semantic_completion(db, &env, semantic_completion)
                             .module_dependency_kind(module_dependency_kind),
                     );
@@ -3846,6 +3848,56 @@ if TYPE_CHECKING:
 
         let test = builder.build();
         test.contains("_runtime").not_contains("_typing_only");
+    }
+
+    #[test]
+    fn filtered_project_builtin_completions_follow_edits() -> std::io::Result<()> {
+        let mut test = CursorTest::builder()
+            .source(
+                "__builtins__.pyi",
+                r#"
+                def custom_one() -> int:
+                    """A builtin."""
+                    ...
+
+                def unrelated() -> int: ...
+                "#,
+            )
+            .source("main.py", "custom_local = 1; cst<CURSOR>")
+            .build();
+        let settings = CompletionSettings {
+            auto_import: false,
+            ..CompletionSettings::default()
+        };
+
+        let before = completion(
+            &test.db,
+            &settings,
+            CompletionCapabilities::default(),
+            test.program_file(test.cursor.file),
+            test.cursor.offset,
+        );
+        assert!(before.iter().any(|item| {
+            item.name == "custom_one"
+                && item.builtin
+                && item.ty.is_some()
+                && item.documentation.is_some()
+        }));
+        assert!(before.iter().any(|item| item.name == "custom_local"));
+        assert!(!before.iter().any(|item| item.name == "unrelated"));
+        drop(before);
+
+        test.write_file("__builtins__.pyi", "def custom_two() -> str: ...\n")?;
+        let after = completion(
+            &test.db,
+            &settings,
+            CompletionCapabilities::default(),
+            test.program_file(test.cursor.file),
+            test.cursor.offset,
+        );
+        assert!(!after.iter().any(|item| item.name == "custom_one"));
+        assert!(after.iter().any(|item| item.name == "custom_two"));
+        Ok(())
     }
 
     /// Unlike [`private_symbols_in_stub`], this test doesn't use a `.pyi` file so all of the names
