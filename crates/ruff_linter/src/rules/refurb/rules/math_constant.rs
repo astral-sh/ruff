@@ -26,12 +26,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// A = math.pi * r**2
 /// ```
 ///
-/// ## Known problems
-/// A literal is matched on its digits alone, so a value that merely happens to
-/// begin with the same digits as a mathematical constant is flagged even when it
-/// means something else entirely. A measurement that rounds to `3.14`, or a price
-/// of `2.718`, is indistinguishable here from an approximation of π or e.
-///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as replacing a literal with the constant
 /// can change the result of a calculation.
