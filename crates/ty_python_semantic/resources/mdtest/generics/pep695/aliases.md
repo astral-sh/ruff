@@ -501,6 +501,39 @@ def g(x: Not[B[int]]) -> list[B[int]] | int:
     return identity(x)  # no diagnostic
 ```
 
+## Recursive aliases in restricted complements
+
+A negated recursive alias can share an intersection with a positive constraint. The result keeps the
+exclusion: since `Any` can materialize differently in each union member, the two members do not
+simplify to `list[Any]`.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not
+
+type Without[T] = Intersection[list[Any], Not[T]]
+type A = list[Without[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: (list[Any] & ~A) | list[Without[A] | A]
+```
+
+## Recursive complements after specialization
+
+Specializing the positive constraint to `object` removes it. The remaining complement and the
+recursive alias together cover every object.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection, Not
+
+type Without[T, U] = Intersection[T, Not[U]]
+type A = list[Without[object, A] | A]
+
+def f(x: A):
+    assert_type(x[0], object)
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable
