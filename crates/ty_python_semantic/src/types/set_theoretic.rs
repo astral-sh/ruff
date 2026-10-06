@@ -1405,7 +1405,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
-        match element {
+        match element.resolve_type_alias(db) {
             Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
                 TypeVarBoundOrConstraints::UpperBound(bound) => {
                     builder.add_positive_in_place(bound);
