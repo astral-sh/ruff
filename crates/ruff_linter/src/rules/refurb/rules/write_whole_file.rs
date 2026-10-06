@@ -4,13 +4,16 @@ use ruff_python_ast::{
     self as ast, Expr, Stmt,
     visitor::{self, Visitor},
 };
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::type_inference::{PythonType, ResolvedPythonType};
+use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, OpenMode, find_file_opens};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -37,6 +40,11 @@ use crate::{FixAvailability, Locator, Violation};
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+///
+/// The fix is also marked as unsafe unless Ruff can determine that the argument to `write` is a
+/// `str` (for text mode) or `bytes` (for binary mode). `open` truncates the file before `write`
+/// is called, so writing a value of the wrong type leaves an empty file behind, whereas
+/// `Path.write_text` and `Path.write_bytes` reject the value before opening the file.
 ///
 /// ## References
 /// - [Python documentation: `Path.write_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_bytes)
@@ -154,7 +162,7 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                     );
 
                     if let Some(fix) =
-                        generate_fix(self.checker, &open, self.with_stmt, &suggestion)
+                        generate_fix(self.checker, &open, content, self.with_stmt, &suggestion)
                     {
                         diagnostic.set_fix(fix);
                     }
@@ -204,6 +212,7 @@ fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String
 fn generate_fix(
     checker: &Checker,
     open: &FileOpen,
+    content: &Expr,
     with_stmt: &ast::StmtWith,
     suggestion: &str,
 ) -> Option<Fix> {
@@ -232,7 +241,9 @@ fn generate_fix(
 
     let replacement = format!("{target}.{suggestion}");
 
-    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range())
+        || !content_matches_mode(content, open.mode, checker.semantic())
+    {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -243,4 +254,28 @@ fn generate_fix(
         [import_edit],
         applicability,
     ))
+}
+
+/// Returns `true` if `content` is known to be a `str` (for text mode) or `bytes` (for binary
+/// mode).
+fn content_matches_mode(content: &Expr, mode: OpenMode, semantic: &SemanticModel) -> bool {
+    let expected = match mode {
+        OpenMode::WriteText => PythonType::String,
+        OpenMode::WriteBytes => PythonType::Bytes,
+        OpenMode::ReadText | OpenMode::ReadBytes => return false,
+    };
+
+    match ResolvedPythonType::from(content) {
+        ResolvedPythonType::Atom(resolved) => resolved == expected,
+        ResolvedPythonType::Unknown => content
+            .as_name_expr()
+            .and_then(|name| semantic.only_binding(name))
+            .map(|id| semantic.binding(id))
+            .is_some_and(|binding| match mode {
+                OpenMode::WriteText => typing::is_string(binding, semantic),
+                OpenMode::WriteBytes => typing::is_bytes(binding, semantic),
+                OpenMode::ReadText | OpenMode::ReadBytes => false,
+            }),
+        ResolvedPythonType::Union(_) | ResolvedPythonType::TypeError => false,
+    }
 }

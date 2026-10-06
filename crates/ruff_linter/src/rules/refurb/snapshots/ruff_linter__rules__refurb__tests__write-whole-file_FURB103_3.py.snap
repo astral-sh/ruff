@@ -1,0 +1,220 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+ --> FURB103_3.py:5:10
+  |
+3 | # Safe fix: the argument is known to match the mode.
+4 | def text_param(x: str):
+5 |     with open("file.txt", "w") as f:
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |         f.write(x)
+  |
+help: Replace with `Path("file.txt").write_text(x)`
+  |
+3 | # Safe fix: the argument is known to match the mode.
+4 + import pathlib
+5 | def text_param(x: str):
+  -     with open("file.txt", "w") as f:
+  -         f.write(x)
+6 +     pathlib.Path("file.txt").write_text(x)
+7 |
+  |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(x)`
+  --> FURB103_3.py:10:10
+   |
+ 9 | def bytes_param(x: bytes):
+10 |     with open("file.txt", "wb") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |         f.write(x)
+   |
+help: Replace with `Path("file.txt").write_bytes(x)`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+10 | def bytes_param(x: bytes):
+   -     with open("file.txt", "wb") as f:
+   -         f.write(x)
+11 +     pathlib.Path("file.txt").write_bytes(x)
+12 |
+   |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(f"{x}")`
+  --> FURB103_3.py:15:10
+   |
+14 | def fstring(x):
+15 |     with open("file.txt", "w") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |         f.write(f"{x}")
+   |
+help: Replace with `Path("file.txt").write_text(f"{x}")`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+15 | def fstring(x):
+   -     with open("file.txt", "w") as f:
+   -         f.write(f"{x}")
+16 +     pathlib.Path("file.txt").write_text(f"{x}")
+17 |
+   |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+  --> FURB103_3.py:21:10
+   |
+19 | def text_assignment():
+20 |     x = "text"
+21 |     with open("file.txt", "w") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |         f.write(x)
+   |
+help: Replace with `Path("file.txt").write_text(x)`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+21 |     x = "text"
+   -     with open("file.txt", "w") as f:
+   -         f.write(x)
+22 +     pathlib.Path("file.txt").write_text(x)
+23 |
+   |
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(b"\103")`
+  --> FURB103_3.py:27:6
+   |
+25 | # Unsafe fix: the argument does not match the mode, so `open` would truncate the
+26 | # file before `write` raises, but `write_text`/`write_bytes` raise first.
+27 | with open("file.txt", "w") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+28 |     f.write(b"\103")
+   |
+help: Replace with `Path("file.txt").write_text(b"\103")`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+27 | # file before `write` raises, but `write_text`/`write_bytes` raise first.
+   - with open("file.txt", "w") as f:
+   -     f.write(b"\103")
+28 + pathlib.Path("file.txt").write_text(b"\103")
+29 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes("text")`
+  --> FURB103_3.py:30:6
+   |
+28 |     f.write(b"\103")
+29 |
+30 | with open("file.txt", "wb") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |     f.write("text")
+   |
+help: Replace with `Path("file.txt").write_bytes("text")`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+30 |
+   - with open("file.txt", "wb") as f:
+   -     f.write("text")
+31 + pathlib.Path("file.txt").write_bytes("text")
+32 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(x)`
+  --> FURB103_3.py:35:10
+   |
+34 | def text_param_bytes_mode(x: str):
+35 |     with open("file.txt", "wb") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+36 |         f.write(x)
+   |
+help: Replace with `Path("file.txt").write_bytes(x)`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+35 | def text_param_bytes_mode(x: str):
+   -     with open("file.txt", "wb") as f:
+   -         f.write(x)
+36 +     pathlib.Path("file.txt").write_bytes(x)
+37 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+  --> FURB103_3.py:40:10
+   |
+39 | def bytes_param_text_mode(x: bytes):
+40 |     with open("file.txt", "w") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+41 |         f.write(x)
+   |
+help: Replace with `Path("file.txt").write_text(x)`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+40 | def bytes_param_text_mode(x: bytes):
+   -     with open("file.txt", "w") as f:
+   -         f.write(x)
+41 +     pathlib.Path("file.txt").write_text(x)
+42 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(x)`
+  --> FURB103_3.py:46:10
+   |
+44 | # Unsafe fix: the type of the argument is unknown.
+45 | def untyped(x):
+46 |     with open("file.txt", "w") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+47 |         f.write(x)
+   |
+help: Replace with `Path("file.txt").write_text(x)`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+46 | def untyped(x):
+   -     with open("file.txt", "w") as f:
+   -         f.write(x)
+47 +     pathlib.Path("file.txt").write_text(x)
+48 |
+   |
+note: This is an unsafe fix and may change runtime behavior
+
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(str(1))`
+  --> FURB103_3.py:51:10
+   |
+50 | def call_result():
+51 |     with open("file.txt", "w") as f:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+52 |         f.write(str(1))
+   |
+help: Replace with `Path("file.txt").write_text(str(1))`
+   |
+3  | # Safe fix: the argument is known to match the mode.
+4  + import pathlib
+5  | def text_param(x: str):
+--------------------------------------------------------------------------------
+51 | def call_result():
+   -     with open("file.txt", "w") as f:
+   -         f.write(str(1))
+52 +     pathlib.Path("file.txt").write_text(str(1))
+   |
+note: This is an unsafe fix and may change runtime behavior

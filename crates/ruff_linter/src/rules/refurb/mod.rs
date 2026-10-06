@@ -51,6 +51,7 @@ mod tests {
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
     #[test_case(Rule::WriteWholeFile, Path::new("FURB103_2.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_3.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192_1.py"))]
