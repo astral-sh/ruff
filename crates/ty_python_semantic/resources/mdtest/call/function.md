@@ -684,6 +684,50 @@ info: Function defined here
   |     ^^^^         ------ Parameter declared here
 ```
 
+### Conditional dictionary arguments
+
+Conditional dictionary arguments lose their individual keys. This can hide missing or extra
+arguments and produce unrelated argument type errors.
+
+```py
+def pair(x: int, *, y: str = "", optional: bool = False) -> None: ...
+def conditional(flag: bool, other: bool) -> None:
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**({"x": 1, "y": "two"} if flag else {"x": 2}))
+    pair(x=1, **({"y": "two"} if flag else {}))  # no diagnostic
+    pair(**({"x": 1} if flag else {}))  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**({"x": 1} if flag else {"x": "wrong"}))
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**({"x": 1} if flag else {"x": 2, "extra": 3}))
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(x=1, **({} if flag else {"x": 2}))
+    pair(**({"x": 1} if flag else {"x": 2} if other else {}))  # no diagnostic
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**({"x": 1} if flag else {"x": 2}), **({"y": "two"} if other else {}))
+
+    kwargs = {"x": 1, "y": "two"} if flag else {"x": 2}
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**kwargs, optional=True)
+
+    missing = {"x": 1} if flag else {}
+    pair(**missing)  # no diagnostic
+
+    invalid = {"x": 1} if flag else {"x": "wrong"}
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    pair(**invalid)
+```
+
 ### Statically selected dictionary arguments
 
 Conditional dictionary arguments currently leave the possible keys open. This is undesirable:
@@ -703,6 +747,60 @@ def selected(flag: bool) -> None:
 
     missing = {"value": 1} if False else {}
     takes_value(**missing)  # no diagnostic
+```
+
+### Conditional dictionaries with special call inference
+
+Special handling for built-in and typing functions also applies when a conditional dictionary is
+unpacked.
+
+```py
+from typing_extensions import deprecated
+
+class Parent:
+    def value(self) -> int:
+        return 1
+
+class Child(Parent):
+    def value(self, flag: bool = False) -> int:
+        return reveal_type(super(**({} if flag else {})).value())  # revealed: int
+
+def known(flag: bool) -> None:
+    reveal_type(isinstance(1, int, **({} if flag else {})))  # revealed: Literal[True]
+    reveal_type(1, **({} if flag else {}))  # revealed: Literal[1]
+
+    @deprecated("old", **({} if flag else {}))
+    def old() -> None: ...
+    old()  # error: [deprecated] "old"
+```
+
+### Conditional dictionary updates
+
+Both alternatives contribute to the inferred dictionary type, but reversing them changes the union
+order.
+
+```py
+def updates(flag: bool) -> None:
+    first = {}
+    first.update(**({"first": 1} if flag else {"second": "two"}))
+    reveal_type(first)  # revealed: dict[str, str | int]
+
+    reverse = {}
+    reverse.update(**({"second": "two"} if flag else {"first": 1}))
+    reveal_type(reverse)  # revealed: dict[str, int | str]
+```
+
+### Conditional dictionary exclusions
+
+Conditional dictionaries with computed keys or nonliteral alternatives use ordinary dictionary
+inference.
+
+```py
+def needs_x(x: int) -> None: ...
+def exclusions(flag: bool, key: str, existing: dict[str, int]) -> None:
+    computed = {key: 1} if flag else {}
+    needs_x(**computed)  # no diagnostic
+    needs_x(**({"extra": 1} if flag else existing))  # no diagnostic
 ```
 
 ### Reassigned local dictionary arguments

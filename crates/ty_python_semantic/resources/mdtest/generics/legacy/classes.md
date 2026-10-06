@@ -948,6 +948,29 @@ class Explicit(Generic[T]):
 reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
+### Conditional keyword dictionaries
+
+Conditional dictionary arguments infer unions for the constructor's type parameters, losing the
+relationship between branches.
+
+```py
+from typing import Generic, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+class Pair(Generic[A, B]):
+    def __init__(self, *, first: A, second: B) -> None:
+        self.first = first
+        self.second = second
+
+def conditional(flag: bool) -> None:
+    pair = Pair(**({"first": 1, "second": "two"} if flag else {"first": "three", "second": 4}))
+    reveal_type(pair)  # revealed: Pair[str | int, str | int]
+    reverse = Pair(**({"first": "three", "second": 4} if flag else {"first": 1, "second": "two"}))
+    reveal_type(reverse)  # revealed: Pair[int | str, int | str]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

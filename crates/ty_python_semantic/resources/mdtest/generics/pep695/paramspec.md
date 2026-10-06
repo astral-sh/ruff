@@ -799,6 +799,16 @@ def local() -> None:
 
     wrong = {"x": 1, "y": 2}
     forward(target, **wrong)  # error: [invalid-argument-type]
+
+def conditional(flag: bool) -> None:
+    kwargs = {"x": 1, "y": "two"} if flag else {"x": 2, "y": "three"}
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(forward(target, **kwargs))  # revealed: str
+    missing = {"x": 1, "y": "two"} if flag else {"x": 2}
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    forward(target, **missing)
 ```
 
 ### Preserve an unpacked required suffix
