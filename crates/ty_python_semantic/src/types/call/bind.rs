@@ -6154,17 +6154,29 @@ impl<'db> CallInference<'_, 'db> {
                     self.inferable_typevars,
                 );
 
-                // Use `solve_with` to determine per-typevar variance from the raw
-                // lower/upper bounds on each BDD path.
-                let mut variance_map: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
-                    FxHashMap::default();
                 let solutions = path_bounds.solve_with(|variance, path_bound| {
-                    let identity = path_bound.bound_typevar.identity(db);
-                    variance_map
-                        .entry(identity)
-                        .and_modify(|current| *current = current.join(variance))
-                        .or_insert(variance);
-                    CandidateSolutions::preliminary_solve(db, self.env, constraints, path_bound)
+                    let outcome = CandidateSolutions::preliminary_solve(
+                        db,
+                        self.env,
+                        constraints,
+                        path_bound,
+                    );
+                    // Each path has already combined its lower and upper evidence; having both
+                    // makes its variance invariant. Paths are alternatives, so invariant evidence
+                    // on one path cannot justify selecting an upper-only preference on another.
+                    // Apply the contextual-preference policy per path, without discarding
+                    // unsatisfiability or incomplete-solution status.
+                    if variance.is_covariant() {
+                        match outcome {
+                            PathBoundSolution::Solved(_) => PathBoundSolution::Unsolved,
+                            PathBoundSolution::BudgetExceeded { .. } => {
+                                PathBoundSolution::BudgetExceeded { fallback: None }
+                            }
+                            outcome => outcome,
+                        }
+                    } else {
+                        outcome
+                    }
                 });
 
                 let Solutions::Constrained(solutions) = solutions else {
@@ -6177,17 +6189,6 @@ impl<'db> CallInference<'_, 'db> {
                 for solution in solutions.as_slice() {
                     for binding in &solution.solved_typevars {
                         let identity = binding.bound_typevar.identity(db);
-
-                        // Avoid unnecessarily widening the return type based on a covariant
-                        // type parameter from the type context, as it can lead to argument
-                        // assignability errors if the type variable is constrained by a narrower
-                        // parameter type.
-                        if variance_map
-                            .get(&identity)
-                            .is_some_and(|v| v.is_covariant())
-                        {
-                            continue;
-                        }
 
                         // Filter out inferable typevars (cross-typevar references from
                         // SequentMap transitivity) and provisional markers.

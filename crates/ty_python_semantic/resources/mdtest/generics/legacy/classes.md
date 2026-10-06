@@ -1114,7 +1114,11 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        return Box[T, Self](value, self)  # error: [invalid-return-type]
+        # TODO: Only report the return error. The explicitly specialized constructor accepts
+        # `value: T` and `self: Self`; the incompatible return context should not reject them.
+        # error: [invalid-argument-type]
+        # error: [invalid-return-type]
+        return Box[T, Self](value, self)
 ```
 
 ### Constructing through a classmethod receiver

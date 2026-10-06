@@ -20,7 +20,7 @@ use crate::types::constraints::{
     ConstraintAssignment, ConstraintId, ConstraintSetStorage, Node, NodeId, PathVisitor,
     SourceOrderId, TypeVarId,
 };
-use crate::{Db, FxIndexMap, ProgramEnvironment};
+use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// The position of an assignment in insertion order.
 #[newtype_index]
@@ -60,6 +60,11 @@ pub(crate) struct PathAssignments {
     sequent_antecedents: FxHashMap<ConstraintAssignment, Vec<usize>>,
     /// Each assignment's source constraint and greatest remaining per-path fuel.
     pub(super) assignments: FxIndexMap<ConstraintAssignment, (ConstraintId, u16)>,
+    /// Constraints that have been _replaced_ with other constraints on this path, because a
+    /// sequent substituted an exact type for some typevar.
+    substituted_constraints: FxIndexSet<ConstraintId>,
+    /// Substitutions awaiting admission of their replacement assignment.
+    pending_substitutions: Vec<(ConstraintId, ConstraintId)>,
     /// Positions in `assignments`, cleared when their branch is left. Fuel stays in the map so
     /// replenishment and rollback do not need to update these indices.
     positive_assignment_indices: IndexVec<ConstraintId, Option<AssignmentIndex>>,
@@ -178,6 +183,8 @@ impl Default for PathAssignments {
             sequents: Vec::default(),
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
+            substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -270,6 +277,8 @@ impl PathAssignments {
             sequents: Vec::default(),
             sequent_antecedents: FxHashMap::default(),
             assignments: FxIndexMap::default(),
+            substituted_constraints: FxIndexSet::default(),
+            pending_substitutions: Vec::default(),
             positive_assignment_indices: IndexVec::default(),
             negative_assignment_indices: IndexVec::default(),
             fuel_undo: Vec::default(),
@@ -480,6 +489,7 @@ impl PathAssignments {
         // pass along the range of which assignments are new, and so that we can reset back to this
         // point before returning.
         let start = self.assignments.len();
+        let substituted_constraints_start = self.substituted_constraints.len();
         let fuel_undo_start = self.fuel_undo.len();
         let previous_remaining_overall_fuel = self.remaining_overall_fuel;
 
@@ -525,6 +535,7 @@ impl PathAssignments {
         // Reset back to where we were before following this edge, so that the caller can reuse a
         // single instance for the entire BDD traversal.
         self.assignment_queue.clear();
+        self.pending_substitutions.clear();
         // A branch can replenish an assignment more than once. Restore in reverse order while
         // every referenced assignment still exists.
         for (index, previous_fuel) in self.fuel_undo.drain(fuel_undo_start..).rev() {
@@ -542,6 +553,8 @@ impl PathAssignments {
             }
         }
         self.assignments.truncate(start);
+        self.substituted_constraints
+            .truncate(substituted_constraints_start);
         self.remaining_overall_fuel = previous_remaining_overall_fuel;
         result
     }
@@ -557,6 +570,10 @@ impl PathAssignments {
                 ConstraintAssignment::Negative(_) | ConstraintAssignment::Unconstrained(_) => None,
             },
         )
+    }
+
+    pub(super) fn constraint_is_substituted(&self, constraint: ConstraintId) -> bool {
+        self.substituted_constraints.contains(&constraint)
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment) -> bool {
@@ -658,7 +675,11 @@ impl PathAssignments {
                         }
                     }
                     Sequent::PairImplication {
-                        ante1, ante2, post, ..
+                        ante1,
+                        ante2,
+                        post,
+                        is_substitution,
+                        ..
                     } => {
                         let ante1 = storage.intern_constraint(db, env, *ante1);
                         let ante2 = storage.intern_constraint(db, env, *ante2);
@@ -676,6 +697,7 @@ impl PathAssignments {
                             ante2,
                             post,
                             fuel_cost,
+                            is_substitution: *is_substitution,
                         }
                     }
                     Sequent::SingleImplication { ante, post, .. } => {
@@ -858,6 +880,19 @@ impl PathAssignments {
         while let Some((assignment, fuel)) = self.assignment_queue.pop_front() {
             self.add_assignment(db, env, storage, assignment, source_constraint, fuel)?;
         }
+        // Either fuel limit can prevent a replacement from being admitted. Keep the original
+        // evidence until the replacement actually holds, including when another derivation
+        // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
+        for (original, replacement) in self.pending_substitutions.drain(..) {
+            if self
+                .positive_assignment_indices
+                .get(replacement)
+                .is_some_and(Option::is_some)
+                && !self.substituted_constraints.contains(&replacement)
+            {
+                self.substituted_constraints.insert(original);
+            }
+        }
         Ok(())
     }
 
@@ -1022,9 +1057,18 @@ impl PathAssignments {
                 ante1,
                 ante2,
                 post,
+                is_substitution,
                 fuel_cost,
             } => {
-                self.check_pair_implication(db, storage, ante1, ante2, post, fuel_cost);
+                self.check_pair_implication(
+                    db,
+                    storage,
+                    ante1,
+                    ante2,
+                    post,
+                    is_substitution,
+                    fuel_cost,
+                );
                 Ok(())
             }
             Sequent::SingleImplication {
@@ -1128,6 +1172,7 @@ impl PathAssignments {
         Ok(())
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn check_pair_implication<'db>(
         &mut self,
         db: &'db dyn Db,
@@ -1135,6 +1180,7 @@ impl PathAssignments {
         ante1: ConstraintId,
         ante2: ConstraintId,
         post: ConstraintId,
+        is_substitution: bool,
         fuel_cost: u16,
     ) {
         if storage
@@ -1149,6 +1195,9 @@ impl PathAssignments {
         let Some(ante2_fuel) = self.max_remaining_fuel_for(ante2.when_true()) else {
             return;
         };
+        if is_substitution {
+            self.pending_substitutions.push((ante1, post));
+        }
         let available_fuel = ante1_fuel.min(ante2_fuel);
         if let Some(post_fuel) = available_fuel.checked_sub(fuel_cost) {
             self.enqueue_assignment(
