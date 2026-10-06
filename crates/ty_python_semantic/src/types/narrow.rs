@@ -4648,19 +4648,32 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         is_positive,
                         use_generic_filtering,
                     )
-                    .map(|constraint| {
-                        NarrowingConstraints::from_iter([(
-                            place,
-                            if use_generic_filtering {
-                                NarrowingConstraint::generic_filtering(constraint)
-                            } else {
-                                NarrowingConstraint::intersection(constraint.negate_if(
-                                    db,
-                                    &self.env,
-                                    !is_positive,
-                                ))
-                            },
-                        )])
+                    .map(|target| {
+                        let constraint_type = target.negate_if(db, &self.env, !is_positive);
+                        let constraint = if use_generic_filtering {
+                            NarrowingConstraint::generic_filtering(target)
+                        } else {
+                            NarrowingConstraint::intersection(constraint_type)
+                        };
+                        let mut constraints =
+                            NarrowingConstraints::from_iter([(place, constraint)]);
+                        let argument = &expr_call.arguments.args[0];
+                        if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                            && let Some((tuple_place, tuple_constraint)) = self
+                                .narrow_tuple_subscript_by_type(
+                                    inference,
+                                    subscript,
+                                    constraint_type,
+                                    use_generic_filtering,
+                                )
+                        {
+                            insert_narrowing_constraint(
+                                &mut constraints,
+                                tuple_place,
+                                tuple_constraint,
+                            );
+                        }
+                        constraints
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
@@ -4712,20 +4725,45 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     && !db
                         .analysis_settings(self.scope().file(db))
                         .strict_generic_narrowing;
-                Some((
-                    place,
-                    if use_generic_filtering {
-                        NarrowingConstraint::generic_filtering(target)
-                    } else {
-                        NarrowingConstraint::intersection(
-                            target.top_materialization(db, &self.env).negate_if(
-                                db,
-                                &self.env,
-                                !is_positive,
-                            ),
-                        )
-                    },
-                ))
+                let constraint_type = if use_generic_filtering {
+                    target
+                } else {
+                    target
+                        .top_materialization(db, &self.env)
+                        .negate_if(db, &self.env, !is_positive)
+                };
+                let constraint = if use_generic_filtering {
+                    NarrowingConstraint::generic_filtering(constraint_type)
+                } else {
+                    NarrowingConstraint::intersection(constraint_type)
+                };
+                let mut constraints = NarrowingConstraints::from_iter([(place, constraint)]);
+                for argument in expr_call.arguments.args.iter().chain(
+                    expr_call
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| &keyword.value),
+                ) {
+                    if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                        && let Some(argument_place) = PlaceExpr::try_from_expr(argument)
+                        && self.expect_place(&argument_place) == place
+                        && let Some((tuple_place, tuple_constraint)) = self
+                            .narrow_tuple_subscript_by_type(
+                                inference,
+                                subscript,
+                                constraint_type,
+                                use_generic_filtering,
+                            )
+                    {
+                        insert_narrowing_constraint(
+                            &mut constraints,
+                            tuple_place,
+                            tuple_constraint,
+                        );
+                    }
+                }
+                return Some(constraints);
             }
             // TypeGuard only narrows in the positive case
             Type::TypeGuard(type_guard) if is_positive => {
@@ -5251,6 +5289,29 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     ComparisonSoundnessPolicy::CONSERVATIVE,
                 )
                 .is_none_or(|constraint| !element.is_disjoint_from(self.db, &self.env, constraint))
+            },
+        )
+    }
+
+    /// Apply an element's type constraint to its containing tuple union.
+    fn narrow_tuple_subscript_by_type(
+        &self,
+        inference: &ExpressionInference<'db>,
+        subscript: &ast::ExprSubscript,
+        constraint: Type<'db>,
+        use_generic_filtering: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        self.filter_tuple_subscript(
+            inference.expression_type(&*subscript.value),
+            &subscript.value,
+            inference.expression_type(&*subscript.slice),
+            |element| {
+                if use_generic_filtering {
+                    !filter_generic_narrowing_constraint(self.db, &self.env, element, constraint)
+                        .is_never()
+                } else {
+                    !element.is_disjoint_from(self.db, &self.env, constraint)
+                }
             },
         )
     }

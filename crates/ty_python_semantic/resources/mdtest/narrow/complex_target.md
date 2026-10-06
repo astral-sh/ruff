@@ -543,6 +543,117 @@ def call(value: tuple[Literal[True], Callable[[int], int]] | tuple[Literal[False
     return value[1]()  # no diagnostic
 ```
 
+### Tuple unions and instance checks
+
+An instance check on one element also eliminates tuple alternatives that cannot satisfy the check,
+including in the negative branch.
+
+```py
+from typing import Callable
+
+def instance(value: tuple[int, str] | tuple[str, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[str, int]
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+    if not isinstance(value[-2], str):
+        reveal_type(value[1])  # revealed: str
+
+def overlapping(value: tuple[int | str, bytes] | tuple[str, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[int | str, bytes] | tuple[str, int]
+    else:
+        reveal_type(value)  # revealed: tuple[int | str, bytes]
+
+def call(value: tuple[int, Callable[[int], int]] | tuple[str, Callable[[], int]]) -> int:
+    if isinstance(value[0], str):
+        return value[1]()  # no diagnostic
+    return value[1](value[0])  # no diagnostic
+```
+
+### Tuple unions and subclass checks
+
+Subclass checks also narrow the tuple containing the checked class.
+
+```py
+def subclass(value: tuple[type[int], str] | tuple[type[str], int]):
+    if issubclass(value[0], str):
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+```
+
+### Tuple unions and `TypeIs`
+
+A user-defined `TypeIs` check narrows the tuple containing its argument. `TypeGuard` can widen its
+argument's type, so it does not eliminate tuple alternatives.
+
+```py
+from typing_extensions import TypeGuard, TypeIs
+
+def is_string(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def guard_string(value: object) -> TypeGuard[str]:
+    return isinstance(value, str)
+
+def check(value: tuple[int, str] | tuple[str, int]):
+    if is_string(value[0]):
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+    if is_string(value=value[0]):
+        reveal_type(value[1])  # revealed: int
+    if guard_string(value[0]):
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str, int]
+```
+
+### Tuple union checks with uncertain elements and indices
+
+Alternatives with gradual element types remain possible in either branch. A non-literal index
+provides no fact about a particular element.
+
+```py
+from typing import Any, Literal
+
+def gradual(value: tuple[Any, bytes] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value)  # revealed: tuple[Any, bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Any, bytes] | tuple[Literal[False], str]
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[Any, bytes]
+    else:
+        reveal_type(value)  # revealed: tuple[Any, bytes] | tuple[Literal[False], str]
+
+def unknown_index(value: tuple[int, str] | tuple[str, int], index: int):
+    if value[index]:
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str, int]
+    if isinstance(value[index], str):
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str, int]
+
+def out_of_bounds(value: tuple[int, str] | tuple[str]):
+    # error: [index-out-of-bounds] "Index 1 is out of bounds for tuple `tuple[str]` with length 1"
+    if isinstance(value[1], str):
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str]
+    # error: [index-out-of-bounds] "Index 1 is out of bounds for tuple `tuple[str]` with length 1"
+    if value[1]:
+        reveal_type(value)  # revealed: tuple[int, str] | tuple[str]
+
+def non_tuple(value: list[str] | tuple[int, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: list[str]
+    else:
+        reveal_type(value)  # revealed: list[str] | tuple[int, int]
+
+def variadic(value: tuple[str, ...] | tuple[int, int]):
+    if isinstance(value[0], str):
+        reveal_type(value)  # revealed: tuple[str, ...]
+    else:
+        reveal_type(value)  # revealed: tuple[int, int]
+```
+
 ### Tuple tags with non-literal comparators
 
 A boolean comparison value can match either boolean tag value, but cannot match a string literal:
