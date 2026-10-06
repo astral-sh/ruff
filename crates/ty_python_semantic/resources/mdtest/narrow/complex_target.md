@@ -747,6 +747,19 @@ def check(flag: bool):
         reveal_type(value)  # revealed: Literal[1]
 ```
 
+### Tuple reassignment in an index
+
+Python reads the tuple before evaluating its index. The index expression below then replaces `value`
+with `(False,)`. The truthiness check uses the original tuple and does not narrow the replacement.
+
+```py
+from typing import Literal
+
+def check(value: tuple[Literal[True]] | tuple[Literal[False]]):
+    if value[(value := (False,)) and 0]:
+        reveal_type(value)  # revealed: tuple[Literal[False]]
+```
+
 ### Tuple checks with assignments in later arguments
 
 An assignment in a later argument can replace the tuple after its element has been read. The check

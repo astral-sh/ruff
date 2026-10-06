@@ -1819,17 +1819,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         is_positive,
                     )
                     .or_else(|| {
-                        self.filter_tuple_subscript(
-                            inference.expression_type(&*subscript.value),
-                            &subscript.value,
-                            inference.expression_type(&*subscript.slice),
-                            |element| {
-                                element
-                                    .bool(db, &self.env)
-                                    .negate_if(!is_positive)
-                                    .may_be_true()
-                            },
-                        )
+                        self.narrow_tuple_subscript_by_truthiness(inference, subscript, is_positive)
                     })
                     .map(|(place, constraint)| {
                         NarrowingConstraints::from_iter([(place, constraint)])
@@ -5279,6 +5269,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         operator: ast::CmpOp,
         is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // Filter the union based on whether each tuple element at the index could match the rhs.
         self.filter_tuple_subscript(
             subscript_value_type,
             subscript_value_expr,
@@ -5292,6 +5283,34 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     ComparisonSoundnessPolicy::CONSERVATIVE,
                 )
                 .is_none_or(|constraint| !element.is_disjoint_from(self.db, &self.env, constraint))
+            },
+        )
+    }
+
+    /// Narrow unions of tuples based on the truthiness of an element.
+    fn narrow_tuple_subscript_by_truthiness(
+        &self,
+        inference: &ExpressionInference<'db>,
+        subscript: &ast::ExprSubscript,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // Evaluating the index can replace the tuple after it was read. Until we track
+        // which binding was checked, skip tuple narrowing for subscripts containing assignment expressions.
+        if any_over_expr(&subscript.value, ast::Expr::is_named_expr)
+            || any_over_expr(&subscript.slice, ast::Expr::is_named_expr)
+        {
+            return None;
+        }
+
+        self.filter_tuple_subscript(
+            inference.expression_type(&*subscript.value),
+            &subscript.value,
+            inference.expression_type(&*subscript.slice),
+            |element| {
+                element
+                    .bool(self.db, &self.env)
+                    .negate_if(!is_positive)
+                    .may_be_true()
             },
         )
     }
@@ -5340,16 +5359,21 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         mut matches: impl FnMut(Type<'db>) -> bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let db = self.db;
+        // We need a union type for narrowing to be useful.
         let Type::Union(union) = subscript_value_type.resolve_type_alias(db) else {
             return None;
         };
+
         // The subscript index must be an integer literal.
         let index = i32::try_from(subscript_index_type.as_int_literal()?).ok()?;
+
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
-        // An out-of-bounds access is diagnosed elsewhere and provides no narrowing fact.
+        // Skip narrowing if any tuple in the union has an out-of-bounds index.
+        // A diagnostic will be emitted elsewhere for the out-of-bounds access.
         if any_tuple_has_out_of_bounds_index(db, &self.env, union, index) {
             return None;
         }
+
         let filtered = union.filter(db, |element| {
             element
                 .tuple_instance_spec(db, &self.env)
