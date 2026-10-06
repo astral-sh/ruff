@@ -2421,6 +2421,9 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
+                // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
+                // depend on which typevars are inferable. That will require adding an `inferable`
+                // parameter and plumbing that through to all callers.
                 let source_orders = storage.calculate_source_orders(source_order);
                 let mut walker =
                     SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
@@ -2489,6 +2492,9 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
+                    // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
+                    // depend on which typevars are inferable. That will require adding an
+                    // `inferable` parameter and plumbing that through to all callers.
                     let source_orders = storage.calculate_source_orders(source_order);
                     let mut walker =
                         SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
