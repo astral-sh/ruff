@@ -10,8 +10,9 @@ use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
-    SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions, TypeVarSolution,
+    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
+    TypeVarSolution,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
@@ -43,6 +44,7 @@ fn exact<'db, 'c>(
         db,
         &db.program_environment(),
         builder,
+        ConstraintProvenance::Evidence,
         typevar,
         ty,
     )
@@ -171,7 +173,16 @@ fn invalid_paths_respect_projection_budgets() {
         ))
     });
     let builder = ConstraintSetBuilder::new();
-    let upper = |ty| ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, ty);
+    let upper = |ty| {
+        ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Evidence,
+            t,
+            ty,
+        )
+    };
     let inferable = TypeVarSet::from_typevars(db, [t]);
     let choose = |_, _: &CandidateTypeVarSolution<'_>| PathBoundSolution::Unsolved;
 
@@ -236,7 +247,16 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
         Some(TypeVarBoundOrConstraints::Constraints(declared_constraints))
     });
     let builder = ConstraintSetBuilder::new();
-    let upper = |ty| ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, ty);
+    let upper = |ty| {
+        ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Evidence,
+            t,
+            ty,
+        )
+    };
     let inferable = TypeVarSet::from_typevars(db, [t]);
 
     for bounds in [[bool, bytes], [bytes, bool]] {

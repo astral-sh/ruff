@@ -36,8 +36,8 @@ use crate::types::call::arguments::{
 };
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintSet,
-    ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
+    ConstraintSet, ConstraintSetBuilder, PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::context::LintDiagnosticGuardBuilder;
 use crate::types::dedicated::pydantic::{self, ConfigBoolean};
@@ -2931,6 +2931,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 lower,
                             )
@@ -2959,6 +2960,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 upper,
                             )
@@ -2987,6 +2989,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 value,
                             )
@@ -3018,6 +3021,7 @@ impl<'db> Bindings<'db> {
                                 db,
                                 env,
                                 constraints,
+                                ConstraintProvenance::Evidence,
                                 typevar,
                                 lower,
                                 upper,
@@ -6019,13 +6023,16 @@ impl<'db> CallInference<'_, 'db> {
 
         let declared_return_context = match self.call_expression_tcx.annotation {
             Some(tcx) if !use_legacy_solver => {
-                let validity = self.return_ty.when_constraint_set_assignable_to(
-                    db,
-                    self.env,
-                    tcx,
-                    constraints,
-                );
-                builder.intersect_validity_constraints(validity);
+                let validity = self
+                    .return_ty
+                    .when_constraint_set_assignable_to_with_provenance(
+                        db,
+                        self.env,
+                        tcx,
+                        constraints,
+                        ConstraintProvenance::Validity,
+                    );
+                builder.record_constraint_set(validity);
                 None
             }
             tcx => tcx,
