@@ -50,6 +50,7 @@ class Hyperfine(NamedTuple):
         """Run the benchmark using `hyperfine`."""
         args = [
             "hyperfine",
+            "--shell=default",
             # Ignore any warning/error diagnostics but fail if there are any fatal errors, incorrect configuration, etc.
             # mypy exit codes: https://github.com/python/mypy/issues/14615#issuecomment-1420163253
             # pyright exit codes: https://docs.basedpyright.com/v1.31.6/configuration/command-line/#pyright-exit-codes

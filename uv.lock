@@ -20,7 +20,7 @@ astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
 astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-shear = "2026-08-27T00:00:00Z"
-astral-dev-toolchain-hyperfine = "2026-08-27T00:00:00Z"
+astral-dev-toolchain-hyperfine = "2026-10-06T16:54:00Z"
 
 [manifest]
 build-constraints = [
@@ -164,15 +164,15 @@ wheels = [
 
 [[package]]
 name = "astral-dev-toolchain-hyperfine"
-version = "1.20.0"
+version = "2.0.0a1"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/5e/82/0109da6323b34d69d48df702438c0f3df4c22513e95154c26b6c7d266a13/astral_dev_toolchain_hyperfine-1.20.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:31b43291b77e9c583c3abebcc65995978cdad75195eb8182ce7eefc96f7dc53d", size = 609130, upload-time = "2026-08-26T16:09:29.018Z" },
-    { url = "https://files.pythonhosted.org/packages/5c/c2/bade068349c37f8c40ee1da1ab2853cb3a10ba51898e19bc6bfbbfa9933b/astral_dev_toolchain_hyperfine-1.20.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:828d4b33fa0d2ddb9c74fd8559e1359e74007ed71148e06ddafe0cbee0219c1b", size = 582152, upload-time = "2026-08-26T16:09:30.369Z" },
-    { url = "https://files.pythonhosted.org/packages/a0/54/0bb44acfe37a4a278023592fc703a1f7a7402f76635ba4dcdb14a6075e86/astral_dev_toolchain_hyperfine-1.20.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:aafd0ca4620b89685bdec078657567833b462a8dceba930f3ac395d81a8dde17", size = 622444, upload-time = "2026-08-26T16:09:31.669Z" },
-    { url = "https://files.pythonhosted.org/packages/ec/1e/1ff7bb5b38fd7059577ec6fab9405a09b126b8775f73cad144bc43048499/astral_dev_toolchain_hyperfine-1.20.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a90dcfd64798ce5f82b62b4a05ea923fe76407abcc5b49ffaef30b902d1e3e70", size = 656263, upload-time = "2026-08-26T16:09:32.942Z" },
-    { url = "https://files.pythonhosted.org/packages/49/9e/036f671adf8dd42ca949f6358afe31f93490294f167d51d592362f2789c4/astral_dev_toolchain_hyperfine-1.20.0-py3-none-win_amd64.whl", hash = "sha256:c6e1667d641a06554a0d984b0b372dfecec833db1c4c6e84b56c6d56194ac45d", size = 588524, upload-time = "2026-08-26T16:09:34.192Z" },
-    { url = "https://files.pythonhosted.org/packages/3b/c2/eea4375484705603b7f83f97d2ea7f7f30b8e6ffa55fb4ec81dcd8a3b0a6/astral_dev_toolchain_hyperfine-1.20.0-py3-none-win_arm64.whl", hash = "sha256:2995536b8fa75c3137b8b74a728fe3ae4dc93dcbda226989355bfc3921ac6d55", size = 555078, upload-time = "2026-08-26T16:09:36.041Z" },
+    { url = "https://files.pythonhosted.org/packages/c6/92/c7bfeaf7521633a2fd5c9dff1bc36bf7cffb38b7c2d80507ef638564e288/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:0a338695be673c497fa9515d97fe8ff82054ac9fe49e4328a20e27d701b30205", size = 642004, upload-time = "2026-10-06T16:53:21.384Z" },
+    { url = "https://files.pythonhosted.org/packages/83/23/cf7ac20e4844de8ac55ed1891c9b14dd02c24900d246f1e98aa1a384a549/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:167afa29220a35b494d2f9336d0d307c60706f00265f3b310ec9d9e50e5b2e01", size = 605830, upload-time = "2026-10-06T16:53:23.017Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/37/ee68efff6dab49a3469b400a0c94905df521983fdc683cb82414bb9786b4/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ed5557cd0724ac8cb43e2e4c5c12b4ef6775c952456c2fd344c8c185fb8a6415", size = 643523, upload-time = "2026-10-06T16:53:24.652Z" },
+    { url = "https://files.pythonhosted.org/packages/1b/34/2f0f2833b86142a183b8e662224eb07d943d87029a47015faa4ed3b7b8c1/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d038ab6f138ef1d8359417a448c3e01637af98d5838706c5a09a894a1f368de7", size = 686232, upload-time = "2026-10-06T16:53:26.044Z" },
+    { url = "https://files.pythonhosted.org/packages/14/43/c5791390ff6c4aa516bbfc8bf051ff88c682a5dfd6effce00e81672e97ed/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-win_amd64.whl", hash = "sha256:3f26101669ed95a2664a83ab5e87724e845b9f4dc7de5aab91e87416b52b8b06", size = 632516, upload-time = "2026-10-06T16:53:27.42Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/c3/ce9964be5a6613e433069881d37f5cd784cd9a99dd8afbedaefad9e9f237/astral_dev_toolchain_hyperfine-2.0.0a1-py3-none-win_arm64.whl", hash = "sha256:cfd2ab7e982b91680d9ed1b7704614852b44dec8b3b86371f61cc689cc4c1e9f", size = 590248, upload-time = "2026-10-06T16:53:29.072Z" },
 ]
 
 [[package]]
@@ -1680,7 +1680,7 @@ dev = [
     { name = "astral-dev-toolchain-cargo-insta", marker = "python_full_version >= '3.12'", specifier = ">=1.48.0" },
     { name = "astral-dev-toolchain-cargo-nextest", marker = "python_full_version >= '3.12'", specifier = ">=0.9.143" },
     { name = "astral-dev-toolchain-cargo-shear", marker = "python_full_version >= '3.12'", specifier = ">=1.13.4" },
-    { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'", specifier = ">=1.20.0" },
+    { name = "astral-dev-toolchain-hyperfine", marker = "python_full_version >= '3.12'", specifier = "==2.0.0a1" },
     { name = "prek", marker = "python_full_version >= '3.12'", specifier = "==0.5.0" },
 ]
 docs = [

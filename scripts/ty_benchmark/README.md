@@ -9,7 +9,7 @@
 1. Install Pyright: `npm ci --ignore-scripts`
 1. Run benchmarks: `uv run benchmark`
 
-Requires hyperfine 1.20 or newer.
+Requires hyperfine 2.0.0-alpha.1 or newer.
 
 ## Benchmarks
 
