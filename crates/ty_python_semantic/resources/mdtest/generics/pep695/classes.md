@@ -2501,6 +2501,72 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Generic constructors inheriting recursive protocols
+
+A constructor can infer its type argument from an expected protocol even when an inherited method's
+receiver is annotated with that same protocol.
+
+```py
+from __future__ import annotations
+from collections.abc import Iterable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise RuntimeError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
+
+class Concrete[T](Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())  # no diagnostic
+reveal_type(contextual)  # revealed: Concrete[int]
+
+def make() -> Chain[int]:
+    return Concrete(())  # no diagnostic
+```
+
+We still reject incompatible arguments. Without an expected type, the empty iterable determines the
+constructor's type argument.
+
+```py
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+reveal_type(Concrete(()))  # revealed: Concrete[Never]
+```
+
+## Structural implementations with recursive receiver annotations
+
+A class can satisfy a protocol without inheriting from it, even when checking a method's receiver
+requires checking the same protocol. The remaining parameters must still be compatible.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Valid[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Invalid[T]:
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine[S](self: Chain[S], pair: tuple[S, str]) -> Chain[T]:
+        raise NotImplementedError
+
+def check(valid: Valid[int], invalid: Invalid[int]):
+    accepted: Chain[int] = valid  # no diagnostic
+    rejected: Chain[int] = invalid  # error: [invalid-assignment]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
