@@ -9145,7 +9145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let int_literal = |argument_index: usize| {
             call_arguments
-                .argument_types(argument_index)?
+                .source_types(argument_index)?
                 .get_default()?
                 .as_int_literal()
         };
