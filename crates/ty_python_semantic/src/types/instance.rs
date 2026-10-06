@@ -508,29 +508,11 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
-/// Prove by inspecting its member types that materialization leaves `protocol` unchanged.
-///
-/// Unlike ordinary static-content checks, this proof cannot ignore lazy function signatures or
-/// the wrapped callable of a partial. It does not compare metadata such as parameter-default types,
-/// which do not affect whether one callable satisfies another's requirements.
-fn protocol_materialization_is_noop_by_inspection<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    protocol: ProtocolInstanceType<'db>,
-) -> bool {
-    dynamic_content_impl(
-        db,
-        env,
-        Type::ProtocolInstance(protocol),
-        DynamicContentMode::Materialization,
-    )
-    .is_absent()
-}
-
 /// Conservatively prove that materialization leaves a protocol's requirements unchanged.
 ///
 /// A `true` result permits ignoring materialization when comparing this protocol. A `false`
 /// result can mean that inspection was incomplete, even if materialization is a no-op.
+///
 /// First inspect the specialized interface directly. If that is inconclusive, inspect the
 /// interface using the protocol's own type parameters to handle growing specializations.
 ///
@@ -555,17 +537,67 @@ fn protocol_materialization_is_noop<'db>(
     ) || protocol_materialization_is_noop_with_type_parameters(db, &env, class)
 }
 
-/// Conservatively prove that materialization does not change a protocol specialization.
+/// Prove by inspecting its member types that materialization leaves `protocol` unchanged.
+///
+/// The inspection accounts for callable signatures and the wrapped callable of a partial. It
+/// returns false when a lazily inferred signature cannot be inspected safely. It ignores metadata
+/// such as parameter-default types, which do not affect callable compatibility.
+///
+/// Inspecting a concrete specialization can prove cases that the type-parameter proof below cannot:
+///
+/// ```python
+/// from __future__ import annotations
+/// from typing import Any, Protocol
+///
+/// class P[T](Protocol):
+///     def value(self) -> T | Any: ...
+///     def child(self) -> P[T]: ...
+/// ```
+///
+/// For `P[object]`, the return type of `value` simplifies from `object | Any` to `object`.
+/// The return type of `child` is the same `P[object]` already being inspected, so its recursive
+/// reference adds no new requirements. Materialization therefore leaves `P[object]` unchanged.
+/// The type-parameter proof instead inspects `P[T]`, where `T | Any` is still gradual. It cannot
+/// establish the same result for arbitrary static arguments: `P[int]`, for example, retains
+/// the gradual return type `int | Any`.
+fn protocol_materialization_is_noop_by_inspection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    dynamic_content_impl(
+        db,
+        env,
+        Type::ProtocolInstance(protocol),
+        DynamicContentMode::Materialization,
+    )
+    .is_absent()
+}
+
+/// Prove that materialization leaves a protocol specialization unchanged by inspecting its
+/// interface with type parameters as placeholders and checking its concrete type arguments.
 ///
 /// A `true` result guarantees that its requirements are unchanged. A `false` result may mean that
 /// the proof could not establish this, even if materialization is a no-op.
 ///
-/// Unlike `Type::is_fully_static`, this checks the interface once using the protocol's own type
-/// parameters as placeholders (e.g. `P[T]` when checking `P[int]`) and checks the concrete
-/// arguments separately.
-/// A recursive occurrence of the same protocol is treated as a leaf after checking its arguments.
-/// This can prove that materialization leaves `P[int]` unchanged even when a member refers to
-/// `P[list[T]]`, without expanding an unbounded sequence of specializations.
+/// For example, consider a protocol whose recursive type argument grows with each `child` call:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def value(self) -> T: ...
+///     def child(self) -> P[list[T]]: ...
+/// ```
+///
+/// Inspecting every specialization reachable from `P[int]` would require visiting `P[list[int]]`,
+/// `P[list[list[int]]]`, and so on. Instead, inspect the interface of `P[T]` once, treating `T`
+/// as a placeholder for a fully static type, and separately check that the initial argument `int`
+/// is fully static. At the recursive reference `P[list[T]]`, check that `list[T]` stays fully
+/// static when `T` is fully static, without inspecting another specialized interface. Each
+/// recursive step therefore preserves fully static arguments, and neither member introduces
+/// any gradual types, so materialization leaves all these specializations unchanged.
+///
+/// If `child` instead returned `P[list[Any]]`, the recursive argument check would fail: a static
+/// initial argument does not prevent a later specialization from introducing gradual types.
 ///
 /// The proof accepts ordinary properties and instance methods. Explicit receiver
 /// annotations must be direct, unmaterialized specializations of the same protocol, and are only
