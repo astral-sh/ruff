@@ -172,6 +172,119 @@ class D[T]:
     y: ClassVar[dict[str, T]]
 ```
 
+## Type variables inside aliases
+
+`ClassVar` rejects type variables in an alias's value, whether they appear directly or inside
+another type.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Generic, TypeVar
+
+type DirectAlias[T] = T
+type Items[T] = list[T]
+
+class Holder[T]:
+    # error: [invalid-type-form]
+    direct: ClassVar[DirectAlias[T]]
+    # error: [invalid-type-form]
+    nested: ClassVar[Items[T]]
+```
+
+The same restriction applies to legacy type variables.
+
+```py
+T = TypeVar("T")
+
+class LegacyHolder(Generic[T]):
+    # error: [invalid-type-form]
+    nested: ClassVar[Items[T]]
+```
+
+Arguments that do not appear in the alias's value are allowed. This includes `T` in `object | T`,
+which simplifies to `object`.
+
+```py
+type Ignored[T] = int
+type Either[T, U] = T | U
+
+class Unused[T]:
+    ignored: ClassVar[Ignored[T]]  # no diagnostic
+    simplified: ClassVar[Either[object, T]]  # no diagnostic
+
+class LegacyUnused(Generic[T]):
+    ignored: ClassVar[Ignored[T]]  # no diagnostic
+    simplified: ClassVar[Either[object, T]]  # no diagnostic
+```
+
+## Type variables inside recursive aliases
+
+Recursive aliases can expose an argument only after passing it to a different parameter. Parameters
+that remain unused throughout the recursion are allowed.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+
+type Shift[A, B] = A | list[Shift[B, int]]
+type RecursiveIgnored[A, B] = B | list[RecursiveIgnored[A, int]]
+
+class RecursiveHolder[T]:
+    # error: [invalid-type-form]
+    exposed: ClassVar[Shift[int, T]]
+    ignored: ClassVar[RecursiveIgnored[T, int]]  # no diagnostic
+    simplified: ClassVar[Shift[object, T]]  # no diagnostic
+```
+
+## Recursive aliases with changing type arguments
+
+An unused argument remains valid when each recursive reference wraps it in another `list`. It can be
+unused because it appears only in recursive references, or because a union simplifies to `object`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+
+type Absorbed[A, B] = tuple[A | B, Absorbed[A, list[B]]]
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Holder[T]:
+    simplified: ClassVar[Absorbed[object, T]]  # no diagnostic
+    recursive: ClassVar[Recursive[T]]  # no diagnostic
+```
+
+We do not yet reject `Shift[int, T]`, even though `T` becomes a tuple element after the first
+recursive reference:
+
+```py
+type Shift[A, B] = tuple[A, Shift[B, list[A]]]
+
+class Invalid[T]:
+    # TODO: Reject T when it becomes the first argument of Shift.
+    exposed: ClassVar[Shift[int, T]]
+```
+
+A separate reference to `Shift[T, list[int]]` exposes `T` directly, even when it also occurs inside
+an earlier recursive reference.
+
+```py
+class AlsoInvalid[T]:
+    # error: [invalid-type-form]
+    exposed: ClassVar[tuple[Shift[int, T], Shift[T, list[int]]]]
+```
+
 ## `ClassVar` can contain `Self`
 
 `Self` is allowed inside `ClassVar`.
@@ -199,6 +312,18 @@ reveal_type(Base.all_instances)  # revealed: list[Base]
 class Sub(Base): ...
 
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
+The type parameters in `Self`'s bound do not make `Self` invalid in a generic class.
+
+```py
+from typing import Generic, TypeVar
+
+U = TypeVar("U")
+
+class GenericBase(Generic[U]):
+    direct: ClassVar[Self]  # no diagnostic
+    nested: ClassVar[list[Self]]  # no diagnostic
 ```
 
 Assignments through class objects should bind `Self` when writing a `ClassVar`, matching read-side
@@ -246,6 +371,409 @@ class DynamicSaved:
 def store_any(cls: type[Any], value: Any) -> None:
     cls.count = value
     reveal_type(cls.count)  # revealed: Any
+```
+
+## `Self` in PEP 695 generic classes
+
+`Self` is also valid in generic classes declared with PEP 695 syntax.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Self
+
+class GenericBase[U]:
+    direct: ClassVar[Self]  # no diagnostic
+    nested: ClassVar[list[Self]]  # no diagnostic
+```
+
+## Generic callable signatures
+
+Type variables bound by a callable's own signature are allowed in `ClassVar`. `CallableTypeOf`
+preserves a function's generic signature without specializing it.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, TypeVar
+from ty_extensions._internal import CallableTypeOf, TypeOf
+
+def identity[T](value: T) -> T:
+    return value
+
+class Holder:
+    callback: ClassVar[CallableTypeOf[identity]]  # no diagnostic
+    function: ClassVar[TypeOf[identity]]  # no diagnostic
+```
+
+The same applies to a function that uses a legacy type variable.
+
+```py
+U = TypeVar("U")
+
+def legacy_identity(value: U) -> U:
+    return value
+
+class LegacyHolder:
+    callback: ClassVar[CallableTypeOf[legacy_identity]]  # no diagnostic
+```
+
+## Captured type variables in callables
+
+A callable can still capture a type variable from an enclosing scope. Its own type parameters do not
+bind that captured variable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+from ty_extensions._internal import CallableTypeOf, TypeOf
+
+def outer[T]():
+    def callback[U](value: T, other: U) -> U:
+        return other
+
+    class Holder:
+        # error: [invalid-type-form]
+        value: ClassVar[CallableTypeOf[callback]]
+        # error: [invalid-type-form]
+        function: ClassVar[TypeOf[callback]]
+```
+
+## Protocols with generic methods
+
+A protocol method binds its own type parameters, so the protocol is valid in a `ClassVar`
+annotation.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+class Callback(Protocol):
+    def __call__[T](self, value: T) -> T: ...
+
+class Holder:
+    callback: ClassVar[Callback]  # no diagnostic
+```
+
+This remains valid when the protocol is local to a function.
+
+```py
+def outer():
+    class Callback(Protocol):
+        def __call__[T](self, value: T) -> T: ...
+
+    class Holder:
+        callback: ClassVar[Callback]  # no diagnostic
+```
+
+## Generic property accessors
+
+A property's getter and setter bind their own type parameters, just like other methods. Those
+parameters do not make the protocol invalid in `ClassVar`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol, TypeVar
+
+class GenericProperties(Protocol):
+    @property
+    def getter[T](self) -> tuple[T, T]: ...
+    @property
+    def setter(self) -> object: ...
+    @setter.setter
+    def setter[T](self, value: tuple[T, T]) -> None: ...
+
+class Holder:
+    value: ClassVar[GenericProperties]  # no diagnostic
+```
+
+The same applies to accessors that use legacy type variables.
+
+```py
+T = TypeVar("T")
+
+class LegacyProperties(Protocol):
+    @property
+    def getter(self) -> tuple[T, T]: ...
+    @property
+    def setter(self) -> object: ...
+    @setter.setter
+    def setter(self, value: tuple[T, T]) -> None: ...
+
+class LegacyHolder:
+    value: ClassVar[LegacyProperties]  # no diagnostic
+```
+
+## Captured type variables in property accessors
+
+An accessor's own type parameters do not bind variables captured from an enclosing function.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol, TypeVar
+
+def outer[T]():
+    class Getter(Protocol):
+        @property
+        def value[U](self) -> tuple[U, T]: ...
+
+    class Setter(Protocol):
+        @property
+        def value(self) -> object: ...
+        @value.setter
+        def value[U](self, value: tuple[U, T]) -> None: ...
+
+    class Holder:
+        # error: [invalid-type-form]
+        getter: ClassVar[Getter]
+        # error: [invalid-type-form]
+        setter: ClassVar[Setter]
+```
+
+Legacy accessors also retain the distinction between their own type variables and captured
+variables.
+
+```py
+T = TypeVar("T")
+U = TypeVar("U")
+
+def legacy_outer(value: T):
+    class Getter(Protocol):
+        @property
+        def value(self) -> tuple[U, T]: ...
+
+    class Setter(Protocol):
+        @property
+        def value(self) -> object: ...
+        @value.setter
+        def value(self, value: tuple[U, T]) -> None: ...
+
+    class Holder:
+        # error: [invalid-type-form]
+        getter: ClassVar[Getter]
+        # error: [invalid-type-form]
+        setter: ClassVar[Setter]
+```
+
+## Extra parameters in property accessors
+
+Only the getter's return type and the setter's value type are exposed by a property. Captures in
+optional extra parameters do not affect its use in `ClassVar`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+def extra_parameters[T]():
+    class Property(Protocol):
+        @property
+        def value(self, fallback: T | None = None) -> int: ...
+        @value.setter
+        def value(self, value: int, fallback: T | None = None) -> None: ...
+
+    class Holder:
+        value: ClassVar[Property]  # no diagnostic
+```
+
+## Captured type variables in protocols
+
+A local protocol can use a type variable from an enclosing function in an attribute or method.
+`ClassVar` rejects these uses, even when the method also has type parameters of its own.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, Protocol
+
+def outer[T]():
+    class Captured(Protocol):
+        value: T
+
+    class Callback(Protocol):
+        def method[U](self, value: U) -> tuple[T, U]: ...
+
+    class Holder:
+        # error: [invalid-type-form]
+        attribute: ClassVar[Captured]
+        # error: [invalid-type-form]
+        method: ClassVar[Callback]
+```
+
+## Captured type variables in `TypedDict` fields
+
+`ClassVar` also rejects a local `TypedDict` whose fields use an outer type variable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, TypedDict
+
+def outer[T]() -> None:
+    class Payload(TypedDict):
+        value: T
+
+    class Holder:
+        # error: [invalid-type-form]
+        payload: ClassVar[Payload]
+```
+
+## Recursive protocols
+
+Recursive protocols are valid when they contain no free type variables. A method's inferred `self`
+type and its own type parameters do not make the protocol invalid.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Protocol
+
+class Recursive[T](Protocol):
+    def method[U](self, value: U) -> tuple[Recursive[int], U]: ...
+
+class Holder:
+    protocol: ClassVar[Recursive[int]]  # no diagnostic
+```
+
+This remains true when each recursive reference adds a `list` around the type argument, starting
+from `int`.
+
+```py
+def outer():
+    class Recursive[T](Protocol):
+        next: Recursive[list[T]]
+
+    class Holder:
+        protocol: ClassVar[Recursive[int]]  # no diagnostic
+```
+
+## Recursive protocols with different specializations
+
+The `value` field of `Value[object]` simplifies to `object`. The second tuple element reaches
+`Value[int]` through recursive references; its `value` field still contains the outer type variable
+`T`. The `nested` member keeps adding lists to the type argument, so the first traversal is
+incomplete. That must not prevent us from checking the second tuple element.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Protocol
+
+def outer[T]():
+    class Value[U](Protocol):
+        cycle: Link
+        value: U | T
+        nested: Value[list[U]]
+
+    class Link(Protocol):
+        cycle: BackLink
+        value: Value[int]
+
+    class BackLink(Protocol):
+        cycle: Link
+
+    class Holder:
+        # error: [invalid-type-form]
+        value: ClassVar[tuple[Value[object], BackLink]]
+```
+
+The same applies to a protocol declared with legacy type variables.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def legacy_outer(value: T):
+    class Value(Protocol[U]):
+        cycle: Link
+        value: U | T
+        nested: Value[list[U]]
+
+    class Link(Protocol):
+        cycle: BackLink
+        value: Value[int]
+
+    class BackLink(Protocol):
+        cycle: Link
+
+    class Holder:
+        # error: [invalid-type-form]
+        value: ClassVar[tuple[Value[object], BackLink]]
+```
+
+## Recursive `TypedDict`s
+
+A recursive `TypedDict` is valid when its fields contain no free type variables.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, TypedDict
+
+class RecursivePayload(TypedDict):
+    next: RecursivePayload
+
+class PayloadHolder:
+    payload: ClassVar[RecursivePayload]  # no diagnostic
+```
+
+This remains true when each recursive reference wraps the type argument in another `list`.
+
+```py
+def outer():
+    class Payload[T](TypedDict):
+        next: Payload[list[T]]
+
+    class Holder:
+        payload: ClassVar[Payload[int]]  # no diagnostic
 ```
 
 ## Assignments through generic aliases
