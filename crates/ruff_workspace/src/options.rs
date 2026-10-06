@@ -2440,7 +2440,7 @@ pub struct Flake8TypeCheckingOptions {
         scope = "runtime-evaluated-decorators",
         example = r#"
             "pydantic.validate_call" = "required"
-            "sqlalchemy.orm.declared_attr = "ambiguous"
+            "sqlalchemy.orm.declared_attr" = "ambiguous"
         "#
     )]
     runtime_evaluated_decorators: Option<AnnotationSemanticsSelection>,
