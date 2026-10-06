@@ -1400,22 +1400,19 @@ class Combined[**P, **Q, **R](Protocol):
     @overload
     def call(self, tag: Literal[3], /, *args: P.args, **kwargs: P.kwargs) -> None: ...
 
-class First[**P](Protocol):
-    def combine[**Q, **R](self, q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]: ...
-
-def first[**P](p: Callback[P]) -> First[P]:
+def combine[**P, **Q, **R](p: Callback[P], q: Callback[Q], r: Callback[R]) -> Combined[P, Q, R]:
     raise NotImplementedError
 
 type FourCallbacks = Callback[[int]] | Callback[[str]] | Callback[[bytes]] | Callback[[None]]
 
 def _(x: FourCallbacks) -> None:
     # The cartesian product produces a union of 64 elements.
-    f = first(x).combine(x, x).call
+    f = combine(x, x, x).call
     reveal_type(f())  # revealed: int
 
 def _(x: FourCallbacks, y: FourCallbacks | Callback[[list[int]]]) -> None:
     # The cartesian product would have produced a union of 80 elements.
-    f = first(x).combine(x, y).call
+    f = combine(x, x, y).call
     reveal_type(f)  # revealed: Unknown
 ```
 
