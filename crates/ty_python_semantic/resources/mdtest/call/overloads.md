@@ -185,6 +185,26 @@ def _(ab: A | B, ac: A | C, bc: B | C):
     reveal_type(f(*(ac,)))  # revealed: A | C
 ```
 
+### Expanding immediate list and dictionary arguments
+
+Unpacking an immediate list or dictionary preserves each element's union type for overload
+expansion.
+
+```py
+from typing import overload
+
+@overload
+def choose(x: int) -> int: ...
+@overload
+def choose(x: str) -> str: ...
+def choose(x: int | str) -> int | str:
+    return x
+
+def _(value: int | str) -> None:
+    reveal_type(choose(*[value]))  # revealed: int | str
+    reveal_type(choose(**{"x": value}))  # revealed: int | str
+```
+
 ### Expanding first argument
 
 If the set of argument lists created by expanding the first argument evaluates successfully, the
@@ -1442,6 +1462,7 @@ from overloaded import f
 def _(x1: int, x2: int, args1: list[int], args2: tuple[int, *tuple[int, ...]]):
     reveal_type(f(x1, x2))  # revealed: tuple[int, int]
     reveal_type(f(*(x1, x2)))  # revealed: tuple[int, int]
+    reveal_type(f(*[x1, x2]))  # revealed: tuple[int, int]
 
     # Step 4 should filter out all but the last overload.
     reveal_type(f(x1, *args1))  # revealed: tuple[int, ...]
@@ -1470,8 +1491,10 @@ def _(x1: int, x2: int, kwargs: dict[str, int]):
     reveal_type(f(x1=x1))  # revealed: int
     reveal_type(f(x1=x1, x2=x2))  # revealed: tuple[int, int]
 
-    # Step 4 should filter out all but the last overload.
-    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: int
+    # The literal dictionary has exactly the two keys required by the second overload.
+    reveal_type(f(**{"x1": x1, "x2": x2}))  # revealed: tuple[int, int]
+
+    # Step 4 should filter out all but the last overload for unknown dictionary contents.
     reveal_type(f(**kwargs))  # revealed: int
 ```
 

@@ -743,6 +743,39 @@ accept(wrap(keyword_only), value=1)
 accept(wrap(keyword_only), value="incorrect")  # error: [invalid-argument-type]
 ```
 
+### Immediate literal forwarding
+
+A literal unpack can supply several arguments to a forwarded `ParamSpec`. The wrapped callable
+checks their individual types and argument count.
+
+```py
+from typing import Callable
+
+def forward[**P, R](callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def target(x: int, y: int) -> int:
+    return x + y
+
+reveal_type(forward(target, *[1, 2]))  # revealed: int
+reveal_type(forward(target, **{"x": 1, "y": 2}))  # revealed: int
+forward(target, *[1])  # error: [missing-argument]
+forward(target, **{"x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
+A dictionary can supply both a wrapper parameter and arguments to forward. The wrapper checks its
+own parameter and forwards only the remaining keys.
+
+```py
+def forward_prefix[**P, R](callback: Callable[P, R], prefix: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1, "y": 2}))  # revealed: int
+reveal_type(forward_prefix(target, **{"prefix": 0, "x": 1}, y=2))  # revealed: int
+forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid-argument-type]
+forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
+```
+
 ### Preserve an unpacked required suffix
 
 A `ParamSpec` preserves a named positional prefix and the required suffix of an unpacked variadic

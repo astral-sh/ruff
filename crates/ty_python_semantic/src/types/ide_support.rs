@@ -1127,10 +1127,8 @@ pub fn call_signature_details<'db>(
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-                splatted_value
-                    .inferred_type(model)
-                    .unwrap_or(Type::unknown())
+            CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+                expression.inferred_type(model)
             });
         let mut bindings =
             callable_type
@@ -1175,10 +1173,8 @@ fn resolve_single_overload<'db>(
     let env = &model.program_environment();
     let bindings = callable_type.bindings(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
     });
 
     let constraints = ConstraintSetBuilder::new();
@@ -1221,12 +1217,9 @@ fn full_type_bindings_for_call<'db>(
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
     let env = &model.program_environment();
-    let call_arguments =
-        CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-            splatted_value
-                .inferred_type(model)
-                .unwrap_or(Type::unknown())
-        });
+    let call_arguments = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
+    });
     let constraints = ConstraintSetBuilder::new();
 
     func_type
@@ -1564,10 +1557,8 @@ pub fn resolved_call_signature<'db>(
     let env = &model.program_environment();
     let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
-        splatted_value
-            .inferred_type(model)
-            .unwrap_or(Type::unknown())
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
+        expression.inferred_type(model)
     });
 
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
