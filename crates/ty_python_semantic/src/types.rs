@@ -144,6 +144,7 @@ mod context_manager;
 mod cyclic;
 mod dedicated;
 mod diagnostic;
+mod dict;
 mod display;
 mod enums;
 mod equality;

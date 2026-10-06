@@ -16,6 +16,7 @@ use crate::types::diagnostic::{
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
+use crate::types::dict::dict_literal_key_value_types;
 use crate::types::generics::{GenericContext, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
 use crate::types::infer::builder::{ArgExpr, ArgumentsIter, MultiInferenceGuard};
@@ -183,7 +184,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(self.infer_explicit_type_alias_specialization(subscript, value_ty, false));
         }
 
-        self.infer_subscript_load_impl(value_ty, subscript)
+        let result = self.infer_subscript_load_impl(value_ty, subscript)?;
+        if let ast::Expr::Dict(dict) = subscript.value.as_ref()
+            && let Some((_, values)) =
+                dict_literal_key_value_types(self.db(), self.program_environment(), dict, |expr| {
+                    self.expression_type(expr)
+                })
+        {
+            return Ok(values);
+        }
+        Ok(result)
     }
 
     fn infer_subscript_load_impl(

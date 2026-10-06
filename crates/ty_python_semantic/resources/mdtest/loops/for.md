@@ -249,7 +249,7 @@ reveal_type(x)  # revealed: int
 for x in {"foo": 1}:
     pass
 
-reveal_type(x)  # revealed: str
+reveal_type(x)  # revealed: Literal["foo"]
 
 for x in "a":
     pass
@@ -360,6 +360,91 @@ async def _():
     # revealed: Unknown
     # error: [possibly-unresolved-reference]
     reveal_type(x)
+```
+
+## With literal dictionary
+
+Iterating over a dictionary literal preserves literal key types. Its key, value, and item views also
+preserve literal types because the dictionary cannot be mutated through those views.
+
+```py
+for key in {"a": 1, "b": 2}:
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for key in {"a": 1, "b": 2}.keys():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+
+for value in {"a": 1, "b": 2}.values():
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+for key, value in {"a": 1, "b": 2}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+```
+
+Storing the view in a variable retains these types:
+
+```py
+values = {"a": 1, "b": 2}.values()
+reveal_type(values)  # revealed: dict_values[Literal["a", "b"], Literal[1, 2]]
+```
+
+Comprehensions use the same precise types for their iteration targets:
+
+```py
+[reveal_type(key) for key in {"a": 1, "b": 2}]  # revealed: Literal["a", "b"]
+[reveal_type(value) for value in {1: "a", 2: "b"}.values()]  # revealed: Literal["a", "b"]
+```
+
+This also applies when the target is an attribute or a tuple of names:
+
+```py
+from typing import Literal
+
+class C:
+    key: Literal["a", "b"]
+
+c = C()
+[None for c.key in {"a": 1, "b": 2}]  # no diagnostic
+[None for _ in (0,) for c.key in {"a": 1, "b": 2}]  # no diagnostic
+
+for number, letter in {(1, "a"): 0, (2, "b"): 0}:
+    reveal_type(number)  # revealed: Literal[1, 2]
+    reveal_type(letter)  # revealed: Literal["a", "b"]
+```
+
+Nested mutable containers still permit mutation:
+
+```py
+for values in {"a": [1]}.values():
+    reveal_type(values)  # revealed: list[int]
+    values.append(2)  # no diagnostic
+```
+
+## With unpacked literal dictionary
+
+Unpacking another dictionary literal preserves its literal keys and values. Unpacking an arbitrary
+mapping uses that mapping's key and value types.
+
+```py
+for key, value in {"a": 1, **{"b": 2}}.items():
+    reveal_type(key)  # revealed: Literal["a", "b"]
+    reveal_type(value)  # revealed: Literal[1, 2]
+
+def _(mapping: dict[str, int]):
+    for key, value in {"a": 1, **mapping}.items():
+        reveal_type(key)  # revealed: str
+        reveal_type(value)  # revealed: int
+```
+
+Repeated keys do not imply a fixed iteration length. Values from overwritten entries may still be
+included in the inferred union:
+
+```py
+for value in {**{1: "a"}, 1: "b"}.values():
+    reveal_type(value)  # revealed: Literal["a", "b"]
+
+(key,) = {1: "a", 1: "b"}  # no diagnostic
 ```
 
 ## With non-callable iterator
