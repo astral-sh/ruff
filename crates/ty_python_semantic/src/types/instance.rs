@@ -17,7 +17,7 @@ use crate::types::constraints::{
 };
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::walk_specialization;
+use crate::types::generics::{walk_specialization, walk_specialization_types};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
@@ -28,10 +28,10 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarSet};
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type_expanding_aliases, materialization_is_noop,
-    walk_type_with_recursion_guard,
+    DynamicContentMode, TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    dynamic_content_impl, walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -508,6 +508,315 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// Conservatively prove that materialization leaves a protocol's requirements unchanged.
+///
+/// A `true` result permits ignoring materialization when comparing this protocol. A `false`
+/// result can mean that inspection was incomplete, even if materialization is a no-op.
+///
+/// First inspect the specialized interface directly. If that is inconclusive, inspect the
+/// interface using the protocol's own type parameters to handle growing specializations.
+///
+/// The interface must be read inside this query. If a dependency is provisional during Salsa cycle
+/// recovery, `cycle_result` prevents an incomplete interface from being used as a proof; the
+/// structural comparison remains available as a fallback.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+fn protocol_materialization_is_noop<'db>(
+    db: &'db dyn Db,
+    program: crate::Program<'db>,
+    class: ProtocolClass<'db>,
+) -> bool {
+    let env = ProgramEnvironment::from_program(program);
+    protocol_materialization_is_noop_by_inspection(
+        db,
+        &env,
+        ProtocolInstanceType::from_class(class),
+    ) || protocol_materialization_is_noop_with_type_parameters(db, &env, class)
+}
+
+/// Prove by inspecting its member types that materialization leaves `protocol` unchanged.
+///
+/// The inspection accounts for callable signatures and the wrapped callable of a partial. It
+/// returns false when a lazily inferred signature cannot be inspected safely. It ignores metadata
+/// such as parameter-default types, which do not affect callable compatibility.
+///
+/// Inspecting a concrete specialization can prove cases that the type-parameter proof below cannot:
+///
+/// ```python
+/// from __future__ import annotations
+/// from typing import Any, Protocol
+///
+/// class P[T](Protocol):
+///     def value(self) -> T | Any: ...
+///     def child(self) -> P[T]: ...
+/// ```
+///
+/// For `P[object]`, the return type of `value` simplifies from `object | Any` to `object`.
+/// The return type of `child` is the same `P[object]` already being inspected, so its recursive
+/// reference adds no new requirements. Materialization therefore leaves `P[object]` unchanged.
+/// The type-parameter proof instead inspects `P[T]`, where `T | Any` is still gradual. It cannot
+/// establish the same result for arbitrary static arguments: `P[int]`, for example, retains
+/// the gradual return type `int | Any`.
+fn protocol_materialization_is_noop_by_inspection<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    protocol: ProtocolInstanceType<'db>,
+) -> bool {
+    dynamic_content_impl(
+        db,
+        env,
+        Type::ProtocolInstance(protocol),
+        DynamicContentMode::Materialization,
+    )
+    .is_absent()
+}
+
+/// Prove that materialization leaves a protocol specialization unchanged by inspecting its
+/// interface with type parameters as placeholders and checking its concrete type arguments.
+///
+/// A `true` result guarantees that its requirements are unchanged. A `false` result may mean that
+/// the proof could not establish this, even if materialization is a no-op.
+///
+/// For example, consider a protocol whose recursive type argument grows with each `child` call:
+///
+/// ```python
+/// class P[T](Protocol):
+///     def value(self) -> T: ...
+///     def child(self) -> P[list[T]]: ...
+/// ```
+///
+/// Inspecting every specialization reachable from `P[int]` would require visiting `P[list[int]]`,
+/// `P[list[list[int]]]`, and so on. Instead, inspect the interface of `P[T]` once, treating `T`
+/// as a placeholder for a fully static type, and separately check that the initial argument `int`
+/// is fully static. At the recursive reference `P[list[T]]`, check that `list[T]` stays fully
+/// static when `T` is fully static, without inspecting another specialized interface. Each
+/// recursive step therefore preserves fully static arguments, and neither member introduces
+/// any gradual types, so materialization leaves all these specializations unchanged.
+///
+/// If `child` instead returned `P[list[Any]]`, the recursive argument check would fail: a static
+/// initial argument does not prevent a later specialization from introducing gradual types.
+///
+/// The proof accepts ordinary properties and instance methods. Explicit receiver
+/// annotations must be direct, unmaterialized specializations of the same protocol, and are only
+/// supported for method-only interfaces. Other cases fall back to structural comparison.
+///
+/// This must be called from `protocol_materialization_is_noop` so that `cycle_result`
+/// rejects provisional interface results.
+fn protocol_materialization_is_noop_with_type_parameters<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ProtocolClass<'db>,
+) -> bool {
+    struct ParameterVisitor<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        origin: ClassLiteral<'db>,
+        class_context: Option<crate::types::generics::GenericContext<'db>>,
+        invalid: Cell<bool>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for ParameterVisitor<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(&self, db: &'db dyn Db, variable: BoundTypeVarInstance<'db>) {
+            // Signature generic contexts are visited even for unused parameters, so this also
+            // rejects method-scoped type variables absent from parameter and return types.
+            if !variable.typevar(db).is_self(db)
+                && self
+                    .class_context
+                    .is_none_or(|context| !context.contains(db, variable.identity(db)))
+            {
+                self.invalid.set(true);
+            }
+        }
+
+        fn visit_generic_alias_type(
+            &self,
+            db: &'db dyn Db,
+            alias: crate::types::GenericAlias<'db>,
+        ) {
+            let specialization = alias.specialization(db);
+            if specialization.materialization_kind(db).is_some() {
+                self.invalid.set(true);
+            } else {
+                walk_specialization_types(db, specialization, self);
+            }
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if self.invalid.get() {
+                return;
+            }
+            match ty {
+                Type::ProtocolInstance(protocol) => {
+                    if protocol.materialization_kind(db).is_some() {
+                        self.invalid.set(true);
+                        return;
+                    }
+                    let Some(class) = protocol.class_origin(db) else {
+                        self.invalid.set(true);
+                        return;
+                    };
+                    if class.class_literal(db) != self.origin {
+                        self.invalid.set(true);
+                    } else if let Some((_, Some(specialization))) = class.static_class_literal(db) {
+                        // Type variables in a recursive specialization are expected, but an
+                        // embedded gradual or unresolved type can change under materialization.
+                        self.invalid.set(
+                            specialization.materialization_kind(db).is_some()
+                                || specialization.tuple(db).is_some()
+                                || specialization.types(db).iter().any(|ty| {
+                                    if matches!(ty, Type::ProtocolInstance(_)) {
+                                        self.visit_type(db, *ty);
+                                        self.invalid.get()
+                                    } else {
+                                        !specialization_argument_is_static(
+                                            db,
+                                            self.env,
+                                            *ty,
+                                            self.class_context,
+                                        )
+                                    }
+                                }),
+                        );
+                    }
+                }
+                Type::TypeVar(variable)
+                    if self
+                        .class_context
+                        .is_some_and(|context| context.contains(db, variable.identity(db))) => {}
+                Type::Never
+                | Type::Callable(_)
+                | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::NominalInstance(_)
+                | Type::Union(_)
+                | Type::Intersection(_)
+                | Type::LiteralValue(_) => {
+                    walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                }
+                _ => self.invalid.set(true),
+            }
+        }
+    }
+
+    let Some((origin, specialization)) = class.static_class_literal(db) else {
+        return false;
+    };
+    if specialization
+        .is_some_and(|specialization| specialization.materialization_kind(db).is_some())
+    {
+        return false;
+    }
+    let interface = ProtocolInterfaceView::new(class.interface(db), None);
+    let Some(template) = origin.identity_specialization(db).into_protocol_class(db) else {
+        return false;
+    };
+    let template_view = ProtocolInterfaceView::new(template.interface(db), None);
+    let class_context = origin.generic_context(db);
+    if interface.member_count(db) != template_view.member_count(db) {
+        return false;
+    }
+
+    if class_context.is_some_and(|context| {
+        context.variables(db).any(|variable| {
+            variable.is_paramspec(db)
+                || variable.is_typevartuple(db)
+                || variable
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .is_some_and(|bounds| match bounds {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            !specialization_argument_is_static(db, env, bound, None)
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            // Check each constraint: their union could hide a gradual type,
+                            // as with `(object, Any)`.
+                            constraints.elements(db).iter().any(|constraint| {
+                                !specialization_argument_is_static(db, env, *constraint, None)
+                            })
+                        }
+                    })
+                || variable.typevar(db).default_type(db, env).is_some()
+        })
+    }) {
+        return false;
+    }
+    if let Some(specialization) = specialization
+        && (specialization.tuple(db).is_some()
+            || specialization
+                .types(db)
+                .iter()
+                .any(|ty| !specialization_argument_is_static(db, env, *ty, None)))
+    {
+        return false;
+    }
+    let visitor = ParameterVisitor {
+        env,
+        origin: origin.into(),
+        class_context,
+        invalid: Cell::new(false),
+        recursion_guard: TypeCollector::default(),
+    };
+    let receiver = Type::ProtocolInstance(ProtocolInstanceType::from_class(template));
+    let mut has_property = false;
+    let mut has_explicit_receiver = false;
+    for (member, template_member) in interface.members(db).zip(template_view.members(db)) {
+        if member.name() != template_member.name()
+            || !member.supports_type_parameter_materialization_proof(db, env, origin.into())
+            || !template_member.supports_type_parameter_materialization_proof(
+                db,
+                env,
+                origin.into(),
+            )
+        {
+            return false;
+        }
+        has_property |= !template_member.is_method();
+        has_explicit_receiver |= template_member.has_explicit_receiver_annotation(db);
+        if has_property && has_explicit_receiver {
+            return false;
+        }
+        walk_protocol_instance_member(db, &template_member, receiver, &visitor);
+        if visitor.invalid.get() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Check only closed, directly inspectable types. Recursive substitutions may additionally use
+/// the protocol's own parameters, whose bounds and defaults are checked separately.
+fn specialization_argument_is_static<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    class_context: Option<crate::types::generics::GenericContext<'db>>,
+) -> bool {
+    !any_over_type(db, env, ty, false, |nested| match nested {
+        Type::Never
+        | Type::ClassLiteral(_)
+        | Type::NominalInstance(_)
+        | Type::Union(_)
+        | Type::Intersection(_)
+        | Type::LiteralValue(_) => false,
+        Type::GenericAlias(alias) => alias.specialization(db).materialization_kind(db).is_some(),
+        Type::TypeVar(variable) => {
+            class_context.is_none_or(|context| !context.contains(db, variable.identity(db)))
+        }
+        _ => true,
+    })
+}
+
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
@@ -521,25 +830,72 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let mut result = self.never();
         let source_protocol = ty.as_protocol_instance();
 
-        // Every gradual type lies between its bottom and top materializations. Comparing the
-        // exact same class specialization can therefore settle these directions without expanding
-        // a recursive protocol's members or confusing opposite materialization requirements.
+        // Every gradual type lies between its bottom and top materializations, and is assignable
+        // to and from either one. Comparing the exact same class specialization can therefore
+        // settle these directions without expanding a recursive protocol's members.
         if let Some(source) = source_protocol
-            && matches!(
-                (
-                    source.materialization_kind(db),
-                    protocol.materialization_kind(db)
-                ),
-                (
-                    None | Some(MaterializationKind::Bottom),
-                    Some(MaterializationKind::Top)
-                ) | (Some(MaterializationKind::Bottom), None)
-            )
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin == target_origin
+            && (match (
+                source.materialization_kind(db),
+                protocol.materialization_kind(db),
+            ) {
+                (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
+                | (Some(MaterializationKind::Bottom), None) => true,
+                (Some(MaterializationKind::Top), None)
+                | (None, Some(MaterializationKind::Bottom))
+                    if self.relation.is_assignability() =>
+                {
+                    // A specialization may already carry a separate materialization marker.
+                    // For example, materializing `Box[Any]`, where `Box[T]` has an invariant
+                    // `P[T]` member, can put `Top` on the `P[Any]` specialization. A separate
+                    // `Bottom` protocol wrapper then has that top-materialized specialization
+                    // as its origin, not the original gradual `P[Any]`.
+                    source_origin
+                        .static_class_literal(db)
+                        .is_some_and(|(_, specialization)| {
+                            specialization.is_none_or(|specialization| {
+                                specialization.materialization_kind(db).is_none()
+                            })
+                        })
+                }
+                _ => false,
+            })
         {
             return self.always();
+        }
+
+        // If both instances share a protocol class, a proof that materialization is a no-op can
+        // simplify their comparison.
+        if let Some(source) = source_protocol
+            && (source.materialization_kind(db).is_some()
+                || protocol.materialization_kind(db).is_some())
+            && let (Some(source_origin), Some(target_origin)) =
+                (source.class_origin(db), protocol.class_origin(db))
+            && source_origin.class_literal(db) == target_origin.class_literal(db)
+        {
+            // For the same specialization, unchanged requirements settle the relationship.
+            if source != protocol
+                && source_origin == target_origin
+                && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
+            {
+                return self.always();
+            }
+
+            // A no-op source materialization can be removed before comparing method-only
+            // interfaces. For recursive properties and attributes, keep the wrapper: removing
+            // it can make the cycle guard reject distinct specializations that stabilize.
+            if source.materialization_kind(db).is_some()
+                && source.interface(db).has_only_methods(db)
+                && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
+            {
+                return self.check_type_pair(
+                    db,
+                    Type::ProtocolInstance(ProtocolInstanceType::from_class(source_origin)),
+                    Type::ProtocolInstance(protocol),
+                );
+            }
         }
 
         let source_protocol_as_nominal =
@@ -696,11 +1052,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
         for protocol in [source, target] {
             if let Some(origin) = protocol.materialized_origin(db)
-                && !materialization_is_noop(
-                    db,
-                    self.env,
-                    Type::ProtocolInstance(ProtocolInstanceType::from_class(origin)),
-                )
+                && !protocol_materialization_is_noop(db, self.env.program(db), origin)
             {
                 return None;
             }
@@ -1870,5 +2222,83 @@ mod synthesized_protocol {
         ) -> VarianceTerm<'db> {
             self.0.variance_of(db, env, typevar)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Context;
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
+
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
+    use crate::types::{CallableType, Parameter, Parameters, Signature, Type};
+
+    use super::protocol_materialization_is_noop_by_inspection;
+
+    #[test]
+    fn protocol_materialization_noop_checks_synthesized_types() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+            from __future__ import annotations
+            from typing import Any, Protocol, TypedDict
+            from ty_extensions._internal import TypeOf
+
+            class FunctionalTypedDict(Protocol):
+                def payload(self) -> TypeOf[TypedDict("Payload", {"value": int})(value=1)]: ...
+
+            class GradualFunctionalTypedDict(Protocol):
+                def payload(self) -> TypeOf[TypedDict("Payload", {"value": Any})(value=1)]: ...
+
+            functional_typed_dict: FunctionalTypedDict
+            gradual_functional_typed_dict: GradualFunctionalTypedDict
+            "#,
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        for (name, expected) in [
+            ("functional_typed_dict", true),
+            ("gradual_functional_typed_dict", false),
+        ] {
+            let protocol = global_symbol(&db, module, name)
+                .place
+                .expect_type()
+                .as_protocol_instance()
+                .context("expected a protocol instance")?;
+            assert_eq!(
+                protocol_materialization_is_noop_by_inspection(&db, &env, protocol),
+                expected,
+                "{name}"
+            );
+        }
+
+        for (ty, expected) in [(Type::object(), true), (Type::any(), false)] {
+            let synthesized = Type::protocol_with_readonly_members(&db, &env, [("value", ty)])
+                .as_protocol_instance()
+                .context("expected a synthesized protocol")?;
+            assert_eq!(
+                protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),
+                expected
+            );
+
+            let callable = CallableType::single(
+                &db,
+                Signature::new(Parameters::standard([Parameter::positional_only(None)]), ty),
+            );
+            let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)])
+                .as_protocol_instance()
+                .context("expected a synthesized protocol")?;
+            assert_eq!(
+                protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),
+                expected
+            );
+        }
+
+        Ok(())
     }
 }

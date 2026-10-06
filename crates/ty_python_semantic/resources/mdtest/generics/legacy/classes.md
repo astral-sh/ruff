@@ -2661,6 +2661,72 @@ def _(top: Top[Predicate[Any]], bottom: Bottom[Predicate[Any]], value: object) -
     reveal_type(bottom.unrelated(value))  # revealed: TypeIs[Any @ value]
 ```
 
+## Materialized recursive generic protocols
+
+Materialization leaves recursive return types unchanged when a receiver annotation names a fixed
+specialization:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Fixed(Protocol[T_co]):
+    def read(self: Fixed[int]) -> Fixed[tuple[T_co, T_co]]: ...
+
+static_assert(is_equivalent_to(Fixed[int], Top[Fixed[int]]))
+static_assert(is_equivalent_to(Fixed[int], Bottom[Fixed[int]]))
+```
+
+The receiver itself can name a growing specialization:
+
+```py
+class Growing(Protocol[T_co]):
+    def child(self) -> Growing[tuple[T_co, T_co]]: ...
+    def read(self: Growing[tuple[T_co, T_co]]) -> T_co: ...
+
+static_assert(is_equivalent_to(Growing[int], Top[Growing[int]]))
+```
+
+Overloads can require different receiver specializations:
+
+```py
+from typing import overload
+
+class Overloaded(Protocol[T_co]):
+    def child(self) -> Overloaded[tuple[T_co, T_co]]: ...
+    @overload
+    def read(self: Overloaded[int]) -> int: ...
+    @overload
+    def read(self: Overloaded[str]) -> str: ...
+
+static_assert(is_equivalent_to(Overloaded[int], Top[Overloaded[int]]))
+```
+
+Static bounds and constraints also leave materialization unchanged, including when the receiver's
+type argument grows:
+
+```py
+BoundedT = TypeVar("BoundedT", bound=object, covariant=True)
+
+class Bounded(Protocol[BoundedT]):
+    def read(self: Bounded[tuple[BoundedT, BoundedT]]) -> int: ...
+
+static_assert(is_equivalent_to(Bounded[int], Top[Bounded[int]]))
+static_assert(is_equivalent_to(Bounded[int], Bottom[Bounded[int]]))
+
+ConstrainedT = TypeVar("ConstrainedT", int, tuple[object, ...], covariant=True)
+
+class Constrained(Protocol[ConstrainedT]):
+    def read(self: Constrained[tuple[ConstrainedT, ConstrainedT]]) -> int: ...
+
+static_assert(is_equivalent_to(Constrained[int], Top[Constrained[int]]))
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an
