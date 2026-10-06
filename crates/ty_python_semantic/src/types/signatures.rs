@@ -1348,9 +1348,12 @@ impl<'db> Signature<'db> {
                 return_ty.apply_type_mapping(db, env, &self_mapping, TypeContext::default());
         }
         Self {
+            // If `Self` was the only type variable, the bound signature is nongeneric.
+            // Use `None` so it compares equal to other nongeneric signatures.
             generic_context: self
                 .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
+                .map(|generic_context| generic_context.remove_self(db, binding_context))
+                .filter(|generic_context| generic_context.len(db) > 0),
             definition: self.definition,
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),
