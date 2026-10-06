@@ -1547,15 +1547,10 @@ impl<'db> Signature<'db> {
         }
 
         let constraints = ConstraintSetBuilder::new();
+        let inferable = self.inferable_typevars(db);
         self_type
-            .when_assignable_to(
-                db,
-                env,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_always_satisfied(db, env)
+            .when_assignable_to(db, env, expected_self_ty, &constraints, inferable)
+            .is_always_satisfied(db, env, inferable)
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
@@ -1712,6 +1707,7 @@ impl<'db> Signature<'db> {
             TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
         let receiver_visitor = ApplyTypeMappingVisitor::new(env);
         let self_visitor = ApplyTypeMappingVisitor::new(env);
+        let inferable = self.inferable_typevars(db);
         let receiver_constraints = self
             .map_receiver_constraints(
                 db,
@@ -1729,7 +1725,9 @@ impl<'db> Signature<'db> {
                 )
             })
             .filter(|constraints| {
-                !constraints.query(|_builder, constraints| constraints.is_always_satisfied(db, env))
+                !constraints.query(|_builder, constraints| {
+                    constraints.is_always_satisfied(db, env, inferable)
+                })
             });
         if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
@@ -1787,8 +1785,9 @@ impl<'db> Signature<'db> {
     ) -> Option<OwnedConstraintSet<'db>> {
         let constraints =
             Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
-        (!constraints
-            .query(|_builder, constraints| constraints.is_always_satisfied(db, visitor.env)))
+        (!constraints.query(|_builder, constraints| {
+            constraints.is_always_satisfied(db, visitor.env, self.inferable_typevars(db))
+        }))
         .then_some(constraints)
     }
 
@@ -2025,7 +2024,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_signature_pair(db, &implementation, &overload)
-            .is_always_satisfied(db, env);
+            .is_always_satisfied(db, env, TypeVarSet::None);
 
         if is_consistent {
             ParameterConsistency::Consistent
@@ -2061,7 +2060,7 @@ impl<'db> Signature<'db> {
 
         let is_consistent = checker
             .check_type_pair(db, overload.return_ty, self.return_ty)
-            .is_always_satisfied(db, env);
+            .is_always_satisfied(db, env, TypeVarSet::None);
 
         if is_consistent {
             ReturnTypeConsistency::Consistent
@@ -2329,7 +2328,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let signatures_are_disjoint = self
                 .as_disjointness_checker()
                 .check_type_pair(db, self_parameter_type, other_parameter_type)
-                .is_always_satisfied(db, env);
+                .is_always_satisfied(db, env, self.inferable);
 
             if signatures_are_disjoint {
                 continue;
@@ -2352,7 +2351,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let aggregate_relation =
             parameters_cover_target.and(db, self.constraints, returns_match_target);
         aggregate_relation
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, self.inferable)
             .then_some(aggregate_relation)
     }
 
@@ -2449,7 +2448,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                                 target_signature,
                                             )
                                         })
-                                        .is_never_satisfied(db, env)
+                                        .is_never_satisfied(db, env, self.inferable)
                                 })
                                 .map(|signature| {
                                     Signature::new_generic(
@@ -2960,7 +2959,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         let return_type_checks = !result
             .intersect(db, self.constraints, return_type_constraints)
-            .is_never_satisfied(db, env);
+            .is_never_satisfied(db, env, self.inferable);
         if let Some(context) = self.report_context()
             && !return_type_checks
         {
@@ -3012,7 +3011,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 let no_collision = self.check_type_pair(db, keyword.annotated_type(), Type::Never);
                 if result
                     .intersect(db, self.constraints, no_collision)
-                    .is_never_satisfied(db, env)
+                    .is_never_satisfied(db, env, self.inferable)
                 {
                     // Still allow the ParamSpec handling below to preserve its inferred binding.
                     keyword_collision_checks = false;
@@ -3050,7 +3049,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
             let constraint_set = self.check_type_pair(db, target_ty, source_ty);
             if let Some(context) = self.report_context()
-                && constraint_set.is_never_satisfied(db, env)
+                && constraint_set.is_never_satisfied(db, env, self.inferable)
             {
                 let parameter = ParameterDescription::new(target_index, target_name);
                 context.push(ErrorContext::IncompatibleParameterTypes {
@@ -3063,7 +3062,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // replace the diagnostic context that explains the incompatible parameter.
             !result
                 .intersect(db, self.constraints, constraint_set)
-                .is_never_satisfied(db, env)
+                .is_never_satisfied(db, env, self.inferable)
         };
         let parameter_must_have_default = |parameter: &Parameter<'db>, index: usize| {
             ErrorContext::RequiredParameterMustHaveDefault {

@@ -3188,6 +3188,35 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(result);
                     }
 
+                    Type::KnownBoundMethod(
+                        method @ (KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(tracked)
+                        | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(tracked)),
+                    ) => {
+                        let [Some(inferable)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::NominalInstance(inferable) = inferable.project_type_form(db, env)
+                        else {
+                            continue;
+                        };
+                        let Some(inferable) = inferable_typevars_from_tuple(db, env, &inferable)
+                        else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).query(|_builder, set| {
+                            if matches!(
+                                method,
+                                KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                            ) {
+                                set.is_always_satisfied(db, env, inferable)
+                            } else {
+                                set.is_never_satisfied(db, env, inferable)
+                            }
+                        });
+                        overload.set_return_type(Type::bool_literal(result));
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSolutions(
                         tracked,
                     )) => {
@@ -4010,7 +4039,7 @@ impl<'db> CallableBinding<'db> {
                             constraints,
                             overload.inferable_typevars,
                         )
-                        .is_always_satisfied(db, env)
+                        .is_always_satisfied(db, env, overload.inferable_typevars)
                 })
             });
             if !is_argument_assignable_to_any_overload {
@@ -4310,7 +4339,7 @@ impl<'db> CallableBinding<'db> {
                     (Some(first_parameter_type), Some(current_parameter_type)) => {
                         if !first_parameter_type
                             .when_equivalent_to(db, env, current_parameter_type, constraints)
-                            .is_always_satisfied(db, env)
+                            .is_always_satisfied(db, env, TypeVarSet::None)
                         {
                             participating_slot_indices.insert(slot_index);
                         }
@@ -4394,15 +4423,10 @@ impl<'db> CallableBinding<'db> {
                 }),
             );
 
+            let inferable = self.overloads[*current_index].inferable_typevars;
             if top_materialized_argument_type
-                .when_assignable_to(
-                    db,
-                    env,
-                    parameter_types,
-                    constraints,
-                    self.overloads[*current_index].inferable_typevars,
-                )
-                .is_always_satisfied(db, env)
+                .when_assignable_to(db, env, parameter_types, constraints, inferable)
+                .is_always_satisfied(db, env, inferable)
             {
                 filter_remaining_overloads = true;
             }
@@ -4421,7 +4445,7 @@ impl<'db> CallableBinding<'db> {
                     overload
                         .return_type()
                         .when_equivalent_to(db, env, first_overload_return_type, constraints)
-                        .is_always_satisfied(db, env)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
                 })
             } else {
                 // No matching overload
@@ -5662,7 +5686,7 @@ fn validate_keyword_unpack_key_type<'db>(
             constraints,
             inferable_typevars,
         )
-        .is_always_satisfied(db, env)
+        .is_always_satisfied(db, env, inferable_typevars)
     {
         KeywordUnpackKeyTypeCheck::Valid
     } else {
@@ -6825,7 +6849,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     constraints,
                     self.inferable_typevars,
                 )
-                .is_never_satisfied(db, self.env)
+                .is_never_satisfied(db, self.env, self.inferable_typevars)
             && !self.should_defer_typevartuple_callable_check(
                 parameter.annotated_type(),
                 expected_ty,

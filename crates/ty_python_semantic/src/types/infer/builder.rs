@@ -5853,7 +5853,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 !overload
                     .return_ty
                     .when_assignable_to(db, env, narrowed_ty, &constraints, inferable)
-                    .is_never_satisfied(db, env)
+                    .is_never_satisfied(db, env, inferable)
             }) {
                 return None;
             }

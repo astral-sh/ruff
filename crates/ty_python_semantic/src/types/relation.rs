@@ -238,6 +238,8 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetForAll(_)
                 | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                 | KnownBoundMethodType::ConstraintSetSolutions(_)
+                | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
             | Type::DataclassDecorator(_)
@@ -299,7 +301,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_subtype_of(db, env, target, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(super) fn when_subtype_of<'c>(
@@ -348,7 +350,7 @@ impl<'db> Type<'db> {
         target: Type<'db>,
     ) -> bool {
         self.when_assignable_to_owned(db, env, target, TypeVarSet::None)
-            .query(|_constraints, when| when.is_always_satisfied(db, env))
+            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
 
     /// Re-run the assignability check with error context collection enabled.
@@ -422,7 +424,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, env, target, &constraints)
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Return true if this type is a subtype of `target` for every specialization of the type
@@ -448,7 +450,7 @@ impl<'db> Type<'db> {
                     TypeRelation::Subtyping,
                     TypeVarEvaluation::Lazy,
                 )
-                .is_always_satisfied(db, &env)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
         is_constraint_set_subtype_of_impl(db, TypePair::new(db, env.program(db), self, target))
@@ -640,7 +642,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Redundancy { pure: false },
                 )
-                .is_always_satisfied(db, &env)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
         if self == other {
@@ -675,7 +677,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Redundancy { pure: true },
         )
-        .is_always_satisfied(db, &env)
+        .is_always_satisfied(db, &env, TypeVarSet::None)
     }
 
     pub(super) fn has_relation_to<'c>(
@@ -748,7 +750,7 @@ impl<'db> Type<'db> {
         other: Type<'db>,
     ) -> bool {
         self.when_equivalent_to(db, env, other, &ConstraintSetBuilder::new())
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(crate) fn is_equivalent_to_with_materialization_visitor(
@@ -764,7 +766,7 @@ impl<'db> Type<'db> {
             materialization_visitor,
             TypeVarEvaluation::Eager,
         )
-        .is_always_satisfied(db, materialization_visitor.env)
+        .is_always_satisfied(db, materialization_visitor.env, TypeVarSet::None)
     }
 
     pub(crate) fn when_equivalent_to<'c>(
@@ -836,7 +838,7 @@ impl<'db> Type<'db> {
         }
 
         self.when_constraint_set_equivalent_to_owned(db, env, other)
-            .query(|_constraints, when| when.is_always_satisfied(db, env))
+            .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
 
     fn when_equivalent_to_with_materialization_visitor<'c>(
@@ -886,7 +888,7 @@ impl<'db> Type<'db> {
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_disjoint_from(db, env, other, &constraints, TypeVarSet::None)
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(crate) fn when_disjoint_from<'c>(
@@ -1186,7 +1188,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             self.materialization_visitor,
         )
         .check_class_pair(db, source, target)
-        .is_always_satisfied(db, env)
+        .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -1249,7 +1251,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .when_all(db, self.constraints, |&element| {
                 let constraint_set = self.check_type_pair(db, element, target);
                 if let Some(context) = self.report_context()
-                    && constraint_set.is_never_satisfied(db, self.env)
+                    && constraint_set.is_never_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::NotAllUnionElementsAssignable {
                         element,
@@ -1329,7 +1331,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         if context_tree.is_some()
             && !elements_context.is_empty()
-            && result.is_never_satisfied(db, self.env)
+            && result.is_never_satisfied(db, self.env, self.inferable)
         {
             let elements_without_context = elements.len() - elements_context.len();
             if elements_without_context > 0 && elements_without_context < elements.len() {
@@ -1364,7 +1366,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .when_all(db, self.constraints, |&positive| {
                 let constraint_set = self.check_type_pair(db, source, positive);
                 if let Some(context) = self.report_context()
-                    && constraint_set.is_never_satisfied(db, self.env)
+                    && constraint_set.is_never_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::NotAssignableToIntersectionElement {
                         source,
@@ -1454,7 +1456,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         if context_tree.is_some()
             && !elements_context.is_empty()
-            && result.is_never_satisfied(db, self.env)
+            && result.is_never_satisfied(db, self.env, self.inferable)
         {
             self.set_context(
                 ErrorContext::NoIntersectionElementAssignableToTarget {
@@ -1555,7 +1557,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // recompute unsatisfiable comparisons while preserving the active recursion
                 // guards. Satisfiable constraints remain reusable, including those that
                 // constrain type variables.
-                |result| !collect_context || !result.is_never_satisfied(db, self.env),
+                |result| {
+                    !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
+                },
                 work,
             )
             .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
@@ -2212,7 +2216,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.check_type_pair(db, source, *c)
                             })
                         })
-                    && !constraints.is_never_satisfied(db, env) =>
+                    && !constraints.is_never_satisfied(db, env, self.inferable) =>
             {
                 constraints
             }
@@ -2455,7 +2459,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                     if let Some(context) = self.report_context()
                         && self.should_provide_callable_upcast_context(source)
-                        && result.is_never_satisfied(db, env)
+                        && result.is_never_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::InferredCallableType {
                             source,
@@ -2518,7 +2522,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.as_equivalence_checker()
                                     .check_type_pair(db, field_ty, extra_ty)
                             };
-                            result.is_always_satisfied(db, env)
+                            result.is_always_satisfied(db, env, TypeVarSet::None)
                         });
                     let fallback = if let Some(value_ty) = dict_value_type {
                         KnownClass::Dict.to_specialized_instance(
@@ -2539,7 +2543,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     let result = self.check_type_pair(db, fallback, target);
 
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
+                        && result.is_never_satisfied(db, env, self.inferable)
                         && let Type::NominalInstance(instance) = target
                     {
                         match instance.class(db, env).known(db) {
@@ -2562,7 +2566,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
                                 if self
                                     .check_type_pair(db, closed_typeddict_fallback, target)
-                                    .is_always_satisfied(db, env)
+                                    .is_always_satisfied(db, env, self.inferable)
                                 {
                                     let context_element =
                                         ErrorContext::OpenTypedDictNotAssignableToMapping {
@@ -3071,7 +3075,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
 pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
-    inferable: TypeVarSet<'db>,
+    pub(super) inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
     perform_expensive_checks: bool,
 
@@ -3148,7 +3152,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         let result = check(&checker);
         if let Some(context) = self.report_context() {
             context.take();
-            if result.is_never_satisfied(db, self.env) {
+            if result.is_never_satisfied(db, self.env, checker.inferable) {
                 context.replace(&checker.into_error_context());
             }
         }
@@ -3230,7 +3234,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                         ConstraintSet::from_bool(self.constraints, incompatible)
                     });
                 if let Some(context) = self.report_context()
-                    && result.is_always_satisfied(db, env)
+                    && result.is_always_satisfied(db, env, self.inferable)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name().into(),
@@ -3291,7 +3295,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         }
         let result = self.check_type_pair_impl(db, left, right);
         if let Some(context) = self.report_context()
-            && !result.is_always_satisfied(db, self.env)
+            && !result.is_always_satisfied(db, self.env, self.inferable)
         {
             // A failed alternative is not evidence for a later successful disjointness check.
             context.take();
@@ -3467,7 +3471,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             result
                         });
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, env)
+                        && result.is_always_satisfied(db, env, self.inferable)
                     {
                         context.set(
                             ErrorContext::DisjointUnion {
@@ -3831,7 +3835,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 Place::Undefined => self.never(),
                             };
                             if let Some(context) = self.report_context()
-                                && result.is_always_satisfied(db, env)
+                                && result.is_always_satisfied(db, env, self.inferable)
                             {
                                 context.push(ErrorContext::ProtocolMemberIncompatible {
                                     member_name: member.name().into(),

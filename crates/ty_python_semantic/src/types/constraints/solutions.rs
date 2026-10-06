@@ -712,7 +712,7 @@ impl<'db> SolutionWalker<'db> {
         let when = when_lower.and(storage, when_upper);
         let when_source_order =
             storage.ordered_source_order(when_lower_source_order, when_upper_source_order);
-        !when.is_never_satisfied(db, env, storage, when_source_order)
+        !when.is_never_satisfied(db, env, storage, self.inferable, when_source_order)
     }
 
     /// Finds evidence that excludes every declared constraint without relying on both sides of
@@ -736,7 +736,7 @@ impl<'db> SolutionWalker<'db> {
                     self.inferable,
                 );
                 let (when, source_order) = storage.load(db, env, &when);
-                when.is_never_satisfied(db, env, storage, source_order)
+                when.is_never_satisfied(db, env, storage, self.inferable, source_order)
             })
         {
             return ControlFlow::Continue(Some(ConstraintFailureEvidence::Lower(lower)));
@@ -806,7 +806,7 @@ impl<'db> SolutionWalker<'db> {
                             when = when.and(storage, next);
                             source_order = storage.ordered_source_order(source_order, next_order);
                         }
-                        when.is_never_satisfied(db, env, storage, source_order)
+                        when.is_never_satisfied(db, env, storage, self.inferable, source_order)
                     })
             };
         if excludes_every_constraint(storage, &upper_bounds) {

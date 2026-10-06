@@ -1050,7 +1050,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if type_to_check
                                 .when_assignable_to(db, env, bound, &constraints, TypeVarSet::None)
-                                .is_never_satisfied(db, env)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context
@@ -1087,7 +1087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     &constraints,
                                     TypeVarSet::None,
                                 )
-                                .is_never_satisfied(db, env)
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                             {
                                 if let Some(builder) = self
                                     .context

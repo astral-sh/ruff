@@ -1,6 +1,7 @@
 //! Display implementations for types.
 
 use crate::ProgramEnvironment;
+use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
@@ -1567,6 +1568,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     }
                     KnownBoundMethodType::ConstraintSetSolutions(_) => {
                         return f.write_str("bound method `ConstraintSet.solutions`");
+                    }
+                    KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_) => {
+                        return f.write_str("bound method `ConstraintSet.is_always_satisfied`");
+                    }
+                    KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_) => {
+                        return f.write_str("bound method `ConstraintSet.is_never_satisfied`");
                     }
                     KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                         return f.write_str("bound method `ConstraintSet.with_detailed_display`");
@@ -3925,9 +3932,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'_, 'db> {
                 let set = constraints.load(db, self.env, interned_set.constraints(db));
                 if interned_set.detailed_display(db) {
                     write!(f, "[{}]", set.display(db, self.env))
-                } else if set.is_always_satisfied(db, self.env) {
+                } else if set.is_always_satisfied(db, self.env, TypeVarSet::None) {
                     f.write_str("[Literal[True]]")
-                } else if set.is_never_satisfied(db, self.env) {
+                } else if set.is_never_satisfied(db, self.env, TypeVarSet::None) {
                     f.write_str("[Literal[False]]")
                 } else {
                     f.write_str("[bool]")
