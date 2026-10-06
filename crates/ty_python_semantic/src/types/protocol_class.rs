@@ -474,29 +474,24 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.members(db).all(|member| member.is_method())
     }
 
-    /// Whether every declared property type can be inspected by the member walker.
-    pub(super) fn has_resolvable_member_types(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> bool {
-        self.members(db).all(|member| match member.data.kind {
-            ProtocolMemberKind::Property { read, write } => {
-                read.is_none_or(|read| read.resolve(db, env).is_some())
-                    && write.is_none_or(|write| match write {
-                        ProtocolMemberWrite::Type(ty) => ty.resolve(db, env).is_some(),
-                        ProtocolMemberWrite::Descriptor { descriptor, domain } => {
-                            // An unrepresentable domain is retained as a descriptor requirement;
-                            // materialization only transforms the domain when one is available.
-                            descriptor.resolve(db, env).is_some()
-                                && domain.is_none_or(|domain| domain.resolve(db, env).is_some())
-                        }
-                    })
-            }
-            ProtocolMemberKind::Method(..) | ProtocolMemberKind::Attribute(_) => true,
-        })
-    }
-
+    /// Returns whether the members have forms supported by the type-parameter materialization proof.
+    ///
+    /// That proof inspects `P[T]` once and treats recursive specializations of `P` as leaves after
+    /// checking their arguments. This check limits the member binding and accessor resolution it
+    /// needs to account for:
+    ///
+    /// - Ordinary properties must have resolvable getter return types and setter value types.
+    /// - Instance methods must have at least one signature, and every overload must have a
+    ///   positional receiver. The walker binds inferred receivers. Explicit receivers must be
+    ///   direct, unmaterialized specializations of `class_origin`, so the proof can handle them
+    ///   using the same rule as other recursive references to `P`.
+    ///
+    /// Arbitrary descriptor access can select an overload based on the specialized receiver;
+    /// inspecting `P[T]` alone does not establish the result for every specialization.
+    /// Attributes, arbitrary descriptors, static methods, class methods, and other receiver forms
+    /// are conservatively excluded from this proof. They may still be unchanged by materialization;
+    /// the caller can use concrete interface inspection or structural comparison instead.
+    /// This check does not establish that the supported member types or type arguments are static.
     pub(super) fn has_only_inspectable_members_with_positional_receivers(
         self,
         db: &'db dyn Db,
@@ -757,6 +752,9 @@ pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> +
 /// class P[T](Protocol):
 ///     def method(self) -> T: ...
 /// ```
+///
+/// If a property's exposed type cannot be extracted, visit its accessor callable instead.
+/// Extraction can fail for valid signatures, such as setters that accept the value via `*args`.
 pub(super) fn walk_protocol_instance_interface<
     'db,
     V: super::visitor::TypeVisitor<'db> + ?Sized,
@@ -1606,14 +1604,12 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
         .and_then(|read| read.result_type(db, env, self_type));
     if let Some(read_ty) = read_ty {
         visitor.visit_type(db, read_ty);
-    } else if self_type.is_none()
-        && access.mode == ProtocolMemberAccessMode::Instance
+    } else if access.mode == ProtocolMemberAccessMode::Instance
         && let ProtocolMemberKind::Property {
             read: Some(read), ..
         } = access.declaration.kind
     {
-        // If no receiver type was supplied, fall back to the accessor callable when
-        // its read type cannot be extracted.
+        // Fall back to the accessor callable when its read type cannot be extracted.
         visitor.visit_type(db, read.ty());
     }
 
@@ -1626,9 +1622,7 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
         .and_then(ProtocolMemberWriteRequirement::accepted_type);
     if let Some(write_ty) = write_ty {
         visitor.visit_type(db, write_ty);
-    } else if self_type.is_none()
-        && let Some(domain) = write.declaration.domain()
-    {
+    } else if let Some(domain) = write.declaration.domain() {
         // Apply the same accessor fallback when the write type cannot be extracted.
         visitor.visit_type(db, domain.ty());
     }

@@ -605,16 +605,6 @@ pub(super) fn dynamic_content_impl<'db>(
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            if matches!(self.mode, DynamicContentMode::Materialization)
-                && !protocol
-                    .interface(db)
-                    .has_resolvable_member_types(db, self.env)
-            {
-                // The member walker skips unresolved accessors. An incomplete inspection
-                // cannot establish that materialization leaves the requirements unchanged.
-                self.record(DynamicContent::Indeterminate);
-                return;
-            }
             let Some((origin, specialization)) = protocol
                 .class_origin(db)
                 .and_then(|class| class.static_class_literal(db))
@@ -1030,6 +1020,12 @@ mod tests {
                 @property
                 def callback(self) -> TypeOf[gradual_callback]: ...
 
+            class VariadicSetter(Protocol):
+                @property
+                def value(self) -> int: ...
+                @value.setter
+                def value(self, *values: Any) -> None: ...
+
             class Recursive[T](Protocol):
                 @property
                 def value(self) -> T: ...
@@ -1037,6 +1033,7 @@ mod tests {
                 def child(self) -> Recursive[T]: ...
 
             callbacks: Recursive[Callbacks]
+            variadic_setter: VariadicSetter
             partial_callback = partial(gradual_callback, 0)
             partial_call = partial_callback.__call__
             "#,
@@ -1044,7 +1041,12 @@ mod tests {
         let env = db.program_environment();
         let file = system_path_to_file(&db, "/src/a.py")?;
         let module = ProgramFile::new(&db, file, env.program(&db));
-        for name in ["callbacks", "partial_callback", "partial_call"] {
+        for name in [
+            "callbacks",
+            "variadic_setter",
+            "partial_callback",
+            "partial_call",
+        ] {
             let ty = global_symbol(&db, module, name).place.expect_type();
             assert!(
                 !dynamic_content_impl(&db, &env, ty, DynamicContentMode::Materialization)
