@@ -167,3 +167,38 @@ class UnacceptableOverload2:
     @overload
     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+# Stringized annotations are equivalent to the unquoted ones (#27755)
+class GoodStringized:
+    def __exit__(self, typ: "type[BaseException] | None", exc: "BaseException | None", tb: "TracebackType | None") -> None: ...
+    async def __aexit__(self, typ: type[BaseException] | None, exc: BaseException | None, tb: "types.TracebackType | None") -> None: ...
+
+class GoodStringizedObject:
+    def __exit__(self, typ: "object", exc: "object", tb: "object") -> None: ...
+    async def __aexit__(self, typ: "Unused", exc: object, tb: "object") -> None: ...
+
+class GoodStringizedStarArgs:
+    def __exit__(self, *args: "object") -> None: ...
+    async def __aexit__(self, typ: "type[BaseException] | None", *args: "object") -> None: ...
+
+class BadStringized:
+    def __exit__(self, typ: "type[BaseException]", exc: "BaseException | None", tb: "Exception | None") -> None: ...  # PYI036
+    async def __aexit__(self, typ: type[BaseException] | None, exc: "BaseException", tb: "TracebackType") -> None: ...  # PYI036
+
+class BadStringizedStarArgs:
+    def __exit__(self, *args: "int") -> None: ...  # PYI036
+    async def __aexit__(self, *args: "str") -> None: ...  # PYI036
+
+class AcceptableStringizedOverload:
+    @overload
+    def __exit__(self, exc_typ: "None", exc: "None", tb: "None") -> None: ...
+    @overload
+    def __exit__(self, exc_typ: "type[BaseException]", exc: "BaseException", tb: "TracebackType") -> None: ...
+    def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+class UnacceptableStringizedOverload:
+    @overload
+    def __exit__(self, exc_typ: "type[BaseException] | None", exc: "None", tb: "None") -> None: ...  # PYI036
+    @overload
+    def __exit__(self, exc_typ: "object", exc: "Exception", tb: "TracebackType") -> None: ...  # PYI036
+    def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
