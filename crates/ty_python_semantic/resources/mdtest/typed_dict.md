@@ -430,17 +430,9 @@ bob["extra"] = True
 
 ## Unpacked assignments to `TypedDict` variables
 
-This is a regression test for a bug in an early implementation of precise annotations for unpacked
-assignments.
-
-When a dictionary literal is assigned directly to a `TypedDict` variable, ty checks the literal
-against the variable's type and suppresses the assignment diagnostic to avoid reporting the same
-error twice. A dictionary literal inside an unpacked value does not receive that type context, so
-this more specific diagnostic is never emitted.
-
-The early implementation passed the inner dictionary to the duplicate-diagnostic check after
-identifying it for the primary annotation. This incorrectly suppressed the assignment diagnostic as
-well, causing ty to report no error for an incompatible dictionary.
+An unpacking target supplies its `TypedDict` annotation as context for the corresponding dictionary
+literal. Invalid fields produce a diagnostic at the field value, without a second diagnostic for the
+assignment.
 
 ```py
 from typing import TypedDict
@@ -449,19 +441,96 @@ class Payload(TypedDict):
     value: int
 
 payload: Payload
-payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
+payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-argument-type
+reveal_type(payload)  # revealed: Payload
+reveal_type(other)  # revealed: Literal[0]
 ```
 
 ```snapshot
-error[invalid-assignment]: Object of type `dict[str, str]` is not assignable to `Payload`
- --> src/mdtest_snippet.py:7:19
+error[invalid-argument-type]: Invalid argument to key "value" with declared type `int` on TypedDict `Payload`
+ --> src/mdtest_snippet.py:7:29
   |
-6 | payload: Payload
-  |          ------- Declared type
-7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-assignment
-  | -------           ^^^^^^^^^^^^^^^^^^ Incompatible value of type `dict[str, str]`
-  | |
-  | Assigned to this variable
+7 | payload, other = ({"value": "wrong"}, 0)  # snapshot: invalid-argument-type
+  |                   ----------^^^^^^^-
+  |                   ||        |
+  |                   ||        value of type `Literal["wrong"]`
+  |                   |key has declared type `int`
+  |                   TypedDict `Payload`
+info: Item declaration
+ --> src/mdtest_snippet.py:4:5
+  |
+4 |     value: int
+  |     ---------- Item declared here
+```
+
+Expanding a literal tuple retains the correspondence between each source expression and its target.
+The declaration therefore supplies context to the dictionary inside the expanded tuple.
+
+```py
+# error: [invalid-argument-type]
+payload, other = ({"value": "wrong"}, *(0,))
+reveal_type(payload)  # revealed: Payload
+reveal_type(other)  # revealed: Literal[0]
+```
+
+Expanding an existing iterable does not change the destination of a preceding fixed expression. The
+dictionary still receives `payload`'s context, even though the iterable's elements have no
+individual source expressions.
+
+```py
+def assign_from_iterable(tail: tuple[int]):
+    payload: Payload
+    # error: [invalid-argument-type]
+    payload, other = ({"value": "wrong"}, *tail)
+```
+
+Unpacking a dictionary itself assigns its keys to the targets. The dictionary is not a `TypedDict`
+literal assigned to `payload`, so the incompatible key type still produces an assignment diagnostic.
+
+```py
+# snapshot: invalid-assignment
+payload, other = {"value": 1, "other": 2}
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `str` is not assignable to `Payload`
+  --> src/mdtest_snippet.py:19:18
+   |
+19 | payload, other = {"value": 1, "other": 2}
+   | -------          ^^^^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `str`
+   | |
+   | Assigned to this variable
+   |
+  ::: src/mdtest_snippet.py:6:10
+   |
+ 6 | payload: Payload
+   |          ------- Declared type
+```
+
+The same contextual check applies when the target is a `TypedDict` key. Tuple, list, and nested
+unpacking each report the invalid field value without an additional assignment diagnostic.
+
+```py
+class Container(TypedDict):
+    payload: Payload
+
+def assign_container(container: Container):
+    # error: [invalid-argument-type] "Invalid argument to key "value" with declared type `int` on TypedDict `Payload`"
+    container["payload"], other = ({"value": "wrong"}, 0)
+
+    # error: [invalid-argument-type]
+    [container["payload"], other] = [{"value": "wrong"}, 0]
+
+    # error: [invalid-argument-type]
+    (container["payload"],), other = (({"value": "wrong"},), 0)
+```
+
+An expanded literal likewise receives a `TypedDict` key's context and reports its invalid field.
+
+```py
+def assign_literal_expansion(container: Container):
+    # error: [invalid-argument-type]
+    container["payload"], other = ({"value": "wrong"}, *(0,))
 ```
 
 ## Nested `TypedDict`
