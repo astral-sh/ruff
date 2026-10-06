@@ -1,0 +1,23 @@
+[package]
+name = "ruff_regex"
+version = "0.0.16"
+description = "This is an internal component crate of Ruff"
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+doctest = false
+
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+regex = { workspace = true }
+
+[target.'cfg(target_family = "wasm")'.dependencies]
+regex-lite = { workspace = true }
+
+[lints]
+workspace = true

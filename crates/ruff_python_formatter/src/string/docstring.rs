@@ -7,12 +7,12 @@ use std::sync::LazyLock;
 use std::{borrow::Cow, collections::VecDeque};
 
 use itertools::Itertools;
-use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
 use ruff_python_parser::ParseOptions;
 use ruff_python_trivia::TriviaRanges;
+use ruff_regex::Regex;
 use {
     ruff_formatter::{FormatOptions, IndentStyle, LineWidth, Printed, write},
     ruff_python_trivia::{PythonWhitespace, is_python_whitespace, tab_offset},
@@ -1338,7 +1338,7 @@ impl<'src> CodeExampleMarkdown<'src> {
                     # groups to determine whether the block is labeled or not.
                     (?<ticks>```+)(?:\s*(?<ticklang>(?i:python|py|python3|py3))[^`]*)?
                     |
-                    (?<tilds>~~~+)(?:\s*(?<tildlang>(?i:python|py|python3|py3))\p{any}*)?
+                    (?<tilds>~~~+)(?:\s*(?<tildlang>(?i:python|py|python3|py3))(?s:.*))?
                 )
                 $
                 ",
