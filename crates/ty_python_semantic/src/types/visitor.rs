@@ -51,6 +51,24 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
+    /// Visit a signature, allowing overrides to bind its local type parameters during traversal.
+    fn visit_signature(&self, db: &'db dyn Db, signature: &super::Signature<'db>) {
+        super::walk_signature(db, signature, self);
+    }
+
+    /// Visit a type with the generic context that binds its local type parameters.
+    ///
+    /// Property accessors retain this context when their exposed types are extracted, without
+    /// requiring visitors to inspect unrelated parameters in the accessor signature.
+    fn visit_type_in_generic_context(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        _context: Option<GenericContext<'db>>,
+    ) {
+        self.visit_type(db, ty);
+    }
+
     fn visit_union_type(&self, db: &'db dyn Db, union: UnionType<'db>) {
         walk_union(db, union, self);
     }
@@ -466,9 +484,12 @@ pub(super) fn dynamic_content<'db>(
 
 /// Determine whether `ty` contains a dynamic type other than `Any`.
 ///
-/// Class-based protocol interfaces can be recursively specialized. An exact recursive cycle adds
-/// no new information, but revisiting the same protocol definition under a different
-/// specialization may expose different members and is therefore indeterminate.
+/// Type-variable bounds and constraints are included. A bound of `Unknown` prevents a redundant-cast
+/// diagnostic even when the source and target types are considered equivalent.
+///
+/// Class-based protocol interfaces can be recursively specialized. Finite specialization cycles
+/// are inspected until an exact type repeats. A recursion that can keep producing new
+/// specializations is indeterminate.
 ///
 /// ```python
 /// class Exact[T](Protocol):
@@ -497,10 +518,7 @@ pub(super) fn dynamic_content_impl<'db>(
     struct DynamicContentVisitor<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
         recursion_guard: TypeCollector<'db>,
-        active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
-        active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
-        active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
-        active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
+        active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
         content: Cell<DynamicContent>,
         mode: DynamicContentMode,
     }
@@ -519,7 +537,7 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn should_visit_lazy_type_attributes(&self) -> bool {
-            true
+            false
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -571,6 +589,20 @@ pub(super) fn dynamic_content_impl<'db>(
             }
         }
 
+        fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+
+            // Revisiting this type variable adds no new content. The original visit still
+            // checks its remaining bounds and default.
+            self.active_types.visit(
+                &Type::KnownInstance(KnownInstanceType::TypeVar(typevar)).to_type_identity(db),
+                || {},
+                || walk_type_var_attributes(db, typevar, self),
+            );
+        }
+
         fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
             // Use `walk_specialization_types` rather than `walk_specialization` to avoid walking
             // the bounds/constraints/defaults of the generic context.
@@ -586,18 +618,26 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-            self.active_type_aliases.visit(
-                &alias.definition(db),
+            self.active_types.visit(
+                &Type::TypeAlias(alias).to_type_identity(db),
                 || self.record(DynamicContent::Indeterminate),
-                || walk_type_alias_type(db, alias, self),
+                || self.visit_type(db, alias.value_type(db)),
             );
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            self.active_recursive_types.visit(
-                &recursive.constructor(db),
+            self.active_types.visit(
+                &Type::Recursive(recursive).to_type_identity(db),
                 || self.record(DynamicContent::Indeterminate),
                 || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+            );
+        }
+
+        fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+            self.active_types.visit(
+                &Type::NewTypeInstance(newtype).to_type_identity(db),
+                || self.record(DynamicContent::Indeterminate),
+                || walk_newtype_base(db, newtype, self),
             );
         }
 
@@ -607,7 +647,7 @@ pub(super) fn dynamic_content_impl<'db>(
             protocol: ProtocolInstanceType<'db>,
         ) {
             let protocol_ty = Type::ProtocolInstance(protocol);
-            let Some((origin, specialization)) = protocol
+            let Some((_, specialization)) = protocol
                 .class_origin(db)
                 .and_then(|class| class.static_class_literal(db))
             else {
@@ -618,18 +658,14 @@ pub(super) fn dynamic_content_impl<'db>(
             };
 
             if let Some(specialization) = specialization {
-                // Bounds and defaults in the generic context do not describe the specialized
-                // instance; only inspect the types assigned to its parameters.
-                for ty in specialization.types(db) {
-                    self.visit_type(db, *ty);
-                    if !self.content.get().is_absent() {
-                        return;
-                    }
+                walk_specialization_types(db, specialization, self);
+                if !self.content.get().is_absent() {
+                    return;
                 }
             }
 
-            self.active_class_protocols.visit(
-                &origin,
+            self.active_types.visit(
+                &protocol.dynamic_content_identity(db),
                 || self.record(DynamicContent::Indeterminate),
                 || {
                     walk_protocol_instance_interface(db, protocol.interface(db), protocol_ty, self);
@@ -638,20 +674,27 @@ pub(super) fn dynamic_content_impl<'db>(
         }
 
         fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
-            let Some((origin, _)) = typed_dict
+            let Some((_, specialization)) = typed_dict
                 .defining_class()
                 .and_then(|class| class.static_class_literal(db))
             else {
                 // Synthesized schemas and inline functional TypedDict schemas are immutable
                 // snapshots; definition-backed schemas re-read their tracked field queries.
-                walk_typed_dict_type(db, typed_dict, self);
+                walk_typed_dict_fields(db, typed_dict, self);
                 return;
             };
 
-            self.active_class_typed_dicts.visit(
-                &origin,
+            if let Some(specialization) = specialization {
+                walk_specialization_types(db, specialization, self);
+                if !self.content.get().is_absent() {
+                    return;
+                }
+            }
+
+            self.active_types.visit(
+                &Type::TypedDict(typed_dict).to_type_identity(db),
                 || self.record(DynamicContent::Indeterminate),
-                || walk_typed_dict_type(db, typed_dict, self),
+                || walk_typed_dict_fields(db, typed_dict, self),
             );
         }
     }
@@ -659,10 +702,7 @@ pub(super) fn dynamic_content_impl<'db>(
     let visitor = DynamicContentVisitor {
         env,
         recursion_guard: TypeCollector::default(),
-        active_class_protocols: ActiveRecursionDetector::default(),
-        active_class_typed_dicts: ActiveRecursionDetector::default(),
-        active_type_aliases: ActiveRecursionDetector::default(),
-        active_recursive_types: ActiveRecursionDetector::default(),
+        active_types: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
         mode,
     };
