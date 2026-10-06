@@ -15,7 +15,8 @@ help: Remove unnecessary `pass`
   |
 4 |     value: int
   -     pass  # PYI012 Class body must not contain `pass`
-5 |
+5 +     # PYI012 Class body must not contain `pass`
+6 |
   |
 
 PYI012 [*] Class body must not contain `pass`
@@ -30,7 +31,8 @@ help: Remove unnecessary `pass`
   |
 7 | class OneAttributeClassRev:
   -     pass  # PYI012 Class body must not contain `pass`
-8 |     value: int
+8 +     # PYI012 Class body must not contain `pass`
+9 |     value: int
   |
 
 PYI012 [*] Class body must not contain `pass`
@@ -47,7 +49,8 @@ help: Remove unnecessary `pass`
    |
 15 |
    -     pass  # PYI012 Class body must not contain `pass`
-16 |
+16 +     # PYI012 Class body must not contain `pass`
+17 |
    |
 
 PYI012 [*] Class body must not contain `pass`
@@ -64,7 +67,8 @@ help: Remove unnecessary `pass`
    |
 19 |     value: int
    -     pass  # PYI012 Class body must not contain `pass`
-20 |
+20 +     # PYI012 Class body must not contain `pass`
+21 |
    |
 
 PYI012 [*] Class body must not contain `pass`
@@ -79,7 +83,8 @@ help: Remove unnecessary `pass`
    |
 22 | class NonEmptyChild2(Exception):
    -     pass  # PYI012 Class body must not contain `pass`
-23 |     value: int
+23 +     # PYI012 Class body must not contain `pass`
+24 |     value: int
    |
 
 PYI012 [*] Class body must not contain `pass`
@@ -96,5 +101,6 @@ help: Remove unnecessary `pass`
    |
 27 |     value: int
    -     pass  # PYI012 Class body must not contain `pass`
-28 |
+28 +     # PYI012 Class body must not contain `pass`
+29 |
    |
