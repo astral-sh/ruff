@@ -241,6 +241,7 @@ help: Use `math.pi`
 26 + r = math.pi  # FURB152
 27 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB152 [*] Replace `2.718` with `math.e`
   --> FURB152.py:31:5
@@ -316,7 +317,7 @@ FURB152 [*] Replace `2.7182000000000001` with `math.e`
 45 | e = 2.7182000000000001  # FURB152
    |     ^^^^^^^^^^^^^^^^^^
 46 |
-47 | # Each of these already denotes exactly the same float as the constant it matches,
+47 | # Full-precision literals are still reported, with the same unsafe fix.
    |
 help: Use `math.e`
    |
@@ -331,60 +332,62 @@ help: Use `math.e`
 note: This is an unsafe fix and may change runtime behavior
 
 FURB152 [*] Replace `3.141592653589793` with `math.pi`
-  --> FURB152.py:51:5
+  --> FURB152.py:48:5
    |
-49 | # shorter approximation above computes a different value once rewritten, so those
-50 | # fixes are offered as unsafe.
-51 | r = 3.141592653589793  # FURB152
+47 | # Full-precision literals are still reported, with the same unsafe fix.
+48 | r = 3.141592653589793  # FURB152
    |     ^^^^^^^^^^^^^^^^^
-52 |
-53 | e = 2.718281828459045  # FURB152
+49 |
+50 | e = 2.718281828459045  # FURB152
    |
 help: Use `math.pi`
    |
 1  + import math
 2  | r = 3.1  # OK
 --------------------------------------------------------------------------------
-51 | # fixes are offered as unsafe.
+48 | # Full-precision literals are still reported, with the same unsafe fix.
    - r = 3.141592653589793  # FURB152
-52 + r = math.pi  # FURB152
-53 |
+49 + r = math.pi  # FURB152
+50 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB152 [*] Replace `2.718281828459045` with `math.e`
-  --> FURB152.py:53:5
+  --> FURB152.py:50:5
    |
-51 | r = 3.141592653589793  # FURB152
-52 |
-53 | e = 2.718281828459045  # FURB152
+48 | r = 3.141592653589793  # FURB152
+49 |
+50 | e = 2.718281828459045  # FURB152
    |     ^^^^^^^^^^^^^^^^^
-54 |
-55 | t = 6.283185307179586  # FURB152
+51 |
+52 | t = 6.283185307179586  # FURB152
    |
 help: Use `math.e`
    |
 1  + import math
 2  | r = 3.1  # OK
 --------------------------------------------------------------------------------
-53 |
+50 |
    - e = 2.718281828459045  # FURB152
-54 + e = math.e  # FURB152
-55 |
+51 + e = math.e  # FURB152
+52 |
    |
+note: This is an unsafe fix and may change runtime behavior
 
 FURB152 [*] Replace `6.283185307179586` with `math.tau`
-  --> FURB152.py:55:5
+  --> FURB152.py:52:5
    |
-53 | e = 2.718281828459045  # FURB152
-54 |
-55 | t = 6.283185307179586  # FURB152
+50 | e = 2.718281828459045  # FURB152
+51 |
+52 | t = 6.283185307179586  # FURB152
    |     ^^^^^^^^^^^^^^^^^
 help: Use `math.tau`
    |
 1  + import math
 2  | r = 3.1  # OK
 --------------------------------------------------------------------------------
-55 |
+52 |
    - t = 6.283185307179586  # FURB152
-56 + t = math.tau  # FURB152
+53 + t = math.tau  # FURB152
    |
+note: This is an unsafe fix and may change runtime behavior

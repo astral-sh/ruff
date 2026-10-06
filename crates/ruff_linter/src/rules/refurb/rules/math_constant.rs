@@ -33,12 +33,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// of `2.718`, is indistinguishable here from an approximation of π or e.
 ///
 /// ## Fix safety
-/// This rule's fix is marked as safe only when the literal already denotes exactly
-/// the same float as the constant, so that replacing it cannot change a result.
-/// Shorter approximations are rewritten under an unsafe fix, because `math.pi` is
-/// not equal to `3.14`: a literal that was deliberately chosen — a rounded
-/// measurement, a threshold, a test fixture — computes a different value once it
-/// becomes a constant.
+/// This rule's fix is marked as unsafe, as replacing a literal with the constant
+/// can change the result of a calculation.
 ///
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
@@ -78,39 +74,24 @@ pub(crate) fn math_constant(checker: &Checker, literal: &ast::ExprNumberLiteral)
             },
             literal.range(),
         );
-        diagnostic.try_set_fix(|| convert_to_constant(literal, value, constant, checker));
+        diagnostic.try_set_fix(|| convert_to_constant(literal, constant.name(), checker));
     }
 }
 
 fn convert_to_constant(
     literal: &ast::ExprNumberLiteral,
-    value: f64,
-    constant: Constant,
+    constant: &'static str,
     checker: &Checker,
 ) -> Result<Fix> {
     let (edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import("math", constant.name()),
+        &ImportRequest::import("math", constant),
         literal.start(),
         checker.semantic(),
     )?;
-    let replacement = Edit::range_replacement(binding, literal.range());
-
-    // The rule matches any literal that rounds to the constant, so `3.14` is reported
-    // just as `3.141592653589793` is. Substituting the constant only leaves the
-    // program computing the same values in the latter case; in the former it silently
-    // replaces the author's number with a different one.
-    #[expect(
-        clippy::float_cmp,
-        reason = "an exact comparison is the point: only a literal that is already the \
-                  same float can be replaced without changing what the program computes"
-    )]
-    let is_exact = value == constant.value();
-
-    if is_exact {
-        Ok(Fix::safe_edits(replacement, [edit]))
-    } else {
-        Ok(Fix::unsafe_edits(replacement, [edit]))
-    }
+    Ok(Fix::unsafe_edits(
+        Edit::range_replacement(binding, literal.range()),
+        [edit],
+    ))
 }
 
 fn matches_constant(constant: f64, value: f64) -> bool {
@@ -153,15 +134,6 @@ impl Constant {
             Constant::Pi => "pi",
             Constant::E => "e",
             Constant::Tau => "tau",
-        }
-    }
-
-    /// The value `math.<name>` evaluates to, for comparing against a matched literal.
-    fn value(self) -> f64 {
-        match self {
-            Constant::Pi => std::f64::consts::PI,
-            Constant::E => std::f64::consts::E,
-            Constant::Tau => std::f64::consts::TAU,
         }
     }
 }
