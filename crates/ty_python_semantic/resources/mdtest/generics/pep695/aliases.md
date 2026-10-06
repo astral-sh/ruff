@@ -534,6 +534,81 @@ def f(x: A):
     assert_type(x[0], object)
 ```
 
+## Recursive tuples intersected with a protocol
+
+Specialization can put a recursive tuple alias inside a positive intersection. The tuple and its
+elements retain that alias, so they can be inspected without repeatedly unfolding the tuple.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, assert_type
+from ty_extensions import Intersection
+
+class Items(Protocol):
+    def __iter__(self) -> Iterator[Any]: ...
+
+type WithItems[T] = Intersection[Items, T]
+type A = tuple[WithItems[A], ...]
+
+def f(x: A):
+    reveal_type(x)  # revealed: tuple[WithItems[A], ...]
+    assert_type(x[0], WithItems[A])
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+The standard `Iterable` protocol exercises the same behavior with its typeshed definition.
+
+```py
+from collections.abc import Iterable
+
+type WithIterable[T] = Intersection[Iterable[Any], T]
+type B = tuple[WithIterable[B], ...]
+
+def g(x: B):
+    reveal_type(x)  # revealed: tuple[WithIterable[B], ...]
+    assert_type(x[0], WithIterable[B])
+```
+
+## Simplifying aliased intersection elements after specialization
+
+Specializing an intersection exposes the types behind its aliases. Subtracting one boolean literal
+from `bool` leaves the other. A literal string that is not truthy is empty.
+
+```py
+from typing import Literal, LiteralString, assert_type
+from ty_extensions import AlwaysTruthy, Intersection, Not
+
+type Minus[T, U] = Intersection[T, Not[U]]
+type Boolean = bool
+type TrueLiteral = Literal[True]
+type LiteralText = LiteralString
+
+def f(x: Minus[Boolean, TrueLiteral], y: Minus[LiteralText, AlwaysTruthy]):
+    assert_type(x, Literal[False])
+    assert_type(y, Literal[""])
+    reveal_type(x)  # revealed: Literal[False]
+    reveal_type(y)  # revealed: Literal[""]
+```
+
+Enum complements also recognize aliases for both the enum and its excluded members.
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+type Palette = Color
+type Red = Literal[Color.RED]
+type Green = Literal[Color.GREEN]
+
+def colors(x: Minus[Palette, Red], y: Minus[Palette, Red | Green]):
+    reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    reveal_type(y)  # revealed: Literal[Color.BLUE]
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable

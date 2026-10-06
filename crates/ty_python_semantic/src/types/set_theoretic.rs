@@ -1135,8 +1135,7 @@ impl<'db> IntersectionType<'db> {
             }
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
-            let mut builder =
-                IntersectionBuilder::new(db, visitor.env).preserve_negated_aliases(true);
+            let mut builder = IntersectionBuilder::new(db, visitor.env).preserve_aliases(true);
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,
@@ -1406,7 +1405,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
-        match element {
+        match element.resolve_type_alias(db) {
             Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
                 TypeVarBoundOrConstraints::UpperBound(bound) => {
                     builder.add_positive_in_place(bound);
