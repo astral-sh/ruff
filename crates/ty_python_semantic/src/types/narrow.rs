@@ -1810,18 +1810,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Expr::Subscript(subscript) => {
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 let inference = infer_expression_types(db, expression, TypeContext::default());
-                let typeddict_constraints = self
+                let subscript_constraints = self
                     .narrow_typeddict_subscript_by_truthiness(
                         inference.expression_type(&*subscript.value),
                         &subscript.value,
                         inference.expression_type(&*subscript.slice),
                         is_positive,
                     )
+                    .or_else(|| {
+                        self.filter_tuple_subscript(
+                            inference.expression_type(&*subscript.value),
+                            &subscript.value,
+                            inference.expression_type(&*subscript.slice),
+                            |element| {
+                                element
+                                    .bool(db, &self.env)
+                                    .negate_if(!is_positive)
+                                    .may_be_true()
+                            },
+                        )
+                    })
                     .map(|(place, constraint)| {
                         NarrowingConstraints::from_iter([(place, constraint)])
                     });
 
-                Self::merge_optional_constraints_and(constraints, typeddict_constraints)
+                Self::merge_optional_constraints_and(constraints, subscript_constraints)
             }
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
@@ -5225,37 +5238,47 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         operator: ast::CmpOp,
         is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        self.filter_tuple_subscript(
+            subscript_value_type,
+            subscript_value_expr,
+            subscript_index_type,
+            |element| {
+                self.evaluate_expr_compare_op(
+                    element,
+                    rhs_type,
+                    operator,
+                    is_positive,
+                    ComparisonSoundnessPolicy::CONSERVATIVE,
+                )
+                .is_none_or(|constraint| !element.is_disjoint_from(self.db, &self.env, constraint))
+            },
+        )
+    }
+
+    /// Retain tuple union members whose indexed element can satisfy a predicate.
+    fn filter_tuple_subscript(
+        &self,
+        subscript_value_type: Type<'db>,
+        subscript_value_expr: &ast::Expr,
+        subscript_index_type: Type<'db>,
+        mut matches: impl FnMut(Type<'db>) -> bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let db = self.db;
-        // We need a union type for narrowing to be useful.
         let Type::Union(union) = subscript_value_type.resolve_type_alias(db) else {
             return None;
         };
-
         // The subscript index must be an integer literal.
-        let index = subscript_index_type.as_int_literal()?;
-        let index = i32::try_from(index).ok()?;
-
+        let index = i32::try_from(subscript_index_type.as_int_literal()?).ok()?;
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
-        // Skip narrowing if any tuple in the union has an out-of-bounds index.
-        // A diagnostic will be emitted elsewhere for the out-of-bounds access.
+        // An out-of-bounds access is diagnosed elsewhere and provides no narrowing fact.
         if any_tuple_has_out_of_bounds_index(db, &self.env, union, index) {
             return None;
         }
-
-        // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered = union.filter(db, |elem| {
-            elem.tuple_instance_spec(db, &self.env)
+        let filtered = union.filter(db, |element| {
+            element
+                .tuple_instance_spec(db, &self.env)
                 .and_then(|spec| spec.py_index(db, &self.env, index).ok())
-                .is_none_or(|el_ty| {
-                    self.evaluate_expr_compare_op(
-                        el_ty,
-                        rhs_type,
-                        operator,
-                        is_positive,
-                        ComparisonSoundnessPolicy::CONSERVATIVE,
-                    )
-                    .is_none_or(|constraint| !el_ty.is_disjoint_from(db, &self.env, constraint))
-                })
+                .is_none_or(&mut matches)
         });
 
         // Only create a constraint if we actually narrowed something.

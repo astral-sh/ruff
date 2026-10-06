@@ -506,6 +506,43 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
 ```
 
+### Tuple unions and truthiness
+
+Checking an element's truthiness eliminates tuple alternatives whose element always has the opposite
+truth value. Other elements retain their relationship with the checked element.
+
+```py
+from typing import Callable, Literal
+
+def truthy(value: tuple[Literal[True], int] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value)  # revealed: tuple[Literal[True], int]
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+    if not value[-2]:
+        reveal_type(value[1])  # revealed: str
+    if bool(value[0]):
+        reveal_type(value[1])  # revealed: int
+
+def literal_tags(value: tuple[Literal[0, ""], str] | tuple[Literal[1, "x"], int]):
+    if value[0]:
+        reveal_type(value[1])  # revealed: int
+    else:
+        reveal_type(value[1])  # revealed: str
+
+def ambiguous(value: tuple[bool, int] | tuple[Literal[False], str]):
+    if value[0]:
+        reveal_type(value)  # revealed: tuple[bool, int]
+    else:
+        reveal_type(value)  # revealed: tuple[bool, int] | tuple[Literal[False], str]
+
+def call(value: tuple[Literal[True], Callable[[int], int]] | tuple[Literal[False], Callable[[], int]]) -> int:
+    if value[0]:
+        return value[1](1)  # no diagnostic
+    return value[1]()  # no diagnostic
+```
+
 ### Tuple tags with non-literal comparators
 
 A boolean comparison value can match either boolean tag value, but cannot match a string literal:

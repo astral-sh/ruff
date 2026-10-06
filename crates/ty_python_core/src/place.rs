@@ -627,7 +627,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 places.extend(self.simple_expr(&attribute.value));
                 places
             }
-            // Subscript truthiness can also narrow its base (`TypedDict` tagged unions).
+            // Subscript truthiness can also narrow its base (`TypedDict` and tuple unions).
             ast::Expr::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
                 places.extend(self.simple_expr(&subscript.value));
