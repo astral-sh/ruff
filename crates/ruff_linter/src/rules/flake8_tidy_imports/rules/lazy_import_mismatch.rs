@@ -12,6 +12,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Enforces the configured lazy-import policy in contexts where `lazy import`
 /// is legal.
 ///
+/// This rule is not enforced in stub files.
+///
 /// ## Why is this bad?
 /// Python 3.15 adds support for `lazy import` and `lazy from ... import ...`,
 /// which defer the actual import work until the imported name is first used.
@@ -101,7 +103,8 @@ impl Violation for LazyImportMismatch {
 
 /// TID254
 pub(crate) fn lazy_import_mismatch(checker: &Checker, stmt: &Stmt) {
-    if checker.lazy_import_context().is_some()
+    if checker.source_type.is_stub()
+        || checker.lazy_import_context().is_some()
         || (checker.target_version() < PythonVersion::PY315
             && checker.semantic().lazy_modules.is_none())
     {
