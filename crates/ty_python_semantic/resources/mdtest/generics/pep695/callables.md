@@ -1388,6 +1388,73 @@ class IPolys[T](Protocol):
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
 ```
 
+## Specializing generic protocol methods
+
+A method can use its own type parameter as the class argument of another instance of its protocol.
+That class argument stays fixed while the other instance's method accepts independently chosen
+argument types. An implementation that always returns `int` in the first tuple element therefore
+satisfies `Required[int]`, but cannot satisfy `Required[T]` for an arbitrary `T`. The local `accept`
+function captures `method`'s `T`, so passing an argument cannot infer a new value for it.
+
+```py
+from typing import Protocol
+
+class Implementation:
+    def method[U](self, value: U) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required[C](Protocol):
+    def method[T](self, value: T) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## Specializing overloaded generic protocol methods
+
+Each overload's type parameter is independent of the class argument. The local `accept` function
+captures the first overload's type parameter. The second overload's return type places no
+restriction on the class argument.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+useless-overload-body = "ignore"
+```
+
+```py
+from typing import Literal, Protocol, overload
+
+class Implementation:
+    def method[U](self, value: U, flag: bool) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required[C](Protocol):
+    @overload
+    def method[T](self, value: T, flag: Literal[False]) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+    @overload
+    def method[T](self, value: T, flag: Literal[True]) -> object: ...
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
 ## Returned callables with recursive parameter aliases
 
 A type variable used by a recursive parameter alias belongs to the function. The returned callable
