@@ -33,7 +33,7 @@ use crate::types::{
     DisplaySettings, DynamicType, InternedType, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     MemberLookupPolicy, Parameter, Parameters, SpecialFormType, StaticClassLiteral, Type,
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionType, UnionTypeInstance, any_over_type, todo_type,
+    UnionType, UnionTypeInstance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::definition::Definition;
@@ -2434,9 +2434,6 @@ enum LegacyGenericContextError<'db> {
     /// It's invalid to subscript `Generic` or `Protocol` with a variadic tuple type.
     /// We should emit a diagnostic for this, but we don't yet.
     VariadicTupleArguments,
-    /// It's valid to subscribe `Generic` or `Protocol` with this type,
-    /// but the type is not yet supported.
-    NotYetSupported,
     /// A duplicate typevar was provided.
     DuplicateTypevar(&'db str),
     /// A `TypeVarTuple` was provided but not unpacked.
@@ -2444,20 +2441,6 @@ enum LegacyGenericContextError<'db> {
     /// The generic context is available when the argument is a bound `TypeVarTuple` and is used
     /// to avoid cascading errors during recovery.
     TypeVarTupleMustBeUnpacked(Option<GenericContext<'db>>),
-}
-
-impl<'db> LegacyGenericContextError<'db> {
-    const fn into_type(self) -> Type<'db> {
-        match self {
-            LegacyGenericContextError::InvalidArgument(_)
-            | LegacyGenericContextError::VariadicTupleArguments
-            | LegacyGenericContextError::DuplicateTypevar(_)
-            | LegacyGenericContextError::TypeVarTupleMustBeUnpacked(_) => Type::unknown(),
-            LegacyGenericContextError::NotYetSupported => {
-                todo_type!("ParamSpecs and TypeVarTuples")
-            }
-        }
-    }
 }
 
 /// Validate the type arguments to `Generic[...]` or `Protocol[...]`, returning
@@ -2504,10 +2487,7 @@ fn infer_legacy_generic_subscript<'db>(
                 SubscriptErrorKind::TypeVarTupleNotUnpacked { origin },
             ))
         }
-        Err(
-            error @ (LegacyGenericContextError::NotYetSupported
-            | LegacyGenericContextError::VariadicTupleArguments),
-        ) => Ok(error.into_type()),
+        Err(LegacyGenericContextError::VariadicTupleArguments) => Ok(Type::unknown()),
     }
 }
 
@@ -2574,14 +2554,6 @@ fn legacy_generic_class_context<'db>(
             )
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked(None));
-        } else if any_over_type(db, env, argument_ty, true, |inner_ty| match inner_ty {
-            Type::NominalInstance(nominal) => matches!(
-                nominal.known_class(db),
-                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
-            ),
-            _ => false,
-        }) {
-            return Err(LegacyGenericContextError::NotYetSupported);
         } else {
             return Err(LegacyGenericContextError::InvalidArgument(argument_ty));
         }
