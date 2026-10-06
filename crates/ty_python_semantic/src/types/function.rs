@@ -79,7 +79,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, SubclassOfInner,
     SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
-    definition_expression_type, walk_signature,
+    definition_expression_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1166,7 +1166,7 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 ) {
     if let Some(callable_signature) = function.updated_signature(db) {
         for signature in &callable_signature.overloads {
-            walk_signature(db, signature, visitor);
+            visitor.visit_signature(db, signature);
         }
     }
     if let Some(callables) = function.updated_implementation_callables(db) {

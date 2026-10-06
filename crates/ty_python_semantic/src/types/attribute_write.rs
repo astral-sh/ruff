@@ -19,9 +19,9 @@ use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
 use super::visitor::may_contain_typevar_from;
 use super::{
-    BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    BindingContext, GenericContext, IntersectionType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, Parameter, PropertyInstanceType, SelfBinding, Signature, Type, TypeContext,
+    TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -1165,11 +1165,18 @@ fn may_contain_signature_typevar<'db>(
         .is_some_and(|generic_context| may_contain_typevar_from(db, env, ty, generic_context))
 }
 
+/// A setter's accepted value type, retaining its `Self` binding and local type parameters.
+pub(super) struct PropertySetterValue<'db> {
+    pub(super) ty: Type<'db>,
+    pub(super) definition: Option<Definition<'db>>,
+    pub(super) generic_context: Option<GenericContext<'db>>,
+}
+
 /// Union the value parameter types accepted by a property's setter overloads.
 ///
 /// Keep the first available signature definition so callers can bind `Self` in the
-/// setter's defining context. Return `None` if the setter is not callable or a signature
-/// has no positional value parameter.
+/// setter's defining context, and retain the local type parameters from every overload.
+/// Return `None` if the setter is not callable or a signature has no positional value parameter.
 ///
 /// ```python
 /// from typing import Self
@@ -1187,16 +1194,23 @@ pub(super) fn property_setter_value_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     setter: Type<'db>,
-) -> Option<(Type<'db>, Option<Definition<'db>>)> {
+) -> Option<PropertySetterValue<'db>> {
     let mut set_types = Vec::new();
     let mut definition = None;
+    let mut generic_context = None;
     for callable in &setter.try_upcast_to_callable(db, env)? {
         for signature in callable.signatures(db) {
             set_types.push(signature.parameters().get_positional(1)?.annotated_type());
             definition = definition.or(signature.definition());
+            generic_context =
+                GenericContext::merge_optional(db, generic_context, signature.generic_context);
         }
     }
-    Some((UnionType::from_elements(db, env, set_types), definition))
+    Some(PropertySetterValue {
+        ty: UnionType::from_elements(db, env, set_types),
+        definition,
+        generic_context,
+    })
 }
 
 /// Bind the setter's accepted value type to the receiver used for this write.
@@ -1215,7 +1229,8 @@ fn property_set_type<'db>(
     {
         return Some(domain);
     }
-    let (ty, definition) = property_setter_value_type(db, env, property.setter(db)?)?;
+    let PropertySetterValue { ty, definition, .. } =
+        property_setter_value_type(db, env, property.setter(db)?)?;
     if !ty.contains_self(db, env) {
         return Some(ty);
     }
