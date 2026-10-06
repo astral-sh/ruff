@@ -870,6 +870,15 @@ def bounded_list[T: list[int]](value: T) -> T:
 reveal_type(bounded_list(empty_list()))  # revealed: list[Unknown]
 ```
 
+The type variable remains unsolved when the upper-bound context passes through another generic call:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(identity(empty_list())))  # revealed: list[Unknown]
+```
+
 If an explicit default is provided, it is instead used as the fallback value:
 
 ```py
