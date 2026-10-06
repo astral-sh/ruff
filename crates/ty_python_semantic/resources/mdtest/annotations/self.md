@@ -641,6 +641,47 @@ class C(Generic[T]):
         reveal_type(self.foo)  # revealed: T@C
 ```
 
+## `Self` in aliased annotations
+
+Inherited attributes and methods bind `Self` to the receiver's class, even through an alias:
+
+```py
+from typing import Self
+
+type Alias[T] = T
+
+class Parent:
+    attribute: Alias[Self]
+
+    def method(self) -> Alias[Self]:
+        return self
+
+class Child(Parent): ...
+
+def _(child: Child) -> None:
+    reveal_type(child.attribute)  # revealed: Child
+    reveal_type(child.method())  # revealed: Child
+```
+
+## Unused `Self` arguments in aliases
+
+An unused alias argument has no effect. `Ignored[Self]` still resolves to `int` in an inherited
+attribute:
+
+```py
+from typing import Self
+
+type Ignored[T] = int
+
+class Parent:
+    attribute: Ignored[Self]
+
+class Child(Parent): ...
+
+def _(child: Child) -> None:
+    reveal_type(child.attribute)  # revealed: int
+```
+
 ## Callable attributes that return `Self`
 
 Attributes annotated as callables returning `Self` should bind to the concrete class.
