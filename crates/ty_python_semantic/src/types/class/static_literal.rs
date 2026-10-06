@@ -1622,6 +1622,7 @@ impl<'db> StaticClassLiteral<'db> {
         let sources = self.member_sources(db);
         let symbol = sources.table.symbol_id(name);
         let member = class_member_with_symbol(db, sources.scope, symbol).map_type(|ty| {
+            let ty = ty.freshen_member_for_owner_specialization(db, env, specialization);
             let ty = if name.starts_with("__") && name.ends_with("__") {
                 into_dunder_paramspec_callable(db, env, ty)
             } else {
