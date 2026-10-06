@@ -1318,21 +1318,23 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
-        let updated_signature = self
-            .signature(db)
-            .with_inherited_generic_context(db, inherited_generic_context);
+        self.map_signatures(db, |signature| {
+            signature.with_inherited_generic_context(db, inherited_generic_context)
+        })
+    }
+
+    /// Transforms the public overloads and any separate implementation signatures.
+    pub(super) fn map_signatures(
+        self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableSignature<'db>) -> CallableSignature<'db>,
+    ) -> Self {
+        let updated_signature = map(self.signature(db));
         let literal = self.literal(db);
         let updated_implementation_callables = literal.has_separate_implementation(db).then(|| {
             self.implementation_callables(db)
                 .iter()
-                .map(|callable| {
-                    callable.with_signatures(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, inherited_generic_context),
-                    )
-                })
+                .map(|callable| callable.with_signatures(db, map(callable.signatures(db))))
                 .collect()
         });
         Self::new_internal(
