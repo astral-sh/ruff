@@ -1451,8 +1451,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_region_deferred(&mut self, definition: Definition<'db>) {
-        // N.B. We don't defer the types for an annotated assignment here because it is done in
-        // the same definition query. It utilizes the deferred expression state instead.
+        // We infer the annotation of an annotated assignment in the same definition query,
+        // using the deferred expression state instead of this region.
         //
         // This is because for partially stringified annotations like `a: tuple[int, "ForwardRef"]`,
         // we need to defer the types of non-stringified expressions like `tuple` and `int` in the
@@ -1481,6 +1481,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     assignment.target(self.module()),
                     assignment.value(self.module()),
                 );
+            }
+            DefinitionKind::AnnotatedAssignment(assignment) => {
+                // A bare `Final` annotation can still define a `NewType`, whose base is deferred.
+                if let Some(ast::Expr::Call(call)) = assignment.value(self.module())
+                    && call.arguments.args.len() == 2
+                    && call.arguments.keywords.is_empty()
+                    && !call.arguments.args.iter().any(ast::Expr::is_starred_expr)
+                    && self
+                        .get_or_infer_expression(&call.func, TypeContext::default())
+                        .as_class_literal()
+                        .and_then(|class| class.known(self.db()))
+                        == Some(KnownClass::NewType)
+                {
+                    self.infer_newtype_assignment_deferred(&call.arguments);
+                }
             }
             _ => {}
         }
@@ -3685,12 +3700,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) -> Type<'db> {
         fn error<'db>(
-            context: &InferContext<'db, '_>,
+            builder: &mut TypeInferenceBuilder<'db, '_>,
+            arguments: &ast::Arguments,
             message: impl std::fmt::Display,
             node: impl Ranged,
         ) -> Type<'db> {
-            if let Some(builder) = context.report_lint(&INVALID_NEWTYPE, node) {
-                builder.into_diagnostic(message);
+            // Valid bases are inferred later to avoid cycles. On an invalid definition, infer
+            // the remaining arguments now so errors in those expressions are still reported.
+            for argument in &arguments.args {
+                builder.get_or_infer_expression(argument, TypeContext::default());
+            }
+            for keyword in &arguments.keywords {
+                builder.get_or_infer_expression(&keyword.value, TypeContext::default());
+            }
+            if let Some(diagnostic) = builder.context.report_lint(&INVALID_NEWTYPE, node) {
+                diagnostic.into_diagnostic(message);
             }
             Type::unknown()
         }
@@ -3700,7 +3724,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if !arguments.keywords.is_empty() {
             return error(
-                &self.context,
+                self,
+                arguments,
                 "Keyword arguments are not supported in `NewType` creation",
                 call_expr,
             );
@@ -3708,7 +3733,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
             return error(
-                &self.context,
+                self,
+                arguments,
                 "Starred arguments are not supported in `NewType` creation",
                 starred,
             );
@@ -3716,7 +3742,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if arguments.args.len() != 2 {
             return error(
-                &self.context,
+                self,
+                arguments,
                 format!(
                     "Wrong number of arguments in `NewType` creation: expected 2, found {}",
                     arguments.args.len()
@@ -3729,7 +3756,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
-                &self.context,
+                self,
+                arguments,
                 "The first argument to `NewType` must be a string literal",
                 call_expr,
             );
@@ -3740,7 +3768,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }) = target
         else {
             return error(
-                &self.context,
+                self,
+                arguments,
                 "A `NewType` definition must be a simple variable assignment",
                 target,
             );
@@ -4793,10 +4822,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
             let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
 
-            let inferred_ty = self.infer_maybe_standalone_expression(
-                value,
-                TypeContext::new(Some(declared.inner_type())),
-            );
+            let tcx = TypeContext::new(Some(declared.inner_type()));
+            // A bare `Final` still infers its type from the value. A `NewType` call needs the
+            // definition to create its nominal identity and defer its base.
+            let inferred_ty = if target.is_name_expr()
+                && declared.qualifiers.contains(TypeQualifiers::FINAL)
+                && declared.inner_type().is_unknown()
+                && self.index.try_expression(value).is_none()
+                && let ast::Expr::Call(call_expr) = value
+            {
+                let callable_type = self.infer_callee(&call_expr.func);
+                let ty = if callable_type
+                    .as_class_literal()
+                    .and_then(|class| class.known(db))
+                    == Some(KnownClass::NewType)
+                {
+                    self.infer_newtype_expression(target, call_expr, definition)
+                } else {
+                    self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                };
+                self.finish_expression_type(value, ty, tcx)
+            } else {
+                self.infer_maybe_standalone_expression(value, tcx)
+            };
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // Alias type inference emits the diagnostic, but this runtime value is
                 // retained as the alias binding.

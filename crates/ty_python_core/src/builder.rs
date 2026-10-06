@@ -4366,11 +4366,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.visit_annotation(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if self.is_method_or_eagerly_executed_in_method().is_some() {
+                    if !node.target.is_name_expr()
+                        && self.is_method_or_eagerly_executed_in_method().is_some()
+                    {
                         // Record the right-hand side of the assignment as a standalone expression
-                        // if we're inside a method. This allows type inference to infer the type
-                        // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
-                        // where the type itself is not part of the annotation.
+                        // for non-name targets inside a method. This allows type inference to
+                        // infer the value of an implicit attribute like `self.CONSTANT: Final = 1`.
                         self.add_standalone_expression(value);
                     }
                 }

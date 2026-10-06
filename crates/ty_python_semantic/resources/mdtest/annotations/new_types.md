@@ -510,9 +510,112 @@ def f(x: TFloat) -> None:
 ## A `NewType` definition must be a simple variable assignment
 
 ```py
-from typing import NewType
+from typing import Final, NewType
 
 N: NewType = NewType("N", int)  # error: [invalid-newtype] "A `NewType` definition must be a simple variable assignment"
+M: Final[NewType] = NewType("M", int)  # error: [invalid-newtype] "A `NewType` definition must be a simple variable assignment"
+```
+
+## Bare `Final` annotations
+
+A `NewType` can be declared as `Final` without changing the type it defines:
+
+```py
+from typing import Final, NewType
+
+UserId: Final = NewType("UserId", int)  # no diagnostic
+reveal_type(UserId)  # revealed: <NewType pseudo-class 'UserId'>
+reveal_type(UserId(1))  # revealed: UserId
+UserId("1")  # error: [invalid-argument-type]
+
+def takes_user_id(user_id: UserId) -> None: ...
+
+takes_user_id(UserId(1))  # no diagnostic
+takes_user_id(1)  # error: [invalid-argument-type]
+
+AdminId: Final = NewType("AdminId", UserId)  # no diagnostic
+reveal_type(AdminId(UserId(1)))  # revealed: AdminId
+AdminId(1)  # error: [invalid-argument-type]
+
+UserId = UserId  # error: [invalid-assignment] "Reassignment of `Final` symbol `UserId` is not allowed"
+```
+
+Qualified and stringified `Final` annotations work as well:
+
+```py
+import typing
+
+OrderId: typing.Final = NewType("OrderId", int)  # no diagnostic
+reveal_type(OrderId(1))  # revealed: OrderId
+StringId: "Final" = NewType("StringId", int)  # no diagnostic
+reveal_type(StringId(1))  # revealed: StringId
+```
+
+The usual checks for the name and base type still apply:
+
+```py
+# error: [mismatched-type-name]
+WrongName: Final = NewType("OtherName", int)
+InvalidBase: Final = NewType("InvalidBase", int | str)  # error: [invalid-newtype] "invalid base for `typing.NewType`"
+MissingBase: Final = NewType("MissingBase")  # error: [invalid-newtype] "Wrong number of arguments in `NewType` creation"
+# error: [unresolved-reference]
+# error: [invalid-newtype] "Wrong number of arguments in `NewType` creation"
+MissingArgument: Final = NewType(missing)
+# error: [unresolved-reference]
+# error: [invalid-newtype] "Wrong number of arguments in `NewType` creation"
+MissingArgumentWithoutFinal = NewType(missing)
+# error: [unresolved-reference]
+# error: [invalid-newtype] "Keyword arguments are not supported in `NewType` creation"
+KeywordArgument: Final = NewType("KeywordArgument", base=missing)
+# error: [unresolved-reference]
+# error: [invalid-newtype] "Starred arguments are not supported in `NewType` creation"
+StarredArgument: Final = NewType(*missing)
+# error: [unresolved-reference]
+# error: [invalid-newtype] "The first argument to `NewType` must be a string literal"
+InvalidName: Final = NewType(1, missing)
+```
+
+`Final` annotations also work for `NewType` definitions in class and function scopes:
+
+```py
+class Namespace:
+    Id: Final = NewType("Id", int)  # no diagnostic
+
+    def __init__(self) -> None:
+        MethodId: Final = NewType("MethodId", int)  # no diagnostic
+        reveal_type(MethodId(1))  # revealed: MethodId
+
+reveal_type(Namespace.Id(1))  # revealed: Id
+
+def use_class_type(value: Namespace.Id) -> int:
+    return value
+
+def local_newtype() -> None:
+    LocalId: Final = NewType("LocalId", int)  # no diagnostic
+    reveal_type(LocalId(1))  # revealed: LocalId
+```
+
+## Importing a `Final` `NewType`
+
+`ids.py`:
+
+```py
+from typing import Final, NewType
+
+UserId: Final = NewType("UserId", int)  # no diagnostic
+```
+
+`main.py`:
+
+```py
+from ids import UserId
+
+def takes_user_id(user_id: UserId) -> None: ...
+
+reveal_type(UserId(1))  # revealed: UserId
+takes_user_id(UserId(1))  # no diagnostic
+takes_user_id(1)  # error: [invalid-argument-type]
+UserId = UserId  # error: [invalid-assignment] "Reassignment of `Final` symbol `UserId` is not allowed"
 ```
 
 ## Newtypes can be cyclic in various ways
@@ -557,6 +660,16 @@ d = D(42)  # error: [invalid-argument-type] "Argument is incorrect: Expected `C`
 d = D(c)
 d = D(b)  # Allowed, the same surprise as above. B and C are subtypes of each other.
 reveal_type(d)  # revealed: D
+```
+
+The base is also deferred for a `NewType` with a bare `Final` annotation:
+
+```py
+from typing import Final
+
+FinalCycle: Final = NewType("FinalCycle", "FinalCycle")  # no diagnostic
+reveal_type(FinalCycle)  # revealed: <NewType pseudo-class 'FinalCycle'>
+FinalCycle(42)  # error: [invalid-argument-type]
 ```
 
 Normal classes can't inherit from newtypes, but generic classes can be parametrized with them, so we
