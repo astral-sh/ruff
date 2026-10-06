@@ -106,6 +106,8 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
+use crate::types::type_alias::walk_type_alias_with_recursion_guard;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
 };
@@ -114,8 +116,9 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, Type,
-    TypeContext, TypeMapping, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType,
+    KnownInstanceType, Type, TypeAliasType, TypeContext, TypeMapping, TypePair,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1328,6 +1331,7 @@ impl<'db> ConstraintSetStorage<'db> {
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
             support: RefCell<&'a mut Support>,
             recursion_guard: TypeCollector<'db>,
+            active_type_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
@@ -1354,7 +1358,17 @@ impl<'db> ConstraintSetStorage<'db> {
                 }
             }
 
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                walk_type_alias_with_recursion_guard(db, alias, self, &self.active_type_aliases);
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if matches!(ty, Type::KnownInstance(KnownInstanceType::TypeAliasType(_))) {
+                    // The alias's value type does not describe its runtime object.
+                    self.notify_skipped_lazy_type_attributes();
+                    return;
+                }
+
                 if let Type::TypeVar(bound_typevar) = ty {
                     let mut storage = self.storage.borrow_mut();
                     let typevar = storage.intern_typevar(db, bound_typevar);
@@ -1370,6 +1384,7 @@ impl<'db> ConstraintSetStorage<'db> {
             storage: RefCell::new(self),
             support: RefCell::new(support),
             recursion_guard: TypeCollector::default(),
+            active_type_aliases: ActiveRecursionDetector::default(),
         }
         .visit_type(db, ty);
     }

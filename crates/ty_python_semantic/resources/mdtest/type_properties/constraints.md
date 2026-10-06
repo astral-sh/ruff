@@ -2136,6 +2136,139 @@ def typevartuple_subject[*Us]() -> None:
     ConstraintSet.range(Callable[[int], None], Us, Callable[[int], None])  # error: [invalid-type-form]
 ```
 
+## Type-variable dependencies
+
+### Constraints through type aliases
+
+An alias that preserves its argument also preserves the constraint's dependency on that argument.
+`T ≤ Alias[U]` relates `T` and `U` just like `T ≤ U`:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Alias[V] = V
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Alias[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=Alias[U@_], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+Existentially quantifying `U` leaves no constraint on `T`: choosing `U = object` satisfies both
+bounds for any `T`. This also removes `U` from inside the alias:
+
+```py
+from ty_extensions import static_assert
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Alias[U]) & ConstraintSet.lower_bound(int, U)
+    quantified = constraints.exists(tuple[U])
+    static_assert(quantified == ConstraintSet.always())
+```
+
+An alias that ignores its argument leaves the concrete bound `int`, which does not depend on `U`:
+
+```py
+type Ignored[V] = int
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Ignored[U]) & ConstraintSet.lower_bound(int, U)
+    static_assert(constraints.exists(tuple[U]) == ConstraintSet.upper_bound(T, int))
+```
+
+### Constraints on runtime alias objects
+
+Passing a local alias to a generic function infers the type of its runtime object, regardless of
+type variables in the alias's value:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+def _[U]() -> None:
+    type Alias = U
+    reveal_type(identity(Alias))  # revealed: TypeAliasType
+```
+
+The same distinction applies to constraints. `TypeOf[Alias]` describes the runtime alias object, so
+quantifying `U` does not remove the constraint on `T`:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet, TypeOf
+
+def _[T, U]() -> None:
+    type Alias = U
+    constraints = ConstraintSet.upper_bound(T, TypeOf[Alias])
+    quantified = constraints.exists(tuple[U])
+    static_assert(quantified == constraints)
+```
+
+Using `Alias` as an annotation instead constrains `T` by `U`, so quantifying `U` removes that
+constraint:
+
+```py
+def _[T, U]() -> None:
+    type Alias = U
+    constraints = ConstraintSet.upper_bound(T, Alias)
+    static_assert(constraints.exists(tuple[U]) == ConstraintSet.always())
+```
+
+### Constraints through recursive aliases
+
+We retain type variables in recursive alias arguments even when expansion keeps changing the
+specialization:
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+type Recursive[V] = list[Recursive[list[V]]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[U]) & ConstraintSet.lower_bound(int, U)
+    # revealed: tuple[Solution[T=Recursive[U@_], U=int]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Constraints with recursive protocols
+
+`U ≤ list[T]` relates two type variables, while `T ≤ Recursive[int]` gives `T` a concrete bound. The
+protocol's recursive members do not introduce another type-variable dependency:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions._internal import ConstraintSet
+
+class Recursive[V](Protocol):
+    next: Recursive[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Recursive[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Recursive[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
+### Constraints with recursive `TypedDict`s
+
+Recursive fields also leave the concrete bound independent of `U`:
+
+```py
+from __future__ import annotations
+
+from typing import TypedDict
+from ty_extensions._internal import ConstraintSet
+
+class Payload[V](TypedDict):
+    child: Payload[list[V]]
+
+def _[T, U]() -> None:
+    constraints = ConstraintSet.upper_bound(T, Payload[int]) & ConstraintSet.upper_bound(U, list[T])
+    # revealed: tuple[Solution[T=Payload[int], U=list[T@_]]]
+    reveal_type(constraints.solutions(inferable=tuple[T, U]))
+```
+
 ## Displaying constraints
 
 The `with_detailed_display` method can be used to print out the boolean formula that a constraint
