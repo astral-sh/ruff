@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::typevar::TypeVarSet;
 use ruff_python_ast as ast;
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
@@ -390,6 +391,8 @@ impl<'db> Type<'db> {
                         | KnownBoundMethodType::ConstraintSetForAll(_)
                         | KnownBoundMethodType::ConstraintSetSolutionsFor(_)
                         | KnownBoundMethodType::ConstraintSetSolutions(_)
+                        | KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(_)
+                        | KnownBoundMethodType::ConstraintSetIsNeverSatisfied(_)
                         | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                             (method, NegativeRetention::Stable)
                         }
@@ -1277,9 +1280,9 @@ fn infer_binary_type_comparison_inner<'db>(
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, env, left.constraints(db));
             let right = constraints.load(db, env, right.constraints(db));
-            let equivalent = left
-                .iff(db, &constraints, right)
-                .is_always_satisfied(db, env);
+            let equivalent =
+                left.iff(db, &constraints, right)
+                    .is_always_satisfied(db, env, TypeVarSet::None);
             match op {
                 NonIdentityOperator::Rich(RichCompareOperator::Eq) => {
                     Some(Ok(Type::bool_literal(equivalent)))

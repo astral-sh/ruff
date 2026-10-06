@@ -934,12 +934,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
-            let can_use_nominal_result_directly = nominally_satisfied.is_never_satisfied(db, env)
-                || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
-                    || !protocol.materialization_changes_requirements(db, env, protocol))
-                    && !source_protocol.is_some_and(|source| {
-                        source.materialization_changes_requirements(db, env, protocol)
-                    }));
+            let can_use_nominal_result_directly =
+                nominally_satisfied.is_never_satisfied(db, env, self.inferable)
+                    || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
+                        || !protocol.materialization_changes_requirements(db, env, protocol))
+                        && !source_protocol.is_some_and(|source| {
+                            source.materialization_changes_requirements(db, env, protocol)
+                        }));
 
             if can_use_nominal_result_directly
                 && result
@@ -1016,7 +1017,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         };
         if let Some(context) = self.report_context()
-            && structurally_satisfied.is_never_satisfied(db, env)
+            && structurally_satisfied.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
@@ -1140,7 +1141,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         for (_, member) in recursive_members {
             if structurally_satisfied
                 .implies(db, self.constraints, || nominally_satisfied)
-                .is_always_satisfied(db, env)
+                .is_always_satisfied(db, env, self.inferable)
             {
                 break;
             }
@@ -1325,7 +1326,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
                 || !structurally_satisfied
                     .implies(db, self.constraints, || nominally_satisfied)
-                    .is_always_satisfied(db, env))
+                    .is_always_satisfied(db, env, self.inferable))
         {
             return None;
         }
@@ -1334,7 +1335,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
         (self.typevar_evaluation == TypeVarEvaluation::Lazy
-            || structurally_satisfied.is_never_satisfied(db, env))
+            || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
         .then_some(structurally_satisfied)
     }
 
@@ -1912,7 +1913,7 @@ impl<'db> ProtocolInstanceType<'db> {
             );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
-                .is_always_satisfied(db, &env)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         }
 
         is_equivalent_to_object_inner(db, self, ())

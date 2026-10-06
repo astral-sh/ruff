@@ -207,7 +207,7 @@ impl<'db> ExpectedReturnType<'db> {
 
         check(self.public)
             .or(db, &builder, || check(self.lexical))
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 }
 

@@ -936,7 +936,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let iterable = KnownClass::Iterable.to_specialized_instance(db, env, TOP_SPEC);
                 check(value_type, iterable)
             })
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Read an already-inferred expression's type and truthiness using the requested

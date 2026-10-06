@@ -529,10 +529,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set never holds, without checking the type variables'
     /// declared bounds or constraints. Use [`Self::has_no_valid_solutions`] to include those.
-    pub(crate) fn is_never_satisfied(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+    ///
+    /// Checks for conflicting inferred bounds on the variables in `inferable`.
+    pub(crate) fn is_never_satisfied(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
-            .is_never_satisfied(db, env, &mut storage, self.source_order)
+            .is_never_satisfied(db, env, &mut storage, inferable, self.source_order)
     }
 
     /// Returns whether no specialization satisfying the type variables' upper bounds and
@@ -549,7 +556,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        if self.is_never_satisfied(db, env) {
+        if self.is_never_satisfied(db, env, TypeVarSet::None) {
             return true;
         }
 
@@ -577,16 +584,18 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == ALWAYS_FALSE
     }
 
-    /// Returns whether this constraint set always holds.
+    /// Returns whether this constraint set always holds, by checking that its negation is never
+    /// satisfied with the given inferable type variables.
     #[inline]
     pub(crate) fn is_always_satisfied(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
     ) -> bool {
         let mut storage = self.builder.storage.borrow_mut();
         self.node
-            .is_always_satisfied(db, env, &mut storage, self.source_order)
+            .is_always_satisfied(db, env, &mut storage, inferable, self.source_order)
     }
 
     /// Returns whether this constraint set is the `always` terminal.
@@ -1022,7 +1031,7 @@ struct ConstraintSetStorage<'db> {
     /// Only caches completed top-level results. Recursive results depend on active path
     /// assignments and must not use this cache. A BDD's satisfiability does not depend on the
     /// source order used to traverse it.
-    never_satisfied_cache: FxHashMap<NodeId, bool>,
+    never_satisfied_cache: FxHashMap<(NodeId, TypeVarSet<'db>), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId), NodeId>,
@@ -2426,18 +2435,15 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
         match self.node() {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
-                // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
-                // depend on which typevars are inferable. That will require adding an `inferable`
-                // parameter and plumbing that through to all callers.
                 let source_orders = storage.calculate_source_orders(source_order);
-                let mut walker =
-                    SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
+                let mut walker = SolutionWalker::new(db, storage, source_orders, inferable, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
                 walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
@@ -2450,6 +2456,7 @@ impl NodeId {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
+        inferable: TypeVarSet<'db>,
         source_order: Option<SourceOrderId>,
     ) -> bool {
         /// Checks whether this BDD is a single conjunction, where either (a) every constraint is
@@ -2496,23 +2503,21 @@ impl NodeId {
             Node::AlwaysTrue => false,
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
-                if let Some(result) = storage.never_satisfied_cache.get(&self) {
+                let key = (self, inferable);
+                if let Some(result) = storage.never_satisfied_cache.get(&key) {
                     return *result;
                 }
 
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
-                    // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
-                    // depend on which typevars are inferable. That will require adding an
-                    // `inferable` parameter and plumbing that through to all callers.
                     let source_orders = storage.calculate_source_orders(source_order);
                     let mut walker =
-                        SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
+                        SolutionWalker::new(db, storage, source_orders, inferable, self);
                     let mut path = interior.path_assignments(db, env, storage, source_order);
                     walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
                 };
-                storage.never_satisfied_cache.insert(self, result);
+                storage.never_satisfied_cache.insert(key, result);
                 result
             }
         }
@@ -3133,7 +3138,7 @@ impl<'db> CandidateTypeVarSolver<'db> {
         let lower = range.effective_lower(db, env);
         if !range.upper.is_satisfied_by(db, env, lower) {
             let (when_upper, source_order) = range.upper.when_satisfied_by(db, env, storage, lower);
-            if when_upper.is_never_satisfied(db, env, storage, source_order) {
+            if when_upper.is_never_satisfied(db, env, storage, TypeVarSet::None, source_order) {
                 // This path does not satisfy the accumulated upper bound, and is
                 // therefore not a valid specialization.
                 return None;
@@ -3415,7 +3420,7 @@ fn is_possibly_constraint_set_assignable<'db>(db: &'db dyn Db, types: TypePair<'
     types
         .first(db)
         .when_constraint_set_assignable_to_owned(db, env, types.second(db))
-        .query(|_storage, when| !when.is_never_satisfied(db, env))
+        .query(|_storage, when| !when.is_never_satisfied(db, env, TypeVarSet::None))
 }
 
 /// Candidate solutions for a constraint set
@@ -3926,7 +3931,13 @@ impl<'db> CandidateSolutions<'db> {
                     path_bound
                         .upper
                         .when_satisfied_by(db, env, &mut storage, lower);
-                if when_upper.is_never_satisfied(db, env, &mut storage, source_order) {
+                if when_upper.is_never_satisfied(
+                    db,
+                    env,
+                    &mut storage,
+                    TypeVarSet::None,
+                    source_order,
+                ) {
                     // This path does not satisfy the accumulated upper bound, and is
                     // therefore not a valid specialization.
                     return PathBoundSolution::Unsatisfiable;
@@ -4882,7 +4893,7 @@ mod tests {
         assert!(
             mapped
                 .iff(db, &builder, expected)
-                .is_always_satisfied(db, &env)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         );
     }
 
@@ -5027,7 +5038,7 @@ mod tests {
             &ApplyTypeMappingVisitor::new(&env),
         );
 
-        assert!(mapped.is_always_satisfied(db, &env));
+        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::None));
     }
 
     #[test]
@@ -5051,7 +5062,7 @@ mod tests {
             &ApplyTypeMappingVisitor::new(&env),
         );
 
-        assert!(mapped.is_always_satisfied(db, &env));
+        assert!(mapped.is_always_satisfied(db, &env, TypeVarSet::None));
     }
 
     #[test]
@@ -5165,7 +5176,7 @@ mod tests {
             let full = left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None);
 
             assert!(trivial.is_trivially_never_satisfied());
-            assert!(!full.is_always_satisfied(db, &env));
+            assert!(!full.is_always_satisfied(db, &env, TypeVarSet::None));
         }
     }
 
@@ -5203,7 +5214,7 @@ mod tests {
                     positive_results += 1;
                     assert!(
                         left.when_disjoint_from(db, &env, right, &builder, TypeVarSet::None)
-                            .is_always_satisfied(db, &env),
+                            .is_always_satisfied(db, &env, TypeVarSet::None),
                         "cheap disjointness incorrectly accepts `{}` and `{}`",
                         left.display(db, &env),
                         right.display(db, &env)
@@ -5510,7 +5521,7 @@ class E: ...
         assert!(!ConstraintSet::never(&builder).is_trivially_always_satisfied());
         assert!(!t_int.is_trivially_always_satisfied());
         assert!(!t_int.is_trivially_never_satisfied());
-        assert!(impossible.is_never_satisfied(db, &env));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::None));
         assert!(!impossible.is_trivially_never_satisfied());
 
         let t_bool_upper = ConstraintSet::constrain_typevar_upper_bound(
@@ -5531,7 +5542,7 @@ class E: ...
             .negate(db, &builder)
             .or(db, &builder, || t_int_upper);
 
-        assert!(tautology.is_always_satisfied(db, &env));
+        assert!(tautology.is_always_satisfied(db, &env, TypeVarSet::None));
         assert!(!tautology.is_trivially_always_satisfied());
     }
 
@@ -5632,18 +5643,25 @@ class E: ...
         let t_str = create_constraint(db, &builder, t, KnownClass::Str);
         let impossible = t_int.and(db, &builder, || t_str);
 
-        assert!(!t_int.is_never_satisfied(db, &env));
-        assert!(!t_int.is_never_satisfied(db, &env));
-        assert!(impossible.is_never_satisfied(db, &env));
-        assert!(impossible.is_never_satisfied(db, &env));
-        assert!(ConstraintSet::never(&builder).is_never_satisfied(db, &env));
-        assert!(!ConstraintSet::always(&builder).is_never_satisfied(db, &env));
+        assert!(!t_int.is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(!t_int.is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(impossible.is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(ConstraintSet::never(&builder).is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(!ConstraintSet::always(&builder).is_never_satisfied(db, &env, TypeVarSet::None));
 
         {
             let storage = builder.storage.borrow();
-            assert_eq!(storage.never_satisfied_cache.get(&t_int.node), Some(&false));
             assert_eq!(
-                storage.never_satisfied_cache.get(&impossible.node),
+                storage
+                    .never_satisfied_cache
+                    .get(&(t_int.node, TypeVarSet::None)),
+                Some(&false)
+            );
+            assert_eq!(
+                storage
+                    .never_satisfied_cache
+                    .get(&(impossible.node, TypeVarSet::None)),
                 Some(&true)
             );
             assert_eq!(storage.never_satisfied_cache.len(), 2);
@@ -5651,10 +5669,15 @@ class E: ...
 
         let owned = create_compacted_owned_set(db);
         owned.query(|builder, set| {
-            assert!(!set.is_never_satisfied(db, &env));
-            assert!(!set.is_never_satisfied(db, &env));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
             let storage = builder.storage.borrow();
-            assert_eq!(storage.never_satisfied_cache.get(&set.node), Some(&false));
+            assert_eq!(
+                storage
+                    .never_satisfied_cache
+                    .get(&(set.node, TypeVarSet::None)),
+                Some(&false)
+            );
         });
     }
 
@@ -5674,8 +5697,8 @@ class E: ...
 
         assert_eq!(first.node, second.node);
         assert_ne!(first.source_order, second.source_order);
-        assert!(!first.is_never_satisfied(db, &env));
-        assert!(!second.is_never_satisfied(db, &env));
+        assert!(!first.is_never_satisfied(db, &env, TypeVarSet::None));
+        assert!(!second.is_never_satisfied(db, &env, TypeVarSet::None));
         let storage = builder.storage.borrow();
         assert_eq!(storage.never_satisfied_cache.len(), 1);
     }
@@ -5815,8 +5838,8 @@ class E: ...
             };
             signatures.insert(format!(
                 "never={} always={} merged=[{merged}] paths=[{paths}]",
-                set.is_never_satisfied(db, &env),
-                set.is_always_satisfied(db, &env),
+                set.is_never_satisfied(db, &env, TypeVarSet::None),
+                set.is_always_satisfied(db, &env, TypeVarSet::None),
             ));
         }
 
@@ -6308,13 +6331,13 @@ class E: ...
         // T ∧ ¬T == false
         assert!(
             tdd.and(db, &builder, || negated)
-                .is_never_satisfied(db, &env)
+                .is_never_satisfied(db, &env, TypeVarSet::None)
         );
 
         // T ∨ ¬T == true
         assert!(
             tdd.or(db, &builder, || negated)
-                .is_always_satisfied(db, &env)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
         );
     }
 
@@ -6334,7 +6357,7 @@ class E: ...
         let negated = tdd.negate(db, &builder);
         let double_negated = negated.negate(db, &builder);
         let equivalent = tdd.iff(db, &builder, double_negated);
-        assert!(equivalent.is_always_satisfied(db, &env));
+        assert!(equivalent.is_always_satisfied(db, &env, TypeVarSet::None));
     }
 
     /// `iff(T, T)` is always satisfied for TDDs with uncertain branches.
@@ -6351,11 +6374,17 @@ class E: ...
         let tdd = t_int.or(db, &builder, || u_str);
 
         // iff(T, T) == true
-        assert!(tdd.iff(db, &builder, tdd).is_always_satisfied(db, &env));
+        assert!(
+            tdd.iff(db, &builder, tdd)
+                .is_always_satisfied(db, &env, TypeVarSet::None)
+        );
 
         // iff(T, ¬T) == false
         let negated = tdd.negate(db, &builder);
-        assert!(tdd.iff(db, &builder, negated).is_never_satisfied(db, &env));
+        assert!(
+            tdd.iff(db, &builder, negated)
+                .is_never_satisfied(db, &env, TypeVarSet::None)
+        );
     }
 
     #[test]
@@ -6521,11 +6550,11 @@ class E: ...
                 t,
                 Type::TypeVar(u),
             );
-            assert!(
-                loaded
-                    .iff(db, builder, direct)
-                    .is_always_satisfied(db, &env)
-            );
+            assert!(loaded.iff(db, builder, direct).is_always_satisfied(
+                db,
+                &env,
+                TypeVarSet::None
+            ));
 
             let mut storage = builder.storage.borrow_mut();
             assert_eq!(storage.typevar_id(db, u), original_u_id);
@@ -6867,7 +6896,7 @@ class E: ...
             );
 
             let combined = set.and(db, builder, || w_str);
-            assert!(!combined.is_never_satisfied(db, &env));
+            assert!(!combined.is_never_satisfied(db, &env, TypeVarSet::None));
 
             let storage = builder.storage.borrow();
             assert!(!storage.nodes.is_empty());
@@ -6912,7 +6941,7 @@ class E: ...
         assert!(owned.inner.is_none());
 
         owned.query(|builder, set| {
-            assert!(set.is_always_satisfied(db, &env));
+            assert!(set.is_always_satisfied(db, &env, TypeVarSet::None));
             let storage = builder.storage.borrow();
             assert!(storage.compacted.is_none());
             assert!(storage.nodes.is_empty());
@@ -6922,7 +6951,7 @@ class E: ...
 
         let builder = ConstraintSetBuilder::new();
         let loaded = builder.load(db, &env, &owned);
-        assert!(loaded.is_always_satisfied(db, &env));
+        assert!(loaded.is_always_satisfied(db, &env, TypeVarSet::None));
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to

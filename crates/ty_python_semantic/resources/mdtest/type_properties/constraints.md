@@ -1280,6 +1280,68 @@ def same_paramspec[**P]() -> None:
     static_assert(constraints == expected)
 ```
 
+## Satisfiability with inferable typevars
+
+Satisfiability checks validate the inferred lower and upper bounds of the given inferable type
+variables. A constraint set can be neither always nor never satisfied when it permits some
+specializations but rejects others.
+
+```py
+from typing import Any
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def basic[T]() -> None:
+    static_assert(ConstraintSet.always().is_always_satisfied(inferable=tuple[T]))
+    static_assert(not ConstraintSet.always().is_never_satisfied(inferable=tuple[T]))
+    static_assert(ConstraintSet.never().is_never_satisfied(inferable=tuple[T]))
+    static_assert(not ConstraintSet.never().is_always_satisfied(inferable=tuple[T]))
+
+    bounded = ConstraintSet.range(bool, T, int)
+    static_assert(not bounded.is_never_satisfied(inferable=tuple[T]))
+    static_assert(not bounded.is_always_satisfied(inferable=tuple[T]))
+```
+
+Gradual bounds can still conflict in their static components. There is no specialization between
+`tuple[Any, str]` and `tuple[int, int]`, so the range is never satisfied when `T` is inferable, and
+its negation is always satisfied. An empty or unrelated inferable set leaves `T`'s gradual bounds
+unchecked.
+
+```py
+def conflicting_bounds[T, U]() -> None:
+    impossible = ConstraintSet.range(tuple[Any, str], T, tuple[int, int])
+    static_assert(impossible.solutions(inferable=tuple[T]) is None)
+    static_assert(impossible.is_never_satisfied(inferable=tuple[T]))
+    static_assert((~impossible).is_always_satisfied(inferable=tuple[T]))
+    static_assert(not impossible.is_always_satisfied(inferable=tuple[T]))
+    static_assert(not (~impossible).is_never_satisfied(inferable=tuple[T]))
+
+    static_assert(not impossible.is_never_satisfied(inferable=tuple[()]))
+    static_assert(not impossible.is_never_satisfied(inferable=tuple[U]))
+    static_assert(not (~impossible).is_always_satisfied(inferable=tuple[U]))
+```
+
+An alternative with compatible bounds keeps the constraint set satisfiable.
+
+```py
+def alternatives[T]() -> None:
+    impossible = ConstraintSet.range(tuple[Any, str], T, tuple[int, int])
+    possible = ConstraintSet.range(tuple[Any, int], T, tuple[int, int])
+    static_assert(not possible.is_never_satisfied(inferable=tuple[T]))
+    static_assert(not (impossible | possible).is_never_satisfied(inferable=tuple[T]))
+    static_assert(not (~(impossible | possible)).is_always_satisfied(inferable=tuple[T]))
+```
+
+These checks do not validate declared type-variable bounds. Solution extraction performs that
+additional validation.
+
+```py
+def declared_bound[T: str]() -> None:
+    constraint = ConstraintSet.equality(T, int)
+    static_assert(not constraint.is_never_satisfied(inferable=tuple[T]))
+    static_assert(constraint.solutions(inferable=tuple[T]) is None)
+```
+
 ## Solutions with inferable and non-inferable typevars
 
 Solution extraction receives the type variables that it is allowed to infer. Other type variables

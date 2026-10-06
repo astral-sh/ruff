@@ -2222,7 +2222,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         })
                         .negate(db, self.constraints);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, self.env)
+                        && result.is_always_satisfied(db, self.env, self.inferable)
                     {
                         context.push(ErrorContext::InvariantTypeArgument {
                             left: left_type,
@@ -3835,7 +3835,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             );
             element_when
                 .iff(db, self.constraints, mapping_when)
-                .is_always_satisfied(db, env)
+                .is_always_satisfied(db, env, self.inferable)
                 && element_when
                     .solutions(db, env, self.inferable)
                     .is_ok_and(|solutions| solutions == mapping_solutions)
@@ -4023,7 +4023,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             !element
                 .apply_specialization(db, self.generic_context.unknown_specialization(db, None))
                 .when_disjoint_from(db, self.env, actual, &disjoint_constraints, self.inferable)
-                .is_always_satisfied(db, self.env)
+                .is_always_satisfied(db, self.env, self.inferable)
         });
 
         // ParamSpecs and TypeVarTuples still use the forward-only legacy mapping table. Keep
@@ -4202,7 +4202,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     let assignable_elements = union_formal.elements(db).iter().filter(|ty| {
                         actual
                             .when_subtype_of(db, self.env, **ty, self.constraints, self.inferable)
-                            .is_always_satisfied(db, self.env)
+                            .is_always_satisfied(db, self.env, self.inferable)
                     });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
@@ -4245,7 +4245,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_never_satisfied(db, self.env, self.inferable)
                         {
                             found_matching_element = true;
                         }
@@ -4284,7 +4284,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_always_satisfied(db, self.env)
+                            .is_always_satisfied(db, self.env, self.inferable)
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
@@ -4346,7 +4346,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                         self.constraints,
                                         self.inferable,
                                     )
-                                    .is_always_satisfied(db, self.env)
+                                    .is_always_satisfied(db, self.env, self.inferable)
                             } else {
                                 ty.when_assignable_to(
                                     db,
@@ -4355,7 +4355,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                     self.constraints,
                                     self.inferable,
                                 )
-                                .is_always_satisfied(db, self.env)
+                                .is_always_satisfied(
+                                    db,
+                                    self.env,
+                                    self.inferable,
+                                )
                             };
 
                             if is_satisfied {
@@ -4439,7 +4443,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                                 self.constraints,
                                 self.inferable,
                             )
-                            .is_never_satisfied(db, self.env)
+                            .is_never_satisfied(db, self.env, self.inferable)
                         {
                             found_matching_element = true;
                         }
@@ -5530,11 +5534,19 @@ mod tests {
 
         let analysis = builder.analyze_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(builder.pending.is_always_satisfied(db, &env));
+        assert!(
+            builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.record_constraint_set(set);
         assert!(matches!(&builder.types, LegacyTypeMappings::Available(types) if types.is_empty()));
-        assert!(!builder.pending.is_always_satisfied(db, &env));
+        assert!(
+            !builder
+                .pending
+                .is_always_satisfied(db, &env, builder.inferable)
+        );
 
         builder.project_for_legacy_fallback(&analysis);
         assert!(builder.inferred_type_is_assignable_to(typevar.identity(db), int));
@@ -5564,7 +5576,11 @@ mod tests {
         builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         assert!(matches!(builder.types, LegacyTypeMappings::BudgetExceeded));
-        assert!(!builder.pending.is_never_satisfied(db, &env));
+        assert!(
+            !builder
+                .pending
+                .is_never_satisfied(db, &env, builder.inferable)
+        );
 
         let mut choices = 0;
         let types = builder.solve_hash_map_with(context, &mut |_, _| {

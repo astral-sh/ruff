@@ -1249,8 +1249,9 @@ mod tests {
 
         for set in [lhs, rhs, intersection, tautology, implication] {
             assert_eq!(
-                set.is_always_satisfied(db, &env),
-                set.negate(db, &builder).is_never_satisfied(db, &env)
+                set.is_always_satisfied(db, &env, TypeVarSet::None),
+                set.negate(db, &builder)
+                    .is_never_satisfied(db, &env, TypeVarSet::None)
             );
         }
     }
