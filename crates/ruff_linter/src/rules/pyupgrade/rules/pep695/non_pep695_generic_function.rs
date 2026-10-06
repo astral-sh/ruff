@@ -30,6 +30,9 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
 /// cause type checking to [fail].
 ///
+/// No fix is offered if any of the type variables is defined with unpacked keyword arguments, such
+/// as `TypeVar("T", **kwargs)`, because the arguments in the unpacked mapping cannot be preserved.
+///
 /// ## Fix safety
 ///
 /// This fix is marked unsafe, as [PEP 695] uses inferred variance for type parameters, instead of
@@ -91,7 +94,7 @@ pub(crate) struct NonPEP695GenericFunction {
 }
 
 impl Violation for NonPEP695GenericFunction {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -147,6 +150,7 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
     }
 
     let mut type_vars = Vec::new();
+    let mut any_unpacked_keywords = false;
     for parameter in parameters {
         if let Some(annotation) = parameter.annotation() {
             let vars = {
@@ -154,12 +158,26 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
                     vars: vec![],
                     semantic: checker.semantic(),
                     any_skipped: false,
+                    any_unpacked_keywords: false,
                 };
                 visitor.visit_expr(annotation);
+                any_unpacked_keywords |= visitor.any_unpacked_keywords;
                 visitor.vars
             };
             type_vars.extend(vars);
         }
+    }
+
+    // The fix would drop any arguments passed through an unpacked mapping, such as
+    // `TypeVar("T", **{"default": Any})`, so only offer the diagnostic.
+    if any_unpacked_keywords {
+        checker.report_diagnostic(
+            NonPEP695GenericFunction {
+                name: name.to_string(),
+            },
+            TextRange::new(name.start(), parameters.end()),
+        );
+        return;
     }
 
     // Deduplicate type vars that appear in multiple parameter annotations

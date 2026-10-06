@@ -15,8 +15,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
 use super::{
-    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarReferenceVisitor, expr_name_to_type_var,
-    non_default_follows_default,
+    DisplayTypeVars, TypeParamKind, TypeVar, TypeVarLookup, TypeVarReferenceVisitor,
+    expr_name_to_type_var, non_default_follows_default,
 };
 
 /// ## What it does
@@ -72,6 +72,9 @@ use super::{
 /// definition cannot be resolved to preserve its bounds, constraints, defaults, or even kind,
 /// producing unconstrained `TypeVar`s.
 ///
+/// No fix is offered if any of the type variables is defined with unpacked keyword arguments, such
+/// as `TypeVar("T", **kwargs)`, because the arguments in the unpacked mapping cannot be preserved.
+///
 /// ## See also
 ///
 /// This rule only applies to `TypeAlias`es and `TypeAliasType`s. See
@@ -109,7 +112,7 @@ enum TypeAliasKind {
 }
 
 impl Violation for NonPEP695TypeAlias {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -177,17 +180,24 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         return;
     }
 
+    let mut any_unpacked_keywords = false;
     let Some(vars) = type_params
         .iter()
         .map(|expr| {
-            expr.as_name_expr().map(|name| {
-                expr_name_to_type_var(checker.semantic(), name).unwrap_or(TypeVar {
-                    name: &name.id,
-                    restriction: None,
-                    kind: TypeParamKind::TypeVar,
-                    default: None,
-                })
-            })
+            expr.as_name_expr().map(
+                |name| match expr_name_to_type_var(checker.semantic(), name) {
+                    TypeVarLookup::Resolved(type_var) => type_var,
+                    lookup => {
+                        any_unpacked_keywords |= matches!(lookup, TypeVarLookup::UnpackedKeywords);
+                        TypeVar {
+                            name: &name.id,
+                            restriction: None,
+                            kind: TypeParamKind::TypeVar,
+                            default: None,
+                        }
+                    }
+                },
+            )
         })
         .collect::<Option<Vec<_>>>()
     else {
@@ -199,6 +209,7 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
         stmt.into(),
         &target_name.id,
         &vars,
+        !any_unpacked_keywords,
         TypeAliasKind::TypeAliasType,
         &unwrapped_call_argument(
             call,
@@ -238,14 +249,15 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         return;
     };
 
-    let vars = {
+    let (vars, any_unpacked_keywords) = {
         let mut visitor = TypeVarReferenceVisitor {
             vars: vec![],
             semantic: checker.semantic(),
             any_skipped: false,
+            any_unpacked_keywords: false,
         };
         visitor.visit_expr(value);
-        visitor.vars
+        (visitor.vars, visitor.any_unpacked_keywords)
     };
 
     // Type variables must be unique; filter while preserving order.
@@ -262,17 +274,22 @@ pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
         stmt.into(),
         name,
         &vars,
+        !any_unpacked_keywords,
         TypeAliasKind::TypeAlias,
         &checker.source()[range_with_parentheses],
     );
 }
 
 /// Generate a [`Diagnostic`] for a non-PEP 695 type alias or type alias type.
+///
+/// The fix is omitted if `fixable` is `false`, e.g. when one of the type variables was defined with
+/// unpacked keyword arguments that the fix would drop.
 fn create_diagnostic(
     checker: &Checker,
     stmt: StmtRef,
     name: &Name,
     type_vars: &[TypeVar],
+    fixable: bool,
     type_alias_kind: TypeAliasKind,
     value_source: &str,
 ) {
@@ -293,6 +310,18 @@ fn create_diagnostic(
         return;
     }
 
+    let mut diagnostic = checker.report_diagnostic(
+        NonPEP695TypeAlias {
+            name: name.to_string(),
+            type_alias_kind,
+        },
+        stmt.range(),
+    );
+
+    if !fixable {
+        return;
+    }
+
     let source = checker.source();
 
     let content = format!(
@@ -301,13 +330,5 @@ fn create_diagnostic(
     );
     let edit = Edit::range_replacement(content, stmt.range());
 
-    checker
-        .report_diagnostic(
-            NonPEP695TypeAlias {
-                name: name.to_string(),
-                type_alias_kind,
-            },
-            stmt.range(),
-        )
-        .set_fix(Fix::unsafe_edit(edit));
+    diagnostic.set_fix(Fix::unsafe_edit(edit));
 }

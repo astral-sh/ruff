@@ -35,7 +35,8 @@ use super::{
 ///
 /// This rule can only offer a fix if all of the generic types in the class definition are defined
 /// in the current module. For external type parameters, a diagnostic is emitted without a suggested
-/// fix.
+/// fix. The same applies to type variables defined with unpacked keyword arguments, such as
+/// `TypeVar("T", **kwargs)`, because the arguments in the unpacked mapping cannot be preserved.
 ///
 /// Not all type checkers fully support PEP 695 yet, so even valid fixes suggested by this rule may
 /// cause type checking to [fail].
@@ -209,8 +210,15 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
         vars: vec![],
         semantic: checker.semantic(),
         any_skipped: false,
+        any_unpacked_keywords: false,
     };
     visitor.visit_expr(slice);
+
+    // the fix would drop any arguments passed through an unpacked mapping, such as
+    // `TypeVar("T", **{"default": Any})`, so only offer the diagnostic
+    if visitor.any_unpacked_keywords {
+        return;
+    }
 
     // if any of the parameters have been skipped, this indicates that we could not resolve the type
     // to a `TypeVar`, `TypeVarTuple`, or `ParamSpec`, and thus our fix would remove it from the
