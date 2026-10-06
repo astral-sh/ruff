@@ -81,6 +81,90 @@ def multiple_legacy_defaults[T = K, U = K](value: K) -> K:
     return value
 ```
 
+This restriction also applies when the legacy type variable appears inside an alias's value:
+
+```py
+type Items[T] = list[T]
+
+# error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+def aliased_legacy_default[T = Items[K]](): ...
+```
+
+An argument that the alias does not use is allowed.
+
+```py
+type Ignored[T] = int
+
+def unused_legacy_default[T = Ignored[K]](): ...  # no diagnostic
+```
+
+### Defaults containing generic callables
+
+A generic callable binds its own type variables, so a class, function, or type alias can use it as a
+default without declaring those variables again.
+
+```py
+from ty_extensions._internal import CallableTypeOf
+
+def identity[T](value: T) -> T:
+    return value
+
+class Holder[F = CallableTypeOf[identity]]: ...  # no diagnostic
+
+def use_default[F = CallableTypeOf[identity]](): ...  # no diagnostic
+
+type Alias[F = CallableTypeOf[identity]] = list[F]  # no diagnostic
+```
+
+### Defaults containing generic property accessors
+
+A property setter binds its own type variables. A protocol with such a setter is valid as a default
+for a class, function, or type alias.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> object: ...
+    @value.setter
+    def value[T](self, value: tuple[T, T]) -> None: ...
+
+class Holder[F = HasValue]: ...  # no diagnostic
+
+def use_default[F = HasValue](): ...  # no diagnostic
+
+type Alias[F = HasValue] = list[F]  # no diagnostic
+```
+
+The protocol is also valid in a `ParamSpec` default list.
+
+```py
+def paramspec_default[**P = [HasValue]](): ...  # no diagnostic
+```
+
+### Defaults containing captured type variables in properties
+
+A property accessor can also capture an outer type parameter. That parameter remains out of scope
+for a nested default, even when the accessor binds another type parameter of its own.
+
+```py
+from typing import Protocol
+
+def outer[T]():
+    class HasValue(Protocol):
+        @property
+        def value(self) -> object: ...
+        @value.setter
+        def value[U](self, value: tuple[U, T]) -> None: ...
+
+    # error: [invalid-type-variable-default]
+    def use_default[F = HasValue](): ...
+
+    # error: [invalid-type-variable-default]
+    def paramspec_default[**P = [HasValue]](): ...
+```
+
 ### Defaults containing bounded type variables
 
 A default can specialize a bounded generic with an earlier type variable whose upper bound is

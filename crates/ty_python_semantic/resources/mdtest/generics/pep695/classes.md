@@ -2044,6 +2044,37 @@ class Bad[S = T, T = int]: ...
 class AlsoBad[S = list[T], T = int]: ...
 ```
 
+## Defaults through type aliases
+
+An alias in a default can refer to an earlier type parameter.
+
+```py
+type Items[T] = list[T]
+
+class Good[T, U = Items[T]]: ...  # no diagnostic
+```
+
+We reject the default if the parameter belongs to an enclosing class or appears later in the
+parameter list.
+
+```py
+# error: [invalid-generic-class]
+class Later[U = Items[T], T = int]: ...
+
+class Outer[T]:
+    # error: [invalid-generic-class]
+    class Inner[U = Items[T]]: ...
+```
+
+An argument that the alias does not use does not need to be a parameter of the class.
+
+```py
+type Ignored[T] = int
+
+class Outer[T]:
+    class Unused[U = Ignored[T]]: ...  # no diagnostic
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
