@@ -672,6 +672,8 @@ def ab(a: str):
             "#,
         );
 
+        // `*[2]` still supplies the positional parameter `x`, even though `x=1` also supplies it.
+        // Highlight that binding despite the duplicate assignment.
         assert_snapshot!(test.signature_help_render(), @"
 
         ============== active signature =============
@@ -693,6 +695,8 @@ def ab(a: str):
             "#,
         );
 
+        // Treat the unpacking as one source argument and highlight its first matched parameter.
+        // The first key is `y`, so `y` is active even though `x` appears first in the signature.
         assert_snapshot!(test.signature_help_render(), @"
 
         ============== active signature =============
@@ -721,6 +725,8 @@ def ab(a: str):
             "#,
         );
 
+        // The two list elements select the two-parameter overload. The unpacking is one source
+        // argument, so highlight its first matched parameter, `x`, in both signatures.
         assert_snapshot!(test.signature_help_render(), @"
 
         ============== active signature =============
@@ -757,6 +763,8 @@ def ab(a: str):
             "#,
         );
 
+        // The two known keys select the overload that accepts both `x` and `y`. Highlight `x` in
+        // both signatures because it is the first key supplied by this single unpacked argument.
         assert_snapshot!(test.signature_help_render(), @"
 
         ============== active signature =============

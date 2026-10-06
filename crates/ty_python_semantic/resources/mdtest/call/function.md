@@ -502,7 +502,7 @@ first_zero(*(
 # fmt: on
 ```
 
-### Immediate list and dictionary arguments
+### Immediate list arguments
 
 Unpacking a list constructed in the call preserves its exact length and each element's type. The
 list's homogeneous element type does not describe these argument positions precisely enough.
@@ -518,83 +518,75 @@ Missing arguments, extra arguments, and incompatible element types are rejected.
 currently highlight the call or unpacked list rather than individual list elements.
 
 ```py
-def pair(x: int, y: str) -> None: ...
-
 # snapshot: missing-argument
 pair(*[])
 ```
 
 ```snapshot
 error[missing-argument]: No arguments provided for required parameters `x`, `y` of function `pair`
- --> src/mdtest_snippet.py:8:1
+ --> src/mdtest_snippet.py:6:1
   |
-8 | pair(*[])
+6 | pair(*[])
   | ^^^^^^^^^
 info: Parameters declared here
- --> src/mdtest_snippet.py:5:9
+ --> src/mdtest_snippet.py:1:9
   |
-5 | def pair(x: int, y: str) -> None: ...
+1 | def pair(x: int, y: str) -> None: ...
   |         ^^^^^^^^^^^^^^^^
 ```
 
 ```py
-def pair(x: int, y: str) -> None: ...
-
 # snapshot: missing-argument
 pair(*[1])
 ```
 
 ```snapshot
 error[missing-argument]: No argument provided for required parameter `y` of function `pair`
-  --> src/mdtest_snippet.py:12:1
-   |
-12 | pair(*[1])
-   | ^^^^^^^^^^
-info: Parameter declared here
- --> src/mdtest_snippet.py:9:18
+ --> src/mdtest_snippet.py:8:1
   |
-9 | def pair(x: int, y: str) -> None: ...
+8 | pair(*[1])
+  | ^^^^^^^^^^
+info: Parameter declared here
+ --> src/mdtest_snippet.py:1:18
+  |
+1 | def pair(x: int, y: str) -> None: ...
   |                  ^^^^^^
 ```
 
 ```py
-def pair(x: int, y: str) -> None: ...
-
 # snapshot: too-many-positional-arguments
 pair(*[1, "two", 3, 4])
 ```
 
 ```snapshot
 error[too-many-positional-arguments]: Too many positional arguments to function `pair`: expected 2, got 4
-  --> src/mdtest_snippet.py:16:6
+  --> src/mdtest_snippet.py:10:6
    |
-16 | pair(*[1, "two", 3, 4])
+10 | pair(*[1, "two", 3, 4])
    |      ^^^^^^^^^^^^^^^^^
 info: Function signature here
-  --> src/mdtest_snippet.py:13:5
-   |
-13 | def pair(x: int, y: str) -> None: ...
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
 
 ```py
-def pair(x: int, y: str) -> None: ...
-
 # snapshot: invalid-argument-type
 pair(*["one", "two"])
 ```
 
 ```snapshot
 error[invalid-argument-type]: Argument to function `pair` is incorrect
-  --> src/mdtest_snippet.py:20:6
+  --> src/mdtest_snippet.py:12:6
    |
-20 | pair(*["one", "two"])
+12 | pair(*["one", "two"])
    |      ^^^^^^^^^^^^^^^ Expected `int`, found `Literal["one"]`
 info: Function defined here
-  --> src/mdtest_snippet.py:17:5
-   |
-17 | def pair(x: int, y: str) -> None: ...
-   |     ^^^^ ------ Parameter declared here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, y: str) -> None: ...
+  |     ^^^^ ------ Parameter declared here
 ```
 
 An exact positional unpack still supplies a parameter that also has an explicit keyword, whether
@@ -606,6 +598,8 @@ def f(x: int, *, y: int = 0) -> None: ...
 f(x=1, *[2])  # error: [parameter-already-assigned]
 f(*[2], x=1)  # error: [parameter-already-assigned]
 ```
+
+### Immediate dictionary arguments
 
 A dictionary constructed directly in the call preserves each string key and its value type. A
 repeated key replaces the earlier value, as it does at runtime.
