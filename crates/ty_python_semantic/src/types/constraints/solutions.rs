@@ -2,7 +2,6 @@ use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
-use arrayvec::ArrayVec;
 use indexmap::map::Slice;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -413,28 +412,33 @@ impl<'db> SolutionWalker<'db> {
             PathIs::Uncertain => {}
         }
 
-        // At this point we actually have to walk the outgoing edges of this node.
+        // At this point we actually have to walk the outgoing edges of this node. The repetitive
+        // nature of the visit_edge calls is intentional; in the negative polarity case, it's
+        // important that we not construct the `if_false` edge sink unless we actually need to
+        // visit it.
         let interior = storage.interior_node_data(node);
         let constraint = interior.constraint;
-        let edges: ArrayVec<(ConstraintAssignment, NodeId), 3> = if polarity == Polarity::Positive {
-            ArrayVec::from_iter([
-                (constraint.when_true(), interior.if_true),
-                (constraint.when_unconstrained(), interior.if_uncertain),
-                (constraint.when_false(), interior.if_false),
-            ])
+
+        let if_true = if polarity == Polarity::Positive {
+            interior.if_true
         } else {
-            ArrayVec::from_iter([
-                (
-                    constraint.when_true(),
-                    interior.if_true.or(storage, interior.if_uncertain),
-                ),
-                (
-                    constraint.when_false(),
-                    interior.if_false.or(storage, interior.if_uncertain),
-                ),
-            ])
+            interior.if_true.or(storage, interior.if_uncertain)
         };
-        for (assignment, child) in edges {
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            polarity,
+            constraint.when_true(),
+            if_true,
+            check_cache,
+            prune_path,
+            process_satisfied,
+        )?;
+
+        if polarity == Polarity::Positive {
             self.visit_edge(
                 db,
                 env,
@@ -442,13 +446,33 @@ impl<'db> SolutionWalker<'db> {
                 limits,
                 path,
                 polarity,
-                assignment,
-                child,
+                constraint.when_unconstrained(),
+                interior.if_uncertain,
                 check_cache,
                 prune_path,
                 process_satisfied,
             )?;
         }
+
+        let if_false = if polarity == Polarity::Positive {
+            interior.if_false
+        } else {
+            interior.if_false.or(storage, interior.if_uncertain)
+        };
+        self.visit_edge(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            polarity,
+            constraint.when_false(),
+            if_false,
+            check_cache,
+            prune_path,
+            process_satisfied,
+        )?;
+
         ControlFlow::Continue(())
     }
 
