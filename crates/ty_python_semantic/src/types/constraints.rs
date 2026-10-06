@@ -5633,7 +5633,7 @@ class E: ...
     }
 
     #[test]
-    fn never_satisfied_results_are_cached() {
+    fn never_satisfied_results_depend_on_inferable() {
         let db = setup_db();
         let db = &db;
         let env = db.program_environment();
@@ -5650,34 +5650,34 @@ class E: ...
         assert!(ConstraintSet::never(&builder).is_never_satisfied(db, &env, TypeVarSet::None));
         assert!(!ConstraintSet::always(&builder).is_never_satisfied(db, &env, TypeVarSet::None));
 
-        {
-            let storage = builder.storage.borrow();
-            assert_eq!(
-                storage
-                    .never_satisfied_cache
-                    .get(&(t_int.node, TypeVarSet::None)),
-                Some(&false)
-            );
-            assert_eq!(
-                storage
-                    .never_satisfied_cache
-                    .get(&(impossible.node, TypeVarSet::None)),
-                Some(&true)
-            );
-            assert_eq!(storage.never_satisfied_cache.len(), 2);
-        }
-
         let owned = create_compacted_owned_set(db);
-        owned.query(|builder, set| {
+        owned.query(|_builder, set| {
             assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
             assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
-            let storage = builder.storage.borrow();
-            assert_eq!(
-                storage
-                    .never_satisfied_cache
-                    .get(&(set.node, TypeVarSet::None)),
-                Some(&false)
-            );
+        });
+
+        // tuple[Any, str] <= T <= tuple[int, int] has conflicting bounds when T is inferable.
+        let u = create_typevar(db, "U");
+        let infer_t = TypeVarSet::from_typevars(db, [t]);
+        let infer_u = TypeVarSet::from_typevars(db, [u]);
+        let int = known_instance(db, KnownClass::Int);
+        let str = known_instance(db, KnownClass::Str);
+        let lower = Type::heterogeneous_tuple(db, &env, [Type::any(), str]);
+        let upper = Type::heterogeneous_tuple(db, &env, [int, int]);
+        let owned = ConstraintSetBuilder::new().into_owned(|builder| {
+            ConstraintSet::constrain_typevar(db, &env, builder, t, lower, upper)
+        });
+
+        // The answer must not depend on which inferable set was queried first.
+        owned.query(|_builder, set| {
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
+            assert!(set.is_never_satisfied(db, &env, infer_t));
+            assert!(!set.is_never_satisfied(db, &env, infer_u));
+        });
+        owned.query(|_builder, set| {
+            assert!(set.is_never_satisfied(db, &env, infer_t));
+            assert!(!set.is_never_satisfied(db, &env, infer_u));
+            assert!(!set.is_never_satisfied(db, &env, TypeVarSet::None));
         });
     }
 
