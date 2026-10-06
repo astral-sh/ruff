@@ -707,20 +707,14 @@ def check(value: tuple[int, str] | tuple[str]):
 
 ### Tuple checks that assign to another name
 
-Assigning the checked element to a different name still allows narrowing the tuple.
+Assigning the checked element to another name leaves the tuple unchanged, but currently prevents
+narrowing the tuple.
 
 ```py
 def element(value: tuple[str, int] | tuple[int, str]):
     if isinstance(item := value[0], str):
-        reveal_type(value[1])  # revealed: int
-```
-
-Assigning the tuple before reading its element also allows narrowing the assigned tuple:
-
-```py
-def tuple_assignment(value: tuple[str, int] | tuple[int, str]):
-    if isinstance((copied := value)[0], str):
-        reveal_type(copied[1])  # revealed: int
+        # TODO: Narrow to `int`.
+        reveal_type(value[1])  # revealed: int | str
 ```
 
 ### Tuple checks that reassign the tuple
@@ -800,22 +794,6 @@ class Container:
 def attribute(container: Container):
     if is_string(container.value[0], container := Container()):
         reveal_type(container.value)  # revealed: tuple[str, int] | tuple[int, str]
-```
-
-### Tuple checks with assignments in lambdas
-
-An assignment inside a lambda refers to a local name, so it does not prevent narrowing the tuple in
-the containing function.
-
-```py
-from typing_extensions import TypeIs
-
-def is_string(value: object, other: object) -> TypeIs[str]:
-    return isinstance(value, str)
-
-def check(value: tuple[str, int] | tuple[int, str]):
-    if is_string(value[0], lambda: (value := 0)):
-        reveal_type(value[1])  # revealed: int
 ```
 
 ### Tuple tags with non-literal comparators

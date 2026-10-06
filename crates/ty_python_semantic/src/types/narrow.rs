@@ -36,7 +36,7 @@ use ty_python_core::predicate::{
     ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate, PatternPredicateKind,
     Predicate, PredicateNode, SequencePatternPredicateKind, SubjectElementPatternPredicate,
 };
-use ty_python_core::scope::{ScopeId, ScopeKind};
+use ty_python_core::scope::ScopeId;
 use ty_python_core::symbol::Symbol;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
@@ -44,7 +44,6 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_text_size::Ranged;
 
 use super::UnionType;
 use super::call::CallArguments;
@@ -4664,16 +4663,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                             && let Some((tuple_place, tuple_constraint)) = self
                                 .narrow_tuple_subscript_by_type(
                                     inference,
+                                    expr_call,
                                     subscript,
                                     constraint_type,
                                     use_generic_filtering,
                                 )
-                            && !self.call_rebinds_tuple_base(
-                                expr_call,
-                                argument,
-                                subscript,
-                                tuple_place,
-                            )
                         {
                             insert_narrowing_constraint(
                                 &mut constraints,
@@ -4759,16 +4753,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         && let Some((tuple_place, tuple_constraint)) = self
                             .narrow_tuple_subscript_by_type(
                                 inference,
+                                expr_call,
                                 subscript,
                                 constraint_type,
                                 use_generic_filtering,
                             )
-                        && !self.call_rebinds_tuple_base(
-                            expr_call,
-                            argument,
-                            subscript,
-                            tuple_place,
-                        )
                     {
                         insert_narrowing_constraint(
                             &mut constraints,
@@ -5311,10 +5300,22 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn narrow_tuple_subscript_by_type(
         &self,
         inference: &ExpressionInference<'db>,
+        call: &ast::ExprCall,
         subscript: &ast::ExprSubscript,
         constraint: Type<'db>,
         use_generic_filtering: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // An assignment can replace the tuple after its element was read. Until we track
+        // which binding was checked, skip tuple narrowing for calls containing assignment expressions.
+        if any_over_expr(&call.func, ast::Expr::is_named_expr)
+            || call
+                .arguments
+                .iter_source_order()
+                .any(|argument| any_over_expr(argument.value(), ast::Expr::is_named_expr))
+        {
+            return None;
+        }
+
         self.filter_tuple_subscript(
             inference.expression_type(&*subscript.value),
             &subscript.value,
@@ -5328,53 +5329,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 }
             },
         )
-    }
-
-    /// Check whether argument evaluation invalidates a constraint on a subscript's base.
-    fn call_rebinds_tuple_base(
-        &self,
-        call: &ast::ExprCall,
-        checked_argument: &ast::Expr,
-        subscript: &ast::ExprSubscript,
-        tuple_place: ScopedPlaceId,
-    ) -> bool {
-        let db = self.db;
-        let scope = self.scope();
-        let index = semantic_index(db, scope.program_file(db));
-        let places = self.places();
-        // Comprehension walruses bind in the containing Python scope; lambda locals do not.
-        let binding_scope = |expression: &ast::Expr| {
-            index
-                .ancestor_scopes(index.expression_scope_id(expression))
-                .find(|(_, scope)| scope.kind() != ScopeKind::Comprehension)
-                .map(|(scope, _)| scope)
-        };
-
-        call.arguments
-            .args
-            .iter()
-            .chain(call.arguments.keywords.iter().map(|keyword| &keyword.value))
-            .skip_while(|argument| !std::ptr::eq(*argument, checked_argument))
-            .any(|argument| {
-                any_over_expr(argument, |expression| {
-                    if let ast::Expr::Named(named) = expression
-                        // The assignment in `(value := make_tuple())[0]` precedes the read.
-                        // In `(value := value[0])`, it overwrites the tuple after the read.
-                        && (!std::ptr::eq(argument, checked_argument)
-                            || named.end() > subscript.value.end())
-                        && binding_scope(&named.target) == binding_scope(&subscript.value)
-                        && let Some(target) = PlaceExpr::try_from_expr(&named.target)
-                        && let Some(target_place) = places.place_id(&target)
-                    {
-                        tuple_place == target_place
-                            || places
-                                .parents(places.place(tuple_place))
-                                .any(|parent| parent == target_place)
-                    } else {
-                        false
-                    }
-                })
-            })
     }
 
     /// Retain tuple union members whose indexed element can satisfy a predicate.
