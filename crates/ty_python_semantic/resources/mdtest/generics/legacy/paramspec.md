@@ -1310,6 +1310,35 @@ forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid
 forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
 ```
 
+### Local dictionary forwarding
+
+The current diagnostic for forwarding a local dictionary through a `ParamSpec` is undesirable: when
+the dictionary contains only `x`, ty reports an incompatible type for `y` instead of a missing
+argument. The return type is retained.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def forward(callback: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+def target(x: int, y: str) -> str:
+    return y * x
+
+def local() -> None:
+    kwargs = {"x": 1, "y": "two"}
+    reveal_type(forward(target, **kwargs))  # revealed: str
+
+    missing = {"x": 1}
+    forward(target, **missing)  # error: [invalid-argument-type]
+
+    wrong = {"x": 1, "y": 2}
+    forward(target, **wrong)  # error: [invalid-argument-type]
+```
+
 ### Constructor overrides with receiver-inferred parameters
 
 In the below example, `Base.__new__` takes the same arguments as the class's `build` method. Binding

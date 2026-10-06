@@ -617,6 +617,298 @@ pair(**{"x": 1}, **{"x": 2, "y": "two"})  # error: [parameter-already-assigned]
 pair(**{"z": 3, "x": 1, "y": "two"})  # error: [unknown-argument]
 ```
 
+### Local dictionary arguments
+
+The current diagnostics for local dictionary arguments are undesirable: ty reports incompatible
+argument types for some valid calls and can miss missing or duplicate arguments. Dictionary
+inference retains some value information, but leaves the possible keys open.
+
+```py
+def pair(x: int, y: str, optional: bool = False) -> None: ...
+def valid() -> None:
+    kwargs = {"y": "two", "x": 1}
+    pair(**kwargs)  # error: [invalid-argument-type]
+    pair(**kwargs, optional=True)  # no diagnostic
+
+    first = {"x": 1}
+    second = {"y": "two"}
+    # error: [invalid-argument-type] "Expected `bool`, found `int`"
+    # error: [invalid-argument-type] "Expected `str`, found `int`"
+    pair(**first, **second)
+
+def invalid() -> None:
+    empty = {}
+    pair(**empty)  # no diagnostic
+
+    missing = {"x": 1}
+    # error: [invalid-argument-type] "Expected `bool`, found `int`"
+    # error: [invalid-argument-type] "Expected `str`, found `int`"
+    pair(**missing)
+
+    extra = {"x": 1, "y": "two", "extra": 3}
+    pair(**extra)  # error: [invalid-argument-type]
+
+    wrong_optional = {"x": 1, "y": "two", "optional": "yes"}
+    pair(**wrong_optional)  # error: [invalid-argument-type]
+
+    duplicate = {"x": 1, "y": "two"}
+    pair(x=2, **duplicate)  # error: [invalid-argument-type]
+
+    other = {"x": 2}
+    pair(**duplicate, **other)  # error: [invalid-argument-type]
+```
+
+Repeated dictionary keys use the last value, but this call still reports an incompatible type for
+`optional`.
+
+```py
+def overwritten_key() -> None:
+    kwargs = {"x": "wrong", "x": 1, "y": "two"}
+    pair(**kwargs)  # error: [invalid-argument-type]
+```
+
+The diagnostic below compares `kwargs` with the absent `optional` parameter.
+
+```py
+def wrong_value() -> None:
+    kwargs = {"x": 1, "y": 2}
+    # error: [invalid-argument-type] "Expected `str`, found `Literal[2]`"
+    # snapshot: invalid-argument-type
+    pair(**kwargs)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+  --> src/mdtest_snippet.py:40:10
+   |
+40 |     pair(**kwargs)
+   |          ^^^^^^^^ Expected `bool`, found `int`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, y: str, optional: bool = False) -> None: ...
+  |     ^^^^                 ---------------------- Parameter declared here
+```
+
+### Statically selected dictionary arguments
+
+Conditional dictionary arguments currently leave the possible keys open. This is undesirable:
+missing arguments can go unreported even when the selected dictionary is empty.
+
+```py
+def takes_value(*, value: int) -> None: ...
+def selected(flag: bool) -> None:
+    takes_value(**({"value": 1} if True else {}))  # no diagnostic
+    takes_value(**({"extra": 1} if False else {"value": 1}))  # no diagnostic
+    takes_value(**({"value": "wrong"} if flag and False else {"value": 1}))  # no diagnostic
+    takes_value(**({"value": 1} if flag or True else {}))  # no diagnostic
+    takes_value(**({"value": 1} if flag else {}))  # no diagnostic
+
+    kwargs = {"extra": 1} if False else {"value": 1}
+    takes_value(**kwargs)  # no diagnostic
+
+    missing = {"value": 1} if False else {}
+    takes_value(**missing)  # no diagnostic
+```
+
+### Reassigned local dictionary arguments
+
+Reassigning a local dictionary or assigning it in separate branches currently yields undesirable
+diagnostics. ty reports incompatible types for valid calls and, for a partial dictionary, reports
+incompatible types instead of a missing argument.
+
+```py
+def pair(x: int, y: str, optional: bool = False) -> None: ...
+def reassigned() -> None:
+    kwargs = {"x": 1, "y": "two"}
+    pair(**kwargs)  # error: [invalid-argument-type]
+    kwargs = {"x": 2}
+    # error: [invalid-argument-type] "Expected `bool`, found `int`"
+    # error: [invalid-argument-type] "Expected `str`, found `int`"
+    pair(**kwargs)
+    kwargs = {"x": 3, "y": "three"}
+    pair(**kwargs)  # error: [invalid-argument-type]
+
+def separate_branches(flag: bool) -> None:
+    if flag:
+        kwargs = {"x": 1}
+        # error: [invalid-argument-type] "Expected `bool`, found `int`"
+        # error: [invalid-argument-type] "Expected `str`, found `int`"
+        pair(**kwargs)
+    else:
+        kwargs = {"x": 2, "y": "two"}
+        pair(**kwargs)  # error: [invalid-argument-type]
+```
+
+When several assignments can reach the same call, normal dictionary inference leaves the set of
+possible keys open.
+
+```py
+def needs_x(x: int) -> None: ...
+def ambiguous(flag: bool) -> None:
+    if flag:
+        kwargs = {"extra": 1}
+    else:
+        kwargs = {"another": 2}
+    needs_x(**kwargs)  # no diagnostic
+```
+
+### Unsupported dictionary assignments
+
+Module and class bindings, annotations, chained assignments, and destructuring use normal dictionary
+inference and leave the possible keys open.
+
+```py
+def needs_x(x: int) -> None: ...
+
+module_kwargs = {"extra": 1}
+needs_x(**module_kwargs)  # no diagnostic
+
+class Namespace:
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+
+def annotated() -> None:
+    kwargs: dict[str, int] = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+
+def separate_annotation() -> None:
+    kwargs: dict[str, int]
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+
+def chained() -> None:
+    kwargs = other = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+    needs_x(**other)  # no diagnostic
+
+def destructured() -> None:
+    (kwargs,) = ({"extra": 1},)
+    needs_x(**kwargs)  # no diagnostic
+```
+
+Computed keys, dictionary spreads, and dictionary constructors also leave the possible keys open.
+
+```py
+def other_dictionary_forms() -> None:
+    key = "extra"
+    computed = {key: 1}
+    needs_x(**computed)  # no diagnostic
+
+    spread = {**{"extra": 1}}
+    needs_x(**spread)  # no diagnostic
+
+    constructed = dict(extra=1)
+    needs_x(**constructed)  # no diagnostic
+```
+
+### Other uses of local dictionary arguments
+
+These examples read, share, mutate, or delete a local dictionary. ty leaves the possible keys open
+at each call.
+
+```py
+def needs_x(x: int) -> None: ...
+def consume(values: dict[str, int]) -> None: ...
+def ordinary_read() -> None:
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+    reveal_type(kwargs)  # revealed: dict[str, int]
+
+def aliased() -> None:
+    kwargs = {"extra": 1}
+    other = kwargs
+    needs_x(**kwargs)  # no diagnostic
+    needs_x(**other)  # no diagnostic
+
+def loop_carried_alias(items: list[int]) -> None:
+    kwargs = {"extra": 1}
+    for item in items:
+        previous = kwargs
+        kwargs = {"x": item}
+        needs_x(**previous)  # no diagnostic
+    needs_x(**kwargs)  # no diagnostic
+
+def escaped() -> None:
+    kwargs = {"extra": 1}
+    consume(kwargs)
+    needs_x(**kwargs)  # no diagnostic
+
+def mutated() -> None:
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+    kwargs["x"] = 2
+    needs_x(**kwargs)  # no diagnostic
+
+def cleared() -> None:
+    kwargs = {"extra": 1}
+    kwargs.clear()
+    needs_x(**kwargs)  # no diagnostic
+
+def deleted_item() -> None:
+    kwargs = {"extra": 1}
+    del kwargs["extra"]
+    needs_x(**kwargs)  # no diagnostic
+
+def deleted_name() -> None:
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+    del kwargs
+```
+
+A nested function can outlive the current assignment. The captured dictionary also has an open set
+of possible keys, even when the capture itself only unpacks keyword arguments.
+
+```py
+def captured() -> None:
+    kwargs = {"extra": 1}
+    needs_x(**kwargs)  # no diagnostic
+
+    def inner() -> None:
+        needs_x(**kwargs)  # no diagnostic
+```
+
+A nested function can replace a local dictionary through a `nonlocal` assignment without reading its
+current value.
+
+```py
+def nonlocal_write() -> None:
+    def change() -> None:
+        nonlocal values
+        values = {"extra": 1}
+
+    values = {"another": 2}
+    change()
+    needs_x(**values)  # no diagnostic
+```
+
+A function from the previous iteration can replace the current dictionary when the nested function
+is defined later in a loop.
+
+```py
+def loop_carried_nonlocal_write() -> None:
+    def change() -> None: ...
+
+    for _ in range(2):
+        values = {"extra": 1}
+        change()
+        needs_x(**values)  # no diagnostic
+
+        def change() -> None:
+            nonlocal values
+            values = {"x": 2}
+```
+
+A generator's assignment expression can replace a local dictionary when the generator is advanced.
+
+```py
+def generator_write() -> None:
+    updates = (values := {"x": 1} for _ in [0])
+    values = {"extra": 1}
+    next(updates)
+    needs_x(**values)  # no diagnostic
+```
+
 ### Aliased list arguments
 
 Assigning a list literal to a variable loses the per-position types used for immediate unpacking.
