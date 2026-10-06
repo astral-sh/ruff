@@ -950,8 +950,7 @@ reveal_type(Explicit(1))  # revealed: Explicit[int]
 
 ### Conditional keyword dictionaries
 
-Conditional dictionary arguments infer unions for the constructor's type parameters, losing the
-relationship between branches.
+Each dictionary branch can infer a different constructor specialization.
 
 ```py
 from typing import Generic, TypeVar
@@ -966,9 +965,9 @@ class Pair(Generic[A, B]):
 
 def conditional(flag: bool) -> None:
     pair = Pair(**({"first": 1, "second": "two"} if flag else {"first": "three", "second": 4}))
-    reveal_type(pair)  # revealed: Pair[str | int, str | int]
+    reveal_type(pair)  # revealed: Pair[int, str] | Pair[str, int]
     reverse = Pair(**({"first": "three", "second": 4} if flag else {"first": 1, "second": "two"}))
-    reveal_type(reverse)  # revealed: Pair[int | str, int | str]
+    reveal_type(reverse)  # revealed: Pair[str, int] | Pair[int, str]
 ```
 
 ### Constrained constructor inference uses argument evidence

@@ -1784,7 +1784,7 @@ fn conditional_keyword_dictionary_expansion_limit() -> anyhow::Result<()> {
     let mut db = setup_db();
     for (count, last, expected) in [
         (256, "{\"x\": 255}", "int"),
-        (257, "{\"x\": 256}", "int"),
+        (257, "{\"x\": 256}", "Unknown"),
         (258, "dict(x=1)", "int"),
     ] {
         let expression = tree(0, count, count, last);

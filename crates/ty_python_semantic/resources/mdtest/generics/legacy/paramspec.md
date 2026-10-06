@@ -1339,13 +1339,9 @@ def local() -> None:
 
 def conditional(flag: bool) -> None:
     kwargs = {"x": 1, "y": "two"} if flag else {"x": 2, "y": "three"}
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     reveal_type(forward(target, **kwargs))  # revealed: str
     missing = {"x": 1, "y": "two"} if flag else {"x": 2}
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    forward(target, **missing)
+    forward(target, **missing)  # error: [missing-argument]
 ```
 
 ### Constructor overrides with receiver-inferred parameters

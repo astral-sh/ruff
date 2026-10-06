@@ -329,7 +329,8 @@ reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
 
 ## Conditional keyword dictionaries
 
-Conditional dictionary arguments can leave dataclass options unrecognized.
+When both branches set `frozen=True`, ty recognizes the frozen dataclass, and it reports an invalid
+`order=True, eq=False` combination in either branch.
 
 ```py
 from dataclasses import dataclass
@@ -340,10 +341,12 @@ def conditional(flag: bool) -> None:
         x: int
 
     reveal_type(Frozen(1))  # revealed: Frozen
-    Frozen(1).x = 2  # no diagnostic
+    Frozen(1).x = 2  # error: [invalid-assignment]
 
-    dataclass(**({"order": True, "eq": False} if flag else {"order": False, "eq": True}))  # no diagnostic
-    dataclass(**({"order": False, "eq": True} if flag else {"order": True, "eq": False}))  # no diagnostic
+    # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+    dataclass(**({"order": True, "eq": False} if flag else {"order": False, "eq": True}))
+    # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+    dataclass(**({"order": False, "eq": True} if flag else {"order": True, "eq": False}))
 ```
 
 ## `@dataclass` calls with arguments
@@ -1902,7 +1905,7 @@ Versioned(value=1)  # no diagnostic
 
 ### Version-dependent options on newer Python versions
 
-The same version guard is accepted on a newer Python version, but its slots are not recognized.
+The same version guard enables slots when the target Python version supports them.
 
 ```toml
 [environment]
@@ -1919,8 +1922,7 @@ class Versioned:
 
 Versioned(1)  # no diagnostic
 Versioned(value=1)  # no diagnostic
-# error: [unresolved-attribute]
-reveal_type(Versioned.__slots__)  # revealed: Unknown
+reveal_type(Versioned.__slots__)  # revealed: tuple[Literal["value"]]
 ```
 
 ## `Final` fields

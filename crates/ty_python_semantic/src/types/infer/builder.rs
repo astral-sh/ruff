@@ -6256,7 +6256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 overloads_with_binding.push((overload, binding, OnceCell::new()));
             });
         } else {
-            bindings.visit_type_context_callables(&mut |binding| {
+            bindings.visit_evaluated_type_context_callables(&mut |binding| {
                 add_overloads_from_binding(&mut overloads_with_binding, binding);
             });
         }
@@ -9730,50 +9730,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             pydantic::report_discarded_extra_arguments(&self.context, class, arguments, &bindings);
         }
 
-        for binding in bindings.iter_flat_mut() {
-            let binding_type = binding.callable_type;
-            for (_, overload) in binding.matching_overloads_mut() {
-                match binding_type {
-                    Type::FunctionLiteral(function_literal) => {
-                        if let Some(known_function) = function_literal.known(self.db()) {
-                            known_function.check_call(
-                                self,
-                                overload,
-                                &call_arguments,
-                                call_expression,
-                            );
-                        }
-                    }
-                    Type::ClassLiteral(class) => {
-                        if let Some(known_class) = class.known(self.db()) {
-                            known_class.check_call(
-                                &self.context,
-                                self.index,
-                                overload,
-                                call_expression,
-                            );
-                        }
-                    }
-                    Type::Never => {
-                        // In unreachable sections of code, we infer `Never` for symbols that were
-                        // defined outside the unreachable part. We still want to emit revealed-type
-                        // diagnostics in these sections, so check on the name of the callable here
-                        // and assume that it's actually `typing.reveal_type`.
-                        let is_reveal_type = match func.as_ref() {
-                            ast::Expr::Name(name) => name.id == "reveal_type",
-                            ast::Expr::Attribute(attr) => {
-                                attr.attr.id == "reveal_type" && is_dotted_name(func)
+        let mut revealed_types = None;
+        bindings.visit_evaluated_cases_mut(&call_arguments, &mut |bindings, call_arguments| {
+            for binding in bindings.iter_flat_mut() {
+                let binding_type = binding.callable_type;
+                for (_, overload) in binding.matching_overloads_mut() {
+                    match binding_type {
+                        Type::FunctionLiteral(function_literal) => {
+                            if let Some(known_function) = function_literal.known(self.db()) {
+                                known_function.check_call(
+                                    self,
+                                    overload,
+                                    call_arguments,
+                                    call_expression,
+                                    &mut revealed_types,
+                                );
                             }
-                            _ => false,
-                        };
-                        if is_reveal_type && let Some(first_arg) = arguments.args.first() {
-                            let revealed_ty = self.expression_type(first_arg);
-                            report_revealed_type(&self.context, revealed_ty, first_arg);
                         }
+                        Type::ClassLiteral(class) => {
+                            if let Some(known_class) = class.known(self.db()) {
+                                known_class.check_call(
+                                    &self.context,
+                                    self.index,
+                                    overload,
+                                    call_expression,
+                                );
+                            }
+                        }
+                        Type::Never => {
+                            // In unreachable sections of code, we infer `Never` for symbols that were
+                            // defined outside the unreachable part. We still want to emit revealed-type
+                            // diagnostics in these sections, so check on the name of the callable here
+                            // and assume that it's actually `typing.reveal_type`.
+                            let is_reveal_type = match func.as_ref() {
+                                ast::Expr::Name(name) => name.id == "reveal_type",
+                                ast::Expr::Attribute(attr) => {
+                                    attr.attr.id == "reveal_type" && is_dotted_name(func)
+                                }
+                                _ => false,
+                            };
+                            if is_reveal_type && let Some(first_arg) = arguments.args.first() {
+                                let revealed_ty = self.expression_type(first_arg);
+                                report_revealed_type(&self.context, revealed_ty, first_arg);
+                            }
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
+        });
+        if let Some(revealed_types) = revealed_types {
+            report_revealed_type(
+                &self.context,
+                revealed_types.build(),
+                function::call_argument_node(call_expression, "obj", 0)
+                    .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
+            );
         }
 
         // Record the constraints for the receiver of a bound method call, if the receiver is an
@@ -9814,28 +9826,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if call_result.is_ok() {
                     let db = self.db();
-                    for call_specialization in identity_bindings
-                        .iter_flat()
-                        .flat_map(CallableBinding::matching_overloads)
-                        .filter_map(|(_, identity_overload)| {
-                            identity_overload.partial_specialization(db, env)
-                        })
-                    {
-                        // Record the constraints on the receiver's generic context formed by
-                        // the arguments to this bound method call.
-                        let Some(constraints) = self.collection_use_constraint_from_specialization(
-                            identity_instance,
-                            collection_generic_context,
-                            call_specialization,
-                        ) else {
-                            continue;
-                        };
+                    identity_bindings.visit_evaluated_type_context_callables(&mut |binding| {
+                        for call_specialization in
+                            binding
+                                .matching_overloads()
+                                .filter_map(|(_, identity_overload)| {
+                                    identity_overload.partial_specialization(db, env)
+                                })
+                        {
+                            // Record the constraints on the receiver's generic context formed by
+                            // the arguments to this bound method call.
+                            let Some(constraints) = self
+                                .collection_use_constraint_from_specialization(
+                                    identity_instance,
+                                    collection_generic_context,
+                                    call_specialization,
+                                )
+                            else {
+                                continue;
+                            };
 
-                        self.collection_use_constraints
-                            .entry(collection_def)
-                            .or_default()
-                            .insert(constraints);
-                    }
+                            self.collection_use_constraints
+                                .entry(collection_def)
+                                .or_default()
+                                .insert(constraints);
+                        }
+                    });
                 }
             }
         }

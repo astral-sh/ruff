@@ -26,7 +26,7 @@ use crate::{
         },
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
-            OverloadLiteral, function_body_kind, is_implicit_classmethod, report_revealed_type,
+            OverloadLiteral, function_body_kind, is_implicit_classmethod,
             same_module_uncached_raw_signature,
         },
         generics::{enclosing_generic_contexts, typing_self},
@@ -1557,6 +1557,7 @@ impl KnownFunction {
         overload: &mut Binding<'db>,
         call_arguments: &CallArguments<'_, 'db>,
         call_expression: &ast::ExprCall,
+        revealed_types: &mut Option<UnionBuilder<'db>>,
     ) {
         let db = builder.db();
         let parameter_types = overload.parameter_types();
@@ -1564,18 +1565,11 @@ impl KnownFunction {
         match self {
             KnownFunction::RevealType => {
                 let env = builder.program_environment();
-                let revealed_type = overload
-                    .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(db, env), |builder, (_, ty)| {
-                        builder.add(ty)
-                    })
-                    .build();
-                report_revealed_type(
-                    &builder.context,
-                    revealed_type,
-                    call_argument_node(call_expression, "obj", 0)
-                        .unwrap_or_else(|| ast::AnyNodeRef::from(call_expression)),
-                );
+                let revealed_types =
+                    revealed_types.get_or_insert_with(|| UnionBuilder::new(db, env));
+                for (_, ty) in overload.arguments_for_parameter(call_arguments, 0) {
+                    revealed_types.add_in_place(ty);
+                }
             }
 
             KnownFunction::HasMember => {
@@ -2158,7 +2152,7 @@ impl KnownFunction {
     }
 }
 
-fn call_argument_node<'a>(
+pub(super) fn call_argument_node<'a>(
     call_expression: &'a ast::ExprCall,
     name: &str,
     position: usize,
