@@ -313,7 +313,14 @@ force-exclude = '''
 major_labels = []  # Ruff never uses the major version number
 minor_labels = ["breaking"]   # Bump the minor version on breaking changes
 
-ignore_labels = ["internal", "ci", "testing", "ty"]
+ignore_labels = [
+    "internal",
+    "ci",
+    "testing",
+    "ty",
+    "release",
+    "playground",
+]
 
 version_files = [
     "README.md",
@@ -340,7 +347,7 @@ version_files = [
 "Bug fixes" = ["bug"]
 "Rule changes" = [
     "diagnostics",
-    "docstrings",
+    "docstring",
     "rule",
     "fixes",
     "isort",
