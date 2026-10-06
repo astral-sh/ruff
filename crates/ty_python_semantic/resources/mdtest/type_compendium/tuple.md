@@ -341,6 +341,62 @@ static_assert(
 )
 ```
 
+## Bounded gradual tuple lengths
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Intersecting `tuple[Any, ...]` with an element bound preserves its gradual length. It can still
+match a fixed-length tuple, with element relations following the usual fixed-length tuple rules.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+type BoundedInt = Intersection[Any, int]
+
+def fixed_lengths(value: tuple[BoundedInt, ...]) -> None:
+    empty: tuple[()] = value  # no diagnostic
+    one: tuple[int] = value  # no diagnostic
+    two: tuple[int, int] = value  # no diagnostic
+```
+
+Fixed elements around the gradual segment remain required. The segment can provide additional
+elements, but it cannot replace an incompatible prefix or suffix.
+
+```py
+def fixed_ends(value: tuple[str, *tuple[BoundedInt, ...], bytes]) -> None:
+    empty_middle: tuple[str, bytes] = value  # no diagnostic
+    one_middle: tuple[str, int, bytes] = value  # no diagnostic
+    two_middle: tuple[str, int, int, bytes] = value  # no diagnostic
+
+    too_short: tuple[str] = value  # error: [invalid-assignment]
+    wrong_prefix: tuple[int, bytes] = value  # error: [invalid-assignment]
+    wrong_suffix: tuple[str, int] = value  # error: [invalid-assignment]
+```
+
+Gradual elements nested inside another type do not give the outer tuple a gradual length.
+
+```py
+def nested_gradual_elements(value: tuple[list[Any], ...]) -> None:
+    empty: tuple[()] = value  # error: [invalid-assignment]
+    one: tuple[list[Any]] = value  # error: [invalid-assignment]
+```
+
+The top materialization is an ordinary homogeneous tuple. Its length cannot be chosen to match a
+fixed-length target.
+
+```py
+from ty_extensions import Top
+
+def materialized_length(value: Top[tuple[BoundedInt, ...]]) -> None:
+    homogeneous: tuple[int, ...] = value  # no diagnostic
+    empty: tuple[()] = value  # error: [invalid-assignment]
+    one: tuple[int] = value  # error: [invalid-assignment]
+```
+
 ## Disjointness
 
 ```toml

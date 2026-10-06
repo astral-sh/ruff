@@ -987,8 +987,8 @@ python-version = "3.12"
 
 ```py
 from typing import Any, Generic, Never, TypeVar
-from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_equivalent_to, is_subtype_of
+from ty_extensions import Bottom, Intersection, Top, static_assert
+from ty_extensions._internal import Unknown, is_equivalent_to, is_subtype_of
 
 class BoundedCovariant[T: int]:
     def get(self) -> T:
@@ -998,6 +998,15 @@ static_assert(is_equivalent_to(Top[BoundedCovariant[Any]], BoundedCovariant[int]
 static_assert(is_equivalent_to(Bottom[BoundedCovariant[Any]], BoundedCovariant[Never]))
 static_assert(is_subtype_of(BoundedCovariant[Any], Top[BoundedCovariant[Any]]))
 static_assert(is_subtype_of(BoundedCovariant[Any], BoundedCovariant[int]))
+```
+
+Intersecting a gradual argument with its declared bound does not change its valid materializations.
+The resulting specialization remains gradual, so it is not equivalent to the static upper bound.
+
+```py
+static_assert(is_equivalent_to(BoundedCovariant[Any], BoundedCovariant[Intersection[Any, int]]))
+static_assert(is_equivalent_to(BoundedCovariant[Unknown], BoundedCovariant[Intersection[Unknown, int]]))
+static_assert(not is_equivalent_to(BoundedCovariant[Any], BoundedCovariant[int]))
 ```
 
 A type alias can conceal a gradual argument; the same subtype relationships still apply.
@@ -1031,6 +1040,8 @@ class BoundedContravariant[T: int]:
 
 static_assert(is_equivalent_to(Top[BoundedContravariant[Any]], BoundedContravariant[Never]))
 static_assert(is_equivalent_to(Bottom[BoundedContravariant[Any]], BoundedContravariant[int]))
+static_assert(is_equivalent_to(BoundedContravariant[Any], BoundedContravariant[Intersection[Any, int]]))
+static_assert(not is_equivalent_to(BoundedContravariant[Any], BoundedContravariant[int]))
 ```
 
 For an invariant generic, materialize attributes and method parameters according to their own
@@ -1052,13 +1063,46 @@ def bounded_invariant(
 ) -> None:
     reveal_type(top.value)  # revealed: int
     reveal_type(top.unrelated)  # revealed: Any
-    reveal_type(top.get)  # revealed: bound method Top[BoundedInvariant[Any]].get() -> int
-    reveal_type(top.put)  # revealed: bound method Top[BoundedInvariant[Any]].put(value: Never) -> None
+    reveal_type(top.get)  # revealed: bound method Top[BoundedInvariant[Any & int]].get() -> int
+    reveal_type(top.put)  # revealed: bound method Top[BoundedInvariant[Any & int]].put(value: Never) -> None
 
     reveal_type(bottom.unrelated)  # revealed: Any
-    reveal_type(bottom.get)  # revealed: bound method Bottom[BoundedInvariant[Any]].get() -> Never
-    reveal_type(bottom.put)  # revealed: bound method Bottom[BoundedInvariant[Any]].put(value: int) -> None
+    reveal_type(bottom.get)  # revealed: bound method Bottom[BoundedInvariant[Any & int]].get() -> Never
+    reveal_type(bottom.put)  # revealed: bound method Bottom[BoundedInvariant[Any & int]].put(value: int) -> None
     reveal_type(bottom.value)  # revealed: Never
+```
+
+The top and bottom materializations of an invariant specialization include only type arguments
+within the declared bound. They still range over multiple specializations, including `int` and
+`bool`, rather than becoming the static specialization `BoundedInvariant[int]`.
+
+```py
+static_assert(is_equivalent_to(BoundedInvariant[Any], BoundedInvariant[Intersection[Any, int]]))
+static_assert(is_equivalent_to(BoundedInvariant[Unknown], BoundedInvariant[Intersection[Unknown, int]]))
+static_assert(not is_equivalent_to(BoundedInvariant[Any], BoundedInvariant[int]))
+
+static_assert(is_equivalent_to(Top[BoundedInvariant[Any]], Top[BoundedInvariant[Intersection[Any, int]]]))
+static_assert(is_equivalent_to(Bottom[BoundedInvariant[Any]], Bottom[BoundedInvariant[Intersection[Any, int]]]))
+static_assert(is_subtype_of(BoundedInvariant[bool], Top[BoundedInvariant[Any]]))
+static_assert(is_subtype_of(Bottom[BoundedInvariant[Any]], BoundedInvariant[bool]))
+static_assert(not is_subtype_of(Top[BoundedInvariant[Any]], BoundedInvariant[int]))
+static_assert(not is_subtype_of(BoundedInvariant[int], Bottom[BoundedInvariant[Any]]))
+```
+
+If the argument also has `int` as a lower bound, only the static specialization remains. Its top and
+bottom materializations are both that specialization.
+
+```py
+static_assert(is_equivalent_to(BoundedInvariant[Any | int], BoundedInvariant[int]))
+static_assert(is_equivalent_to(Top[BoundedInvariant[Any | int]], BoundedInvariant[int]))
+static_assert(is_equivalent_to(Bottom[BoundedInvariant[Any | int]], BoundedInvariant[int]))
+```
+
+An incompatible static arm of a union still violates the bound; `Any` does not make it valid.
+
+```py
+def invalid_bounded_invariant(value: BoundedInvariant[Any | str]) -> None:  # error: [invalid-type-arguments]
+    pass
 ```
 
 Explicitly covariant and contravariant legacy `TypeVar` declarations obey the same bounded
@@ -1071,6 +1115,8 @@ class LegacyBoundedCovariant(Generic[BoundedT_co]): ...
 
 static_assert(is_equivalent_to(Top[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[int]))
 static_assert(is_equivalent_to(Bottom[LegacyBoundedCovariant[Any]], LegacyBoundedCovariant[Never]))
+static_assert(is_equivalent_to(LegacyBoundedCovariant[Any], LegacyBoundedCovariant[Intersection[Any, int]]))
+static_assert(not is_equivalent_to(LegacyBoundedCovariant[Any], LegacyBoundedCovariant[int]))
 
 BoundedT_contra = TypeVar("BoundedT_contra", bound=int, contravariant=True)
 
@@ -1078,6 +1124,8 @@ class LegacyBoundedContravariant(Generic[BoundedT_contra]): ...
 
 static_assert(is_equivalent_to(Top[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[Never]))
 static_assert(is_equivalent_to(Bottom[LegacyBoundedContravariant[Any]], LegacyBoundedContravariant[int]))
+static_assert(is_equivalent_to(LegacyBoundedContravariant[Any], LegacyBoundedContravariant[Intersection[Any, int]]))
+static_assert(not is_equivalent_to(LegacyBoundedContravariant[Any], LegacyBoundedContravariant[int]))
 ```
 
 Reading an attribute of a top-materialized legacy invariant generic yields the type parameter's
@@ -1095,6 +1143,172 @@ def legacy_bounded_invariant(
 ) -> None:
     reveal_type(legacy_top.value)  # revealed: int
     reveal_type(legacy_bottom.value)  # revealed: Never
+```
+
+The same bounded equivalences and materialization ranges apply to legacy invariant generics.
+
+```py
+static_assert(is_equivalent_to(LegacyBoundedInvariant[Any], LegacyBoundedInvariant[Intersection[Any, int]]))
+static_assert(is_equivalent_to(LegacyBoundedInvariant[Unknown], LegacyBoundedInvariant[Intersection[Unknown, int]]))
+static_assert(not is_equivalent_to(LegacyBoundedInvariant[Any], LegacyBoundedInvariant[int]))
+
+static_assert(is_equivalent_to(Top[LegacyBoundedInvariant[Any]], Top[LegacyBoundedInvariant[Intersection[Any, int]]]))
+static_assert(is_equivalent_to(Bottom[LegacyBoundedInvariant[Any]], Bottom[LegacyBoundedInvariant[Intersection[Any, int]]]))
+static_assert(is_subtype_of(LegacyBoundedInvariant[bool], Top[LegacyBoundedInvariant[Any]]))
+static_assert(is_subtype_of(Bottom[LegacyBoundedInvariant[Any]], LegacyBoundedInvariant[bool]))
+static_assert(not is_subtype_of(Top[LegacyBoundedInvariant[Any]], LegacyBoundedInvariant[int]))
+static_assert(not is_subtype_of(LegacyBoundedInvariant[int], Bottom[LegacyBoundedInvariant[Any]]))
+
+static_assert(is_equivalent_to(LegacyBoundedInvariant[Any | int], LegacyBoundedInvariant[int]))
+static_assert(is_equivalent_to(Top[LegacyBoundedInvariant[Any | int]], LegacyBoundedInvariant[int]))
+static_assert(is_equivalent_to(Bottom[LegacyBoundedInvariant[Any | int]], LegacyBoundedInvariant[int]))
+
+def invalid_legacy_bounded_invariant(
+    value: LegacyBoundedInvariant[Any | str],  # error: [invalid-type-arguments]
+) -> None:
+    pass
+```
+
+## Bounded gradual tuple arguments
+
+`tuple[Any, ...]` can materialize to a fixed-length tuple. Applying a shape bound preserves that
+choice, including when a type alias hides the gradual tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+class Array[Shape: tuple[int, ...]]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+def fixed_shape(value: Array[tuple[int]]) -> None: ...
+
+type AnyShape = tuple[Any, ...]
+
+def _(
+    value: Array[tuple[Any, ...]],
+    aliased: Array[AnyShape],
+    bounded: Array[tuple[Intersection[int, Any], ...]],
+):
+    fixed_shape(value)
+    fixed_shape(aliased)
+    fixed_shape(bounded)
+
+static_assert(is_equivalent_to(Array[tuple[Any, ...]], Array[tuple[Intersection[int, Any], ...]]))
+static_assert(not is_equivalent_to(Array[tuple[Any, ...]], Array[tuple[int, ...]]))
+```
+
+Legacy covariant parameters follow the same rules.
+
+```py
+Shape_co = TypeVar("Shape_co", bound=tuple[int, ...], covariant=True)
+
+class LegacyArray(Generic[Shape_co]): ...
+
+def legacy_fixed_shape(value: LegacyArray[tuple[int]]) -> None: ...
+def _(
+    value: LegacyArray[tuple[Any, ...]],
+    aliased: LegacyArray[AnyShape],
+    bounded: LegacyArray[tuple[Intersection[int, Any], ...]],
+):
+    legacy_fixed_shape(value)
+    legacy_fixed_shape(aliased)
+    legacy_fixed_shape(bounded)
+
+static_assert(is_equivalent_to(LegacyArray[tuple[Any, ...]], LegacyArray[tuple[Intersection[int, Any], ...]]))
+static_assert(not is_equivalent_to(LegacyArray[tuple[Any, ...]], LegacyArray[tuple[int, ...]]))
+```
+
+A shape bound can also require at least one element. The gradual argument retains that bound,
+whether it appears explicitly as an intersection or is supplied by the parameter.
+
+```py
+from typing import assert_type
+
+type NonemptyShape = tuple[int, *tuple[int, ...]]
+
+class NonemptyArray[Shape: NonemptyShape]:
+    def __init__(self: "NonemptyArray[tuple[Any, ...]]") -> None: ...
+
+assert_type(NonemptyArray(), NonemptyArray[tuple[Any, ...]])
+static_assert(is_equivalent_to(NonemptyArray[tuple[Any, ...]], NonemptyArray[Intersection[tuple[Any, ...], NonemptyShape]]))
+```
+
+```py
+NonemptyShape_co = TypeVar("NonemptyShape_co", bound=NonemptyShape, covariant=True)
+
+class LegacyNonemptyArray(Generic[NonemptyShape_co]):
+    def __init__(self: "LegacyNonemptyArray[tuple[Any, ...]]") -> None: ...
+
+assert_type(LegacyNonemptyArray(), LegacyNonemptyArray[tuple[Any, ...]])
+static_assert(
+    is_equivalent_to(LegacyNonemptyArray[tuple[Any, ...]], LegacyNonemptyArray[Intersection[tuple[Any, ...], NonemptyShape]])
+)
+```
+
+## Bounded gradual tuple arguments with union bounds
+
+Intersecting a gradual element with a union bound distributes the intersection over the union's
+arms. Each arm remains gradual, so the tuple can still materialize to a fixed length.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Intersection, static_assert
+from ty_extensions._internal import Unknown, is_assignable_to, is_equivalent_to
+
+type Element = Intersection[Any, int] | Intersection[Any, str]
+type UnknownElement = Intersection[Unknown, int | str]
+type Identity[T] = T
+type AliasedElement = Identity[Identity[Element]]
+
+class Array[Shape: tuple[int | str, ...]]:
+    def shape(self) -> Shape:
+        raise NotImplementedError
+
+static_assert(is_equivalent_to(Array[tuple[Any, ...]], Array[tuple[Element, ...]]))
+static_assert(is_assignable_to(Array[tuple[Any, ...]], Array[tuple[int]]))
+static_assert(is_assignable_to(Array[tuple[Element, ...]], Array[tuple[int]]))
+static_assert(is_assignable_to(Array[tuple[UnknownElement, ...]], Array[tuple[str]]))
+static_assert(is_assignable_to(Array[tuple[AliasedElement, ...]], Array[tuple[int, str]]))
+```
+
+The same union bound preserves the length choices of a legacy generic argument.
+
+```py
+Shape_co = TypeVar("Shape_co", bound=tuple[int | str, ...], covariant=True)
+
+class LegacyArray(Generic[Shape_co]): ...
+
+static_assert(is_equivalent_to(LegacyArray[tuple[Any, ...]], LegacyArray[tuple[Element, ...]]))
+static_assert(is_assignable_to(LegacyArray[tuple[Any, ...]], LegacyArray[tuple[int]]))
+static_assert(is_assignable_to(LegacyArray[tuple[Element, ...]], LegacyArray[tuple[int]]))
+static_assert(is_assignable_to(LegacyArray[tuple[UnknownElement, ...]], LegacyArray[tuple[str]]))
+static_assert(is_assignable_to(LegacyArray[tuple[AliasedElement, ...]], LegacyArray[tuple[int, str]]))
+```
+
+A static union arm or a static outer container still makes the length statically unbounded. This
+also holds when an alias expands recursively.
+
+```py
+type PartlyStatic = Any | int
+type Growing[T] = T | list[Growing[list[T]]]
+
+static_assert(not is_assignable_to(tuple[Any | int, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[PartlyStatic, ...], tuple[int]))
+static_assert(not is_assignable_to(tuple[list[Element], ...], tuple[list[int]]))
+static_assert(not is_assignable_to(tuple[Growing[Any], ...], tuple[int]))
 ```
 
 ## Constrained generic type parameters
@@ -1396,6 +1610,49 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+## Static recursive arguments with finite bounds
+
+A fully static recursive alias remains unchanged when it satisfies an invariant parameter's bound.
+An incompatible union arm still violates that bound, even when the other arm is recursive.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_equivalent_to
+
+type Recursive = tuple[int, Recursive | None]
+type InvalidRecursive = tuple[int, InvalidRecursive | None] | str
+
+class Container[T: tuple[object, ...]]:
+    value: T
+
+static_assert(is_equivalent_to(Top[Container[Recursive]], Container[Recursive]))
+static_assert(is_equivalent_to(Bottom[Container[Recursive]], Container[Recursive]))
+
+def invalid(value: Container[InvalidRecursive]) -> None:  # error: [invalid-type-arguments]
+    reveal_type(value)  # revealed: Container[Unknown]
+```
+
+Legacy invariant parameters preserve the same static specialization and reject the incompatible
+recursive alias.
+
+```py
+T = TypeVar("T", bound=tuple[object, ...])
+
+class LegacyContainer(Generic[T]): ...
+
+static_assert(is_equivalent_to(Top[LegacyContainer[Recursive]], LegacyContainer[Recursive]))
+static_assert(is_equivalent_to(Bottom[LegacyContainer[Recursive]], LegacyContainer[Recursive]))
+
+def invalid_legacy(value: LegacyContainer[InvalidRecursive]) -> None:  # error: [invalid-type-arguments]
+    reveal_type(value)  # revealed: LegacyContainer[Unknown]
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive
@@ -1413,6 +1670,105 @@ class RecursiveSpecialization[T: "RecursiveSpecialization[int]"]: ...
 # error: [invalid-type-arguments]
 def recursive_specialization(value: RecursiveSpecialization[str]) -> None:
     reveal_type(value)  # revealed: RecursiveSpecialization[Unknown]
+```
+
+## Recursive bounds on invariant parameters
+
+Narrowing to an unspecialized invariant class preserves its type parameter's recursive bound when
+reading an attribute. The bound has a finite representation using a materialization marker.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+class Adapter[T: Adapter[Any]]:
+    logger: T
+
+    def log(self) -> None: ...
+
+def log(value: object) -> None:
+    if isinstance(value, Adapter):
+        reveal_type(value.logger)  # revealed: Top[Adapter[Any]]
+        value.logger.log()
+```
+
+Legacy type variables preserve the same recursive bound.
+
+```py
+T = TypeVar("T", bound="LegacyAdapter[Any]")
+
+class LegacyAdapter(Generic[T]):
+    logger: T
+
+    def log(self) -> None: ...
+
+def log_legacy(value: object) -> None:
+    if isinstance(value, LegacyAdapter):
+        reveal_type(value.logger)  # revealed: Top[LegacyAdapter[Any]]
+        value.logger.log()
+```
+
+## Mutually recursive bounds on invariant parameters
+
+A bound may refer back to its own parameter through another generic class. Each attribute still
+exposes the members of its declared bound.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[analysis]
+strict-generic-narrowing = true
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+class First[T: Second[Any]]:
+    value: T
+
+    def log(self) -> None: ...
+
+class Second[T: First[Any]]:
+    value: T
+
+    def log(self) -> None: ...
+
+def log(value: object) -> None:
+    if isinstance(value, First):
+        value.value.log()
+    if isinstance(value, Second):
+        value.value.log()
+```
+
+Legacy declarations support the same cycle through two bounds.
+
+```py
+FirstT = TypeVar("FirstT", bound="LegacySecond[Any]")
+SecondT = TypeVar("SecondT", bound="LegacyFirst[Any]")
+
+class LegacyFirst(Generic[FirstT]):
+    value: FirstT
+
+    def log(self) -> None: ...
+
+class LegacySecond(Generic[SecondT]):
+    value: SecondT
+
+    def log(self) -> None: ...
+
+def log_legacy(value: object) -> None:
+    if isinstance(value, LegacyFirst):
+        value.value.log()
+    if isinstance(value, LegacySecond):
+        value.value.log()
 ```
 
 ## Invalid use

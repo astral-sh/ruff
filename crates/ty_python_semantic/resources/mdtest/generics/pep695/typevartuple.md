@@ -816,6 +816,24 @@ def non_gradual_aliases[*Ts](
     pack = recursive  # error: [invalid-assignment]
 ```
 
+### Bounded gradual elements and symbolic packs
+
+A bounded gradual tuple can choose its length, but its elements cannot match every possible
+specialization of an unrelated type variable tuple. An arbitrary pack can also contain elements
+outside the bound.
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+def bounded_gradual_pack[*Ts](
+    bounded: tuple[Intersection[Any, int], ...],
+    arbitrary: tuple[*Ts],
+) -> None:
+    accepts_every_pack: tuple[*Ts] = bounded  # error: [invalid-assignment]
+    restricts_every_element: tuple[Intersection[Any, int], ...] = arbitrary  # error: [invalid-assignment]
+```
+
 ### Starred variadic parameters
 
 An unpacked `TypeVarTuple` can annotate `*args`. Call binding infers the pack from direct arguments

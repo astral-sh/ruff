@@ -20,11 +20,14 @@ use crate::{
         Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
         TypeVarVariance, UnionBuilder, UnionType, any_over_type,
         any_over_type_including_alias_arguments, binding_type,
-        cyclic::TypeIdentity,
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{
+            self, TypeCollector, TypeVisitor, any_over_type_expanding_aliases,
+            walk_type_with_recursion_guard,
+        },
     },
 };
 use ty_python_core::{
@@ -1402,7 +1405,11 @@ impl<'db> BoundTypeVarInstance<'db> {
                                 mapped,
                                 materialized,
                             )
-                            && let Some(upper_bound) = self.top_materialized_upper_bound(db)
+                            && let Some(upper_bound) = self
+                                .top_materialized_upper_bound_with_visitor(
+                                    db,
+                                    &materialization_visitor,
+                                )
                         {
                             IntersectionType::from_two_elements(db, env, materialized, upper_bound)
                         } else {
@@ -1469,12 +1476,43 @@ impl<'db> BoundTypeVarInstance<'db> {
         }
     }
 
+    /// Restricts a gradual argument to the valid specializations of this bounded parameter.
+    ///
+    /// Preserves gradual information: for `T: int`, `Any` becomes `Any & int`, not `int`.
+    /// Constraints describe discrete alternatives rather than an upper bound and need to be
+    /// handled separately. Invalid arguments keep their original type so that applying a bound
+    /// does not turn `Any | str` into a valid argument for `T: int`.
+    pub(super) fn restrict_gradual_argument(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        if self.typevar(db).is_constrained(db)
+            || !any_over_type_expanding_aliases(db, visitor.env, ty, |ty| ty.is_dynamic())
+        {
+            return ty;
+        }
+        let Some(upper_bound) = self.top_materialized_upper_bound_with_visitor(db, visitor) else {
+            return ty;
+        };
+        if upper_bound.is_object() {
+            return ty;
+        }
+        // A gradual tuple can choose a length that satisfies a minimum-length bound.
+        // Check its materializations directly instead of comparing their lower bound.
+        if !ty.is_assignable_to(db, visitor.env, upper_bound) {
+            return ty;
+        }
+        IntersectionType::from_two_elements(db, visitor.env, ty, upper_bound)
+    }
+
     /// Returns the static upper bound used when materializing a gradual type argument.
     ///
     /// Constraints are unioned only when materializing an exposed member, where their union is a
-    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
-    /// either directly or through other bounds. Such a bound has no finite static top
-    /// materialization, so recover from its cycle without applying an upper bound.
+    /// valid conservative upper bound. Recursive bounds retain invariant materialization markers
+    /// instead of repeatedly applying the same bound. For `T: Adapter[Any]`, the upper bound can
+    /// be represented as `Top[Adapter[Any]]` without expanding the nested argument again.
     pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         #[salsa::tracked(
             returns(copy),
@@ -1487,18 +1525,44 @@ impl<'db> BoundTypeVarInstance<'db> {
         ) -> Option<Type<'db>> {
             let env =
                 ProgramEnvironment::from_program(bound_typevar.binding_context(db).program(db));
-
-            bound_typevar
-                .typevar(db)
-                .bound_or_constraints(db, &env)
-                .map(|bound_or_constraints| {
-                    bound_or_constraints
-                        .as_type(db, &env)
-                        .top_materialization(db, &env)
-                })
+            let recursion = ActiveRecursionDetector::default();
+            let visitor = ApplyTypeMappingVisitor {
+                upper_bound_recursion: Some(&recursion),
+                ..ApplyTypeMappingVisitor::new(&env)
+            };
+            bound_typevar.top_materialized_upper_bound_with_visitor(db, &visitor)
         }
 
         top_materialized_upper_bound_inner(db, self)
+    }
+
+    fn top_materialized_upper_bound_with_visitor(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Type<'db>> {
+        let Some(recursion) = visitor.upper_bound_recursion else {
+            return self.top_materialized_upper_bound(db);
+        };
+        recursion.visit(
+            &self,
+            || None,
+            || {
+                self.typevar(db)
+                    .bound_or_constraints(db, visitor.env)
+                    .map(|bound_or_constraints| {
+                        // A nested bound has its own materialization root, but must retain the
+                        // active-bound stack. Otherwise a recursive bound reenters the cached
+                        // query and discards the outer bound through cycle recovery.
+                        let visitor = visitor.for_new_materialization_root();
+                        bound_or_constraints.as_type(db, visitor.env).materialize(
+                            db,
+                            MaterializationKind::Top,
+                            &visitor,
+                        )
+                    })
+            },
+        )
     }
 }
 

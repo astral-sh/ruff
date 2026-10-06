@@ -26,6 +26,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -466,10 +467,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // It typically represents the _union_ of all possible lengths. That means that a
                 // variable-length tuple type is not a subtype of _any_ fixed-length tuple type.
                 //
-                // However, as a special case, if the variable-length portion of the tuple is `Any`
-                // (or any other dynamic type), then the `...` is the _gradual choice_ of all
-                // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
-                // length.
+                // However, a dynamic variable-length portion makes the `...` a _gradual choice_
+                // of length. Intersecting that portion with an element bound preserves this
+                // choice: `tuple[Any & int, ...]` can match fixed-length tuples of integers.
                 //
                 // Unlike a dynamic homogeneous segment, a symbolic type variable tuple ranges
                 // over all specializations rather than making a gradual choice of length.
@@ -603,7 +603,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (source_segment, VariableSegment::TypeVarTuple(target_pack))
                             if !target_pack.is_inferable(db, self.inferable)
                                 && let Some(source_element) =
-                                    source_segment.gradual_element_type(db, env) =>
+                                    source_segment.unrestricted_element_type(db, env) =>
                         {
                             // The pack may be empty, so the source cannot require more elements
                             // than the target's fixed ends. For longer packs, source endpoints
@@ -624,7 +624,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         (VariableSegment::TypeVarTuple(source_pack), target_segment)
                             if !source_pack.is_inferable(db, self.inferable)
                                 && let Some(target_element) =
-                                    target_segment.gradual_element_type(db, env) =>
+                                    target_segment.unrestricted_element_type(db, env) =>
                         {
                             // Conversely, the target's required elements must fit even with an
                             // empty source pack. A target endpoint extending into the pack must
@@ -663,14 +663,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // one tuple materializes to the variable-length portion of the other tuple.
                 let source_variable = source.variable().element_type(db);
                 let target_variable = target.variable().element_type(db);
-                let source_prenormalize_variable = match source.variable() {
-                    VariableSegment::Homogeneous(Type::Dynamic(_)) => Some(target_variable),
-                    _ => None,
-                };
-                let target_prenormalize_variable = match target.variable() {
-                    VariableSegment::Homogeneous(Type::Dynamic(_)) => Some(source_variable),
-                    _ => None,
-                };
+                let source_prenormalize_variable = source
+                    .variable()
+                    .gradual_element_type(db, env)
+                    .map(|_| target_variable);
+                let target_prenormalize_variable = target
+                    .variable()
+                    .gradual_element_type(db, env)
+                    .map(|_| source_variable);
 
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
@@ -925,6 +925,58 @@ impl<'db> VariableSegment<'db> {
 
     /// Return the homogeneous element type if this segment has gradual arity, including aliases.
     fn gradual_element_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<Type<'db>> {
+        fn is_gradual<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+        ) -> bool {
+            match ty {
+                ty if ty.is_dynamic() => true,
+                Type::Intersection(intersection) => intersection
+                    .iter_positive(db)
+                    .any(|positive| is_gradual(db, env, positive, active_aliases)),
+                // Intersecting `Any` with a union distributes over its arms. Each arm must
+                // remain gradual: `Any | int` does not give a tuple a gradual length.
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|&element| is_gradual(db, env, element, active_aliases)),
+                Type::TypeAlias(alias) => active_aliases.visit(
+                    &ty.to_type_identity(db),
+                    || false,
+                    || is_gradual(db, env, alias.value_type(db), active_aliases),
+                ),
+                Type::Recursive(recursive) => active_aliases.visit(
+                    &ty.to_type_identity(db),
+                    || false,
+                    || {
+                        is_gradual(
+                            db,
+                            env,
+                            recursive.unfold(db, env).into_type(),
+                            active_aliases,
+                        )
+                    },
+                ),
+                // A gradual type inside a static constructor does not affect the length:
+                // `tuple[list[Any], ...]` is still statically unbounded.
+                _ => false,
+            }
+        }
+
+        let element = self.homogeneous_type()?;
+        is_gradual(db, env, element, &ActiveRecursionDetector::default()).then_some(element)
+    }
+
+    /// Return the element type when both the length and the elements are unrestricted.
+    ///
+    /// Only these segments can match every specialization of an arbitrary `TypeVarTuple`.
+    fn unrestricted_element_type(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

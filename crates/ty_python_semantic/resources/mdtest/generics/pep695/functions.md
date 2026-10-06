@@ -831,6 +831,232 @@ info: Type variable defined here
   |       ^^^^^^
 ```
 
+## Declared upper bounds restrict gradual solutions
+
+A declared upper bound restricts the materializations of an inferred gradual type without losing its
+gradual component. Fully static arguments retain their inferred types.
+
+```py
+from typing import Any
+from ty_extensions._internal import Unknown
+
+def bounded[T: int](value: T) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded(any_value))  # revealed: int & Any
+    reveal_type(bounded(unknown_value))  # revealed: int & Unknown
+
+reveal_type(bounded(1))  # revealed: Literal[1]
+reveal_type(bounded(True))  # revealed: Literal[True]
+```
+
+A union bound distributes across the gradual type:
+
+```py
+def bounded_union[T: int | str](value: T) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded_union(any_value))  # revealed: (int & Any) | (str & Any)
+    reveal_type(bounded_union(unknown_value))  # revealed: (int & Unknown) | (str & Unknown)
+```
+
+Inference through an invariant container preserves the declared bound as well:
+
+```py
+def bounded_element[T: int](values: list[T]) -> T:
+    return values[0]
+
+def _(any_values: list[Any], unknown_values: list[Unknown]):
+    reveal_type(bounded_element(any_values))  # revealed: int & Any
+    reveal_type(bounded_element(unknown_values))  # revealed: int & Unknown
+```
+
+A gradual declared bound contributes its top materialization:
+
+```py
+def bounded_list[T: list[Any]](value: T) -> T:
+    return value
+
+def _(any_value: Any, unknown_value: Unknown):
+    reveal_type(bounded_list(any_value))  # revealed: Top[list[Any]] & Any
+    reveal_type(bounded_list(unknown_value))  # revealed: Top[list[Any]] & Unknown
+```
+
+The declared bound alone does not provide evidence for inferring a type:
+
+```py
+def without_input[T: int]() -> T:
+    raise NotImplementedError
+
+reveal_type(without_input())  # revealed: Unknown
+```
+
+Separate argument evidence can determine a static solution. An incompatible static union arm still
+violates the declared bound.
+
+```py
+def combine[T: int](left: T, right: T) -> T:
+    return left
+
+def _(value: int, gradual: Any, invalid: Any | str):
+    reveal_type(combine(value, gradual))  # revealed: int
+    reveal_type(combine(gradual, value))  # revealed: int
+    bounded(invalid)  # error: [invalid-argument-type]
+```
+
+## Overload coverage with bounded invariant arguments
+
+Every valid materialization of `Box[Any]` has a type argument within the class's `int` bound. The
+first overload covers all of them, so the later overload does not make the result ambiguous.
+
+```py
+from typing import Any, assert_type, overload
+from ty_extensions._internal import Unknown
+
+class Box[T: int]:
+    value: T
+
+@overload
+def choose[T: int](value: Box[T]) -> Box[Any]: ...
+@overload
+def choose(value: Box[bool]) -> Box[bool]: ...
+def choose(value: object) -> object:
+    raise NotImplementedError
+
+def _(any_value: Box[Any], unknown_value: Box[Unknown], static_value: Box[int]):
+    assert_type(choose(any_value), Box[Any])
+    assert_type(choose(unknown_value), Box[Any])
+    assert_type(choose(static_value), Box[Any])
+```
+
+A narrower function bound does not cover every materialization allowed by the class. Both overloads
+can then match a gradual argument, and their distinct return types leave the result ambiguous.
+
+```py
+@overload
+def narrow[T: bool](value: Box[T]) -> bool: ...
+@overload
+def narrow(value: Box[Any]) -> int: ...
+def narrow(value: object) -> int:
+    raise NotImplementedError
+
+def _(value: Box[Any]):
+    reveal_type(narrow(value))  # revealed: Unknown
+```
+
+## Gradual declared bounds preserve concrete inference
+
+An `Any` or `Unknown` bound does not add a gradual component to a concrete type inferred from an
+argument:
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def infer_any[T: Any](value: T) -> T:
+    return value
+
+def infer_unknown[T: Unknown](value: T) -> T:
+    return value
+
+def _(value: int):
+    reveal_type(infer_any(value))  # revealed: int
+    reveal_type(infer_unknown(value))  # revealed: int
+```
+
+The same applies when the argument provides only an upper bound through a callback parameter:
+
+```py
+def infer_any_upper[T: Any](sink: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def infer_unknown_upper[T: Unknown](sink: Callable[[T], None]) -> T:
+    raise NotImplementedError
+
+def _(sink: Callable[[int], None]):
+    reveal_type(infer_any_upper(sink))  # revealed: int
+    reveal_type(infer_unknown_upper(sink))  # revealed: int
+```
+
+A contravariant generic class also provides an upper bound:
+
+```py
+class Consumer[T]:
+    def put(self, value: T) -> None: ...
+
+def infer_any_consumer[T: Any](sink: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def infer_unknown_consumer[T: Unknown](sink: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def _(sink: Consumer[int]):
+    reveal_type(infer_any_consumer(sink))  # revealed: int
+    reveal_type(infer_unknown_consumer(sink))  # revealed: int
+
+def _(sink: Consumer[Unknown]):
+    reveal_type(infer_any_consumer(sink))  # revealed: Unknown
+    reveal_type(infer_unknown_consumer(sink))  # revealed: Unknown
+```
+
+Nested gradual declared bounds likewise preserve a concrete inferred type:
+
+```py
+def infer_any_tuple_consumer[T: tuple[Any]](sink: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def infer_unknown_tuple_consumer[T: tuple[Unknown]](sink: Consumer[T]) -> T:
+    raise NotImplementedError
+
+def _(sink: Consumer[tuple[int]]):
+    reveal_type(infer_any_tuple_consumer(sink))  # revealed: tuple[int]
+    reveal_type(infer_unknown_tuple_consumer(sink))  # revealed: tuple[int]
+```
+
+An invariant container provides both bounds and also retains its concrete element type:
+
+```py
+def infer_any_element[T: Any](values: list[T]) -> T:
+    return values[0]
+
+def infer_unknown_element[T: Unknown](values: list[T]) -> T:
+    return values[0]
+
+def _(values: list[int]):
+    reveal_type(infer_any_element(values))  # revealed: int
+    reveal_type(infer_unknown_element(values))  # revealed: int
+```
+
+## Lower bounds restrict gradual solutions
+
+A gradual upper bound does not erase a static lower bound:
+
+```py
+from typing import Any, Callable
+from ty_extensions._internal import Unknown
+
+def infer[T](value: T, sink: Callable[[T], None]) -> T:
+    return value
+
+def _(value: int, any_sink: Callable[[Any], None], unknown_sink: Callable[[Unknown], None]):
+    reveal_type(infer(value, any_sink))  # revealed: int
+    reveal_type(infer(value, unknown_sink))  # revealed: int
+```
+
+When an invariant argument contributes a gradual lower bound as well, the inferred type retains both
+lower bounds:
+
+```py
+def infer_invariant[T](value: T, items: list[T]) -> T:
+    return value
+
+def _(value: int, any_items: list[Any], unknown_items: list[Unknown]):
+    reveal_type(infer_invariant(value, any_items))  # revealed: int | Any
+    reveal_type(infer_invariant(value, unknown_items))  # revealed: int | Unknown
+```
+
 ## Inferring a constrained typevar
 
 ```py
@@ -2286,7 +2512,8 @@ def _(values: Iterable[Any]):
     reveal_type(reduce(combine, values))
 ```
 
-Declared upper bounds validate a gradual solution but do not restrict its range on their own:
+Declared upper bounds also restrict a gradual solution when there is no inferred upper bound, or
+when the inferred upper bound is `object`:
 
 ```py
 def bounded[T: A | B](value: T) -> T:
@@ -2296,8 +2523,8 @@ def bounded_with_upper[T: A | B](value: T, upper: Callable[[T], None]) -> T:
     return value
 
 def _(any_value: Any, upper: Callable[[object], None]):
-    reveal_type(bounded(any_value))  # revealed: Any
-    reveal_type(bounded_with_upper(any_value, upper))  # revealed: Any
+    reveal_type(bounded(any_value))  # revealed: (A & Any) | (B & Any)
+    reveal_type(bounded_with_upper(any_value, upper))  # revealed: (A & Any) | (B & Any)
 ```
 
 An inferred upper bound cannot introduce materializations outside the declared upper bound:
