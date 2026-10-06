@@ -5,12 +5,14 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use itertools::{Either, Itertools};
+use rustc_hash::FxHashMap;
 use salsa::plumbing::AsId;
 
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSet, ConstraintSetBuilder, ConstraintSetStorage, Node,
-    NodeId, SourceOrderId, max_constructor_and_typevar_depth, wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSet, ConstraintSetBuilder,
+    ConstraintSetStorage, Node, NodeId, SourceOrderId, max_constructor_and_typevar_depth,
+    wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
@@ -127,14 +129,20 @@ impl<'db> Constraint<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
     ) -> (NodeId, Option<SourceOrderId>) {
         match self {
             Constraint::Atomic(atomic) => {
                 atomic.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
             }
-            Constraint::Existential(existential) => {
-                existential.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
+            Constraint::Existential(existential) => existential.apply_type_mapping_impl(
+                db,
+                builder,
+                type_mapping,
+                tcx,
+                visitor,
+                mapped_constraints,
+            ),
         }
     }
 
@@ -1385,10 +1393,11 @@ impl ExistentialBound {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
     ) -> (NodeId, Option<SourceOrderId>) {
         let env = visitor.env;
         let body = ConstraintSet::from_node(builder, self.body, self.source_order)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            .apply_type_mapping_with_cache(db, type_mapping, tcx, visitor, mapped_constraints);
 
         let mut storage = builder.storage.borrow_mut();
         let locals = Support::from_typevars(self.locals.iter().filter_map(|typevar| {
