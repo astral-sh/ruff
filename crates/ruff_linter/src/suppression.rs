@@ -497,8 +497,33 @@ impl Suppressions {
             true
         }
 
+        // Report unmatched `disable` comments before checking for unused suppressions so that
+        // `RUF104` can itself be suppressed, and the suppressing comment is marked as used.
+        if context.is_rule_enabled(Rule::UnmatchedSuppressionComment) {
+            // Collect the candidates before checking any of them, as `check_rule` marks the
+            // suppressions it finds as used.
+            let unmatched_ranges: Vec<TextRange> = self
+                .valid
+                .iter()
+                .filter_map(|suppression| match &suppression.comments {
+                    SuppressionComments::Single(SuppressionComment {
+                        action: SuppressionAction::Disable,
+                        range,
+                        ..
+                    }) if suppression.used.get() => Some(*range),
+                    _ => None,
+                })
+                .unique()
+                .collect();
+
+            for range in unmatched_ranges {
+                if !self.check_rule(Rule::UnmatchedSuppressionComment, range, None) {
+                    context.report_diagnostic(UnmatchedSuppressionComment, range);
+                }
+            }
+        }
+
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
-        let mut unmatched_ranges = FxHashSet::default();
 
         for suppression in &self.valid {
             let first_comment = suppression.comments.first();
@@ -543,16 +568,6 @@ impl Suppressions {
                     }
                 } else {
                     group.disabled_codes.push(code_str);
-                }
-            } else if let SuppressionComments::Single(SuppressionComment {
-                action: SuppressionAction::Disable,
-                range,
-                ..
-            }) = &suppression.comments
-            {
-                // UnmatchedSuppressionComment
-                if unmatched_ranges.insert(range) {
-                    context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, *range);
                 }
             }
         }

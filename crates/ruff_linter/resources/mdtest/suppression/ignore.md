@@ -308,6 +308,78 @@ message = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # ruff:enable[F401]
 ```
 
+## Suppressing `unmatched-suppression-comment`
+
+`RUF104` diagnostics can be suppressed like any other diagnostic, without the suppression comment
+being reported as unused.
+
+### With `ruff:ignore`
+
+```toml
+[lint]
+select = ["T201", "RUF100", "RUF104"]
+```
+
+```py
+def nested() -> None:
+    # ruff:disable[T201]  # ruff:ignore[RUF104]
+    print("a")
+
+
+def own_line() -> None:
+    # ruff:ignore[RUF104]
+    # ruff:disable[T201]
+    print("a")
+
+
+def same_comment() -> None:
+    # ruff:disable[T201, RUF104]
+    print("a")
+
+
+def unsuppressed() -> None:
+    # error: [unmatched-suppression-comment]
+    # ruff:disable[T201]
+    print("a")
+```
+
+### With `ruff:file-ignore`
+
+```toml
+[lint]
+select = ["T201", "RUF100", "RUF104"]
+```
+
+```py
+# ruff:file-ignore[RUF104]
+
+
+def a() -> None:
+    # ruff:disable[T201]
+    print("a")
+```
+
+### With `ruff:disable`
+
+```toml
+[lint]
+select = ["T201", "RUF100", "RUF104"]
+```
+
+```py
+# ruff:disable[RUF104]
+def a() -> None:
+    # ruff:disable[T201]
+    print("a")
+# ruff:enable[RUF104]
+
+
+def b() -> None:
+    # error: [unmatched-suppression-comment]
+    # ruff:disable[T201]
+    print("b")
+```
+
 ## Disallow human-readable names in stable
 
 ```toml
