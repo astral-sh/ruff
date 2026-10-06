@@ -128,7 +128,7 @@ mod support;
 mod variables;
 
 use paths::PathAssignments;
-use solutions::SolutionWalker;
+use solutions::{Polarity, SolutionWalker};
 use variables::{Constraint, ConstraintProvenance};
 
 /// An extension trait for building constraint sets from [`Option`] values.
@@ -2421,9 +2421,14 @@ impl NodeId {
             Node::AlwaysTrue => true,
             Node::AlwaysFalse => false,
             Node::Interior(interior) => {
+                // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
+                // depend on which typevars are inferable. That will require adding an `inferable`
+                // parameter and plumbing that through to all callers.
+                let source_orders = storage.calculate_source_orders(source_order);
+                let mut walker =
+                    SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
                 let mut path = interior.path_assignments(db, env, storage, source_order);
-                path.visit_negated(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                    .is_continue()
+                walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Negative, self)
             }
         }
     }
@@ -2487,9 +2492,14 @@ impl NodeId {
                 let result = if simple_conjunction_is_satisfiable(storage, self) {
                     false
                 } else {
+                    // TODO: This should not hard-code TypeVarSet::None, since satisfiability can
+                    // depend on which typevars are inferable. That will require adding an
+                    // `inferable` parameter and plumbing that through to all callers.
+                    let source_orders = storage.calculate_source_orders(source_order);
+                    let mut walker =
+                        SolutionWalker::new(db, storage, source_orders, TypeVarSet::None, self);
                     let mut path = interior.path_assignments(db, env, storage, source_order);
-                    path.visit(db, env, storage, self, &mut IsNeverSatisfiedVisitor)
-                        .is_continue()
+                    walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
                 };
                 storage.never_satisfied_cache.insert(self, result);
                 result
@@ -3600,6 +3610,7 @@ impl<'db> CandidateSolutions<'db> {
             limits,
             &mut path,
             node_support.as_ref(),
+            Polarity::Positive,
             node,
         )?;
         ControlFlow::Continue(walker.finish())
@@ -4585,11 +4596,6 @@ impl ConstraintAssignment {
 
 /// A visitor for walking the paths of a BDD.
 ///
-/// **NOTE**: This trait gives you full control over the walking process: in particular, you have
-/// more opportunities to abort the walk early. If you want to perform a simple "fold" over all of
-/// the paths, the [`PathFold`] trait is easier to implement, and can also be used as a
-/// `PathVisitor`.
-///
 /// Each path starts at the root node and ends at a terminal node, and represents one family of
 /// typevar assignments described by the BDD. Each path can be either _satisfied_, meaning that
 /// this family of assignments is accepted by the constraint set; _unsatisfied_, meaning that this
@@ -4693,168 +4699,6 @@ trait PathVisitor {
         if_uncertain: Self::Result,
         if_false: Self::Result,
     ) -> ControlFlow<Self::Break, Self::Result>;
-}
-
-/// A visitor for "folding" over the paths in a BDD, producing a single value that summarizes all
-/// of them.
-///
-/// This is a simpler trait to implement when you don't need as much control over the path walk.
-/// Any type that implements this trait can also be used as a [`PathVisitor`].
-trait PathFold {
-    type Result;
-    type Break;
-
-    /// Returns the base case value that represents a satisfied path.
-    fn satisfied<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result>;
-
-    /// Returns the base case value that represents an unsatisfied path.
-    fn unsatisfied<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result>;
-
-    /// Returns the base case value that represents an impossible path.
-    fn impossible<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result>;
-
-    /// Combines the values for each subtree of an interior node, returning a value that represents
-    /// the subtree rooted at that node.
-    fn combine<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        if_true: Self::Result,
-        if_uncertain: Self::Result,
-        if_false: Self::Result,
-    ) -> ControlFlow<Self::Break, Self::Result>;
-}
-
-impl<T> PathVisitor for T
-where
-    T: PathFold,
-{
-    type Result = <T as PathFold>::Result;
-    type Interior = ();
-    type Break = <T as PathFold>::Break;
-
-    fn visit_satisfied<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::satisfied(self, db, storage, path)
-    }
-
-    fn visit_unsatisfied<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::unsatisfied(self, db, storage, path)
-    }
-
-    fn visit_impossible<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::impossible(self, db, storage, path)
-    }
-
-    fn enter_interior<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _interior_node: InteriorNode,
-    ) -> ControlFlow<Self::Break, Self::Interior> {
-        ControlFlow::Continue(())
-    }
-
-    fn visit_edge<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _interior_value: &Self::Interior,
-        subtree: Self::Result,
-        _path: &PathAssignments,
-        _new_range: Range<usize>,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(subtree)
-    }
-
-    fn leave_interior<'db>(
-        &mut self,
-        db: &'db dyn Db,
-        storage: &mut ConstraintSetStorage<'db>,
-        _interior_value: &Self::Interior,
-        if_true: Self::Result,
-        if_uncertain: Self::Result,
-        if_false: Self::Result,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        PathFold::combine(self, db, storage, if_true, if_uncertain, if_false)
-    }
-}
-
-/// A path visitor that breaks early if it encounters a satisfied path. When applying this visitor,
-/// a `Continue` result indicates that no satisfied path was found, and the BDD was therefore
-/// unsatisfiable. A `Break` result indicates the opposite.
-struct IsNeverSatisfiedVisitor;
-
-impl PathFold for IsNeverSatisfiedVisitor {
-    type Result = ();
-    type Break = ();
-
-    fn satisfied<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Break(())
-    }
-
-    fn unsatisfied<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn impossible<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _path: &PathAssignments,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
-
-    fn combine<'db>(
-        &mut self,
-        _db: &'db dyn Db,
-        _storage: &mut ConstraintSetStorage<'db>,
-        _if_true: Self::Result,
-        _if_uncertain: Self::Result,
-        _if_false: Self::Result,
-    ) -> ControlFlow<Self::Break, Self::Result> {
-        ControlFlow::Continue(())
-    }
 }
 
 /// A single clause in the DNF representation of a BDD
