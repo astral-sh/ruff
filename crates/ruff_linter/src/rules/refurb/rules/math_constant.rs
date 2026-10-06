@@ -26,10 +26,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// A = math.pi * r**2
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as replacing a literal with the constant
+/// can change the result of a calculation.
+///
 /// ## References
 /// - [Python documentation: `math` constants](https://docs.python.org/3/library/math.html#constants)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.6", category = Category::Correctness)]
+#[violation_metadata(preview_since = "v0.1.6", category = Category::Suspicious)]
 pub(crate) struct MathConstant {
     literal: String,
     constant: &'static str,
@@ -78,7 +82,7 @@ fn convert_to_constant(
         literal.start(),
         checker.semantic(),
     )?;
-    Ok(Fix::safe_edits(
+    Ok(Fix::unsafe_edits(
         Edit::range_replacement(binding, literal.range()),
         [edit],
     ))
