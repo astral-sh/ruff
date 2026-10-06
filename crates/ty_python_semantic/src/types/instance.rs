@@ -28,7 +28,7 @@ use crate::types::relation::{
 };
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
-use crate::types::typevar::TypeVarSet;
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarSet};
 use crate::types::visitor::{
     DynamicContentMode, TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
     dynamic_content_impl, walk_type_with_recursion_guard,
@@ -741,7 +741,21 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         context.variables(db).any(|variable| {
             variable.is_paramspec(db)
                 || variable.is_typevartuple(db)
-                || variable.typevar(db).bound_or_constraints(db, env).is_some()
+                || variable
+                    .typevar(db)
+                    .bound_or_constraints(db, env)
+                    .is_some_and(|bounds| match bounds {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            !specialization_argument_is_static(db, env, bound, None)
+                        }
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            // Check each constraint: their union could hide a gradual type,
+                            // as with `(object, Any)`.
+                            constraints.elements(db).iter().any(|constraint| {
+                                !specialization_argument_is_static(db, env, *constraint, None)
+                            })
+                        }
+                    })
                 || variable.typevar(db).default_type(db, env).is_some()
         })
     }) {

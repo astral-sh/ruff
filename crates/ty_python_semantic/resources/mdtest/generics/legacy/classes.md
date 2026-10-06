@@ -2703,6 +2703,26 @@ class Overloaded(Protocol[T_co]):
 static_assert(is_equivalent_to(Overloaded[int], Top[Overloaded[int]]))
 ```
 
+Static bounds and constraints also leave materialization unchanged, including when the receiver's
+type argument grows:
+
+```py
+BoundedT = TypeVar("BoundedT", bound=object, covariant=True)
+
+class Bounded(Protocol[BoundedT]):
+    def read(self: Bounded[tuple[BoundedT, BoundedT]]) -> int: ...
+
+static_assert(is_equivalent_to(Bounded[int], Top[Bounded[int]]))
+static_assert(is_equivalent_to(Bounded[int], Bottom[Bounded[int]]))
+
+ConstrainedT = TypeVar("ConstrainedT", int, tuple[object, ...], covariant=True)
+
+class Constrained(Protocol[ConstrainedT]):
+    def read(self: Constrained[tuple[ConstrainedT, ConstrainedT]]) -> int: ...
+
+static_assert(is_equivalent_to(Constrained[int], Top[Constrained[int]]))
+```
+
 ## `Callable` return annotations preserve enclosing generic context
 
 When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an

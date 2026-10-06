@@ -822,6 +822,20 @@ async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
 reveal_type(open_stream)  # revealed: (value: Stream[int]) -> _AsyncGeneratorContextManager[Stream[int], None]
 ```
 
+The yielded protocol can also be nested in an invariant container, with a bound on its type
+parameter. Checking the decorator still terminates when the receiver's type argument grows:
+
+```py
+class Node[T: object](Protocol):
+    def read(self: Node[tuple[T, T]]) -> int: ...
+
+@asynccontextmanager  # no diagnostic
+async def open_node(value: list[Node[int]]) -> AsyncGenerator[list[Node[int]], None]:
+    yield value
+
+reveal_type(open_node)  # revealed: (value: list[Node[int]]) -> _AsyncGeneratorContextManager[list[Node[int]], None]
+```
+
 ## `asyncio.timeout`
 
 ```toml
