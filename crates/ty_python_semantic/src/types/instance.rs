@@ -605,7 +605,7 @@ fn protocol_materialization_is_noop_by_inspection<'db>(
 ///
 /// This must be called from `protocol_materialization_is_noop` so that `cycle_result`
 /// rejects provisional interface results.
-pub(super) fn protocol_materialization_is_noop_with_type_parameters<'db>(
+fn protocol_materialization_is_noop_with_type_parameters<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: ProtocolClass<'db>,

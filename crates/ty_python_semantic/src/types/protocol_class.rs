@@ -2106,7 +2106,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
     }
 
     /// Returns whether this member has a form supported by
-    /// [`protocol_materialization_is_noop_with_type_parameters`](super::instance::protocol_materialization_is_noop_with_type_parameters).
+    /// `protocol_materialization_is_noop_with_type_parameters`.
     ///
     /// That proof inspects `P[T]` once and treats recursive specializations of `P` as leaves after
     /// checking their arguments. This check limits the member binding and accessor resolution it
