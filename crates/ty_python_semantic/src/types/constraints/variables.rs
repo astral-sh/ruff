@@ -5,17 +5,15 @@ use std::fmt::Display;
 use std::marker::PhantomData;
 
 use itertools::{Either, Itertools};
-use rustc_hash::FxHashMap;
 use salsa::plumbing::AsId;
 
+use crate::types::Type;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
-    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintId, ConstraintSet, ConstraintSetBuilder,
-    ConstraintSetStorage, Node, NodeId, SourceOrderId, max_constructor_and_typevar_depth,
-    wobble_index,
+    ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, Node, NodeId, SourceOrderId,
+    max_constructor_and_typevar_depth, wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
-use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
 /// The _provenance_ of a BDD constraint.
@@ -119,30 +117,6 @@ impl<'db> Constraint<'db> {
         match self {
             Constraint::Atomic(atomic) => Some(*atomic),
             _ => None,
-        }
-    }
-
-    pub(super) fn apply_type_mapping_impl(
-        &self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        match self {
-            Constraint::Atomic(atomic) => {
-                atomic.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            Constraint::Existential(existential) => existential.apply_type_mapping_impl(
-                db,
-                builder,
-                type_mapping,
-                tcx,
-                visitor,
-                mapped_constraints,
-            ),
         }
     }
 
@@ -589,50 +563,6 @@ impl<'db> AtomicConstraint<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        match self {
-            AtomicConstraint::ConcreteLower(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            AtomicConstraint::ConcreteUpper(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            AtomicConstraint::ConcreteEquivalence(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            AtomicConstraint::TypeVarRange(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-            AtomicConstraint::TypeVarEquivalence(this) => {
-                this.apply_type_mapping_impl(db, builder, type_mapping, tcx, visitor)
-            }
-        }
-    }
-
-    pub(super) fn types(self) -> impl Iterator<Item = Type<'db>> {
-        let types = match self {
-            AtomicConstraint::ConcreteLower(this) => [Type::TypeVar(this.typevar), this.bound],
-            AtomicConstraint::ConcreteUpper(this) => [Type::TypeVar(this.typevar), this.bound],
-            AtomicConstraint::ConcreteEquivalence(this) => {
-                [Type::TypeVar(this.typevar), this.bound]
-            }
-            AtomicConstraint::TypeVarRange(this) => {
-                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
-            }
-            AtomicConstraint::TypeVarEquivalence(this) => {
-                [Type::TypeVar(this.left), Type::TypeVar(this.right)]
-            }
-        };
-        types.into_iter()
-    }
-
     pub(super) fn display<'a>(
         self,
         db: &'db dyn Db,
@@ -704,35 +634,6 @@ impl<'db> ConcreteLowerBound<'db> {
             typevar,
             bound,
             _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied =
-                    AtomicConstraint::new_lower_bound(db, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &bound.when_constraint_set_assignable_to_owned(db, env, subject),
-            ),
         }
     }
 
@@ -826,35 +727,6 @@ impl<'db> ConcreteUpperBound<'db> {
         }
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied =
-                    AtomicConstraint::new_upper_bound(db, env, self.provenance, typevar, bound);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_assignable_to_owned(db, env, bound),
-            ),
-        }
-    }
-
     fn display<'a>(
         self,
         db: &'db dyn Db,
@@ -939,40 +811,6 @@ impl<'db> ConcreteEquivalenceBound<'db> {
             typevar,
             bound,
             _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let subject =
-            Type::TypeVar(self.typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let bound = self
-            .bound
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match subject {
-            Type::TypeVar(typevar) => {
-                let applied = AtomicConstraint::new_equivalence_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    typevar,
-                    bound,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &subject.when_constraint_set_equivalent_to_owned(db, env, bound),
-            ),
         }
     }
 
@@ -1077,43 +915,6 @@ impl<'db> TypeVarRangeBound<'db> {
             left,
             right,
             _phantom: PhantomData,
-        }
-    }
-
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let left = Type::TypeVar(self.left).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let right =
-            Type::TypeVar(self.right).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match (left, right) {
-            (Type::TypeVar(left_typevar), _) => {
-                let applied = AtomicConstraint::new_upper_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    left_typevar,
-                    right,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            (_, Type::TypeVar(right_typevar)) => {
-                let applied =
-                    AtomicConstraint::new_lower_bound(db, self.provenance, right_typevar, left);
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &left.when_constraint_set_assignable_to_owned(db, env, right),
-            ),
         }
     }
 
@@ -1233,48 +1034,6 @@ impl<'db> TypeVarEquivalenceBound<'db> {
         TypeVarEquivalenceDirectedView(self, true)
     }
 
-    fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let left = Type::TypeVar(self.left).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let right =
-            Type::TypeVar(self.right).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-        let mut storage = builder.storage.borrow_mut();
-        match (left, right) {
-            (Type::TypeVar(left_typevar), _) => {
-                let applied = AtomicConstraint::new_equivalence_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    left_typevar,
-                    right,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            (_, Type::TypeVar(right_typevar)) => {
-                let applied = AtomicConstraint::new_equivalence_bound(
-                    db,
-                    env,
-                    self.provenance,
-                    right_typevar,
-                    left,
-                );
-                Constraint::new_nodes(db, env, &mut storage, applied)
-            }
-            _ => storage.load(
-                db,
-                env,
-                &left.when_constraint_set_equivalent_to_owned(db, env, right),
-            ),
-        }
-    }
-
     fn display(self, db: &'db dyn Db, holds: Option<bool>) -> impl Display {
         let equality_sign = match holds {
             Some(true) => "=",
@@ -1384,41 +1143,6 @@ impl ExistentialBound {
             source_order,
             _phantom: PhantomData,
         })
-    }
-
-    fn apply_type_mapping_impl<'db>(
-        &self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
-    ) -> (NodeId, Option<SourceOrderId>) {
-        let env = visitor.env;
-        let body = ConstraintSet::from_node(builder, self.body, self.source_order)
-            .apply_type_mapping_with_cache(db, type_mapping, tcx, visitor, mapped_constraints);
-
-        let mut storage = builder.storage.borrow_mut();
-        let locals = Support::from_typevars(self.locals.iter().filter_map(|typevar| {
-            let bound_typevar = storage.typevar_data(typevar);
-            let mapped = Type::TypeVar(bound_typevar)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                .as_typevar()?;
-            Some(storage.intern_typevar(db, mapped))
-        }));
-
-        let Some(existential) = ExistentialBound::new(
-            &storage,
-            self.provenance,
-            locals,
-            body.node,
-            body.source_order,
-        ) else {
-            return (body.node, body.source_order);
-        };
-        let mapped = Constraint::Existential(existential);
-        mapped.new_node(db, env, &mut storage)
     }
 
     fn display<'a, 'db>(
