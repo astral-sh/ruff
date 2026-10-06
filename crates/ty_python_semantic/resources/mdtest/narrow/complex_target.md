@@ -609,6 +609,117 @@ def check(value: tuple[int, str] | tuple[str, int]):
         reveal_type(value)  # revealed: tuple[int, str] | tuple[str, int]
 ```
 
+### Tuple checks that reassign the tuple
+
+Assigning a checked element back to the tuple's name replaces the tuple. The check narrows the
+assigned element without restoring the old tuple type.
+
+```py
+def instance(flag: bool):
+    value = ("x",) if flag else (1,)
+    if isinstance(value := value[0], str):
+        reveal_type(value)  # revealed: Literal["x"]
+        value.upper()  # no diagnostic
+    else:
+        reveal_type(value)  # revealed: Literal[1]
+
+def subclass(flag: bool):
+    value = (str,) if flag else (int,)
+    if issubclass(value := value[0], str):
+        reveal_type(value)  # revealed: <class 'str'>
+    else:
+        reveal_type(value)  # revealed: <class 'int'>
+```
+
+The same applies to user-defined `TypeIs` checks:
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def check(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value := value[0]):
+        reveal_type(value)  # revealed: Literal["x"]
+    else:
+        reveal_type(value)  # revealed: Literal[1]
+```
+
+### Tuple checks with assignments in later arguments
+
+An assignment in a later argument can also replace the tuple after its element has been read.
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object, other: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def instance(flag: bool):
+    value = ("x",) if flag else (1,)
+    if isinstance(value[0], (str, (value := 0))[0]):
+        reveal_type(value)  # revealed: Literal[0]
+    else:
+        reveal_type(value)  # revealed: Literal[0]
+
+def positional(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value[0], value := 0):
+        reveal_type(value)  # revealed: Literal[0]
+    else:
+        reveal_type(value)  # revealed: Literal[0]
+
+def keyword(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value=value[0], other=(value := 0)):
+        reveal_type(value)  # revealed: Literal[0]
+```
+
+Assignments in comprehensions write to the containing scope. Replacing an object also invalidates
+facts about its tuple attributes.
+
+```py
+def comprehension(flag: bool):
+    value = ("x",) if flag else (1,)
+    if is_string(value[0], [(value := 0) for _ in (0,)]):
+        reveal_type(value)  # revealed: int
+
+class Container:
+    value: tuple[str, int] | tuple[int, str] = (1, "new")
+
+def attribute(container: Container):
+    if is_string(container.value[0], container := Container()):
+        reveal_type(container.value)  # revealed: tuple[str, int] | tuple[int, str]
+```
+
+### Tuple checks with independent assignments
+
+Assigning the element to a different name preserves the relationship between the tuple's elements.
+An assignment that finishes before the element is read also permits narrowing the new tuple.
+
+```py
+def check(value: tuple[str, int] | tuple[int, str]):
+    if isinstance(item := value[0], str):
+        reveal_type(value[1])  # revealed: int
+    if isinstance((copied := value)[0], str):
+        reveal_type(copied[1])  # revealed: int
+```
+
+Assignments to lambda locals do not replace the containing scope's tuple.
+
+```py
+from typing_extensions import TypeIs
+
+def is_string(value: object, other: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def check(value: tuple[str, int] | tuple[int, str]):
+    if is_string(value[0], lambda: (value := 0)):
+        reveal_type(value[1])  # revealed: int
+```
+
 ### Tuple union checks with uncertain elements and indices
 
 Alternatives with gradual element types remain possible in either branch. A non-literal index
