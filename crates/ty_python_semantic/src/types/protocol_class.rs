@@ -474,72 +474,6 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.members(db).all(|member| member.is_method())
     }
 
-    /// Returns whether the members have forms supported by the type-parameter materialization proof.
-    ///
-    /// That proof inspects `P[T]` once and treats recursive specializations of `P` as leaves after
-    /// checking their arguments. This check limits the member binding and accessor resolution it
-    /// needs to account for:
-    ///
-    /// - Ordinary properties must have resolvable getter return types and setter value types.
-    /// - Instance methods must have at least one signature, and every overload must have a
-    ///   positional receiver. The walker binds inferred receivers. Explicit receivers must be
-    ///   direct, unmaterialized specializations of `class_origin`, so the proof can handle them
-    ///   using the same rule as other recursive references to `P`.
-    ///
-    /// Arbitrary descriptor access can select an overload based on the specialized receiver;
-    /// inspecting `P[T]` alone does not establish the result for every specialization.
-    /// Attributes, arbitrary descriptors, static methods, class methods, and other receiver forms
-    /// are conservatively excluded from this proof. They may still be unchanged by materialization;
-    /// the caller can use concrete interface inspection or structural comparison instead.
-    /// This check does not establish that the supported member types or type arguments are static.
-    pub(super) fn has_only_inspectable_members_with_positional_receivers(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        class_origin: ClassLiteral<'db>,
-    ) -> bool {
-        self.members(db).all(|member| {
-            if let ProtocolMemberKind::Property { read, write } = member.data.kind {
-                // The proof supports resolved ordinary property accessors, excluding descriptors.
-                return matches!(
-                    (read, write),
-                    (
-                        None | Some(ProtocolPropertyType::PropertyGetter(_)),
-                        None | Some(ProtocolMemberWrite::Type(
-                            ProtocolPropertyType::PropertySetter(_)
-                        ))
-                    )
-                ) && read.is_none_or(|getter| getter.resolve(db, env).is_some())
-                    && write.is_none_or(|setter| {
-                        setter
-                            .domain()
-                            .is_some_and(|setter| setter.resolve(db, env).is_some())
-                    });
-            }
-            let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
-                member.data.kind
-            else {
-                return false;
-            };
-            callable.signatures(db).iter().next().is_some()
-                && callable.signatures(db).iter().all(|signature| {
-                    signature.has_implicit_positional_receiver_annotation()
-                        || (signature.has_explicit_positional_receiver_annotation()
-                            && signature.parameters().get(0).is_some_and(|parameter| {
-                                parameter
-                                    .annotated_type()
-                                    .as_protocol_instance()
-                                    .is_some_and(|protocol| {
-                                        protocol.materialization_kind(db).is_none()
-                                            && protocol.class_origin(db).is_some_and(|class| {
-                                                class.class_literal(db) == class_origin
-                                            })
-                                    })
-                            }))
-                })
-        })
-    }
-
     /// Returns whether structural comparison can avoid recursive member expansion.
     pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
         let env = ProgramEnvironment::from_program(self.interface.program(db));
@@ -2167,8 +2101,73 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 })
     }
 
-    fn is_method(&self) -> bool {
+    pub(super) fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    /// Returns whether this member has a form supported by
+    /// [`protocol_materialization_is_noop_with_type_parameters`](super::instance::protocol_materialization_is_noop_with_type_parameters).
+    ///
+    /// That proof inspects `P[T]` once and treats recursive specializations of `P` as leaves after
+    /// checking their arguments. This check limits the member binding and accessor resolution it
+    /// needs to account for:
+    ///
+    /// - Ordinary properties must have resolvable getter return types and setter value types.
+    /// - Instance methods must have at least one signature, and every overload must have a
+    ///   positional receiver. The walker binds inferred receivers. Explicit receivers must be
+    ///   direct, unmaterialized specializations of `class_origin`, so the proof can handle them
+    ///   using the same rule as other recursive references to `P`.
+    ///
+    /// Arbitrary descriptor access can select an overload based on the specialized receiver;
+    /// inspecting `P[T]` alone does not establish the result for every specialization.
+    /// Attributes, arbitrary descriptors, static methods, class methods, and other receiver forms
+    /// are conservatively excluded from this proof. They may still be unchanged by materialization;
+    /// the caller can use concrete interface inspection or structural comparison instead.
+    /// This check does not establish that the supported member types or type arguments are static.
+    pub(super) fn supports_type_parameter_materialization_proof(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class_origin: ClassLiteral<'db>,
+    ) -> bool {
+        if let ProtocolMemberKind::Property { read, write } = self.data.kind {
+            // The proof supports resolved ordinary property accessors, excluding descriptors.
+            return matches!(
+                (read, write),
+                (
+                    None | Some(ProtocolPropertyType::PropertyGetter(_)),
+                    None | Some(ProtocolMemberWrite::Type(
+                        ProtocolPropertyType::PropertySetter(_)
+                    ))
+                )
+            ) && read.is_none_or(|getter| getter.resolve(db, env).is_some())
+                && write.is_none_or(|setter| {
+                    setter
+                        .domain()
+                        .is_some_and(|setter| setter.resolve(db, env).is_some())
+                });
+        }
+        let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+            self.data.kind
+        else {
+            return false;
+        };
+        callable.signatures(db).iter().next().is_some()
+            && callable.signatures(db).iter().all(|signature| {
+                signature.has_implicit_positional_receiver_annotation()
+                    || (signature.has_explicit_positional_receiver_annotation()
+                        && signature.parameters().get(0).is_some_and(|parameter| {
+                            parameter
+                                .annotated_type()
+                                .as_protocol_instance()
+                                .is_some_and(|protocol| {
+                                    protocol.materialization_kind(db).is_none()
+                                        && protocol.class_origin(db).is_some_and(|class| {
+                                            class.class_literal(db) == class_origin
+                                        })
+                                })
+                        }))
+            })
     }
 
     /// Returns whether an instance method has an explicit positional receiver annotation.

@@ -19,8 +19,8 @@ use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{walk_specialization, walk_specialization_types};
 use crate::types::protocol_class::{
-    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_interface,
-    walk_protocol_instance_member, walk_protocol_interface,
+    ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
+    walk_protocol_interface,
 };
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
@@ -723,17 +723,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
     };
     let template_view = ProtocolInterfaceView::new(template.interface(db), None);
     let class_context = origin.generic_context(db);
-    if ![interface, template_view].iter().all(|interface| {
-        interface.has_only_inspectable_members_with_positional_receivers(db, env, origin.into())
-    }) || (!template_view.has_only_methods(db)
-        && template_view
-            .members(db)
-            .any(|member| member.has_explicit_receiver_annotation(db)))
-        || !interface
-            .members(db)
-            .map(|member| member.name())
-            .eq(template_view.members(db).map(|member| member.name()))
-    {
+    if interface.member_count(db) != template_view.member_count(db) {
         return false;
     }
 
@@ -777,13 +767,31 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         invalid: Cell::new(false),
         recursion_guard: TypeCollector::default(),
     };
-    walk_protocol_instance_interface(
-        db,
-        template_view,
-        Type::ProtocolInstance(ProtocolInstanceType::from_class(template)),
-        &visitor,
-    );
-    !visitor.invalid.get()
+    let receiver = Type::ProtocolInstance(ProtocolInstanceType::from_class(template));
+    let mut has_property = false;
+    let mut has_explicit_receiver = false;
+    for (member, template_member) in interface.members(db).zip(template_view.members(db)) {
+        if member.name() != template_member.name()
+            || !member.supports_type_parameter_materialization_proof(db, env, origin.into())
+            || !template_member.supports_type_parameter_materialization_proof(
+                db,
+                env,
+                origin.into(),
+            )
+        {
+            return false;
+        }
+        has_property |= !template_member.is_method();
+        has_explicit_receiver |= template_member.has_explicit_receiver_annotation(db);
+        if has_property && has_explicit_receiver {
+            return false;
+        }
+        walk_protocol_instance_member(db, &template_member, receiver, &visitor);
+        if visitor.invalid.get() {
+            return false;
+        }
+    }
+    true
 }
 
 /// Check only closed, directly inspectable types. Recursive substitutions may additionally use
