@@ -1408,6 +1408,15 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
     }
 
+    walk_typed_dict_fields(db, typed_dict, visitor);
+}
+
+/// Visit a `TypedDict`'s declared field types, including its extra-item type.
+pub(super) fn walk_typed_dict_fields<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+    visitor: &V,
+) {
     for field in typed_dict.items(db).values() {
         visitor.visit_type(db, field.declared_ty);
     }
