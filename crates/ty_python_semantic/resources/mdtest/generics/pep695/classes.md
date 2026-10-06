@@ -2581,8 +2581,8 @@ python-version = "3.12"
 
 ```py
 def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
-    for incoming, current in ((first, first), (second, second)):
-        for key, data in incoming.items():  # no diagnostic
+    for current in (first, second):
+        for key, data in current.items():  # no diagnostic
             reveal_type(data)  # revealed: T@compare | int
             reveal_type(current.get(key))  # revealed: T@compare | None | int
 ```
