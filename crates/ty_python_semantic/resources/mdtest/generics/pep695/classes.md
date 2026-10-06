@@ -2490,5 +2490,91 @@ def check(child: Child[str]) -> None:
     child.items.append(1)  # error: [invalid-argument-type]
 ```
 
+## Narrowing tuples with recursive protocols and `TypedDict`s
+
+A protocol method can return a fixed specialization of the same protocol. `Node[str]` refers to
+`Node[int]`, which refers back to itself. Both have fully static members, so a tuple containing
+`Node[str]` allows its other element to narrow after a failed pattern match:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    def next(self) -> Node[int]: ...
+
+def check(pair: tuple[Node[str], int | str]) -> None:
+    match pair:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(pair[1])  # revealed: str
+```
+
+The same applies when a `TypedDict` field refers to a fixed specialization:
+
+```py
+from typing import TypedDict
+
+class Record[T](TypedDict):
+    next: Record[int]
+
+def check(pair: tuple[Record[str], int | str]) -> None:
+    match pair:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(pair[1])  # revealed: str
+```
+
+## Generic methods in finite recursive protocols
+
+A generic method does not change the protocol's recursive references: `identity` uses `U`, but
+`next` still returns `Node[int]`. The tuple's second element therefore narrows to `str` after the
+`int` pattern fails:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    def next(self) -> Node[int]: ...
+    def identity[U](self, value: U) -> U: ...
+
+def check(pair: tuple[Node[str], int | str]) -> None:
+    match pair:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(pair[1])  # revealed: str
+```
+
+## Generic property setters in finite recursive protocols
+
+The same narrowing is possible when the protocol has a generic property setter. The setter's `U`
+does not affect the return type of `next`:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+
+class Node[T](Protocol):
+    def next(self) -> Node[int]: ...
+    @property
+    def value(self) -> object: ...
+    @value.setter
+    def value[U](self, value: tuple[U, U]) -> None: ...
+
+def check(pair: tuple[Node[str], int | str]) -> None:
+    match pair:
+        case (_, int()):
+            pass
+        case _:
+            reveal_type(pair[1])  # revealed: str
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

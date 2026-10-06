@@ -224,6 +224,96 @@ def cast_gradual_tuple_class(value: type[tuple[object, Unknown]]) -> None:
     cast(type[tuple[object, Unknown]], value)
 ```
 
+## Redundant casts of type variables
+
+Casting a value of type `T` back to `T` is redundant when its bound is fully static:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import cast
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def set(self, value: T) -> None: ...
+
+def _[T: Box[int]](value: T) -> None:
+    cast(T, value)  # error: [redundant-cast]
+```
+
+`Unknown` in the bound suppresses the diagnostic. Casting `Top[T]` back to `T` can restore writes
+that the materialized bound rejects, and reads return `Unknown` instead of `object`:
+
+```py
+from ty_extensions import Top
+from ty_extensions._internal import Unknown
+
+def _[T: Box[Unknown]](top: Top[T]) -> None:
+    value = cast(T, top)
+    reveal_type(value.get())  # revealed: Unknown
+    value.set(1)  # no diagnostic
+
+    reveal_type(top.get())  # revealed: object
+    top.set(1)  # error: [invalid-argument-type]
+```
+
+`Unknown` also suppresses the diagnostic in legacy type-variable bounds:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=Box[Unknown])
+
+def _(value: T) -> None:
+    cast(T, value)  # no diagnostic
+```
+
+The same applies to constrained type variables:
+
+```py
+def _[T: (Box[Unknown], int)](value: T) -> None:
+    cast(T, value)  # no diagnostic
+```
+
+An explicit `Any` should permit the same cast. We currently report it as redundant even though the
+cast permits writes that `Top[T]` rejects:
+
+```py
+from typing import Any
+
+def _[T: Box[Any]](top: Top[T]) -> None:
+    # TODO: This cast is not redundant.
+    value = cast(T, top)  # error: [redundant-cast]
+    value.set(1)  # no diagnostic
+
+    top.set(1)  # error: [invalid-argument-type]
+```
+
+## Redundant casts with recursive bounds
+
+Each recursive reference in `Recursive[int]` nests another `list` in its type argument. We cannot
+fully inspect this bound, so we omit the redundant-cast diagnostic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, cast
+
+class Recursive[T](Protocol):
+    next: "Recursive[list[T]]"
+
+def _[T: Recursive[int]](value: T) -> None:
+    cast(T, value)  # no diagnostic
+```
+
 ## Disjoint casts
 
 ### Basics
