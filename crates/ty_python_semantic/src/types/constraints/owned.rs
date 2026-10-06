@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use ty_python_core::rank::{RankBitBox, RankBitBoxVec};
 
 use crate::types::constraints::support::Support;
@@ -36,7 +36,7 @@ impl OwnedConstraintSetBuilder {
         };
         builder.mark_node_used(&mut storage, root.node());
         let mapped_source_order = builder
-            .mark_source_order_used(&mut storage, source_order)
+            .mark_source_order_used(&mut storage, source_order, &mut FxHashSet::default())
             .expect("non-terminal BDD should have source_order");
         builder.finish(storage, root, mapped_source_order)
     }
@@ -81,7 +81,11 @@ impl OwnedConstraintSetBuilder {
                 } = *existential;
                 self.mark_node_used(storage, body);
                 if let Some(source_order) = source_order {
-                    let mapped_source_order = self.mark_source_order_used(storage, source_order);
+                    let mapped_source_order = self.mark_source_order_used(
+                        storage,
+                        source_order,
+                        &mut FxHashSet::default(),
+                    );
                     self.mapped_source_orders
                         .insert(source_order, mapped_source_order);
                 }
@@ -97,12 +101,15 @@ impl OwnedConstraintSetBuilder {
         &mut self,
         storage: &mut ConstraintSetStorage<'_>,
         source_order: SourceOrderId,
+        seen_constraints: &mut FxHashSet<ConstraintId>,
     ) -> Option<SourceOrderId> {
+        // TODO: Deduplicate source-order constraints when constructing a `ConstraintSet`,
+        // rather than only when freezing it into an `OwnedConstraintSet`.
         let source_order_data = storage.source_order_data(source_order);
         match source_order_data {
             SourceOrder::Ordered(left, right) => {
-                let mapped_left = self.mark_source_order_used(storage, left);
-                let mapped_right = self.mark_source_order_used(storage, right);
+                let mapped_left = self.mark_source_order_used(storage, left, seen_constraints);
+                let mapped_right = self.mark_source_order_used(storage, right, seen_constraints);
                 match (mapped_left, mapped_right) {
                     (None, None) => None,
                     (None, other) | (other, None) => other,
@@ -113,6 +120,12 @@ impl OwnedConstraintSetBuilder {
                 }
             }
             SourceOrder::AtomicConstraint(constraint) => {
+                // Later occurrences do not affect the order, but retaining them can prevent
+                // recursive queries from converging as their stored trees keep growing.
+                if !seen_constraints.insert(constraint.into_inner()) {
+                    return None;
+                }
+
                 // If a constraint is not used anywhere in the BDD, and doesn't mention any
                 // typevars that are used in the BDD, we don't have to include it in the compacted
                 // source_order list.
