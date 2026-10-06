@@ -310,6 +310,25 @@ def g[S]():
     reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+### Bounds and constraints with unused alias arguments
+
+An unused alias argument does not make a bound generic. `Ignored[S]` resolves to `int`, so `T` has a
+concrete bound:
+
+```py
+type Ignored[T] = int
+
+def _[S, T: Ignored[S]](value: T) -> T:  # no diagnostic
+    return value
+```
+
+The same applies to constraints:
+
+```py
+def _[S, T: (Ignored[S], str)](value: T) -> T:  # no diagnostic
+    return value
+```
+
 ### Cannot have only one constraint
 
 > `TypeVar` supports constraining parametric types to a fixed set of possible types...There should

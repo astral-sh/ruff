@@ -993,8 +993,7 @@ impl<'db> SolutionWalker<'db> {
                         })
                     })
         };
-        let contains_preservable_typevar =
-            |ty| any_over_type(db, env, ty, false, is_preservable_typevar);
+        let contains_preservable_typevar = |ty| any_over_type(db, env, ty, is_preservable_typevar);
         let has_bare_preservable_typevar_evidence =
             evidence.evidence_lower.is_some_and(is_preservable_typevar)
                 || evidence
