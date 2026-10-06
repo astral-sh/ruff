@@ -587,7 +587,7 @@ impl<'db> AtomicConstraint<'db> {
         }
     }
 
-    pub(super) fn apply_type_mapping_impl(
+    fn apply_type_mapping_impl(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,

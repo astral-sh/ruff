@@ -1113,6 +1113,32 @@ def f[S, T, U]():
     ...
 ```
 
+## Repeated combinations preserve the first occurrence
+
+Combining previously constructed constraint sets can repeat the same constraints many times. The
+first occurrence still determines binding order, even when later combinations reverse that order.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def repeated[T, U]() -> None:
+    c0 = ConstraintSet.equality(T, int)
+    c1 = ConstraintSet.equality(U, str)
+    c2 = c0 & c1
+    c3 = c1 & c2
+    c4 = c2 & c3
+    c5 = c3 & c4
+    c6 = c4 & c5
+    c7 = c5 & c6
+    c8 = c6 & c7
+    c9 = c7 & c8
+
+    # revealed: tuple[Solution[T=int, U=str]]
+    reveal_type(c8.solutions(inferable=tuple[T, U]))
+    # revealed: tuple[Solution[U=str, T=int]]
+    reveal_type(c9.solutions(inferable=tuple[T, U]))
+```
+
 ## Other simplifications
 
 ### Ordering of intersection and union elements
