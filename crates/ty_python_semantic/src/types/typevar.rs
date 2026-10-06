@@ -17,14 +17,22 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
-        cyclic::TypeIdentity,
+        Parameter, Parameters, ProtocolInstanceType, RecursiveType, Signature, Specialization,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
+        cyclic::{ActiveRecursionDetector, TypeIdentity},
         definition_expression_type,
+        function::FunctionType,
+        generics::walk_specialization_types,
+        protocol_class::walk_protocol_instance_interface,
         tuple::Tuple,
+        typed_dict::walk_typed_dict_fields,
         variance::VarianceInferable,
-        visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
+        visitor::{
+            self, TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type,
+            walk_type_with_recursion_guard,
+        },
     },
 };
 use ty_python_core::{
@@ -100,12 +108,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> bool {
-        any_over_type(
-            db,
-            env,
-            self,
-            |ty| matches!(ty, Type::TypeVar(typevar) if !typevar.typevar(db).is_self(db)),
-        )
+        find_free_typevar(db, env, self, |ty| {
+            matches!(ty, Type::TypeVar(tv) if !tv.typevar(db).is_self(db)).then_some(())
+        })
+        .is_some()
     }
 
     pub(crate) fn has_typevar_or_typevar_instance(
@@ -142,6 +148,237 @@ impl<'db> Type<'db> {
             ty.as_dynamic()
                 .is_some_and(DynamicType::is_provisional_marker)
         })
+    }
+}
+
+/// Returns the first non-`None` result of `query` over free type-variable occurrences in the type's
+/// value, including alias values and structural members. Type-variable bounds and defaults are
+/// metadata, not occurrences, and parameters bound by a nested callable's signature are not free
+/// in the enclosing type.
+///
+/// For an outer type variable `U`, `Erased[U]` has no free occurrence, while `Retained[U]` does:
+///
+/// ```python
+/// type Erased[T] = int
+/// type Retained[T] = list[T]
+/// ```
+///
+/// Specializations that the growth analysis proves finite are visited until an exact type repeats.
+/// A search that stops at a growing or unresolved recursive reference can miss occurrences exposed
+/// by later specializations. An incomplete search is never treated as a match.
+fn find_free_typevar<'db, T: Copy>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> Option<T>,
+) -> Option<T> {
+    let visitor = FreeTypeVarVisitor {
+        env,
+        query: &query,
+        found: Cell::new(None),
+        bound_contexts: RefCell::default(),
+        completed_types: RefCell::default(),
+        recursion_cutoffs: Cell::new(0),
+        active_types: ActiveRecursionDetector::default(),
+        active_definitions: ActiveRecursionDetector::default(),
+        active_aliases: ActiveRecursionDetector::default(),
+    };
+    visitor.visit_type(db, ty);
+    visitor.found.get()
+}
+
+struct FreeTypeVarVisitor<'a, 'db, T> {
+    env: &'a ProgramEnvironment<'db>,
+    query: &'a dyn Fn(Type<'db>) -> Option<T>,
+    found: Cell<Option<T>>,
+    bound_contexts: RefCell<Vec<GenericContext<'db>>>,
+    completed_types: RefCell<FxHashSet<(Type<'db>, Vec<GenericContext<'db>>)>>,
+    recursion_cutoffs: Cell<usize>,
+    active_types: ActiveRecursionDetector<Type<'db>>,
+    active_definitions: ActiveRecursionDetector<Definition<'db>>,
+    active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
+}
+
+impl<'db, T> FreeTypeVarVisitor<'_, 'db, T> {
+    /// Visit a type or signature with its local type parameters bound.
+    fn with_bound_context(&self, context: Option<GenericContext<'db>>, visit: impl FnOnce()) {
+        if let Some(context) = context {
+            self.bound_contexts.borrow_mut().push(context);
+        }
+        visit();
+        if context.is_some() {
+            self.bound_contexts.borrow_mut().pop();
+        }
+    }
+}
+
+impl<'db, T: Copy> TypeVisitor<'db> for FreeTypeVarVisitor<'_, 'db, T> {
+    fn program_environment(&self) -> &ProgramEnvironment<'db> {
+        self.env
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        if self.found.get().is_some() {
+            return;
+        }
+        let is_free = match ty {
+            Type::TypeVar(typevar) => Some(
+                !self
+                    .bound_contexts
+                    .borrow()
+                    .iter()
+                    .any(|context| context.contains(db, typevar.identity(db))),
+            ),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(
+                !self
+                    .bound_contexts
+                    .borrow()
+                    .iter()
+                    .any(|context| context.binds_typevar(db, typevar).is_some()),
+            ),
+            _ => None,
+        };
+        if let Some(is_free) = is_free {
+            if is_free {
+                self.found.set((self.query)(ty));
+            }
+            return;
+        }
+        if let TypeKind::NonAtomic(ty_kind) = TypeKind::from(ty) {
+            // A type can be shared by many fields or union elements. Reuse completed searches,
+            // but only under the same binders: a later occurrence can have free type variables
+            // that were bound in an earlier callable signature.
+            let key = (ty, self.bound_contexts.borrow().clone());
+            if self.completed_types.borrow().contains(&key) {
+                return;
+            }
+            self.active_types.visit(
+                &ty,
+                || {},
+                || {
+                    let cutoffs = self.recursion_cutoffs.get();
+                    walk_non_atomic_type(db, ty_kind, self);
+                    if self.recursion_cutoffs.get() == cutoffs {
+                        self.completed_types.borrow_mut().insert(key);
+                    } else {
+                        // A recursive edge can rely on an ancestor's unfinished search. If
+                        // that search stops at a different specialization, discard its
+                        // descendants' results too: another path may expose a free variable.
+                        self.completed_types.borrow_mut().clear();
+                    }
+                },
+            );
+        }
+    }
+
+    fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+        self.with_bound_context(signature.generic_context, || {
+            super::walk_signature(db, signature, self);
+        });
+    }
+
+    fn visit_type_in_generic_context(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        context: Option<GenericContext<'db>>,
+    ) {
+        self.with_bound_context(context, || self.visit_type(db, ty));
+    }
+
+    fn visit_type_var_type(&self, _db: &'db dyn Db, _typevar: TypeVarInstance<'db>) {}
+
+    fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
+        self.active_definitions.visit(
+            &function.definition(db),
+            || self.recursion_cutoffs.set(self.recursion_cutoffs.get() + 1),
+            || {
+                for signature in &function.signature(db).overloads {
+                    self.visit_signature(db, signature);
+                }
+            },
+        );
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        self.active_aliases.visit(
+            &Type::TypeAlias(alias).to_type_identity(db),
+            || self.recursion_cutoffs.set(self.recursion_cutoffs.get() + 1),
+            || self.visit_type(db, alias.value_type(db)),
+        );
+    }
+
+    fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+        self.active_aliases.visit(
+            &Type::Recursive(recursive).to_type_identity(db),
+            || self.recursion_cutoffs.set(self.recursion_cutoffs.get() + 1),
+            || self.visit_type(db, recursive.unfold(db, self.env).into_type()),
+        );
+    }
+
+    fn visit_protocol_instance_type(&self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) {
+        if let Some((_, Some(arguments))) = protocol
+            .class_origin(db)
+            .and_then(|class| class.static_class_literal(db))
+        {
+            walk_specialization_types(db, arguments, self);
+        }
+        let visit = || {
+            walk_protocol_instance_interface(
+                db,
+                protocol.interface(db),
+                Type::ProtocolInstance(protocol),
+                self,
+            );
+        };
+        if let Some(definition) = protocol
+            .class_origin(db)
+            .and_then(|class| class.definition(db))
+        {
+            self.active_definitions.visit(
+                &definition,
+                || {
+                    // The exact-type guard already handles repeated specializations. Only
+                    // analyze growth when this definition recurs with different arguments.
+                    if matches!(
+                        protocol.dynamic_content_identity(db),
+                        TypeIdentity::Other(_)
+                    ) {
+                        visit();
+                    } else {
+                        self.recursion_cutoffs.set(self.recursion_cutoffs.get() + 1);
+                    }
+                },
+                visit,
+            );
+        } else {
+            visit();
+        }
+    }
+
+    fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
+        if let Some(class) = typed_dict.defining_class() {
+            self.visit_type(db, class.into());
+        }
+        let visit = || walk_typed_dict_fields(db, typed_dict, self);
+        if let Some(definition) = typed_dict.definition(db) {
+            self.active_definitions.visit(
+                &definition,
+                || {
+                    if matches!(
+                        Type::TypedDict(typed_dict).to_type_identity(db),
+                        TypeIdentity::Other(_)
+                    ) {
+                        visit();
+                    } else {
+                        self.recursion_cutoffs.set(self.recursion_cutoffs.get() + 1);
+                    }
+                },
+                visit,
+            );
+        } else {
+            visit();
+        }
     }
 }
 
@@ -2343,6 +2580,71 @@ mod tests {
     use ruff_db::testing::assert_function_query_was_not_run_by_name;
 
     use crate::db::tests::setup_db;
+    use crate::types::CallableType;
+
+    #[test]
+    fn free_typevar_search_visits_shared_types_once() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let typevar = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let mut ty = Type::heterogeneous_tuple(&db, &env, [Type::TypeVar(typevar)]);
+
+        // Each tuple refers to the same child twice. The search should visit the leaf once,
+        // rather than once for each of the 4,096 paths to it.
+        for _ in 0..12 {
+            ty = Type::heterogeneous_tuple(&db, &env, [ty, ty]);
+        }
+
+        let visits = Cell::new(0);
+        find_free_typevar(&db, &env, ty, |_| {
+            visits.set(visits.get() + 1);
+            None::<()>
+        });
+        assert_eq!(visits.get(), 1);
+    }
+
+    #[test]
+    fn free_typevar_search_distinguishes_callable_binders() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let t = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("T"),
+            TypeVarVariance::Invariant,
+        );
+        let u = BoundTypeVarInstance::synthetic(
+            &db,
+            &env,
+            Name::new_static("U"),
+            TypeVarVariance::Invariant,
+        );
+        let shared = Type::heterogeneous_tuple(&db, &env, [Type::TypeVar(t)]);
+        let callable = |bound_typevar| {
+            Type::Callable(CallableType::single(
+                &db,
+                Signature::new_generic(
+                    Some(GenericContext::from_typevar_instances(
+                        &db,
+                        &env,
+                        [bound_typevar],
+                    )),
+                    Parameters::empty(),
+                    shared,
+                ),
+            ))
+        };
+
+        // The shared return type is valid under the first signature's binder, but T is free
+        // under the second signature's binder.
+        let ty = Type::heterogeneous_tuple(&db, &env, [callable(t), callable(u)]);
+        assert!(ty.has_non_self_typevar(&db, &env));
+    }
 
     fn bound_typevar<'db>(
         db: &'db dyn Db,
