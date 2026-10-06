@@ -39,10 +39,6 @@ fn may_be_tuple<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'d
             self.env
         }
 
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
             if self.may_be_tuple.get() {
                 return;

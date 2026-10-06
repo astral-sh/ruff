@@ -1944,10 +1944,8 @@ impl<'db> Type<'db> {
     /// Returns whether this type can participate in a transitive sequent proof.
     ///
     /// Gradual assignability is not transitive, so constraints with dynamic bounds are ineligible.
-    /// Note that we can't use [`is_fully_static`][Type::is_fully_static] here, since that
-    /// considers the declared bounds/constraints of typevars. In the context of a sequent map,
-    /// typevars are opaque symbolic atoms: considering their bounds or defaults could incorrectly
-    /// make their eligibility depend on a specialization that the sequent is meant to constrain.
+    /// Lazy attributes are not expanded, and type variables are treated as symbolic atoms rather
+    /// than inspecting their bounds or defaults.
     fn is_static_sequent_eligible(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
         struct EligibilityVisitor<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
@@ -1958,10 +1956,6 @@ impl<'db> Type<'db> {
         impl<'db> TypeVisitor<'db> for EligibilityVisitor<'_, 'db> {
             fn program_environment(&self) -> &ProgramEnvironment<'db> {
                 self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
