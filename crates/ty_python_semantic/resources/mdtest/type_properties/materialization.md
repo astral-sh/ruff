@@ -2179,6 +2179,30 @@ def decorated_class_access(
     reveal_type(type(bottom).create)  # revealed: (value: object) -> Never
 ```
 
+### Materialized protocol receivers
+
+Materialization of a protocol receiver changes the type of its gradual members. A top-materialized
+receiver cannot satisfy the bottom-materialized requirement.
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Source(Protocol):
+    def value(self) -> Any: ...
+    def read(self) -> int: ...
+
+class Target(Protocol):
+    def read(self: Source) -> int: ...
+
+static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
+static_assert(is_subtype_of(Bottom[Source], Top[Target]))
+
+def invalid(source: Top[Source]) -> Bottom[Target]:
+    return source  # error: [invalid-return-type]
+```
+
 ### Members outside the protocol interface
 
 `__init__` is not a protocol requirement, but accessing it on a materialized value still uses the
@@ -3206,7 +3230,7 @@ from __future__ import annotations
 
 from typing import Protocol, TypeVar
 from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_assignable_to, is_equivalent_to
+from ty_extensions._internal import is_assignable_to, is_equivalent_to, is_subtype_of
 
 class ValuedStream[T](Protocol):
     def flatten(self: ValuedStream[ValuedStream[T]]) -> None: ...
@@ -3227,6 +3251,28 @@ static_assert(is_equivalent_to(Top[LegacyValuedStream[int]], LegacyValuedStream[
 static_assert(is_equivalent_to(Bottom[LegacyValuedStream[int]], LegacyValuedStream[int]))
 static_assert(not is_assignable_to(Top[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
 static_assert(not is_assignable_to(Bottom[LegacyValuedStream[int]], LegacyValuedStream[LegacyValuedStream[int]]))
+```
+
+Materialization leaves a fully static protocol unchanged, including its receiver restrictions.
+`WrappedReceiver[str]` and `WrappedReceiver[int]` also have matching structures and the same
+restriction on `read`:
+
+```py
+class WrappedReceiver[T](Protocol):
+    def child(self) -> WrappedReceiver[T]: ...
+    def read(self: tuple[WrappedReceiver[int], int]) -> int: ...
+
+# TODO: Matching receiver restrictions should not prevent these protocols from being compatible.
+static_assert(is_subtype_of(WrappedReceiver[str], WrappedReceiver[int]))  # error: [static-assert-error]
+static_assert(is_subtype_of(Top[WrappedReceiver[int]], WrappedReceiver[int]))
+
+class LegacyWrappedReceiver(Protocol[T_co]):
+    def child(self) -> LegacyWrappedReceiver[T_co]: ...
+    def read(self: tuple[LegacyWrappedReceiver[int], int]) -> int: ...
+
+# TODO: Matching receiver restrictions should not prevent these protocols from being compatible.
+static_assert(is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[int]))  # error: [static-assert-error]
+static_assert(is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
 ```
 
 ### Recursive protocol receivers with gradual members
@@ -3651,9 +3697,14 @@ static_assert(is_assignable_to(Recursive[str | int], Bottom[Recursive[str]]))
 static_assert(is_assignable_to(Top[Recursive[str | int]], Bottom[Recursive[str]]))
 ```
 
-Even when a protocol allows growing specializations, the `child` return types can stabilize. For
-these specializations, both `child` properties have type `Stable[object, str | int]`. The
-`other_child` return types remain different but have the same requirements.
+For `Stable[object, str | int]` and `Stable[object, str]`, both `value` properties return
+`str | int`, and both `child` properties return `Stable[object, str | int]`: `object | list[object]`
+simplifies to `object`.
+
+Their `other_child` properties return `Stable[object, str | int]` and `Stable[object, str]`,
+respectively—the same pair of types being compared. Following `other_child` repeats this comparison;
+it never exposes a difference in the `value` or `child` requirements. The two specializations are
+therefore structurally equivalent despite their different type arguments.
 
 ```py
 from typing import TypeVar
@@ -3700,12 +3751,11 @@ static_assert(is_equivalent_to(LegacyStable[str, str], Bottom[LegacyStable[str, 
 ```
 
 Other fully static member types also leave materialization unchanged. Here, `read` has an explicit
-receiver and returns a narrowed `TypedDict` union, which includes a synthesized schema. The `number`
-descriptor has static read and write types.
+receiver and returns a functional `TypedDict`. The `number` descriptor has static read and write
+types.
 
 ```py
 from typing import Any, Callable, TypedDict
-from ty_extensions._internal import TypeOf
 
 class HasValue(Protocol):
     @property
@@ -3719,44 +3769,33 @@ class Descriptor:
 def descriptor(function: Callable[..., Any]) -> Descriptor:
     raise NotImplementedError
 
-class First(TypedDict):
-    first: int
+Fields = TypedDict("Fields", {"value": int})
 
-class Second(TypedDict):
-    second: int
+class StaticMembers[T, U](Protocol):
+    @property
+    def value(self) -> U | int: ...
+    @property
+    def child(self) -> StaticMembers[T | list[T], U | int]: ...
+    def read(self: HasValue) -> Fields: ...
+    @descriptor
+    def number(self) -> int: ...
 
-def get_union() -> First | Second:
-    raise NotImplementedError
+static_assert(is_assignable_to(Top[StaticMembers[object, str | int]], StaticMembers[object, str]))
+static_assert(is_assignable_to(Bottom[StaticMembers[object, str | int]], StaticMembers[object, str]))
+static_assert(is_equivalent_to(StaticMembers[object, str | int], Top[StaticMembers[object, str | int]]))
 
-value = get_union()
-if "first" in value:
-    narrowed = value
+class LegacyStaticMembers(Protocol[T_co, U_co]):
+    @property
+    def value(self) -> U_co | int: ...
+    @property
+    def child(self) -> LegacyStaticMembers[T_co | list[T_co], U_co | int]: ...
+    def read(self: HasValue) -> Fields: ...
+    @descriptor
+    def number(self) -> int: ...
 
-    class StaticMembers[T, U](Protocol):
-        @property
-        def value(self) -> U | int: ...
-        @property
-        def child(self) -> StaticMembers[T | list[T], U | int]: ...
-        def read(self: HasValue) -> TypeOf[narrowed]: ...
-        @descriptor
-        def number(self) -> int: ...
-
-    static_assert(is_assignable_to(Top[StaticMembers[object, str | int]], StaticMembers[object, str]))
-    static_assert(is_assignable_to(Bottom[StaticMembers[object, str | int]], StaticMembers[object, str]))
-    static_assert(is_equivalent_to(StaticMembers[object, str | int], Top[StaticMembers[object, str | int]]))
-
-    class LegacyStaticMembers(Protocol[T_co, U_co]):
-        @property
-        def value(self) -> U_co | int: ...
-        @property
-        def child(self) -> LegacyStaticMembers[T_co | list[T_co], U_co | int]: ...
-        def read(self: HasValue) -> TypeOf[narrowed]: ...
-        @descriptor
-        def number(self) -> int: ...
-
-    static_assert(is_assignable_to(Top[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
-    static_assert(is_assignable_to(Bottom[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
-    static_assert(is_equivalent_to(LegacyStaticMembers[object, str | int], Top[LegacyStaticMembers[object, str | int]]))
+static_assert(is_assignable_to(Top[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
+static_assert(is_assignable_to(Bottom[LegacyStaticMembers[object, str | int]], LegacyStaticMembers[object, str]))
+static_assert(is_equivalent_to(LegacyStaticMembers[object, str | int], Top[LegacyStaticMembers[object, str | int]]))
 ```
 
 ### Recursive protocols with stable attribute types

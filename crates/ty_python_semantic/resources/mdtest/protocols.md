@@ -7241,52 +7241,6 @@ def check_legacy(node: LegacyNode[str]) -> Readable:
     return node  # no diagnostic
 ```
 
-Materialization leaves a fully static protocol unchanged, including its receiver restrictions. The
-structural comparison of different specializations still incorrectly requires the receiver to
-satisfy the annotation:
-
-```py
-from ty_extensions import Top
-
-class WrappedReceiver[T](Protocol):
-    def child(self) -> WrappedReceiver[T]: ...
-    def read(self: tuple[WrappedReceiver[int], int]) -> int: ...
-
-static_assert(not is_subtype_of(WrappedReceiver[str], WrappedReceiver[int]))
-static_assert(is_subtype_of(Top[WrappedReceiver[int]], WrappedReceiver[int]))
-
-class LegacyWrappedReceiver(Protocol[T]):
-    def child(self) -> LegacyWrappedReceiver[T]: ...
-    def read(self: tuple[LegacyWrappedReceiver[int], int]) -> int: ...
-
-static_assert(not is_subtype_of(LegacyWrappedReceiver[str], LegacyWrappedReceiver[int]))
-static_assert(is_subtype_of(Top[LegacyWrappedReceiver[int]], LegacyWrappedReceiver[int]))
-```
-
-### Materialized protocol receivers
-
-Materialization of a protocol receiver changes the type of its gradual members. A top-materialized
-receiver cannot satisfy the bottom-materialized requirement.
-
-```py
-from typing import Any, Protocol
-from ty_extensions import Bottom, Top, static_assert
-from ty_extensions._internal import is_subtype_of
-
-class Source(Protocol):
-    def value(self) -> Any: ...
-    def read(self) -> int: ...
-
-class Target(Protocol):
-    def read(self: Source) -> int: ...
-
-static_assert(not is_subtype_of(Top[Source], Bottom[Target]))
-static_assert(is_subtype_of(Bottom[Source], Top[Target]))
-
-def invalid(source: Top[Source]) -> Bottom[Target]:
-    return source  # error: [invalid-return-type]
-```
-
 ### Explicit receivers on overloaded recursive protocol methods
 
 An overloaded method can constrain its receiver to a tuple specialization of the same recursive
