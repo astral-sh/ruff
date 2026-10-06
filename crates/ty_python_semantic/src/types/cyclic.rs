@@ -34,10 +34,15 @@ use ty_python_core::definition::Definition;
 
 use crate::types::function::FunctionLiteral;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::protocol_class::{ProtocolInterfaceView, walk_protocol_instance_interface};
+use crate::types::typed_dict::walk_typed_dict_fields;
+use crate::types::typevar::{TypeVarInstance, walk_type_var_attributes, walk_type_var_type};
+use crate::types::visitor::{
+    TypeCollector, TypeKind, TypeVisitor, walk_non_atomic_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, ProtocolInstanceType, RecursiveType,
-    StaticClassLiteral, Type, TypeAliasType, TypedDictType,
+    BoundTypeVarIdentity, BoundTypeVarInstance, KnownInstanceType, ProtocolInstanceType,
+    RecursiveType, Signature, StaticClassLiteral, Type, TypeAliasType, TypedDictType,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -105,7 +110,9 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_)
             | Type::Recursive(_) => {
                 let target = RecursiveDefinition::from_type(db, self)?.target;
-                if !target.may_have_unbounded_specialization(db) {
+                if !target
+                    .may_have_unbounded_specialization(db, RecursionAnalysisMode::TypeRelations)
+                {
                     return None;
                 }
                 let definition = target.definition(db);
@@ -140,6 +147,16 @@ enum RecursiveDefinition<'db> {
     Protocol(StaticClassLiteral<'db>),
     TypedDict(StaticClassLiteral<'db>),
     Structural(RecursiveType<'db>),
+}
+
+/// Which types contribute edges when analyzing recursive specialization.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum RecursionAnalysisMode {
+    /// Inspect member annotations and already-inferred type-variable attributes.
+    /// Type relations guard method comparisons separately and do not force lazy attributes here.
+    TypeRelations,
+    /// Inspect complete protocol interfaces and type-variable bounds, constraints, and defaults.
+    DynamicContent,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -228,8 +245,10 @@ struct SpecializationFlowGraph<'db> {
 /// Referenced definitions are queued for a separate walk instead of being expanded here.
 struct SpecializationFlowVisitor<'db> {
     source_parameters: FxHashSet<BoundTypeVarIdentity<'db>>,
+    mode: RecursionAnalysisMode,
     env: ProgramEnvironment<'db>,
-    visited_types: TypeCollector<'db>,
+    bound_contexts: RefCell<Vec<GenericContext<'db>>>,
+    active_types: ActiveRecursionDetector<Type<'db>>,
     edges: RefCell<Vec<FlowEdge<'db>>>,
     referenced_definitions: RefCell<Vec<RecursiveDefinition<'db>>>,
     inconclusive: Cell<bool>,
@@ -344,22 +363,26 @@ impl<'db> RecursiveDefinition<'db> {
         Some(parameters)
     }
 
-    fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
+    fn may_have_unbounded_specialization(
+        self,
+        db: &'db dyn Db,
+        mode: RecursionAnalysisMode,
+    ) -> bool {
         #[salsa::tracked(
             returns(copy),
-            cycle_initial=|_, _, _, ()| true,
+            cycle_initial=|_, _, _, _| true,
             heap_size=ruff_memory_usage::heap_size,
         )]
         fn may_have_unbounded_specialization_inner<'db>(
             db: &'db dyn Db,
             root: RecursiveDefinition<'db>,
-            _: (),
+            mode: RecursionAnalysisMode,
         ) -> bool {
-            let graph = SpecializationFlowGraph::build(db, root);
+            let graph = SpecializationFlowGraph::build(db, root, mode);
             graph.root_may_have_unbounded_specialization(db, root)
         }
 
-        may_have_unbounded_specialization_inner(db, self, ())
+        may_have_unbounded_specialization_inner(db, self, mode)
     }
 }
 
@@ -374,7 +397,7 @@ impl<'db> DefinitionUse<'db> {
 }
 
 impl<'db> SpecializationFlowGraph<'db> {
-    fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>) -> Self {
+    fn build(db: &'db dyn Db, root: RecursiveDefinition<'db>, mode: RecursionAnalysisMode) -> Self {
         let mut graph = Self::default();
         let mut pending = vec![root];
         let mut visited = FxHashSet::default();
@@ -384,7 +407,7 @@ impl<'db> SpecializationFlowGraph<'db> {
             if !visited.insert(source_definition) {
                 continue;
             }
-            let Some(visitor) = SpecializationFlowVisitor::new(db, source) else {
+            let Some(visitor) = SpecializationFlowVisitor::new(db, source, mode) else {
                 graph.inconclusive = true;
                 continue;
             };
@@ -563,11 +586,17 @@ impl<'db> SpecializationFlowGraph<'db> {
 }
 
 impl<'db> SpecializationFlowVisitor<'db> {
-    fn new(db: &'db dyn Db, source: RecursiveDefinition<'db>) -> Option<Self> {
+    fn new(
+        db: &'db dyn Db,
+        source: RecursiveDefinition<'db>,
+        mode: RecursionAnalysisMode,
+    ) -> Option<Self> {
         Some(Self {
             source_parameters: source.source_parameters(db)?,
+            mode,
             env: ProgramEnvironment::from_definition(source.definition(db)),
-            visited_types: TypeCollector::default(),
+            bound_contexts: RefCell::default(),
+            active_types: ActiveRecursionDetector::default(),
             edges: RefCell::default(),
             referenced_definitions: RefCell::default(),
             inconclusive: Cell::default(),
@@ -580,6 +609,14 @@ impl<'db> SpecializationFlowVisitor<'db> {
             self.referenced_definitions.into_inner(),
             self.inconclusive.get(),
         )
+    }
+
+    fn with_bound_context(&self, context: Option<GenericContext<'db>>, visit: impl FnOnce()) {
+        self.bound_contexts.borrow_mut().extend(context);
+        visit();
+        if context.is_some() {
+            self.bound_contexts.borrow_mut().pop();
+        }
     }
 
     /// Visits the definition with each formal parameter mapped to itself.
@@ -596,16 +633,21 @@ impl<'db> SpecializationFlowVisitor<'db> {
                 else {
                     return false;
                 };
-                protocol.walk_recursive_member_types(db, self);
+                match self.mode {
+                    RecursionAnalysisMode::TypeRelations => {
+                        protocol.walk_recursive_member_types(db, self);
+                    }
+                    RecursionAnalysisMode::DynamicContent => walk_protocol_instance_interface(
+                        db,
+                        ProtocolInterfaceView::new(protocol.interface(db), None),
+                        Type::instance(db, &self.env, *protocol),
+                        self,
+                    ),
+                }
             }
             RecursiveDefinition::TypedDict(origin) => {
                 let typed_dict = TypedDictType::new(origin.identity_specialization(db));
-                for field in typed_dict.items(db).values() {
-                    self.visit_type(db, field.declared_ty);
-                }
-                if let Some(extra_items) = typed_dict.explicit_extra_items(db) {
-                    self.visit_type(db, extra_items.declared_ty);
-                }
+                walk_typed_dict_fields(db, typed_dict, self);
             }
         }
         true
@@ -664,11 +706,18 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         if let Type::TypeVar(typevar) = ty {
             let identity = RecursiveDefinition::parameter_identity(db, typevar);
-            if !self.source_parameters.contains(&identity) {
+            if !self.source_parameters.contains(&identity)
+                && !self
+                    .bound_contexts
+                    .borrow()
+                    .iter()
+                    .any(|context| context.contains(db, identity))
+            {
                 // Nested definitions can capture a type variable from an outer generic scope.
                 // Specialization does not yet retain the parent mapping needed to model it.
                 self.inconclusive.set(true);
             }
+            self.visit_bound_type_var_type(db, typevar);
             return;
         }
 
@@ -678,14 +727,45 @@ impl<'db> TypeVisitor<'db> for SpecializationFlowVisitor<'db> {
             return;
         }
 
-        walk_type_with_recursion_guard(db, ty, self, &self.visited_types);
+        // The same type can appear under different callable binders. Only skip active visits,
+        // so a completed visit under one binder does not hide a capture under another.
+        if let TypeKind::NonAtomic(kind) = TypeKind::from(ty) {
+            self.active_types
+                .visit(&ty, || {}, || walk_non_atomic_type(db, kind, self));
+        }
     }
 
-    fn visit_bound_type_var_type(
+    fn visit_signature(&self, db: &'db dyn Db, signature: &Signature<'db>) {
+        self.with_bound_context(signature.generic_context, || {
+            super::walk_signature(db, signature, self);
+        });
+    }
+
+    fn visit_type_in_generic_context(
         &self,
-        _db: &'db dyn Db,
-        _bound_typevar: BoundTypeVarInstance<'db>,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        context: Option<GenericContext<'db>>,
     ) {
+        self.with_bound_context(context, || self.visit_type(db, ty));
+    }
+
+    fn visit_bound_type_var_type(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) {
+        if self.mode == RecursionAnalysisMode::DynamicContent {
+            self.visit_type(
+                db,
+                Type::KnownInstance(KnownInstanceType::TypeVar(bound_typevar.typevar(db))),
+            );
+        }
+    }
+
+    fn visit_type_var_type(&self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) {
+        match self.mode {
+            RecursionAnalysisMode::TypeRelations => walk_type_var_type(db, typevar, self),
+            // Generic method bounds and defaults can refer back to the protocol. The exact-type
+            // guard above prevents revisiting the same type variable while inspecting them.
+            RecursionAnalysisMode::DynamicContent => walk_type_var_attributes(db, typevar, self),
+        }
     }
 }
 
@@ -785,12 +865,39 @@ impl<'db> TypeAliasType<'db> {
     pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
         let root = RecursiveDefinition::TypeAlias(self.unspecialized(db));
         let root_definition = root.definition(db);
-        SpecializationFlowGraph::build(db, root)
+        SpecializationFlowGraph::build(db, root, RecursionAnalysisMode::TypeRelations)
             .definition_reaches(root_definition, root_definition)
     }
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    /// The recursion identity for a walk that inspects all protocol members, including methods.
+    ///
+    /// Unlike type relations, dynamic-content checks do not have separate method guards. Include
+    /// method signatures in the flow graph so finite specialization cycles can use exact type
+    /// identities. If signature inference re-enters the flow query, its conservative cycle
+    /// recovery keeps the definition-level guard.
+    ///
+    /// For example, inspecting `Reset[str]` must also inspect `Reset[int]` before stopping at its
+    /// exact repetition:
+    ///
+    /// ```python
+    /// class Reset[T](Protocol):
+    ///     def next(self) -> Reset[int]: ...
+    /// ```
+    pub(super) fn dynamic_content_identity(self, db: &'db dyn Db) -> TypeIdentity<'db> {
+        if let Some((origin, _)) = self
+            .class_origin(db)
+            .and_then(|class| class.static_class_literal(db))
+            && RecursiveDefinition::Protocol(origin)
+                .may_have_unbounded_specialization(db, RecursionAnalysisMode::DynamicContent)
+        {
+            TypeIdentity::GrowingProtocol(origin.definition(db))
+        } else {
+            TypeIdentity::Other(Type::ProtocolInstance(self))
+        }
+    }
+
     fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         let (origin, _) = self.class_origin(db)?.static_class_literal(db)?;
         Some(origin.definition(db))
@@ -1243,7 +1350,7 @@ mod tests {
 
     use super::{
         CycleDetector, CycleDetectorVisit, Db, FlowEdge, FlowKind, HasIdentity,
-        RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
+        RecursionAnalysisMode, RecursiveDefinition, SpecializationFlowGraph, TypeIdentity,
     };
     use crate::ProgramEnvironment;
     use crate::db::tests::setup_db;
@@ -1574,7 +1681,7 @@ type Saturating[T] = tuple[T, Saturating[T | int]]
                 global_type_alias(&db, &env, name).unspecialized(&db),
             );
             assert_eq!(
-                alias.may_have_unbounded_specialization(&db),
+                alias.may_have_unbounded_specialization(&db, RecursionAnalysisMode::TypeRelations),
                 expected,
                 "unexpected result for {name}",
             );

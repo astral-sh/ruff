@@ -32,7 +32,7 @@ use crate::{
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
         generics::Specialization,
         member::class_member,
-        signatures::{CallableSignature, walk_signature},
+        signatures::CallableSignature,
         variance::infer_protocol_variance,
     },
 };
@@ -735,9 +735,9 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                         Some(runtime_type),
                         Some(receiver_ty),
                     );
-                    walk_signature(db, &signature, visitor);
+                    visitor.visit_signature(db, &signature);
                 } else {
-                    walk_signature(db, signature, visitor);
+                    visitor.visit_signature(db, signature);
                 }
             }
         }
@@ -1269,6 +1269,29 @@ impl<'db> ProtocolAnnotation<'db> {
     }
 }
 
+/// A resolved member type together with the type parameters bound by its property accessor.
+///
+/// This scope is collected only when the accessor is resolved; stored annotations do not need it.
+struct ResolvedProtocolAnnotation<'db> {
+    annotation: ProtocolAnnotation<'db>,
+    generic_context: Option<GenericContext<'db>>,
+}
+
+impl<'db> ResolvedProtocolAnnotation<'db> {
+    fn visit(&self, db: &'db dyn Db, visitor: &(impl super::visitor::TypeVisitor<'db> + ?Sized)) {
+        visitor.visit_type_in_generic_context(db, self.annotation.ty, self.generic_context);
+    }
+}
+
+impl<'db> From<ProtocolAnnotation<'db>> for ResolvedProtocolAnnotation<'db> {
+    fn from(annotation: ProtocolAnnotation<'db>) -> Self {
+        Self {
+            annotation,
+            generic_context: None,
+        }
+    }
+}
+
 /// Describes where to obtain a protocol member's read type or accepted write type.
 ///
 /// The type is either given directly by an annotation or extracted from a property accessor (the
@@ -1361,16 +1384,17 @@ impl<'db> ProtocolPropertyType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-    ) -> Option<ProtocolAnnotation<'db>> {
+    ) -> Option<ResolvedProtocolAnnotation<'db>> {
         match self {
-            Self::Annotation(annotation) => Some(annotation),
+            Self::Annotation(annotation) => Some(annotation.into()),
             Self::PropertyGetter(getter) => property_get_member_type(db, env, getter),
             Self::PropertySetter(setter) => property_set_member_type(db, env, setter),
         }
     }
 
     fn resolve(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
-        self.annotation(db, env).map(|annotation| annotation.ty)
+        self.annotation(db, env)
+            .map(|resolved| resolved.annotation.ty)
     }
 
     fn bind_self(
@@ -1379,7 +1403,11 @@ impl<'db> ProtocolPropertyType<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
     ) -> Option<Type<'db>> {
-        Some(self.annotation(db, env)?.bind_self(db, env, self_type))
+        Some(
+            self.annotation(db, env)?
+                .annotation
+                .bind_self(db, env, self_type),
+        )
     }
 
     fn cycle_normalized(
@@ -1533,11 +1561,11 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
     visitor: &V,
 ) {
     let env = visitor.program_environment();
-    let read_ty = access
+    let read_annotation = access
         .read()
-        .and_then(|read| read.result_type(db, env, self_type));
-    if let Some(read_ty) = read_ty {
-        visitor.visit_type(db, read_ty);
+        .and_then(|read| read.result_annotation(db, env, self_type));
+    if let Some(annotation) = read_annotation {
+        annotation.visit(db, visitor);
     } else if access.mode == ProtocolMemberAccessMode::Instance
         && let ProtocolMemberKind::Property {
             read: Some(read), ..
@@ -1550,6 +1578,17 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
     let Some(write) = access.write() else {
         return;
     };
+
+    if let ProtocolMemberWrite::Type(value) = write.declaration {
+        if let Some(annotation) = write.resolve_value(db, env, value, self_type) {
+            annotation.visit(db, visitor);
+        } else {
+            // Fall back to the accessor callable when its write type cannot be extracted.
+            visitor.visit_type(db, value.ty());
+        }
+        return;
+    }
+
     let requirement = write.requirement(db, env, self_type);
     let write_ty = requirement
         .as_ref()
@@ -1578,7 +1617,17 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let annotation = match self.access.declaration.kind {
+        self.result_annotation(db, env, self_type)
+            .map(|resolved| resolved.annotation.ty)
+    }
+
+    fn result_annotation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        self_type: Option<Type<'db>>,
+    ) -> Option<ResolvedProtocolAnnotation<'db>> {
+        let mut resolved = match self.access.declaration.kind {
             ProtocolMemberKind::Method(ty, kind) => {
                 // TODO: Passing `None` binds the method without a concrete receiver type.
                 // Supply the actual receiver type instead. For `Example.create()`, a classmethod
@@ -1602,17 +1651,18 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
                         .definition
                         .map(BindingContext::Definition),
                 }
+                .into()
             }
             ProtocolMemberKind::Property { read, .. } => read?.annotation(db, env)?,
-            ProtocolMemberKind::Attribute(annotation) => annotation,
+            ProtocolMemberKind::Attribute(annotation) => annotation.into(),
         };
-        let annotation = ProtocolAnnotation {
-            ty: self.access.materialize_type(db, env, annotation.ty),
-            ..annotation
-        };
-        Some(self_type.map_or(annotation.ty, |self_type| {
-            annotation.bind_self(db, env, self_type)
-        }))
+        resolved.annotation.ty = self
+            .access
+            .materialize_type(db, env, resolved.annotation.ty);
+        if let Some(self_type) = self_type {
+            resolved.annotation.ty = resolved.annotation.bind_self(db, env, self_type);
+        }
+        Some(resolved)
     }
 }
 
@@ -1630,17 +1680,15 @@ impl<'db> ProtocolMemberWriteAccess<'db> {
         env: &ProgramEnvironment<'db>,
         value: ProtocolPropertyType<'db>,
         self_type: Option<Type<'db>>,
-    ) -> Option<Type<'db>> {
-        let annotation = value.annotation(db, env)?;
-        let annotation = ProtocolAnnotation {
-            ty: self.materialization.map_or(annotation.ty, |kind| {
-                annotation.ty.materialization(db, env, kind)
-            }),
-            ..annotation
-        };
-        Some(self_type.map_or(annotation.ty, |self_type| {
-            annotation.bind_self(db, env, self_type)
-        }))
+    ) -> Option<ResolvedProtocolAnnotation<'db>> {
+        let mut resolved = value.annotation(db, env)?;
+        if let Some(kind) = self.materialization {
+            resolved.annotation.ty = resolved.annotation.ty.materialization(db, env, kind);
+        }
+        if let Some(self_type) = self_type {
+            resolved.annotation.ty = resolved.annotation.bind_self(db, env, self_type);
+        }
+        Some(resolved)
     }
 
     /// Resolve the complete write requirement. Type-only queries can omit the receiver;
@@ -1654,7 +1702,9 @@ impl<'db> ProtocolMemberWriteAccess<'db> {
         match self.declaration {
             ProtocolMemberWrite::Type(annotation) => {
                 Some(ProtocolMemberWriteRequirement::AssignableTo(
-                    self.resolve_value(db, env, annotation, self_type)?,
+                    self.resolve_value(db, env, annotation, self_type)?
+                        .annotation
+                        .ty,
                 ))
             }
             ProtocolMemberWrite::Descriptor { descriptor, domain } => {
@@ -1665,7 +1715,8 @@ impl<'db> ProtocolMemberWriteAccess<'db> {
                 Some(ProtocolMemberWriteRequirement::Descriptor {
                     descriptor_ty,
                     domain: domain
-                        .and_then(|domain| self.resolve_value(db, env, domain, self_type)),
+                        .and_then(|domain| self.resolve_value(db, env, domain, self_type))
+                        .map(|resolved| resolved.annotation.ty),
                 })
             }
         }
@@ -2434,18 +2485,24 @@ fn property_get_member_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     getter: Type<'db>,
-) -> Option<ProtocolAnnotation<'db>> {
+) -> Option<ResolvedProtocolAnnotation<'db>> {
     let mut get_types = Vec::new();
     let mut definition = None;
+    let mut generic_context = None;
     for callable in &getter.try_upcast_to_callable(db, env)? {
         for signature in callable.signatures(db) {
             get_types.push(signature.return_ty);
             definition = definition.or(signature.definition());
+            generic_context =
+                GenericContext::merge_optional(db, generic_context, signature.generic_context);
         }
     }
-    Some(ProtocolAnnotation {
-        ty: UnionType::from_elements(db, env, get_types),
-        self_binding_context: definition.map(BindingContext::Definition),
+    Some(ResolvedProtocolAnnotation {
+        annotation: ProtocolAnnotation {
+            ty: UnionType::from_elements(db, env, get_types),
+            self_binding_context: definition.map(BindingContext::Definition),
+        },
+        generic_context,
     })
 }
 
@@ -2453,11 +2510,14 @@ fn property_set_member_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     setter: Type<'db>,
-) -> Option<ProtocolAnnotation<'db>> {
-    let (ty, definition) = property_setter_value_type(db, env, setter)?;
-    Some(ProtocolAnnotation {
-        ty,
-        self_binding_context: definition.map(BindingContext::Definition),
+) -> Option<ResolvedProtocolAnnotation<'db>> {
+    let value = property_setter_value_type(db, env, setter)?;
+    Some(ResolvedProtocolAnnotation {
+        annotation: ProtocolAnnotation {
+            ty: value.ty,
+            self_binding_context: value.definition.map(BindingContext::Definition),
+        },
+        generic_context: value.generic_context,
     })
 }
 
