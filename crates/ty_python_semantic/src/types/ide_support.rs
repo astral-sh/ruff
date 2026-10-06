@@ -1150,8 +1150,8 @@ pub fn call_signature_details<'db>(
             CheckTypesMode::Finalize,
         );
 
-        // Argument-order errors survive parser recovery as ordinary AST arguments. Keep their
-        // types for diagnostics, but do not highlight a parameter for an invalid source position.
+        // Parser recovery retains positional arguments after keywords or keyword unpackings.
+        // Do not highlight a parameter for these invalid arguments.
         let parsed = parsed_module(db, model.program_file().python_file(db)).load(db);
         let invalid_arguments: Vec<_> = call_expr
             .arguments

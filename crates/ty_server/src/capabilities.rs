@@ -39,6 +39,7 @@ bitflags::bitflags! {
         const IMPLEMENTATION_LINK_SUPPORT = 1 << 21;
         const TRIGGER_SIGNATURE_HELP_COMMAND = 1 << 22;
         const SEMANTIC_TOKENS_REFRESH = 1 << 23;
+        const SIGNATURE_NO_ACTIVE_PARAMETER_SUPPORT = 1 << 24;
     }
 }
 
@@ -153,6 +154,11 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports per-signature active parameter in signature help.
     pub(crate) const fn supports_signature_active_parameter(self) -> bool {
         self.contains(Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT)
+    }
+
+    /// Returns `true` if the client supports an explicit `null` active parameter.
+    pub(crate) const fn supports_signature_no_active_parameter(self) -> bool {
+        self.contains(Self::SIGNATURE_NO_ACTIVE_PARAMETER_SUPPORT)
     }
 
     /// Returns `true` if the client supports hierarchical document symbols.
@@ -391,6 +397,20 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::SIGNATURE_ACTIVE_PARAMETER_SUPPORT;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                text_document
+                    .signature_help
+                    .as_ref()?
+                    .signature_information
+                    .as_ref()?
+                    .no_active_parameter_support
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::SIGNATURE_NO_ACTIVE_PARAMETER_SUPPORT;
         }
 
         if text_document
