@@ -303,3 +303,55 @@ fn partial_nested_config() {
         }"#;
     check!(r#"print('hello world')"#, config, []);
 }
+
+#[wasm_bindgen_test]
+fn format_module() {
+    ruff_wasm::before_main();
+
+    let config = js_sys::JSON::parse(r#"{}"#).unwrap();
+    let workspace = Workspace::new(config, PositionEncoding::Utf8).unwrap();
+    let output = workspace.format("def add(a,b):\n return a+b\n").unwrap();
+
+    assert_eq!(output, "def add(a, b):\n    return a + b\n");
+}
+
+#[wasm_bindgen_test]
+fn format_docstring_code() {
+    ruff_wasm::before_main();
+
+    let config = js_sys::JSON::parse(r#"{"format": {"docstring-code-format": true}}"#).unwrap();
+    let workspace = Workspace::new(config, PositionEncoding::Utf8).unwrap();
+    let source = r#"def example():
+    """
+    .. code-block:: python
+
+        x=1
+
+    ```python
+    y=2
+    ```
+
+    ~~~python
+    z=3
+    ~~~
+    """
+"#;
+    let expected = r#"def example():
+    """
+    .. code-block:: python
+
+        x = 1
+
+    ```python
+    y = 2
+    ```
+
+    ~~~python
+    z = 3
+    ~~~
+    """
+"#;
+    let output = workspace.format(source).unwrap();
+
+    assert_eq!(output, expected);
+}
