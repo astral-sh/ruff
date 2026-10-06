@@ -783,6 +783,132 @@ def ok2(x: T1, y: DefaultStrT) -> tuple[T1, DefaultStrT]:
     return x, y
 ```
 
+### Defaults through type aliases
+
+An alias in a default can refer to an earlier type parameter of the same function or type alias.
+
+```py
+type Items[T] = list[T]
+
+def in_scope[T, U = Items[T]](): ...  # no diagnostic
+
+type InScope[T, U = Items[T]] = tuple[T, U]  # no diagnostic
+```
+
+It cannot refer to a parameter from an enclosing scope.
+
+```py
+def outer[T]():
+    # error: [invalid-type-variable-default]
+    def inner[U = Items[T]](): ...
+
+    # error: [invalid-type-variable-default]
+    type Invalid[U = Items[T]] = tuple[U]
+```
+
+An argument that does not appear in the alias's value is allowed. This includes `T` in `object | T`,
+which simplifies to `object`.
+
+```py
+type Ignored[T] = int
+type Either[T, U] = T | U
+
+def outer[T]():
+    def unused[U = Ignored[T]](): ...  # no diagnostic
+    def simplified[U = Either[object, T]](): ...  # no diagnostic
+```
+
+### Defaults through recursive aliases
+
+Recursion does not change which type parameters a default can use.
+
+```py
+type Tree[T] = T | list[Tree[T]]
+
+def in_scope[T, U = Tree[T]](): ...  # no diagnostic
+def outer[T]():
+    # error: [invalid-type-variable-default]
+    def inner[U = Tree[T]](): ...
+```
+
+### Type variables in `ParamSpec` default lists
+
+Each type in a `ParamSpec` default list can refer to an earlier type parameter, directly or through
+an alias.
+
+```py
+type Items[T] = list[T]
+
+def in_scope[T, **P = [T, Items[T]]](): ...  # no diagnostic
+
+type InScope[T, **P = [T, Items[T]]] = tuple[T]  # no diagnostic
+```
+
+An outer type parameter is invalid in either form.
+
+```py
+def outer[T]():
+    # error: [invalid-type-variable-default]
+    def direct[**P = [T]](): ...
+
+    # error: [invalid-type-variable-default]
+    def aliased[**P = [Items[T]]](): ...
+
+    # error: [invalid-type-variable-default]
+    type Invalid[**P = [Items[T]]] = tuple[int]
+```
+
+As with other defaults, an unused alias argument is allowed.
+
+```py
+type Ignored[T] = int
+
+def outer[T]():
+    def unused[**P = [Ignored[T]]](): ...  # no diagnostic
+```
+
+### Legacy defaults through type aliases
+
+A legacy type variable can have a default that refers through an alias to a type variable that
+appears earlier in the function signature.
+
+```py
+from typing import TypeVar
+
+type Items[T] = list[T]
+
+T = TypeVar("T", default=int)
+U = TypeVar("U", default=Items[T])
+
+# no diagnostic
+def earlier(value: T, other: U) -> tuple[T, U]:
+    return value, other
+```
+
+We reject the default if that type variable is absent from the function or appears later in its
+signature.
+
+```py
+# error: [invalid-type-variable-default]
+def out_of_scope(value: U) -> U:
+    return value
+
+# error: [invalid-type-variable-default]
+def later(value: U, other: T) -> tuple[U, T]:
+    return value, other
+```
+
+An argument that the alias does not use does not need to appear in the function signature.
+
+```py
+type Ignored[T] = int
+V = TypeVar("V", default=Ignored[T])
+
+# no diagnostic
+def unused(value: V) -> V:
+    return value
+```
+
 ## Mixed-scope type parameters
 
 Methods can have type parameters that are scoped to the method itself, while also referring to type
