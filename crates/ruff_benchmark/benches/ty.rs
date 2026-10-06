@@ -1741,6 +1741,48 @@ def narrow(node: Node) -> None:
     });
 }
 
+/// Regression benchmark for indexing nested positional patterns.
+fn benchmark_nested_positional_pattern_places(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for width in [1, 16] {
+        let depth = 24;
+        let pattern = format!("{}_{}", "Node(".repeat(depth), ")".repeat(depth));
+        let mut reads = String::new();
+        for index in 0..width {
+            writeln!(&mut reads, "    value{}.other", ".child".repeat(index)).ok();
+        }
+        let code = format!(
+            r#"
+from __future__ import annotations
+
+class Node:
+    __match_args__ = ("child",)
+    child: Node
+    other: Node
+
+def visit(value: Node) -> None:
+    match value:
+        case {pattern}:
+            pass
+{reads}    value{}
+"#,
+            ".child".repeat(depth)
+        );
+
+        criterion.bench_function(
+            &format!("ty_micro[nested_positional_places_{width}]"),
+            |b| {
+                b.iter_batched_ref(
+                    || setup_micro_case(&code),
+                    |case| assert_eq!(case.db.check().len(), 0),
+                    BatchSize::SmallInput,
+                );
+            },
+        );
+    }
+}
+
 /// Regression benchmark for exhaustiveness checks on recursive class patterns.
 fn benchmark_nested_class_pattern_exhaustiveness(criterion: &mut Criterion) {
     setup_rayon();
@@ -2214,6 +2256,7 @@ criterion_group!(
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
     benchmark_nested_class_pattern_capture,
+    benchmark_nested_positional_pattern_places,
     benchmark_nested_class_pattern_exhaustiveness,
     benchmark_nested_mapping_pattern_exhaustiveness,
     benchmark_typeis_narrowing,

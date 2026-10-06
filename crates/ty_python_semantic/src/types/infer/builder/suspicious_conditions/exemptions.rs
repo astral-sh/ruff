@@ -889,6 +889,7 @@ fn predicate_contains_special_cased_condition<'db>(
         | PredicateNode::ContextManagerSuppresses { .. }
         | PredicateNode::FinallyNormalPathImpossible { .. }
         | PredicateNode::OrPatternAlternative(_)
+        | PredicateNode::ClassMemberMayAlias(_)
         | PredicateNode::StarImportPlaceholder(_) => return false,
     };
     let file = expression.program_file(db);

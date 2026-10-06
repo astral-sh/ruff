@@ -415,6 +415,7 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
             let place_expr = PlaceExprRef::from(&self.place_expr);
             let enclosing_place_id = enclosing_place_table.place_id(place_expr);
             let enclosing_place = enclosing_place_id.map(|id| enclosing_place_table.place(id));
+
             // A `global` declaration forwards the place to the module instead of making this
             // enclosing scope its owner. A possibly-unbound snapshot must still fall through.
             let forwards_to_global = is_lexical_enclosing_scope
@@ -428,11 +429,37 @@ impl<'db, 'ast> PlaceLoadResolution<'db, 'ast> {
 
             let mut eagerly_undefined = false;
             if self.context.uses_enclosing_snapshots() {
-                match self.context.index.enclosing_snapshot(
+                let snapshot = self.context.index.enclosing_snapshot(
                     enclosing_file_scope,
                     place_expr,
                     file_scope,
-                ) {
+                );
+
+                // A class-local or global name can fall back to the module in the class body while
+                // a nested scope resolves the same spelling to a surrounding function, or vice
+                // versa. The snapshot then describes a different root binding. Either root could
+                // have been written through an alias, so use the nested root's member type.
+                if matches!(
+                    &snapshot,
+                    EnclosingSnapshotResult::FoundConstraint(_)
+                        | EnclosingSnapshotResult::FoundBindings(_)
+                ) && enclosing_scope.kind().is_class()
+                    && !is_lexical_enclosing_scope
+                    && matches!(place_expr, PlaceExprRef::Member(_))
+                    && self
+                        .context
+                        .root_binding_scope(enclosing_file_scope, place_expr.root_name())
+                        != self
+                            .context
+                            .root_binding_scope(file_scope, place_expr.root_name())
+                {
+                    return (
+                        Self::node_after_enclosing_scope(enclosing_scope.kind()),
+                        None,
+                    );
+                }
+
+                match snapshot {
                     EnclosingSnapshotResult::FoundConstraint(constraint) => {
                         self.constraints.push(
                             enclosing_file_scope,
@@ -910,6 +937,30 @@ impl<'db> PlaceLoadResolutionContext<'db, '_> {
         self.index.scope(enclosing_scope).kind().is_function_like()
             || (self.scope.is_annotation(self.db)
                 && self.scope.scope(self.db).parent() == Some(enclosing_scope))
+    }
+
+    /// Find the scope used for an unbound root name at `start`.
+    fn root_binding_scope(self, start: FileScopeId, name: &str) -> FileScopeId {
+        for (scope_id, scope) in self.index.visible_ancestor_scopes(start) {
+            if scope_id.is_global() {
+                return scope_id;
+            }
+            let table = self.index.place_table(scope_id);
+            let Some(symbol) = table.symbol_id(name).map(|id| table.symbol(id)) else {
+                continue;
+            };
+            if symbol.is_global() {
+                return FileScopeId::global();
+            }
+            if symbol.is_local() {
+                return if scope_id == start && scope.kind().is_class() {
+                    FileScopeId::global()
+                } else {
+                    scope_id
+                };
+            }
+        }
+        FileScopeId::global()
     }
 
     fn local_source(

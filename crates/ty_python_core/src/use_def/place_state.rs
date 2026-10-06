@@ -338,6 +338,23 @@ impl Bindings {
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 
+    /// Combine with OR the constraints on an unbound member across its control-flow paths.
+    ///
+    /// A member can be initially unbound on one path, while a deletion or ancestor write
+    /// invalidates its narrowing on another. Either path can reach a nested scope, so both
+    /// constraints must be considered there.
+    pub(super) fn unbound_member_narrowing_constraint(
+        &self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+    ) -> ScopedNarrowingConstraint {
+        self.live_bindings.iter().fold(
+            ScopedNarrowingConstraint::ALWAYS_FALSE,
+            |combined, binding| {
+                narrowing_constraints.add_or_constraint(combined, binding.narrowing_constraint)
+            },
+        )
+    }
+
     pub(super) fn finish(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -566,6 +583,8 @@ impl Bindings {
 pub(crate) struct PlaceState {
     declarations: Declarations,
     bindings: Bindings,
+    /// The member bindings visible through the outer name when a class-local name shadows its root.
+    enclosing_bindings: Option<Box<Bindings>>,
 }
 
 impl PlaceState {
@@ -574,6 +593,7 @@ impl PlaceState {
         Self {
             declarations: Declarations::undeclared(reachability),
             bindings: Bindings::unbound(reachability),
+            enclosing_bindings: None,
         }
     }
 
@@ -598,7 +618,7 @@ impl PlaceState {
         );
     }
 
-    /// Add given constraint to all live bindings.
+    /// Add given constraint to all current live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -608,25 +628,7 @@ impl PlaceState {
             .record_narrowing_constraint(narrowing_constraints, constraint);
     }
 
-    /// Add the given constraint to live bindings that were also present at an earlier use.
-    pub(super) fn record_narrowing_constraint_for_bindings_at_use(
-        &mut self,
-        narrowing_constraints: &mut NarrowingConstraintsBuilder,
-        constraint: ScopedNarrowingConstraint,
-        bindings_at_use: &Bindings,
-    ) {
-        for binding in &mut self.bindings.live_bindings {
-            if bindings_at_use
-                .iter()
-                .any(|binding_at_use| binding_at_use.binding() == binding.binding())
-            {
-                binding.narrowing_constraint = narrowing_constraints
-                    .add_and_constraint(binding.narrowing_constraint, constraint);
-            }
-        }
-    }
-
-    /// Add the given constraint to live bindings selected by definition ID.
+    /// Add the given constraint to current live bindings selected by definition ID.
     pub(super) fn record_narrowing_constraint_for_bindings(
         &mut self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
@@ -649,6 +651,9 @@ impl PlaceState {
     ) {
         self.bindings
             .record_reachability_constraint(reachability_constraints, constraint);
+        if let Some(bindings) = &mut self.enclosing_bindings {
+            bindings.record_reachability_constraint(reachability_constraints, constraint);
+        }
         self.declarations
             .record_reachability_constraint(reachability_constraints, constraint);
     }
@@ -690,10 +695,74 @@ impl PlaceState {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        let PlaceState {
+            declarations,
+            bindings,
+            enclosing_bindings,
+        } = b;
+        if self.enclosing_bindings.is_some() || enclosing_bindings.is_some() {
+            let mut outer = self
+                .enclosing_bindings
+                .take()
+                .unwrap_or_else(|| Box::new(self.bindings.clone()));
+            let other_outer = enclosing_bindings.unwrap_or_else(|| Box::new(bindings.clone()));
+            outer.merge(
+                *other_outer,
+                narrowing_constraints,
+                reachability_constraints,
+            );
+            self.enclosing_bindings = Some(outer);
+        }
+
         self.bindings
-            .merge(b.bindings, narrowing_constraints, reachability_constraints);
+            .merge(bindings, narrowing_constraints, reachability_constraints);
         self.declarations
-            .merge(b.declarations, reachability_constraints);
+            .merge(declarations, reachability_constraints);
+    }
+
+    /// Preserve the member bindings visible through the outer name when a class-local name shadows
+    /// their root. The first preserved view is retained on subsequent calls.
+    pub(super) fn preserve_enclosing_bindings(&mut self) {
+        self.enclosing_bindings
+            .get_or_insert_with(|| Box::new(self.bindings.clone()));
+    }
+
+    pub(super) fn restore_enclosing_bindings(&mut self) {
+        if let Some(bindings) = self.enclosing_bindings.take() {
+            self.bindings = *bindings;
+        }
+    }
+
+    pub(super) fn has_enclosing_bindings(&self) -> bool {
+        self.enclosing_bindings.is_some()
+    }
+
+    /// Update member bindings visible through an enclosing name after a class-body write.
+    ///
+    /// Keep the previous enclosing bindings where the objects may be distinct, and use the current
+    /// bindings where the write may have reached the enclosing object.
+    pub(super) fn update_enclosing_bindings_after_write(
+        &mut self,
+        unchanged_reachability: ScopedReachabilityConstraintId,
+        write_reachability: ScopedReachabilityConstraintId,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        let Some(enclosing) = &mut self.enclosing_bindings else {
+            return;
+        };
+        if write_reachability == ScopedReachabilityConstraintId::ALWAYS_FALSE {
+            return;
+        }
+
+        enclosing.record_reachability_constraint(reachability_constraints, unchanged_reachability);
+        let mut current = self.bindings.clone();
+        current.record_reachability_constraint(reachability_constraints, write_reachability);
+        enclosing.merge(current, narrowing_constraints, reachability_constraints);
+    }
+
+    pub(super) fn enclosing_bindings(&self) -> &Bindings {
+        self.enclosing_bindings.as_deref().unwrap_or(&self.bindings)
     }
 
     pub(super) fn bindings(&self) -> &Bindings {
