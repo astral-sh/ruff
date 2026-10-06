@@ -28,6 +28,7 @@ use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, Signature
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
 };
+use crate::types::type_alias::walk_type_alias_with_recursion_guard;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity, TypeVarInstance, TypeVarSet,
 };
@@ -801,14 +802,7 @@ impl<'db> GenericContext<'db> {
             }
 
             fn visit_type_alias_type(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
-                // The default implementation would do this for us if we returned `true` from
-                // `should_visit_lazy_type_attributes`. However, this is the _only_ lazy type
-                // attribute that we want to recurse into, so we do it by hand.
-                self.active_aliases.visit(
-                    &Type::TypeAlias(type_alias).to_type_identity(db),
-                    || (),
-                    || self.visit_type(db, type_alias.value_type(db)),
-                );
+                walk_type_alias_with_recursion_guard(db, type_alias, self, &self.active_aliases);
             }
 
             fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
