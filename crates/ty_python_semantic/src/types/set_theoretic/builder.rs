@@ -1316,7 +1316,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
-    preserve_negated_aliases: bool,
+    preserve_aliases: bool,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1326,17 +1326,19 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
-            preserve_negated_aliases: false,
+            preserve_aliases: false,
         }
     }
 
-    /// Retain aliases under negation when their values need no further normalization.
+    /// Retain aliases when rebuilding mapped intersections.
     ///
-    /// Rebuilding a mapped intersection must not unfold a recursive alias on every visit.
-    /// Aliases to set-theoretic types, `object`, `Never`, and other types with special
-    /// negation rules still need to be expanded.
-    pub(crate) fn preserve_negated_aliases(mut self, preserve: bool) -> Self {
-        self.preserve_negated_aliases = preserve;
+    /// Unfolding aliases after their mapping has completed can repeatedly insert a recursive
+    /// type into itself. Positive elements retain aliases to non-`object` nominal instances.
+    /// Negative elements retain aliases whose values need no special negation rules.
+    /// In both cases we still expand aliases to set operations or `object` so their
+    /// simplifications remain visible.
+    pub(crate) fn preserve_aliases(mut self, preserve: bool) -> Self {
+        self.preserve_aliases = preserve;
         self
     }
 
@@ -1484,7 +1486,16 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 seen_aliases.push(ty);
                 let value_type = ty.resolve_type_alias(db);
-                self.add_positive_impl::<L>(value_type, seen_aliases)?;
+                if self.preserve_aliases
+                    && matches!(ty, Type::TypeAlias(_))
+                    && matches!(value_type, Type::NominalInstance(instance) if !instance.is_object())
+                {
+                    for inner in &mut self.intersections {
+                        inner.add_positive(db, &self.env, ty);
+                    }
+                } else {
+                    self.add_positive_impl::<L>(value_type, seen_aliases)?;
+                }
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1542,7 +1553,7 @@ impl<'db> IntersectionBuilder<'db> {
     /// of its resolved value. Alias chains and set-theoretic types need expansion here;
     /// the remaining exclusions have special rules in `InnerIntersectionBuilder::add_negative`.
     fn should_preserve_negated_alias(&self, ty: Type<'db>, value_type: Type<'db>) -> bool {
-        if !self.preserve_negated_aliases || !matches!(ty, Type::TypeAlias(_)) {
+        if !self.preserve_aliases || !matches!(ty, Type::TypeAlias(_)) {
             return false;
         }
 

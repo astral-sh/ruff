@@ -66,3 +66,40 @@ A = TypeAliasType("A", "list[Without[object, A] | A]")
 def f(x: A):
     assert_type(x[0], object)
 ```
+
+## Recursive tuples intersected with a protocol
+
+Specialization can put a recursive tuple alias inside a positive intersection. The tuple and its
+elements retain that alias, so they can be inspected without repeatedly unfolding the tuple.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, TypeVar
+from typing_extensions import TypeAliasType, assert_type
+from ty_extensions import Intersection
+
+class Items(Protocol):
+    def __iter__(self) -> Iterator[Any]: ...
+
+T = TypeVar("T")
+WithItems = TypeAliasType("WithItems", Intersection[Items, T], type_params=(T,))
+A = TypeAliasType("A", "tuple[WithItems[A], ...]")
+
+def f(x: A):
+    reveal_type(x)  # revealed: tuple[WithItems[A], ...]
+    assert_type(x[0], WithItems[A])
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+The standard `Iterable` protocol exercises the same behavior with its typeshed definition.
+
+```py
+from collections.abc import Iterable
+
+WithIterable = TypeAliasType("WithIterable", Intersection[Iterable[Any], T], type_params=(T,))
+B = TypeAliasType("B", "tuple[WithIterable[B], ...]")
+
+def g(x: B):
+    reveal_type(x)  # revealed: tuple[WithIterable[B], ...]
+    assert_type(x[0], WithIterable[B])
+```

@@ -534,6 +534,41 @@ def f(x: A):
     assert_type(x[0], object)
 ```
 
+## Recursive tuples intersected with a protocol
+
+Specialization can put a recursive tuple alias inside a positive intersection. The tuple and its
+elements retain that alias, so they can be inspected without repeatedly unfolding the tuple.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, assert_type
+from ty_extensions import Intersection
+
+class Items(Protocol):
+    def __iter__(self) -> Iterator[Any]: ...
+
+type WithItems[T] = Intersection[Items, T]
+type A = tuple[WithItems[A], ...]
+
+def f(x: A):
+    reveal_type(x)  # revealed: tuple[WithItems[A], ...]
+    assert_type(x[0], WithItems[A])
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+The standard `Iterable` protocol exercises the same behavior with its typeshed definition.
+
+```py
+from collections.abc import Iterable
+
+type WithIterable[T] = Intersection[Iterable[Any], T]
+type B = tuple[WithIterable[B], ...]
+
+def g(x: B):
+    reveal_type(x)  # revealed: tuple[WithIterable[B], ...]
+    assert_type(x[0], WithIterable[B])
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable
