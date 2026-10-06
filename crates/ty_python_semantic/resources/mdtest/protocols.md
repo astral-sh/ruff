@@ -3542,6 +3542,359 @@ def update_bounded_value(value: HasBoundedValue) -> None:
     value.bounded_value = "bad"  # error: [invalid-assignment]
 ```
 
+### Specialized protocol setter value types
+
+`P[int]` does not depend on the setter's unused `U`. A property setter accepting `P[int]` therefore
+satisfies the same writable member, including for strict subtyping:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class P[T](Protocol):
+    def method(self) -> T: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: P[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+A setter accepting only `P[Literal[1]]` is too narrow:
+
+```py
+from typing import Literal
+
+class Narrowed:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[Literal[1]]) -> None: ...
+
+x: HasValue = Narrowed()  # error: [invalid-assignment]
+```
+
+### Local protocol setter types
+
+A setter's unused type parameter does not affect the accepted value type, even when that type is a
+local protocol. A property setter accepting the same protocol satisfies the writable member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+def _() -> None:
+    class Local(Protocol):
+        member: int
+
+    class Descriptor:
+        def __init__(self, getter: object) -> None: ...
+        def __get__(self, instance: object, owner: type | None = None) -> int:
+            return 1
+
+        def __set__[U](self, instance: object, value: Local) -> None: ...
+
+    class HasValue(Protocol):
+        @Descriptor
+        def value(self) -> int: ...
+
+    class Implementation:
+        @property
+        def value(self) -> int:
+            return 1
+
+        @value.setter
+        def value(self, value: Local) -> None: ...
+
+    static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+### Recursive protocol setter value types
+
+`P[int]` does not depend on the setter's `U`, so a matching property setter satisfies the writable
+member even though `P`'s method returns another instance of the protocol:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class P[T](Protocol):
+    def method(self) -> P[int]: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: P[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: P[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+### Setter value types with permuted protocol arguments
+
+Recursion through different specializations remains independent of the setter's type parameter.
+`Swapped[int, str]` alternates with `Swapped[str, int]`, and a setter accepting that type satisfies
+the writable member:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Swapped[A, B](Protocol):
+    def value(self) -> A: ...
+    def next(self) -> Swapped[B, A]: ...
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U](self, instance: object, value: Swapped[int, str]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> object: ...
+
+class Implementation:
+    @property
+    def value(self) -> object:
+        return object()
+
+    @value.setter
+    def value(self, value: Swapped[int, str]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+```
+
+The second argument is used after following the recursive reference. The setter's `U: int` bound
+therefore restricts that argument:
+
+```py
+class GenericDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> object:
+        return object()
+
+    def __set__[U: int](self, instance: object, value: Swapped[str, U]) -> None: ...
+
+class HasGenericValue(Protocol):
+    @GenericDescriptor
+    def value(self) -> object: ...
+
+def update(value: HasGenericValue, accepted: Swapped[str, int], rejected: Swapped[str, str]) -> None:
+    value.value = accepted  # no diagnostic
+    value.value = rejected  # error: [invalid-assignment]
+```
+
+### Setter value types with nested recursive arguments
+
+Each `next` member nests another `list` in the protocol's type argument. This recursion does not
+depend on `__set__`'s type parameter, so assignments are checked against `Recursive[int]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Recursive[int]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue, value: Recursive[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+The same property setter satisfies the protocol, while an `int` attribute cannot accept
+`Recursive[int]` values:
+
+```py
+class Implementation:
+    @property
+    def value(self) -> int:
+        return 1
+
+    @value.setter
+    def value(self, value: Recursive[int]) -> None: ...
+
+static_assert(is_subtype_of(Implementation, HasValue))
+
+class IntAttribute:
+    value: int
+
+x: HasValue = IntAttribute()  # error: [invalid-assignment]
+```
+
+### Recursive `TypedDict` setter value types
+
+A recursive `TypedDict` can also be independent of the setter's type parameter. Assignments are
+checked against `Payload[int]`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, TypedDict
+
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+class PayloadDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: Payload[int]) -> None: ...
+
+class HasPayload(Protocol):
+    @PayloadDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasPayload, value: Payload[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Recursive alias setter value types
+
+A recursive alias independent of the setter's type parameter behaves the same way:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type RecursiveAlias[T] = list[RecursiveAlias[list[T]]]
+
+class AliasDescriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[U](self, instance: object, value: RecursiveAlias[int]) -> None: ...
+
+class HasAlias(Protocol):
+    @AliasDescriptor
+    def value(self) -> int: ...
+
+def _(x: HasAlias, value: RecursiveAlias[int]) -> None:
+    x.value = value  # no diagnostic
+    x.value = 1  # error: [invalid-assignment]
+```
+
+### Recursive aliases in generic setters
+
+A generic setter still rejects values incompatible with the outer type of a recursive alias.
+`Recursive[T]` always denotes a `list`, so an `int` assignment is invalid:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Recursive[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1  # error: [invalid-assignment]
+```
+
 ### Type variables from the surrounding function
 
 A type variable supplied by the surrounding function is still the descriptor's value type. Assigning
@@ -3617,6 +3970,37 @@ Assignments through the protocol accept `int` but reject `str`:
 def update_aliased_receiver(value: HasAliasedReceiver) -> None:
     value.value = 1
     value.value = "bad"  # error: [invalid-assignment]
+```
+
+### Unused alias arguments do not constrain setters
+
+`Ignored[T]` always denotes `int`, so the setter accepts `int` independently of its type parameter
+and rejects `str`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+type Ignored[T] = int
+
+class Descriptor:
+    def __init__(self, getter: object) -> None: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int:
+        return 1
+
+    def __set__[T](self, instance: object, value: Ignored[T]) -> None: ...
+
+class HasValue(Protocol):
+    @Descriptor
+    def value(self) -> int: ...
+
+def _(x: HasValue) -> None:
+    x.value = 1  # no diagnostic
+    x.value = "bad"  # error: [invalid-assignment]
 ```
 
 ### Constrained generic setters
