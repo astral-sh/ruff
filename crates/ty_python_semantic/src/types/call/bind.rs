@@ -426,17 +426,11 @@ impl<'db> CallableItem<'db> {
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<CallableType<'db>> {
+    ) -> Option<Type<'db>> {
         match self {
-            CallableItem::Regular(binding) => CallableType::partially_apply(
-                db,
-                binding.partial_signature_applications(
-                    db,
-                    env,
-                    partial_overload,
-                    bound_call_arguments,
-                )?,
-            ),
+            CallableItem::Regular(binding) => {
+                binding.partial_callable_type(db, env, partial_overload, bound_call_arguments)
+            }
             CallableItem::Constructor(_) => None,
         }
     }
@@ -1237,13 +1231,20 @@ impl<'db> Bindings<'db> {
             return self.map_item_types(db, env, |partial_item| {
                 partial_item
                     .functools_partial_callable(db, env, partial_overload, bound_call_arguments)
-                    .map(|callable| {
-                        callable.into_precise_functools_partial_instance(db, wrapped_callable_ty)
+                    .and_then(|callable| {
+                        callable.try_map_callable(db, env, &mut |callable| {
+                            Some(
+                                callable.into_precise_functools_partial_instance(
+                                    db,
+                                    wrapped_callable_ty,
+                                ),
+                            )
+                        })
                     })
             });
         }
 
-        let partial_callables: SmallVec<[CallableType<'db>; 1]> = self
+        let partial_callables: SmallVec<[Type<'db>; 1]> = self
             .iter_callable_items()
             .filter_map(|partial_item| {
                 partial_item.functools_partial_callable(
@@ -1257,9 +1258,17 @@ impl<'db> Bindings<'db> {
 
         if partial_callables.is_empty() {
             Type::Never
+        } else if partial_callables.iter().all(Type::is_callable_type) {
+            CallableTypes::from_elements(
+                partial_callables.into_iter().filter_map(Type::as_callable),
+            )
+            .into_precise_functools_partial_instance(db, wrapped_callable_ty)
         } else {
-            CallableTypes::from_elements(partial_callables)
-                .into_precise_functools_partial_instance(db, wrapped_callable_ty)
+            IntersectionType::from_elements(db, env, partial_callables)
+                .try_map_callable(db, env, &mut |callable| {
+                    Some(callable.into_precise_functools_partial_instance(db, wrapped_callable_ty))
+                })
+                .unwrap_or_else(Type::unknown)
         }
     }
 
@@ -3682,17 +3691,17 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
-    /// Selects the reduced signature applications for this `functools.partial(...)` binding.
+    /// Builds the reduced callable for this `functools.partial(...)` binding.
     ///
     /// Diagnostics for invalid bound arguments are still reported back to the outer `partial(...)`
-    /// overload. Callable construction happens in the callable layer after this summary is built.
-    fn partial_signature_applications<'a>(
+    /// overload. Parameter-list combinations retain their union or intersection structure.
+    fn partial_callable_type<'a>(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         partial_overload: &mut Binding<'db>,
         bound_call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<SmallVec<[PartialSignatureApplication<'db>; 1]>> {
+    ) -> Option<Type<'db>> {
         if self.overloads().is_empty() {
             return None;
         }
@@ -3725,15 +3734,38 @@ impl<'db> CallableBinding<'db> {
         };
 
         let signature_arguments = bound_call_arguments.with_self(self.bound_type);
-        let applications: SmallVec<_> = selected_overload_indexes
+        let callables: SmallVec<[Type<'db>; 1]> = selected_overload_indexes
             .into_iter()
             .filter_map(|index| {
-                self.overloads().get(index).map(|overload| {
-                    overload.partial_signature_application(db, env, signature_arguments.as_ref())
-                })
+                self.overloads()
+                    .get(index)
+                    .map(|overload| overload.partially_apply(db, env, signature_arguments.as_ref()))
             })
             .collect();
-        (!applications.is_empty()).then_some(applications)
+        if callables.is_empty() {
+            None
+        } else if callables.iter().all(Type::is_callable_type) {
+            let mut seen = FxHashSet::default();
+            let signatures = callables
+                .iter()
+                .filter_map(|ty| ty.as_callable())
+                .flat_map(|callable| callable.signatures(db).iter().cloned())
+                .filter(|signature| {
+                    seen.insert(
+                        signature
+                            .clone()
+                            .with_definition(None)
+                            .with_source_overload_index(None),
+                    )
+                });
+            Some(Type::Callable(CallableType::new(
+                db,
+                CallableSignature::from_overloads(signatures),
+                CallableTypeKind::Regular,
+            )))
+        } else {
+            Some(IntersectionType::from_elements(db, env, callables))
+        }
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -7140,7 +7172,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// ```
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
+    /// `paramspec` or contains a value other than captured parameter lists.
     fn evaluate_paramspec_sub_call(
         &mut self,
         constraints: &ConstraintSetBuilder<'db>,
@@ -7148,21 +7180,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
         let db = self.db;
-        let Some(Type::Callable(callable)) = self
+        let Some(callable) = self
             .merged_specialization()
             .and_then(|specialization| specialization.get(db, paramspec))
+            .and_then(|value| value.paramspec_value_callable_type(db, self.env))
         else {
             return false;
         };
-
-        if callable.kind(db) != CallableTypeKind::ParamSpecValue {
-            return false;
-        }
-
-        let signatures = &callable.signatures(db).overloads;
-        if signatures.is_empty() {
-            return false;
-        }
 
         let (sub_arguments, error_argument_indices) =
             if let Some(paramspec_arguments) = paramspec_arguments {
@@ -7178,9 +7202,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
         let error_argument_indices = error_argument_indices.as_deref();
 
-        let callable_binding =
-            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
-        let bindings = match Bindings::from(callable_binding)
+        let bindings = match callable
+            .bindings(db, self.env)
             .match_parameters(db, self.env, &sub_arguments)
             .check_types(
                 db,
@@ -7193,11 +7216,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => *bindings,
         };
-
-        // SAFETY: `bindings` was created from a single `CallableBinding` above.
-        let callable_binding = bindings
-            .single_element()
-            .expect("ParamSpec sub-call should only contain a single CallableBinding");
 
         let mut extend_errors = |binding: &Binding<'db>| {
             let parameter_source = binding
@@ -7238,35 +7256,47 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }));
         };
 
-        let mut matching_overloads = callable_binding.matching_overloads();
-        match (matching_overloads.next(), matching_overloads.next()) {
-            (None, _) => {
-                if let [binding] = callable_binding.overloads() {
-                    // This is not an overloaded function, so we can propagate its errors to the
-                    // outer bindings.
-                    extend_errors(binding);
-                } else {
-                    let index = callable_binding
-                        .best_failing_overload_index(
-                            FailingOverloadSelection::AffectsOverloadResolution,
-                        )
-                        .unwrap_or(0);
-                    // TODO: We should also update the specialization for the `ParamSpec` to reflect
-                    // the matching overload here.
-                    extend_errors(&callable_binding.overloads()[index]);
+        for element in &bindings.elements {
+            if element.as_result(db).is_ok() {
+                continue;
+            }
+            let priority = element.error_priority(db);
+            for item in &element.items {
+                if item.error_priority(db) != priority {
+                    continue;
                 }
-            }
-            (Some((_, binding)), None) => {
-                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
-                // matching overload here.
-                extend_errors(binding);
-            }
-            (Some(_), Some(_)) => {
-                if !matches!(
-                    callable_binding.overload_call_result,
-                    Some(OverloadCallResult::ArgumentTypeExpansion(_))
-                ) {
-                    extend_errors(&callable_binding.overloads()[0]);
+                let callable_binding = item.callable();
+                let mut matching_overloads = callable_binding.matching_overloads();
+                match (matching_overloads.next(), matching_overloads.next()) {
+                    (None, _) => {
+                        if let [binding] = callable_binding.overloads() {
+                            // This is not an overloaded function, so we can propagate its errors to the
+                            // outer bindings.
+                            extend_errors(binding);
+                        } else {
+                            let index = callable_binding
+                                .best_failing_overload_index(
+                                    FailingOverloadSelection::AffectsOverloadResolution,
+                                )
+                                .unwrap_or(0);
+                            // TODO: We should also update the specialization for the `ParamSpec` to reflect
+                            // the matching overload here.
+                            extend_errors(&callable_binding.overloads()[index]);
+                        }
+                    }
+                    (Some((_, binding)), None) => {
+                        // TODO: We should also update the specialization for the `ParamSpec` to reflect the
+                        // matching overload here.
+                        extend_errors(binding);
+                    }
+                    (Some(_), Some(_)) => {
+                        if !matches!(
+                            callable_binding.overload_call_result,
+                            Some(OverloadCallResult::ArgumentTypeExpansion(_))
+                        ) {
+                            extend_errors(&callable_binding.overloads()[0]);
+                        }
+                    }
                 }
             }
         }
@@ -7548,7 +7578,7 @@ struct ParamSpecArgumentContext<'a, 'call, 'db> {
     env: &'a ProgramEnvironment<'db>,
     constraints: &'a ConstraintSetBuilder<'db>,
     binding: &'a CallableBinding<'db>,
-    callable: CallableType<'db>,
+    callable: Type<'db>,
     arguments_types: &'a CallArguments<'call, 'db>,
     argument_index: usize,
     call_expression_tcx: TypeContext<'db>,
@@ -7858,18 +7888,15 @@ impl<'db> Binding<'db> {
             .iter()
             .position(|paramspec_argument_index| *paramspec_argument_index == argument_index)?;
 
-        let specialized_binding = CallableBinding::from_overloads(
-            self.signature_type,
-            callable.signatures(db).iter().cloned(),
-        );
-
         let mut sub_arguments = arguments_types.select(&paramspec_argument_indices);
         // Clear the previously inferred type for this argument, if it was inferred in the previous
         // fixpoint iteration.
         sub_arguments.clear_types(sub_argument_index);
 
         let mut specialized_bindings =
-            Bindings::from(specialized_binding).match_parameters(db, env, &sub_arguments);
+            callable
+                .bindings(db, env)
+                .match_parameters(db, env, &sub_arguments);
         let _ = specialized_bindings.check_types_impl(
             db,
             env,
@@ -7880,34 +7907,35 @@ impl<'db> Binding<'db> {
             CheckTypesMode::Finalize,
         );
 
-        let specialized_binding = specialized_bindings.single_element()?;
-        let (_, specialized_overload) = specialized_binding
-            .matching_overloads()
-            .exactly_one()
-            .ok()?;
-        let [specialized_parameter] = specialized_overload
-            .argument_matches()
-            .get(sub_argument_index)?
-            .parameters
-            .as_slice()
-        else {
-            return None;
-        };
+        let mut contexts = Vec::new();
+        for specialized_binding in specialized_bindings.iter_flat() {
+            for (_, specialized_overload) in specialized_binding.matching_overloads() {
+                let [specialized_parameter] = specialized_overload
+                    .argument_matches()
+                    .get(sub_argument_index)?
+                    .parameters
+                    .as_slice()
+                else {
+                    return None;
+                };
 
-        let parameter_type = specialized_overload.signature.parameters()
-            [specialized_parameter.index]
-            .annotated_type();
-        // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
-        // type variables in the same way as for arguments to an ordinary generic call.
-        Some(parameter_type.apply_optional_specialization(
-            db,
-            specialized_overload.argument_type_context_specialization(
-                db,
-                env,
-                constraints,
-                call_expression_tcx,
-            ),
-        ))
+                let parameter_type = specialized_overload.signature.parameters()
+                    [specialized_parameter.index]
+                    .annotated_type();
+                // Preserve gradual context such as `Callable[[int], Any]`, while marking unsolved
+                // type variables in the same way as for arguments to an ordinary generic call.
+                contexts.push(parameter_type.apply_optional_specialization(
+                    db,
+                    specialized_overload.argument_type_context_specialization(
+                        db,
+                        env,
+                        constraints,
+                        call_expression_tcx,
+                    ),
+                ));
+            }
+        }
+        (!contexts.is_empty()).then(|| UnionType::from_elements(db, env, contexts))
     }
 
     /// Returns the expected tuple element for an argument matched to a `TypeVarTuple`.
@@ -8009,17 +8037,12 @@ impl<'db> Binding<'db> {
             .expected_type
             .unwrap_or(original_parameter_type);
         let paramspec_callable = |paramspec| {
-            let Type::Callable(callable) = self
-                .merged_specialization(db)
+            self.merged_specialization(db)
                 .and_then(|specialization| specialization.get(db, paramspec))
                 .or_else(|| {
                     specialization().and_then(|specialization| specialization.get(db, paramspec))
                 })?
-            else {
-                return None;
-            };
-
-            (callable.kind(db) == CallableTypeKind::ParamSpecValue).then_some(callable)
+                .paramspec_value_callable_type(db, env)
         };
 
         // If the parameter is a single non-ParamSpec type variable with an upper bound,
@@ -8509,15 +8532,15 @@ impl<'db> Binding<'db> {
         partial_application
     }
 
-    /// Packages the information needed to synthesize this overload's reduced partial signature.
-    fn partial_signature_application(
+    /// Specializes and reduces this overload, retaining any combined parameter lists.
+    fn partially_apply(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
-    ) -> PartialSignatureApplication<'db> {
+    ) -> Type<'db> {
         let partial_application = self.partial_application(arguments);
-        let signature = self.signature.specialize_for_partial_application(
+        let callable = self.signature.specialize_for_partial_application(
             db,
             env,
             &partial_application,
@@ -8525,17 +8548,19 @@ impl<'db> Binding<'db> {
             self.unspecialized_return_type(db),
         );
 
-        if signature.parameters() == self.signature.parameters() {
-            return PartialSignatureApplication::new(signature, partial_application);
-        }
-
-        // Specializing `*args: *Ts` can replace one parameter with several positional parameters.
-        // Rematch before reducing so bound arguments consume those positions and keyword bindings
-        // still refer to the correct parameters after the expansion.
-        let mut binding = Self::single(self.signature_type, signature);
-        binding.match_parameters(db, env, arguments);
-        let partial_application = binding.partial_application(arguments);
-        PartialSignatureApplication::new(binding.signature, partial_application)
+        callable
+            .try_map_callable(db, env, &mut |callable| {
+                let applications = callable.signatures(db).iter().map(|signature| {
+                    // A captured parameter list can replace the variadic pair with concrete
+                    // parameters. Rematch each expanded signature before consuming bound arguments.
+                    let mut binding = Self::single(self.signature_type, signature.clone());
+                    binding.match_parameters(db, env, arguments);
+                    let partial_application = binding.partial_application(arguments);
+                    PartialSignatureApplication::new(binding.signature, partial_application)
+                });
+                CallableType::partially_apply(db, applications).map(Type::Callable)
+            })
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Returns the bound type for the specified parameter, or `None` if no argument was matched to

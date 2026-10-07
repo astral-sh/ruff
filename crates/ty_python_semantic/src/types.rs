@@ -54,12 +54,12 @@ pub(crate) use self::match_pattern::{
     starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
+use self::set_theoretic::KnownUnion;
 use self::set_theoretic::NegativeIntersectionElements;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-use self::set_theoretic::{KnownUnion, RecursivelyDefined};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -9459,7 +9459,7 @@ impl<'db> Type<'db> {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
         }
 
-        // Expand union-valued `ParamSpec`s before specializing a given callable.
+        // Expand combined `ParamSpec`s before specializing a given callable.
         if let TypeMapping::ApplySpecialization(specialization)
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
@@ -9489,73 +9489,59 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let union_paramspecs = signatures
+            let combined_paramspecs = signatures
                 .into_iter()
                 .flat_map(|signatures| signatures.iter())
                 .filter_map(|signature| {
                     let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
-                    let Type::Union(union) = specialization.get(db, typevar)? else {
-                        return None;
-                    };
-
-                    Some((typevar, union))
+                    let value = specialization.get(db, typevar)?;
+                    matches!(value, Type::Union(_) | Type::Intersection(_))
+                        .then_some((typevar, value))
                 })
                 .filter(|(typevar, _)| seen.insert(typevar.identity(db)))
                 .collect::<Vec<_>>();
 
-            if !union_paramspecs.is_empty() {
-                // Independent union-valued `ParamSpec`s produce a Cartesian product. Bound
-                // the expansion to avoid exponential blowup.
+            if let Some((typevar, value)) = combined_paramspecs.first() {
+                // Independent combinations can produce a Cartesian product. Count all leaves
+                // before expanding the first variable so recursive expansion shares this bound.
                 const MAX_PARAMSPEC_EXPANSION: usize = 64;
-
-                let mut expanded_callables = UnionBuilder::new(db, visitor.env);
                 let mut expansion_size = 1usize;
-                for (_, union) in &union_paramspecs {
-                    expansion_size = expansion_size.saturating_mul(union.elements(db).len());
-                    if expansion_size > MAX_PARAMSPEC_EXPANSION {
+                for (_, value) in &combined_paramspecs {
+                    let mut count = 0usize;
+                    let counted = value.try_map_union_intersection(db, visitor.env, &mut |value| {
+                        count += 1;
+                        (count <= MAX_PARAMSPEC_EXPANSION).then_some(value)
+                    });
+                    expansion_size = expansion_size.saturating_mul(count);
+                    if counted.is_none() || expansion_size > MAX_PARAMSPEC_EXPANSION {
                         return Type::unknown();
-                    }
-
-                    if union.recursively_defined(db).is_yes() {
-                        expanded_callables =
-                            expanded_callables.or_recursively_defined(RecursivelyDefined::Yes);
                     }
                 }
 
                 return visitor.visit(db, self, type_mapping, || {
-                    let expanded_paramspecs = union_paramspecs
-                        .iter()
-                        .map(|(typevar, union)| {
-                            union.elements(db).iter().map(move |ty| (*typevar, *ty))
-                        })
-                        .multi_cartesian_product();
-
-                    for bindings in expanded_paramspecs {
-                        // Override the specialization with a specific parameter-list assigned to
-                        // each `ParamSpec` from the union expansion.
-                        let specialization = ApplySpecialization::WithBindings {
-                            specialization,
-                            bindings: &bindings,
-                        };
-
-                        let mapping = match type_mapping {
-                            TypeMapping::ApplySpecializationWithMaterialization {
-                                materialization_kind,
-                                ..
-                            } => TypeMapping::ApplySpecializationWithMaterialization {
+                    value
+                        .try_map_union_intersection(db, visitor.env, &mut |value| {
+                            let bindings = [(*typevar, value)];
+                            let specialization = ApplySpecialization::WithBindings {
                                 specialization,
-                                materialization_kind: *materialization_kind,
-                            },
-                            _ => TypeMapping::ApplySpecialization(specialization),
-                        };
+                                bindings: &bindings,
+                            };
+                            let mapping = match type_mapping {
+                                TypeMapping::ApplySpecializationWithMaterialization {
+                                    materialization_kind,
+                                    ..
+                                } => TypeMapping::ApplySpecializationWithMaterialization {
+                                    specialization,
+                                    materialization_kind: *materialization_kind,
+                                },
+                                _ => TypeMapping::ApplySpecialization(specialization),
+                            };
 
-                        // Use a fresh visitor, as the visitor cache does not distinguish
-                        // between these specialization bindings.
-                        let callable = self.apply_type_mapping(db, visitor.env, &mapping, tcx);
-                        expanded_callables.add_in_place(callable);
-                    }
-
-                    expanded_callables.build()
+                            // A fresh visitor distinguishes the overridden binding. Other combined
+                            // ParamSpecs are expanded recursively before mapping the signatures.
+                            Some(self.apply_type_mapping(db, visitor.env, &mapping, tcx))
+                        })
+                        .unwrap_or_else(Type::unknown)
                 });
             }
         }
