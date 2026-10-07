@@ -53,9 +53,11 @@ reveal_type("\U0001d167")  # revealed: Literal["\U0001d167"]
 
 ## Canonically equivalent strings
 
-Distinct strings can render identically when they are [canonically equivalent]. ty escapes non-ASCII
-characters that can participate in normalization in parts of the string that are not in [NFC], so
-these strings can be distinguished.
+Distinct strings can render identically when they are [canonically equivalent]. ty may escape
+non-ASCII characters in parts of the string that are not in [NFC], so these strings can be
+distinguished. It uses ASCII and some NFC-inert characters as boundaries when checking these parts.
+NFC-inert characters do not interact with adjacent characters during normalization. ty may also
+escape other characters that do not participate in normalization.
 
 NFC combines `e\u0301` into `é`, whereas `q\u0301` is already in NFC. It also puts combining marks
 into a standard order.
@@ -76,6 +78,41 @@ reveal_type("q\u0300\u0315")  # revealed: Literal["q̀̕"]
 
 def equivalent_literals(value: Literal["é", "e\u0301"]):
     reveal_type(value)  # revealed: Literal["é", "e\u0301"]
+```
+
+ty recognizes `☃`, `字`, and `𠀀` as NFC-inert but does not recognize `⏱`. In the first example,
+`é⏱\u212b` is checked as one part and all three characters are escaped. In the others, the inert
+character separates `é` from `\u212b`, so `é` remains unescaped:
+
+```py
+reveal_type("é⏱\u212b")  # revealed: Literal["\xe9\u23f1\u212b"]
+reveal_type("é☃\u212b")  # revealed: Literal["é☃\u212b"]
+reveal_type("é字\u212b")  # revealed: Literal["é字\u212b"]
+reveal_type("é𠀀\u212b")  # revealed: Literal["é𠀀\u212b"]
+```
+
+ASCII characters provide a boundary before themselves, even if they can combine with following
+characters. In `ée\u0301`, the `e` starts a non-NFC segment, so ty escapes the combining accent
+without escaping the preceding `é`:
+
+```py
+reveal_type("ée\u0301")  # revealed: Literal["ée\u0301"]
+```
+
+The following two strings can look identical, but the first contains the single character `é`, while
+the second contains `e` followed by a separate accent:
+
+```py
+reveal_type("q\u0301é")  # revealed: Literal["q́é"]
+```
+
+In `q\u0301e\u0301`, the boundary before `e` lets ty check the two parts separately. `q\u0301` is
+already in NFC, and there is no equivalent single character for `q` plus this accent, so the accent
+remains visible. By contrast, `e\u0301` is canonically equivalent to the single character `é`, so ty
+escapes its accent to distinguish the type from the preceding example:
+
+```py
+reveal_type("q\u0301e\u0301")  # revealed: Literal["q́e\u0301"]
 ```
 
 ## Default-ignorable characters

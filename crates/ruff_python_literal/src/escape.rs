@@ -1,13 +1,27 @@
 use icu_normalizer::ComposingNormalizer;
 use icu_properties::{
     CodePointSetData,
-    props::{DefaultIgnorableCodePoint, NfcInert},
+    props::{BinaryProperty, DefaultIgnorableCodePoint, UnifiedIdeograph},
 };
 use itertools::Either;
 use ruff_python_ast::{
     BytesLiteralFlags, StringFlags, StringLiteralFlags,
     str::{Quote, TripleQuotes},
 };
+
+/// Returns whether `ch` is in a conservative set of NFC-inert characters, which are unchanged by
+/// NFC and cannot interact with adjacent characters during normalization.
+///
+/// Other characters may also be inert; treating them as non-inert can cause additional escaping.
+fn is_known_nfc_inert(ch: char) -> bool {
+    // CJK unified ideographs are NFC-inert, and this property includes their extensions.
+    // The ranges cover other NFC-inert characters: Miscellaneous Symbols and Dingbats
+    // (U+2600–U+27BF), and supplementary symbols including emoji and enclosed characters
+    // (U+1F000–U+1FAFF). The `known_normalization_boundaries` test checks these sets
+    // against ICU's normalization data.
+    UnifiedIdeograph::for_char(ch)
+        || matches!(ch, '\u{2600}'..='\u{27bf}' | '\u{1f000}'..='\u{1faff}')
+}
 
 pub struct EscapeLayout {
     pub quote: Quote,
@@ -74,15 +88,14 @@ impl<'a> UnicodeEscape<'a> {
     /// invisible. It also escapes combining marks that would otherwise attach to the opening quote
     /// or an escape sequence in the output.
     ///
-    /// To distinguish [canonically equivalent] strings, it escapes non-ASCII characters that can
-    /// participate in normalization in parts of the string that are not in [NFC]. Characters
-    /// with the [`NfcInert`] property cannot interact with adjacent characters during normalization
-    /// and separate these parts.
+    /// To distinguish [canonically equivalent] strings, it may escape non-ASCII characters in parts
+    /// of the string that are not in [NFC]. ASCII and characters known to be [NFC-inert] provide
+    /// boundaries before themselves, separating these parts.
     ///
     /// [default-ignorable characters]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
     /// [NFC]: https://www.unicode.org/reports/tr15/#Norm_Forms
     /// [canonically equivalent]: https://www.unicode.org/reports/tr15/#Canon_Compat_Equivalence
-    /// [`NfcInert`]: https://docs.rs/icu_properties/latest/icu_properties/props/struct.NfcInert.html
+    /// [NFC-inert]: https://unicode-org.github.io/icu-docs/apidoc/released/icu4c/classNormalizer2.html
     #[must_use]
     pub fn escape_for_display(mut self) -> Self {
         // ASCII is already NFC and has no combining marks or default-ignorable characters, so it
@@ -245,25 +258,33 @@ impl UnicodeEscape<'_> {
     /// Yields characters and whether to escape them for display to distinguish canonically
     /// equivalent strings, when display escaping is enabled.
     ///
-    /// Characters with the [`NfcInert`] property cannot interact with adjacent characters during
-    /// normalization, so they provide boundaries between independently normalized segments.
-    ///
-    /// [`NfcInert`]: https://docs.rs/icu_properties/latest/icu_properties/props/struct.NfcInert.html
+    /// ASCII and known NFC-inert characters provide normalization boundaries before themselves.
+    /// An ASCII character can combine with the next character, so it does not always provide a
+    /// boundary after itself.
     fn display_chars(source: &str, escape_for_display: bool) -> impl Iterator<Item = (char, bool)> {
         if !escape_for_display || ComposingNormalizer::new_nfc().is_normalized(source) {
             return Either::Left(source.chars().map(|ch| (ch, false)));
         }
 
-        let inert = CodePointSetData::new::<NfcInert>();
         Either::Right(
             source
-                .split_inclusive(move |ch| inert.contains(ch))
+                .char_indices()
+                .skip(1)
+                .filter_map(|(index, ch)| {
+                    (ch.is_ascii() || is_known_nfc_inert(ch)).then_some(index)
+                })
+                .chain([source.len()])
+                .scan(0, move |start, end| {
+                    let segment = &source[*start..end];
+                    *start = end;
+                    Some(segment)
+                })
                 .flat_map(move |segment| {
                     let escape = !ComposingNormalizer::new_nfc().is_normalized(segment);
                     segment.chars().map(move |ch| {
                         let escape = escape
                             && !ch.is_ascii()
-                            && !inert.contains(ch)
+                            && !is_known_nfc_inert(ch)
                             && crate::char::is_printable(ch);
                         (ch, escape)
                     })
@@ -540,6 +561,36 @@ impl std::fmt::Display for BytesRepr<'_, '_> {
 #[cfg(test)]
 mod unicode_escape_tests {
     use super::*;
+    use icu_normalizer::properties::{
+        CanonicalCombiningClassMap, CanonicalComposition, CanonicalDecomposition, Decomposed,
+    };
+
+    /// Checks that ASCII and the chosen NFC-inert characters have NFC boundaries before them,
+    /// and that the latter also have boundaries after them, using the current ICU data.
+    #[test]
+    fn known_normalization_boundaries() {
+        let classes = CanonicalCombiningClassMap::new();
+        let decomposition = CanonicalDecomposition::new();
+        let composition = CanonicalComposition::new();
+        for ch in (0..=char::MAX as u32).filter_map(char::from_u32) {
+            let decomposed = decomposition.decompose(ch);
+            if ch.is_ascii() || is_known_nfc_inert(ch) {
+                assert_eq!(classes.get_u8(ch), 0, "U+{:04X}", ch as u32);
+                assert_eq!(decomposed, Decomposed::Default, "U+{:04X}", ch as u32);
+            }
+            if let Decomposed::Expansion(first, second) = decomposed
+                && composition.compose(first, second) == Some(ch)
+            {
+                assert!(
+                    !is_known_nfc_inert(first) && !second.is_ascii() && !is_known_nfc_inert(second),
+                    "U+{:04X} + U+{:04X} compose to U+{:04X}",
+                    first as u32,
+                    second as u32,
+                    ch as u32
+                );
+            }
+        }
+    }
 
     #[test]
     fn changed() {
