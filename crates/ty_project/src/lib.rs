@@ -3,7 +3,7 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 use crate::glob::{GlobFilterCheckMode, IncludeResult};
-use crate::metadata::options::OptionDiagnostic;
+use crate::metadata::options::{OptionDiagnostic, ToProgramSettingsError};
 use crate::parallel::ParallelIteratorExt;
 use crate::script::Script;
 use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
@@ -18,7 +18,7 @@ use rayon::prelude::*;
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
 };
-use ruff_db::files::{File, system_path_to_file};
+use ruff_db::files::{File, system_path_to_directory, system_path_to_file};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
@@ -30,7 +30,7 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use ty_python_core::ProgramFile;
-use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
+use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings, PythonEnvironmentError};
 pub use ty_python_semantic::Db as SemanticDb;
 use ty_python_semantic::dependency::{DependencyMetadata, DependencyProjectKind};
 use ty_python_semantic::lint::RuleSelection;
@@ -278,7 +278,7 @@ impl Project {
         Program::from_settings(db, self.program_settings(db))
     }
 
-    /// Extract dependency information once per metadata update. Unrelated project settings and
+    /// Extract dependency information for the resolved Python environment. Unrelated settings and
     /// source ranges do not invalidate import inference when the extracted information is equal.
     #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn dependency_metadata(
@@ -296,28 +296,41 @@ impl Project {
         let environment = workspace
             .environment()
             .ok_or(DependencyMetadataError::MissingEnvironment)?;
-        let environment = db
-            .system()
-            .canonicalize_path(environment)
-            .map_err(|error| DependencyMetadataError::InvalidEnvironment {
-                path: environment.to_path_buf(),
-                message: error.to_string().into(),
-            })?;
-        let selected_environment = metadata
-            .to_merged_options()
-            .python_environment(db.system())
-            .map_err(|error| {
-                DependencyMetadataError::EnvironmentResolution(error.to_string().into())
-            })?
+        // Track the path before resolving it, so a synced change can invalidate the result.
+        if let Ok(directory) = system_path_to_directory(db, environment) {
+            let _ = directory.revision(db);
+        }
+        let canonical_environment =
+            db.system()
+                .canonicalize_path(environment)
+                .map_err(|error| {
+                    // If `.venv` points to `env`, deleting `env` makes this fail before we read
+                    // the target's directory status below. Salsa then drops that dependency,
+                    // so recreating `env` and syncing only its path won't invalidate the cached
+                    // error. Retry on the next revision so dependency checks can recover.
+                    db.report_untracked_read();
+                    DependencyMetadataError::InvalidEnvironment {
+                        path: environment.to_path_buf(),
+                        message: error.to_string().into(),
+                    }
+                })?;
+        // Changes may be reported for the canonical target instead of the symlink.
+        let _ = system_path_to_directory(db, &canonical_environment);
+        let program_settings = self.program_settings(db);
+        let selected_environment = program_settings
+            .python_environment
+            .as_ref()
+            .map_err(|error| DependencyMetadataError::EnvironmentResolution(error.message.clone()))?
+            .as_ref()
             .ok_or(DependencyMetadataError::MissingSelectedEnvironment)?;
 
         // An explicit Python environment can override uv's selection. Its installed modules may
         // belong to different distributions, so uv's ownership map cannot describe those imports.
-        if selected_environment.sys_prefix().as_std_path() != environment.as_std_path() {
+        if selected_environment.sys_prefix().as_std_path() != canonical_environment.as_std_path() {
             return Err(DependencyMetadataError::EnvironmentMismatch {
                 selected: selected_environment.sys_prefix().to_path_buf(),
                 selected_origin: selected_environment.origin().to_string().into(),
-                uv: environment,
+                uv: canonical_environment,
             });
         }
 
@@ -331,6 +344,23 @@ impl Project {
             settings.search_paths.try_register_static_roots(db);
             self.set_program_settings(db).to(settings);
         }
+    }
+
+    /// Update or clear the environment error while retaining the last working search paths.
+    fn update_environment_error(self, db: &mut dyn Db, error: &ToProgramSettingsError) {
+        let mut settings = self.program_settings(db).clone();
+        let last_usable = match settings.python_environment {
+            Ok(environment) => environment,
+            Err(error) => error.last_usable,
+        };
+        settings.python_environment = match error {
+            ToProgramSettingsError::PythonEnvironment(error) => Err(PythonEnvironmentError {
+                message: error.to_string().into(),
+                last_usable,
+            }),
+            _ => Ok(last_usable),
+        };
+        self.update_program(db, settings);
     }
 
     pub fn root(self, db: &dyn Db) -> &SystemPath {
@@ -402,6 +432,7 @@ impl Project {
                         "Failed to convert metadata to program settings, \
                          continuing without applying them: {error}"
                     );
+                    self.update_environment_error(db, &error);
                     Vec::new()
                 }
             };

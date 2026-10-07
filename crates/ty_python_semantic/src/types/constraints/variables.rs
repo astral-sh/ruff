@@ -72,7 +72,7 @@ pub(super) struct UnsatisfiableBound;
 
 /// One condition that can be checked by an interior node in a constraint set BDD
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) enum Constraint<'db> {
+pub(super) enum Constraint<'db> {
     ConcreteLower(ConcreteLowerBound<'db>),
     ConcreteUpper(ConcreteUpperBound<'db>),
     ConcreteEquivalence(ConcreteEquivalenceBound<'db>),

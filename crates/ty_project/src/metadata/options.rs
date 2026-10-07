@@ -35,7 +35,7 @@ use ty_module_resolver::{
     ModuleGlobSet, ModuleGlobSetBuilder, SearchPathSettings, SearchPathSettingsError, SearchPaths,
 };
 use ty_python_core::platform::PythonPlatform;
-use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings};
+use ty_python_core::program::{MisconfigurationStrategy, ProgramSettings, PythonEnvironmentError};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     AnalysisSettings, PythonEnvironment, PythonVersionFileSource, PythonVersionSource,
@@ -216,6 +216,14 @@ impl Options {
             configured => configured.map_err(ToProgramSettingsError::PythonEnvironment),
         };
 
+        let python_environment_error = match &python_environment {
+            Err(ToProgramSettingsError::PythonEnvironment(error)) => Some(PythonEnvironmentError {
+                message: error.to_string().into(),
+                last_usable: None,
+            }),
+            _ => None,
+        };
+
         // If in safe-mode, fallback to None if this fails instead of erroring.
         let python_environment = strategy
             .fallback_opt(python_environment, |_| {
@@ -306,9 +314,10 @@ impl Options {
                 python_version,
                 python_platform,
                 search_paths,
-                virtual_environment: python_environment
-                    .filter(PythonEnvironment::is_virtual)
-                    .map(|environment| environment.sys_prefix().to_path_buf()),
+                python_environment: match python_environment_error {
+                    Some(error) => Err(error),
+                    None => Ok(python_environment),
+                },
             },
             diagnostics,
         ))

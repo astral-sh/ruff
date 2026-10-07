@@ -1939,6 +1939,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(source)),
+                Type::KnownInstance(KnownInstanceType::Annotated(target)),
+            ) if source.inner(db).is_recursive_divergent()
+                || target.inner(db).is_recursive_divergent() =>
+            {
+                // Recursive inference preserves an Annotated object while replacing its wrapped
+                // type with Divergent. That approximation must accept another unfolding of the
+                // object, without making distinct concrete Annotated values interchangeable.
+                self.check_relation_in_invariant_position(
+                    db,
+                    source.inner(db),
+                    None,
+                    target.inner(db),
+                    None,
+                )
+            }
+
             // The read-only `__func__` and `__wrapped__` attributes expose the complete wrapped
             // object, so its attributes matter here as well as its call signature.
             (
@@ -3661,6 +3679,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     )
                 })
             }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(left)),
+                Type::KnownInstance(KnownInstanceType::Annotated(right)),
+            ) if left.inner(db).is_recursive_divergent()
+                || right.inner(db).is_recursive_divergent() =>
+            {
+                // A recursive approximation can represent the same Annotated object as a
+                // concrete unfolding, even though their wrapped types differ.
+                self.never()
+            }
 
             // These types are disjoint whenever their represented objects differ.
             (

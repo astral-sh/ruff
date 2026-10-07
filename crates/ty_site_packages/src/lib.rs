@@ -270,7 +270,7 @@ impl PartialEq<&[SystemPathBuf]> for SitePackagesPaths {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum PythonEnvironment {
     Virtual(VirtualEnvironment),
     System(SystemEnvironment),
@@ -493,7 +493,7 @@ impl std::fmt::Display for InstallationDir {
 ///
 /// We only need to distinguish cases that change the on-disk layout.
 /// Everything else can be treated like CPython.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, get_size2::GetSize)]
 pub(crate) enum PythonImplementation {
     CPython,
     PyPy,
@@ -520,7 +520,7 @@ impl PythonImplementation {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, get_size2::GetSize)]
 struct PythonInterpreterLayout {
     version: Option<PythonVersion>,
     implementation: PythonImplementation,
@@ -649,7 +649,7 @@ impl PythonInterpreterLayout {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default, get_size2::GetSize)]
 enum PythonBuildVariant {
     #[default]
     Unknown,
@@ -686,7 +686,7 @@ impl PythonBuildVariant {
 /// Most of this information is derived from the virtual environment's `pyvenv.cfg` file.
 /// The format of this file is not defined anywhere, and exactly which keys are present
 /// depends on the tool that was used to create the virtual environment.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct VirtualEnvironment {
     root_path: SysPrefixPath,
     base_executable_home_path: Option<PythonHomePath>,
@@ -1156,7 +1156,7 @@ struct RawPyvenvCfg<'s> {
 ///
 /// This environment may or may not be one that is managed by the operating system itself, e.g.,
 /// this captures both Homebrew-installed Python versions and the bundled macOS Python installation.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub struct SystemEnvironment {
     path: PythonEnvironmentPath,
 }
@@ -1861,7 +1861,7 @@ fn real_stdlib_directory_from_sys_prefix(
 /// `/opt/homebrew/lib/python3.X/site-packages`.
 ///
 /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub struct SysPrefixPath {
     inner: SystemPathBuf,
     origin: SysPrefixPathOrigin,
@@ -1887,7 +1887,7 @@ fn sys_prefix_from_executable_path(path: &SystemPath) -> Option<&SystemPath> {
 }
 
 /// A selected Python environment path resolved to its `sys.prefix`.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 enum PythonEnvironmentPath {
     Prefix(SysPrefixPath),
     Executable {
@@ -2126,7 +2126,7 @@ impl Deref for SysPrefixPath {
 }
 
 /// Enumeration of sources a `sys.prefix` path can come from.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 pub enum SysPrefixPathOrigin {
     /// The `sys.prefix` path came from a configuration file setting: `pyproject.toml` or `ty.toml`
     ConfigFileSetting(Arc<SystemPathBuf>, Option<TextRange>),
@@ -2258,7 +2258,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
 ///
 /// [`PYTHONHOME`]: https://docs.python.org/3/using/cmdline.html#envvar-PYTHONHOME
 /// [the original PEP adding the `venv` module]: https://peps.python.org/pep-0405/
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, get_size2::GetSize)]
 struct PythonHomePath(SystemPathBuf);
 
 impl PythonHomePath {
