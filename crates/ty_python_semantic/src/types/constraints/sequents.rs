@@ -370,12 +370,13 @@ impl<'db> SequentMap<'db> {
     pub(super) fn for_constraint(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        constraint: Constraint<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        constraint: ConstraintId,
     ) -> Option<&'db Self> {
         // Most individual constraints produce no sequents. Avoid interning the query arguments
         // and retaining an empty Salsa result for those cases. Keep the checks in sync with the
         // single-constraint `add_sequents` methods below.
-        let may_produce_sequents = match constraint {
+        let may_produce_sequents = match storage.constraint_data(constraint) {
             Constraint::ConcreteLower(bound) => {
                 bound.bound == bound.typevar.domain(db).bottom(db)
                     || bound.bound == bound.typevar.domain(db).top(db)
@@ -417,7 +418,7 @@ impl<'db> SequentMap<'db> {
         Some(for_constraint_inner(
             db,
             env.program(db),
-            InternedSequentConstraint::new(db, constraint),
+            storage.intern_sequent_constraint(db, constraint),
         ))
     }
 
@@ -432,15 +433,16 @@ impl<'db> SequentMap<'db> {
     pub(super) fn for_constraint_pair(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        left: Constraint<'db>,
-        right: Constraint<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        left: ConstraintId,
+        right: ConstraintId,
     ) -> Option<&'db Self> {
         // Currently, the only pattern we look for is when two concrete lower-bound constraints
         // have disjoint bounds. Given `l₁ ≤ T ∧ l₂ ≤ T`, the only sequent we could theoretically
         // produce is `(l₁ | l₂) ≤ T`. But we don't store that as a single constraint; we always
         // break that apart into the two smaller constraints that we started with.
-        if let Constraint::ConcreteLower(left) = left
-            && let Constraint::ConcreteLower(right) = right
+        if let Constraint::ConcreteLower(left) = storage.constraint_data(left)
+            && let Constraint::ConcreteLower(right) = storage.constraint_data(right)
             && left.typevar.is_same_typevar_as(db, right.typevar)
             && left
                 .bound
@@ -484,8 +486,8 @@ impl<'db> SequentMap<'db> {
         Some(for_constraint_pair_inner(
             db,
             env.program(db),
-            InternedSequentConstraint::new(db, left),
-            InternedSequentConstraint::new(db, right),
+            storage.intern_sequent_constraint(db, left),
+            storage.intern_sequent_constraint(db, right),
         ))
     }
 }
@@ -2106,10 +2108,14 @@ mod tests {
             Type::int_literal(1),
         ));
 
-        assert!(SequentMap::for_constraint(db, &env, left).is_none());
-        assert!(SequentMap::for_constraint(db, &env, right).is_none());
+        let mut storage = ConstraintSetStorage::default();
+        let left = storage.intern_constraint(db, &env, left);
+        let right = storage.intern_constraint(db, &env, right);
+
+        assert!(SequentMap::for_constraint(db, &env, &mut storage, left).is_none());
+        assert!(SequentMap::for_constraint(db, &env, &mut storage, right).is_none());
         for (left, right) in [(left, right), (right, left)] {
-            assert!(SequentMap::for_constraint_pair(db, &env, left, right).is_none());
+            assert!(SequentMap::for_constraint_pair(db, &env, &mut storage, left, right).is_none());
         }
     }
 
@@ -2135,8 +2141,12 @@ mod tests {
             bool_class,
         ));
 
+        let mut storage = ConstraintSetStorage::default();
+        let left = storage.intern_constraint(db, &env, left);
+        let right = storage.intern_constraint(db, &env, right);
+
         for (left, right) in [(left, right), (right, left)] {
-            let sequents = SequentMap::for_constraint_pair(db, &env, left, right);
+            let sequents = SequentMap::for_constraint_pair(db, &env, &mut storage, left, right);
 
             assert!(sequents.is_some_and(|sequents| {
                 sequents

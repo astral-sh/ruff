@@ -105,6 +105,7 @@ use ty_static::EnvVars;
 
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
+use crate::types::constraints::sequents::InternedSequentConstraint;
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
@@ -1022,6 +1023,9 @@ struct ConstraintSetStorage<'db> {
 
     // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    /// Reuse Salsa IDs when a constraint participates in multiple sequent queries. This cache is
+    /// populated only after the checks that skip empty sequent maps, and is dropped with the builder.
+    sequent_constraint_cache: FxHashMap<ConstraintId, InternedSequentConstraint<'db>>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
     /// Avoid repeatedly walking deep constraint bounds without imposing Salsa-query overhead on
@@ -1467,6 +1471,20 @@ impl<'db> ConstraintSetStorage<'db> {
             return self.constraints[ConstraintId::from_usize(index - split)];
         }
         self.constraints[constraint]
+    }
+
+    fn intern_sequent_constraint(
+        &mut self,
+        db: &'db dyn Db,
+        constraint: ConstraintId,
+    ) -> InternedSequentConstraint<'db> {
+        if let Some(interned) = self.sequent_constraint_cache.get(&constraint) {
+            return *interned;
+        }
+
+        let interned = InternedSequentConstraint::new(db, self.constraint_data(constraint));
+        self.sequent_constraint_cache.insert(constraint, interned);
+        interned
     }
 
     fn cached_constraint_bound_depth(

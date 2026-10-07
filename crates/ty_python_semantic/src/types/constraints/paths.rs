@@ -733,7 +733,7 @@ impl PathAssignments {
         }
 
         let constraint_data = storage.constraint_data(constraint);
-        if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
+        if let Some(map) = SequentMap::for_constraint(db, env, storage, constraint) {
             let added = self.add_sequents(db, env, storage, map);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
@@ -784,17 +784,17 @@ impl PathAssignments {
                 }
             }
 
-            let (a, a_data, b, b_data) = if existing_index < constraint_index {
-                (*existing, existing_data, constraint, constraint_data)
+            let (a, b) = if existing_index < constraint_index {
+                (*existing, constraint)
             } else {
-                (constraint, constraint_data, *existing, existing_data)
+                (constraint, *existing)
             };
             if self.elaborated_pairs.contains(&(a, b)) {
                 // We've already elaborated this pair of constraints.
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+            let Some(map) = SequentMap::for_constraint_pair(db, env, storage, a, b) else {
                 continue;
             };
             self.elaborated_pairs.insert((a, b));
