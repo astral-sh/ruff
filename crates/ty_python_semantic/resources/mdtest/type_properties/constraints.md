@@ -1619,14 +1619,29 @@ def correlated_noninferable[I, J, N]() -> None:
 ### Conditional solutions for fixed type variables
 
 A path can restrict the non-inferable variable as well as the inferable variable. Its solution
-applies only to specializations that satisfy the path's constraints.
+applies only to specializations that satisfy the path's constraints. If the path fixes `S` to `int`,
+no `T` bounded by `str` can satisfy `S ≤ T`.
 
 ```py
+from typing import TypeVar
 from ty_extensions._internal import ConstraintSet
 
 def conditional[S, T: str]() -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
     reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@conditional]]
+
+    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
+    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+S = TypeVar("S")
+T = TypeVar("T", bound=str)
+
+def legacy_conditional(source: S, target: T) -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@legacy_conditional]]
+
+    impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
+    reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
 ```
 
 ### Joint inference
@@ -1635,19 +1650,18 @@ When both variables are inferable, the solver can specialize them together.
 
 ```py
 from typing import TypeVar
-from ty_extensions import static_assert
 from ty_extensions._internal import ConstraintSet
 
 def joint[S, T: str]() -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
-    static_assert(constraints.solutions_for(T, inferable=tuple[S, T]) is not None)  # no diagnostic
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
 
 S = TypeVar("S")
 T = TypeVar("T", bound=str)
 
 def legacy_joint(source: S, target: T) -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
-    static_assert(constraints.solutions_for(T, inferable=tuple[S, T]) is not None)  # no diagnostic
+    reveal_type(constraints.solutions(inferable=tuple[S, T]))  # revealed: tuple[Solution[T=str, S=str]]
 ```
 
 ## Existential quantification
