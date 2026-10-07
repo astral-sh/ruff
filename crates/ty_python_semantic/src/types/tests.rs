@@ -775,6 +775,7 @@ fn pending_narrowing_cycle_recovery_preserves_guarded_contributions() {
     // Pending narrowing in an opaque bound invalidates the enclosing type argument.
     let pending_typevar = BoundTypeVarInstance::synthetic_self(
         &db,
+        SelfTypeVarOrigin::ReceiverPlaceholder,
         pending,
         BindingContext::Synthetic(env.program(&db)),
     );
