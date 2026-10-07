@@ -1160,6 +1160,31 @@ def target(name: str, callback: Callable[[int], Any]): ...
 forward(target, callback=lambda value: value)  # error: [missing-argument]
 ```
 
+### Forwarding lists of `TypedDict` values
+
+The parameter annotation supplies `list[Payload]` as context for the list literal, even though a
+field in `Payload` has type `Any`:
+
+```py
+from typing import Any, Callable, TypedDict
+
+class Payload(TypedDict):
+    value: Any
+
+def accept(value: list[Payload]) -> None: ...
+
+accept(reveal_type([{"value": 1}]))  # revealed: list[Payload]
+```
+
+Forwarding the call through `ParamSpec` preserves that context:
+
+```py
+def forward[**P, R](callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+forward(accept, reveal_type([{"value": 1}]))  # revealed: list[Payload]
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py

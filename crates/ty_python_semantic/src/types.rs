@@ -2372,6 +2372,7 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Return whether this type is known to contain no dynamic types, including in lazy attributes.
     fn is_fully_static(self, db: &'db dyn Db, env: &ProgramEnvironment) -> bool {
         dynamic_content(db, env, self).is_absent()
     }
@@ -2500,10 +2501,10 @@ impl<'db> Type<'db> {
         // still ensures convergence in cases that are prone to oscillation.
         let result = if cycle.iteration() <= crate::TAINTED_CYCLES {
             let self_degraded_by_overload =
-                any_over_type(db, env, self, false, |ty| {
+                any_over_type(db, env, self, |ty| {
                     matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-                }) && !any_over_type(db, env, self, false, |ty| ty.is_divergent())
-                    && any_over_type(db, env, previous, false, |ty| ty.is_divergent());
+                }) && !any_over_type(db, env, self, |ty| ty.is_divergent())
+                    && any_over_type(db, env, previous, |ty| ty.is_divergent());
             // Generally, the precision of type inference improves with each iteration.
             // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
             // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
@@ -2875,8 +2876,9 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Return whether this type contains a dynamic type without expanding lazy attributes.
     fn has_dynamic(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
-        any_over_type(db, env, self, false, |ty| ty.is_dynamic())
+        any_over_type(db, env, self, |ty| ty.is_dynamic())
     }
 
     /// Returns the specialized Python property represented by this type.

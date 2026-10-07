@@ -1310,6 +1310,34 @@ forward_prefix(target, **{"prefix": "wrong", "x": 1, "y": 2})  # error: [invalid
 forward_prefix(target, **{"prefix": 0, "x": 1, "y": "wrong"})  # error: [invalid-argument-type]
 ```
 
+### Forwarding lists of `TypedDict` values
+
+The parameter annotation supplies `list[Payload]` as context for the list literal, even though a
+field in `Payload` has type `Any`:
+
+```py
+from typing import Any, Callable, ParamSpec, TypeVar, TypedDict
+
+class Payload(TypedDict):
+    value: Any
+
+def accept(value: list[Payload]) -> None: ...
+
+accept(reveal_type([{"value": 1}]))  # revealed: list[Payload]
+```
+
+Forwarding the call through `ParamSpec` preserves that context:
+
+```py
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def forward(callback: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return callback(*args, **kwargs)
+
+forward(accept, reveal_type([{"value": 1}]))  # revealed: list[Payload]
+```
+
 ### Constructor overrides with receiver-inferred parameters
 
 In the below example, `Base.__new__` takes the same arguments as the class's `build` method. Binding
