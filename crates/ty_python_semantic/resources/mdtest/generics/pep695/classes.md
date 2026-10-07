@@ -2699,8 +2699,13 @@ class NewConflict(Gradual, Concrete):
 
 ## Narrowing a bounded generic subclass
 
-The runtime check retains the relationship between an invariant base's type parameter and the
-subclass's bounded type parameter, even when the caller's type parameter is unrestricted.
+An unrestricted type variable `S` cannot be used to specialize `Child`, whose type parameter is
+bounded by `str`. Specializing `Child` with `S & str` would also be incorrect: `Parent` is
+invariant, so `Parent[S]` does not imply `Parent[S & str]`. The runtime check therefore retains the
+original `Parent[S]` and narrows to `Child[Unknown]`. Member types can consequently become gradual.
+
+TODO: If we tracked `S <= str` as a flow-sensitive constraint in the branch, we could infer
+`Child[S]`.
 
 ```py
 class Parent[T]:
@@ -2714,9 +2719,32 @@ class Child[T: str](Parent[T]): ...
 
 def narrow[S](value: Parent[S]) -> None:
     if isinstance(value, Child):
-        reveal_type(value)  # revealed: Child[S@narrow]
-        reveal_type(value.get())  # revealed: S@narrow
-        value.put(42)  # error: [invalid-argument-type]
+        reveal_type(value)  # revealed: Parent[S@narrow] & Child[Unknown]
+        reveal_type(value.get())  # revealed: S@narrow & Unknown
+        value.put(42)  # no diagnostic
+
+def narrow_bounded[S: str](value: Parent[S]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[S@narrow_bounded]
+```
+
+The same applies when narrowing an intersection of two invariant generic bases.
+
+```py
+from ty_extensions import Intersection
+
+class Other[T]:
+    value: list[T]
+
+class ChildBoth[T: str](Parent[T], Other[T]): ...
+
+def narrow_intersection[S](value: Intersection[Parent[S], Other[S]]) -> None:
+    if isinstance(value, ChildBoth):
+        reveal_type(value)  # revealed: Parent[S@narrow_intersection] & Other[S@narrow_intersection] & ChildBoth[Unknown]
+
+def narrow_intersection_bounded[S: str](value: Intersection[Parent[S], Other[S]]) -> None:
+    if isinstance(value, ChildBoth):
+        reveal_type(value)  # revealed: ChildBoth[S@narrow_intersection_bounded]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

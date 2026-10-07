@@ -1616,32 +1616,49 @@ def correlated_noninferable[I, J, N]() -> None:
 
 ## Solving declared upper bounds
 
-### Conditional solutions for fixed type variables
+### Fixed type variables
 
-A path can restrict the non-inferable variable as well as the inferable variable. Its solution
-applies only to specializations that satisfy the path's constraints. If the path fixes `S` to `int`,
-no `T` bounded by `str` can satisfy `S ≤ T`.
+An inferred type must satisfy the type variable's declared upper bound or constraints. An unbounded,
+caller-fixed `S` does not satisfy a bound of `str` or select one of the constraints `str` and
+`bytes`, even if the path contains an upper bound on `S`.
 
 ```py
 from typing import TypeVar
 from ty_extensions._internal import ConstraintSet
 
-def conditional[S, T: str]() -> None:
+def fixed_upper_bound[S, T: str, U: (str, bytes)]() -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@conditional]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
 
     impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
     reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+def bounded_upper_bound[S: str, T: str]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@bounded_upper_bound]]
 
 S = TypeVar("S")
+BoundedS = TypeVar("BoundedS", bound=str)
 T = TypeVar("T", bound=str)
+U = TypeVar("U", str, bytes)
 
-def legacy_conditional(source: S, target: T) -> None:
+def legacy_fixed_upper_bound(source: S, target: T, constrained_target: U) -> None:
     constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
-    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@legacy_conditional]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+    constrained = ConstraintSet.lower_bound(S, U) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constrained.solutions_for(U, inferable=tuple[U]))  # revealed: None
 
     impossible = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, int)
     reveal_type(impossible.solutions_for(T, inferable=tuple[T]))  # revealed: None
+
+def legacy_bounded_upper_bound(source: BoundedS, target: T) -> None:
+    constraints = ConstraintSet.lower_bound(BoundedS, T)
+    # revealed: tuple[Solution[T=BoundedS@legacy_bounded_upper_bound]]
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))
 ```
 
 ### Joint inference
