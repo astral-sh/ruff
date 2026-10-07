@@ -18,6 +18,7 @@ use crate::diagnostic::DiagnosticGuard;
 use crate::importer::Importer;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
+use crate::types::diagnostic::INVALID_TYPE_FORM;
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -247,7 +248,12 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(super) fn has_diagnostics(&self) -> bool {
-        !self.diagnostics.borrow().is_empty()
+        self.diagnostics.borrow().has_diagnostics()
+    }
+
+    /// Records an invalid type form even when its diagnostic is suppressed or inferred separately.
+    pub(super) fn mark_invalid_type_form(&self) {
+        self.diagnostics.borrow_mut().mark_invalid_type_form();
     }
 
     /// Prevents diagnostic construction for this inference context.
@@ -293,6 +299,9 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         lint: &'static LintMetadata,
         ranged: T,
     ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
+        if LintId::of(lint) == LintId::of(&INVALID_TYPE_FORM) {
+            self.mark_invalid_type_form();
+        }
         LintDiagnosticGuardBuilder::new(self, lint, ranged.range())
     }
 
