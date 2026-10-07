@@ -3174,6 +3174,7 @@ dependencies = [
  "codspeed-criterion-compat",
  "codspeed-divan-compat",
  "criterion",
+ "itertools 0.15.0",
  "mimalloc",
  "rayon",
  "ruff_db",
