@@ -453,8 +453,7 @@ def compatible_context(value: BoundedS) -> list[BoundedS]:
     return box(value)  # no diagnostic
 
 def gradual_context(value: Any) -> list[S]:
-    # TODO: `Any` satisfies the bound even when the return context contains `S`.
-    return box(value)  # error: [invalid-argument-type]
+    return box(value)  # no diagnostic
 
 from collections.abc import Callable
 

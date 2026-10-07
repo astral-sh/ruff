@@ -11,9 +11,9 @@ use crate::place::global_symbol;
 use crate::types::callable::{CallableType, CallableTypeKind};
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
-    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, FixedTypeVarPolicy,
-    IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths, SolutionValidity,
-    SolutionViolationKind, Solutions, TypeVarSolution,
+    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+    PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
+    TypeVarSolution,
 };
 use crate::types::generics::GenericContext;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
@@ -38,22 +38,6 @@ fn create_typevar<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInsta
 
 fn known_instance(db: &TestDb, class: KnownClass) -> Type<'_> {
     class.to_instance(db, &db.program_environment())
-}
-
-fn strict_solutions<'db>(
-    db: &'db TestDb,
-    set: ConstraintSet<'db, '_>,
-    inferable: TypeVarSet<'db>,
-) -> Result<Solutions<'db>, ProjectionError> {
-    let env = db.program_environment();
-    set.solutions_with_policy(
-        db,
-        &env,
-        inferable,
-        SolutionBudget::default(),
-        FixedTypeVarPolicy::RequireCallerFixedBounds,
-        |_, candidate| CandidateSolutions::default_solve(db, &env, set.builder, candidate),
-    )
 }
 
 fn exact<'db, 'c>(
@@ -125,7 +109,6 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
-        FixedTypeVarPolicy::Conditional,
         |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
@@ -169,7 +152,6 @@ fn path_limit_is_checked_before_solving() {
                 paths: max_paths,
                 ..SolutionBudget::default()
             },
-            FixedTypeVarPolicy::Conditional,
             |_, bound| {
                 selected += 1;
                 CandidateSolutions::default_solve(db, &env, &builder, bound)
@@ -363,7 +345,7 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
         };
         let set =
             lower(Type::TypeVar(fixed[0])).or(db, &builder, || lower(Type::TypeVar(fixed[1])));
-        let result = strict_solutions(db, set, inferable);
+        let result = set.solutions(db, &env, inferable);
         let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
             panic!("expected invalid paths, got {result:?}");
         };
@@ -412,25 +394,26 @@ fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
     });
     let inferable = TypeVarSet::from_typevars(db, [t]);
 
-    let result = strict_solutions(db, set, inferable);
+    let result = set.solutions(db, &env, inferable);
     let Ok(Solutions::Unsatisfiable(paths)) = result else {
         panic!("expected invalid paths, got {result:?}");
     };
-    let violations: Vec<_> = paths
-        .as_slice()
-        .iter()
-        .flat_map(Solution::violations)
-        .collect();
-    assert!(violations.iter().any(|violation| {
-        violation.bound_typevar == t
-            && violation.kind
-                == SolutionViolationKind::UpperBound(Some(UnionType::from_two_elements(
-                    db,
-                    &env,
-                    str,
-                    Type::TypeVar(s),
-                )))
-    }));
+    assert!(
+        paths
+            .as_slice()
+            .iter()
+            .flat_map(Solution::violations)
+            .any(|violation| {
+                violation.bound_typevar == t
+                    && violation.kind
+                        == SolutionViolationKind::UpperBound(Some(UnionType::from_two_elements(
+                            db,
+                            &env,
+                            str,
+                            Type::TypeVar(s),
+                        )))
+            })
+    );
 }
 
 #[test]
@@ -463,7 +446,7 @@ fn upper_bound_checks_mixed_evidence_after_substitution() {
     // Substituting U's validity constraint into U <= T produces the mixed lower bound
     // list[S] <= T. S is fixed, so it cannot be specialized to make that satisfy T's bound.
     assert!(matches!(
-        strict_solutions(db, set, inferable),
+        set.solutions(db, &env, inferable),
         Ok(Solutions::Unsatisfiable(_))
     ));
 }
@@ -497,7 +480,7 @@ fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
     let inferable = TypeVarSet::from_typevars(db, [t, u]);
 
     assert!(matches!(
-        strict_solutions(db, set, inferable),
+        set.solutions(db, &env, inferable),
         Ok(Solutions::Constrained(_))
     ));
 }
@@ -536,7 +519,7 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
     let inferable = TypeVarSet::from_typevars(db, [t]);
 
     assert!(matches!(
-        strict_solutions(db, set, inferable),
+        set.solutions(db, &env, inferable),
         Ok(Solutions::Unsatisfiable(_))
     ));
 }
@@ -618,7 +601,7 @@ fn upper_bound_specializes_captured_callable_variables() {
             )
         });
         let inferable = TypeVarSet::from_typevars(db, [t, paramspec]);
-        let result = strict_solutions(db, set, inferable);
+        let result = set.solutions(db, &env, inferable);
         assert!(
             matches!(
                 (&result, valid),
@@ -811,16 +794,9 @@ fn incomplete_solution_discards_the_projection() {
             )))
         );
         assert_eq!(
-            set.try_fold_solutions(
-                db,
-                &env,
-                inferable,
-                budget,
-                FixedTypeVarPolicy::Conditional,
-                choose,
-                0,
-                |count, _, _| Ok(count + 1),
-            ),
+            set.try_fold_solutions(db, &env, inferable, budget, choose, 0, |count, _, _| {
+                Ok(count + 1)
+            }),
             Err(ProjectionError::IncompleteSolution)
         );
     }
@@ -889,7 +865,6 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         &env,
                         inferable,
                         budget,
-                        FixedTypeVarPolicy::Conditional,
                         choose,
                         Vec::new(),
                         |mut paths, path, budget| {
@@ -950,7 +925,6 @@ fn valid_unsolved_path_is_not_unconstrained() {
                 &env,
                 inferable,
                 budget,
-                FixedTypeVarPolicy::Conditional,
                 |_, _| selected,
                 0,
                 |count, path, _| {
@@ -997,7 +971,6 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            FixedTypeVarPolicy::Conditional,
             |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {

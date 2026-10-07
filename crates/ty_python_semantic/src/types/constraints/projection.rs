@@ -3,8 +3,8 @@
 use rustc_hash::FxHashSet;
 
 use super::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, FixedTypeVarPolicy,
-    PathBoundSolution, Solutions, TypeVarSolution,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution, Solutions,
+    TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
 use crate::types::{Type, TypeVarVariance};
@@ -113,7 +113,7 @@ impl ProjectionTypeBudget {
 
 impl<'db> ConstraintSet<'db, '_> {
     /// Computes default solutions for each BDD path within the default projection budget.
-    /// Each solution is conditional on its path, including constraints on non-inferable typevars.
+    /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
     pub(crate) fn solutions(
         self,
         db: &'db dyn Db,
@@ -136,7 +136,6 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        fixed_typevar_policy: FixedTypeVarPolicy,
     ) -> Result<CandidateSolutions<'db>, ProjectionError> {
         CandidateSolutions::compute_bounded(
             db,
@@ -146,7 +145,6 @@ impl<'db> ConstraintSet<'db, '_> {
             inferable,
             self.source_order,
             budget,
-            fixed_typevar_policy,
         )
     }
 
@@ -154,8 +152,8 @@ impl<'db> ConstraintSet<'db, '_> {
     ///
     /// The selector receives the typevar's variance and explicit lower and upper bounds. Its
     /// outcome distinguishes missing evidence, invalid paths, and exhausted solution budgets.
-    /// Each solution is conditional on its path, including constraints on non-inferable typevars.
     /// The caller is responsible for combining the resulting paths (typically via union).
+    /// Constraints on non-inferable typevars are not necessarily retained in the solutions.
     /// The selector must preserve the typevar's declared bound: path validation does not
     /// revalidate an arbitrary type selected afterward.
     ///
@@ -163,7 +161,7 @@ impl<'db> ConstraintSet<'db, '_> {
     /// family as [`SolutionPaths::BudgetExceeded`](super::SolutionPaths::BudgetExceeded).
     /// Exhausting a limit in the supplied [`SolutionBudget`] instead returns an error without a
     /// partial path family.
-    fn solutions_with(
+    pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -171,27 +169,7 @@ impl<'db> ConstraintSet<'db, '_> {
         budget: SolutionBudget,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
     ) -> Result<Solutions<'db>, ProjectionError> {
-        self.solutions_with_policy(
-            db,
-            env,
-            inferable,
-            budget,
-            FixedTypeVarPolicy::Conditional,
-            choose,
-        )
-    }
-
-    pub(crate) fn solutions_with_policy(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
-        budget: SolutionBudget,
-        fixed_typevar_policy: FixedTypeVarPolicy,
-        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
-    ) -> Result<Solutions<'db>, ProjectionError> {
-        let path_bounds =
-            self.bounded_path_bounds(db, env, inferable, budget, fixed_typevar_policy)?;
+        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
         let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
         path_bounds.try_solve_with(choose, |solution| {
             for violation in solution.violations() {
@@ -227,7 +205,6 @@ impl<'db> ConstraintSet<'db, '_> {
         env: &ProgramEnvironment<'db>,
         inferable: TypeVarSet<'db>,
         budget: SolutionBudget,
-        fixed_typevar_policy: FixedTypeVarPolicy,
         choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
         initial: T,
         fold: impl FnMut(
@@ -236,8 +213,7 @@ impl<'db> ConstraintSet<'db, '_> {
             &mut ProjectionTypeBudget,
         ) -> Result<T, ProjectionError>,
     ) -> Result<SolutionProjection<T>, ProjectionError> {
-        let path_bounds =
-            self.bounded_path_bounds(db, env, inferable, budget, fixed_typevar_policy)?;
+        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
 
         path_bounds.try_fold_with(
             choose,

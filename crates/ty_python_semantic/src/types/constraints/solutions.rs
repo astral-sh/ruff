@@ -13,8 +13,8 @@ use crate::types::constraints::variables::{Constraint, ConstraintProvenance, Uns
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
     CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
-    ConstraintSetStorage, FixedTypeVarPolicy, Node, NodeId, SolutionLimits, SolutionValidity,
-    SolutionViolation, SolutionViolationKind, UnboundedSolutionLimits,
+    ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
+    SolutionViolationKind, UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -146,7 +146,6 @@ type ExploredNodeKey = (
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
-    pub(super) fixed_typevar_policy: FixedTypeVarPolicy,
     /// The relation before non-inferable variables are projected away. Used to recover the
     /// original upper bounds for diagnostics, since projected paths can contain derived bounds
     /// that obscure the original evidence.
@@ -194,7 +193,6 @@ impl<'db> SolutionWalker<'db> {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,
-            fixed_typevar_policy: FixedTypeVarPolicy::Conditional,
             original_node,
             inferable,
             inferable_support,
@@ -693,9 +691,6 @@ impl<'db> SolutionWalker<'db> {
         path: &mut PathAssignments,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> ControlFlow<L::Break, bool> {
-        if self.fixed_typevar_policy == FixedTypeVarPolicy::Conditional {
-            return ControlFlow::Continue(true);
-        }
         if !bound_typevar.is_inferable(db, self.inferable) {
             return ControlFlow::Continue(true);
         }
@@ -757,11 +752,8 @@ impl<'db> SolutionWalker<'db> {
             if constraint.provenance() == ConstraintProvenance::Validity {
                 continue;
             }
-            let (typevar, ty) = match constraint {
-                Constraint::ConcreteLower(bound) => (bound.typevar, bound.bound),
-                Constraint::ConcreteUpper(bound) => (bound.typevar, bound.bound),
-                Constraint::ConcreteEquivalence(bound) => (bound.typevar, bound.bound),
-                Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => continue,
+            let Some((typevar, ty)) = constraint.as_concrete() else {
+                continue;
             };
             if !typevar.is_paramspec(db) || !typevar.is_inferable(db, self.inferable) {
                 continue;
