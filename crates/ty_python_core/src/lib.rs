@@ -1310,49 +1310,34 @@ mod tests {
     }
 
     #[test]
-    fn keyword_unpacking_uses() {
+    fn nested_symbol_accesses() {
         for (body, expected) in [
-            ("values = {}\nf(**values)\nf(**values)", true),
-            ("values = {}\nf(**values)\nvalues = {}\nf(**values)", true),
-            ("values = {}\nf(values)\nf(**values)", false),
-            ("values = {}\nf(**values)\nalias = values", false),
-            ("values = {}\nvalues['x'] = 1\nf(**values)", false),
-            ("values = {}\nvalues.clear()\nf(**values)", false),
-            ("values = {}\nf(**(alias := values))", false),
-            ("values = {}\nf(**(values if flag else {}))", false),
-            ("values = {}\nf(**values)\ndel values", false),
+            ("values = {}\nf(values)\nvalues.clear()", false),
+            ("def nested():\n    return values\nvalues = {}", true),
+            ("values = {}\nfn = lambda: values", true),
             (
-                "def nested():\n    f(**values)\nvalues = {}\nf(**values)",
-                false,
-            ),
-            (
-                "def nested():\n    nonlocal values\n    values = {}\nvalues = {}\nf(**values)",
-                false,
-            ),
-            (
-                "values = {}\nf(**values)\ndef middle():\n    def nested():\n        nonlocal values\n        values = {}",
-                false,
-            ),
-            (
-                "for n in range(2):\n    values = {'x': 1}\n    if n:\n        change()\n    f(**values)\n    def change():\n        nonlocal values\n        values = {'y': 2}",
-                false,
-            ),
-            (
-                "values = {}\nf(**values)\ndef nested():\n    global values\n    values = {}",
+                "def nested():\n    nonlocal values\n    values = {}\nvalues = {}",
                 true,
             ),
             (
-                "updates = ((values := {'x': 1} for _ in [0]) for _ in [0])\nvalues = {'extra': 1}\nnext(next(updates))\nf(**values)",
+                "values = {}\ndef middle():\n    def nested():\n        nonlocal values\n        values = {}",
+                true,
+            ),
+            (
+                "for n in range(2):\n    values = {'x': 1}\n    if n:\n        change()\n    def change():\n        nonlocal values\n        values = {'y': 2}",
+                true,
+            ),
+            (
+                "values = {}\ndef nested():\n    global values\n    values = {}",
                 false,
             ),
             (
-                "values = {}\nitems = [f(**values) for _ in xs]\nf(**values)",
-                false,
+                "updates = ((values := {'x': 1} for _ in [0]) for _ in [0])\nvalues = {'extra': 1}\nnext(next(updates))",
+                true,
             ),
-            (
-                "while flag:\n    save(values)\n    values = {}\n    f(**values)",
-                false,
-            ),
+            ("values = {}\nitems = [f(values) for _ in xs]", true),
+            ("while flag:\n    save(values)\n    values = {}", false),
+            ("values = {}\ndef nested():\n    values = {}", false),
         ] {
             let source = format!("def outer():\n    {}\n", body.replace('\n', "\n    "));
             let TestCase { db, file } = test_case(&source);
@@ -1365,7 +1350,7 @@ mod tests {
                 place_table(&db, scope)
                     .symbol_by_name("values")
                     .unwrap()
-                    .is_used_only_for_keyword_unpacking(),
+                    .is_accessed_from_nested_scope(),
                 expected,
                 "{source}",
             );

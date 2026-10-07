@@ -82,12 +82,6 @@ use super::place::PlaceExprRef;
 mod except_handlers;
 mod loop_bindings_visitor;
 
-#[derive(Clone, Copy)]
-enum SymbolUse {
-    Value,
-    KeywordUnpacking,
-}
-
 #[derive(Clone, Debug, Default)]
 struct Loop {
     /// Flow states at each `break` in the current loop.
@@ -716,7 +710,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     if let Some(symbol) = self.place_tables[popped_scope_id].symbol_id(&name) {
                         self.place_tables[popped_scope_id]
                             .symbol_mut(symbol)
-                            .mark_non_keyword_unpacking_use();
+                            .mark_accessed_from_nested_scope();
                     }
                     self.use_def_maps[popped_scope_id]
                         .mark_binding_definitions_used(capture.binding_definition_ids);
@@ -1434,18 +1428,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_place_table_mut().symbol_mut(id).mark_used();
     }
 
-    fn record_place_use(
-        &mut self,
-        place_id: ScopedPlaceId,
-        expr: &'ast ast::Expr,
-        symbol_use: SymbolUse,
-    ) {
+    fn record_place_use(&mut self, place_id: ScopedPlaceId, expr: &'ast ast::Expr) {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
-            let symbol = self.current_place_table_mut().symbol_mut(symbol_id);
-            match symbol_use {
-                SymbolUse::Value => symbol.mark_used(),
-                SymbolUse::KeywordUnpacking => symbol.mark_used_for_keyword_unpacking(),
-            }
+            self.mark_symbol_used(symbol_id);
         }
         let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
@@ -1978,11 +1963,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .any(|declaration| !declaration.is_global())
             {
                 // A write-only closure can run before its lexical definition on a later loop
-                // iteration. Exclude its owning symbol even if the nested binding definition
-                // does not reach a particular use.
+                // iteration. Record the access even if its nested binding definition does not
+                // reach a particular use.
                 self.current_place_table_mut()
                     .symbol_mut(symbol)
-                    .mark_non_keyword_unpacking_use();
+                    .mark_accessed_from_nested_scope();
             }
             let place: ScopedPlaceId = symbol.into();
             let definition = Definition::new(
@@ -2226,7 +2211,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.place_tables[containing_scope_id].symbol_mut(containing_symbol);
             // Generator bodies can run after later assignments in this scope. This also marks
             // the owner directly when the walrus is inside multiple nested comprehensions.
-            containing_symbol.mark_non_keyword_unpacking_use();
+            containing_symbol.mark_accessed_from_nested_scope();
             if !containing_symbol.is_nonlocal() && !containing_symbol.is_bound() {
                 containing_symbol.mark_bound();
             }
@@ -3487,15 +3472,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn visit_expr_with_context(&mut self, expr: &'ast ast::Expr, context: ExpressionContext) {
-        self.visit_expr_with_symbol_use(expr, context, SymbolUse::Value);
-    }
-
-    fn visit_expr_with_symbol_use(
-        &mut self,
-        expr: &'ast ast::Expr,
-        context: ExpressionContext,
-        symbol_use: SymbolUse,
-    ) {
         self.with_semantic_checker(|semantic, builder| semantic.visit_expr(expr, builder));
 
         self.scopes_by_expression
@@ -3565,7 +3541,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     let place_id = self.add_place(place_expr);
 
                     if is_use {
-                        self.record_place_use(place_id, expr, symbol_use);
+                        self.record_place_use(place_id, expr);
 
                         // Keep track of any uses of unannotated collection initializers.
                         if let Some(collection_def) =
@@ -5699,15 +5675,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     }
 
     fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
-        if keyword.arg.is_none() && keyword.value.is_name_expr() {
-            self.visit_expr_with_symbol_use(
-                &keyword.value,
-                ExpressionContext::Value,
-                SymbolUse::KeywordUnpacking,
-            );
-        } else {
-            walk_keyword(self, keyword);
-        }
+        walk_keyword(self, keyword);
 
         if keyword.arg.is_some() {
             return;
