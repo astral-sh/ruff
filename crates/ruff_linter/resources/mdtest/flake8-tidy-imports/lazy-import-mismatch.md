@@ -58,6 +58,18 @@ error[TID254]: `package.deferred` should be imported lazily
 help: Convert to a lazy import
 ```
 
+### Stub files
+
+Lazy-import policies do not apply to stub files.
+
+```pyi
+import typing
+from package import deferred
+
+lazy import this
+lazy from package import eager
+```
+
 ## Module declarations
 
 ```toml

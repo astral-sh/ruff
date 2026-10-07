@@ -41,6 +41,7 @@ use ty_python_core::symbol::Symbol;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -1810,18 +1811,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Expr::Subscript(subscript) => {
                 let constraints = self.evaluate_simple_expr(expression_node, is_positive);
                 let inference = infer_expression_types(db, expression, TypeContext::default());
-                let typeddict_constraints = self
+                let subscript_constraints = self
                     .narrow_typeddict_subscript_by_truthiness(
                         inference.expression_type(&*subscript.value),
                         &subscript.value,
                         inference.expression_type(&*subscript.slice),
                         is_positive,
                     )
+                    .or_else(|| {
+                        self.narrow_tuple_subscript_by_truthiness(inference, subscript, is_positive)
+                    })
                     .map(|(place, constraint)| {
                         NarrowingConstraints::from_iter([(place, constraint)])
                     });
 
-                Self::merge_optional_constraints_and(constraints, typeddict_constraints)
+                Self::merge_optional_constraints_and(constraints, subscript_constraints)
             }
             ast::Expr::Compare(expr_compare) => {
                 self.evaluate_expr_compare(expr_compare, expression, is_positive)
@@ -4635,19 +4639,33 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                         is_positive,
                         use_generic_filtering,
                     )
-                    .map(|constraint| {
-                        NarrowingConstraints::from_iter([(
-                            place,
-                            if use_generic_filtering {
-                                NarrowingConstraint::generic_filtering(constraint)
-                            } else {
-                                NarrowingConstraint::intersection(constraint.negate_if(
-                                    db,
-                                    &self.env,
-                                    !is_positive,
-                                ))
-                            },
-                        )])
+                    .map(|target| {
+                        let constraint_type = target.negate_if(db, &self.env, !is_positive);
+                        let constraint = if use_generic_filtering {
+                            NarrowingConstraint::generic_filtering(target)
+                        } else {
+                            NarrowingConstraint::intersection(constraint_type)
+                        };
+                        let mut constraints =
+                            NarrowingConstraints::from_iter([(place, constraint)]);
+                        let argument = &expr_call.arguments.args[0];
+                        if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                            && let Some((tuple_place, tuple_constraint)) = self
+                                .narrow_tuple_subscript_by_type(
+                                    inference,
+                                    expr_call,
+                                    subscript,
+                                    constraint_type,
+                                    use_generic_filtering,
+                                )
+                        {
+                            insert_narrowing_constraint(
+                                &mut constraints,
+                                tuple_place,
+                                tuple_constraint,
+                            );
+                        }
+                        constraints
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
@@ -4699,20 +4717,46 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     && !db
                         .analysis_settings(self.scope().file(db))
                         .strict_generic_narrowing;
-                Some((
-                    place,
-                    if use_generic_filtering {
-                        NarrowingConstraint::generic_filtering(target)
-                    } else {
-                        NarrowingConstraint::intersection(
-                            target.top_materialization(db, &self.env).negate_if(
-                                db,
-                                &self.env,
-                                !is_positive,
-                            ),
-                        )
-                    },
-                ))
+                let constraint_type = if use_generic_filtering {
+                    target
+                } else {
+                    target
+                        .top_materialization(db, &self.env)
+                        .negate_if(db, &self.env, !is_positive)
+                };
+                let constraint = if use_generic_filtering {
+                    NarrowingConstraint::generic_filtering(constraint_type)
+                } else {
+                    NarrowingConstraint::intersection(constraint_type)
+                };
+                let mut constraints = NarrowingConstraints::from_iter([(place, constraint)]);
+                for argument in expr_call.arguments.args.iter().chain(
+                    expr_call
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| &keyword.value),
+                ) {
+                    if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                        && let Some(argument_place) = PlaceExpr::try_from_expr(argument)
+                        && self.expect_place(&argument_place) == place
+                        && let Some((tuple_place, tuple_constraint)) = self
+                            .narrow_tuple_subscript_by_type(
+                                inference,
+                                expr_call,
+                                subscript,
+                                constraint_type,
+                                use_generic_filtering,
+                            )
+                    {
+                        insert_narrowing_constraint(
+                            &mut constraints,
+                            tuple_place,
+                            tuple_constraint,
+                        );
+                    }
+                }
+                return Some(constraints);
             }
             // TypeGuard only narrows in the positive case
             Type::TypeGuard(type_guard) if is_positive => {
@@ -5225,6 +5269,95 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         operator: ast::CmpOp,
         is_positive: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // Filter the union based on whether each tuple element at the index could match the rhs.
+        self.filter_tuple_subscript(
+            subscript_value_type,
+            subscript_value_expr,
+            subscript_index_type,
+            |element| {
+                self.evaluate_expr_compare_op(
+                    element,
+                    rhs_type,
+                    operator,
+                    is_positive,
+                    ComparisonSoundnessPolicy::CONSERVATIVE,
+                )
+                .is_none_or(|constraint| !element.is_disjoint_from(self.db, &self.env, constraint))
+            },
+        )
+    }
+
+    /// Narrow unions of tuples based on the truthiness of an element.
+    fn narrow_tuple_subscript_by_truthiness(
+        &self,
+        inference: &ExpressionInference<'db>,
+        subscript: &ast::ExprSubscript,
+        is_positive: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // Evaluating the index can replace the tuple after it was read. Until we track
+        // which binding was checked, skip tuple narrowing for subscripts containing assignment expressions.
+        if any_over_expr(&subscript.value, ast::Expr::is_named_expr)
+            || any_over_expr(&subscript.slice, ast::Expr::is_named_expr)
+        {
+            return None;
+        }
+
+        self.filter_tuple_subscript(
+            inference.expression_type(&*subscript.value),
+            &subscript.value,
+            inference.expression_type(&*subscript.slice),
+            |element| {
+                element
+                    .bool(self.db, &self.env)
+                    .negate_if(!is_positive)
+                    .may_be_true()
+            },
+        )
+    }
+
+    /// Apply an element's type constraint to its containing tuple union.
+    fn narrow_tuple_subscript_by_type(
+        &self,
+        inference: &ExpressionInference<'db>,
+        call: &ast::ExprCall,
+        subscript: &ast::ExprSubscript,
+        constraint: Type<'db>,
+        use_generic_filtering: bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
+        // An assignment can replace the tuple after its element was read. Until we track
+        // which binding was checked, skip tuple narrowing for calls containing assignment expressions.
+        if any_over_expr(&call.func, ast::Expr::is_named_expr)
+            || call
+                .arguments
+                .iter_source_order()
+                .any(|argument| any_over_expr(argument.value(), ast::Expr::is_named_expr))
+        {
+            return None;
+        }
+
+        self.filter_tuple_subscript(
+            inference.expression_type(&*subscript.value),
+            &subscript.value,
+            inference.expression_type(&*subscript.slice),
+            |element| {
+                if use_generic_filtering {
+                    !filter_generic_narrowing_constraint(self.db, &self.env, element, constraint)
+                        .is_never()
+                } else {
+                    !element.is_disjoint_from(self.db, &self.env, constraint)
+                }
+            },
+        )
+    }
+
+    /// Retain tuple union members whose indexed element can satisfy a predicate.
+    fn filter_tuple_subscript(
+        &self,
+        subscript_value_type: Type<'db>,
+        subscript_value_expr: &ast::Expr,
+        subscript_index_type: Type<'db>,
+        mut matches: impl FnMut(Type<'db>) -> bool,
+    ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let db = self.db;
         // We need a union type for narrowing to be useful.
         let Type::Union(union) = subscript_value_type.resolve_type_alias(db) else {
@@ -5232,8 +5365,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         };
 
         // The subscript index must be an integer literal.
-        let index = subscript_index_type.as_int_literal()?;
-        let index = i32::try_from(index).ok()?;
+        let index = i32::try_from(subscript_index_type.as_int_literal()?).ok()?;
 
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         // Skip narrowing if any tuple in the union has an out-of-bounds index.
@@ -5242,20 +5374,11 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return None;
         }
 
-        // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered = union.filter(db, |elem| {
-            elem.tuple_instance_spec(db, &self.env)
+        let filtered = union.filter(db, |element| {
+            element
+                .tuple_instance_spec(db, &self.env)
                 .and_then(|spec| spec.py_index(db, &self.env, index).ok())
-                .is_none_or(|el_ty| {
-                    self.evaluate_expr_compare_op(
-                        el_ty,
-                        rhs_type,
-                        operator,
-                        is_positive,
-                        ComparisonSoundnessPolicy::CONSERVATIVE,
-                    )
-                    .is_none_or(|constraint| !el_ty.is_disjoint_from(db, &self.env, constraint))
-                })
+                .is_none_or(&mut matches)
         });
 
         // Only create a constraint if we actually narrowed something.

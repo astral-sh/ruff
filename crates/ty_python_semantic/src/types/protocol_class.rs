@@ -22,11 +22,11 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        CallableType, ClassBase, ClassType, ErrorContext, FindLegacyTypeVarsVisitor, GenericAlias,
-        GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction, KnownInstanceType,
-        MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter, ProtocolInstanceType,
-        SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
-        TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
+        CallableType, ClassBase, ClassLiteral, ClassType, ErrorContext, FindLegacyTypeVarsVisitor,
+        GenericAlias, GenericContext, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
+        KnownInstanceType, MaterializationKind, MemberLookupKey, MemberLookupPolicy, Parameter,
+        ProtocolInstanceType, SelfBinding, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, UnionType, VarianceInferable, VarianceTerm,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::{INVALID_PROTOCOL, report_undeclared_protocol_member},
@@ -470,6 +470,10 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.member_count(db)
     }
 
+    pub(super) fn has_only_methods(self, db: &'db dyn Db) -> bool {
+        self.members(db).all(|member| member.is_method())
+    }
+
     /// Returns whether structural comparison can avoid recursive member expansion.
     pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
         let env = ProgramEnvironment::from_program(self.interface.program(db));
@@ -682,6 +686,9 @@ pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> +
 /// class P[T](Protocol):
 ///     def method(self) -> T: ...
 /// ```
+///
+/// If a property's exposed type cannot be extracted, visit its accessor callable instead.
+/// Extraction can fail for valid signatures, such as setters that accept the value via `*args`.
 pub(super) fn walk_protocol_instance_interface<
     'db,
     V: super::visitor::TypeVisitor<'db> + ?Sized,
@@ -1531,14 +1538,12 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
         .and_then(|read| read.result_type(db, env, self_type));
     if let Some(read_ty) = read_ty {
         visitor.visit_type(db, read_ty);
-    } else if self_type.is_none()
-        && access.mode == ProtocolMemberAccessMode::Instance
+    } else if access.mode == ProtocolMemberAccessMode::Instance
         && let ProtocolMemberKind::Property {
             read: Some(read), ..
         } = access.declaration.kind
     {
-        // If no receiver type was supplied, fall back to the accessor callable when
-        // its read type cannot be extracted.
+        // Fall back to the accessor callable when its read type cannot be extracted.
         visitor.visit_type(db, read.ty());
     }
 
@@ -1551,9 +1556,7 @@ fn walk_protocol_member_access<'db, V: super::visitor::TypeVisitor<'db> + ?Sized
         .and_then(ProtocolMemberWriteRequirement::accepted_type);
     if let Some(write_ty) = write_ty {
         visitor.visit_type(db, write_ty);
-    } else if self_type.is_none()
-        && let Some(domain) = write.declaration.domain()
-    {
+    } else if let Some(domain) = write.declaration.domain() {
         // Apply the same accessor fallback when the write type cannot be extracted.
         visitor.visit_type(db, domain.ty());
     }
@@ -2098,8 +2101,73 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 })
     }
 
-    fn is_method(&self) -> bool {
+    pub(super) fn is_method(&self) -> bool {
         matches!(self.data.kind, ProtocolMemberKind::Method(..))
+    }
+
+    /// Returns whether this member has a form supported by
+    /// `protocol_materialization_is_noop_with_type_parameters`.
+    ///
+    /// That proof inspects `P[T]` once and treats recursive specializations of `P` as leaves after
+    /// checking their arguments. This check limits the member binding and accessor resolution it
+    /// needs to account for:
+    ///
+    /// - Ordinary properties must have resolvable getter return types and setter value types.
+    /// - Instance methods must have at least one signature, and every overload must have a
+    ///   positional receiver. The walker binds inferred receivers. Explicit receivers must be
+    ///   direct, unmaterialized specializations of `class_origin`, so the proof can handle them
+    ///   using the same rule as other recursive references to `P`.
+    ///
+    /// Arbitrary descriptor access can select an overload based on the specialized receiver;
+    /// inspecting `P[T]` alone does not establish the result for every specialization.
+    /// Attributes, arbitrary descriptors, static methods, class methods, and other receiver forms
+    /// are conservatively excluded from this proof. They may still be unchanged by materialization;
+    /// the caller can use concrete interface inspection or structural comparison instead.
+    /// This check does not establish that the supported member types or type arguments are static.
+    pub(super) fn supports_type_parameter_materialization_proof(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class_origin: ClassLiteral<'db>,
+    ) -> bool {
+        if let ProtocolMemberKind::Property { read, write } = self.data.kind {
+            // The proof supports resolved ordinary property accessors, excluding descriptors.
+            return matches!(
+                (read, write),
+                (
+                    None | Some(ProtocolPropertyType::PropertyGetter(_)),
+                    None | Some(ProtocolMemberWrite::Type(
+                        ProtocolPropertyType::PropertySetter(_)
+                    ))
+                )
+            ) && read.is_none_or(|getter| getter.resolve(db, env).is_some())
+                && write.is_none_or(|setter| {
+                    setter
+                        .domain()
+                        .is_some_and(|setter| setter.resolve(db, env).is_some())
+                });
+        }
+        let ProtocolMemberKind::Method(Type::Callable(callable), ProtocolMethodKind::Instance) =
+            self.data.kind
+        else {
+            return false;
+        };
+        callable.signatures(db).iter().next().is_some()
+            && callable.signatures(db).iter().all(|signature| {
+                signature.has_implicit_positional_receiver_annotation()
+                    || (signature.has_explicit_positional_receiver_annotation()
+                        && signature.parameters().get(0).is_some_and(|parameter| {
+                            parameter
+                                .annotated_type()
+                                .as_protocol_instance()
+                                .is_some_and(|protocol| {
+                                    protocol.materialization_kind(db).is_none()
+                                        && protocol.class_origin(db).is_some_and(|class| {
+                                            class.class_literal(db) == class_origin
+                                        })
+                                })
+                        }))
+            })
     }
 
     /// Returns whether an instance method has an explicit positional receiver annotation.
@@ -2561,7 +2629,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |required_ty| {
                     let result = self.check_type_pair(db, attribute_type, required_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
+                        && result.is_never_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::ProtocolMemberReadTypeIncompatible {
                             source: attribute_type,
@@ -2753,7 +2821,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             let result =
                                 self.check_attribute_write(db, receiver_ty, member.name, write_ty);
                             if let Some(context) = self.report_context()
-                                && result.is_never_satisfied(db, env)
+                                && result.is_never_satisfied(db, env, self.inferable)
                             {
                                 context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible {
                                     target: write_ty,
@@ -2841,7 +2909,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 )
             });
         if let Some(context) = self.report_context()
-            && result.is_never_satisfied(db, env)
+            && result.is_never_satisfied(db, env, self.inferable)
         {
             context.push(ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
@@ -2886,7 +2954,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 };
 
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env)
+                    && result.is_never_satisfied(db, env, self.inferable)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: member.name.into(),
@@ -2956,7 +3024,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let result = self.check_type_pair(db, source, target);
             if let Some(context) = self.report_context()
                 && !target_member.is_method()
-                && result.is_never_satisfied(db, env)
+                && result.is_never_satisfied(db, env, self.inferable)
             {
                 context.push(ErrorContext::ProtocolMemberReadTypeIncompatible { source, target });
             }
@@ -2991,7 +3059,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     };
                     let result = self.check_type_pair(db, target, source);
                     if let Some(context) = self.report_context()
-                        && result.is_never_satisfied(db, env)
+                        && result.is_never_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::ProtocolMemberWriteTypeIncompatible { target });
                     }
@@ -3057,7 +3125,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     })
                 });
                 if let Some(context) = self.report_context()
-                    && result.is_never_satisfied(db, env)
+                    && result.is_never_satisfied(db, env, self.inferable)
                 {
                     context.push(ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
@@ -3123,7 +3191,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 .when_some_and(db, self.constraints, |read_ty| {
                     let result = self.check_type_pair(db, ty, read_ty);
                     if let Some(context) = self.report_context()
-                        && result.is_always_satisfied(db, env)
+                        && result.is_always_satisfied(db, env, self.inferable)
                     {
                         context.push(ErrorContext::DisjointTypes {
                             left: ty,
@@ -3171,7 +3239,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                     callable_signature.return_ty,
                                 );
                                 if let Some(context) = self.report_context()
-                                    && result.is_always_satisfied(db, env)
+                                    && result.is_always_satisfied(db, env, self.inferable)
                                 {
                                     context.push(ErrorContext::DisjointReturnTypes {
                                         left: method_signature.return_ty,
@@ -3185,7 +3253,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             })
         };
         if let Some(context) = self.report_context()
-            && !result.is_always_satisfied(db, env)
+            && !result.is_always_satisfied(db, env, self.inferable)
         {
             context.take();
         }

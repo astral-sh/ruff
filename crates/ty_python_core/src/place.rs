@@ -627,7 +627,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 places.extend(self.simple_expr(&attribute.value));
                 places
             }
-            // Subscript truthiness can also narrow its base (`TypedDict` tagged unions).
+            // Subscript truthiness can also narrow its base (`TypedDict` and tuple unions).
             ast::Expr::Subscript(subscript) => {
                 let mut places = self.simple_expr(expr);
                 places.extend(self.simple_expr(&subscript.value));
@@ -720,10 +720,17 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                 .filter(|keyword| keyword.arg.is_some())
                 .map(|keyword| &keyword.value),
         ) {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(argument) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
+            if let Some(place_expr) = PlaceExpr::try_from_expr(argument)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
+            }
+            // Checking a tuple element can also eliminate alternatives of its tuple union.
+            if let ast::Expr::Subscript(subscript) = argument.expression_value()
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 

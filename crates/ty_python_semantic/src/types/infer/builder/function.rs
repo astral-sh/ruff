@@ -207,7 +207,7 @@ impl<'db> ExpectedReturnType<'db> {
 
         check(self.public)
             .or(db, &builder, || check(self.lexical))
-            .is_always_satisfied(db, env)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 }
 
@@ -839,7 +839,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let annotation = param_with_default
                 .annotation()
                 .map(|annotation| function_signature_expression_type(db, definition, annotation));
-            self.infer_expression(default, TypeContext::new(annotation));
+            self.infer_expression(default, TypeContext::declared(annotation));
         }
 
         self.deferred_state = previous_deferred_state;
@@ -1813,7 +1813,10 @@ impl KnownFunction {
                         .is_none_or(|value_expr| {
                             builder
                                 .speculate_without_diagnostics()
-                                .infer_expression(value_expr, TypeContext::new(Some(casted_type)))
+                                .infer_expression(
+                                    value_expr,
+                                    TypeContext::declared(Some(casted_type)),
+                                )
                                 .is_disjoint_from(db, env, casted_type)
                         })
                     && let Some(diagnostic) =

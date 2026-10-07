@@ -3,6 +3,7 @@ use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::DbWithWritableSystem as _;
@@ -615,7 +616,7 @@ fn divergent_type() {
     );
     for (source, target) in [(div, union), (div, Type::unknown()), (Type::unknown(), div)] {
         let when = source.when_constraint_set_assignable_to_owned(db, &env, target);
-        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env)));
+        assert!(when.query(|_builder, when| when.is_always_satisfied(db, &env, TypeVarSet::None)));
     }
     let normalized = union
         .recursive_type_normalized_impl(db, &env, div, false)

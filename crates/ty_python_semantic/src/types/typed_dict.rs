@@ -978,7 +978,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             };
             result.intersect(db, self.constraints, field_constraints);
             if result.is_trivially_never_satisfied()
-                || (self.is_context_collection_enabled() && result.is_never_satisfied(db, self.env))
+                || (self.is_context_collection_enabled()
+                    && result.is_never_satisfied(db, self.env, self.inferable))
             {
                 if let Some(context) = self.report_context()
                     && let Some(source_item_field) = source_items.get(target_item_name.as_str())
@@ -1241,7 +1242,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
                 };
                 if let Some(context) = self.report_context()
-                    && result.is_always_satisfied(db, self.env)
+                    && result.is_always_satisfied(db, self.env, self.inferable)
                 {
                     context.push(ErrorContext::TypedDictFieldTypeConflict {
                         field_name: name.clone(),
@@ -2649,8 +2650,10 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
                 && positional_target.openness(db).is_implicitly_open();
             let positional_target_ty = Type::TypedDict(positional_target);
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
-            let arg_ty =
-                expression_type_fn(arg, TypeContext::new(Some(positional_inference_target_ty)));
+            let arg_ty = expression_type_fn(
+                arg,
+                TypeContext::declared(Some(positional_inference_target_ty)),
+            );
 
             if let Some(provided_keys) = validate_from_typed_dict_argument(
                 context,
@@ -2702,7 +2705,7 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
         // Assignability already checks for required keys and type compatibility,
         // so we don't need separate validation.
         let arg = &arguments.args[0];
-        let arg_ty = expression_type_fn(arg, TypeContext::new(Some(typed_dict_ty)));
+        let arg_ty = expression_type_fn(arg, TypeContext::declared(Some(typed_dict_ty)));
 
         if !arg_ty.is_assignable_to(db, env, typed_dict_ty) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
@@ -2794,7 +2797,7 @@ fn validate_from_keywords<'db, 'ast>(
 
             let value_tcx = typed_dict
                 .item(db, arg_name.id.as_str())
-                .map(|field| TypeContext::new(Some(field.declared_ty)))
+                .map(|field| TypeContext::declared(Some(field.declared_ty)))
                 .unwrap_or_default();
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
             TypedDictKeyAssignment {
@@ -2877,8 +2880,10 @@ fn validate_merged_dict_literal<'db, 'ast>(
                     if let Some(expected_ty) = typed_dict
                         .arbitrary_key_initialization_type_excluding(db, env, shadowed_keys)
                     {
-                        let value_ty =
-                            expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
+                        let value_ty = expression_type_fn(
+                            &item.value,
+                            TypeContext::declared(Some(expected_ty)),
+                        );
                         if !value_ty.is_assignable_to(db, env, expected_ty) {
                             valid = false;
                             if let Some(builder) =
@@ -2920,7 +2925,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             if !is_shadowed {
                 let value_tcx = typed_dict
                     .item(db, key.as_str())
-                    .map(|field| TypeContext::new(Some(field.declared_ty)))
+                    .map(|field| TypeContext::declared(Some(field.declared_ty)))
                     .unwrap_or_default();
                 let value_ty = expression_type_fn(&item.value, value_tcx);
                 valid &= TypedDictKeyAssignment {

@@ -1,5 +1,6 @@
 use crate::Db;
 use crate::ProgramEnvironment;
+use crate::types::typevar::TypeVarSet;
 use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -278,7 +279,7 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
                 let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
-                Truthiness::from(tracked_set.is_always_satisfied(db, env))
+                Truthiness::from(tracked_set.is_always_satisfied(db, env, TypeVarSet::None))
             }
 
             Type::KnownInstance(KnownInstanceType::Range { is_non_empty }) => {

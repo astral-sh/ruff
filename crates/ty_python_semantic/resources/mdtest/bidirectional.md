@@ -769,6 +769,149 @@ def forwarded[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 ```
 
+## Upper-bound type context
+
+The declared upper bound of a type variable provides type context for a nested generic call:
+
+```py
+def singleton[T](value: T) -> list[T]:
+    return [value]
+
+def bounded[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(singleton(True))  # revealed: list[bool]
+reveal_type(bounded(singleton(True)))  # revealed: list[int]
+```
+
+Declared upper bounds also restrict the range of an inferred gradual solution:
+
+```py
+from collections.abc import Callable, Sequence
+from typing import Any
+
+def singleton_sequence[T](value: T) -> Sequence[T]:
+    return [value]
+
+def bounded_sequence[T: Sequence[int]](value: T) -> T:
+    return value
+
+def consumer[T](value: T) -> Callable[[T], None]:
+    return lambda _: None
+
+def bounded_consumer[T: Callable[[int], None]](value: T) -> T:
+    return value
+
+def _(value: Any):
+    # TODO: This should be `Sequence[Any & int]`.
+    reveal_type(bounded_sequence(singleton_sequence(value)))  # revealed: Sequence[Any]
+    # TODO: This should be `list[int]`.
+    reveal_type(bounded(singleton(value)))  # revealed: list[Any | int]
+    reveal_type(bounded_consumer(consumer(value)))  # revealed: (Any | int, /) -> None
+```
+
+The argument of a callable is narrowed based on outer type context:
+
+```py
+def from_callback[T](f: Callable[[T], None]) -> list[T]:
+    return []
+
+def _(f: Callable[[object], None]):
+    reveal_type(from_callback(f))  # revealed: list[object]
+    reveal_type(bounded(from_callback(f)))  # revealed: list[int]
+```
+
+Upper bounds also provide context for `TypedDict` and lambda parameters:
+
+```py
+from typing import TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+def payload[T: Payload](value: T) -> T:
+    return value
+
+def callback[T: Callable[[int], list[int]]](value: T) -> T:
+    return value
+
+reveal_type(payload({"value": 1}))  # revealed: Payload
+reveal_type(callback(lambda value: [value]))  # revealed: (value: int) -> list[int]
+```
+
+As well as propagate through lambda bodies:
+
+```py
+def _(value: Any):
+    f = callback(lambda _: singleton(value))
+    reveal_type(f(1))  # revealed: list[Any | int]
+```
+
+## Upper-bound context without inference evidence
+
+If there are no inferred or declared constraints for a given type variable, it remains unsolved,
+despite lower and upper validity bounds:
+
+```py
+def empty[T]() -> T:
+    raise NotImplementedError
+
+def bounded[T: int](value: T) -> T:
+    return value
+
+reveal_type(bounded(empty()))  # revealed: Unknown
+
+def empty_list[T]() -> list[T]:
+    return []
+
+def bounded_list[T: list[int]](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(empty_list()))  # revealed: list[Unknown]
+```
+
+The type variable remains unsolved when the upper-bound context passes through another generic call:
+
+```py
+def identity[T](value: T) -> T:
+    return value
+
+reveal_type(bounded_list(identity(empty_list())))  # revealed: list[Unknown]
+```
+
+If an explicit default is provided, it is instead used as the fallback value:
+
+```py
+def empty_with_default[T = bool]() -> T:
+    raise NotImplementedError
+
+reveal_type(bounded(empty_with_default()))  # revealed: bool
+```
+
+## Upper-bound context with constrained type variables
+
+The solution to a constrained type variable is chosen to satisfy outer validity constraints:
+
+```py
+def make[T: (int, str)]() -> T:
+    raise NotImplementedError
+
+def number[U: int](value: U) -> U:
+    return value
+
+reveal_type(number(make()))  # revealed: int
+```
+
+A default is only used when the type variable remains unsolved:
+
+```py
+def make_with_default[T: (int, str) = str]() -> T:
+    raise NotImplementedError
+
+reveal_type(make_with_default())  # revealed: str
+reveal_type(number(make_with_default()))  # revealed: int
+```
+
 ## Generic constructors
 
 The same applies to constructors of generic classes:

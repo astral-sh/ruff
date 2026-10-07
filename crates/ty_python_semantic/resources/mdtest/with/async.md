@@ -796,6 +796,46 @@ async def main_async_generator():
         reveal_type(session)  # revealed: Session
 ```
 
+## Async context manager yielding a protocol with a recursive receiver
+
+The context manager can yield a protocol whose receiver is specialized with the same protocol.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Protocol
+
+class Stream[T](Protocol):
+    def flatten(self: Stream[Stream[T]]) -> None: ...
+
+@asynccontextmanager  # no diagnostic
+async def open_stream(value: Stream[int]) -> AsyncGenerator[Stream[int], None]:
+    yield value
+
+reveal_type(open_stream)  # revealed: (value: Stream[int]) -> _AsyncGeneratorContextManager[Stream[int], None]
+```
+
+The yielded protocol can also be nested in an invariant container, with a bound on its type
+parameter. Checking the decorator still terminates when the receiver's type argument grows:
+
+```py
+class Node[T: object](Protocol):
+    def read(self: Node[tuple[T, T]]) -> int: ...
+
+@asynccontextmanager  # no diagnostic
+async def open_node(value: list[Node[int]]) -> AsyncGenerator[list[Node[int]], None]:
+    yield value
+
+reveal_type(open_node)  # revealed: (value: list[Node[int]]) -> _AsyncGeneratorContextManager[list[Node[int]], None]
+```
+
 ## `asyncio.timeout`
 
 ```toml

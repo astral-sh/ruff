@@ -10,14 +10,15 @@ request already addresses the issue, do not submit a competing one without maint
 
 ## PR conventions
 
-Before opening a PR, inspect the repository's available GitHub labels and the current Rooster
-configuration, including required and ignored labels, in the `[tool.rooster]` and
+Before opening a PR, inspect the repository's available GitHub labels and their descriptions,
+excluding archived labels. Also inspect the current Rooster configuration, including required and
+ignored labels, in the `[tool.rooster]` and
 `[tool.rooster.section-labels]` sections of [Ruff's `pyproject.toml`](pyproject.toml) and
 [ty's `pyproject.toml`](https://github.com/astral-sh/ty/blob/main/pyproject.toml). Labels such as
 `internal`, `testing`, and `ci` can exclude a PR from a changelog. Decide whether and how the change
-should appear in each changelog, then select appropriate labels.
+should appear in each changelog, then select appropriate labels for the PR's content.
 
-When working on ty, PR titles should start with `[ty]`. Add the `ty` GitHub label.
+When working on ty, PR titles should start with `[ty]`. If you can, add the `ty` GitHub label.
 
 If you have permission, apply the selected labels when creating the PR or afterward, then verify
 that the PR's actual labels include them and have the intended effect on each changelog. If the
