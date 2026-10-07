@@ -1461,8 +1461,8 @@ def bounded(fixed: BoundedS) -> None:
 
 ### Specializing a captured variable to satisfy a return bound
 
-The callable's own type variable can be specialized to satisfy the return bound, even when its
-return type also contains a fixed variable from the enclosing function.
+The bound check may specialize a callable's own type variable, even when its return type also
+contains a fixed variable from the enclosing function.
 
 ```py
 from typing import Callable, ParamSpec, TypeVar

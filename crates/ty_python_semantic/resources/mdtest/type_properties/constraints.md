@@ -1614,7 +1614,7 @@ def correlated_noninferable[I, J, N]() -> None:
     reveal_type(constraints.solutions_for(J, inferable=tuple[I, J]))
 ```
 
-## Solving declared upper bounds
+## Solving declared bounds and constraints
 
 ### Fixed type variables
 

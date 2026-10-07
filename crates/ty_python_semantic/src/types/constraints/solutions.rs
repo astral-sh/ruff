@@ -679,9 +679,13 @@ impl<'db> SolutionWalker<'db> {
         evidence.finish(db, env, storage, bound_typevar)
     }
 
-    /// Check a bounded inferable variable's chosen lower bound without specializing caller-fixed
-    /// variables to make the declared bound hold. The ordinary path walk may otherwise derive
-    /// `S <= str` from `S <= T` and `T: str`, even when `S` is fixed by the caller.
+    /// Check an inferable variable's lower bound against its declared upper bound without
+    /// restricting caller-fixed variables.
+    ///
+    /// For example, if `S <= T`, `T: str`, `T` is inferable, and `S` is fixed by the caller, the
+    /// ordinary path walk can derive `S <= str` and accept the path under that condition. That
+    /// condition must instead hold for every specialization permitted by `S`'s own declaration;
+    /// an unconstrained `S` might be `int`.
     fn inferred_lower_satisfies_upper_bound<L: SolutionLimits>(
         &mut self,
         db: &'db dyn Db,
@@ -726,6 +730,7 @@ impl<'db> SolutionWalker<'db> {
         }
         lower_bounds.sort_by_key(|(source_order, _)| *source_order);
         let lower = UnionType::from_elements(db, env, lower_bounds.into_iter().map(|(_, ty)| ty));
+        // Normalization can remove all type variables, as in `S | object`.
         if !any_over_type_expanding_aliases(db, env, lower, Type::is_type_var) {
             return ControlFlow::Continue(true);
         }
