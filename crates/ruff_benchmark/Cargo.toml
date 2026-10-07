@@ -42,6 +42,7 @@ tikv-jemallocator = { workspace = true, optional = true }
 mimalloc = { workspace = true, optional = true }
 
 [dev-dependencies]
+itertools = { workspace = true }
 rayon = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_ranged_value = { workspace = true }
