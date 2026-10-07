@@ -1428,6 +1428,74 @@ def _(values: list[list[Any]]) -> list[Any] | None:
     return pick(values, key=lambda value: reveal_type(value).append(1))  # revealed: list[Any]
 ```
 
+## Generic callback inference in union argument contexts
+
+The input iterables determine the key callback's parameter type when `heapq.merge` is wrapped in
+`list` and passed to a union-typed argument. The compatible union alternative can appear in either
+position.
+
+### Python 3.11
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+import heapq
+from collections.abc import Sequence
+
+class WithId:
+    id: int = 0
+
+class WithoutId: ...
+class First(WithId): ...
+class Second(WithId): ...
+
+def consume(values: Sequence[WithoutId] | Sequence[WithId]) -> None: ...
+def consume_reversed(values: Sequence[WithId] | Sequence[WithoutId]) -> None: ...
+
+first: list[First] = []
+second: list[Second] = []
+
+consume(list(heapq.merge(first, second, key=lambda value: value.id)))  # no diagnostic
+consume_reversed(list(heapq.merge(first, second, key=lambda value: value.id)))  # no diagnostic
+
+merged = list(heapq.merge(first, second, key=lambda value: value.id))
+consume(merged)  # no diagnostic
+```
+
+### Python 3.14
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+import heapq
+from collections.abc import Sequence
+
+class WithId:
+    id: int = 0
+
+class WithoutId: ...
+class First(WithId): ...
+class Second(WithId): ...
+
+def consume(values: Sequence[WithoutId] | Sequence[WithId]) -> None: ...
+def consume_reversed(values: Sequence[WithId] | Sequence[WithoutId]) -> None: ...
+
+first: list[First] = []
+second: list[Second] = []
+
+consume(list(heapq.merge(first, second, key=lambda value: value.id)))  # no diagnostic
+consume_reversed(list(heapq.merge(first, second, key=lambda value: value.id)))  # no diagnostic
+
+merged = list(heapq.merge(first, second, key=lambda value: value.id))
+consume(merged)  # no diagnostic
+```
+
 ## Defaulted type variables in nested generic calls
 
 A type-variable default that refers to an earlier type variable preserves the earlier variable's
