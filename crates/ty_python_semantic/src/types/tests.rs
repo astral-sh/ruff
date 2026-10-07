@@ -704,7 +704,7 @@ fn recursive_annotated_normalization() {
 }
 
 #[test]
-fn recursive_annotated_assignability() {
+fn recursive_annotated_relations() {
     let db = setup_db();
     let env = db.program_environment();
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
@@ -719,9 +719,13 @@ fn recursive_annotated_assignability() {
         assert!(recursive.is_assignable_to(&db, &env, concrete));
         assert!(!concrete.is_subtype_of(&db, &env, recursive));
         assert!(!recursive.is_subtype_of(&db, &env, concrete));
+        assert!(!concrete.is_disjoint_from(&db, &env, recursive));
+        assert!(!recursive.is_disjoint_from(&db, &env, concrete));
     }
     assert!(!integer.is_assignable_to(&db, &env, object));
     assert!(!object.is_assignable_to(&db, &env, integer));
+    assert!(integer.is_disjoint_from(&db, &env, object));
+    assert!(object.is_disjoint_from(&db, &env, integer));
     assert!(!Type::int_literal(1).is_assignable_to(&db, &env, recursive));
     assert!(!recursive.is_assignable_to(&db, &env, KnownClass::Int.to_instance(&db, &env)));
 }

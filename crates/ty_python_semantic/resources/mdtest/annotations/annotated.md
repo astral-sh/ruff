@@ -176,7 +176,9 @@ reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 ## Recursive runtime values
 
 `TypeOf` can make an `Annotated` value refer to the type of another runtime `Annotated` object.
-Inference preserves the outer object and collapses the recursive wrapped type.
+Inference preserves the outer object and collapses the recursive wrapped type. The resulting
+approximation can overlap with a concrete `Annotated` object, so identity comparisons remain
+ambiguous.
 
 ```py
 from typing import Annotated
@@ -186,6 +188,9 @@ value = int
 while True:
     value = Annotated[TypeOf[value], "metadata"]
     reveal_type(value)  # revealed: <special-form 'typing.Annotated[Divergent, <metadata>]'>
+    reveal_type(value is Annotated[TypeOf[int], "metadata"])  # revealed: bool
+    reveal_type(Annotated[TypeOf[int], "metadata"] is value)  # revealed: bool
+    reveal_type(value is not Annotated[TypeOf[int], "metadata"])  # revealed: bool
 ```
 
 ## Recursive inferred attributes
@@ -220,6 +225,9 @@ from ty_extensions._internal import TypeOf
 
 integer = Annotated[int, "metadata"]
 object_ = Annotated[object, "metadata"]
+
+reveal_type(integer is object_)  # revealed: Literal[False]
+reveal_type(integer is not object_)  # revealed: Literal[True]
 
 def accepts_integer(value: TypeOf[integer]): ...
 def accepts_object(value: TypeOf[object_]): ...

@@ -3680,6 +3680,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }),
 
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(left)),
+                Type::KnownInstance(KnownInstanceType::Annotated(right)),
+            ) if left.inner(db).is_recursive_divergent()
+                || right.inner(db).is_recursive_divergent() =>
+            {
+                // A recursive approximation can represent the same Annotated object as a
+                // concrete unfolding, even though their wrapped types differ.
+                self.never()
+            }
+
             // These types are disjoint whenever their represented objects differ.
             (
                 // `LiteralString` can represent different strings and is handled above.
