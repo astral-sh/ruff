@@ -175,3 +175,8 @@ b >= c and a > b
 (b > a) and b < c
 b < c and (b > a)
 
+# Case 5: parenthesized outer operands keep their parentheses
+b < c and (x or y) < b
+b < c and (a < d) < b
+(not x) < b and c > b
+b > (x if y else z) and a > b

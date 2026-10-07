@@ -8,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
+use crate::preview::is_boolean_chained_comparison_reversed_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -35,6 +36,21 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// if a < b < c:
 ///     pass
 /// ```
+///
+/// In [preview], this rule also detects comparisons whose order is reversed or
+/// whose operators are flipped, such as `b < c and a < b` or `b > a and b < c`.
+///
+/// ## Fix safety
+/// The fix is safe for comparisons that already appear in chain order, such as
+/// `a < b and b < c`.
+///
+/// The fix for reversed or flipped comparisons is marked as unsafe. Rewriting
+/// `b < c and a < b` as `a < b < c` changes the order in which the operands are
+/// evaluated and which of them are skipped by short-circuiting. Rewriting
+/// `b > a` as `a < b` calls `__lt__` instead of `__gt__`, which can behave
+/// differently for user-defined types.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.9.0", category = Category::Style)]
 pub(crate) struct BooleanChainedComparison;
@@ -133,6 +149,10 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
 
         // Secondary path: reversed condition order or inverted operators
         // (e.g. `b < c and a < b`, `b > a and b < c`, `b < c and b > a`).
+        if !is_boolean_chained_comparison_reversed_enabled(checker.settings()) {
+            continue;
+        }
+
         let Some((left_l, left_op, left_r)) = left_compare.as_single() else {
             continue;
         };
@@ -156,37 +176,56 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
             && c1_upper_name.id() == c2_lower_name.id()
         {
             // Way 1: `c1` then `c2` in canonical ascending order.
-            Some((c1_lower, c1_dir, c1_upper_name, c2_dir, c2_upper))
+            Some((
+                (c1_lower, left_compare),
+                c1_dir,
+                c1_upper_name,
+                c2_dir,
+                (c2_upper, right_compare),
+            ))
         } else if let (Expr::Name(c2_upper_name), Expr::Name(c1_lower_name)) = (c2_upper, c1_lower)
             && c2_upper_name.id() == c1_lower_name.id()
         {
             // Way 2: `c2` then `c1` in canonical ascending order.
-            Some((c2_lower, c2_dir, c2_upper_name, c1_dir, c1_upper))
+            Some((
+                (c2_lower, right_compare),
+                c2_dir,
+                c2_upper_name,
+                c1_dir,
+                (c1_upper, left_compare),
+            ))
         } else {
             None
         };
 
-        let Some((lower, dir1, middle, dir2, upper)) = chain else {
+        let Some(((lower, lower_compare), dir1, middle, dir2, (upper, upper_compare))) = chain
+        else {
             continue;
         };
 
+        // Keep any parentheses around the outer operands, e.g. `(x or y) < b`.
+        let lower = locator.slice(
+            parenthesized_range(lower.into(), lower_compare.into(), tokens)
+                .unwrap_or(lower.range()),
+        );
+        let upper = locator.slice(
+            parenthesized_range(upper.into(), upper_compare.into(), tokens)
+                .unwrap_or(upper.range()),
+        );
+
         let replacement = if both_originally_greater {
             format!(
-                "{} {} {} {} {}",
-                locator.slice(upper.range()),
+                "{upper} {} {} {} {lower}",
                 inv_dir_to_str(dir2),
                 middle.id(),
                 inv_dir_to_str(dir1),
-                locator.slice(lower.range())
             )
         } else {
             format!(
-                "{} {} {} {} {}",
-                locator.slice(lower.range()),
+                "{lower} {} {} {} {upper}",
                 dir_to_str(dir1),
                 middle.id(),
                 dir_to_str(dir2),
-                locator.slice(upper.range())
             )
         };
 
