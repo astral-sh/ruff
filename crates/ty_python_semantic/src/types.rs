@@ -10980,17 +10980,17 @@ pub enum PromotionKind {
     SingletonsOnly,
 }
 
-/// Returns the class from a `Self` typevar's current upper bound for receiver binding.
-fn self_typevar_bound_class_literal<'db>(
+/// Returns the class recorded in a `Self` typevar's origin.
+fn self_typevar_origin_class_literal<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
     bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<ClassLiteral<'db>> {
-    bound_typevar
-        .typevar(db)
-        .upper_bound(db, env)
-        .and_then(|ty| ty.nominal_class(db, env))
-        .map(|class| class.class_literal(db))
+    match bound_typevar.kind(db) {
+        TypeVarKind::TypingSelf {
+            origin: SelfTypeVarOrigin::Class(class),
+        } => Some(class),
+        _ => None,
+    }
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -11007,8 +11007,8 @@ fn class_mro_literals<'db>(
 
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
-/// Uses the binding context and MRO-based matching against the class from a `Self` typevar's
-/// current upper bound. That bound can differ from the class recorded in its source identity.
+/// Uses the binding context and MRO-based matching against the class recorded in a `Self`
+/// typevar's origin.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
@@ -11035,7 +11035,7 @@ impl<'db> SelfBinding<'db> {
     ) -> Self {
         let class_literal = match self_type {
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
-                self_typevar_bound_class_literal(db, env, typevar)
+                self_typevar_origin_class_literal(db, typevar)
             }
             _ => self_type
                 .nominal_class(db, env)
@@ -11050,12 +11050,7 @@ impl<'db> SelfBinding<'db> {
     }
 
     /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
-    fn should_bind(
-        &self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
         if !bound_typevar.typevar(db).is_self(db) {
             return false;
         }
@@ -11066,12 +11061,12 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // Check that the class from Self's current upper bound is in the receiver's MRO.
-        // A known receiver class can bind Self even if its bound has no nominal class.
+        // Check that Self's originating class is in the receiver's MRO. Receiver placeholders
+        // and synthesized TypedDict schemas have no class to restrict matching.
         self.class_literal.is_some_and(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_bound_class_literal(db, env, bound_typevar)
-                .is_none_or(|bound_class| class_mro.contains(&bound_class))
+            self_typevar_origin_class_literal(db, bound_typevar)
+                .is_none_or(|origin_class| class_mro.contains(&origin_class))
         })
     }
 }
