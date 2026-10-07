@@ -919,7 +919,7 @@ def second(value: Node.Tree): ...
 
 ## Disabled `invalid-type-form` `Self` fallback
 
-Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+Invalid uses of `Self` recover as `Unknown` even when the diagnostic is disabled:
 
 ```toml
 [rules]
@@ -941,13 +941,34 @@ class C:
         reveal_type(value)  # revealed: tuple[Unknown]
 
     def takes_stringified(self, value: Stringified) -> None:
-        reveal_type(value)  # revealed: Unknown
+        reveal_type(value)  # revealed: tuple[Unknown, int]
 
     def invalid_attribute(self) -> Self:
         self.attribute: TypeAlias = Self
         return self.attribute  # error: [invalid-return-type]
 
 C().takes(1)
+```
+
+## Forwarding generic recursive aliases
+
+A forwarded explicit alias preserves type arguments throughout the recursive type:
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Node: TypeAlias = tuple[T, "Forwarded[T] | None"]
+Forwarded: TypeAlias = Node
+
+def inspect(value: Forwarded[int]):
+    reveal_type(value[0])  # revealed: int
+    tail = value[1]
+    if tail is not None:
+        reveal_type(tail[0])  # revealed: int
+
+def invalid() -> Forwarded[int]:
+    return (1, ("bad", None))  # error: [invalid-return-type]
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

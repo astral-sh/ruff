@@ -1508,6 +1508,53 @@ fn dependency_unrelated_symbol() -> anyhow::Result<()> {
 }
 
 #[test]
+fn dependency_implicit_alias_definition() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/main.py",
+        "from aliases import Alias\nvalue: Alias = []",
+    )?;
+    let main = system_path_to_file(&db, "/src/main.py")?;
+
+    for (source, expected, should_run) in [
+        (
+            "Alias = list[int]\ndef unrelated(): return 1",
+            "list[int]",
+            true,
+        ),
+        // The alias's meaning is unchanged by edits elsewhere in its defining module.
+        (
+            "Alias = list[int]\ndef unrelated(): return 2",
+            "list[int]",
+            false,
+        ),
+        (
+            "Alias = list[str]\ndef unrelated(): return 2",
+            "list[str]",
+            true,
+        ),
+    ] {
+        db.write_file("/src/aliases.py", source)?;
+        db.clear_salsa_events();
+
+        let value = global_symbol(&db, main, "value").place.expect_type();
+        assert_eq!(
+            value.display(&db, &db.program_environment()).to_string(),
+            expected
+        );
+
+        let events = db.take_salsa_events();
+        let definition = first_public_binding(&db, main, "value");
+        if should_run {
+            assert_function_query_was_run(&db, infer_definition_types, definition, &events);
+        } else {
+            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();

@@ -1460,6 +1460,8 @@ declare_lint! {
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
+    /// Tracks type-expression validity independently of diagnostic configuration and suppression.
+    has_invalid_type_form: bool,
 }
 
 pub(crate) fn report_mismatched_type_name<'db>(
@@ -1497,9 +1499,10 @@ impl TypeCheckDiagnostics {
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.extend_from_slice(&other.diagnostics);
         self.used_suppressions.extend(&other.used_suppressions);
+        self.has_invalid_type_form |= other.has_invalid_type_form;
     }
 
-    /// Extend with selected diagnostics while retaining all used suppressions.
+    /// Extend with selected diagnostics while retaining all used suppressions and validity metadata.
     pub(super) fn extend_filtered(
         &mut self,
         other: &TypeCheckDiagnostics,
@@ -1512,6 +1515,16 @@ impl TypeCheckDiagnostics {
                 .cloned(),
         );
         self.used_suppressions.extend(&other.used_suppressions);
+        self.has_invalid_type_form |= other.has_invalid_type_form;
+    }
+
+    /// Whether inference encountered an invalid type form, even if its diagnostic was suppressed.
+    pub(super) fn has_invalid_type_form(&self) -> bool {
+        self.has_invalid_type_form
+    }
+
+    pub(super) fn mark_invalid_type_form(&mut self) {
+        self.has_invalid_type_form = true;
     }
 
     pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
@@ -1540,7 +1553,12 @@ impl TypeCheckDiagnostics {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+        !self.has_diagnostics() && !self.has_invalid_type_form
+    }
+
+    /// Whether diagnostics or used suppressions were collected, excluding validity metadata.
+    pub(super) fn has_diagnostics(&self) -> bool {
+        !self.diagnostics.is_empty() || !self.used_suppressions.is_empty()
     }
 
     fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {

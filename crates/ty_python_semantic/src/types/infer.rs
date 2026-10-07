@@ -75,6 +75,7 @@ use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, se
 
 mod builder;
 mod implicit_alias;
+use implicit_alias::implicit_alias_definition;
 pub(super) use implicit_alias::implicit_alias_parameters;
 mod comparisons;
 #[cfg(test)]
@@ -92,8 +93,8 @@ pub(super) struct CyclicTypeAliasError<'db> {
 
 /// Infer the type denoted by an implicit or PEP 613 alias independently of its runtime value.
 ///
-/// `_parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
-/// Although the function body does not read it, Salsa's `cycle_initial` uses it to construct
+/// `parameters` supplies the formal type parameters collected by [`implicit_alias_parameters`].
+/// Salsa's `cycle_initial` uses it to construct
 /// `μa. a` with an identity specialization (for example, `T -> T`) on both the recursive type and
 /// its self-reference. This lets recursive uses such as `Alias[int]` or `Alias[list[T]]` specialize
 /// the provisional type before inference of the alias's body is complete. `cycle_fn` then binds
@@ -108,6 +109,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
+            parameters,
             diagnostics: TypeCheckDiagnostics::default(),
             implicit_aliases: Box::default(),
         }
@@ -124,7 +126,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
 pub(super) fn infer_implicit_alias_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    _parameters: Option<crate::types::GenericContext<'db>>,
+    parameters: Option<crate::types::GenericContext<'db>>,
 ) -> ImplicitAliasInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
@@ -132,6 +134,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return ImplicitAliasInference {
             ty: Ok(Type::unknown()),
+            parameters,
             diagnostics: TypeCheckDiagnostics::default(),
             implicit_aliases: Box::default(),
         };
@@ -147,7 +150,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
         index,
         &module,
     )
-    .finish_implicit_alias_type(definition, value)
+    .finish_implicit_alias_type(definition, value, parameters)
 }
 
 /// The type and diagnostics inferred from an alias's right-hand side.
@@ -158,6 +161,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAliasInference<'db> {
     pub(super) ty: ImplicitAliasResult<'db>,
+    pub(super) parameters: Option<crate::types::GenericContext<'db>>,
     pub(super) diagnostics: TypeCheckDiagnostics,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }

@@ -1,6 +1,5 @@
 use itertools::Either;
 use ruff_db::diagnostic::Annotation;
-use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::helpers::is_dotted_name;
@@ -12,7 +11,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
-use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
     INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
@@ -23,14 +21,13 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
-    implicit_alias_parameters, infer_implicit_alias_type,
+    implicit_alias_definition, implicit_alias_parameters, infer_implicit_alias_type,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::place_table;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -44,79 +41,33 @@ use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagn
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    fn recursive_implicit_alias_reference(
+    fn implicit_alias_reference(
         &mut self,
-        value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
         let db = self.db();
-        let mut definition = definition?;
-        // A resolved non-recursive value already describes the alias. Gradual types, unions,
-        // and quoted aliases can hide recursive references, so they still need inference.
-        // Even a valid union can have lost a cyclic member during value inference.
-        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
-            matches!(
-                ty,
-                Type::Dynamic(_)
-                    | Type::Divergent(_)
-                    | Type::Recursive(_)
-                    | Type::TypeAlias(_)
-                    | Type::KnownInstance(
-                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
-                    )
-            )
-        }) {
-            return None;
-        }
-        if definition.kind(db).is_import() {
-            // Imports bind names without declaring their types, so resolve their definitions directly.
-            let table = place_table(db, definition.scope(db));
-            let symbol = table.symbol(definition.place(db).as_symbol()?);
-            let definitions = resolve_definition(
-                db,
-                self.program_environment(),
-                definition,
-                Some(symbol.name().as_str()),
-                ImportAliasResolution::ResolveAliases,
-            );
-            let [resolved] = definitions.as_slice() else {
-                return None;
-            };
-            definition = resolved.definition()?;
-        }
-        let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
-        let value = definition.kind(db).value(&module)?;
-        if !matches!(
-            value,
-            ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::BinOp(_)
-                | ast::Expr::StringLiteral(_)
-        ) {
-            return None;
-        }
-        match definition.kind(db) {
-            DefinitionKind::Assignment(_) if !value.is_string_literal_expr() => {}
-            DefinitionKind::AnnotatedAssignment(assignment)
-                if crate::types::definition_expression_type(
-                    db,
-                    definition,
-                    assignment.annotation(&module),
-                )
-                .is_typealias_special_form() => {}
-            _ => return None,
-        }
+        let alias_definition = implicit_alias_definition(db, definition?)?;
+        let definition = alias_definition.definition;
         let parameters = implicit_alias_parameters(db, definition);
-        let result = infer_implicit_alias_type(db, definition, parameters).ty;
+        let inference = infer_implicit_alias_type(db, definition, parameters);
         // Preserve cycle errors even when recovery removes every recursive reference. Both
         // runtime-value inference and enclosing aliases need the fallback type to converge.
-        let ty = result.unwrap_or_else(|error| error.fallback_type);
-        let is_recursive = any_over_type(db, self.program_environment(), ty, false, |ty| {
-            matches!(ty, Type::Recursive(_))
-        });
-        if result.is_ok() && !is_recursive {
+        let ty = inference.ty.unwrap_or_else(|error| error.fallback_type);
+
+        // An ordinary assignment whose value is not a valid type expression remains a
+        // variable. Keep recursive recovery types, which can preserve useful structure even
+        // when part of an alias is invalid, and validate explicit aliases at their definitions.
+        if !alias_definition.is_explicit
+            && inference.ty.is_ok()
+            && inference.diagnostics.has_invalid_type_form()
+            && !any_over_type(db, self.program_environment(), ty, false, |ty| {
+                matches!(ty, Type::Recursive(_))
+            })
+        {
             return None;
+        }
+        if inference.diagnostics.has_invalid_type_form() {
+            self.context.mark_invalid_type_form();
         }
 
         // Diagnostics and suppression usage belong to the file defining the alias.
@@ -125,17 +76,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             self.implicit_aliases.insert(definition);
         }
-        Some((ty, parameters))
+        Some((ty, inference.parameters))
     }
 
     pub(in crate::types::infer) fn finish_implicit_alias_type(
         mut self,
         definition: Definition<'db>,
         value: &ast::Expr,
+        parameters: Option<GenericContext<'db>>,
     ) -> ImplicitAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        let ty = self.infer_type_expression(value);
+        // Forwarding an alias preserves its parameters. Interpreting a bare generic alias as
+        // an annotation here would instead apply its default specialization too early.
+        // Explicit alias validation and references without a unique source still need this
+        // path even though references to forwarding aliases are canonicalized during lookup.
+        let (ty, parameters) = if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+            self.context.inference_flags |= InferenceFlags::IN_TYPE_EXPRESSION;
+            if self.in_stub() {
+                self.replace_deferred_state(DeferredExpressionState::Deferred);
+            }
+            let (value_ty, referenced) = self.infer_type_expression_reference(value);
+            self.implicit_alias_reference(referenced)
+                .unwrap_or_else(|| {
+                    (
+                        self.infer_name_or_attribute_type_expression(value_ty, referenced, value),
+                        parameters,
+                    )
+                })
+        } else {
+            (self.infer_type_expression(value), parameters)
+        };
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
             let target = match definition.kind(db) {
@@ -161,6 +132,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
         ImplicitAliasInference {
             ty,
+            parameters,
             diagnostics: self.context.finish(),
             implicit_aliases: self.implicit_aliases.into_iter().collect(),
         }
@@ -261,13 +233,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        if let Some((alias, parameters)) = self.recursive_implicit_alias_reference(ty, definition) {
-            return match parameters {
+        if let Some((alias, parameters)) = self.implicit_alias_reference(definition) {
+            report_missing_type_arguments(&self.context, ty, annotation);
+            let result = match parameters {
                 Some(parameters) => {
                     alias.apply_specialization(db, parameters.default_specialization(db, None))
                 }
                 None => alias,
             };
+            return self.check_type_variable_scope(annotation, result);
         }
         if annotation.is_attribute_expr()
             && let Type::TypeVar(tvar) = ty
@@ -1309,10 +1283,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value_ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) -> Type<'db> {
-        if let Some((alias, Some(parameters))) =
-            self.recursive_implicit_alias_reference(value_ty, definition)
+        if let Some((alias, parameters)) = self.implicit_alias_reference(definition)
+            && (parameters.is_some() || !alias.is_dynamic())
         {
             let db = self.db();
+            let parameters = parameters.unwrap_or_else(|| {
+                GenericContext::from_typevar_instances(db, self.program_environment(), [])
+            });
             return self.infer_explicit_callable_specialization(
                 subscript,
                 alias,

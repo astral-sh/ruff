@@ -5,8 +5,7 @@ special marker, just an ordinary assignment statement.
 
 ## Basic
 
-We support simple type aliases with no extra effort, when the "value type" of the RHS is still a
-valid type for use in a type expression:
+An implicit alias denotes the type described by its right-hand side:
 
 ```py
 MyInt = int
@@ -343,9 +342,7 @@ class Bar(metaclass=Meta): ...
 
 X = Foo | Bar
 
-# In an ideal world, perhaps we would respect `Meta.__or__` here and reveal `str`?
-# But we still need to record what the elements are, since (according to the typing spec)
-# `X` is still a valid type alias
+# TODO: Respect `Meta.__or__` here and reveal `str`.
 reveal_type(X)  # revealed: <types.UnionType special-form 'Foo | Bar'>
 
 def f(obj: X):
@@ -632,6 +629,60 @@ class Derived2(GenericBaseAlias[int]):
     pass
 ```
 
+### Forwarding aliases
+
+Assigning a generic alias to another name preserves its type parameters and their defaults. An alias
+of a generic class or special form also remains subscriptable:
+
+```py
+from typing_extensions import Annotated, TypeAlias, TypeVar, Union
+
+T = TypeVar("T", default=str)
+
+Items = list[T]
+Forwarded = Items
+ForwardedAgain = Forwarded
+List = list
+ForwardedList = List
+DeclaredList: TypeAlias = list  # error: [missing-type-argument]
+UnionAlias = Union
+ForwardedUnion = UnionAlias
+
+def inspect(
+    explicit: Forwarded[int],
+    default: Forwarded,
+    repeated: ForwardedAgain[bytes],
+    class_alias: ForwardedList[int],
+    declared_class_alias: DeclaredList[int],
+    special_form: ForwardedUnion[int, str],
+):
+    reveal_type(explicit)  # revealed: list[int]
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(repeated)  # revealed: list[bytes]
+    reveal_type(class_alias)  # revealed: list[int]
+    reveal_type(declared_class_alias)  # revealed: list[int]
+    reveal_type(special_form)  # revealed: int | str
+```
+
+Renaming a type variable preserves its identity; it does not create an alias that accepts type
+arguments. An alias containing that variable, even a transparent `Annotated` wrapper, can be
+specialized:
+
+```py
+Renamed = T
+ForwardedTypeVar = Renamed
+Identity = Annotated[T, "identity"]
+ForwardedIdentity = Identity
+
+def inspect(
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    type_var: ForwardedTypeVar[int],
+    identity: ForwardedIdentity[int],
+):
+    reveal_type(type_var)  # revealed: Unknown
+    reveal_type(identity)  # revealed: int
+```
+
 ### Generic typed dictionaries in aliases
 
 First, define a generic typed dictionary whose field uses a legacy type variable:
@@ -719,16 +770,56 @@ MyList = list[T]
 from my_types import MyList
 import my_types as mt
 
+Forwarded = MyList
+ForwardedAttribute = mt.MyList
+
 def _(
     list_of_ints1: MyList[int],
     list_of_ints2: mt.MyList[int],
     list_of_str: mt.MyList,
     list_of_str_or_none: mt.MyList | None,
+    forwarded: Forwarded[int],
+    forwarded_attribute: ForwardedAttribute[int],
+    forwarded_default: ForwardedAttribute,
 ):
     reveal_type(list_of_ints1)  # revealed: list[int]
     reveal_type(list_of_ints2)  # revealed: list[int]
     reveal_type(list_of_str)  # revealed: list[str]
     reveal_type(list_of_str_or_none)  # revealed: list[str] | None
+    reveal_type(forwarded)  # revealed: list[int]
+    reveal_type(forwarded_attribute)  # revealed: list[int]
+    reveal_type(forwarded_default)  # revealed: list[str]
+```
+
+### Forward references in stubs
+
+An alias in a stub can refer to a definition that appears later in the file. Forwarding a generic
+alias this way preserves its type parameters:
+
+`aliases.pyi`:
+
+```pyi
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+
+Forwarded: TypeAlias = Items
+Items = list[T]
+Explicit: TypeAlias = Later
+
+class Later: ...
+
+def items() -> Forwarded[int]: ...
+def later() -> Explicit: ...
+```
+
+`main.py`:
+
+```py
+from aliases import items, later
+
+reveal_type(items())  # revealed: list[int]
+reveal_type(later())  # revealed: Later
 ```
 
 ### Imported tagged typed-dictionary aliases
@@ -822,7 +913,7 @@ from typing import Protocol, TypeVar, TypedDict
 
 ListOfInts = list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'list[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `list[int]`"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -845,7 +936,7 @@ def _(doubly_specialized: List, doubly_specialized_2: WorseList):
 
 Tuple = tuple[int, str]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'tuple[int, str]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `tuple[int, str]`"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -857,7 +948,7 @@ class LegacyProto(Protocol[T_co]):
 
 LegacyProtoInt = LegacyProto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'LegacyProto[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `LegacyProto[int]`"
 def _(doubly_specialized: LegacyProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -866,7 +957,7 @@ class Proto[T](Protocol):
 
 ProtoInt = Proto[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Proto[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Proto[int]`"
 def _(doubly_specialized: ProtoInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -888,20 +979,20 @@ class Dict[T](TypedDict):
 
 DictInt = Dict[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<class 'Dict[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Dict[int]`"
 def _(doubly_specialized: DictInt[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 Union = list[str] | list[int]
 
-# error: [not-subscriptable] "Cannot subscript non-generic type `<types.UnionType special-form 'list[str] | list[int]'>`"
+# error: [not-subscriptable] "Cannot subscript non-generic type `list[str] | list[int]`"
 def _(doubly_specialized: Union[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 type MyListAlias[T] = list[T]
 MyListOfInts = MyListAlias[int]
 
-# error: [not-subscriptable] "Cannot specialize non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot subscript non-generic type `MyListAlias[int]`"
 def _(doubly_specialized: MyListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
@@ -998,7 +1089,7 @@ three_ints: ThreeInts[int]
 ```
 
 ```snapshot
-error[not-subscriptable]: Cannot subscript non-generic type `<class 'tuple[int, int, int]'>`
+error[not-subscriptable]: Cannot subscript non-generic type `tuple[int, int, int]`
  --> src/mdtest_snippet.py:8:13
   |
 8 | three_ints: ThreeInts[int]
@@ -1017,7 +1108,7 @@ alias_for_a: AliasForA[int]
 ```
 
 ```snapshot
-error[not-subscriptable]: Cannot subscript non-generic type `<class 'A[int]'>`
+error[not-subscriptable]: Cannot subscript non-generic type `A[int]`
   --> src/mdtest_snippet.py:14:14
    |
 14 | alias_for_a: AliasForA[int]
@@ -1153,7 +1244,7 @@ reveal_type(LiteralInt)  # revealed: Unknown
 def _(weird: LiteralInt):
     reveal_type(weird)  # revealed: Unknown
 
-# error: [invalid-type-form] "`Literal[26]` is not a generic class"
+# error: [not-subscriptable] "Cannot subscript non-generic type `Literal[26]`"
 def _(weird: IntLiteral1[int]):
     reveal_type(weird)  # revealed: Unknown
 ```
@@ -1982,9 +2073,7 @@ From the [typing spec on type aliases](https://typing.python.org/en/latest/spec/
 > Type aliases may be as complex as type hints in annotations – anything that is acceptable as a
 > type hint is acceptable in a type alias
 
-However, no other type checker seems to support stringified annotations in implicit type aliases. We
-currently also do not support them, and we detect places where these attempted unions cause runtime
-errors:
+An assignment of a string literal creates a string variable, rather than an implicit type alias:
 
 ```py
 AliasForStr = "str"
@@ -1992,13 +2081,25 @@ AliasForStr = "str"
 # error: [invalid-type-form] "Variable of type `Literal["str"]` is not allowed in a parameter annotation"
 def _(s: AliasForStr):
     reveal_type(s)  # revealed: Unknown
+```
 
+A union with a string operand is invalid at runtime. We report that error, but still interpret the
+original union expression when the alias is used as a type:
+
+```py
 IntOrStr = int | "str"  # error: [unsupported-operator]
 
 reveal_type(IntOrStr)  # revealed: Unknown
 
 def _(int_or_str: IntOrStr):
-    reveal_type(int_or_str)  # revealed: Unknown
+    reveal_type(int_or_str)  # revealed: int | str
+```
+
+This alias has no type parameters, even though its runtime value is `Unknown`:
+
+```py
+def invalid(value: IntOrStr[int]):  # error: [not-subscriptable]
+    reveal_type(value)  # revealed: Unknown
 ```
 
 We *do* support stringified annotations if they appear in a position where a type expression is
@@ -2046,6 +2147,77 @@ from typing_extensions import Self
 class Node:
     marker = Self
     classes = [int, str]
+```
+
+## Invalid implicit aliases
+
+A valid runtime expression can still be invalid as a type expression. We reject using such a value
+as an annotation, rather than reporting an error on its ordinary assignment:
+
+```py
+Number = 1 + 2  # no diagnostic
+one = 1
+ForwardedNumber = one  # no diagnostic
+
+def inspect(
+    expression: Number,  # error: [invalid-type-form]
+    forwarded: ForwardedNumber,  # error: [invalid-type-form]
+):
+    reveal_type(expression)  # revealed: Unknown
+    reveal_type(forwarded)  # revealed: Unknown
+```
+
+## Invalid expressions with nested scopes
+
+Lambdas and comprehensions are invalid type arguments, even when they refer to type variables:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+LambdaAlias = list[lambda: T]  # error: [invalid-type-form]
+ComprehensionAlias = list[[T for _ in []]]  # error: [invalid-type-form]
+
+def inspect(lambda_alias: LambdaAlias, comprehension_alias: ComprehensionAlias):
+    reveal_type(lambda_alias)  # revealed: list[Unknown]
+    reveal_type(comprehension_alias)  # revealed: list[Unknown]
+```
+
+## Imported invalid implicit aliases
+
+Importing a value, accessing it through its module, or assigning it to another name does not make it
+a valid type alias. This also holds when the defining module is a dependency that is not checked:
+
+```toml
+[environment]
+extra-paths = ["/dependencies"]
+```
+
+`/dependencies/values.py`:
+
+```py
+Number = 1 + 2
+Forwarded = Number
+```
+
+`main.py`:
+
+```py
+import values
+from values import Number, Forwarded
+
+Local = Number  # no diagnostic
+
+def inspect(
+    imported: Number,  # error: [invalid-type-form]
+    attribute: values.Number,  # error: [invalid-type-form]
+    forwarded: Forwarded,  # error: [invalid-type-form]
+    local: Local,  # error: [invalid-type-form]
+):
+    reveal_type(imported)  # revealed: Unknown
+    reveal_type(attribute)  # revealed: Unknown
+    reveal_type(forwarded)  # revealed: Unknown
+    reveal_type(local)  # revealed: Unknown
 ```
 
 ## Recursive
@@ -2791,8 +2963,8 @@ python-version = "3.12"
 ```py
 type Identity[T] = T
 
-Direct = Identity["Direct"]
-Repeated = Identity[Identity["Repeated"]]
+Direct = Identity["Direct"]  # error: [cyclic-type-alias-definition]
+Repeated = Identity[Identity["Repeated"]]  # error: [cyclic-type-alias-definition]
 
 def inspect(direct: Direct, repeated: Repeated):
     reveal_type(direct)  # revealed: Divergent
@@ -2993,6 +3165,35 @@ def inspect(value: NestedDict[int]):
 class Holder:
     valid: NestedDict[int] = {"nested": {}}
     invalid: NestedDict[int] = {"nested": 1}  # error: [invalid-assignment]
+```
+
+### Forwarding generic recursive aliases
+
+A forwarded alias preserves type arguments even when the recursive definition refers back to the
+forwarded name:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Node = tuple[T, "Forwarded[T] | None"]
+Forwarded = Node
+
+def inspect(forwarded: Forwarded[int], original: Node[str]):
+    reveal_type(forwarded[0])  # revealed: int
+    reveal_type(original[0])  # revealed: str
+    forwarded_tail = forwarded[1]
+    if forwarded_tail is not None:
+        reveal_type(forwarded_tail[0])  # revealed: int
+    original_tail = original[1]
+    if original_tail is not None:
+        reveal_type(original_tail[0])  # revealed: str
+
+def valid() -> Forwarded[int]:
+    return (1, (2, None))
+
+def invalid() -> Forwarded[int]:
+    return (1, ("bad", None))  # error: [invalid-return-type]
 ```
 
 ### Generic mutually recursive aliases
