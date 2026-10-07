@@ -43,21 +43,18 @@ impl AnnotationContext {
     ) -> Self {
         // If the annotation is in a class scope (e.g., an annotated assignment for a
         // class field), and that class is marked as annotation as runtime-required.
-        match semantic.current_scope().kind {
-            ScopeKind::Class(class_def) => {
-                match flake8_type_checking::helpers::class_annotation_runtime_semantics(
-                    class_def, semantic, settings,
-                ) {
-                    RuntimeSemantics::Required => {
-                        return Self::RuntimeRequired;
-                    }
-                    RuntimeSemantics::Ambiguous => {
-                        return Self::RuntimeAmbiguous;
-                    }
-                    RuntimeSemantics::Default => {}
+        if let ScopeKind::Class(class_def) = semantic.current_scope().kind {
+            match flake8_type_checking::helpers::class_annotation_runtime_semantics(
+                class_def, semantic, settings,
+            ) {
+                RuntimeSemantics::Required => {
+                    return Self::RuntimeRequired;
                 }
+                RuntimeSemantics::Ambiguous => {
+                    return Self::RuntimeAmbiguous;
+                }
+                RuntimeSemantics::Default => {}
             }
-            _ => {}
         }
 
         // If `__future__` annotations are enabled or it's a stub file,
