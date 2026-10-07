@@ -27,6 +27,7 @@ use ty_python_semantic::{
     types::{CycleDetector, KnownClass, Type},
 };
 
+use crate::annotation_expression::is_in_annotation_expression;
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
 use crate::symbols::QueryPattern;
@@ -1104,32 +1105,14 @@ impl<'m> ContextCursor<'m> {
     }
 
     fn suppress_class_parentheses(&self, model: &SemanticModel<'_>) -> bool {
-        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
-
-        self.covering_node.ancestors().any(|node| match node {
-            ast::AnyNodeRef::StmtAnnAssign(stmt) => {
-                contains(&stmt.annotation)
-                    || (stmt.value.as_deref().is_some_and(contains)
-                        && model.is_type_alias_annotation(&stmt.annotation))
-            }
-            ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
-            ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
-            ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
-            ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
-                type_param.bound.as_deref().is_some_and(contains)
-                    || type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::TypeParamTypeVarTuple(type_param) => {
-                type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::TypeParamParamSpec(type_param) => {
-                type_param.default.as_deref().is_some_and(contains)
-            }
-            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                handler.type_.as_deref().is_some_and(contains)
-            }
-            _ => false,
-        })
+        is_in_annotation_expression(model, &self.covering_node, self.range)
+            || self.covering_node.ancestors().any(|node| match node {
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                    .type_
+                    .as_deref()
+                    .is_some_and(|expr| expr.range().contains_range(self.range)),
+                _ => false,
+            })
     }
 
     /// Returns true when the tokens indicate that the definition of a new
