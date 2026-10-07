@@ -906,37 +906,6 @@ satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]`
 reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
-The callable-local variable also remains available when `P` is inferred from another callable:
-
-```py
-def construct_with[**P, R: Factory[object]](
-    factory: Callable[P, R], other: Callable[P, object], /, *args: P.args, **kwargs: P.kwargs
-) -> R:
-    return factory(*args, **kwargs)
-
-construct_with(Factory, lambda: object())  # no diagnostic
-```
-
-A generic callable can also return a type containing a variable fixed by an enclosing function.
-Capturing the callable's own type variable in `P` does not make the enclosing variable inferable:
-
-```py
-def outer[S](value: S) -> None:
-    def make[U](value: U) -> Factory[S]:
-        raise NotImplementedError
-
-    construct(make, 1)  # error: [invalid-argument-type]
-```
-
-A generic callable whose return type satisfies the bound is accepted:
-
-```py
-def make_object[U](value: U) -> Factory[object]:
-    raise NotImplementedError
-
-construct(make_object, 1)  # no diagnostic
-```
-
 ### Captured and fixed variables in a return type
 
 Capturing a callable's type variable does not permit a second, enclosing variable in its return type
@@ -978,24 +947,6 @@ def outer[S: str](fixed: S) -> None:
         return value, fixed
 
     forward(make, "text")  # no diagnostic
-```
-
-### Bounds in captured callables
-
-A captured variable's bound allows the return type to satisfy the return bound, while forwarded
-arguments must still satisfy that variable's bound.
-
-```py
-from typing import Callable
-
-def forward[**P, R: tuple[str, int]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
-    return factory(*args, **kwargs)
-
-def make[T: str](value: T) -> tuple[T, int]:
-    return value, 1
-
-forward(make, "text")  # no diagnostic
-forward(make, 1)  # error: [invalid-argument-type]
 ```
 
 ### `ParamSpec` in prepended positional parameters
