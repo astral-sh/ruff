@@ -108,7 +108,7 @@ use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
 use crate::types::generics::{Specialization, walk_specialization_types};
 use crate::types::typevar::{
-    BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
+    BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarNonce, TypeVarSet,
 };
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
@@ -316,6 +316,7 @@ impl<'db> OwnedConstraintSet<'db> {
         };
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
+            signature_typevar_freshness: Cell::new(None),
         };
         let set = ConstraintSet::from_node(&builder, self.node, self.source_order);
         f(&builder, set)
@@ -962,6 +963,10 @@ impl Debug for ConstraintSet<'_, '_> {
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
+    /// Maximum freshness reserved by signature comparisons. Independent comparisons, including
+    /// recursive protocol member checks, can contribute existential scopes to the same constraint
+    /// set. Sharing this bound keeps their signature-local typevars distinct.
+    pub(super) signature_typevar_freshness: Cell<Option<TypeVarNonce>>,
 }
 
 type ExistsCacheKey<'db> = (NodeId, TypeVarSet<'db>, Option<SourceOrderId>);

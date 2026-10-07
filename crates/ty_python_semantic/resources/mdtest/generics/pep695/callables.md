@@ -1388,6 +1388,32 @@ class IPolys[T](Protocol):
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
 ```
 
+## Inferring independent specializations of protocol members
+
+A generic function used for two protocol members can specialize independently for each member.
+
+```py
+from typing import Protocol
+
+def identity[T](value: T, /) -> T:
+    return value
+
+class Required[A, B](Protocol):
+    @staticmethod
+    def first(value: int, /) -> A: ...
+    @staticmethod
+    def second(value: str, /) -> B: ...
+
+class Implementation:
+    first = staticmethod(identity)
+    second = staticmethod(identity)
+
+def infer[A, B](value: Required[A, B]) -> tuple[A, B]:
+    return value.first(1), value.second("a")
+
+reveal_type(infer(Implementation()))  # revealed: tuple[int, str]
+```
+
 ## Specializing generic protocol methods
 
 A method can use its own type parameter as the class argument of another instance of its protocol.
