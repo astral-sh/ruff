@@ -1258,7 +1258,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let target_interface = protocol.interface(db);
         let target_non_recursive = non_recursive_protocol_interface(
             db,
-            target_interface.base(),
+            target_interface,
             identity_protocol,
             Type::ProtocolInstance(protocol),
         );
@@ -1397,7 +1397,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
 fn non_recursive_protocol_interface<'db>(
     db: &'db dyn Db,
-    interface: ProtocolInterface<'db>,
+    interface: ProtocolInterfaceView<'db>,
     protocol: ProtocolClass<'db>,
     receiver_ty: Type<'db>,
 ) -> ProtocolInterface<'db> {
@@ -1447,7 +1447,7 @@ fn non_recursive_protocol_interface<'db>(
     }
 
     let env = ProgramEnvironment::from_file(protocol.class_literal(db).program_file(db));
-    interface.filter_members(db, |member| {
+    interface.filter_members_for_recursion(db, |member| {
         let visitor = ProtocolReferenceFinder {
             env: &env,
             origin: protocol.class_literal(db),
@@ -2042,12 +2042,8 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
-        let non_recursive = non_recursive_protocol_interface(
-            db,
-            interface.base(),
-            origin,
-            Type::ProtocolInstance(target),
-        );
+        let non_recursive =
+            non_recursive_protocol_interface(db, interface, origin, Type::ProtocolInstance(target));
         let target = interface.with_interface(non_recursive);
         if target.member_count(db) == 0 {
             return None;

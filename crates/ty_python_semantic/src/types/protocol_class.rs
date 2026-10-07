@@ -481,6 +481,39 @@ impl<'db> ProtocolInterfaceView<'db> {
         Self { interface, ..self }
     }
 
+    /// Filters the unmaterialized requirements for recursion. Ordinary declarations must stay
+    /// lazy: specializing a recursive signature can itself require another protocol comparison.
+    /// A descriptor's read type, however, comes from selecting a `__get__` overload. Its
+    /// declaration does not determine whether the specialized result is recursive.
+    pub(super) fn filter_members_for_recursion(
+        self,
+        db: &'db dyn Db,
+        mut predicate: impl FnMut(&ProtocolMember<'db>) -> bool,
+    ) -> ProtocolInterface<'db> {
+        let members = self
+            .interface
+            .inner(db)
+            .iter()
+            .filter(|&(name, data)| {
+                let specialized_class = match data.kind {
+                    ProtocolMemberKind::Property {
+                        read: Some(ProtocolPropertyType::Annotation(_)),
+                        ..
+                    } => self.specialized_class,
+                    _ => None,
+                };
+                predicate(&ProtocolMember {
+                    name,
+                    data,
+                    specialized_class,
+                    materialization: None,
+                })
+            })
+            .map(|(name, data)| (name.clone(), *data))
+            .collect::<BTreeMap<_, _>>();
+        ProtocolInterface::new(db, self.interface.program(db), members)
+    }
+
     pub(super) fn members(
         self,
         db: &'db dyn Db,
@@ -508,19 +541,8 @@ impl<'db> ProtocolInterfaceView<'db> {
     pub(super) fn has_only_finite_members(self, db: &'db dyn Db) -> bool {
         let env = ProgramEnvironment::from_program(self.interface.program(db));
         self.members(db).all(|member| {
-            if matches!(
-                member.structural_member_priority(db, &env),
-                StructuralMemberPriority::Recursive
-            ) {
-                return false;
-            }
-            if member.specialized_class.is_none() {
-                return true;
-            }
-            // A finite declaration can acquire recursive types through its specialization.
-            let data = member.specialized_data(db);
             !matches!(
-                ProtocolMember { data, ..member }.structural_member_priority(db, &env),
+                member.structural_member_priority(db, &env),
                 StructuralMemberPriority::Recursive
             )
         })
@@ -884,29 +906,6 @@ impl<'db> ProtocolInterface<'db> {
             specialized_class: None,
             materialization: None,
         })
-    }
-
-    pub(super) fn filter_members(
-        self,
-        db: &'db dyn Db,
-        mut predicate: impl FnMut(&ProtocolMember<'db>) -> bool,
-    ) -> Self {
-        Self::new(
-            db,
-            self.program(db),
-            self.inner(db)
-                .iter()
-                .filter(|&(name, data)| {
-                    predicate(&ProtocolMember {
-                        name,
-                        data,
-                        specialized_class: None,
-                        materialization: None,
-                    })
-                })
-                .map(|(name, data)| (name.clone(), *data))
-                .collect::<BTreeMap<_, _>>(),
-        )
     }
 
     fn member_count(self, db: &'db dyn Db) -> usize {
@@ -2255,7 +2254,22 @@ impl<'db> ProtocolMember<'db> {
     /// aliases that contain a protocol or are themselves recursive are compared last.
     /// Inspect the declaration before specialization: specializing a recursive signature can
     /// itself require another protocol comparison, before finite requirements can reject it.
+    /// A finite declaration can also acquire recursive types through its type arguments.
     pub(super) fn structural_member_priority(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> StructuralMemberPriority {
+        let priority = self.declared_member_priority(db, env);
+        if priority == StructuralMemberPriority::Recursive || self.specialized_class.is_none() {
+            priority
+        } else {
+            self.specialized(db).declared_member_priority(db, env)
+        }
+    }
+
+    /// Classifies the stored member types without forcing pending specialization.
+    fn declared_member_priority(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

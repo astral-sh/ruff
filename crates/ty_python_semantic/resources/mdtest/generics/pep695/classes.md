@@ -2172,6 +2172,80 @@ def inherited[T](x: Nested[T]):
     reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
 ```
 
+## Recursive protocol members introduced by type arguments
+
+A property declared as `T` can become recursive after specialization. Finite overloaded requirements
+must be compared before expanding such a property. The `combine` overloads grow both the number of
+alternatives and the recursive type argument on each call.
+
+```py
+from __future__ import annotations
+from typing import Protocol, overload
+
+class S[T](Protocol):
+    @overload
+    def combine[U1](self, v1: U1, /) -> S[T | U1]: ...
+    @overload
+    def combine[U1, U2](self, v1: U1, v2: U2, /) -> S[T | U1 | U2]: ...
+    @overload
+    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> S[T | U1 | U2 | U3]: ...
+    @overload
+    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> S[T | U1 | U2 | U3 | U4]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> S[T | U1 | U2 | U3 | U4 | U5]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
+    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6, U7](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
+    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
+    def combine(self, *values: object) -> S[object]: ...
+
+class D[T](Protocol):
+    @overload
+    def combine[U1](self, v1: U1, /) -> D[T | U1]: ...
+    @overload
+    def combine[U1, U2](self, v1: U1, v2: U2, /) -> D[T | U1 | U2]: ...
+    @overload
+    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> D[T | U1 | U2 | U3]: ...
+    @overload
+    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> D[T | U1 | U2 | U3 | U4]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> D[T | U1 | U2 | U3 | U4 | U5]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
+    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6, U7](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
+    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
+    def combine(self, *values: object) -> D[object]: ...
+
+class Source[T](Protocol):
+    @property
+    def a(self) -> T: ...
+    @overload
+    def z(self, v: int) -> int: ...
+    @overload
+    def z(self, v: str) -> str: ...
+    def z(self, v: int | str) -> int | str: ...
+
+class Target[T](Protocol):
+    @property
+    def a(self) -> T: ...
+    @overload
+    def z(self, v: int) -> str: ...
+    @overload
+    def z(self, v: str) -> int: ...
+    def z(self, v: int | str) -> int | str: ...
+
+def f(x: Source[S[int]]) -> Target[D[int]]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Specializing descriptor overloads on protocols
 
 A descriptor can select different overloads for different protocol specializations. We specialize
@@ -2203,6 +2277,35 @@ class BytesValue:
 
 static_assert(is_assignable_to(BytesValue, HasValue[str]))
 static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
+## Inferring through specialization-dependent protocol descriptors
+
+The descriptor's general overload refers back to `P`, but `P[int].value` is finite. Callback
+inference retains that specialized requirement when it omits recursive protocol members.
+
+```py
+from __future__ import annotations
+from typing import Callable, Protocol, overload
+
+class Descriptor[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> int: ...
+    @overload
+    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]:
+        raise NotImplementedError
+
+class P[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+def consume(value: P[int]) -> None: ...
+def infer[T](callback: Callable[[P[T]], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(consume))  # revealed: int
 ```
 
 ## Specializing protocol attributes to methods
