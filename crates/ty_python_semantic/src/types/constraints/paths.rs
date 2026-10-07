@@ -829,11 +829,18 @@ impl PathAssignments {
         // evidence until the replacement actually holds, including when another derivation
         // supplied it. Process in discovery order to avoid replacing both sides of a cycle.
         for (original, replacement) in self.pending_substitutions.drain(..) {
+            // An unspecialized type variable supplies no inference evidence. Preserve the original
+            // constraint when its replacement contains this marker, including nested bounds such
+            // as `T = list[UnspecializedTypeVar]`.
             if self
                 .positive_assignment_indices
                 .get(replacement)
                 .is_some_and(Option::is_some)
                 && !self.substituted_constraints.contains(&replacement)
+                && storage
+                    .constraint_data(replacement)
+                    .as_concrete()
+                    .is_none_or(|(_, bound)| !bound.has_unspecialized_type_var(db, env))
             {
                 self.substituted_constraints.insert(original);
             }

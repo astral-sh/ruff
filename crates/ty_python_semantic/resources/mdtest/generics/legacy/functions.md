@@ -2172,6 +2172,54 @@ reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
 
+## Nested calls preserve outer type variables
+
+Nested generic calls preserve type variables from the enclosing scope. A bound on the called
+function's type variable does not widen the argument's type variable to that bound:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=object)
+U = TypeVar("U")
+
+def f(x: list[T]) -> list[T]:
+    return x
+
+def _(x: list[U]):
+    reveal_type(f(x))  # revealed: list[U@_]
+    reveal_type(f(f(x)))  # revealed: list[U@_]
+```
+
+The enclosing type variable also retains its identity when it has an upper bound:
+
+```py
+V = TypeVar("V", bound=int)
+
+def g(x: list[U]) -> list[U]:
+    return x
+
+def _(x: list[V]):
+    reveal_type(g(x))  # revealed: list[V@_]
+    reveal_type(g(g(x)))  # revealed: list[V@_]
+```
+
+An unresolved component does not discard the concrete context for other type variables:
+
+```py
+from typing import Any
+
+W = TypeVar("W")
+
+def pair(x: U, y: W) -> tuple[list[U], list[W]]:
+    return [x], [y]
+
+def outer(x: tuple[list[Any], list[U]]) -> None:
+    pass
+
+outer(reveal_type(pair(1, "a")))  # revealed: tuple[list[Any], list[str]]
+```
+
 ## Passing generic functions to generic functions
 
 ```py
