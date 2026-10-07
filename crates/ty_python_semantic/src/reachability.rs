@@ -1747,8 +1747,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
+            // Exact tuples are always eligible for sequence patterns. Avoid projecting their
+            // element types into a generic tuple specialization just to establish this fact.
+            let is_exact_tuple = |ty: Type<'db>| ty.exact_tuple_instance_spec(db).is_some();
+            let is_tuple_subject = match subject_ty {
+                Type::Union(union) => union.elements(db).iter().copied().all(is_exact_tuple),
+                _ => is_exact_tuple(subject_ty),
+            };
             let sequence_ty = sequence_pattern_type_builder(db, env).build();
-            if subject_ty.is_subtype_of(db, env, sequence_ty) {
+            if is_tuple_subject || subject_ty.is_subtype_of(db, env, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
                 } else {

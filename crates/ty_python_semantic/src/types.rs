@@ -2840,7 +2840,10 @@ impl<'db> Type<'db> {
     ///
     /// I.e., for the type `tuple[int, str]`, this will return the tuple spec `[int, str]`.
     /// But for a subclass of `tuple[int, str]`, it will return `None`.
-    fn exact_tuple_instance_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
+    pub(crate) fn exact_tuple_instance_spec(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<Cow<'db, TupleSpec<'db>>> {
         self.as_nominal_instance()
             .and_then(|instance| instance.own_tuple_spec(db))
     }
