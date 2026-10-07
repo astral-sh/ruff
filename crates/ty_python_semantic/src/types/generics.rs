@@ -878,6 +878,10 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).len()
     }
 
+    pub(crate) fn is_empty(self, db: &'db dyn Db) -> bool {
+        self.variables_inner(db).is_empty()
+    }
+
     pub(crate) fn default_specialization(
         self,
         db: &'db dyn Db,

@@ -1353,7 +1353,7 @@ impl<'db> Signature<'db> {
             generic_context: self
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context))
-                .filter(|generic_context| generic_context.len(db) > 0),
+                .filter(|generic_context| !generic_context.is_empty(db)),
             definition: self.definition,
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),
