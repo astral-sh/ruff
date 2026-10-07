@@ -847,6 +847,16 @@ def deleted_name() -> None:
     del kwargs
 ```
 
+An augmented assignment reads and modifies the dictionary, so it also prevents us from relying on
+the initializer's keys.
+
+```py
+def augmented() -> None:
+    kwargs = {"extra": 1}
+    kwargs |= {"x": 2}
+    needs_x(**kwargs)  # no diagnostic
+```
+
 A nested function can outlive the current assignment, so a captured dictionary also uses normal
 dictionary inference even when the capture itself only unpacks keyword arguments.
 
@@ -898,6 +908,31 @@ def generator_write() -> None:
     values = {"extra": 1}
     next(updates)
     needs_x(**values)  # no diagnostic
+```
+
+### Local dictionaries in function defaults
+
+A nested function's defaults are evaluated in the enclosing scope. Using a dictionary for a default
+can share it with later calls, so it prevents us from treating the original keys as complete.
+
+```py
+def needs_x(x: int) -> None: ...
+def shared_default() -> None:
+    kwargs = {"extra": 1}
+    def inner(values=kwargs) -> None: ...
+    needs_x(**kwargs)  # no diagnostic
+```
+
+Unpacking in a call that computes the default does not share the dictionary itself:
+
+```py
+def pair(x: int, y: str, optional: bool = False) -> int:
+    return x
+
+def unpacked_default() -> None:
+    kwargs = {"x": 1, "y": "two"}
+    def inner(value=pair(**kwargs)) -> None: ...  # no diagnostic
+    pair(**kwargs)  # no diagnostic
 ```
 
 ### Aliased list arguments

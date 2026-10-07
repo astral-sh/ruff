@@ -8,10 +8,12 @@ use itertools::{Either, Itertools};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword};
 use rustc_hash::FxHashMap;
 use ty_python_core::definition::{BindingsOwner, DefinitionKind};
 use ty_python_core::scope::{ScopeId, ScopeKind};
-use ty_python_core::semantic_index;
+use ty_python_core::symbol::ScopedSymbolId;
+use ty_python_core::{FileScopeId, SemanticIndex, semantic_index};
 
 use crate::FxIndexMap;
 use crate::ProgramEnvironment;
@@ -388,10 +390,13 @@ impl<'db> UnpackedKeywords<'db> {
         let file = scope.program_file(db);
         let index = semantic_index(db, file);
         let file_scope = scope.file_scope_id(db);
-        let symbol = index.place_table(file_scope).symbol_by_name(&name.id)?;
+        let table = index.place_table(file_scope);
+        let symbol_id = table.symbol_id(&name.id)?;
+        let symbol = table.symbol(symbol_id);
         if !symbol.is_local()
             || symbol.is_declared()
-            || !symbol.is_used_only_for_keyword_unpacking()
+            || !symbol.is_used()
+            || symbol.is_accessed_from_nested_scope()
         {
             return None;
         }
@@ -411,11 +416,72 @@ impl<'db> UnpackedKeywords<'db> {
         }
         let module = parsed_module(db, file.python_file(db)).load(db);
         let dictionary = assignment.value(&module).as_dict_expr()?;
+        if symbols_used_outside_keyword_unpacking(db, scope)
+            .binary_search(&symbol_id)
+            .is_ok()
+        {
+            return None;
+        }
         let inference = infer_definition_types(db, definition);
         if inference.discards_dict_key_assignments() {
             return None;
         }
         Self::from_literal(dictionary, |value| inference.try_expression_type(value))
+    }
+}
+
+/// Names whose contents cannot be retained for keyword argument matching.
+///
+/// The use-def index identifies real uses (including `del name` and augmented assignments)
+/// and their scopes. Inspect the syntax to exclude direct keyword unpacks. This is queried
+/// only after finding a local dictionary initializer and shared by every call in the function.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn symbols_used_outside_keyword_unpacking(
+    db: &dyn Db,
+    scope: ScopeId<'_>,
+) -> Box<[ScopedSymbolId]> {
+    let Some(function) = scope.node(db).as_function() else {
+        return Box::default();
+    };
+    let index = semantic_index(db, scope.program_file(db));
+    let module = parsed_module(db, scope.python_file(db)).load(db);
+    let mut visitor = NonKeywordUseCollector {
+        index,
+        scope: scope.file_scope_id(db),
+        symbols: Vec::new(),
+    };
+    visitor.visit_body(&function.node(&module).body);
+    visitor.symbols.sort_unstable();
+    visitor.symbols.dedup();
+    visitor.symbols.into_boxed_slice()
+}
+
+struct NonKeywordUseCollector<'db, 'a> {
+    index: &'a SemanticIndex<'db>,
+    scope: FileScopeId,
+    symbols: Vec<ScopedSymbolId>,
+}
+
+impl<'ast> Visitor<'ast> for NonKeywordUseCollector<'_, '_> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if let ast::Expr::Name(name) = expression
+            && self.index.try_expression_scope_id(expression) == Some(self.scope)
+            && self
+                .index
+                .try_expression_use_id(expression.into())
+                .is_some()
+            && let Some(symbol) = self.index.place_table(self.scope).symbol_id(&name.id)
+        {
+            self.symbols.push(symbol);
+        }
+        walk_expr(self, expression);
+    }
+
+    fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
+        if keyword.arg.is_none() && keyword.value.is_name_expr() {
+            return;
+        }
+        walk_keyword(self, keyword);
     }
 }
 
