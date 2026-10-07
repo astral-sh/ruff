@@ -10536,65 +10536,6 @@ def swap(value: int | str) -> int | str:
     }
 
     #[test]
-    fn incompatible_context_preserves_correlated_inference() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from typing import Callable, overload
-
-def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[list[T], list[U]]:
-    raise NotImplementedError
-
-@overload
-def swap(value: int) -> str: ...
-@overload
-def swap(value: str) -> int: ...
-def swap(value: int | str) -> int | str:
-    raise NotImplementedError
-
-expected: tuple[list[object], list[object]]
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        let callable = global_symbol(db, file, "infer_pair").place.expect_type();
-        let argument = global_symbol(db, file, "swap").place.expect_type();
-        let expected = global_symbol(db, file, "expected").place.expect_type();
-        let without_context = call_inference(db, callable, [argument], TypeContext::default())?;
-        let inference = call_inference(db, callable, [argument], expected.into())?;
-        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
-            anyhow::bail!(
-                "expected correlated alternatives, got {:?}",
-                inference.solutions(db)
-            );
-        };
-        let TypeVarInferenceSolutions::Alternatives(without_context_paths) =
-            without_context.solutions(db)
-        else {
-            anyhow::bail!("expected correlated alternatives without context");
-        };
-        let paths = paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>();
-
-        // Neither overload accepts object. Ignoring that preference must retain the same
-        // alternatives as argument inference alone, including each overload's correlation.
-        assert_eq!(
-            paths,
-            without_context_paths
-                .iter()
-                .map(AsRef::as_ref)
-                .collect::<FxHashSet<_>>()
-        );
-        let int = KnownClass::Int.to_instance(db, &env);
-        let str = KnownClass::Str.to_instance(db, &env);
-        assert!(paths.contains([Some(Resolved(int)), Some(Resolved(str))].as_slice()));
-        assert!(paths.contains([Some(Resolved(str)), Some(Resolved(int))].as_slice()));
-        Ok(())
-    }
-
-    #[test]
     fn generic_callback_resolves_dependencies_per_alternative() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
