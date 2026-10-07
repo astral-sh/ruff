@@ -893,7 +893,7 @@ impl TypeVarNonce {
         )
     }
 
-    fn add(self, delta: u32) -> Self {
+    pub(super) fn add(self, delta: u32) -> Self {
         Self(
             self.0
                 .checked_add(delta)
@@ -1586,6 +1586,27 @@ impl<'db> BoundTypeVarInstance<'db> {
             self.paramspec_attr(db),
             self.freshness(db),
         )
+    }
+
+    pub(super) fn freshen_bound_typevars(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        Type::TypeVar(self)
+            .apply_type_mapping_impl(
+                db,
+                &TypeMapping::FreshenBoundTypeVars {
+                    generic_context,
+                    delta,
+                },
+                TypeContext::default(),
+                visitor,
+            )
+            .as_typevar()
+            .unwrap_or(self)
     }
 
     fn freshen_with_mapping(
