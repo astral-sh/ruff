@@ -338,6 +338,36 @@ def f(
     reveal_type(h)  # revealed: tuple[Any | str, ...]
 ```
 
+## Tuple unions with narrowed built-in elements
+
+A tuple alternative is redundant when its element type is covered by another alternative, including
+when that element is a built-in type narrowed by an exclusion. The `float` annotation includes
+`int`, so it also covers `int & ~bool`:
+
+```py
+from ty_extensions import Intersection, Not
+
+def numeric(value: tuple[Intersection[int, Not[bool]]] | tuple[float]):
+    reveal_type(value)  # revealed: tuple[float]
+```
+
+## Tuple unions with built-in exclusions
+
+Matching the positive class is not enough to establish redundancy: its exclusions also matter. For
+example, a subclass of both `Marker` and `str` can inhabit the first tuple alternative below, but
+neither branch of the second:
+
+```py
+from ty_extensions import Intersection, Not
+
+class Marker: ...
+
+def different_exclusions(
+    value: tuple[Intersection[Marker, Not[int]]] | tuple[Intersection[Marker, Not[str]] | bytes],
+):
+    reveal_type(value)  # revealed: tuple[Marker & ~int] | tuple[(Marker & ~str) | bytes]
+```
+
 ## Unions of other generic containers
 
 ```toml
