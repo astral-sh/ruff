@@ -54,6 +54,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    TypeVarInferenceFallback, TypeVarInferenceSolutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
@@ -6233,6 +6234,32 @@ impl<'db> CallInference<'_, 'db> {
             preferred_solutions_incomplete,
             &mut specialization_errors,
         );
+        // Individually compatible preferences can still make the combined argument constraints
+        // unsatisfiable. Retry with a fresh builder and no contextual choices, discarding errors
+        // from the rejected attempt. Incomplete inference is not evidence of a contradiction.
+        if !preferred_type_mappings.is_empty()
+            && matches!(
+                inference.solutions(db),
+                TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+            )
+        {
+            let retry = Self {
+                call_expression_tcx: TypeContext::default(),
+                ..self
+            }
+            .infer(constraints);
+            // If the arguments are still inconsistent, keep the original diagnostic mapping.
+            // The retry's recovery types can contain `Unknown`, hiding the argument error.
+            if let Some(inference) = retry.inference
+                && !matches!(
+                    inference.solutions(db),
+                    TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
+                )
+            {
+                return retry;
+            }
+        }
+
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
@@ -10437,7 +10464,6 @@ mod tests {
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
     use crate::types::constraints::resolution::SolutionType::Resolved;
-    use crate::types::generics::TypeVarInferenceSolutions;
 
     fn call_inference<'db>(
         db: &'db TestDb,
@@ -10506,6 +10532,65 @@ def swap(value: int | str) -> int | str:
                 [Some(Resolved(str)), Some(Resolved(int))].as_slice(),
             ])
         );
+        Ok(())
+    }
+
+    #[test]
+    fn incompatible_context_preserves_correlated_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import Callable, overload
+
+def infer_pair[T, U](converter: Callable[[T], U]) -> tuple[list[T], list[U]]:
+    raise NotImplementedError
+
+@overload
+def swap(value: int) -> str: ...
+@overload
+def swap(value: str) -> int: ...
+def swap(value: int | str) -> int | str:
+    raise NotImplementedError
+
+expected: tuple[list[object], list[object]]
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "infer_pair").place.expect_type();
+        let argument = global_symbol(db, file, "swap").place.expect_type();
+        let expected = global_symbol(db, file, "expected").place.expect_type();
+        let without_context = call_inference(db, callable, [argument], TypeContext::default())?;
+        let inference = call_inference(db, callable, [argument], expected.into())?;
+        let TypeVarInferenceSolutions::Alternatives(paths) = inference.solutions(db) else {
+            anyhow::bail!(
+                "expected correlated alternatives, got {:?}",
+                inference.solutions(db)
+            );
+        };
+        let TypeVarInferenceSolutions::Alternatives(without_context_paths) =
+            without_context.solutions(db)
+        else {
+            anyhow::bail!("expected correlated alternatives without context");
+        };
+        let paths = paths.iter().map(AsRef::as_ref).collect::<FxHashSet<_>>();
+
+        // Neither overload accepts object. Ignoring that preference must retain the same
+        // alternatives as argument inference alone, including each overload's correlation.
+        assert_eq!(
+            paths,
+            without_context_paths
+                .iter()
+                .map(AsRef::as_ref)
+                .collect::<FxHashSet<_>>()
+        );
+        let int = KnownClass::Int.to_instance(db, &env);
+        let str = KnownClass::Str.to_instance(db, &env);
+        assert!(paths.contains([Some(Resolved(int)), Some(Resolved(str))].as_slice()));
+        assert!(paths.contains([Some(Resolved(str)), Some(Resolved(int))].as_slice()));
         Ok(())
     }
 

@@ -948,6 +948,29 @@ class Explicit(Generic[T]):
 reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
+### Incompatible constructor context
+
+When a constructor's arguments determine a specialization that is incompatible with the context, we
+report an assignment error using the inferred specialization.
+
+```py
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Animal: ...
+class Dog(Animal): ...
+
+class Consumer(Generic[T]):
+    def __init__(self, callback: Callable[[T], None]) -> None:
+        self.callback = callback
+
+def accepts_dog(value: Dog) -> None: ...
+
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-assignment]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

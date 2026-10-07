@@ -3811,5 +3811,74 @@ class BoundedSetter(Base):
     def value[I: int](self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
 
+## Retrying incompatible return-context preferences
+
+A return-context preference for `list[object]` cannot satisfy the argument constraints on `wrap`.
+Inferring the call without that preference preserves `list[str]`, which satisfies the other return
+alternative. This also works when another generic call forwards the result.
+
+```py
+def wrap[T](x: list[T]) -> list[T]:
+    return x
+
+def identity[T](x: T) -> T:
+    return x
+
+def inferred(x: list[str]) -> list[object] | list[str]:
+    return reveal_type(identity(wrap(x)))  # revealed: list[str]
+
+def outer(x: list[str]) -> list[object] | list[str]:
+    return identity(wrap(x))  # no diagnostic
+```
+
+## Errors after retrying return-context preferences
+
+Dropping an incompatible preference can make the call valid without making its return type
+compatible with the enclosing function's annotation.
+
+```py
+def wrap[T](x: list[T]) -> list[T]:
+    return x
+
+def identity[T](x: T) -> T:
+    return x
+
+def invalid_return(x: list[str]) -> list[object] | list[int]:
+    # error: [invalid-return-type] "expected `list[object] | list[int]`, found `list[str]`"
+    return identity(wrap(x))
+```
+
+Conflicting argument constraints still produce argument errors when no specialization satisfies both
+arguments.
+
+```py
+def combine[T](x: list[T], y: list[T]) -> list[T]:
+    return x
+
+def conflicting_arguments(x: list[str], y: list[int]) -> list[object] | list[str]:
+    # error: [invalid-argument-type] "Expected `list[object]`, found `list[str]`"
+    # error: [invalid-argument-type] "Expected `list[object]`, found `list[int]`"
+    return identity(combine(x, y))
+```
+
+## Context-sensitive arguments after retrying return-context preferences
+
+The callback's parameter type follows the argument constraints when the return-context preference is
+incompatible. Inferring the callback again with `str` avoids an attribute error from the rejected
+`object` preference.
+
+```py
+from collections.abc import Callable
+
+def identity[T](x: T) -> T:
+    return x
+
+def apply[T](x: list[T], callback: Callable[[T], T]) -> list[T]:
+    return [callback(item) for item in x]
+
+def outer(x: list[str]) -> list[object] | list[str]:
+    return identity(apply(x, lambda item: item.upper()))  # no diagnostic
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371

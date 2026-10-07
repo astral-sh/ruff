@@ -591,10 +591,10 @@ class Explicit[T]:
 reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 ```
 
-### Failed constructor inference
+### Incompatible constructor context
 
-A failed constructor call reports its argument error without exposing an unsolved class type
-parameter or producing an additional assignment error.
+When a constructor's arguments determine a specialization that is incompatible with the context, we
+report an assignment error using the inferred specialization.
 
 ```py
 from collections.abc import Callable
@@ -608,7 +608,7 @@ class Consumer[T]:
 
 def accepts_dog(value: Dog) -> None: ...
 
-consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-assignment]
 ```
 
 ### Constrained constructor inference uses argument evidence
