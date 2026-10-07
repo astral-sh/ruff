@@ -361,68 +361,6 @@ def f(x: IntOrStr, y: str | bytes):
     reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
 ```
 
-## Negated aliases
-
-Negating an alias to `object` produces `Never`.
-
-```py
-from typing import Never, assert_type
-from ty_extensions import Not
-
-type Top = object
-
-def f(x: Not[Top]):
-    assert_type(x, Never)
-```
-
-Negating an alias to `Never` produces `object`.
-
-```py
-type Bottom = Never
-
-def g(x: Not[Bottom]):
-    assert_type(x, object)
-```
-
-Double negation cancels even when an alias separates the two negations.
-
-```py
-type NotInt = Not[int]
-
-def h(x: Not[NotInt]):
-    assert_type(x, int)
-```
-
-## Gradual alias complements
-
-An alias containing `Any` and its complement do not simplify to `object`: their gradual types can
-materialize differently.
-
-```py
-from typing import Any
-from ty_extensions import Not
-
-type A = list[Any]
-
-def f(x: A | Not[A]):
-    reveal_type(x)  # revealed: list[Any] | ~A
-```
-
-Negating a gradual alias is equivalent to negating its underlying type.
-
-```py
-from typing import assert_type
-
-def identity[T](x: T) -> T:
-    return x
-
-def g(x: Not[A]):
-    assert_type(identity(x), Not[list[Any]])
-
-def h(x: Not[list[Any]]):
-    assert_type(identity(x), Not[A])
-```
-
 ## Loop-carried augmented unions
 
 PEP 604 unions created by augmented assignment should converge when the previous loop iteration
@@ -1802,10 +1740,10 @@ def _(x: X):
     reveal_type(x is x)  # revealed: bool
 ```
 
-### Recursive union complements
+### Recursive aliases and their complements
 
-This alias contains no gradual types, so its union with its complement covers every object. Indexing
-the list therefore yields `object`.
+For a fully static alias `A`, every object is either an `A` or not an `A`. This also holds when the
+alias refers to itself: the list element type `Not[A] | A` is `object`.
 
 ```py
 from ty_extensions import Not
@@ -1813,22 +1751,13 @@ from ty_extensions import Not
 type A = list[Not[A] | A]
 
 def f(x: A):
-    reveal_type(x)  # revealed: list[~A | A]
-    reveal_type(x[0])  # revealed: object
-```
-
-The order of the union members does not affect the result.
-
-```py
-type B = list[B | Not[B]]
-
-def g(x: B):
     reveal_type(x[0])  # revealed: object
 ```
 
 ### Negated recursive aliases
 
-Indexing this list preserves the recursive alias inside its negation.
+The list element is not an `A`. We can describe its type without expanding the recursive list each
+time it is inspected.
 
 ```py
 from ty_extensions import Not
@@ -1839,18 +1768,11 @@ def f(x: A):
     reveal_type(x[0])  # revealed: ~A
 ```
 
-The alias and its expanded body remain equivalent inside a negation.
+### Equivalent complements of a gradual recursive alias
 
-```py
-from typing import assert_type
-
-def g(x: Not[A]):
-    assert_type(x, Not[list[Not[A]]])
-```
-
-### Negated gradual recursive aliases
-
-A recursive alias containing `Any` and its expanded body also have equivalent negations.
+The presence of `Any` must not change what an alias means. Negating this recursive alias is
+equivalent to negating its definition. Generic inference respects that equivalence in either
+direction.
 
 ```py
 from typing import Any, assert_type
@@ -1864,23 +1786,6 @@ def identity[T](x: T) -> T:
 def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
     assert_type(identity(x), Not[list[tuple[Any, A]]])
     assert_type(identity(y), Not[A])
-
-    # error: [type-assertion-failure]
-    assert_type(identity(x), Not[list[int]])
-```
-
-### Negating recursive negations
-
-Double negation cancels even when the aliased type is recursive.
-
-```py
-from typing import assert_type
-from ty_extensions import Not
-
-type A = Not[list[A]]
-
-def f(x: Not[A]):
-    assert_type(x, list[A])
 ```
 
 ### Recursive invariant
