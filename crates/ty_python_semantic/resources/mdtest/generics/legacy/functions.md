@@ -431,6 +431,7 @@ An argument whose type is fixed by an enclosing function must satisfy the callee
 specialization of that type variable.
 
 ```py
+from collections.abc import Callable
 from typing import Any, TypeVar
 
 T = TypeVar("T", bound=str)
@@ -441,7 +442,8 @@ def box(value: T) -> list[T]:
     return [value]
 
 def unrestricted(value: S) -> None:
-    box(value)  # error: [invalid-argument-type]
+    # error: [invalid-argument-type] "Argument type `S@unrestricted` does not satisfy upper bound `str` of type variable `T`"
+    box(value)
 
 def bounded(value: BoundedS) -> None:
     reveal_type(box(value))  # revealed: list[BoundedS@bounded]
@@ -454,8 +456,6 @@ def compatible_context(value: BoundedS) -> list[BoundedS]:
 
 def gradual_context(value: Any) -> list[S]:
     return box(value)  # no diagnostic
-
-from collections.abc import Callable
 
 def box_callable(value: Callable[[], T]) -> list[T]:
     return [value()]

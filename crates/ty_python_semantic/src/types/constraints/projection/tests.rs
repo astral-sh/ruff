@@ -362,6 +362,17 @@ fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
             ))
         );
     }
+
+    for alternatives in [[Type::TypeVar(s), str], [str, Type::TypeVar(s)]] {
+        let builder = ConstraintSetBuilder::new();
+        let lower = |ty| ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, ty);
+        let set = lower(alternatives[0]).or(db, &builder, || lower(alternatives[1]));
+        let result = set.solutions(db, &env, inferable);
+        let Ok(Solutions::Constrained(SolutionPaths::Complete(paths))) = result else {
+            panic!("expected valid paths, got {result:?}");
+        };
+        assert_eq!(paths.as_slice(), &[solution([binding(t, str)])]);
+    }
 }
 
 #[test]
