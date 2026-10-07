@@ -3272,5 +3272,33 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Narrowing a bounded generic subclass
+
+The runtime check retains the relationship between an invariant base's type parameter and the
+subclass's bounded type parameter, even when the caller's type parameter is unrestricted.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+BoundedT = TypeVar("BoundedT", bound=str)
+S = TypeVar("S")
+
+class Parent(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+    def put(self, value: T) -> None:
+        pass
+
+class Child(Parent[BoundedT]): ...
+
+def narrow(value: Parent[S]) -> None:
+    if isinstance(value, Child):
+        reveal_type(value)  # revealed: Child[S@narrow]
+        reveal_type(value.get())  # revealed: S@narrow
+        value.put(42)  # error: [invalid-argument-type]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

@@ -1390,6 +1390,152 @@ target("a", ["a"])
 forward(target, "a", ["a"])
 ```
 
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Factory(Generic[T]):
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable, ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=Factory[object])
+
+def construct(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
+result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
+satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
+
+```py
+# TODO: revealed: Factory[Unknown]
+# no diagnostic
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
+The callable-local variable also remains available when `P` is inferred from another callable:
+
+```py
+def construct_with(factory: Callable[P, R], other: Callable[P, object], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+construct_with(Factory, lambda: object())  # no diagnostic
+```
+
+A generic callable can also return a type containing a variable fixed by an enclosing function.
+Capturing the callable's own type variable in `P` does not make the enclosing variable inferable:
+
+```py
+S = TypeVar("S")
+U = TypeVar("U")
+
+def outer(value: S) -> None:
+    def make(value: U) -> Factory[S]:
+        raise NotImplementedError
+
+    construct(make, 1)  # error: [invalid-argument-type]
+```
+
+A generic callable whose return type satisfies the bound is accepted:
+
+```py
+def make_object(value: U) -> Factory[object]:
+    raise NotImplementedError
+
+construct(make_object, 1)  # no diagnostic
+```
+
+### Captured and fixed variables in a return type
+
+Capturing a callable's type variable does not permit a second, enclosing variable in its return type
+to violate a bound. An enclosing variable whose bound already satisfies the return bound is
+accepted.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=tuple[object, str])
+T = TypeVar("T")
+S = TypeVar("S")
+BoundedS = TypeVar("BoundedS", bound=str)
+
+def forward(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def unrestricted(fixed: S) -> None:
+    def make(value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, 1)  # error: [invalid-argument-type]
+
+def bounded(fixed: BoundedS) -> None:
+    def make(value: T) -> tuple[T, BoundedS]:
+        return value, fixed
+
+    forward(make, 1)  # no diagnostic
+```
+
+### Specializing a captured variable to satisfy a return bound
+
+The callable's own type variable can be specialized to satisfy the return bound, even when its
+return type also contains a fixed variable from the enclosing function.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=tuple[str, str])
+T = TypeVar("T")
+S = TypeVar("S", bound=str)
+
+def forward(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def outer(fixed: S) -> None:
+    def make(value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, "text")  # no diagnostic
+```
+
+### Bounds in captured callables
+
+A captured variable's bound allows the return type to satisfy the return bound, while forwarded
+arguments must still satisfy that variable's bound.
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R", bound=tuple[str, int])
+T = TypeVar("T", bound=str)
+
+def forward(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def make(value: T) -> tuple[T, int]:
+    return value, 1
+
+forward(make, "text")  # no diagnostic
+forward(make, 1)  # error: [invalid-argument-type]
+```
+
 ## Calling methods on a union of `ParamSpec` specializations
 
 A caller's parameter list can be shared by the receivers while the return type preserves the

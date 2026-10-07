@@ -425,6 +425,71 @@ def consume_comparable(values: Iterable[ComparableT]) -> None: ...
 consume_comparable([None, 2])  # error: [invalid-argument-type]
 ```
 
+## Inferring a bound from a caller's type variable
+
+An argument whose type is fixed by an enclosing function must satisfy the callee's bound for every
+specialization of that type variable.
+
+```py
+from typing import Any, TypeVar
+
+T = TypeVar("T", bound=str)
+S = TypeVar("S")
+BoundedS = TypeVar("BoundedS", bound=str)
+
+def box(value: T) -> list[T]:
+    return [value]
+
+def unrestricted(value: S) -> None:
+    box(value)  # error: [invalid-argument-type]
+
+def bounded(value: BoundedS) -> None:
+    reveal_type(box(value))  # revealed: list[BoundedS@bounded]
+
+def contextual(value: str, existing: S) -> list[S]:
+    return box(value)  # error: [invalid-return-type]
+
+def compatible_context(value: BoundedS) -> list[BoundedS]:
+    return box(value)  # no diagnostic
+
+def gradual_context(value: Any) -> list[S]:
+    # TODO: `Any` satisfies the bound even when the return context contains `S`.
+    return box(value)  # error: [invalid-argument-type]
+
+from collections.abc import Callable
+
+def box_callable(value: Callable[[], T]) -> list[T]:
+    return [value()]
+
+def invalid_argument_with_context(value: Callable[[], S]) -> list[str]:
+    return box_callable(value)  # error: [invalid-argument-type]
+```
+
+## Inferring a bound from a narrowed protocol
+
+```py
+from typing import Protocol, TypeVar
+
+S = TypeVar("S")
+T = TypeVar("T", bound=str)
+SourceT = TypeVar("SourceT", covariant=True)
+
+class Source(Protocol[SourceT]):
+    def get(self) -> SourceT: ...
+
+class Text:
+    def get(self) -> str:
+        return ""
+
+def require_text(value: Source[T]) -> T:
+    return value.get()
+
+def narrowed(value: Source[S]) -> None:
+    if isinstance(value, Text):
+        # TODO(#28677): Accept the compatible `Text` alternative when inferring the bound.
+        require_text(value)  # error: [invalid-argument-type]
+```
+
 ## Inferring a constrained typevar
 
 ```py

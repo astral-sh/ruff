@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
@@ -6,17 +6,19 @@ use indexmap::map::Slice;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::paths::PathAssignments;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::variables::{Constraint, ConstraintProvenance, UnsatisfiableBound};
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, CandidateSolution, CandidateSolutions, CandidateTypeVarSolution,
     CandidateTypeVarSolver, ConstraintAssignment, ConstraintFailureEvidence, ConstraintId,
-    ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
-    SolutionViolationKind, UnboundedSolutionLimits,
+    ConstraintSetStorage, FixedTypeVarPolicy, Node, NodeId, SolutionLimits, SolutionValidity,
+    SolutionViolation, SolutionViolationKind, UnboundedSolutionLimits,
 };
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
-use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
+use crate::types::visitor::any_over_type_expanding_aliases;
+use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, UnionType, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
 /// A callback used by [`visit_node_and_then`][SolutionWalker::visit_node_and_then] to determine
@@ -144,6 +146,7 @@ type ExploredNodeKey = (
 
 pub(super) struct SolutionWalker<'db> {
     source_orders: FxIndexSet<ConstraintId>,
+    pub(super) fixed_typevar_policy: FixedTypeVarPolicy,
     /// The relation before non-inferable variables are projected away. Used to recover the
     /// original upper bounds for diagnostics, since projected paths can contain derived bounds
     /// that obscure the original evidence.
@@ -191,6 +194,7 @@ impl<'db> SolutionWalker<'db> {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
             source_orders,
+            fixed_typevar_policy: FixedTypeVarPolicy::Conditional,
             original_node,
             inferable,
             inferable_support,
@@ -677,6 +681,193 @@ impl<'db> SolutionWalker<'db> {
         evidence.finish(db, env, storage, bound_typevar)
     }
 
+    /// Check a bounded inferable variable's chosen lower bound without specializing caller-fixed
+    /// variables to make the declared bound hold. The ordinary path walk may otherwise derive
+    /// `S <= str` from `S <= T` and `T: str`, even when `S` is fixed by the caller.
+    fn inferred_lower_satisfies_upper_bound<L: SolutionLimits>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        limits: &mut L,
+        path: &mut PathAssignments,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> ControlFlow<L::Break, bool> {
+        if self.fixed_typevar_policy == FixedTypeVarPolicy::Conditional {
+            return ControlFlow::Continue(true);
+        }
+        if !bound_typevar.is_inferable(db, self.inferable) {
+            return ControlFlow::Continue(true);
+        }
+        let Some(bound) = bound_typevar.typevar(db).upper_bound(db, env) else {
+            return ControlFlow::Continue(true);
+        };
+        let mut path_constraints = SmallVec::<[ConstraintId; 8]>::new();
+        let mut lower_bounds = SmallVec::<[(usize, Type<'db>); 4]>::new();
+        let mut has_lower_inference = false;
+        let mut has_symbolic_lower = false;
+        // Inference or mixed lower bounds determine whether a solution is chosen, but validity
+        // lower bounds also contribute to that solution.
+        for (constraint, source) in path.positive_constraints() {
+            limits.visit_node()?;
+            if path.constraint_is_substituted(constraint) {
+                continue;
+            }
+            let data = storage.constraint_data(constraint);
+            if let Some(lower) = data.lower_bound_for(db, bound_typevar) {
+                has_lower_inference |= data.provenance() != ConstraintProvenance::Validity;
+                has_symbolic_lower |=
+                    any_over_type_expanding_aliases(db, env, lower, Type::is_type_var);
+                let source_order = self
+                    .source_orders
+                    .get_index_of(&source)
+                    .unwrap_or(usize::MAX);
+                lower_bounds.push((source_order, lower));
+            }
+            path_constraints.push(constraint);
+        }
+        if !has_lower_inference || !has_symbolic_lower {
+            return ControlFlow::Continue(true);
+        }
+        lower_bounds.sort_by_key(|(source_order, _)| *source_order);
+        let lower = UnionType::from_elements(db, env, lower_bounds.into_iter().map(|(_, ty)| ty));
+        if !any_over_type_expanding_aliases(db, env, lower, Type::is_type_var) {
+            return ControlFlow::Continue(true);
+        }
+
+        // Leave relationships involving variables still being inferred to the path walk, which
+        // can solve them jointly. Checking them independently would lose those relationships.
+        let has_inferable = |nested: Type<'db>| {
+            nested
+                .as_typevar()
+                .is_some_and(|typevar| typevar.is_inferable(db, self.inferable))
+        };
+        if any_over_type_expanding_aliases(db, env, lower, has_inferable)
+            || any_over_type_expanding_aliases(db, env, bound, has_inferable)
+        {
+            return ControlFlow::Continue(true);
+        }
+
+        // A ParamSpec value retains the generic context of the callable whose parameters it
+        // captures. These variables are local to that callable and can be inferred; they are
+        // distinct from variables fixed by the enclosing caller.
+        let captured = RefCell::new(SmallVec::<[BoundTypeVarInstance<'db>; 1]>::new());
+        for constraint in path_constraints {
+            let constraint = storage.constraint_data(constraint);
+            if constraint.provenance() == ConstraintProvenance::Validity {
+                continue;
+            }
+            let (typevar, ty) = match constraint {
+                Constraint::ConcreteLower(bound) => (bound.typevar, bound.bound),
+                Constraint::ConcreteUpper(bound) => (bound.typevar, bound.bound),
+                Constraint::ConcreteEquivalence(bound) => (bound.typevar, bound.bound),
+                Constraint::TypeVarRange(_) | Constraint::TypeVarEquivalence(_) => continue,
+            };
+            if !typevar.is_paramspec(db) || !typevar.is_inferable(db, self.inferable) {
+                continue;
+            }
+            any_over_type_expanding_aliases(db, env, ty, |nested| {
+                if let Type::Callable(callable) = nested
+                    && callable.kind(db) == CallableTypeKind::ParamSpecValue
+                {
+                    captured.borrow_mut().extend(
+                        callable
+                            .signatures(db)
+                            .overloads
+                            .iter()
+                            .flat_map(|signature| {
+                                signature
+                                    .generic_context
+                                    .into_iter()
+                                    .flat_map(|context| context.variables(db))
+                            }),
+                    );
+                }
+                false
+            });
+        }
+        let captured = TypeVarSet::from_typevars(db, captured.into_inner());
+        let inferable = self.inferable.merge(db, captured);
+        let relation = lower.when_assignable_to_owned(db, env, bound, inferable);
+        let (mut node, mut source_order) = storage.load(db, env, &relation);
+        if captured != TypeVarSet::None
+            && let Node::Interior(interior) = node.node()
+        {
+            // Captured variables may be specialized to satisfy the bound. Eliminate them before
+            // checking whether the remaining relation holds for every caller-fixed variable.
+            let (reduced, derived_order) = interior.abstract_inner(
+                db,
+                env,
+                storage,
+                source_order,
+                limits,
+                |storage, constraint| {
+                    storage.constraint_mentions_typevars(db, constraint, captured)
+                },
+            )?;
+            let retained_order = storage
+                .calculate_source_orders(source_order)
+                .into_iter()
+                .fold(None, |order, constraint| {
+                    if storage.constraint_mentions_typevars(db, constraint, captured) {
+                        order
+                    } else {
+                        let next = storage.constraint_source_order(constraint);
+                        storage.ordered_source_order(order, Some(next))
+                    }
+                });
+            node = reduced;
+            source_order = storage.ordered_source_order(retained_order, derived_order);
+        }
+        if node == ALWAYS_TRUE {
+            return ControlFlow::Continue(true);
+        }
+        if node == ALWAYS_FALSE {
+            return ControlFlow::Continue(false);
+        }
+        self.source_orders
+            .extend(storage.calculate_source_orders(source_order));
+        // Test the negation from an empty path: the evidence path may itself constrain a fixed
+        // typevar, but the declared bound has to hold for every allowed specialization of it.
+        let validations = storage
+            .node_support(node)
+            .cloned()
+            .map(|support| Validations::from_support(db, env, storage, &support));
+        let mut relation_path = node.path_assignments(db, env, storage, source_order);
+        let has_counterexample = Cell::new(false);
+        self.visit_node_and_then(
+            db,
+            env,
+            storage,
+            limits,
+            &mut relation_path,
+            Polarity::Negative,
+            node,
+            &|_, _, _, _, _, _| ControlFlow::Continue(!has_counterexample.get()),
+            &never_prune,
+            &|this, storage, limits, path| {
+                this.validate_satisfied_path(
+                    db,
+                    env,
+                    storage,
+                    limits,
+                    path,
+                    validations.as_ref(),
+                    &|this, storage, _limits, path| {
+                        if this
+                            .pending_candidate_solution(db, env, storage, path, None)
+                            .is_some()
+                        {
+                            has_counterexample.set(true);
+                        }
+                        ControlFlow::Continue(())
+                    },
+                )
+            },
+        )?;
+        ControlFlow::Continue(!has_counterexample.into_inner())
+    }
+
     fn evidence_satisfies_declared_constraint(
         &self,
         db: &'db dyn Db,
@@ -871,7 +1062,7 @@ impl<'db> SolutionWalker<'db> {
         constrained: &Slice<BoundTypeVarInstance<'db>, Constrained<'db>>,
         process_satisfied: &ProcessSatisfied<'_, 'db, L, L::Break>,
     ) -> ControlFlow<L::Break> {
-        let Some(((_, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
+        let Some(((&bound_typevar, upper_bound), upper_bounds)) = upper_bounds.split_first() else {
             // We've checked all typevars that have an upper bound. Next check the typevars with
             // declared constraints.
             return self.validate_constrained(
@@ -889,6 +1080,17 @@ impl<'db> SolutionWalker<'db> {
             // This upper bound is entirely unsatisfiable.
             return ControlFlow::Continue(());
         };
+
+        if !self.inferred_lower_satisfies_upper_bound(
+            db,
+            env,
+            storage,
+            limits,
+            path,
+            bound_typevar,
+        )? {
+            return ControlFlow::Continue(());
+        }
 
         // Verify that we can add all of the upper bound's constraints to the current path without
         // making it unsatisfiable. If we can, make a recursive call to check the next typevar with
@@ -1415,7 +1617,9 @@ impl<'db> SolutionWalker<'db> {
                         solution.selected_declared_constraint = Some(ty);
                         Some(ty)
                     }
-                    None => solution.inference_lower(db, env),
+                    None => solution
+                        .has_lower_inference()
+                        .then(|| solution.effective_lower(db, env)),
                 };
 
                 if let Some(typevar_violations) = typevar_violations
@@ -1487,7 +1691,15 @@ impl<'db> SolutionWalker<'db> {
 
         for (bound_typevar, upper_bound) in upper_bounds {
             let satisfied = Cell::new(false);
-            if let Some(constraints) = upper_bound.constraints.as_deref() {
+            if self.inferred_lower_satisfies_upper_bound(
+                db,
+                env,
+                storage,
+                limits,
+                path,
+                *bound_typevar,
+            )? && let Some(constraints) = upper_bound.constraints.as_deref()
+            {
                 self.visit_constraints_and_then(
                     db,
                     env,

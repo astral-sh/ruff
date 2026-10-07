@@ -831,6 +831,63 @@ info: Type variable defined here
   |       ^^^^^^
 ```
 
+## Inferring a bound from a caller's type variable
+
+An argument whose type is fixed by an enclosing function must satisfy the callee's bound for every
+specialization of that type variable.
+
+```py
+from typing import Any
+
+def box[T: str](value: T) -> list[T]:
+    return [value]
+
+def unrestricted[S](value: S) -> None:
+    box(value)  # error: [invalid-argument-type]
+
+def bounded[S: str](value: S) -> None:
+    reveal_type(box(value))  # revealed: list[S@bounded]
+
+def contextual[S](value: str, existing: S) -> list[S]:
+    return box(value)  # error: [invalid-return-type]
+
+def compatible_context[S: str](value: S) -> list[S]:
+    return box(value)  # no diagnostic
+
+def gradual_context[S](value: Any) -> list[S]:
+    # TODO: `Any` satisfies the bound even when the return context contains `S`.
+    return box(value)  # error: [invalid-argument-type]
+
+from collections.abc import Callable
+
+def box_callable[T: str](value: Callable[[], T]) -> list[T]:
+    return [value()]
+
+def invalid_argument_with_context[S](value: Callable[[], S]) -> list[str]:
+    return box_callable(value)  # error: [invalid-argument-type]
+```
+
+## Inferring a bound from a narrowed protocol
+
+```py
+from typing import Protocol
+
+class Source[T](Protocol):
+    def get(self) -> T: ...
+
+class Text:
+    def get(self) -> str:
+        return ""
+
+def require_text[T: str](value: Source[T]) -> T:
+    return value.get()
+
+def narrowed[S](value: Source[S]) -> None:
+    if isinstance(value, Text):
+        # TODO(#28677): Accept the compatible `Text` alternative when inferring the bound.
+        require_text(value)  # error: [invalid-argument-type]
+```
+
 ## Inferring a constrained typevar
 
 ```py

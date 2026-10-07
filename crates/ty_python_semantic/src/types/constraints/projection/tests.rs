@@ -8,13 +8,19 @@ use ty_python_core::ProgramFile;
 use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProjection};
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
+use crate::types::callable::{CallableType, CallableTypeKind};
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
-    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
-    TypeVarSolution,
+    ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, FixedTypeVarPolicy,
+    IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths, SolutionValidity,
+    SolutionViolationKind, Solutions, TypeVarSolution,
 };
-use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
+use crate::types::generics::GenericContext;
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::typevar::{
+    BindingContext, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarNonce, TypeVarSet,
+};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
 };
@@ -34,9 +40,35 @@ fn known_instance(db: &TestDb, class: KnownClass) -> Type<'_> {
     class.to_instance(db, &db.program_environment())
 }
 
+fn strict_solutions<'db>(
+    db: &'db TestDb,
+    set: ConstraintSet<'db, '_>,
+    inferable: TypeVarSet<'db>,
+) -> Result<Solutions<'db>, ProjectionError> {
+    let env = db.program_environment();
+    set.solutions_with_policy(
+        db,
+        &env,
+        inferable,
+        SolutionBudget::default(),
+        FixedTypeVarPolicy::RequireCallerFixedBounds,
+        |_, candidate| CandidateSolutions::default_solve(db, &env, set.builder, candidate),
+    )
+}
+
 fn exact<'db, 'c>(
     db: &'db TestDb,
     builder: &'c ConstraintSetBuilder<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+    ty: Type<'db>,
+) -> ConstraintSet<'db, 'c> {
+    exact_with_provenance(db, builder, ConstraintProvenance::Evidence, typevar, ty)
+}
+
+fn exact_with_provenance<'db, 'c>(
+    db: &'db TestDb,
+    builder: &'c ConstraintSetBuilder<'db>,
+    provenance: ConstraintProvenance,
     typevar: BoundTypeVarInstance<'db>,
     ty: Type<'db>,
 ) -> ConstraintSet<'db, 'c> {
@@ -44,7 +76,7 @@ fn exact<'db, 'c>(
         db,
         &db.program_environment(),
         builder,
-        ConstraintProvenance::Evidence,
+        provenance,
         typevar,
         ty,
     )
@@ -93,6 +125,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
+        FixedTypeVarPolicy::Conditional,
         |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
         Paths::default(),
         |mut paths, path, budget| {
@@ -136,6 +169,7 @@ fn path_limit_is_checked_before_solving() {
                 paths: max_paths,
                 ..SolutionBudget::default()
             },
+            FixedTypeVarPolicy::Conditional,
             |_, bound| {
                 selected += 1;
                 CandidateSolutions::default_solve(db, &env, &builder, bound)
@@ -301,6 +335,341 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
         PathBoundSolution::Unsolved
     });
     assert!(matches!(result, Ok(Solutions::Constrained(_))));
+}
+
+#[test]
+fn caller_fixed_upper_bound_failures_preserve_evidence_and_order() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S");
+    let u = create_typevar(db, "U");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    for fixed in [[s, u], [u, s]] {
+        let builder = ConstraintSetBuilder::new();
+        let lower = |ty| {
+            ConstraintSet::constrain_typevar_lower_bound(
+                db,
+                &env,
+                &builder,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
+        };
+        let set =
+            lower(Type::TypeVar(fixed[0])).or(db, &builder, || lower(Type::TypeVar(fixed[1])));
+        let result = set.solutions_with_policy(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            FixedTypeVarPolicy::RequireCallerFixedBounds,
+            |_, candidate| CandidateSolutions::default_solve(db, &env, &builder, candidate),
+        );
+        let Ok(Solutions::Unsatisfiable(SolutionPaths::Complete(paths))) = result else {
+            panic!("expected invalid paths, got {result:?}");
+        };
+        let violations = paths
+            .iter()
+            .flat_map(Solution::violations)
+            .map(|violation| (violation.bound_typevar, violation.kind.clone()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            violations,
+            fixed.map(|variable| (
+                t,
+                SolutionViolationKind::UpperBound(Some(Type::TypeVar(variable)))
+            ))
+        );
+    }
+}
+
+#[test]
+fn upper_bound_checks_validity_lower_when_evidence_selects_a_solution() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S");
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_lower_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::Evidence,
+        t,
+        str,
+    )
+    .and(db, &builder, || {
+        ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Validity,
+            t,
+            Type::TypeVar(s),
+        )
+    });
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    let result = strict_solutions(db, set, inferable);
+    let Ok(Solutions::Unsatisfiable(paths)) = result else {
+        panic!("expected invalid paths, got {result:?}");
+    };
+    let violations: Vec<_> = paths
+        .as_slice()
+        .iter()
+        .flat_map(Solution::violations)
+        .collect();
+    assert!(violations.iter().any(|violation| {
+        violation.bound_typevar == t
+            && violation.kind
+                == SolutionViolationKind::UpperBound(Some(UnionType::from_two_elements(
+                    db,
+                    &env,
+                    str,
+                    Type::TypeVar(s),
+                )))
+    }));
+}
+
+#[test]
+fn upper_bound_checks_mixed_evidence_after_substitution() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let list_str = KnownClass::List.to_specialized_instance(db, &env, &[str]);
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(list_str))
+    });
+    let u = create_typevar(db, "U");
+    let s = create_typevar(db, "S");
+    let list_s = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_lower_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::Evidence,
+        t,
+        Type::TypeVar(u),
+    )
+    .and(db, &builder, || {
+        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+    });
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+
+    // Substituting U's validity constraint into U <= T produces the mixed lower bound
+    // list[S] <= T. S is fixed, so it cannot be specialized to make that satisfy T's bound.
+    assert!(matches!(
+        strict_solutions(db, set, inferable),
+        Ok(Solutions::Unsatisfiable(_))
+    ));
+}
+
+#[test]
+fn mixed_evidence_may_use_a_caller_typevars_declared_bound() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let str = known_instance(db, KnownClass::Str);
+    let iterable_str = KnownClass::Iterable.to_specialized_instance(db, &env, &[str]);
+    let t = create_typevar(db, "T").map_bound_or_constraints(db, |_| {
+        Some(TypeVarBoundOrConstraints::UpperBound(iterable_str))
+    });
+    let u = create_typevar(db, "U");
+    let s = create_typevar(db, "S")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let list_s = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(s)]);
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_lower_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::Evidence,
+        t,
+        Type::TypeVar(u),
+    )
+    .and(db, &builder, || {
+        exact_with_provenance(db, &builder, ConstraintProvenance::Validity, u, list_s)
+    });
+    let inferable = TypeVarSet::from_typevars(db, [t, u]);
+
+    assert!(matches!(
+        strict_solutions(db, set, inferable),
+        Ok(Solutions::Constrained(_))
+    ));
+}
+
+#[test]
+fn upper_bound_cannot_narrow_a_callable_receiver() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let s = create_typevar(db, "S");
+    let int = known_instance(db, KnownClass::Int);
+    let bound = Type::single_callable(db, Signature::new(Parameters::empty(), Type::object()));
+    // Binding the receiver retains the condition `int <= S` on the signature.
+    let callable = Type::single_callable(
+        db,
+        Signature::new(
+            Parameters::from_annotation(
+                db,
+                [Parameter::positional_only(None).with_annotated_type(Type::TypeVar(s))],
+            ),
+            Type::TypeVar(s),
+        )
+        .bind_self_with_receiver(db, &env, Some(int), None),
+    );
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
+    let builder = ConstraintSetBuilder::new();
+    let set = ConstraintSet::constrain_typevar_lower_bound(
+        db,
+        &env,
+        &builder,
+        ConstraintProvenance::Evidence,
+        t,
+        callable,
+    );
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+
+    assert!(matches!(
+        strict_solutions(db, set, inferable),
+        Ok(Solutions::Unsatisfiable(_))
+    ));
+}
+
+#[test]
+fn upper_bound_specializes_captured_callable_variables() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let u = create_typevar(db, "U");
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let bounded_u =
+        u.map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
+    let s = create_typevar(db, "S");
+    let list = |element| KnownClass::List.to_specialized_instance(db, &env, &[element]);
+    let bound = Type::single_callable(db, Signature::new(Parameters::empty(), Type::object()));
+    let t = create_typevar(db, "T")
+        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
+    let paramspec_identity = TypeVarIdentity::new(
+        db,
+        Name::new_static("P"),
+        None,
+        TypeVarKind::Pep695ParamSpec,
+    );
+    let paramspec = BoundTypeVarInstance::new(
+        db,
+        TypeVarInstance::new(db, paramspec_identity, None, None, None),
+        BindingContext::Synthetic(env.program(db)),
+        None,
+        TypeVarNonce::NONE,
+    );
+    let q_identity = TypeVarIdentity::new(
+        db,
+        Name::new_static("Q"),
+        None,
+        TypeVarKind::Pep695ParamSpec,
+    );
+    let indirect_paramspec = BoundTypeVarInstance::new(
+        db,
+        TypeVarInstance::new(db, q_identity, None, None, None),
+        BindingContext::Synthetic(env.program(db)),
+        None,
+        TypeVarNonce::NONE,
+    );
+    for (captured_var, annotation, receiver, valid) in [
+        (u, Type::TypeVar(u), int, true),
+        (u, list(Type::TypeVar(u)), list(Type::TypeVar(s)), true),
+        (bounded_u, list(Type::TypeVar(bounded_u)), list(int), false),
+    ] {
+        // Receiver binding retains a constraint on the captured variable. It can be
+        // specialized, but only within its declared bound and without narrowing fixed S.
+        let callable = Type::single_callable(
+            db,
+            Signature::new(
+                Parameters::from_annotation(
+                    db,
+                    [Parameter::positional_only(None).with_annotated_type(annotation)],
+                ),
+                int,
+            )
+            .bind_self_with_receiver(db, &env, Some(receiver), None),
+        );
+        let mut signature = Signature::new(Parameters::empty(), Type::unknown());
+        signature.generic_context = Some(GenericContext::from_typevar_instances(
+            db,
+            &env,
+            [captured_var],
+        ));
+        let captured = Type::Callable(CallableType::new(
+            db,
+            CallableSignature::single(signature),
+            CallableTypeKind::ParamSpecValue,
+        ));
+        for mixed in [false, true] {
+            let builder = ConstraintSetBuilder::new();
+            let set = ConstraintSet::constrain_typevar_lower_bound(
+                db,
+                &env,
+                &builder,
+                ConstraintProvenance::Evidence,
+                t,
+                callable,
+            )
+            .and(db, &builder, || {
+                if mixed {
+                    ConstraintSet::constrain_typevar_lower_bound(
+                        db,
+                        &env,
+                        &builder,
+                        ConstraintProvenance::Evidence,
+                        paramspec,
+                        Type::TypeVar(indirect_paramspec),
+                    )
+                    .and(db, &builder, || {
+                        exact_with_provenance(
+                            db,
+                            &builder,
+                            ConstraintProvenance::Validity,
+                            indirect_paramspec,
+                            captured,
+                        )
+                    })
+                } else {
+                    ConstraintSet::constrain_typevar_lower_bound(
+                        db,
+                        &env,
+                        &builder,
+                        ConstraintProvenance::Evidence,
+                        paramspec,
+                        captured,
+                    )
+                }
+            });
+            let inferable = TypeVarSet::from_typevars(db, [t, paramspec, indirect_paramspec]);
+            let result = strict_solutions(db, set, inferable);
+            assert!(
+                matches!(
+                    (&result, valid),
+                    (Ok(Solutions::Constrained(_)), true)
+                        | (Ok(Solutions::Unsatisfiable(_)), false)
+                ),
+                "mixed = {mixed}, result = {result:?}"
+            );
+        }
+    }
 }
 
 #[test]
@@ -485,9 +854,16 @@ fn incomplete_solution_discards_the_projection() {
             )))
         );
         assert_eq!(
-            set.try_fold_solutions(db, &env, inferable, budget, choose, 0, |count, _, _| Ok(
-                count + 1
-            ),),
+            set.try_fold_solutions(
+                db,
+                &env,
+                inferable,
+                budget,
+                FixedTypeVarPolicy::Conditional,
+                choose,
+                0,
+                |count, _, _| Ok(count + 1),
+            ),
             Err(ProjectionError::IncompleteSolution)
         );
     }
@@ -556,6 +932,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         &env,
                         inferable,
                         budget,
+                        FixedTypeVarPolicy::Conditional,
                         choose,
                         Vec::new(),
                         |mut paths, path, budget| {
@@ -616,6 +993,7 @@ fn valid_unsolved_path_is_not_unconstrained() {
                 &env,
                 inferable,
                 budget,
+                FixedTypeVarPolicy::Conditional,
                 |_, _| selected,
                 0,
                 |count, path, _| {
@@ -662,6 +1040,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
+            FixedTypeVarPolicy::Conditional,
             |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
             Type::Never,
             |accumulated, path, budget| {
