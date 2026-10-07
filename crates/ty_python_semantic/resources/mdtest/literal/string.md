@@ -53,29 +53,28 @@ reveal_type("\U0001d167")  # revealed: Literal["\U0001d167"]
 
 ## Canonically equivalent strings
 
-Distinct strings can render identically when they are [canonically equivalent]. ty escapes non-ASCII
-characters that can participate in normalization in parts of the string that are not in [NFC], so
-these strings can be distinguished.
+Distinct strings can render identically when they are [canonically equivalent]. ty does not escape
+characters solely to distinguish such strings.
 
-NFC combines `e\u0301` into `é`, whereas `q\u0301` is already in NFC. It also puts combining marks
-into a standard order.
+[NFC] combines `e\u0301` into `é`, whereas `q\u0301` is already in NFC. It also maps `\u212b` to
+`Å`, combines `\u1100\u1161` into `가`, and puts combining marks into a standard order.
 
 ```py
 from typing import Literal
 
 reveal_type("é")  # revealed: Literal["é"]
-reveal_type("e\u0301")  # revealed: Literal["e\u0301"]
-reveal_type("q\u0301 e\u0301")  # revealed: Literal["q́ e\u0301"]
-reveal_type("é e\u0301")  # revealed: Literal["é e\u0301"]
+reveal_type("e\u0301")  # revealed: Literal["é"]
+reveal_type("q\u0301 e\u0301")  # revealed: Literal["q́ é"]
+reveal_type("é e\u0301")  # revealed: Literal["é é"]
 reveal_type("Å")  # revealed: Literal["Å"]
-reveal_type("\u212b")  # revealed: Literal["\u212b"]
+reveal_type("\u212b")  # revealed: Literal["Å"]
 reveal_type("가")  # revealed: Literal["가"]
-reveal_type("\u1100\u1161")  # revealed: Literal["\u1100\u1161"]
-reveal_type("q\u0315\u0300")  # revealed: Literal["q\u0315\u0300"]
+reveal_type("\u1100\u1161")  # revealed: Literal["가"]
+reveal_type("q\u0315\u0300")  # revealed: Literal["q̀̕"]
 reveal_type("q\u0300\u0315")  # revealed: Literal["q̀̕"]
 
 def equivalent_literals(value: Literal["é", "e\u0301"]):
-    reveal_type(value)  # revealed: Literal["é", "e\u0301"]
+    reveal_type(value)  # revealed: Literal["é", "é"]
 ```
 
 ## Default-ignorable characters

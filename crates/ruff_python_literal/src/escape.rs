@@ -1,9 +1,4 @@
-use icu_normalizer::ComposingNormalizer;
-use icu_properties::{
-    CodePointSetData,
-    props::{DefaultIgnorableCodePoint, NfcInert},
-};
-use itertools::Either;
+use icu_properties::{CodePointSetData, props::DefaultIgnorableCodePoint};
 use ruff_python_ast::{
     BytesLiteralFlags, StringFlags, StringLiteralFlags,
     str::{Quote, TripleQuotes},
@@ -74,28 +69,18 @@ impl<'a> UnicodeEscape<'a> {
     /// invisible. It also escapes combining marks that would otherwise attach to the opening quote
     /// or an escape sequence in the output.
     ///
-    /// To distinguish [canonically equivalent] strings, it escapes non-ASCII characters that can
-    /// participate in normalization in parts of the string that are not in [NFC]. Characters
-    /// with the [`NfcInert`] property cannot interact with adjacent characters during normalization
-    /// and separate these parts.
-    ///
     /// [default-ignorable characters]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
-    /// [NFC]: https://www.unicode.org/reports/tr15/#Norm_Forms
-    /// [canonically equivalent]: https://www.unicode.org/reports/tr15/#Canon_Compat_Equivalence
-    /// [`NfcInert`]: https://docs.rs/icu_properties/latest/icu_properties/props/struct.NfcInert.html
     #[must_use]
     pub fn escape_for_display(mut self) -> Self {
-        // ASCII is already NFC and has no combining marks or default-ignorable characters, so it
-        // needs no additional escaping for display.
+        // ASCII has no combining marks or default-ignorable characters, so it needs no additional
+        // escaping for display.
         if self.escape_for_display || self.source.is_ascii() {
             return self;
         }
         self.escape_for_display = true;
         let mut follows_syntax = true;
-        for (ch, escape_for_normalization) in
-            Self::display_chars(self.source, self.escape_for_display)
-        {
-            let escape = self.display_escape(ch, follows_syntax, escape_for_normalization);
+        for ch in self.source.chars() {
+            let escape = self.display_escape(ch, follows_syntax);
             follows_syntax = escape.next_follows_syntax;
             if escape.should_escape {
                 let extra = Self::escaped_codepoint_len(ch) - ch.len_utf8();
@@ -242,59 +227,23 @@ impl UnicodeEscape<'_> {
         }
     }
 
-    /// Yields characters and whether to escape them for display to distinguish canonically
-    /// equivalent strings, when display escaping is enabled.
-    ///
-    /// Characters with the [`NfcInert`] property cannot interact with adjacent characters during
-    /// normalization, so they provide boundaries between independently normalized segments.
-    ///
-    /// [`NfcInert`]: https://docs.rs/icu_properties/latest/icu_properties/props/struct.NfcInert.html
-    fn display_chars(source: &str, escape_for_display: bool) -> impl Iterator<Item = (char, bool)> {
-        if !escape_for_display || ComposingNormalizer::new_nfc().is_normalized(source) {
-            return Either::Left(source.chars().map(|ch| (ch, false)));
-        }
-
-        let inert = CodePointSetData::new::<NfcInert>();
-        Either::Right(
-            source
-                .split_inclusive(move |ch| inert.contains(ch))
-                .flat_map(move |segment| {
-                    let escape = !ComposingNormalizer::new_nfc().is_normalized(segment);
-                    segment.chars().map(move |ch| {
-                        let escape = escape
-                            && !ch.is_ascii()
-                            && !inert.contains(ch)
-                            && crate::char::is_printable(ch);
-                        (ch, escape)
-                    })
-                }),
-        )
-    }
-
     /// Returns whether `ch` needs additional escaping and, when display escaping is enabled,
     /// whether the next character would immediately follow an escape sequence in the output.
     ///
     /// When display escaping is enabled, printable default-ignorable characters are escaped.
     /// `follows_syntax` is true if `ch` would immediately follow the opening quote or an escape
-    /// sequence; in that case, combining marks are also escaped. `escape_for_normalization` marks
-    /// characters in a non-NFC segment that can participate in normalization.
-    fn display_escape(
-        &self,
-        ch: char,
-        follows_syntax: bool,
-        escape_for_normalization: bool,
-    ) -> DisplayEscape {
+    /// sequence; in that case, combining marks are also escaped.
+    fn display_escape(&self, ch: char, follows_syntax: bool) -> DisplayEscape {
         if !self.escape_for_display {
             return DisplayEscape {
                 should_escape: false,
                 next_follows_syntax: follows_syntax,
             };
         }
-        let should_escape = escape_for_normalization
-            || (!ch.is_ascii()
-                && ((follows_syntax && crate::char::is_combining_mark(ch))
-                    || (CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(ch)
-                        && crate::char::is_printable(ch))));
+        let should_escape = !ch.is_ascii()
+            && ((follows_syntax && crate::char::is_combining_mark(ch))
+                || (CodePointSetData::new::<DefaultIgnorableCodePoint>().contains(ch)
+                    && crate::char::is_printable(ch)));
         DisplayEscape {
             should_escape,
             next_follows_syntax: should_escape
@@ -355,10 +304,8 @@ impl Escape for UnicodeEscape<'_> {
     #[cold]
     fn write_body_slow(&self, formatter: &mut impl std::fmt::Write) -> std::fmt::Result {
         let mut follows_syntax = true;
-        for (ch, escape_for_normalization) in
-            Self::display_chars(self.source, self.escape_for_display)
-        {
-            let display_escape = self.display_escape(ch, follows_syntax, escape_for_normalization);
+        for ch in self.source.chars() {
+            let display_escape = self.display_escape(ch, follows_syntax);
             follows_syntax = display_escape.next_follows_syntax;
             Self::write_char(
                 ch,
@@ -571,56 +518,6 @@ mod unicode_escape_tests {
             escaped.str_repr(TripleQuotes::No).to_string().as_deref(),
             Some("'\\u0301q\u{0301}'")
         );
-    }
-
-    #[test]
-    fn canonically_equivalent_strings() {
-        let source = "q\u{0301} e\u{0301}\u{200b}";
-        let original = UnicodeEscape::new_repr(source);
-        assert_eq!(
-            original.str_repr(TripleQuotes::No).to_string().as_deref(),
-            Some("'q\u{0301} e\u{0301}\\u200b'")
-        );
-
-        let escaped = UnicodeEscape::new_repr(source).escape_for_display();
-        assert_eq!(
-            escaped.layout().len,
-            Some("q\u{0301} e\\u0301\\u200b".len())
-        );
-        assert_eq!(
-            escaped.str_repr(TripleQuotes::No).to_string().as_deref(),
-            Some("'q\u{0301} e\\u0301\\u200b'")
-        );
-    }
-
-    #[test]
-    fn canonical_equivalents_have_distinct_normalized_displays() {
-        let nfc = icu_normalizer::ComposingNormalizer::new_nfc();
-        let nfd = icu_normalizer::DecomposingNormalizer::new_nfd();
-        for codepoint in 0..=0x0010_ffff {
-            let Some(ch) = char::from_u32(codepoint) else {
-                continue;
-            };
-            let original = ch.to_string();
-            let composed = nfc.normalize(&original);
-            let decomposed = nfd.normalize(&original);
-            let forms = [original.as_str(), composed.as_ref(), decomposed.as_ref()];
-            for (i, first) in forms.iter().enumerate() {
-                for second in &forms[i + 1..] {
-                    if first != second {
-                        let first = UnicodeEscape::new_repr(first).escape_for_display();
-                        let second = UnicodeEscape::new_repr(second).escape_for_display();
-                        let first_repr = format!("{}", first.str_repr(TripleQuotes::No));
-                        let second_repr = format!("{}", second.str_repr(TripleQuotes::No));
-                        assert_ne!(
-                            nfc.normalize(&first_repr),
-                            nfc.normalize(&second_repr),
-                            "U+{codepoint:04X}: {first_repr:?} and {second_repr:?}"
-                        );
-                    }
-                }
-            }
-        }
     }
 
     #[test]
