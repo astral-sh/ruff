@@ -365,7 +365,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
 pub(crate) struct TypeCollector<'db>(RefCell<CollectedTypes<'db>>);
 
 impl<'db> TypeCollector<'db> {
-    fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+    pub(super) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
         !self.0.borrow_mut().insert(ty)
     }
 }

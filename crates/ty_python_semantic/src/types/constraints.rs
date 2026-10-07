@@ -106,16 +106,17 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::generics::{Specialization, walk_specialization_types};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
 };
 use crate::types::visitor::{
     NonAtomicType, TypeCollector, TypeKind, TypeVisitor, any_over_type_expanding_aliases,
-    walk_non_atomic_type, walk_type_with_recursion_guard,
+    walk_non_atomic_type,
 };
 use crate::types::{
-    BoundTypeVarInstance, DynamicType, IntersectionType, Type, TypePair, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionType,
+    BoundTypeVarInstance, DynamicType, IntersectionType, RecursiveType, Type, TypeAliasType,
+    TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1192,11 +1193,49 @@ impl<'db> ConstraintSetStorage<'db> {
         ty: Type<'db>,
         support: &mut Support,
     ) {
+        struct AliasVisit<'db> {
+            ty: Type<'db>,
+            support: Support,
+            specialization: Option<Specialization<'db>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
         struct InternMentionedTypevars<'a, 'db> {
             env: &'a ProgramEnvironment<'db>,
             storage: RefCell<&'a mut ConstraintSetStorage<'db>>,
             support: RefCell<&'a mut Support>,
+            aliases: RefCell<Vec<AliasVisit<'db>>>,
             recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> InternMentionedTypevars<'_, 'db> {
+            fn visit_alias(
+                &self,
+                db: &'db dyn Db,
+                ty: Type<'db>,
+                specialization: Option<Specialization<'db>>,
+                body: Type<'db>,
+            ) {
+                let mut aliases = self.aliases.borrow_mut();
+                let mut previous = aliases.iter().rev().filter(|alias| alias.ty == ty);
+                let latest = previous.next();
+                let earlier = previous.next();
+                if let (Some(earlier), Some(latest)) = (earlier, latest)
+                    && latest.support == earlier.support
+                {
+                    return;
+                }
+                let index = aliases.len();
+                aliases.push(AliasVisit {
+                    ty,
+                    support: self.support.borrow().clone(),
+                    specialization,
+                    recursion_guard: TypeCollector::default(),
+                });
+                drop(aliases);
+                self.visit_type(db, body);
+                self.aliases.borrow_mut().truncate(index);
+            }
         }
 
         impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
@@ -1218,19 +1257,75 @@ impl<'db> ConstraintSetStorage<'db> {
             }
 
             fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
-                for ty in alias.specialization(db).types(db) {
-                    self.visit_type(db, *ty);
-                }
+                walk_specialization_types(db, alias.specialization(db), self);
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                let specialization = alias.specialization(db).or_else(|| {
+                    alias
+                        .generic_context(db)
+                        .map(|context| context.default_specialization(db, None))
+                });
+                self.visit_alias(
+                    db,
+                    Type::TypeAlias(alias.unspecialized(db)),
+                    specialization,
+                    alias.raw_value_type(db),
+                );
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                let constructor = recursive.constructor(db);
+                self.visit_alias(
+                    db,
+                    Type::Recursive(constructor),
+                    recursive.arguments(db),
+                    constructor.unfold(db, self.env).into_type(),
+                );
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if let Type::TypeVar(bound_typevar) = ty {
+                    let alias = self.aliases.borrow_mut().pop();
+                    if let Some(alias) = alias {
+                        // The raw definition retains formal parameters. Visit their arguments
+                        // in the caller's context so finite nesting like Alias[Alias[T]] does
+                        // not count as a recursive reference in Alias's definition.
+                        let argument = alias
+                            .specialization
+                            .and_then(|specialization| specialization.get(db, bound_typevar))
+                            .unwrap_or(ty);
+                        self.visit_type(db, argument);
+                        self.aliases.borrow_mut().push(alias);
+                        return;
+                    }
                     let mut storage = self.storage.borrow_mut();
                     let typevar = storage.intern_typevar(db, bound_typevar);
                     let mut support = self.support.borrow_mut();
                     support.insert(typevar);
                 }
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                // The usual recursion guard would also cut off alias revisits that have
+                // discovered additional type variables.
+                match ty {
+                    Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
+                    Type::Recursive(recursive) => self.visit_recursive_type(db, recursive),
+                    _ => {
+                        let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) else {
+                            return;
+                        };
+                        // Release the stack borrow before walking: nested visits can change
+                        // the active alias frame.
+                        let already_seen = self
+                            .aliases
+                            .borrow()
+                            .last()
+                            .map_or(&self.recursion_guard, |alias| &alias.recursion_guard)
+                            .type_was_already_seen(ty);
+                        if !already_seen {
+                            walk_non_atomic_type(db, non_atomic, self);
+                        }
+                    }
+                }
             }
         }
 
@@ -1238,6 +1333,7 @@ impl<'db> ConstraintSetStorage<'db> {
             env,
             storage: RefCell::new(self),
             support: RefCell::new(support),
+            aliases: RefCell::default(),
             recursion_guard: TypeCollector::default(),
         }
         .visit_type(db, ty);

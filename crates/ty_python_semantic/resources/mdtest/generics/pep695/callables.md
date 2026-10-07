@@ -1485,3 +1485,127 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Inferring aliased return types from generic methods
+
+A receiver can determine a generic method's return type through a type alias. Passing the instance
+to a generic function preserves that concrete return type.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+type Alias[T] = Box[T]
+
+class Producer[T](Protocol):
+    def produce(self) -> T: ...
+
+class Factory[T]:
+    def produce[S](self: Factory[S]) -> Alias[S]:
+        raise NotImplementedError
+
+def extract[T](producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+def check(factory: Factory[int]):
+    reveal_type(extract(factory))  # revealed: Box[int]
+```
+
+Nested applications of the same alias preserve the inferred type argument at every level.
+
+```py
+class NestedFactory[T]:
+    def produce[S](self: NestedFactory[S]) -> Alias[Alias[S]]:
+        raise NotImplementedError
+
+def check_nested(factory: NestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[int]]
+
+class DeeplyNestedFactory[T]:
+    def produce[S](self: DeeplyNestedFactory[S]) -> Alias[Alias[Alias[S]]]:
+        raise NotImplementedError
+
+def check_deeply_nested(factory: DeeplyNestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[Box[int]]]
+```
+
+An unused alias parameter does not affect the return type.
+
+```py
+type Ignore[T] = int
+
+class IgnoringFactory[T]:
+    def produce[S](self: IgnoringFactory[S]) -> Ignore[S]:
+        raise NotImplementedError
+
+def check_ignored(factory: IgnoringFactory[str]):
+    reveal_type(extract(factory))  # revealed: int
+```
+
+## Inferring recursive aliased return types
+
+An explicitly annotated receiver can also specialize a recursive return type. Here the writable
+`item` attribute makes the receiver invariant, so its argument determines `S` exactly.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+type Growing[T] = tuple[T, Growing[list[T]] | None]
+type Rotate[A, B] = tuple[A, Rotate[B, A] | None]
+type First[T] = tuple[int, Second[T] | None]
+type Second[T] = tuple[T, First[T] | None]
+
+class Producer[T](Protocol):
+    def produce(self) -> T: ...
+
+def extract[T](producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+class GrowingFactory[T]:
+    item: T
+
+    def produce[S](self: GrowingFactory[S]) -> Growing[S]:
+        raise NotImplementedError
+
+def check_growing(factory: GrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: tuple[int, Growing[list[int]] | None]
+```
+
+Nested applications of a recursive alias also preserve the inferred type argument.
+
+```py
+class NestedGrowingFactory[T]:
+    item: T
+
+    def produce[S](self: NestedGrowingFactory[S]) -> Growing[Growing[Growing[S]]]:
+        raise NotImplementedError
+
+def check_nested_growing(factory: NestedGrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: tuple[Growing[Growing[int]], Growing[list[Growing[Growing[int]]]] | None]
+```
+
+Recursive references can move an argument into another parameter position or pass it through another
+alias before it appears in the return type.
+
+```py
+class RotatingFactory[T]:
+    item: T
+
+    def produce[S](self: RotatingFactory[S]) -> Rotate[str, S]:
+        raise NotImplementedError
+
+class MutualFactory[T]:
+    item: T
+
+    def produce[S](self: MutualFactory[S]) -> First[S]:
+        raise NotImplementedError
+
+def check_recursive(rotating: RotatingFactory[int], mutual: MutualFactory[bytes]):
+    reveal_type(extract(rotating))  # revealed: tuple[str, Rotate[int, str] | None]
+    reveal_type(extract(mutual))  # revealed: tuple[int, Second[bytes] | None]
+```

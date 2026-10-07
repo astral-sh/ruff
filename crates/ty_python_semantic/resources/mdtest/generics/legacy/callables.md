@@ -1426,3 +1426,138 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Inferring aliased return types from generic methods
+
+A receiver can determine a generic method's return type through a type alias. Passing the instance
+to a generic function preserves that concrete return type.
+
+```py
+from __future__ import annotations
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import TypeAliasType
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Box(Generic[T_co]):
+    def get(self) -> T_co:
+        raise NotImplementedError
+
+Alias = TypeAliasType("Alias", Box[T], type_params=(T,))
+
+class Producer(Protocol[T_co]):
+    def produce(self) -> T_co: ...
+
+class Factory(Generic[T_co]):
+    def produce(self: Factory[S]) -> Alias[S]:
+        raise NotImplementedError
+
+def extract(producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+def check(factory: Factory[int]):
+    reveal_type(extract(factory))  # revealed: Box[int]
+```
+
+Nested applications of the same alias preserve the inferred type argument at every level.
+
+```py
+class NestedFactory(Generic[T_co]):
+    def produce(self: NestedFactory[S]) -> Alias[Alias[S]]:
+        raise NotImplementedError
+
+def check_nested(factory: NestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[int]]
+
+class DeeplyNestedFactory(Generic[T_co]):
+    def produce(self: DeeplyNestedFactory[S]) -> Alias[Alias[Alias[S]]]:
+        raise NotImplementedError
+
+def check_deeply_nested(factory: DeeplyNestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[Box[int]]]
+```
+
+An unused alias parameter does not affect the return type.
+
+```py
+Ignore = TypeAliasType("Ignore", int, type_params=(T,))
+
+class IgnoringFactory(Generic[T_co]):
+    def produce(self: IgnoringFactory[S]) -> Ignore[S]:
+        raise NotImplementedError
+
+def check_ignored(factory: IgnoringFactory[str]):
+    reveal_type(extract(factory))  # revealed: int
+```
+
+## Inferring recursive aliased return types
+
+An explicitly annotated receiver can also specialize a recursive return type. Here the writable
+`item` attribute makes the receiver invariant, so its argument determines `S` exactly.
+
+```py
+from __future__ import annotations
+from typing import Generic, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+S = TypeVar("S")
+A = TypeVar("A")
+B = TypeVar("B")
+
+Growing = tuple[T, "Growing[list[T]] | None"]
+Rotate = tuple[A, "Rotate[B, A] | None"]
+First = tuple[int, "Second[T] | None"]
+Second = tuple[T, "First[T] | None"]
+
+class Producer(Protocol[T_co]):
+    def produce(self) -> T_co: ...
+
+def extract(producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+class GrowingFactory(Generic[T]):
+    item: T
+
+    def produce(self: GrowingFactory[S]) -> Growing[S]:
+        raise NotImplementedError
+
+def check_growing(factory: GrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: Growing[int]
+```
+
+Nested applications of a recursive alias also preserve the inferred type argument.
+
+```py
+class NestedGrowingFactory(Generic[T]):
+    item: T
+
+    def produce(self: NestedGrowingFactory[S]) -> Growing[Growing[Growing[S]]]:
+        raise NotImplementedError
+
+def check_nested_growing(factory: NestedGrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: Growing[Growing[Growing[int]]]
+```
+
+Recursive references can move an argument into another parameter position or pass it through another
+alias before it appears in the return type.
+
+```py
+class RotatingFactory(Generic[T]):
+    item: T
+
+    def produce(self: RotatingFactory[S]) -> Rotate[str, S]:
+        raise NotImplementedError
+
+class MutualFactory(Generic[T]):
+    item: T
+
+    def produce(self: MutualFactory[S]) -> First[S]:
+        raise NotImplementedError
+
+def check_recursive(rotating: RotatingFactory[int], mutual: MutualFactory[bytes]):
+    reveal_type(extract(rotating))  # revealed: Rotate[str, int]
+    reveal_type(extract(mutual))  # revealed: First[bytes]
+```
