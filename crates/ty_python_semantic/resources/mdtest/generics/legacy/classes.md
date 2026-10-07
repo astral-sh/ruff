@@ -968,7 +968,20 @@ class Consumer(Generic[T]):
 
 def accepts_dog(value: Dog) -> None: ...
 
-consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-assignment]
+# snapshot: invalid-assignment
+consumer: Consumer[Animal] = Consumer(accepts_dog)
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`
+  --> src/mdtest_snippet.py:16:30
+   |
+16 | consumer: Consumer[Animal] = Consumer(accepts_dog)
+   |           ----------------   ^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `Consumer[Dog]`
+   |           |
+   |           Declared type
+info: `Consumer` is invariant in its type parameter
+info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
 ```
 
 ### Constrained constructor inference uses argument evidence
