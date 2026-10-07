@@ -3037,9 +3037,8 @@ static_assert(is_assignable_to(PropertyWithSelfSetter, HasConcretePropertySetter
 
 ## Writable `__class__` members
 
-A protocol with a writable `__class__` member requires both its read and write types to be
-compatible. A subclass of `object` does not satisfy a protocol that allows assigning any class to
-`__class__`: the inherited setter accepts only `type[Self]`.
+A writable `__class__: type[object]` excludes proper subclasses of `object`: their inherited setter
+accepts only `type[Self]`.
 
 ```py
 from typing import Protocol
@@ -3057,62 +3056,19 @@ def takes_class(value: type[JustObject]) -> None: ...
 takes_instance(object())  # no diagnostic
 takes_class(object)  # no diagnostic
 
-takes_instance(C())  # snapshot: invalid-argument-type
+takes_instance(C())  # error: [invalid-argument-type]
 takes_class(C)  # error: [invalid-argument-type]
 takes_instance(C)  # error: [invalid-argument-type]
 
 static_assert(not is_equivalent_to(JustObject, object))
 ```
 
-```snapshot
-error[invalid-argument-type]: Argument to function `takes_instance` is incorrect
-  --> src/mdtest_snippet.py:16:16
-   |
-16 | takes_instance(C())  # snapshot: invalid-argument-type
-   |                ^^^ Expected `JustObject`, found `C`
-info: type `C` is not assignable to protocol `JustObject`
-info: └── protocol member `__class__` is incompatible
-info:     └── the member does not accept writes of type `type`
-info: Function defined here
-  --> src/mdtest_snippet.py:10:5
-   |
-10 | def takes_instance(value: JustObject) -> None: ...
-   |     ^^^^^^^^^^^^^^ ----------------- Parameter declared here
-```
-
-The same requirements apply when the member is declared as a property with a setter, including when
-the protocol inherits it:
+Inherited declarations impose the same requirement:
 
 ```py
-class JustObjectProperty(Protocol):
-    @property
-    def __class__(self) -> type[object]: ...
-    @__class__.setter
-    def __class__(self, value: type[object]) -> None: ...
+class InheritedJustObject(JustObject, Protocol): ...
 
-class InheritedJustObject(JustObjectProperty, Protocol): ...
-
-def takes_property(value: JustObjectProperty) -> None: ...
-def takes_inherited(value: InheritedJustObject) -> None: ...
-
-takes_property(object())  # no diagnostic
-takes_property(C())  # error: [invalid-argument-type]
-takes_inherited(C())  # error: [invalid-argument-type]
-```
-
-A read-only `__class__` member is covariant, so every object satisfies this protocol:
-
-```py
-class ReadClass(Protocol):
-    @property
-    def __class__(self) -> type[object]: ...
-
-def takes_read_only(value: ReadClass) -> None: ...
-def takes_read_only_class(value: type[ReadClass]) -> None: ...
-
-takes_read_only(C())  # no diagnostic
-takes_read_only_class(C)  # no diagnostic
-static_assert(is_equivalent_to(ReadClass, object))
+inherited: InheritedJustObject = C()  # error: [invalid-assignment]
 ```
 
 Writable contracts that accept only `type[Self]` or `Never` do not require accepting another

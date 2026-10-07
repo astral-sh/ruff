@@ -2199,9 +2199,7 @@ reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.Gene
 
 ## Writable `__class__` protocol specializations
 
-Specializing a writable `__class__` property to `object` still requires the exact class. Instances
-of a proper subclass do not satisfy the protocol, and classes constructing them do not satisfy
-`type[Just[object]]`.
+Specializing a writable `__class__` property to `object` still requires the exact class.
 
 ```py
 from typing import Protocol
@@ -2214,13 +2212,10 @@ class Just[T](Protocol):
 
 class Custom: ...
 
-def takes_instance(value: Just[object]) -> None: ...
-def takes_class(value: type[Just[object]]) -> None: ...
-
-takes_instance(object())  # no diagnostic
-takes_instance(Custom())  # error: [invalid-argument-type]
-takes_class(object)  # no diagnostic
-takes_class(Custom)  # error: [invalid-argument-type]
+exact: Just[object] = object()  # no diagnostic
+subclass: Just[object] = Custom()  # error: [invalid-assignment]
+exact_class: type[Just[object]] = object  # no diagnostic
+subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
 ```
 
 ## Subscripting non-generic classes
