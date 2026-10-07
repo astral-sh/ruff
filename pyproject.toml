@@ -95,7 +95,7 @@ typeshed-docstrings = [
     "docstring-adder",
 ]
 typeshed-formatting = [
-    "black",
+    "black>=26.10.0",
 ]
 
 [tool.uv]
@@ -113,7 +113,6 @@ preview-features = ["missing-exclude-newer-package-lock"]
 required-version = ">=0.12.10"
 # CI installs the local ecosystem runner and tools pinned to Git revisions.
 no-binary-package = [
-    "black",
     "docstring-adder",
     "ecosystem-analyzer",
     "mypy-primer",
@@ -128,20 +127,9 @@ no-binary-package = [
 # flit-core pin changed, the conflicting pins would cause the build to fail
 # until the pin here was updated to match.
 build-constraint-dependencies = [
-    "hatch-fancy-pypi-readme==25.1.0",
-    "hatch-vcs==0.5.0",
-    "hatchling==1.32.0",
     "packaging==26.3",
-    "pathspec==1.1.1",
-    "pluggy==1.6.0",
     "setuptools==84.0.0",
-    "setuptools-scm==10.2.1",
-    "tomli==2.4.1; python_version < '3.11'",
-    "tomlkit==0.15.1",
-    "trove-classifiers==2026.6.1.19",
-    "typing-extensions==4.16.0; python_version < '3.11'",
     "uv-build==0.12.3",
-    "vcs-versioning==2.2.4",
     "wheel==0.47.0",
 ]
 exclude-newer = "P7D"
@@ -154,6 +142,10 @@ astral-dev-toolchain-cargo-codspeed = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-nextest = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-insta = "2026-08-27T00:00:00Z"
 astral-dev-toolchain-cargo-fuzz = "2026-09-01T00:00:00Z"
+# Black 26.10.0's preview style adds missing blank lines after docstring-only
+# functions in stubs, except within overload groups. Its wheels are not yet old
+# enough for the seven-day cooldown. Remove this exception after 2026-10-11 17:00 UTC.
+black = "2026-10-04T17:00:00Z"
 
 [tool.uv.dependency-groups]
 dev = { requires-python = ">=3.12" }
@@ -166,9 +158,6 @@ typeshed-formatting = { requires-python = ">=3.10" }
 
 [tool.uv.sources]
 docstring-adder = { git = "https://github.com/astral-sh/docstring-adder.git" }
-# Switch to a released version once it includes
-# https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
-black = { git = "https://github.com/psf/black.git" }
 # Keep scripts/setup_primer_project.py and its lockfile synchronized with
 # ecosystem-analyzer's mypy-primer pin when updating its locked revision.
 ecosystem-analyzer = { git = "https://github.com/astral-sh/ecosystem-analyzer" }
