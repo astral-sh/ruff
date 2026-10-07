@@ -875,6 +875,129 @@ c = C(f)
 reveal_type(c.f)  # revealed: (x: int, y: str) -> int
 ```
 
+### Generic constructors with bounded return types
+
+A class object can be passed as a callable that constructs instances. `Factory` takes no constructor
+arguments, but its instances have a generic, writable `value` attribute:
+
+```py
+class Factory[T]:
+    value: T
+```
+
+The `construct` helper captures a callable's parameters in `P`, forwards its arguments, and returns
+the resulting instance. The bound on `R` requires that instance to be assignable to
+`Factory[object]`:
+
+```py
+from typing import Callable
+
+def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+```
+
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
+result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
+satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
+
+```py
+# TODO: revealed: Factory[Unknown]
+# no diagnostic
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
+The callable-local variable also remains available when `P` is inferred from another callable:
+
+```py
+def construct_with[**P, R: Factory[object]](
+    factory: Callable[P, R], other: Callable[P, object], /, *args: P.args, **kwargs: P.kwargs
+) -> R:
+    return factory(*args, **kwargs)
+
+construct_with(Factory, lambda: object())  # no diagnostic
+```
+
+A generic callable can also return a type containing a variable fixed by an enclosing function.
+Capturing the callable's own type variable in `P` does not make the enclosing variable inferable:
+
+```py
+def outer[S](value: S) -> None:
+    def make[U](value: U) -> Factory[S]:
+        raise NotImplementedError
+
+    construct(make, 1)  # error: [invalid-argument-type]
+```
+
+A generic callable whose return type satisfies the bound is accepted:
+
+```py
+def make_object[U](value: U) -> Factory[object]:
+    raise NotImplementedError
+
+construct(make_object, 1)  # no diagnostic
+```
+
+### Captured and fixed variables in a return type
+
+Capturing a callable's type variable does not permit a second, enclosing variable in its return type
+to violate a bound. An enclosing variable whose bound already satisfies the return bound is
+accepted.
+
+```py
+from typing import Callable
+
+def forward[**P, R: tuple[object, str]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def unrestricted[S](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, 1)  # error: [invalid-argument-type]
+
+def bounded[S: str](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, 1)  # no diagnostic
+```
+
+### Specializing a captured variable to satisfy a return bound
+
+The callable's own type variable can be specialized to satisfy the return bound, even when its
+return type also contains a fixed variable from the enclosing function.
+
+```py
+from typing import Callable
+
+def forward[**P, R: tuple[str, str]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def outer[S: str](fixed: S) -> None:
+    def make[T](value: T) -> tuple[T, S]:
+        return value, fixed
+
+    forward(make, "text")  # no diagnostic
+```
+
+### Bounds in captured callables
+
+A captured variable's bound allows the return type to satisfy the return bound, while forwarded
+arguments must still satisfy that variable's bound.
+
+```py
+from typing import Callable
+
+def forward[**P, R: tuple[str, int]](factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return factory(*args, **kwargs)
+
+def make[T: str](value: T) -> tuple[T, int]:
+    return value, 1
+
+forward(make, "text")  # no diagnostic
+forward(make, 1)  # error: [invalid-argument-type]
+```
+
 ### `ParamSpec` in prepended positional parameters
 
 > If one of these prepended positional parameters contains a free `ParamSpec`, we consider that

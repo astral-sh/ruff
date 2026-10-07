@@ -1614,6 +1614,42 @@ def correlated_noninferable[I, J, N]() -> None:
     reveal_type(constraints.solutions_for(J, inferable=tuple[I, J]))
 ```
 
+## Solving declared upper bounds
+
+### Conditional solutions for fixed type variables
+
+A path can restrict the non-inferable variable as well as the inferable variable. Its solution
+applies only to specializations that satisfy the path's constraints.
+
+```py
+from ty_extensions._internal import ConstraintSet
+
+def conditional[S, T: str]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.upper_bound(S, str)
+    reveal_type(constraints.solutions_for(T, inferable=tuple[T]))  # revealed: tuple[Solution[T=S@conditional]]
+```
+
+### Joint inference
+
+When both variables are inferable, the solver can specialize them together.
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import ConstraintSet
+
+def joint[S, T: str]() -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
+    static_assert(constraints.solutions_for(T, inferable=tuple[S, T]) is not None)  # no diagnostic
+
+S = TypeVar("S")
+T = TypeVar("T", bound=str)
+
+def legacy_joint(source: S, target: T) -> None:
+    constraints = ConstraintSet.lower_bound(S, T) & ConstraintSet.equality(S, str)
+    static_assert(constraints.solutions_for(T, inferable=tuple[S, T]) is not None)  # no diagnostic
+```
+
 ## Existential quantification
 
 Existential quantification removes the listed typevars from a constraint set. Any constraints that
