@@ -638,7 +638,7 @@ impl<'db> CallableSignature<'db> {
             &signature_relation_visitor,
             &materialization_visitor,
         );
-        checker.check_callable_signature_pair_inner(db, &self.overloads, &other.overloads)
+        checker.check_callable_signature_pair(db, self, other)
     }
 }
 
@@ -2762,8 +2762,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             }
 
-            // source is definitely not overloaded while target is possibly overloaded.
-            ([_], _) => {
+            (_, _) => {
+                // Create separate freshened copies of any typevars introduced by the source
+                // signature, so that each target overload can infer an independent specialization
+                // of them.
+                let overloads = source_overloads.iter().chain(target_overloads);
+                let max_freshness = overloads
+                    .clone()
+                    .filter_map(|signature| signature.generic_context)
+                    .flat_map(|context| {
+                        overloads.clone().filter_map(move |signature| {
+                            signature.max_typevar_freshness_matching_generic_context(db, context)
+                        })
+                    })
+                    .max();
+                self.constraints.signature_typevar_freshness.set(
+                    self.constraints
+                        .signature_typevar_freshness
+                        .get()
+                        .max(max_freshness),
+                );
                 target_overloads
                     .iter()
                     .when_all(db, self.constraints, |target_signature| {
@@ -2774,17 +2792,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
             }
-
-            // source is definitely overloaded while target is possibly overloaded.
-            (_, _) => target_overloads
-                .iter()
-                .when_all(db, self.constraints, |target_signature| {
-                    self.check_callable_signature_pair_inner(
-                        db,
-                        source_overloads,
-                        std::slice::from_ref(target_signature),
-                    )
-                }),
         }
     }
 
@@ -2835,18 +2842,34 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     || self.typevar_evaluation != TypeVarEvaluation::Lazy
             })
         };
+        let freshen = |signature: &Signature<'db>,
+                       generic_context: GenericContext<'db>,
+                       after: TypeVarNonce| {
+            // Shift the least-fresh local past the reserved range, without adding that entire
+            // range to identities that have already been freshened.
+            let delta = generic_context
+                .variables(db)
+                .map(|typevar| typevar.freshness(db))
+                .min()
+                .map_or(0, |freshness| {
+                    after.increment().value().saturating_sub(freshness.value())
+                });
+            signature.freshen_bound_typevars(db, env, delta)
+        };
         // If either signature is generic, freshen that signature's typevars before considering
         // them inferable for this relation. The relation only needs to find one specialization of
         // each generic callable that causes the check to succeed, but those callable-local
         // specializations must not collide with any same-source typevars in the other signature.
+        let max_freshness = self.constraints.signature_typevar_freshness.get();
         let freshened_source;
-        let source = if signature_context(source) != signature_context(target)
+        let source = if (max_freshness.is_some()
+            || signature_context(source) != signature_context(target))
             && let Some(generic_context) = signature_context(source)
-            && let Some(delta) = target
+            && let Some(freshness) = target
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_source = source.freshen_bound_typevars(db, env, delta);
+            freshened_source = freshen(source, generic_context, freshness);
             &freshened_source
         } else {
             source
@@ -2854,11 +2877,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let freshened_target;
         let target = if let Some(generic_context) = signature_context(target)
-            && let Some(delta) = source
+            && let Some(freshness) = source
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
-                .map(|freshness| freshness.increment().value())
+                .max(max_freshness)
         {
-            freshened_target = target.freshen_bound_typevars(db, env, delta);
+            freshened_target = freshen(target, generic_context, freshness);
             &freshened_target
         } else {
             target
@@ -2871,6 +2894,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let source_inferable = signature_typevars(source);
         let target_inferable = signature_typevars(target);
         let signature_inferable = source_inferable.merge(db, target_inferable);
+        // Reserve these identities before checking receivers, parameters, or return types, any
+        // of which can recursively compare more signatures using this builder.
+        self.constraints.signature_typevar_freshness.set(
+            signature_inferable
+                .iter(db)
+                .map(|typevar| typevar.freshness(db))
+                .max()
+                .max(max_freshness),
+        );
 
         let inferable = self.inferable.merge(db, signature_inferable);
 
