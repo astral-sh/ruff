@@ -3251,10 +3251,13 @@ def narrow_nested_exact_tuple_subject(
 ```
 
 Tuple-pattern narrowing limits the total number of alternative tuple types created while matching
-nested patterns. Each inner pattern below creates 32 alternatives, and the outer pattern creates two
-more. Together, they exceed the limit of 64, so ty uses conservative fallthrough narrowing.
+nested patterns. Each inner pattern below creates 32 alternatives, and the outer pattern creates
+four more. Together, they exceed the limit of 128. Fallthrough narrowing retains the original tuple
+type, including the lengths and element types of the inner tuples.
 
 ```py
+from typing_extensions import assert_type
+
 # fmt: off
 NestedExpansionInner = tuple[
     bool, bool, bool, bool, bool, bool, bool, bool,
@@ -3262,7 +3265,12 @@ NestedExpansionInner = tuple[
     bool, bool, bool, bool, bool, bool, bool, bool,
     bool, bool, bool, bool, bool, bool, bool, bool,
 ]
-NestedExpansionOuter = tuple[NestedExpansionInner, NestedExpansionInner]
+NestedExpansionOuter = tuple[
+    NestedExpansionInner,
+    NestedExpansionInner,
+    NestedExpansionInner,
+    NestedExpansionInner,
+]
 
 def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
     match value:
@@ -3279,12 +3287,232 @@ def nested_tuple_expansion_limit(value: NestedExpansionOuter) -> None:
                 True, True, True, True, True, True, True, True,
                 True, True, True, True, True, True, True, True,
             ),
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
+            (
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True,
+            ),
         ):
             pass
         case _:
-            # revealed: tuple[tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool], tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool, bool]] & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(value)
+            assert_type(value, NestedExpansionOuter)  # no diagnostic
+            assert_type(value[0], NestedExpansionInner)  # no diagnostic
+            value[4]  # error: [index-out-of-bounds]
+            value[0][32]  # error: [index-out-of-bounds]
 # fmt: on
+```
+
+## Sequence pattern expansion across a union
+
+The tuple expansion budget is shared across union members. Each member below fits within the budget
+on its own, but expanding both exceeds the limit. Fallthrough narrowing then uses the conservative
+result for the entire subject, without retaining a partially expanded union.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+type Atom = A | B | C | D
+type Payload = tuple[Atom, Atom, Atom]
+
+def union_expansion_limit(value: tuple[Payload, Literal[0]] | tuple[Payload, Literal[1]]) -> None:
+    match value:
+        case ((A(), A(), A()) | (B(), B(), B()) | (C(), C(), C()) | (D(), D(), D()), _):
+            pass
+        case _:
+            # revealed: tuple[Payload, Literal[0]] | tuple[Payload, Literal[1]]
+            reveal_type(value)
+```
+
+## Sequence pattern fallthrough alternatives
+
+Successive tuple patterns can double the number of alternatives in the fallthrough type. Seven
+patterns below produce 128 alternatives. These alternatives retain enough information to recognize a
+repeated pattern as unreachable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+class G: ...
+class H: ...
+
+type Element = A | B | C | D | E | F | G | H
+
+def tuple_alternatives_at_limit(value: tuple[Element, Element]) -> None:
+    match value:
+        case (A(), A()):
+            pass
+        case (B(), B()):
+            pass
+        case (C(), C()):
+            pass
+        case (D(), D()):
+            pass
+        case (E(), E()):
+            pass
+        case (F(), F()):
+            pass
+        case (G(), G()):
+            pass
+        case (G(), G()) as repeated:
+            assert_never(repeated)  # no diagnostic
+```
+
+An eighth pattern would exceed the limit. The fallback retains the tuple shape and the individual
+element types, but forgets which pairs have already matched. A repeated pattern can therefore appear
+reachable again. Captures still narrow according to their successful patterns. An all-wildcard tuple
+pattern consumes the remaining subject even after the limit is exceeded.
+
+```py
+def tuple_alternatives_over_limit(value: tuple[Element, Element]) -> None:
+    match value:
+        case (A(), A()):
+            pass
+        case (B(), B()):
+            pass
+        case (C(), C()):
+            pass
+        case (D(), D()):
+            pass
+        case (E(), E()):
+            pass
+        case (F(), F()):
+            pass
+        case (G(), G()):
+            pass
+        case (H(), H()):
+            pass
+        case (H(), H()) as repeated:
+            reveal_type(repeated)  # revealed: tuple[H, H]
+            repeated[2]  # error: [index-out-of-bounds]
+        case (_, _):
+            pass
+        case rest:
+            assert_never(rest)  # no diagnostic
+```
+
+Patterns with false or unknown guards do not exclude matched values from later cases and therefore
+do not disable expansion for later cases. The repeated `G` pattern remains unreachable after both
+guarded `H` patterns. A true guard allows the next `H` pattern to exceed the limit. Once that
+happens, later cases keep the conservative fallthrough type instead of restarting tuple expansion.
+
+```py
+def guarded_tuple_expansion_limit(value: tuple[Element, Element], condition: bool) -> None:
+    match value:
+        case (A(), A()):
+            pass
+        case (B(), B()):
+            pass
+        case (C(), C()):
+            pass
+        case (D(), D()):
+            pass
+        case (E(), E()):
+            pass
+        case (F(), F()):
+            pass
+        case (G(), G()):
+            pass
+        case (H(), H()) if False:
+            pass
+        case (H(), H()) if condition:
+            pass
+        case (G(), G()) as repeated:
+            assert_never(repeated)  # no diagnostic
+        case (H(), H()) if True:
+            pass
+        case (H(), H()) as repeated:
+            reveal_type(repeated)  # revealed: tuple[H, H]
+        case (H(), H()) as repeated:
+            reveal_type(repeated)  # revealed: tuple[H, H]
+```
+
+Exceeding the budget preserves exclusions already established for an individual position. The
+`or`-pattern below requires too many tuple alternatives, but values removed by the first case remain
+excluded afterward.
+
+```py
+class Excluded: ...
+
+def tuple_fallback_preserves_earlier_exclusion(value: tuple[Element | Excluded, Element]) -> None:
+    match value:
+        case (Excluded(), _):
+            pass
+        case (A(), A()) | (B(), B()) | (C(), C()) | (D(), D()) | (E(), E()) | (F(), F()) | (G(), G()) | (H(), H()):
+            pass
+        case (Excluded(), _) as repeated:
+            assert_never(repeated)  # no diagnostic
+```
+
+## Sequence patterns with wide element unions
+
+The number of members in each element union does not determine how many tuple alternatives are
+needed. Failing to match `(0, 0)` requires two alternatives: either the first element is not `0`, or
+the second is not `0`. A later pattern matching `0` in the first position therefore excludes `0`
+from its second capture, even when the element unions describe many possible pairs.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal, assert_never
+
+type Eight = Literal[0, 1, 2, 3, 4, 5, 6, 7]
+type Nine = Literal[0, 1, 2, 3, 4, 5, 6, 7, 8]
+
+def correlated_wide_element_unions(value: tuple[Nine, Eight]) -> None:
+    match value:
+        case (0, 0):
+            pass
+        case (0, tail):
+            reveal_type(tail)  # revealed: Literal[1, 2, 3, 4, 5, 6, 7]
+```
+
+Correlations also allow ty to recognize exhaustive combinations of patterns. The first case below
+handles all pairs except those with `8` in the first position or `7` in the second. The remaining
+two cases cover those alternatives.
+
+```py
+def wide_tuple_exhaustiveness(value: tuple[Nine, Eight]) -> None:
+    match value:
+        case (0 | 1 | 2 | 3 | 4 | 5 | 6 | 7, 0 | 1 | 2 | 3 | 4 | 5 | 6):
+            pass
+        case (8, _):
+            pass
+        case (_, 7):
+            pass
+        case rest:
+            reveal_type(rest)  # revealed: Never
+            assert_never(rest)  # no diagnostic
 ```
 
 ## Sequence display subjects

@@ -206,7 +206,8 @@ use crate::{
         definite_match_pattern_type, definite_match_pattern_type_for_subject, equality_truthiness,
         expand_type, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        pattern_binding_fallthrough_type_with_expansion, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_db::parsed::parsed_module;
@@ -245,6 +246,21 @@ pub(crate) enum PatternSubjectExpansion {
     Expanded,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+struct PatternNarrowingState<'db> {
+    ty: Type<'db>,
+    tuple_expansion_exhausted: bool,
+}
+
+impl<'db> PatternNarrowingState<'db> {
+    fn new(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            tuple_expansion_exhausted: false,
+        }
+    }
+}
+
 /// Narrow the subject by preceding match patterns with no guard or an always-true guard.
 ///
 /// Caching the subject type narrowed by the patterns before each case lets the next case reuse it
@@ -255,10 +271,18 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     predicate: PatternPredicate<'db>,
     expansion: PatternSubjectExpansion,
 ) -> Type<'db> {
+    pattern_narrowing_by_previous_patterns(db, predicate, expansion).ty
+}
+
+fn pattern_narrowing_by_previous_patterns<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    expansion: PatternSubjectExpansion,
+) -> PatternNarrowingState<'db> {
     let Some(previous) = predicate.previous_predicate(db) else {
         let subject = predicate.subject(db);
         let subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
-        return match expansion {
+        return PatternNarrowingState::new(match expansion {
             PatternSubjectExpansion::Raw => subject_ty,
             PatternSubjectExpansion::Expanded => {
                 let env = ProgramEnvironment::from_scope(subject.scope(db));
@@ -266,7 +290,7 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
                     .map(|types| UnionType::from_elements(db, &env, types))
                     .unwrap_or(subject_ty)
             }
-        };
+        });
     };
     type_narrowed_after_pattern(db, *previous, expansion)
 }
@@ -281,10 +305,13 @@ pub(crate) fn type_narrowed_by_previous_patterns<'db>(
 /// pattern capture. Inferring it within the query lets Salsa recognize and normalize that cycle.
 #[salsa::tracked(
     returns(copy),
-    cycle_initial = |_, id, _, _| Type::divergent(id),
-    cycle_fn = |db: &'db dyn Db, cycle, previous: &Type<'db>, result: Type<'db>, predicate: PatternPredicate<'db>, _| {
+    cycle_initial = |_, id, _, _| PatternNarrowingState::new(Type::divergent(id)),
+    cycle_fn = |db: &'db dyn Db, cycle, previous: &PatternNarrowingState<'db>, result: PatternNarrowingState<'db>, predicate: PatternPredicate<'db>, _| {
         let env = ProgramEnvironment::from_scope(predicate.subject(db).scope(db));
-        result.cycle_normalized(db, &env, *previous, cycle)
+        PatternNarrowingState {
+            ty: result.ty.cycle_normalized(db, &env, previous.ty, cycle),
+            tuple_expansion_exhausted: previous.tuple_expansion_exhausted || result.tuple_expansion_exhausted,
+        }
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -292,13 +319,13 @@ fn type_narrowed_after_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     expansion: PatternSubjectExpansion,
-) -> Type<'db> {
+) -> PatternNarrowingState<'db> {
     let narrowed_by_previous_patterns =
-        type_narrowed_by_previous_patterns(db, predicate, expansion);
+        pattern_narrowing_by_previous_patterns(db, predicate, expansion);
 
     let narrowed_by_pattern =
         type_narrowed_by_pattern(db, predicate, narrowed_by_previous_patterns);
-    // If the pattern does not narrow the subject, the guard's truthiness cannot affect the result.
+    // If both the type and expansion state are unchanged, the guard cannot affect the result.
     // Skipping its inference also avoids cycles through the subject or a pattern capture.
     if narrowed_by_pattern == narrowed_by_previous_patterns
         || !pattern_guard_allows_all_matches(db, predicate)
@@ -328,10 +355,17 @@ fn pattern_guard_allows_all_matches(db: &dyn Db, predicate: PatternPredicate<'_>
 fn type_narrowed_by_pattern<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
-    subject_ty: Type<'db>,
-) -> Type<'db> {
+    mut subject: PatternNarrowingState<'db>,
+) -> PatternNarrowingState<'db> {
     let env = ProgramEnvironment::from_file(predicate.program_file(db));
-    pattern_binding_fallthrough_type(db, &env, predicate.kind(db), subject_ty)
+    subject.ty = pattern_binding_fallthrough_type_with_expansion(
+        db,
+        &env,
+        predicate.kind(db),
+        subject.ty,
+        &mut subject.tuple_expansion_exhausted,
+    );
+    subject
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -537,8 +571,9 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject_ty =
-        type_narrowed_by_previous_patterns(db, predicate, PatternSubjectExpansion::Expanded);
+    let narrowed_subject =
+        pattern_narrowing_by_previous_patterns(db, predicate, PatternSubjectExpansion::Expanded);
+    let narrowed_subject_ty = narrowed_subject.ty;
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -552,9 +587,9 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // This check concerns the pattern itself. The cached type after the case also accounts for
     // its guard and may therefore retain values matched by the pattern.
     let next_narrowed_subject_ty = if predicate.guard(db).is_none() {
-        type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded)
+        type_narrowed_after_pattern(db, predicate, PatternSubjectExpansion::Expanded).ty
     } else {
-        type_narrowed_by_pattern(db, predicate, narrowed_subject_ty)
+        type_narrowed_by_pattern(db, predicate, narrowed_subject).ty
     };
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
