@@ -3462,5 +3462,88 @@ def check(pair: tuple[Node[str], int | str]) -> None:
             reveal_type(pair[1])  # revealed: str
 ```
 
+## `ClassVar` with recursive protocols
+
+The `value` field of `Node[object]` simplifies to `object`. Its `next` method returns `Node[int]`,
+whose field still contains the outer type variable `T`, making the `ClassVar` annotation invalid.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def outer(value: T):
+    class Node(Protocol[U]):
+        value: U | T
+        def next(self) -> Node[int]: ...
+
+    class Holder:
+        # error: [invalid-type-form]
+        value: ClassVar[Node[object]]
+```
+
+## `ClassVar` with recursive `TypedDict`s
+
+The `value` field of `Node[object]` simplifies to `object`, but its `next` field leads to
+`Node[int]`, whose `value` field contains the outer type variable `T`.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Generic, TypedDict, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def outer(value: T):
+    class Node(TypedDict, Generic[U]):
+        value: U | T
+        next: Node[int]
+
+    class Holder:
+        # error: [invalid-type-form]
+        value: ClassVar[Node[object]]
+```
+
+## Mutually recursive protocols and `TypedDict`s in `ClassVar`
+
+A `TypedDict` and a protocol can refer to each other without introducing a free type variable, even
+when each call to the protocol's method adds another `list` around the type argument.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from __future__ import annotations
+
+from typing import ClassVar, Generic, Protocol, TypedDict, TypeVar
+
+U = TypeVar("U")
+
+class Payload(TypedDict, Generic[U]):
+    next: Link[U]
+
+class Link(Protocol[U]):
+    def next(self) -> Payload[list[U]]: ...
+
+class Holder:
+    value: ClassVar[Payload[int]]  # no diagnostic
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
