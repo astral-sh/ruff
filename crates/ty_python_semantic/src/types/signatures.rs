@@ -2610,6 +2610,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
         max_freshness: &mut Option<TypeVarNonce>,
     ) -> ConstraintSet<'db, 'c> {
+        // Salsa uses the bottom signature as the initial value for recursive bound methods.
+        // It already satisfies the target, so avoid expanding the target's receiver constraints.
+        if source.return_ty.is_never() && source == &Signature::bottom() {
+            return self.always();
+        }
+
         let env = self.env;
         // In lazy comparisons, a captured parameter list refers to typevars owned by the
         // surrounding call inference. Preserve constraints on those variables instead of
