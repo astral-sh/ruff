@@ -1276,7 +1276,7 @@ unclosed table, expected `]`
                 error: None,
             },
         )?;
-        let mut db = ProjectDatabase::fallible(metadata, system)?;
+        let mut db = ProjectDatabase::fallible(metadata, system.clone())?;
         let project = db.project();
         assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
 
@@ -1299,6 +1299,10 @@ unclosed table, expected `]`
             project.dependency_metadata(&db),
             Err(DependencyMetadataError::InvalidEnvironment { .. })
         );
+
+        system.create_directory_all(&environment)?;
+        File::sync_path(&mut db, &environment);
+        assert_matches!(project.dependency_metadata(&db), Ok(Some(_)));
 
         Ok(())
     }

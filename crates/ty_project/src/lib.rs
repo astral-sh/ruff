@@ -303,9 +303,16 @@ impl Project {
         let canonical_environment =
             db.system()
                 .canonicalize_path(environment)
-                .map_err(|error| DependencyMetadataError::InvalidEnvironment {
-                    path: environment.to_path_buf(),
-                    message: error.to_string().into(),
+                .map_err(|error| {
+                    // If `.venv` points to `env`, deleting `env` makes this fail before we read
+                    // the target's directory status below. Salsa then drops that dependency,
+                    // so recreating `env` and syncing only its path won't invalidate the cached
+                    // error. Retry on the next revision so dependency checks can recover.
+                    db.report_untracked_read();
+                    DependencyMetadataError::InvalidEnvironment {
+                        path: environment.to_path_buf(),
+                        message: error.to_string().into(),
+                    }
                 })?;
         // Changes may be reported for the canonical target instead of the symlink.
         let _ = system_path_to_directory(db, &canonical_environment);
