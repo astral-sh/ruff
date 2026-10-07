@@ -2542,10 +2542,11 @@ enum LegacyTypeMappings<'db> {
 pub(crate) struct TypeVarInference<'db> {
     #[returns(copy)]
     pub(crate) generic_context: GenericContext<'db>,
-    /// Inferred types in generic-context order. Ordinary variables are union-merged, including
-    /// fallback types from incomplete solution families. Parameter lists keep the first available
-    /// choice. This projection loses correlations and completeness; `solutions` retains that
-    /// information. Unavailable families hold a diagnostic or recovery mapping.
+    /// Inferred types in generic-context order. Multiple solutions are union-merged per variable,
+    /// including fallback types from incomplete solution families. This projection loses
+    /// correlations and completeness; `solutions` retains that information. When correlated
+    /// solutions are unavailable, this hold the compatibility or diagnostic recovery mapping.
+    /// For ParamSpec, we currently hold the first parameter-list.
     #[returns(deref)]
     merged_types: Box<[Option<Type<'db>>]>,
     #[returns(ref)]
