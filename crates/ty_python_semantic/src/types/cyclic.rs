@@ -165,7 +165,11 @@ impl<'db> RecursiveType<'db> {
 struct GrowingTypeVisitor<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
     visited_types: TypeCollector<'db>,
+    // Full type values can differ while sharing lazy attributes: bound occurrences share an
+    // underlying TypeVar, and a NewType keeps its definition when its base is evaluated or
+    // normalized. Guard those shared attributes separately from `visited_types`.
     active_types: ActiveRecursionDetector<TypeIdentity<'db>>,
+    // Protocol methods can change specialization without producing a growing TypeIdentity.
     active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
     found: Cell<bool>,
 }
@@ -190,6 +194,7 @@ impl<'db> GrowingTypeVisitor<'_, 'db> {
             return;
         }
 
+        // A cycle through shared attributes does not itself imply growing specialization.
         self.active_types.visit(&identity, || {}, visit);
     }
 }
