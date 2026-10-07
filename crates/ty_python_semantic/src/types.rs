@@ -9366,7 +9366,6 @@ impl<'db> Type<'db> {
                         | KnownInstanceType::SubscriptedGeneric(_)
                         | KnownInstanceType::TypeAliasType(_)
                         | KnownInstanceType::Deprecated(_)
-                        | KnownInstanceType::Field(_)
                         | KnownInstanceType::ConstraintSet(_)
                         | KnownInstanceType::ConstraintSetSolution(_)
                         | KnownInstanceType::GenericContext(_)
