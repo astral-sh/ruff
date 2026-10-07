@@ -4550,7 +4550,9 @@ impl<'db> CallableBinding<'db> {
     /// Returns the overloads selected for deprecation reporting without changing the matches
     /// retained for argument inference. Equivalent return types select the first match;
     /// ambiguous calls retain every match, and argument expansion combines its selected matches.
-    fn selected_overloads(&self) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
+    pub(crate) fn selected_overloads(
+        &self,
+    ) -> impl Iterator<Item = (usize, &Binding<'db>)> + Clone {
         let matching = self.matching_overloads();
         let Some(result) = &self.overload_call_result else {
             return Either::Left(matching.take(1));

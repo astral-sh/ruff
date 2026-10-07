@@ -19,8 +19,8 @@ use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, constructor_signature,
-    definitions_and_overloads_for_function, definitions_for_keyword_argument,
-    typed_dict_key_definition,
+    definitions_and_overloads_for_function, definitions_for_keyword_argument, overload_definitions,
+    selected_overload_definitions, typed_dict_key_definition,
 };
 use ty_python_semantic::{Db as SemanticDb, ResolvedDefinition};
 use ty_python_semantic::{
@@ -336,6 +336,107 @@ impl<'db> Definitions<'db> {
         }
     }
 
+    /// Narrows the overloads of a called function to those selected by the call's arguments.
+    ///
+    /// ```py
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// @overload
+    /// def f(x: str) -> str: ...
+    /// def f(x): ...
+    ///
+    /// f(1)  # Navigates to the first overload only
+    /// ```
+    ///
+    /// If no overload matches the call, all definitions are kept so that users can still
+    /// navigate to the overload they meant to call.
+    ///
+    /// Only use this for navigation. Rename and find references need every overload,
+    /// regardless of which one a call selects.
+    pub(crate) fn select_called_overloads(
+        mut self,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+    ) -> Self {
+        let GotoTarget::Call { call, .. } = goto_target else {
+            return self;
+        };
+        let Some(overloaded) = goto_target
+            .inferred_type(model)
+            .and_then(|ty| overload_definitions(model.db(), ty))
+        else {
+            return self;
+        };
+
+        let selected = selected_overload_definitions(model, call);
+        if !self
+            .iter()
+            .filter_map(ResolvedDefinition::definition)
+            .any(|definition| selected.contains(&definition))
+        {
+            return self;
+        }
+
+        self.0.retain(|resolved| match resolved.definition() {
+            Some(definition) if overloaded.contains(model.db(), definition) => {
+                selected.contains(&definition)
+            }
+            _ => true,
+        });
+        self
+    }
+
+    /// Replaces the overloads of a referenced or called function with its implementation.
+    ///
+    /// The overloads only declare the function's signatures; the implementation is where the
+    /// function is actually defined.
+    ///
+    /// ```py
+    /// @overload
+    /// def f(x: int) -> int: ...
+    /// @overload
+    /// def f(x: str) -> str: ...
+    /// def f(x): ...
+    ///
+    /// f(1)  # Navigates to `def f(x)`
+    /// ```
+    ///
+    /// Functions without an implementation, which is common in stub files and protocols, keep
+    /// their overloads.
+    fn replace_overloads_with_implementation(
+        self,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
+    ) -> Self {
+        if !matches!(
+            goto_target,
+            GotoTarget::Expression(_) | GotoTarget::Call { .. }
+        ) {
+            return self;
+        }
+        let Some(overloaded) = goto_target
+            .inferred_type(model)
+            .and_then(|ty| overload_definitions(model.db(), ty))
+        else {
+            return self;
+        };
+        let Some(implementation) = overloaded.implementation else {
+            return self;
+        };
+
+        Self::new(
+            self.0
+                .into_iter()
+                .map(|resolved| match resolved.definition() {
+                    Some(definition) if overloaded.contains(model.db(), definition) => {
+                        ResolvedDefinition::Definition(implementation)
+                    }
+                    _ => resolved,
+                })
+                .collect(),
+        )
+    }
+
     /// Get the "goto-definition" interpretation of this definition
     ///
     /// In this case we apply stub-mapping to try to find the "real" implementation
@@ -364,6 +465,8 @@ impl<'db> Definitions<'db> {
         Some(
             definitions
                 .goto_declaration(model, goto_target)?
+                .select_called_overloads(model, goto_target)
+                .replace_overloads_with_implementation(model, goto_target)
                 .map_stubs(model.db()),
         )
     }
