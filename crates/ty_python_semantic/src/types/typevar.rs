@@ -2002,10 +2002,46 @@ impl<'db> Type<'db> {
             program: Program<'db>,
             ty: NonAtomicType<'db>,
         ) -> (TypeVarSet<'db>, bool) {
+            struct AliasVisit<'db> {
+                ty: Type<'db>,
+                variables: FxIndexSet<BoundTypeVarInstance<'db>>,
+                specialization: Option<Specialization<'db>>,
+                recursion_guard: TypeCollector<'db>,
+            }
+
             struct CollectFreeTypeVars<'a, 'db> {
                 env: &'a ProgramEnvironment<'db>,
                 variables: RefCell<FxIndexSet<BoundTypeVarInstance<'db>>>,
                 skipped_lazy: Cell<bool>,
+                aliases: RefCell<Vec<AliasVisit<'db>>>,
+            }
+
+            impl<'db> CollectFreeTypeVars<'_, 'db> {
+                fn visit_alias(
+                    &self,
+                    db: &'db dyn Db,
+                    ty: Type<'db>,
+                    specialization: Option<Specialization<'db>>,
+                    body: Type<'db>,
+                ) {
+                    let mut aliases = self.aliases.borrow_mut();
+                    let mut previous = aliases.iter().rev().filter(|alias| alias.ty == ty);
+                    if let (Some(latest), Some(earlier)) = (previous.next(), previous.next())
+                        && latest.variables == earlier.variables
+                    {
+                        return;
+                    }
+                    let index = aliases.len();
+                    aliases.push(AliasVisit {
+                        ty,
+                        variables: self.variables.borrow().clone(),
+                        specialization,
+                        recursion_guard: TypeCollector::default(),
+                    });
+                    drop(aliases);
+                    self.visit_type(db, body);
+                    self.aliases.borrow_mut().truncate(index);
+                }
             }
 
             impl<'db> TypeVisitor<'db> for CollectFreeTypeVars<'_, 'db> {
@@ -2056,22 +2092,61 @@ impl<'db> Type<'db> {
                 }
 
                 fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
-                    self.notify_skipped_lazy_type_attributes();
-                    let Some(specialization) = alias.specialization(db) else {
-                        return;
-                    };
-                    let parameters = specialization.generic_context(db).variables(db);
-                    let origin = alias.unspecialized(db);
-                    for (parameter, &argument) in parameters.zip(specialization.types(db)) {
-                        // With `type Constant[T] = int`, the value of T has no effect on the alias.
-                        let variance = origin.variance_of(db, self.env, parameter.identity(db));
-                        if variance.evaluate(db) != TypeVarVariance::Bivariant {
-                            self.visit_type(db, argument);
-                        }
-                    }
+                    let specialization = alias.specialization(db).or_else(|| {
+                        alias
+                            .generic_context(db)
+                            .map(|context| context.default_specialization(db, None))
+                    });
+                    self.visit_alias(
+                        db,
+                        Type::TypeAlias(alias.unspecialized(db)),
+                        specialization,
+                        alias.raw_value_type(db),
+                    );
+                }
+
+                fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                    let constructor = recursive.constructor(db);
+                    self.visit_alias(
+                        db,
+                        Type::Recursive(constructor),
+                        recursive.arguments(db),
+                        constructor.unfold(db, self.env).into_type(),
+                    );
                 }
 
                 fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                    if let Type::TypeVar(_) = ty {
+                        let alias = self.aliases.borrow_mut().pop();
+                        if let Some(alias) = alias {
+                            // Visit an argument in its use-site context, outside the alias definition.
+                            let argument = alias
+                                .specialization
+                                .map(|specialization| ty.apply_specialization(db, specialization))
+                                .unwrap_or(ty);
+                            self.visit_type(db, argument);
+                            self.aliases.borrow_mut().push(alias);
+                            return;
+                        }
+                    }
+                    if !self.aliases.borrow().is_empty() {
+                        match ty {
+                            Type::TypeAlias(alias) => self.visit_type_alias_type(db, alias),
+                            Type::Recursive(recursive) => self.visit_recursive_type(db, recursive),
+                            _ => {
+                                let already_seen =
+                                    self.aliases.borrow().last().is_some_and(|alias| {
+                                        alias.recursion_guard.type_was_already_seen(ty)
+                                    });
+                                if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty)
+                                    && !already_seen
+                                {
+                                    walk_non_atomic_type(db, non_atomic, self);
+                                }
+                            }
+                        }
+                        return;
+                    }
                     let (typevars, skipped_lazy) = ty.free_typevars(db, self.env);
                     self.variables.borrow_mut().extend(typevars.iter(db));
                     if skipped_lazy {
@@ -2084,6 +2159,7 @@ impl<'db> Type<'db> {
                 env: &ProgramEnvironment::from_program(program),
                 variables: RefCell::default(),
                 skipped_lazy: Cell::new(false),
+                aliases: RefCell::default(),
             };
             walk_non_atomic_type(db, ty, &collector);
             (
