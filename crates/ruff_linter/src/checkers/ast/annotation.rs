@@ -42,27 +42,11 @@ impl AnnotationContext {
         version: PythonVersion,
     ) -> Self {
         // If the annotation is in a class scope (e.g., an annotated assignment for a
-        // class field) or a function scope, and that class or function is marked as
-        // runtime-required, treat the annotation as runtime-required.
+        // class field), and that class is marked as annotation as runtime-required.
         match semantic.current_scope().kind {
             ScopeKind::Class(class_def) => {
                 match flake8_type_checking::helpers::class_annotation_runtime_semantics(
                     class_def, semantic, settings,
-                ) {
-                    RuntimeSemantics::Required => {
-                        return Self::RuntimeRequired;
-                    }
-                    RuntimeSemantics::Ambiguous => {
-                        return Self::RuntimeAmbiguous;
-                    }
-                    RuntimeSemantics::Default => {}
-                }
-            }
-            ScopeKind::Function(function_def) => {
-                match flake8_type_checking::helpers::function_annotation_runtime_semantics(
-                    function_def,
-                    semantic,
-                    settings,
                 ) {
                     RuntimeSemantics::Required => {
                         return Self::RuntimeRequired;
