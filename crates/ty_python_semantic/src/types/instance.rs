@@ -1,6 +1,7 @@
 //! Instance types: both nominal and structural.
 
 use crate::ProgramEnvironment;
+use ruff_python_ast::name::Name;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::debug_assert_matches;
@@ -9,7 +10,7 @@ use std::marker::PhantomData;
 use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
-    MaterializationKind, SubclassOfType, Type, TypeAliasType,
+    MaterializationKind, SubclassOfType, Type, TypeAliasType, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -1897,6 +1898,27 @@ impl<'db> ProtocolInstanceType<'db> {
             }
 
             let env = ProgramEnvironment::from_program(interface.base().program(db));
+            if interface.includes_member(db, "__class__") {
+                // `object.__class__` accepts `type[Self]`. Checking writes on `object` alone
+                // would incorrectly make a writable `__class__: type[object]` universal.
+                // Check an arbitrary receiver instead, preserving requirements expressed in
+                // terms of `Self` and setters that accept only `Never`.
+                let receiver = Type::TypeVar(BoundTypeVarInstance::synthetic(
+                    db,
+                    &env,
+                    Name::new_static("ProtocolSelf"),
+                    TypeVarVariance::Invariant,
+                ));
+                if let Some((Some(write), _)) =
+                    interface.instance_write_requirement(db, &env, receiver, "__class__")
+                    && !write.accepted_type().is_some_and(|write_ty| {
+                        write_ty.is_subtype_of(db, &env, receiver.to_meta_type(db, &env))
+                    })
+                {
+                    return false;
+                }
+            }
+
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
