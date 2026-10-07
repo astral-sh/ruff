@@ -1,8 +1,5 @@
 use icu_normalizer::ComposingNormalizer;
-use icu_properties::{
-    CodePointSetData,
-    props::{DefaultIgnorableCodePoint, NfcInert},
-};
+use icu_properties::{CodePointSetData, props::DefaultIgnorableCodePoint};
 use itertools::Either;
 use ruff_python_ast::{
     BytesLiteralFlags, StringFlags, StringLiteralFlags,
@@ -254,7 +251,10 @@ impl UnicodeEscape<'_> {
             return Either::Left(source.chars().map(|ch| (ch, false)));
         }
 
-        let inert = CodePointSetData::new::<NfcInert>();
+        // We've asked the upstream maintainers to reconsider the deprecation. See
+        // https://github.com/unicode-org/icu4x/issues/7892#issuecomment-6045495719.
+        #[expect(deprecated)]
+        let inert = CodePointSetData::new::<icu_properties::props::NfcInert>();
         Either::Right(
             source
                 .split_inclusive(move |ch| inert.contains(ch))
