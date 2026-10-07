@@ -4710,11 +4710,13 @@ def accepts_dog(value: Dog) -> None: ...
 dog_consumer: Consumer[Dog] = Consumer(callback=accepts_animal)
 ```
 
-A callback accepting only `Dog` produces a `Consumer[Dog]`, which cannot be assigned to
-`Consumer[Animal]`.
+An incompatible callback reports its argument error without producing an additional assignment
+error.
 
 ```py
-animal_consumer: Consumer[Animal] = Consumer(callback=accepts_dog)  # error: [invalid-assignment]
+animal_consumer: Consumer[Animal] = Consumer(
+    callback=accepts_dog,  # error: [invalid-argument-type]
+)
 ```
 
 ### Constructor inference from extra items

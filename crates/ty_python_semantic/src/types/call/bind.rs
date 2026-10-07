@@ -5789,6 +5789,8 @@ struct CallInference<'a, 'db> {
     return_ty: Type<'db>,
     /// Whether a partial may leave variadic arguments for a later call.
     is_partial_application: bool,
+    /// Whether inference is part of a class constructor call.
+    is_constructor: bool,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
 }
@@ -6237,7 +6239,10 @@ impl<'db> CallInference<'_, 'db> {
         // Individually compatible preferences can still make the combined argument constraints
         // unsatisfiable. Retry with a fresh builder and no contextual choices, discarding errors
         // from the rejected attempt. Incomplete inference is not evidence of a contradiction.
-        if !preferred_type_mappings.is_empty()
+        // Constructor stages share a specialization, so dropping the context for just one stage
+        // can produce inconsistent type arguments.
+        if !self.is_constructor
+            && !preferred_type_mappings.is_empty()
             && matches!(
                 inference.solutions(db),
                 TypeVarInferenceSolutions::Unavailable(TypeVarInferenceFallback::Unsatisfiable)
@@ -8286,6 +8291,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
+            is_constructor: self.constructor_context.is_some(),
             inferable_typevars: self
                 .signature
                 .generic_context

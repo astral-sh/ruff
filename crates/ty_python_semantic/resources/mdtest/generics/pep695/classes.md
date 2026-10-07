@@ -591,10 +591,10 @@ class Explicit[T]:
 reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 ```
 
-### Incompatible constructor context
+### Failed constructor inference
 
-When a constructor's arguments determine a specialization that is incompatible with the context, we
-report an assignment error using the inferred specialization.
+A failed constructor call reports its argument error without exposing an unsolved class type
+parameter or producing an additional assignment error.
 
 ```py
 from collections.abc import Callable
@@ -608,20 +608,7 @@ class Consumer[T]:
 
 def accepts_dog(value: Dog) -> None: ...
 
-# snapshot: invalid-assignment
-consumer: Consumer[Animal] = Consumer(accepts_dog)
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`
-  --> src/mdtest_snippet.py:13:30
-   |
-13 | consumer: Consumer[Animal] = Consumer(accepts_dog)
-   |           ----------------   ^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `Consumer[Dog]`
-   |           |
-   |           Declared type
-info: `Consumer` is invariant in its type parameter
-info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
+consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
 ```
 
 ### Constrained constructor inference uses argument evidence

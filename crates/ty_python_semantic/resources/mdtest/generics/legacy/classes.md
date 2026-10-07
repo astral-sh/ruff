@@ -948,42 +948,6 @@ class Explicit(Generic[T]):
 reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
-### Incompatible constructor context
-
-When a constructor's arguments determine a specialization that is incompatible with the context, we
-report an assignment error using the inferred specialization.
-
-```py
-from collections.abc import Callable
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class Animal: ...
-class Dog(Animal): ...
-
-class Consumer(Generic[T]):
-    def __init__(self, callback: Callable[[T], None]) -> None:
-        self.callback = callback
-
-def accepts_dog(value: Dog) -> None: ...
-
-# snapshot: invalid-assignment
-consumer: Consumer[Animal] = Consumer(accepts_dog)
-```
-
-```snapshot
-error[invalid-assignment]: Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`
-  --> src/mdtest_snippet.py:16:30
-   |
-16 | consumer: Consumer[Animal] = Consumer(accepts_dog)
-   |           ----------------   ^^^^^^^^^^^^^^^^^^^^^ Incompatible value of type `Consumer[Dog]`
-   |           |
-   |           Declared type
-info: `Consumer` is invariant in its type parameter
-info: For more information, see https://docs.astral.sh/ty/reference/typing-faq/#invariant-generics
-```
-
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument
