@@ -715,7 +715,8 @@ will execute Pylint with maximum parallelism and only report errors.
 To benchmark Pyupgrade, run the following from `crates/ruff_linter/resources/test/cpython`:
 
 ```shell
-uv run --only-dev hyperfine --ignore-failure --warmup 5 --prepare "git reset --hard HEAD" \
+uv run --only-dev hyperfine --shell=default --ignore-failure --warmup=5 \
+  --prepare="git reset --hard HEAD" \
   "find . -type f -name \"*.py\" | xargs -P 0 pyupgrade --py311-plus"
 
 Benchmark 1: find . -type f -name "*.py" | xargs -P 0 pyupgrade --py311-plus
