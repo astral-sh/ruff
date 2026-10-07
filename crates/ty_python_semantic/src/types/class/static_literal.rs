@@ -25,9 +25,9 @@ use crate::{
         CallableType, ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags,
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
-        Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
-        UnionBuilder, UnionType,
+        Parameter, Parameters, PropertyInstanceType, SelfTypeVarOrigin, Signature, SpecialFormType,
+        StaticMroError, SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance,
+        TypingModule, UnionBuilder, UnionType,
         attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -41,7 +41,7 @@ use crate::{
         },
         context::InferContext,
         dedicated::pydantic,
-        definition_expression_type, determine_upper_bound,
+        definition_expression_type, determine_self_class,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{DataclassTransformerParams, KnownFunction},
@@ -1987,6 +1987,7 @@ impl<'db> StaticClassLiteral<'db> {
                             db,
                             env,
                             &TypeMapping::ReplaceSelf {
+                                new_origin: SelfTypeVarOrigin::Class(self.into()),
                                 new_upper_bound: instance_ty,
                             },
                             TypeContext::default(),
@@ -2014,7 +2015,7 @@ impl<'db> StaticClassLiteral<'db> {
                     db,
                     env,
                     name,
-                    instance_ty,
+                    self.apply_optional_specialization(db, specialization),
                     fields_iter,
                     specialization.map(|s| s.generic_context(db)),
                 )
@@ -2095,19 +2096,20 @@ impl<'db> StaticClassLiteral<'db> {
                     .own_class_member(db, env, self.inherited_generic_context(db), None, name)
                     .ignore_possibly_undefined()
                     .map(|ty| {
+                        let self_class = determine_self_class(
+                            db,
+                            self.apply_optional_specialization(db, specialization),
+                            |base| {
+                                base.into_class()
+                                    .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
+                            },
+                        );
                         ty.apply_type_mapping(
                             db,
                             env,
                             &TypeMapping::ReplaceSelf {
-                                new_upper_bound: determine_upper_bound(
-                                    db,
-                                    env,
-                                    self.apply_optional_specialization(db, specialization),
-                                    |base| {
-                                        base.into_class()
-                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
-                                    },
-                                ),
+                                new_origin: SelfTypeVarOrigin::Class(self_class.class_literal(db)),
+                                new_upper_bound: Type::instance(db, env, self_class),
                             },
                             TypeContext::default(),
                         )
@@ -2893,6 +2895,7 @@ impl<'db> StaticClassLiteral<'db> {
                         db,
                         env,
                         &TypeMapping::ReplaceSelf {
+                            new_origin: SelfTypeVarOrigin::Class(self.into()),
                             new_upper_bound: Type::instance(
                                 db,
                                 env,
