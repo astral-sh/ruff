@@ -49,9 +49,8 @@ use crate::{
         overrides,
         special_form::TypeQualifier,
         tuple::Tuple,
-        typevar::TypeVarInstance,
+        typevar::{TypeVarInstance, find_free_typevar},
         variance::VarianceInferable,
-        visitor::find_over_type,
     },
 };
 use ty_python_core::{
@@ -949,7 +948,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                     continue;
                 };
 
-                let first_bad_tvar = find_over_type(db, env, default_ty, |t| {
+                let first_bad_tvar = find_free_typevar(db, env, default_ty, |t| {
                     let tvar = match t {
                         Type::TypeVar(tvar) => tvar.typevar(db),
                         Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,

@@ -15,9 +15,8 @@ use crate::{
         list_members::all_end_of_scope_members,
         member::class_member,
         signatures::ReturnCallableTypeVarScope,
-        typevar::TypeVarInstance,
+        typevar::{TypeVarInstance, find_free_typevar},
         variance::{MemberVariance, VarianceInferable},
-        visitor::find_over_type,
     },
 };
 use itertools::Itertools;
@@ -266,7 +265,7 @@ fn check_pep695_function_legacy_typevars<'db>(
     let env = context.program_environment();
     let mut has_legacy_default = false;
     for default in type_params.iter().filter_map(ast::TypeParam::default) {
-        let Some(typevar) = find_over_type(db, env, file_expression_type(default), |ty| {
+        let Some(typevar) = find_free_typevar(db, env, file_expression_type(default), |ty| {
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
                 && matches!(
                     typevar.kind(db),
@@ -426,7 +425,7 @@ fn check_legacy_typevar_defaults<'db>(
             continue;
         };
 
-        let first_bad_tvar = find_over_type(db, env, default_ty, |t| {
+        let first_bad_tvar = find_free_typevar(db, env, default_ty, |t| {
             let tvar = match t {
                 Type::TypeVar(tvar) => tvar.typevar(db),
                 Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,

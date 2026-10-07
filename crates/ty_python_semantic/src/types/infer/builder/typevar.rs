@@ -15,9 +15,8 @@ use crate::{
         },
         typevar::{
             TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-            TypeVarIdentity, TypeVarInstance,
+            TypeVarIdentity, TypeVarInstance, find_free_typevar,
         },
-        visitor::find_over_type,
     },
 };
 use ruff_db::{
@@ -490,7 +489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let expected_binding = BindingContext::Definition(expected_binding_def);
 
-        let outer_tv = find_over_type(db, self.program_environment(), default_ty, |ty| {
+        let outer_tv = find_free_typevar(db, self.program_environment(), default_ty, |ty| {
             if let Type::TypeVar(bound_tv) = ty
                 && bound_tv.binding_context(db) != expected_binding
             {
@@ -630,6 +629,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // use a heterogeneous tuple type to represent the list of types instead.
                 let ty = Type::heterogeneous_tuple(db, self.program_environment(), types);
                 self.store_expression_type(default_expr, ty);
+                if let Some(name) = paramspec_name {
+                    self.check_default_for_outer_scope_typevars(ty, default_expr, name);
+                }
                 return;
             }
             ast::Expr::Name(_) => {

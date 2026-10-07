@@ -977,7 +977,7 @@ pub(super) fn any_over_type<'db>(
 }
 
 /// Return the first non-`None` result of `query`, using the same traversal as [`any_over_type`].
-pub(super) fn find_over_type<'db, T: Copy>(
+fn find_over_type<'db, T: Copy>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,

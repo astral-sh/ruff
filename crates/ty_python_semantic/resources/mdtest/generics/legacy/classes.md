@@ -904,6 +904,46 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## Defaults through type aliases
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+An alias in a default can refer to an earlier type parameter.
+
+```py
+from typing_extensions import Generic, TypeVar
+
+type Items[T] = list[T]
+
+T = TypeVar("T", default=int)
+U = TypeVar("U", default=Items[T])
+
+class Good(Generic[T, U]): ...  # no diagnostic
+```
+
+We reject the default if the parameter is absent from the class or appears later in the parameter
+list.
+
+```py
+# error: [invalid-generic-class]
+class OutOfScope(Generic[U]): ...
+
+# error: [invalid-generic-class]
+class Later(Generic[U, T]): ...
+```
+
+An argument that the alias does not use does not need to be a parameter of the class.
+
+```py
+type Ignored[T] = int
+V = TypeVar("V", default=Ignored[T])
+
+class Unused(Generic[V]): ...  # no diagnostic
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
