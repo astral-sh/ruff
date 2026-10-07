@@ -2,7 +2,7 @@ use crate::ProgramEnvironment;
 use std::borrow::Cow;
 
 use itertools::Itertools;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
@@ -25,7 +25,7 @@ use crate::types::{
     SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
-    Db,
+    Db, Program,
     types::{
         ErrorContext, ErrorContextTree, Type, TypePair, constraints::ConstraintSet,
         typevar::TypeVarSet,
@@ -206,6 +206,70 @@ pub(crate) enum TypeVarEvaluation {
     ///
     /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
     Lazy,
+}
+
+/// Restrict the index to ordinary nominal classes.
+fn non_generic_nominal_class<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let Type::NominalInstance(instance) = ty else {
+        return None;
+    };
+    if instance.own_tuple_spec(db).is_some() {
+        return None;
+    }
+    let ClassType::NonGeneric(class @ ClassLiteral::Static(_)) = instance.class(db, env) else {
+        return None;
+    };
+    class.known(db).is_none().then_some(class)
+}
+
+/// Recognize a single nominal positive and nominal exclusions, without alias, type-variable, or
+/// enum-literal operands. These classes can still inherit specialized or recursive generic bases.
+fn nominal_intersection_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<ClassLiteral<'db>> {
+    let positive = if let Type::Intersection(intersection) = ty {
+        if intersection.positive(db).len() != 1
+            || intersection
+                .negative(db)
+                .iter()
+                .any(|&negative| non_generic_nominal_class(db, env, negative).is_none())
+        {
+            return None;
+        }
+        *intersection.positive(db).iter().next()?
+    } else {
+        ty
+    };
+    non_generic_nominal_class(db, env, positive)
+}
+
+/// Index union alternatives by their required nominal class before checking their exclusions.
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn nominal_union_index<'db>(
+    db: &'db dyn Db,
+    program: Program<'db>,
+    union: UnionType<'db>,
+) -> Option<FxHashMap<ClassLiteral<'db>, Box<[Type<'db>]>>> {
+    let env = ProgramEnvironment::from_program(program);
+    let mut index: FxHashMap<_, Vec<_>> = FxHashMap::default();
+    for &element in union.elements(db) {
+        index
+            .entry(nominal_intersection_bound(db, &env, element)?)
+            .or_default()
+            .push(element);
+    }
+    let mut index: FxHashMap<_, _> = index
+        .into_iter()
+        .map(|(class, elements)| (class, elements.into_boxed_slice()))
+        .collect();
+    index.shrink_to_fit();
+    Some(index)
 }
 
 #[salsa::tracked]
@@ -1311,6 +1375,35 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             && let Some(alternatives) = intersection.finite_alternative_union(db, self.env)
         {
             return self.check_type_pair(db, alternatives, target);
+        }
+
+        if matches!(self.relation, TypeRelation::Redundancy { pure: false })
+            && !self.is_context_collection_enabled()
+            && source.is_intersection()
+            && let Some(source_class) = nominal_intersection_bound(db, self.env, source)
+            && let Some(index) = nominal_union_index(db, self.env.program(db), union)
+        {
+            // A successful alternative needs the same nominal class or one of its bases.
+            // Check class identity separately: an unspecialized generic class acquires default
+            // arguments in its MRO. The full relation still checks each alternative's exclusions.
+            let mut matching = std::iter::once(source_class)
+                .chain(source_class.iter_mro(db).filter_map(|base| match base {
+                    ClassBase::Class(ClassType::NonGeneric(class)) if class != source_class => {
+                        Some(class)
+                    }
+                    _ => None,
+                }))
+                .filter_map(|class| index.get(&class));
+            let Some(elements) = matching.next() else {
+                return self.never();
+            };
+            // One group preserves the target union's comparison order. If several bounds match,
+            // use the original traversal so recursive inherited specializations keep that order.
+            if matching.next().is_none() {
+                return elements.iter().when_any(db, self.constraints, |&element| {
+                    self.check_type_pair(db, source, element)
+                });
+            }
         }
 
         let check_expanded_source = || {
@@ -4447,5 +4540,112 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 || check_optional_methods(left.deleter(db), right.deleter(db)),
             )
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ty_python_core::ProgramFile;
+
+    use crate::db::tests::setup_db;
+    use crate::place::global_symbol;
+    use crate::types::{ClassType, IntersectionBuilder, Type, UnionType};
+
+    #[test]
+    fn nominal_union_redundancy_preserves_inheritance_and_exclusions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/classes.py",
+            "
+            from typing import Any, Generic, TypeVar
+
+            T = TypeVar('T')
+            class Box(Generic[T]): ...
+            class Recursive(Box['Recursive']): ...
+            class RecursiveChild(Recursive): ...
+
+            class A: ...
+            class B: ...
+            class Other: ...
+            class Child(A): ...
+            class Both(A, B): ...
+            class Gradual(Any): ...
+            class GradualChild(Gradual): ...
+            class X: ...
+            class Y: ...
+            class Z: ...
+
+            ",
+        )?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/classes.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let class = |name| {
+            global_symbol(&db, module, name)
+                .place
+                .expect_type()
+                .expect_class_literal()
+        };
+        let instance = |name| Type::instance(&db, &env, class(name).default_specialization(&db));
+        let without = |ty, excluded| {
+            IntersectionBuilder::new(&db, &env)
+                .add_positive(ty)
+                .add_negative(excluded)
+                .build()
+        };
+        let a = instance("A");
+        let b = instance("B");
+        let child = instance("Child");
+        let both = instance("Both");
+        let gradual = instance("Gradual");
+        let x = instance("X");
+        let y = instance("Y");
+        let target = UnionType::from_two_elements(&db, &env, without(a, x), without(b, y));
+
+        for (name, source, expected) in [
+            ("inherited bound", without(child, x), true),
+            ("different exclusion", without(child, y), false),
+            ("first multiple-inheritance base", without(both, x), true),
+            ("second multiple-inheritance base", without(both, y), true),
+            ("unrelated bound", without(instance("Other"), x), false),
+            (
+                "Any base retains nominal redundancy",
+                without(gradual, x),
+                false,
+            ),
+        ] {
+            assert_eq!(
+                source.is_redundant_with(&db, &env, target),
+                expected,
+                "{name}"
+            );
+        }
+
+        // Different exclusions on the same class remain separate alternatives.
+        let target = UnionType::from_two_elements(&db, &env, without(a, x), without(a, y));
+        assert!(without(child, y).is_redundant_with(&db, &env, target));
+        assert!(!without(child, instance("Z")).is_redundant_with(&db, &env, target));
+
+        // An explicit Any base does not hide a known nominal inheritance path.
+        let target = UnionType::from_two_elements(&db, &env, without(gradual, x), without(a, y));
+        assert!(without(instance("GradualChild"), x).is_redundant_with(&db, &env, target));
+
+        let target = UnionType::from_two_elements(
+            &db,
+            &env,
+            without(instance("Recursive"), x),
+            without(a, y),
+        );
+        assert!(without(instance("RecursiveChild"), x).is_redundant_with(&db, &env, target));
+
+        // Class identity also applies to unspecialized generic definitions, even though their
+        // MRO iterator supplies a default specialization for its first element.
+        let unspecialized = Type::instance(&db, &env, ClassType::NonGeneric(class("Box")));
+        let target =
+            UnionType::from_two_elements(&db, &env, without(unspecialized, x), without(a, y));
+        assert!(without(without(unspecialized, x), y).is_redundant_with(&db, &env, target));
+        Ok(())
     }
 }
