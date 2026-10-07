@@ -221,6 +221,20 @@ fn should_preserve_hashable_union(
         || (is_hashable(right) && is_non_final_nominal_instance(left))
 }
 
+/// Return whether a nominal bound excludes instances of the bare `object` class.
+fn has_non_object_nominal_bound(db: &dyn Db, ty: Type<'_>) -> bool {
+    let is_non_object_nominal =
+        |ty: Type<'_>| matches!(ty, Type::NominalInstance(instance) if !instance.is_object());
+    match ty {
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .any(is_non_object_nominal),
+        _ => is_non_object_nominal(ty),
+    }
+}
+
 /// Combine union elements that cover more of the same enum class.
 ///
 /// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
@@ -1163,6 +1177,14 @@ impl<'db> UnionBuilder<'db> {
 
                 if element_type.is_redundant_with(db, &self.env, ty) {
                     to_remove.push(i);
+                    continue;
+                }
+
+                // Both operands exclude bare `object` instances, even with gradual type
+                // arguments, so their union cannot cover `object`.
+                if has_non_object_nominal_bound(db, ty)
+                    && has_non_object_nominal_bound(db, element_type)
+                {
                     continue;
                 }
 
