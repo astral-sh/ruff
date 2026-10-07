@@ -3283,6 +3283,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.with_recursion_guard(db, left, right, || {
+            if intersection.negative(db).contains(&other) {
+                // Test an exact exclusion before unrelated positive components. Gradual types
+                // need the full reflexive subtyping check: `Any` is not a subtype of itself.
+                let excluded = self
+                    .as_relation_checker(TypeRelation::Subtyping)
+                    .check_type_pair(db, other, other);
+                if excluded.is_trivially_always_satisfied() {
+                    return excluded;
+                }
+            }
             intersection
                 .positive(db)
                 .iter()
