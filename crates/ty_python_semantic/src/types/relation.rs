@@ -2911,10 +2911,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
-            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => self
-                .with_recursion_guard(db, source, target, || {
+            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => {
+                // Comparing against a non-generic class only inspects MRO class identities;
+                // there are no type arguments whose comparison could recurse.
+                if target_i.own_tuple_spec(db).is_none()
+                    && matches!(target_i.class(db, env), ClassType::NonGeneric(_))
+                {
                     self.check_nominal_instance_pair(db, source_i, target_i)
-                }),
+                } else {
+                    self.with_recursion_guard(db, source, target, || {
+                        self.check_nominal_instance_pair(db, source_i, target_i)
+                    })
+                }
+            }
 
             (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => self
                 .with_recursion_guard(db, source, target, || {
