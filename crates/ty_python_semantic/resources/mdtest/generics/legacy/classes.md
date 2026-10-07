@@ -1605,6 +1605,67 @@ reveal_type(generic_context(into_regular_callable(A)))
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Inherited dataclass converters
+
+A subclass specializes an inherited converter's input type for its synthesized methods and attribute
+assignments.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Callable, Generic, TypeVar, dataclass_transform
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+def field(*, converter: Callable[..., Any]) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def model(cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Base(Generic[T]):
+    @staticmethod
+    def convert(value: T) -> T:
+        return value
+
+    value: T = field(converter=convert)
+
+@model
+class Child(Base[str]): ...
+
+reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+child = Child("a")
+reveal_type(child.value)  # revealed: str
+Child(1)  # error: [invalid-argument-type]
+
+child.value = "b"  # no diagnostic
+child.value = 1  # error: [invalid-assignment]
+
+reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+child.__replace__(value="b")  # no diagnostic
+child.__replace__(value=1)  # error: [invalid-argument-type]
+```
+
+Specialization also propagates through an intermediate generic subclass with a nested field type.
+
+```py
+@model
+class Nested(Base[list[U]]): ...
+
+@model
+class Indirect(Nested[str]): ...
+
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+indirect = Indirect(["a"])
+Indirect([1])  # error: [invalid-argument-type]
+indirect.value = ["b"]  # no diagnostic
+indirect.value = [1]  # error: [invalid-assignment]
+```
+
 ### Class typevar has another typevar as a default
 
 ```py
