@@ -2697,29 +2697,74 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
         if required.mode == ProtocolMemberAccessMode::Instance {
-            attribute_type
-                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
-                .when_some_and(db, self.constraints, |callables| {
-                    self.check_callables_vs_callable(
-                        db,
-                        &callables.map(|callable| {
-                            protocol_apply_self_with_receiver(
-                                db,
-                                env.program(db),
-                                callable,
-                                implementation_receiver_binding_ty,
-                                implementation_self_binding_ty,
-                            )
-                        }),
+            // Specializing a protocol receiver here would check its members using a separate
+            // relation checker, which can repeatedly expand recursive receiver annotations.
+            // Keep its receiver constraint deferred so the signature comparison below checks it
+            // with our active recursion guards. Nominal receivers still benefit from early
+            // specialization, particularly when their type variables occur in recursive aliases.
+            let callables = if let Type::BoundMethod(method) = attribute_type {
+                method
+                    .func(db)
+                    .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
+                    .map(|callables| {
+                        callables.map(|callable| {
+                            if callable.signatures(db).iter().any(|signature| {
+                                signature.parameters().get(0).is_some_and(|parameter| {
+                                    matches!(
+                                        parameter.annotated_type().resolve_type_alias(db),
+                                        Type::ProtocolInstance(_)
+                                    )
+                                })
+                            }) {
+                                callable
+                                    .with_signatures(
+                                        db,
+                                        callable.signatures(db).bind_self_with_receiver(
+                                            db,
+                                            env,
+                                            Some(method.signature_receiver(db)),
+                                            Some(method.typing_self_type(db)),
+                                        ),
+                                    )
+                                    .into_regular(db)
+                            } else {
+                                callable.bind_self(
+                                    db,
+                                    env,
+                                    method.signature_receiver(db),
+                                    method.typing_self_type(db),
+                                )
+                            }
+                        })
+                    })
+            } else {
+                attribute_type.try_upcast_to_callable_with_policy(
+                    db,
+                    env,
+                    UpcastPolicy::from(self.relation),
+                )
+            };
+            callables.when_some_and(db, self.constraints, |callables| {
+                self.check_callables_vs_callable(
+                    db,
+                    &callables.map(|callable| {
                         protocol_apply_self_with_receiver(
                             db,
                             env.program(db),
-                            required_callable,
-                            protocol_receiver_binding_ty,
-                            protocol_self_binding_ty,
-                        ),
-                    )
-                })
+                            callable,
+                            implementation_receiver_binding_ty,
+                            implementation_self_binding_ty,
+                        )
+                    }),
+                    protocol_apply_self_with_receiver(
+                        db,
+                        env.program(db),
+                        required_callable,
+                        protocol_receiver_binding_ty,
+                        protocol_self_binding_ty,
+                    ),
+                )
+            })
         } else if member.is_instance_method() {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
