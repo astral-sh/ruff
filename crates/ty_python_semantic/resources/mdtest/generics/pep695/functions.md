@@ -1487,6 +1487,21 @@ def f[T: float](value: T):
     reveal_type(value + value)  # revealed: Unknown
 ```
 
+## `Self` satisfies variadic constraints
+
+`Box[*tuple[Any, ...]]` accepts any specialization of `Box`, including the implicit `Self` type
+inside its methods:
+
+```py
+from typing import Any
+
+class Box[*Ts]:
+    def _(self) -> None:
+        accept(self)  # no diagnostic
+
+def accept[T: (Box[*tuple[Any, ...]], str)](value: T) -> None: ...
+```
+
 ## All occurrences of the same typevar have the same type
 
 If a typevar appears multiple times in a function signature, all occurrences have the same type.

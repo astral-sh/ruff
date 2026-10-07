@@ -924,61 +924,44 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
     ty: Type<'db>,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    struct AliasSearchVisitor<'a, 'db> {
-        env: &'a ProgramEnvironment<'db>,
-        query: &'a dyn Fn(Type<'db>) -> bool,
-        recursion_guard: TypeCollector<'db>,
-        active_aliases: ActiveRecursionDetector<TypeIdentity<'db>>,
-        found: Cell<bool>,
+    /// Search stored types with a fresh recursion guard for each alias expansion.
+    ///
+    /// Sharing that guard would stop at `list[A]` before detecting the cycle in
+    /// `type A = list[A]` when the search starts at `list[A]`.
+    fn search<'db>(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        query: &impl Fn(Type<'db>) -> bool,
+        active_aliases: &ActiveRecursionDetector<TypeIdentity<'db>>,
+    ) -> bool {
+        any_over_type(db, env, ty, |nested| {
+            query(nested)
+                || match nested {
+                    Type::TypeAlias(alias) => active_aliases.visit(
+                        &nested.to_type_identity(db),
+                        || true,
+                        || search(db, env, alias.value_type(db), query, active_aliases),
+                    ),
+                    Type::Recursive(recursive) => active_aliases.visit(
+                        &nested.to_type_identity(db),
+                        || true,
+                        || {
+                            search(
+                                db,
+                                env,
+                                recursive.unfold(db, env).into_type(),
+                                query,
+                                active_aliases,
+                            )
+                        },
+                    ),
+                    _ => false,
+                }
+        })
     }
 
-    impl<'db> TypeVisitor<'db> for AliasSearchVisitor<'_, 'db> {
-        fn program_environment(&self) -> &ProgramEnvironment<'db> {
-            self.env
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            if self.found.get() {
-                return;
-            }
-
-            if (self.query)(ty) {
-                self.found.set(true);
-                return;
-            }
-
-            if ty.is_alias_like() {
-                // Check for cycles before deduplicating, since an exact cycle also returns true.
-                self.active_aliases.visit(
-                    &ty.to_type_identity(db),
-                    || self.found.set(true),
-                    || {
-                        if !self.recursion_guard.type_was_already_seen(ty) {
-                            match ty {
-                                Type::TypeAlias(alias) => self.visit_type(db, alias.value_type(db)),
-                                Type::Recursive(recursive) => {
-                                    self.visit_type(db, recursive.unfold(db, self.env).into_type());
-                                }
-                                _ => {}
-                            }
-                        }
-                    },
-                );
-            } else {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-    }
-
-    let visitor = AliasSearchVisitor {
-        env,
-        query: &query,
-        recursion_guard: TypeCollector::default(),
-        active_aliases: ActiveRecursionDetector::default(),
-        found: Cell::new(false),
-    };
-    visitor.visit_type(db, ty);
-    visitor.found.get()
+    search(db, env, ty, &query, &ActiveRecursionDetector::default())
 }
 
 /// Return whether `query` matches `ty` or any of its nested types.
@@ -1040,6 +1023,7 @@ pub(super) fn find_over_type<'db, T: Copy>(
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
+    use test_case::test_case;
     use ty_python_core::ProgramFile;
 
     use crate::db::tests::setup_db;
@@ -1047,6 +1031,26 @@ mod tests {
     use crate::types::{DynamicType, Parameter, Parameters, SpecialFormType, Type};
 
     use super::{CollectedTypes, DynamicContentMode, dynamic_content, dynamic_content_impl};
+
+    #[test_case("type A = list[A]"; "pep695")]
+    #[test_case("from typing import TypeAlias\nA: TypeAlias = list[\"A\"]"; "legacy")]
+    fn alias_cycle_through_stored_container(declaration: &str) -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_file("/src/a.py", format!("{declaration}\nvalue: list[A]\n"))?;
+        let env = db.program_environment();
+        let file = system_path_to_file(&db, "/src/a.py")?;
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let ty = global_symbol(&db, module, "value").place.expect_type();
+
+        // Expanding A revisits the container before it reaches the repeated alias.
+        assert!(super::any_over_type_expanding_aliases(
+            &db,
+            &env,
+            ty,
+            |_| false
+        ));
+        Ok(())
+    }
 
     #[test]
     fn fully_static_paramspec_value_has_no_dynamic_content() {
