@@ -1416,7 +1416,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 })
                 .unwrap_or_else(|| possibly_apply_to_self(specialization)),
             TypeMapping::BindSelf(binding) => {
-                if binding.should_bind(db, visitor.env, self) {
+                if binding.should_bind(db, self) {
                     binding.self_type()
                 } else {
                     Type::TypeVar(self)
