@@ -643,7 +643,11 @@ impl<'db> BoundSuperType<'db> {
             Ok(builder.build())
         };
 
-        let owner = match owner_type {
+        let owner_for_lookup = owner_type
+            .as_protocol_instance(db)
+            .map(Type::ProtocolInstance)
+            .unwrap_or(owner_type);
+        let owner = match owner_for_lookup {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -689,7 +693,7 @@ impl<'db> BoundSuperType<'db> {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let class = match bound {
                                 Type::NominalInstance(instance) => Some(instance.class(db, env)),
-                                Type::ProtocolInstance(protocol) => {
+                                bound if let Some(protocol) = bound.as_protocol_instance(db) => {
                                     protocol.class_origin(db).map(|class| *class)
                                 }
                                 _ => None,
@@ -795,7 +799,7 @@ impl<'db> BoundSuperType<'db> {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         let class = match bound {
                             Type::NominalInstance(instance) => Some(instance.class(db, env)),
-                            Type::ProtocolInstance(protocol) => {
+                            bound if let Some(protocol) = bound.as_protocol_instance(db) => {
                                 protocol.class_origin(db).map(|class| *class)
                             }
                             _ => None,

@@ -64,11 +64,8 @@ fn base_top_intersection<'db>(
     base: Type<'db>,
     subclass: Type<'db>,
 ) -> Option<GenericIntersection<'db>> {
-    if !matches!(base, Type::NominalInstance(_) | Type::ProtocolInstance(_))
-        || !matches!(
-            subclass,
-            Type::NominalInstance(_) | Type::ProtocolInstance(_)
-        )
+    if !(base.is_nominal_instance() || base.is_protocol_instance(db))
+        || !(subclass.is_nominal_instance() || subclass.is_protocol_instance(db))
         || base.has_dynamic(db, env)
     {
         return None;

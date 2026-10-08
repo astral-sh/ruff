@@ -199,7 +199,10 @@ impl<'db> ShapeObserver<'db> {
             }
             Type::Recursive(recursive) => {
                 let definition = recursive.definition(db);
-                let body = self.declaration(db, definition, |db| recursive.shape_body(db));
+                let Some(body) = recursive.shape_body(db) else {
+                    return ShapeDependencies { error: Some(TupleShapeError::NotTuple), ..ShapeDependencies::default() };
+                };
+                let body = self.declaration(db, definition, |_| body);
                 result.error = body.error;
                 for parameter in body.parameters {
                     let mapped = recursive.apply_to_node_structural(db, Type::TypeVar(parameter));
@@ -284,7 +287,7 @@ impl<'db> ShapeObserver<'db> {
                 self.unpack(db, body)
             }
             Type::Recursive(recursive) => {
-                let body = recursive.shape_body(db);
+                let body = recursive.shape_body(db).ok_or(TupleShapeError::NotTuple)?;
                 self.unpack(db, recursive.apply_to_node_structural(db, body))
             }
             Type::NominalInstance(instance) if let Some(tuple) = instance.own_tuple_type() => {

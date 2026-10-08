@@ -335,7 +335,15 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_type_alias_type(db, alias);
         }
         NonAtomicType::Recursive(recursive) => {
-            visitor.visit_recursive_type(db, recursive);
+            // Protocol constructors preserve the class declaration's lazy scope. A visitor
+            // that expands recursive aliases still leaves protocol member declarations lazy.
+            if !visitor.should_visit_lazy_type_attributes()
+                && let Some(protocol) = ProtocolInstanceType::from_recursive(db, recursive)
+            {
+                visitor.visit_protocol_instance_type(db, protocol);
+            } else {
+                visitor.visit_recursive_type(db, recursive);
+            }
         }
         NonAtomicType::NewTypeInstance(newtype) => {
             visitor.visit_newtype_instance_type(db, newtype);
@@ -524,6 +532,14 @@ pub(super) fn dynamic_content_impl<'db>(
             if !self.content.get().is_absent() {
                 return;
             }
+
+            // A protocol's constructor and its nominal interface view denote the same
+            // specialization. Use one identity so an exact recursive reference adds no
+            // new requirements, while a changed specialization remains indeterminate.
+            let ty = ty
+                .as_protocol_instance(db)
+                .map(Type::ProtocolInstance)
+                .unwrap_or(ty);
 
             if matches!(self.mode, DynamicContentMode::Materialization) && ty.is_divergent() {
                 self.record(DynamicContent::Indeterminate);
@@ -926,19 +942,21 @@ pub(super) fn any_over_type_expanding_aliases<'db>(
                         || true,
                         || search(db, env, alias.value_type(db), query, active_aliases),
                     ),
-                    Type::Recursive(recursive) => active_aliases.visit(
-                        &nested.to_type_identity(db),
-                        || true,
-                        || {
-                            search(
-                                db,
-                                env,
-                                recursive.unfold(db, env).into_type(),
-                                query,
-                                active_aliases,
-                            )
-                        },
-                    ),
+                    Type::Recursive(recursive) if recursive.protocol_origin(db).is_none() => {
+                        active_aliases.visit(
+                            &nested.to_type_identity(db),
+                            || true,
+                            || {
+                                search(
+                                    db,
+                                    env,
+                                    recursive.unfold(db, env).into_type(),
+                                    query,
+                                    active_aliases,
+                                )
+                            },
+                        )
+                    }
                     _ => false,
                 }
         })

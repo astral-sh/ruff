@@ -59,27 +59,42 @@
 //! ```
 //!
 //! Tuple subscripting then selects the element at index 1: `x[1]: Tree[list[int]] | None`.
-
-use std::cell::{Cell, RefCell};
+//!
+//! Protocol declarations also supply recursive constructors. Their bodies are structural records
+//! of member requirements, inferred from the declaration when an operation unfolds the protocol.
+//! A reference stores the declaration and its arguments without asking for those members. Thus
+//! specializing `P[T]` substitutes its arguments without recursively specializing `P`'s methods.
 
 use rustc_hash::FxHashSet;
+use salsa::plumbing::AsId;
+use std::cell::{Cell, RefCell};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 use ty_python_core::semantic_index;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
+use super::protocol_class::ProtocolClass;
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::set_theoretic::TypeNormalization;
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{self, TypeVisitor};
 use super::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, ClassType,
-    GenericContext, MaterializationKind, ProtocolInstanceType, SelfBinding, Type, TypeContext,
-    TypeMapping, TypedDictType, VarianceTerm,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    GenericContext, MaterializationKind, SelfBinding, Type, TypeContext, TypeMapping, TypedDictType, VarianceTerm,
 };
+use super::{ClassType, GenericAlias, ProtocolInstanceType, StaticClassLiteral};
 use crate::{Db, ProgramEnvironment};
+
+/// An owned substitution captured by a delayed operation. The keys retain their original
+/// binding scopes; replacing a free variable after materialization must not move that
+/// replacement beneath the materialization.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct RecursiveSpecialization<'db> {
+    base: RecursiveSpecializationBase<'db>,
+    overrides: Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum RecursiveSpecializationBase<'db> {
@@ -95,15 +110,6 @@ enum RecursiveSpecializationBase<'db> {
     },
     Single(BoundTypeVarInstance<'db>, Type<'db>),
     ReturnCallables(Box<[(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)]>),
-}
-
-/// An owned substitution captured by a delayed operation. The keys retain their original
-/// binding scopes; replacing a free variable after materialization must not move that
-/// replacement beneath the materialization.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub struct RecursiveSpecialization<'db> {
-    base: RecursiveSpecializationBase<'db>,
-    overrides: Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
 }
 
 impl<'db> RecursiveSpecialization<'db> {
@@ -516,9 +522,28 @@ impl RecursiveSubstitution<'_> {
     }
 }
 
-/// Identifies an alias query and names its recursive binder and variables.
+/// Identifies the declaration or inference query that owns a recursive constructor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RecursiveCycle(salsa::Id);
+pub enum RecursiveCycle {
+    Alias(salsa::Id),
+    Protocol(salsa::Id),
+}
+
+impl RecursiveCycle {
+    fn id(self) -> salsa::Id {
+        match self {
+            Self::Alias(id) | Self::Protocol(id) => id,
+        }
+    }
+}
+
+/// A recursive body is either inferred structurally or supplied by a protocol declaration.
+/// Protocol bodies are delayed so constructing a reference never asks for that reference's members.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum RecursiveBody<'db> {
+    Inferred(Type<'db>),
+    Protocol(StaticClassLiteral<'db>),
+}
 
 impl get_size2::GetSize for RecursiveCycle {}
 
@@ -530,14 +555,14 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the implicit alias, including for qualified references.
+    /// The defining symbol of the alias or protocol, including for qualified references.
     #[returns(copy)]
     pub(super) definition: Definition<'db>,
-    /// Names the binder and distinguishes provisional types of different alias queries.
+    /// Names the binder and distinguishes declarations and provisional alias queries.
     #[returns(copy)]
     cycle: RecursiveCycle,
     #[returns(copy)]
-    body: Type<'db>,
+    body: RecursiveBody<'db>,
     /// The actual arguments for this application, which may themselves contain type variables.
     /// They are applied when unfolding; the stored body remains unspecialized.
     #[returns(copy)]
@@ -563,11 +588,15 @@ impl<'db> RecursiveType<'db> {
             recursive: RecursiveType<'db>,
             (): (),
         ) -> AliasCycleSummary<'db> {
-            let mut summary = AliasCycleSummary::from_type(db, recursive.body(db));
+            let mut summary = match recursive.body(db) {
+                RecursiveBody::Inferred(body) => AliasCycleSummary::from_type(db, body),
+                // A protocol body is a structural record, which guards every recursive reference.
+                RecursiveBody::Protocol(_) => AliasCycleSummary::from_type(db, Type::object()),
+            };
             // Nested bodies can refer to an enclosing binder. Close only the cycle marker,
             // so recovery never exposes an unbound variable as a standalone type.
             if let Some(Type::RecursiveVar(variable)) = summary.cycle {
-                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).0));
+                summary.cycle = Some(Type::divergent_alias(variable.cycle(db).id()));
             }
             summary
         }
@@ -582,21 +611,50 @@ impl<'db> RecursiveType<'db> {
         cycle: salsa::Id,
         parameters: Option<GenericContext<'db>>,
     ) -> Self {
-        let cycle = RecursiveCycle(cycle);
+        let cycle = RecursiveCycle::Alias(cycle);
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
         Self::new_internal(
             db,
             definition,
             cycle,
-            Type::RecursiveVar(RecursiveVar::new_internal(
+            RecursiveBody::Inferred(Type::RecursiveVar(RecursiveVar::new_internal(
                 db,
                 cycle,
                 arguments,
                 Box::<[RecursiveOperation<'_>]>::default(),
-            )),
+            ))),
             arguments,
             Box::<[RecursiveOperation<'_>]>::default(),
         )
+    }
+
+    /// Refer to a protocol constructor without evaluating its member signatures.
+    pub(super) fn protocol(
+        db: &'db dyn Db,
+        origin: StaticClassLiteral<'db>,
+        arguments: Option<Specialization<'db>>,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            origin.definition(db),
+            RecursiveCycle::Protocol(origin.as_id()),
+            RecursiveBody::Protocol(origin),
+            arguments,
+            Box::<[RecursiveOperation<'_>]>::default(),
+        )
+    }
+
+    /// The nominal protocol origin, reconstructed from the stored arguments without unfolding.
+    pub(super) fn protocol_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
+        let RecursiveBody::Protocol(origin) = self.body(db) else {
+            return None;
+        };
+        let class = self
+            .arguments(db)
+            .map_or(ClassType::NonGeneric(origin.into()), |arguments| {
+                ClassType::Generic(GenericAlias::new(db, origin, arguments))
+            });
+        class.into_protocol_class(db)
     }
 
     /// Close recursive occurrences after inferring an alias's constructor expression.
@@ -635,7 +693,7 @@ impl<'db> RecursiveType<'db> {
         );
         // Alias arguments can expose a reference without introducing a container.
         if body.has_unguarded_alias_cycle(db) {
-            Type::divergent_alias(self.cycle(db).0)
+            Type::divergent_alias(self.cycle(db).id())
         } else if body == original {
             // Binding changes a closed type only by introducing references to this binder.
             body
@@ -644,7 +702,7 @@ impl<'db> RecursiveType<'db> {
                 db,
                 self.definition(db),
                 self.cycle(db),
-                body,
+                RecursiveBody::Inferred(body),
                 self.arguments(db),
                 Box::<[RecursiveOperation<'_>]>::default(),
             ))
@@ -707,7 +765,47 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    /// Whether argument-based comparisons need the complete operation sequence.
+    /// Preserve the materialization's spelling when later substitutions introduce only static
+    /// values. This is display metadata: the recorded operations keep their original order.
+    pub(super) fn display_materialization_kind(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<MaterializationKind> {
+        struct StaticCaptures<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            proven: Cell<bool>,
+        }
+        impl<'db> TypeVisitor<'db> for StaticCaptures<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> { self.env }
+            fn should_visit_lazy_type_attributes(&self) -> bool { false }
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if self.proven.get() && !structurally_static(db, self.env, ty) {
+                    self.proven.set(false);
+                }
+            }
+        }
+
+        let mut materialization = None;
+        for operation in self.operations(db) {
+            match operation {
+                RecursiveOperation::Materialize(kind, _) => materialization = Some(*kind),
+                RecursiveOperation::Specialize(..) | RecursiveOperation::BindSelf(..)
+                    if materialization.is_some() =>
+                {
+                    let captures = StaticCaptures { env, proven: Cell::new(true) };
+                    operation.visit_types(db, &captures);
+                    if !captures.proven.get() { materialization = None; }
+                }
+                RecursiveOperation::Freshen(..) => {}
+                RecursiveOperation::BindLegacy(..) | RecursiveOperation::ReplaceSelf(..) => materialization = None,
+                _ => {}
+            }
+        }
+        materialization
+    }
+
+    /// Only a plain application or one complete materialization has a nominal view.
     /// Ordered substitutions and materializations that exclude variable metadata must be
     /// observed by replaying their operations on the closed body.
     pub(super) fn requires_operation_replay(self, db: &'db dyn Db) -> bool {
@@ -756,8 +854,10 @@ impl<'db> RecursiveType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn captured_variables(self, db: &'db dyn Db) -> (Box<[Type<'db>]>, bool) {
-        let body = self.body(db);
-        let (variables, complete) = stored_variables(db, &self.environment(db), body);
+        let (variables, complete) = match self.body(db) {
+            RecursiveBody::Inferred(body) => stored_variables(db, &self.environment(db), body),
+            RecursiveBody::Protocol(origin) => (enclosing_type_variables(db, origin.definition(db)).collect(), true),
+        };
         let variables = variables
             .into_iter()
             .filter(|variable| {
@@ -802,13 +902,14 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The source alias's definition and name, if this binder comes from an alias.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Keep alias metadata optional for inferred recursive types"
-    )]
     pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
-        // Only implicit alias inference constructs recursive types at present.
-        Some((self.definition(db), self.name(db)))
+        self.is_alias(db)
+            .then(|| (self.definition(db), self.name(db)))
+    }
+
+    /// Classify the constructor without consulting its body or source-name tables.
+    pub(super) fn is_alias(self, db: &'db dyn Db) -> bool {
+        matches!(self.body(db), RecursiveBody::Inferred(_))
     }
 
     /// Restore the formal arguments and remove materialization for constructor analysis.
@@ -833,7 +934,8 @@ impl<'db> RecursiveType<'db> {
     /// Report whether unfolding returns exactly `Type::Recursive(self)`. An unfolded
     /// type can still contain recursive references, so callers must retain their recursion guards.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
-        let unfolded = self.replay_operations(db, env, self.unfolded_body(db));
+        let base = self.with_operations(db, Box::<[RecursiveOperation<'_>]>::default());
+        let unfolded = self.replay_operations(db, env, base.unfolded_body(db));
         if unfolded == Type::Recursive(self) {
             UnfoldResult::Unchanged(self)
         } else {
@@ -842,13 +944,17 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// The unspecialized finite body used to analyze tuple unpack dependencies.
-    pub(super) fn shape_body(self, db: &'db dyn Db) -> Type<'db> {
-        self.body(db)
+    pub(super) fn shape_body(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self.body(db) {
+            RecursiveBody::Inferred(body) => Some(body),
+            RecursiveBody::Protocol(_) => None,
+        }
     }
 
     /// Instantiate one body node with the same environment and operation order as unfolding.
     pub(super) fn apply_to_node_structural(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
-        self.replay_operations(db, &self.environment(db), self.close_body_node(db, node))
+        let base = self.with_operations(db, Box::<[RecursiveOperation<'_>]>::default());
+        self.replay_operations(db, &self.environment(db), base.close_body_node(db, node))
     }
 
     fn replay_operations(
@@ -857,19 +963,42 @@ impl<'db> RecursiveType<'db> {
         env: &ProgramEnvironment<'db>,
         mut unfolded: Type<'db>,
     ) -> Type<'db> {
-        for operation in self.operations(db) {
+        for (index, operation) in self.operations(db).iter().enumerate() {
             operation.with_mapping(|mapping| {
                 let mut visitor = ApplyTypeMappingVisitor::new_for_type_construction(env);
                 if let RecursiveOperation::Materialize(_, map_bounds) = operation {
                     visitor.materialize_typevar_bounds_and_defaults = *map_bounds;
                 }
-                unfolded = unfolded.apply_type_mapping_impl(
-                    db,
-                    &mapping,
-                    TypeContext::default(),
-                    &visitor,
-                );
+                unfolded = match unfolded {
+                    Type::ProtocolInstance(protocol) if self.protocol_origin(db).is_some() => {
+                        // This is the outer body being observed. References captured inside
+                        // its members still map through their closed recursive applications.
+                        Type::ProtocolInstance(protocol.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &visitor,
+                        ))
+                    }
+                    _ => unfolded.apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        &visitor,
+                    ),
+                };
             });
+            if self.protocol_origin(db).is_some()
+                && let Type::ProtocolInstance(protocol) = unfolded
+            {
+                let origin = self.with_operations(db, self.operations(db)[..=index].into());
+                unfolded = Type::ProtocolInstance(protocol.with_recursive_origin(db, origin));
+            }
+        }
+        if self.protocol_origin(db).is_some()
+            && let Type::ProtocolInstance(protocol) = unfolded
+        {
+            unfolded = Type::ProtocolInstance(protocol.with_recursive_origin(db, self));
         }
         unfolded
     }
@@ -881,23 +1010,55 @@ impl<'db> RecursiveType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
-        self.close_body_node(db, self.body(db))
+        let body = match self.body(db) {
+            RecursiveBody::Inferred(body) => body,
+            RecursiveBody::Protocol(origin) => {
+                let Some(protocol) = origin.identity_specialization(db).into_protocol_class(db)
+                else {
+                    return Type::Recursive(self);
+                };
+                match protocol.recursive_body(db) {
+                    Type::ProtocolInstance(body) => {
+                        Type::ProtocolInstance(body.with_recursive_origin(db, self.constructor(db)))
+                    }
+                    body => body,
+                }
+            }
+        };
+        self.close_body_node(db, body)
     }
 
     fn close_body_node(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
         let env = self.environment(db);
-        let unfolded = node.apply_type_mapping_impl(
-            db,
-            &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-                RecursiveSubstitution::Unfold(
-                    self.with_operations(db, Box::<[RecursiveOperation<'_>]>::default()),
-                ),
-            )),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::new_for_type_construction(&env),
-        );
-        match self.base_arguments(db) {
+        let unfolded = match self.body(db) {
+            RecursiveBody::Inferred(_) => node.apply_type_mapping_impl(
+                db,
+                &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                    RecursiveSubstitution::Unfold(
+                        self.with_operations(db, Box::<[RecursiveOperation<'_>]>::default()),
+                    ),
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::new_for_type_construction(&env),
+            ),
+            RecursiveBody::Protocol(_) => node,
+        };
+        let protocol_origin = self.protocol_origin(db);
+        let unfolded = match self.base_arguments(db) {
             Some(arguments) => {
+                let arguments = if protocol_origin.is_some() {
+                    // An explicit protocol materialization determines each member's read
+                    // and write polarity. Retain the original arguments in the nominal
+                    // origin, but do not pre-materialize these shared requirements.
+                    let arguments = if self.materialization_kind(db).is_some() {
+                        arguments.with_materialization_kind(db, None)
+                    } else {
+                        arguments
+                    };
+                    arguments.with_typevar_bounds(db)
+                } else {
+                    arguments
+                };
                 let specialization = ApplySpecialization::TypeAlias(arguments);
                 let mapping = match arguments.materialization_kind(db) {
                     Some(materialization_kind) => {
@@ -908,14 +1069,33 @@ impl<'db> RecursiveType<'db> {
                     }
                     None => TypeMapping::ApplySpecialization(specialization),
                 };
-                unfolded.apply_type_mapping_impl(
-                    db,
-                    &mapping,
-                    TypeContext::default(),
-                    &ApplyTypeMappingVisitor::new_for_type_construction(&env),
-                )
+                let visitor = ApplyTypeMappingVisitor::new_for_type_construction(&env);
+                match unfolded {
+                    Type::ProtocolInstance(protocol) if protocol_origin.is_some() => {
+                        Type::ProtocolInstance(protocol.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &visitor,
+                        ))
+                    }
+                    _ => unfolded.apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        &visitor,
+                    ),
+                }
             }
             None => unfolded,
+        };
+        if let (Type::ProtocolInstance(protocol), Some(origin)) = (unfolded, protocol_origin) {
+            Type::ProtocolInstance(
+                ProtocolInstanceType::from_interface(db, origin, protocol.interface(db).base())
+                    .with_recursive_origin(db, self),
+            )
+        } else {
+            unfolded
         }
     }
 
@@ -939,6 +1119,33 @@ impl<'db> RecursiveType<'db> {
                 .map(|operation| operation.map_types(db, mapping, visitor))
                 .collect();
             return Type::Recursive(recursive.with_operations(db, operations));
+        }
+        // A protocol declaration owns its member signatures. Transforming an application
+        // substitutes its arguments, while materialization acts on the structural contract.
+        // In particular, promotion and callable-default cleanup must not walk declarations.
+        if self.operations(db).is_empty()
+            && matches!(self.body(db), RecursiveBody::Protocol(_))
+            && !matches!(
+                mapping,
+                TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::Materialize(_)
+            )
+            && !self.captures_change(db, mapping, visitor)
+        {
+            let structural;
+            let visitor = if visitor.normalization == TypeNormalization::Semantic {
+                structural = visitor.for_type_construction();
+                &structural
+            } else {
+                visitor
+            };
+            return Type::Recursive(
+                self.with_arguments(
+                    db,
+                    self.arguments(db).map(|arguments| {
+                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                    }),
+                ),
+            );
         }
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
@@ -964,8 +1171,12 @@ impl<'db> RecursiveType<'db> {
                 let body = if self.cycle(db) == substitution.cycle(db) {
                     self.body(db)
                 } else {
-                    self.body(db)
-                        .apply_type_mapping_impl(db, mapping, tcx, visitor)
+                    match self.body(db) {
+                        RecursiveBody::Inferred(body) => RecursiveBody::Inferred(
+                            body.apply_type_mapping_impl(db, mapping, tcx, visitor),
+                        ),
+                        body @ RecursiveBody::Protocol(_) => body,
+                    }
                 };
                 let arguments = self
                     .base_arguments(db)
@@ -1202,7 +1413,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if !self.materialization_visitor.materialize_typevar_bounds_and_defaults
                 )
         };
-        if needs_body(source)
+        // Protocol arguments have declared variance and contribute inference constraints
+        // through their members. Their interface comparison handles those relationships.
+        if !source.is_alias(db)
+            || !target.is_alias(db)
+            || needs_body(source)
             || needs_body(target)
             || !matches!(
                 self.relation,
@@ -1280,9 +1495,12 @@ impl<'db> VarianceInferable<'db> for RecursiveType<'db> {
     fn variance_of(
         self,
         db: &'db dyn Db,
-        _env: &ProgramEnvironment<'db>,
+        env: &ProgramEnvironment<'db>,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
+        if let Some(protocol) = self.protocol_origin(db) {
+            return protocol.variance_of(db, env, typevar);
+        }
         VarianceTerm::variable(db, VarianceOrigin::Recursive(self), typevar)
     }
 }
@@ -1350,8 +1568,11 @@ fn structurally_static<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: 
                     }
                     match recursive.body(db) {
                         // A provisional binder supplies no evidence about the final body.
-                        Type::RecursiveVar(_) => self.is_static.set(false),
-                        body => self.visit_type(db, body),
+                        RecursiveBody::Inferred(Type::RecursiveVar(_))
+                        | RecursiveBody::Protocol(_) => {
+                            self.is_static.set(false);
+                        }
+                        RecursiveBody::Inferred(body) => self.visit_type(db, body),
                     }
                 }
                 _ => {

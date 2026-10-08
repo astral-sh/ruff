@@ -2482,9 +2482,9 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    /// Returns `true` if `self` is [`Type::ProtocolInstance`].
-    const fn is_protocol_instance(&self) -> bool {
-        matches!(self, Type::ProtocolInstance(..))
+    /// Returns whether this type denotes a protocol, including an unopened recursive constructor.
+    fn is_protocol_instance(&self, db: &'db dyn Db) -> bool {
+        self.as_protocol_instance(db).is_some()
     }
 
     pub(crate) fn cycle_normalized(
@@ -2569,8 +2569,12 @@ impl<'db> Type<'db> {
     }
 
     /// Whether this type wraps an alias body that can be unfolded.
-    const fn is_alias_like(self) -> bool {
-        matches!(self, Type::TypeAlias(_) | Type::Recursive(_))
+    fn is_alias_like(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::TypeAlias(_) => true,
+            Type::Recursive(recursive) => recursive.is_alias(db),
+            _ => false,
+        }
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
@@ -2736,6 +2740,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<ClassType<'db>> {
+        if let Type::Recursive(recursive) = self
+            && let Some(origin) = recursive.protocol_origin(db)
+        {
+            return Some(*origin);
+        }
         match self.resolve_type_alias(db) {
             Type::NominalInstance(instance) => Some(instance.class(db, env)),
             Type::ProtocolInstance(instance) => instance.class_origin(db).map(|class| *class),
@@ -3009,9 +3018,10 @@ impl<'db> Type<'db> {
         self.as_dynamic().expect("Expected a Type::Dynamic variant")
     }
 
-    const fn as_protocol_instance(self) -> Option<ProtocolInstanceType<'db>> {
+    fn as_protocol_instance(self, db: &'db dyn Db) -> Option<ProtocolInstanceType<'db>> {
         match self {
             Type::ProtocolInstance(instance) => Some(instance),
+            Type::Recursive(recursive) => ProtocolInstanceType::from_recursive(db, recursive),
             _ => None,
         }
     }
@@ -3290,8 +3300,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
-            Type::Recursive(_)
-            | Type::AlwaysTruthy
+            Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::KnownBoundMethod(_)
             | Type::KnownInstance(_)
@@ -3306,6 +3315,7 @@ impl<'db> Type<'db> {
             | Type::NewTypeInstance(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
+            | Type::Recursive(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::GenericAlias(_)
@@ -3358,7 +3368,7 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
+            // `Recursive` represents named implicit type aliases and declared protocols.
             // Revisit this and `is_hintable` when general recursive type inference can produce
             // types without a declared alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
@@ -4334,7 +4344,7 @@ impl<'db> Type<'db> {
         if let Some(fallback) = ty.materialized_divergent_fallback() {
             return fallback.class_member_with_policy(db, env, name, policy);
         }
-        if let Type::ProtocolInstance(protocol) = ty
+        if let Some(protocol) = ty.as_protocol_instance(db)
             && let Some(origin) = protocol.materialized_origin(db)
         {
             let interface = protocol.interface(db);
@@ -4741,6 +4751,12 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, env, *complement, name)
             }
 
+            Type::Recursive(recursive)
+                if recursive.materialization_kind(db).is_none()
+                    && let Some(protocol) = self.as_protocol_instance(db) =>
+            {
+                protocol.instance_member(db, env, name)
+            }
             Type::Recursive(recursive) => recursive
                 .unfold(db, env)
                 .map(|unfolded| unfolded.instance_member(db, env, name))
@@ -5946,6 +5962,16 @@ impl<'db> Type<'db> {
             }
 
             match this {
+                Type::Recursive(recursive)
+                    if recursive.materialization_kind(db).is_none()
+                        && let Some(protocol) = this.as_protocol_instance(db) =>
+                {
+                    // Runtime member lookup needs only this declaration and its arguments.
+                    // Unfolding the complete structural interface would specialize unrelated
+                    // members, including their potentially exponential ParamSpec expansions.
+                    Type::ProtocolInstance(protocol)
+                        .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver)
+                }
                 Type::Recursive(recursive) => recursive
                     .unfold(db, env)
                     .map(|unfolded| {
@@ -6909,7 +6935,7 @@ impl<'db> Type<'db> {
                 // receiver. Bake an implicit positional receiver into the signature instead of
                 // checking it structurally again during call inference.
                 let protocol_receiver_is_specialized = self_instance
-                    .as_protocol_instance()
+                    .as_protocol_instance(db)
                     .is_some_and(|protocol| protocol.class_origin(db).is_some())
                     && signature
                         .overloads
@@ -9093,6 +9119,11 @@ impl<'db> Type<'db> {
             visitor: &ActiveRecursionDetector<TypeAliasType<'db>>,
         ) -> Type<'db> {
             match ty {
+                Type::Recursive(recursive)
+                    if let Some(protocol) = ProtocolInstanceType::from_recursive(db, recursive) =>
+                {
+                    protocol.to_nominal_meta_type(db, env)
+                }
                 Type::Recursive(recursive) => recursive
                     .unfold(db, env)
                     .map(|unfolded| to_meta_type_inner(db, env, unfolded, context, visitor))
@@ -9291,12 +9322,14 @@ impl<'db> Type<'db> {
     /// Class-backed protocols return their structural `type[Protocol]` view.
     #[must_use]
     fn dunder_class(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        if let Some(protocol) = self.as_protocol_instance(db) {
+            return protocol.to_meta_type(db, env);
+        }
         match self {
             Type::Union(union) => union.map(db, env, |element| element.dunder_class(db, env)),
             Type::Intersection(intersection) => intersection
                 .try_dunder_class(db, env)
                 .unwrap_or_else(|| self.to_meta_type(db, env)),
-            Type::ProtocolInstance(protocol) => protocol.to_meta_type(db, env),
             Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(
                     db,
@@ -9741,6 +9774,10 @@ impl<'db> Type<'db> {
                 }))
             }),
 
+            Type::ProtocolInstance(instance) if let Some(origin) = instance.recursive_origin(db) => {
+                origin.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            }
+
             Type::ProtocolInstance(instance) => Type::ProtocolInstance(
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
@@ -10024,7 +10061,11 @@ impl<'db> Type<'db> {
                         visitor,
                     );
                 }
-                if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
+                // Protocol member signatures bind their own variables. Only the arguments of
+                // the protocol application belong to the scope whose variables we collect.
+                if recursive.protocol_origin(db).is_none()
+                    && let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env)
+                {
                     unfolded.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
                 }
             }),

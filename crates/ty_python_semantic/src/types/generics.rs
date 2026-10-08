@@ -3855,10 +3855,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         // Other protocols can observe key-specific or gradual evidence that the shared mapping
         // fallback erases; restrict mixed unions to the protocol used by dictionary constructors.
         if !other_types.is_empty()
-            && !matches!(formal, Type::ProtocolInstance(protocol)
-            if protocol.class_origin(db).is_some_and(|class| {
-                class.is_known(db, KnownClass::SupportsKeysAndGetItem)
-            }))
+            && !formal.as_protocol_instance(db).is_some_and(|protocol| {
+                protocol
+                    .class_origin(db)
+                    .is_some_and(|class| class.is_known(db, KnownClass::SupportsKeysAndGetItem))
+            })
         {
             return None;
         }

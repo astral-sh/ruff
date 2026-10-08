@@ -139,7 +139,10 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db).iter().copied().any(Type::is_alias_like)
+        self.elements(db)
+            .iter()
+            .copied()
+            .any(|ty| ty.is_alias_like(db))
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -1190,10 +1193,10 @@ impl<'db> IntersectionType<'db> {
         env: &ProgramEnvironment<'db>,
     ) -> Option<Type<'db>> {
         if !self.iter_positive(db).any(|positive| {
-            matches!(
-                positive,
-                Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some()
-            ) || positive.is_typed_dict()
+            positive
+                .as_protocol_instance(db)
+                .is_some_and(|protocol| protocol.class_origin(db).is_some())
+                || positive.is_typed_dict()
         }) {
             return None;
         }

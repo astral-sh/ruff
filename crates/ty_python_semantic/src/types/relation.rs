@@ -1761,6 +1761,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
+        if let (Some(source), Some(target)) =
+            (source.as_protocol_instance(db), target.as_protocol_instance(db))
+            && self.protocol_materializations_relate(db, source, target)
+        {
+            return self.always();
+        }
+
         let env = self.env;
 
         // With lazy evaluation, comparisons with a type variable are translated directly into a

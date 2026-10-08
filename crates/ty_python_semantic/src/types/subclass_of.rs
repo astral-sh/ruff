@@ -120,7 +120,9 @@ impl<'db> SubclassOfType<'db> {
                     })
                     .map(IntersectionBuilder::build)
             }
-            Type::ProtocolInstance(protocol) => Ok(protocol.to_meta_type(db, env)),
+            ty if let Some(protocol) = ty.as_protocol_instance(db) => {
+                Ok(protocol.to_meta_type(db, env))
+            }
             _ => SubclassOfInner::try_from_instance(db, env, ty)
                 .map(|subclass_of| Self::from(db, env, subclass_of))
                 .ok_or(ty),
@@ -274,7 +276,10 @@ impl<'db> SubclassOfType<'db> {
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
         if let SubclassOfInner::Protocol(protocol) = self.subclass_of
-            && let Some(member) = protocol.interface(db).meta_member(db, env, name)
+            && let Some(member) =
+                protocol
+                    .interface(db)
+                    .meta_member(db, env, Type::SubclassOf(self), name)
         {
             return Some(member);
         }

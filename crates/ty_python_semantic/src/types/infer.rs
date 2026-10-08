@@ -2464,6 +2464,9 @@ bitflags::bitflags! {
         /// Whether this expression constructs an implicit alias before binding its recursive references.
         /// Keep set operations structural until the constructor body has been closed.
         const IN_ALIAS_CONSTRUCTOR = 1 << 16;
+
+        /// Whether this annotation contributes to a protocol's recursive constructor.
+        const IN_PROTOCOL_CONSTRUCTOR = 1 << 17;
     }
 }
 

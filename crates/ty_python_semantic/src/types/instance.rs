@@ -6,7 +6,9 @@ use std::cell::Cell;
 use std::debug_assert_matches;
 use std::marker::PhantomData;
 
-use super::protocol_class::{ProtocolInterface, ProtocolInterfaceView, StructuralMemberPriority};
+use super::protocol_class::{ProtocolInterface, ProtocolInterfaceOperations, ProtocolInterfaceView, StructuralMemberPriority};
+use super::recursive::RecursiveOperation;
+use super::set_theoretic::TypeNormalization;
 use super::{
     BoundTypeVarIdentity, BoundTypeVarInstance, ClassType, DivergentType, KnownClass,
     MaterializationKind, SubclassOfType, Type, TypeAliasType,
@@ -22,6 +24,7 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
 };
+use crate::types::recursive::RecursiveType;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
@@ -88,9 +91,11 @@ impl<'db> Type<'db> {
                         .is_typed_dict(db)
                         .then(|| Type::typed_dict(class))
                         .or_else(|| {
-                            class.into_protocol_class(db).map(|protocol_class| {
-                                Self::ProtocolInstance(ProtocolInstanceType::from_class(
-                                    protocol_class,
+                            class.into_protocol_class(db).map(|_| {
+                                Self::Recursive(RecursiveType::protocol(
+                                    db,
+                                    class_literal,
+                                    specialization,
                                 ))
                             })
                         })
@@ -665,6 +670,13 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                 return;
             }
             match ty {
+                Type::Recursive(recursive) => {
+                    let Some(protocol) = ProtocolInstanceType::from_recursive(db, recursive) else {
+                        self.invalid.set(true);
+                        return;
+                    };
+                    self.visit_type(db, Type::ProtocolInstance(protocol));
+                }
                 Type::ProtocolInstance(protocol) => {
                     if protocol.materialization_kind(db).is_some() {
                         self.invalid.set(true);
@@ -683,7 +695,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                             specialization.materialization_kind(db).is_some()
                                 || specialization.tuple(db).is_some()
                                 || specialization.types(db).iter().any(|ty| {
-                                    if matches!(ty, Type::ProtocolInstance(_)) {
+                                    if ty.as_protocol_instance(db).is_some() {
                                         self.visit_type(db, *ty);
                                         self.invalid.get()
                                     } else {
@@ -826,6 +838,48 @@ fn specialization_argument_is_static<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Prove the materialization laws for the exact same protocol application. These facts
+    /// do not depend on an active coinductive assumption, so they also apply before classifying
+    /// a recursive comparison as an argument-growing obligation.
+    pub(super) fn protocol_materializations_relate(
+        &self,
+        db: &'db dyn Db,
+        source: ProtocolInstanceType<'db>,
+        target: ProtocolInstanceType<'db>,
+    ) -> bool {
+        if source.requires_operation_replay(db) || target.requires_operation_replay(db) {
+            return false;
+        }
+        let (Some(source_origin), Some(target_origin)) =
+            (source.class_origin(db), target.class_origin(db))
+        else {
+            return false;
+        };
+        if source_origin != target_origin {
+            return false;
+        }
+        let kinds = (source.materialization_kind(db), target.materialization_kind(db));
+        // Every gradual type lies between its bottom and top materializations, and is
+        // assignable to and from either one.
+        match kinds {
+            (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
+            | (Some(MaterializationKind::Bottom), None) => return true,
+            (Some(MaterializationKind::Top), None)
+            | (None, Some(MaterializationKind::Bottom)) if self.relation.is_assignability() => {
+                // An invariant enclosing specialization can carry another materialization.
+                // That origin is not the original gradual type to which these laws apply.
+                if source_origin.static_class_literal(db).is_some_and(|(_, specialization)| {
+                    specialization.is_none_or(|specialization| specialization.materialization_kind(db).is_none())
+                }) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        (kinds.0.is_some() || kinds.1.is_some())
+            && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
+    }
+
     /// Return `true` if `ty` conforms to the interface described by `protocol`.
     pub(super) fn check_type_satisfies_protocol(
         &self,
@@ -836,40 +890,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Explicit protocol inheritance establishes subtyping even when a subclass overrides
         // members incompatibly.
         let mut result = self.never();
-        let source_protocol = ty.as_protocol_instance();
+        let source_protocol = ty.as_protocol_instance(db);
 
-        // Every gradual type lies between its bottom and top materializations, and is assignable
-        // to and from either one. Comparing the exact same class specialization can therefore
-        // settle these directions without expanding a recursive protocol's members.
         if let Some(source) = source_protocol
-            && let (Some(source_origin), Some(target_origin)) =
-                (source.class_origin(db), protocol.class_origin(db))
-            && source_origin == target_origin
-            && (match (
-                source.materialization_kind(db),
-                protocol.materialization_kind(db),
-            ) {
-                (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
-                | (Some(MaterializationKind::Bottom), None) => true,
-                (Some(MaterializationKind::Top), None)
-                | (None, Some(MaterializationKind::Bottom))
-                    if self.relation.is_assignability() =>
-                {
-                    // A specialization may already carry a separate materialization marker.
-                    // For example, materializing `Box[Any]`, where `Box[T]` has an invariant
-                    // `P[T]` member, can put `Top` on the `P[Any]` specialization. A separate
-                    // `Bottom` protocol wrapper then has that top-materialized specialization
-                    // as its origin, not the original gradual `P[Any]`.
-                    source_origin
-                        .static_class_literal(db)
-                        .is_some_and(|(_, specialization)| {
-                            specialization.is_none_or(|specialization| {
-                                specialization.materialization_kind(db).is_none()
-                            })
-                        })
-                }
-                _ => false,
-            })
+            && self.protocol_materializations_relate(db, source, protocol)
         {
             return self.always();
         }
@@ -877,20 +901,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // If both instances share a protocol class, a proof that materialization is a no-op can
         // simplify their comparison.
         if let Some(source) = source_protocol
+            && !source.requires_operation_replay(db)
+            && !protocol.requires_operation_replay(db)
             && (source.materialization_kind(db).is_some()
                 || protocol.materialization_kind(db).is_some())
             && let (Some(source_origin), Some(target_origin)) =
                 (source.class_origin(db), protocol.class_origin(db))
             && source_origin.class_literal(db) == target_origin.class_literal(db)
         {
-            // For the same specialization, unchanged requirements settle the relationship.
-            if source != protocol
-                && source_origin == target_origin
-                && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
-            {
-                return self.always();
-            }
-
             // A no-op source materialization can be removed before comparing method-only
             // interfaces. For recursive properties and attributes, keep the wrapper: removing
             // it can make the cycle guard reject distinct specializations that stabilize.
@@ -1046,8 +1064,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> Option<ConstraintSet<'db, 'c>> {
-        let source = source.as_protocol_instance()?;
-        let target = target.as_protocol_instance()?;
+        let source = source.as_protocol_instance(db)?;
+        let target = target.as_protocol_instance(db)?;
         if source.materialization_kind(db).is_none() && target.materialization_kind(db).is_none() {
             return None;
         }
@@ -1285,10 +1303,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             db,
             ty,
             source_interface,
-            ProtocolInterfaceView::new(
-                target_non_recursive,
-                target_interface.materialization_kind(),
-            ),
+            target_interface.with_base(target_non_recursive),
         );
 
         // A skipped member can be the only source of information about a type variable. In this
@@ -1396,7 +1411,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// Returns the finite members of a protocol interface, omitting members that refer back to its
-/// class-backed origin. Type aliases are expanded, but lazy protocol attributes are not visited.
+/// class-backed origin or a protocol base. Type aliases are expanded, but lazy protocol
+/// attributes are not visited.
 ///
 /// For example, `value` is retained while `child` is omitted:
 ///
@@ -1442,13 +1458,20 @@ fn non_recursive_protocol_interface<'db>(
                 return;
             }
 
-            if ty
-                .as_protocol_instance()
-                .and_then(|protocol| protocol.nominal_origin_instance(db))
-                .is_some_and(|instance| {
-                    instance.class_literal(db, self.program_environment()) == self.origin
-                })
-            {
+            let protocol_origin = match ty {
+                Type::ProtocolInstance(protocol) => protocol.class_origin(db),
+                Type::Recursive(recursive) => recursive.protocol_origin(db),
+                _ => None,
+            };
+            if protocol_origin.is_some_and(|protocol| {
+                let referenced = protocol.class_literal(db);
+                // An inherited member refers to its declaring protocol even when the interface
+                // is being checked through a derived protocol.
+                self.origin
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|class| class.class_literal(db) == referenced)
+            }) {
                 self.found.set(true);
                 return;
             }
@@ -1686,7 +1709,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
         walk_protocol_interface(db, protocol.interface(db), visitor);
     } else {
         match protocol.inner {
-            Protocol::FromClass(_) | Protocol::Materialized(_) => {
+            Protocol::FromClass(_) | Protocol::FromInterface(_) | Protocol::Materialized(_) => {
                 visitor.notify_skipped_lazy_type_attributes();
                 if let Some((_, Some(specialization))) = protocol
                     .class_origin(db)
@@ -1719,6 +1742,58 @@ impl<'db> ProtocolInstanceType<'db> {
         Self {
             inner: Protocol::FromClass(class),
             _phantom: PhantomData,
+        }
+    }
+
+    /// Inspect a protocol constructor's nominal identity without unfolding its members.
+    pub(super) fn from_recursive(db: &'db dyn Db, recursive: RecursiveType<'db>) -> Option<Self> {
+        if recursive.requires_operation_replay(db) {
+            return None;
+        }
+        let origin = recursive.protocol_origin(db)?;
+        Some(match recursive.materialization_kind(db) {
+            Some(kind) => Self::materialized(db, origin, kind),
+            None => Self::from_class(origin),
+        })
+    }
+
+    /// Retain the nominal origin when a recursive constructor exposes its structural body.
+    pub(super) fn from_interface(
+        db: &'db dyn Db,
+        origin: ProtocolClass<'db>,
+        interface: ProtocolInterface<'db>,
+    ) -> Self {
+        Self {
+            inner: Protocol::FromInterface(ClassProtocolInterface::new(
+                db, origin, interface, None, None, None,
+            )),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// Retain the closed application that produced an observed structural interface.
+    pub(super) fn with_recursive_origin(self, db: &'db dyn Db, origin: RecursiveType<'db>) -> Self {
+        let Protocol::FromInterface(protocol) = self.inner else {
+            return self;
+        };
+        Self {
+            inner: Protocol::FromInterface(ClassProtocolInterface::new(
+                db,
+                protocol.origin(db),
+                protocol.interface(db),
+                protocol.materialization(db),
+                protocol.operations(db),
+                Some(origin),
+            )),
+            _phantom: PhantomData,
+        }
+    }
+
+    /// The closed application to retain when an observed interface becomes a stored type.
+    pub(super) fn recursive_origin(self, db: &'db dyn Db) -> Option<RecursiveType<'db>> {
+        match self.inner {
+            Protocol::FromInterface(protocol) => protocol.recursive_origin(db),
+            _ => None,
         }
     }
 
@@ -1765,15 +1840,29 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn class_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         match self.inner {
             Protocol::FromClass(class) => Some(class),
+            Protocol::FromInterface(protocol) => Some(protocol.origin(db)),
             Protocol::Synthesized(_) => None,
             Protocol::Materialized(materialized) => Some(materialized.origin(db)),
         }
+    }
+
+    /// Whether nominal metadata omits an ordered transformation of the members.
+    fn requires_operation_replay(self, db: &'db dyn Db) -> bool {
+        matches!(self.inner, Protocol::FromInterface(protocol)
+            if protocol.operations(db).is_some_and(|operations| operations.requires_replay(db))
+                || protocol.recursive_origin(db).is_some_and(|origin| origin.requires_operation_replay(db)))
+    }
+
+    fn has_materialized_requirements(self, db: &'db dyn Db) -> bool {
+        self.materialization_kind(db).is_some()
+            || matches!(self.inner, Protocol::FromInterface(protocol) if protocol.operations(db).is_some())
     }
 
     /// Returns the pending materialization of a class-based protocol, if any.
     pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
         match self.inner {
             Protocol::Materialized(materialized) => Some(materialized.materialization_kind(db)),
+            Protocol::FromInterface(protocol) => protocol.materialization(db),
             Protocol::FromClass(_) | Protocol::Synthesized(_) => None,
         }
     }
@@ -1782,6 +1871,9 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn materialized_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         match self.inner {
             Protocol::Materialized(materialized) => Some(materialized.origin(db)),
+            Protocol::FromInterface(protocol) => {
+                self.has_materialized_requirements(db).then(|| protocol.origin(db))
+            }
             Protocol::FromClass(_) | Protocol::Synthesized(_) => None,
         }
     }
@@ -1809,7 +1901,7 @@ impl<'db> ProtocolInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         target: ProtocolInstanceType<'db>,
     ) -> bool {
-        self.materialization_kind(db).is_some()
+        self.has_materialized_requirements(db)
             && self
                 .interface(db)
                 .differs_for_members_required_by(db, env, target.interface(db))
@@ -1825,15 +1917,14 @@ impl<'db> ProtocolInstanceType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Option<MaterializationKind> {
-        let Protocol::Materialized(materialized) = self.inner else {
-            return None;
-        };
-        let origin = materialized.origin(db);
-        if origin
-            .static_class_literal(db)
-            .and_then(|(_, specialization)| specialization)
-            .and_then(|specialization| specialization.materialization_kind(db))
-            .is_some()
+        let materialization_kind = self.materialization_kind(db)?;
+        let origin = self.class_origin(db)?;
+        if protocol_materialization_is_noop(db, env.program(db), origin)
+            || origin
+                .static_class_literal(db)
+                .and_then(|(_, specialization)| specialization)
+                .and_then(|specialization| specialization.materialization_kind(db))
+                .is_some()
         {
             return None;
         }
@@ -1841,13 +1932,13 @@ impl<'db> ProtocolInstanceType<'db> {
         let interface = self.interface(db);
         interface
             .differs_for_members_required_by(db, env, interface)
-            .then_some(materialized.materialization_kind(db))
+            .then_some(materialization_kind)
     }
 
     /// Return the structural meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         match self.inner {
-            Protocol::FromClass(_) | Protocol::Materialized(_) => {
+            Protocol::FromClass(_) | Protocol::FromInterface(_) | Protocol::Materialized(_) => {
                 SubclassOfType::from_protocol(self)
             }
 
@@ -1949,7 +2040,9 @@ impl<'db> ProtocolInstanceType<'db> {
         env: &ProgramEnvironment<'db>,
         name: &str,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        self.materialization_kind(db)?;
+        if !self.has_materialized_requirements(db) {
+            return None;
+        }
         let interface = self.interface(db);
         interface
             .includes_member(db, name)
@@ -1964,6 +2057,18 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self.inner {
             Protocol::FromClass(class) => class.instance_member(db, env, name),
+            Protocol::FromInterface(protocol) => {
+                let interface = ProtocolInterfaceView::new(
+                    protocol.interface(db),
+                    protocol.materialization(db),
+                ).with_operations(protocol.operations(db));
+                if interface.includes_member(db, name) {
+                    let receiver = Type::instance(db, env, *protocol.origin(db));
+                    interface.instance_member_with_receiver(db, env, receiver, name)
+                } else {
+                    protocol.origin(db).instance_member(db, env, name)
+                }
+            }
             Protocol::Synthesized(synthesized) => {
                 synthesized.interface().instance_member(db, env, name)
             }
@@ -1992,6 +2097,43 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::Synthesized(synthesized) => Self::synthesized(
                 synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
+            Protocol::FromInterface(protocol) => {
+                let origin = protocol.origin(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                let operation = match type_mapping {
+                    TypeMapping::Materialize(kind) => Some(RecursiveOperation::Materialize(*kind, visitor.materialize_typevar_bounds_and_defaults)),
+                    _ if protocol.operations(db).is_some() => RecursiveOperation::substitution(type_mapping),
+                    _ => None,
+                };
+                if operation.as_ref().is_some_and(|operation| !matches!(operation, RecursiveOperation::Materialize(..))) {
+                    // Repeated specialization must reach a structural fixed point. An unrelated
+                    // substitution changes neither the declaration nor the captured values in
+                    // its operation program, so recording it would only create fresh identities.
+                    let mut structural = ApplyTypeMappingVisitor::new(visitor.env)
+                        .with_recursion_context(visitor.recursion_context)
+                        .with_normalization(TypeNormalization::Structural);
+                    structural.materialize_typevar_bounds_and_defaults = visitor.materialize_typevar_bounds_and_defaults;
+                    if origin == protocol.origin(db)
+                        && protocol.interface(db).apply_type_mapping_impl(db, type_mapping, tcx, &structural) == protocol.interface(db)
+                        && protocol.operations(db).map(|operations| operations.map_types(db, type_mapping, &structural)) == protocol.operations(db)
+                    {
+                        return self;
+                    }
+                }
+                let (interface, operations) = match operation {
+                    Some(operation) => (protocol.interface(db), Some(ProtocolInterfaceOperations::append(db, protocol.operations(db), operation))),
+                    None => (
+                        protocol.interface(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                        protocol.operations(db).map(|operations| operations.map_types(db, type_mapping, visitor)),
+                    ),
+                };
+                let materialization = operations.and_then(|operations| operations.terminal_materialization(db));
+                Self {
+                    inner: Protocol::FromInterface(ClassProtocolInterface::new(
+                        db, origin, interface, materialization, operations, None,
+                    )),
+                    _phantom: PhantomData,
+                }
+            }
             Protocol::Materialized(materialized) => {
                 if matches!(type_mapping, TypeMapping::Materialize(_)) {
                     self
@@ -2026,6 +2168,17 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::Synthesized(synthesized) => {
                 synthesized.find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
             }
+            Protocol::FromInterface(protocol) => {
+                // The class binds variables in its members. Only this application's
+                // arguments can introduce type variables into the enclosing scope.
+                protocol.origin(db).find_legacy_typevars_impl(
+                    db,
+                    env,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }
             Protocol::Materialized(materialized) => {
                 materialized.origin(db).find_legacy_typevars_impl(
                     db,
@@ -2059,7 +2212,7 @@ impl<'db> ProtocolInstanceType<'db> {
             origin,
             Type::ProtocolInstance(target),
         );
-        let target = ProtocolInterfaceView::new(non_recursive, interface.materialization_kind());
+        let target = interface.with_base(non_recursive);
         if target.member_count(db) == 0 {
             return None;
         }
@@ -2091,10 +2244,34 @@ pub(super) struct MaterializedProtocolType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for MaterializedProtocolType<'_> {}
 
+/// The structural body of a class-backed protocol's recursive constructor.
+///
+/// Its member types retain closed recursive constructor applications. The origin preserves
+/// nominal inheritance, descriptor lookup, and the spelling of the protocol type.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+pub(super) struct ClassProtocolInterface<'db> {
+    #[returns(copy)]
+    pub(super) origin: ProtocolClass<'db>,
+    #[returns(copy)]
+    pub(super) interface: ProtocolInterface<'db>,
+    /// Reads and writes apply this polarity in their own variance positions.
+    #[returns(copy)]
+    pub(super) materialization: Option<MaterializationKind>,
+    #[returns(copy)]
+    pub(super) operations: Option<ProtocolInterfaceOperations<'db>>,
+    /// The complete application, including ordered transformations, that produced this view.
+    /// Construction leaves this unset until the application's operations have all been replayed.
+    #[returns(copy)]
+    pub(super) recursive_origin: Option<RecursiveType<'db>>,
+}
+
+impl get_size2::GetSize for ClassProtocolInterface<'_> {}
+
 /// A class-backed, synthesized, or lazily materialized protocol.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) enum Protocol<'db> {
     FromClass(ProtocolClass<'db>),
+    FromInterface(ClassProtocolInterface<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
     Materialized(MaterializedProtocolType<'db>),
 }
@@ -2104,6 +2281,9 @@ impl<'db> Protocol<'db> {
     fn interface(self, db: &'db dyn Db) -> ProtocolInterfaceView<'db> {
         match self {
             Self::FromClass(class) => ProtocolInterfaceView::new(class.interface(db), None),
+            Self::FromInterface(protocol) => {
+                ProtocolInterfaceView::new(protocol.interface(db), protocol.materialization(db)).with_operations(protocol.operations(db))
+            }
             Self::Synthesized(synthesized) => {
                 ProtocolInterfaceView::new(synthesized.interface(), None)
             }
@@ -2128,6 +2308,20 @@ impl<'db> Protocol<'db> {
             Self::Synthesized(synthesized) => Some(Self::Synthesized(
                 synthesized.recursive_type_normalized_impl(db, env, div, nested)?,
             )),
+            Self::FromInterface(protocol) => {
+                Some(Self::FromInterface(ClassProtocolInterface::new(
+                    db,
+                    protocol
+                        .origin(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    protocol
+                        .interface(db)
+                        .recursive_type_normalized_impl(db, env, div, nested)?,
+                    protocol.materialization(db),
+                    protocol.operations(db),
+                    None,
+                )))
+            }
             Self::Materialized(materialized) => {
                 Some(Self::Materialized(MaterializedProtocolType::new(
                     db,
@@ -2150,6 +2344,7 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
     ) -> VarianceTerm<'db> {
         match self {
             Protocol::FromClass(class_type) => class_type.variance_of(db, env, typevar),
+            Protocol::FromInterface(protocol) => protocol.origin(db).variance_of(db, env, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
                 synthesized_protocol_type.variance_of(db, env, typevar)
             }
@@ -2277,7 +2472,7 @@ mod tests {
             let protocol = global_symbol(&db, module, name)
                 .place
                 .expect_type()
-                .as_protocol_instance()
+                .as_protocol_instance(&db)
                 .context("expected a protocol instance")?;
             assert_eq!(
                 protocol_materialization_is_noop_by_inspection(&db, &env, protocol),
@@ -2288,7 +2483,7 @@ mod tests {
 
         for (ty, expected) in [(Type::object(), true), (Type::any(), false)] {
             let synthesized = Type::protocol_with_readonly_members(&db, &env, [("value", ty)])
-                .as_protocol_instance()
+                .as_protocol_instance(&db)
                 .context("expected a synthesized protocol")?;
             assert_eq!(
                 protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),
@@ -2300,7 +2495,7 @@ mod tests {
                 Signature::new(Parameters::standard([Parameter::positional_only(None)]), ty),
             );
             let synthesized = Type::protocol_with_methods(&db, &env, [("method", callable)])
-                .as_protocol_instance()
+                .as_protocol_instance(&db)
                 .context("expected a synthesized protocol")?;
             assert_eq!(
                 protocol_materialization_is_noop_by_inspection(&db, &env, synthesized),

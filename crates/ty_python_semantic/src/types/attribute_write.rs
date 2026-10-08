@@ -906,7 +906,7 @@ pub(super) fn assignment_attribute_members<'db>(
             Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
         ) {
         object_ty.member(db, env, attribute)
-    } else if let Type::ProtocolInstance(protocol) = object_ty
+    } else if let Some(protocol) = object_ty.as_protocol_instance(db)
         && let Some(origin) = protocol.materialized_origin_property(db, attribute)
     {
         Type::instance(db, env, *origin).class_member(db, env, attribute)
@@ -955,6 +955,9 @@ pub(super) fn assignment_attribute_members<'db>(
             | Type::NewTypeInstance(_) => object_ty.instance_member(db, env, attribute),
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 object_ty.class_object_member(db, env, attribute, MemberLookupPolicy::default())
+            }
+            Type::Recursive(_) if object_ty.is_protocol_instance(db) => {
+                object_ty.instance_member(db, env, attribute)
             }
             Type::Union(..)
             | Type::Intersection(..)

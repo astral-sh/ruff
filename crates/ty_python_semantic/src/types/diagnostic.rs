@@ -4054,7 +4054,12 @@ pub(crate) fn report_undeclared_protocol_member(
         ty: Type<'db>,
     ) -> bool {
         let class = match ty {
-            Type::ProtocolInstance(protocol) if protocol.class_origin(db).is_some() => return true,
+            ty if ty
+                .as_protocol_instance(db)
+                .is_some_and(|protocol| protocol.class_origin(db).is_some()) =>
+            {
+                return true;
+            }
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Protocol(_) => return true,

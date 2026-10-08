@@ -129,7 +129,7 @@ impl<'db> RecursiveType<'db> {
     pub(super) fn may_have_unbounded_specialization(self, db: &'db dyn Db) -> bool {
         matches!(
             Type::Recursive(self).recursive_identity(db),
-            Some(TypeIdentity::GrowingRecursive(_))
+            Some(TypeIdentity::GrowingRecursive(_) | TypeIdentity::GrowingProtocol(_))
         )
     }
 }
@@ -249,11 +249,16 @@ impl<'db> RecursiveDefinition<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<DefinitionUse<'db>> {
         let (target, specialization) = match ty {
             Type::Recursive(recursive) => {
-                let specialization = recursive.arguments(db)?;
-                (
-                    Self::Structural(recursive.constructor(db)),
-                    Some(specialization),
-                )
+                if let Some(protocol) = recursive.protocol_origin(db) {
+                    let (origin, specialization) = protocol.static_class_literal(db)?;
+                    (Self::Protocol(origin), specialization)
+                } else {
+                    let specialization = recursive.arguments(db)?;
+                    (
+                        Self::Structural(recursive.constructor(db)),
+                        Some(specialization),
+                    )
+                }
             }
             Type::TypeAlias(alias) => (
                 Self::TypeAlias(alias.unspecialized(db)),

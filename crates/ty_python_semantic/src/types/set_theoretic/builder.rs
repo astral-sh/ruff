@@ -215,8 +215,10 @@ fn should_preserve_hashable_union(
     left: Type,
     right: Type,
 ) -> bool {
-    let is_hashable =
-        |ty| matches!(ty, Type::ProtocolInstance(protocol) if protocol.is_hashable(db));
+    let is_hashable = |ty: Type| {
+        ty.as_protocol_instance(db)
+            .is_some_and(|protocol| protocol.is_hashable(db))
+    };
     let is_non_final_nominal_instance =
         |ty| matches!(ty, Type::NominalInstance(instance) if !instance.class(db, env).is_final(db));
 
@@ -1117,7 +1119,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !ty.is_alias_like() && !self.cycle_recovery;
+        let should_simplify_full = !ty.is_alias_like(db) && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -1198,13 +1200,13 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !element_type.is_alias_like() {
+            if should_simplify_full && !element_type.is_alias_like(db) {
                 // Preserving aliases also excludes comparisons that expand aliases nested in
                 // type arguments. A recursive alias can rebuild this union during specialization.
                 if !self.unpack_aliases
-                    && [ty, element_type]
-                        .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
+                    && [ty, element_type].into_iter().any(|ty| {
+                        any_over_type(db, &self.env, ty, false, |ty| ty.is_alias_like(db))
+                    })
                 {
                     continue;
                 }

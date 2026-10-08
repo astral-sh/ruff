@@ -661,7 +661,7 @@ impl<'db> ErrorContext<'db> {
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
-                if let Type::ProtocolInstance(_) = ty {
+                if ty.is_protocol_instance(db) {
                     format!(
                         "protocol `{}` is not {} protocol `{}`",
                         ty.display(db, env),
@@ -865,7 +865,7 @@ impl<'db> ErrorContextNode<'db> {
         }
 
         if let ErrorContext::TypeNotCompatibleWithProtocol { ty, protocol } = &self.context
-            && let Type::ProtocolInstance(proto_instance) = protocol
+            && let Some(proto_instance) = protocol.as_protocol_instance(db)
             && let [single_child] = self.children.as_slice()
             && let ErrorContext::ProtocolMemberIncompatible { member_name } = &single_child.context
             && let [single_grandchild] = single_child.children.as_slice()

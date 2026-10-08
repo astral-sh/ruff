@@ -186,10 +186,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Recursive declarations must finish construction before their types can be compared.
     fn type_expression_normalization(&self) -> TypeNormalization {
-        if self
-            .inference_flags()
-            .contains(InferenceFlags::IN_ALIAS_CONSTRUCTOR)
-        {
+        if self.inference_flags().intersects(
+            InferenceFlags::IN_ALIAS_CONSTRUCTOR | InferenceFlags::IN_PROTOCOL_CONSTRUCTOR,
+        ) {
             TypeNormalization::Structural
         } else {
             TypeNormalization::Semantic
@@ -1802,11 +1801,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                                 .specialize_partial(db, types.iter().copied())
                                         });
                                         if class_literal.is_protocol(db) {
-                                            match Type::instance(db, env, class) {
-                                                Type::ProtocolInstance(protocol) => {
+                                            match Type::instance(db, env, class)
+                                                .as_protocol_instance(db)
+                                            {
+                                                Some(protocol) => {
                                                     SubclassOfType::from_protocol(protocol)
                                                 }
-                                                _ => SubclassOfType::from(db, env, class),
+                                                None => SubclassOfType::from(db, env, class),
                                             }
                                         } else {
                                             SubclassOfType::from(db, env, class)

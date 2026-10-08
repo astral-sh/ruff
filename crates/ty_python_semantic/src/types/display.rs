@@ -691,7 +691,12 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
-            Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
+            Type::Recursive(recursive) => {
+                if let Some(class) = recursive.protocol_origin(db) {
+                    return self.visit_type(db, Type::from(class));
+                }
+                self.record(db, NamedItem::Recursive(recursive));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -1321,7 +1326,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         .display_with(db, self.env, self.settings.clone())
                         .fmt_detailed(f),
                 },
-                Protocol::Materialized(materialized) => {
+                Protocol::FromInterface(_) | Protocol::Materialized(_) => {
+                    let Some(origin) = protocol.class_origin(db) else {
+                        return f.write_str("Protocol");
+                    };
                     let materialization_kind = protocol.display_materialization_kind(db, self.env);
                     if let Some(kind) = materialization_kind {
                         let (name, form) = match kind {
@@ -1332,7 +1340,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                         f.write_char('[')?;
                     }
 
-                    match *materialized.origin(db) {
+                    match *origin {
                         ClassType::NonGeneric(class) => class
                             .display_with(db, self.settings.clone())
                             .fmt_detailed(f),
@@ -1899,19 +1907,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     alias.materialization_kind(db),
                     f,
                 ),
-            Type::Recursive(recursive) => TypeAliasDisplay {
-                db,
-                ty: self.ty,
-                definition: recursive.definition(db),
-                name: recursive.name(db),
-                settings: self.settings.clone(),
+            Type::Recursive(recursive) => {
+                if let Some(protocol) = self.ty.as_protocol_instance(db) {
+                    return Type::ProtocolInstance(protocol)
+                        .display_with(db, self.env, self.settings.clone())
+                        .fmt_detailed(f);
+                }
+                TypeAliasDisplay {
+                    db,
+                    ty: self.ty,
+                    definition: recursive.definition(db),
+                    name: recursive.name(db),
+                    settings: self.settings.clone(),
+                }
+                .fmt_specialized(
+                    self.env,
+                    recursive.arguments(db),
+                    recursive.display_materialization_kind(db, self.env),
+                    f,
+                )
             }
-            .fmt_specialized(
-                self.env,
-                recursive.arguments(db),
-                recursive.materialization_kind(db),
-                f,
-            ),
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),
         }
     }

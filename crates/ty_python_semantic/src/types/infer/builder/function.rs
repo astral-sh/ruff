@@ -37,7 +37,7 @@ use crate::{
                 validate_paramspec_components,
             },
             function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
+            infer_function_default_types, infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
             original_class_type,
         },
         infer_definition_types,
@@ -894,6 +894,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
         definition: Definition<'db>,
     ) {
+        // Parameter and return annotations use the type-expression entry point directly.
+        // Like attribute annotations, they construct the protocol before any structural proof
+        // may inspect its members.
+        let protocol_constructor = self.inference_flags().contains(InferenceFlags::IN_PROTOCOL_CONSTRUCTOR)
+            || nearest_enclosing_class(self.db(), self.index, self.scope())
+                .is_some_and(|class| class.is_protocol(self.db()));
+        let previous_protocol_constructor = self.context.inference_flags.replace(
+            InferenceFlags::IN_PROTOCOL_CONSTRUCTOR,
+            protocol_constructor,
+        );
         let receiver_is_incompatible = self.infer_method_receiver_annotation(function, definition);
         let previous_incompatible_receiver = self.context.inference_flags.replace(
             InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
@@ -906,6 +916,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         self.infer_parameters(&function.parameters, receiver_is_incompatible.is_some());
 
+        self.context.inference_flags.set(
+            InferenceFlags::IN_PROTOCOL_CONSTRUCTOR,
+            previous_protocol_constructor,
+        );
         self.context.inference_flags.set(
             InferenceFlags::HAS_INCOMPATIBLE_SELF_RECEIVER,
             previous_incompatible_receiver,
@@ -1880,8 +1894,8 @@ impl KnownFunction {
                         );
                     }
 
-                    if casted_type.is_protocol_instance() {
-                        if source_type.is_protocol_instance() {
+                    if casted_type.is_protocol_instance(db) {
+                        if source_type.is_protocol_instance(db) {
                             diagnostic.info(format_args!(
                                 "protocol `{casted_display}` is disjoint \
                                 from protocol `{source_display}`"
@@ -1892,7 +1906,7 @@ impl KnownFunction {
                                 from `{source_display}`"
                             ));
                         }
-                    } else if source_type.is_protocol_instance() {
+                    } else if source_type.is_protocol_instance(db) {
                         diagnostic.info(format_args!(
                             "`{casted_display}` is disjoint \
                             from protocol `{source_display}`"

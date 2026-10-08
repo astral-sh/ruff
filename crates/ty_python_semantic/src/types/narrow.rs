@@ -905,7 +905,7 @@ fn intersect_narrowing_types<'db>(
             IntersectionType::from_two_elements(db, env, subject, target)
         }
         (subject, target)
-            if matches!(target, Type::ProtocolInstance(_) | Type::Callable(_))
+            if (target.is_protocol_instance(db) || matches!(target, Type::Callable(_)))
                 && subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
         {
             subject

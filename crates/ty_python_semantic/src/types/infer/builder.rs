@@ -4026,7 +4026,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
             diag.set_primary_annotation_message(format!("type `{}`", inferred.display(db, env)));
-            if matches!(inferred, Type::ProtocolInstance(_)) {
+            if inferred.is_protocol_instance(db) {
                 diag.info("The base of a `NewType` is not allowed to be a protocol class.");
             } else if matches!(inferred, Type::TypedDict(_)) {
                 diag.info("The base of a `NewType` is not allowed to be a `TypedDict`.");
