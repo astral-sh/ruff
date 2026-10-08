@@ -3303,15 +3303,13 @@ class Incompatible(Base[int]):
     value: str  # error: [invalid-attribute-override]
 ```
 
-## Attribute conflicts introduced by another specialization
+## Inheriting different specializations of a property
 
-A parent that satisfies `Base[Any]` can conflict with `Base[int]` inherited through another parent.
-The concrete contract remains relevant even if the lookup MRO selects the gradual one.
+`String` can return `str` for the property inherited from `Base[Any]`. Combining it with `Integer`
+also requires the property to return `int`, so the new subclass is invalid.
 
 ```py
-from typing import Any
-
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
 
@@ -3320,14 +3318,19 @@ class Base(Generic[T]):
     def value(self) -> T:
         raise NotImplementedError
 
-class String(Base[Any]):
+class String(Base[Any]):  # no diagnostic
     @property
     def value(self) -> str:
         return ""
 
 class Integer(Base[int]): ...
 class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+```
 
+An explicit override is also checked against `Base[int]`, and the error is reported only at the
+override.
+
+```py
 class Explicit(String, Integer):
     @property
     def value(self) -> str:  # error: [invalid-property-type-override]

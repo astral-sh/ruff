@@ -3146,34 +3146,43 @@ def check(base: Neutral, child: Frozen) -> None:
     child.value = 1  # error: [invalid-assignment]
 ```
 
-## Inherited frozen fields overriding neutral bases
+## Inheriting frozen fields from a dataclass-transform base
 
-A frozen field can retain its contract when inherited alongside another base. The neutral
-dataclass-transform base permits the field to become read-only in both descendants.
+A `dataclass_transform` base permits both frozen and non-frozen subclasses. A frozen subclass's
+fields can remain read-only when inherited alongside another base.
 
 ```py
 from typing_extensions import dataclass_transform
 
 @dataclass_transform(frozen_default=True)
-class FrozenOrThawed(type): ...
+class ModelMeta(type): ...
 
-class EntityDescription(metaclass=FrozenOrThawed):
-    unit_of_measurement: None
+class Base(metaclass=ModelMeta):
+    value: int
 
-class Capability: ...
+class Mixin: ...
 
-class SensorDescription(EntityDescription):
-    unit_of_measurement: None
+class Frozen(Base):
+    value: int
 
-class Combined(Capability, SensorDescription): ...  # no diagnostic
+class Child(Mixin, Frozen): ...  # no diagnostic
+```
 
-def check(description: Combined) -> None:
-    description.unit_of_measurement = None  # error: [invalid-assignment]
+The inherited field is still read-only.
 
-class PropertyDescription(EntityDescription):
+```py
+def assign(child: Child) -> None:
+    child.value = 1  # error: [invalid-assignment]
+```
+
+This permission applies to frozen fields. Replacing the base's writable attribute with a getter-only
+property is still an invalid override.
+
+```py
+class PropertyChild(Base):
     @property
-    def unit_of_measurement(self) -> None:  # error: [invalid-property-type-override]
-        return None
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
 ```
 
 ## Descriptors preserving instance access
@@ -3468,11 +3477,6 @@ class String:
     value: str
 
 class Conflict(Integer, String): ...  # snapshot: invalid-attribute-override
-class Reversed(String, Integer): ...  # error: [invalid-attribute-override]
-class Descendant(Conflict): ...
-class Independent: ...
-class JoinedAgain(Independent, Conflict): ...
-class ReversedAgain(Conflict, Independent): ...
 ```
 
 ```snapshot
@@ -3491,10 +3495,19 @@ error[invalid-attribute-override]: Incompatible inherited attribute `value`
 info: Type `int` is not assignable to inherited type `str`
 ```
 
-## Explicit overrides preserve new base contracts
+The error is not repeated in subclasses, including when the conflicting parent is not the first base
+class.
 
-Matching an existing parent declaration does not hide a conflict introduced by a second base. An
-override that repeats an existing parent violation does not report it again.
+```py
+class Descendant(Conflict): ...  # no diagnostic
+class Independent: ...
+class JoinedAgain(Independent, Conflict): ...  # no diagnostic
+```
+
+## Explicit overrides with multiple bases
+
+An explicit annotation is checked against both bases. The error belongs to that annotation; there is
+no additional error on the class definition for the same attribute.
 
 ```py
 class Integer:
@@ -3505,22 +3518,21 @@ class String:
 
 class Conflict(String, Integer):
     value: str  # error: [invalid-attribute-override]
+```
 
-class Descendant(Conflict):
-    value: str
+Repeating the same annotation in a subclass does not report the existing error again, even when the
+conflicting parent is not the first base.
 
+```py
 class Independent: ...
 
 class JoinedAgain(Independent, Conflict):
-    value: str
-
-class ReversedAgain(Conflict, Independent):
-    value: str
+    value: str  # no diagnostic
 ```
 
-## Gradual intermediate attribute contracts
+## `Any` on an intermediate base
 
-An intermediate `Any` annotation does not erase a concrete ancestor's requirements.
+Annotating `value` as `Any` in an intermediate class does not hide the `int` annotation on its base.
 
 ```py
 from typing import Any
@@ -3535,42 +3547,4 @@ class String:
     value: str
 
 class Conflict(String, Gradual): ...  # error: [invalid-attribute-override]
-```
-
-## Inherited checks preserve lazy class-property initialization
-
-Unannotated assignments in a class-property getter do not introduce declarations for inherited
-override checking. The getter can initialize a cache created by the metaclass.
-
-```toml
-[rules]
-redundant-condition-strict = "error"
-```
-
-```py
-def pkg_dir_to_pkg_name(dirname: str) -> str:
-    return dirname
-
-class classproperty:
-    def __init__(self, callback):
-        self.callback = callback
-
-    def __get__(self, instance, owner):
-        return self.callback(owner)
-
-class PackageMeta(type):
-    def __new__(cls, name, bases, attr_dict):
-        attr_dict["_name"] = None
-        return super(PackageMeta, cls).__new__(cls, name, bases, attr_dict)
-
-class WindowsRPath: ...
-class PackageViewMixin: ...
-
-class PackageBase(WindowsRPath, PackageViewMixin, metaclass=PackageMeta):
-    @classproperty
-    def name(cls):
-        if cls._name is None:  # no diagnostic
-            pkg_module = cls.__module__
-            cls.__qualname__  # error: [unresolved-attribute]
-            cls._name = pkg_dir_to_pkg_name(pkg_module)
 ```

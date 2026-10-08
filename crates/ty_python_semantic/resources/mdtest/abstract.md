@@ -414,9 +414,7 @@ Concrete()  # no diagnostic
 
 ## Slots and abstract properties in the MRO
 
-A slot inherited from a mixin overrides an abstract property only if the mixin comes before the
-property's defining class in the MRO. The reverse order also replaces the mixin's writable slot with
-a read-only property, which violates the mixin's attribute contract.
+A slot inherited from a mixin overrides an abstract property when the mixin comes first in the MRO.
 
 ```py
 from abc import ABC, abstractmethod
@@ -430,9 +428,16 @@ class SlotMixin:
     __slots__ = ("value",)
 
 class Concrete(SlotMixin, Abstract): ...
-class StillAbstract(Abstract, SlotMixin): ...  # error: [invalid-property-type-override]
 
 Concrete()  # no diagnostic
+```
+
+With the bases reversed, the class remains abstract. The getter-only property also removes writes
+permitted by the mixin's slot, so the class definition receives an override error.
+
+```py
+class StillAbstract(Abstract, SlotMixin): ...  # error: [invalid-property-type-override]
+
 StillAbstract()  # error: [call-non-callable]
 ```
 
