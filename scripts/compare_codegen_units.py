@@ -93,7 +93,10 @@ def prepare_corpora(
 
 
 def build_binaries(
-    root: Path, environment: dict[str, str], training: list[str]
+    root: Path,
+    environment: dict[str, str],
+    training: list[str],
+    configurations: tuple[int, ...] = (16, 1),
 ) -> dict:
     target = environment["UV_CGU_TARGET"]
     binary_name = "ruff.exe" if "windows" in target else "ruff"
@@ -101,11 +104,12 @@ def build_binaries(
     original_prepare = pipeline.ecosystem_python_files
     original_environment = os.environ.copy()
     original_arguments = sys.argv[:]
-    results = {}
+    results_path = root / "evidence" / "builds.json"
+    results = json.loads(results_path.read_text()) if results_path.exists() else {}
     try:
         # Both builds train on exactly the same immutable files and argument order.
         pipeline.ecosystem_python_files = lambda *args, **kwargs: training
-        for units in (16, 1):
+        for units in configurations:
             directory = root / f"cgu{units}"
             directory.mkdir(parents=True, exist_ok=True)
             stages = []
@@ -167,7 +171,11 @@ def build_binaries(
         os.environ.clear()
         os.environ.update(original_environment)
         sys.argv = original_arguments
-    if results["16"]["version"] != results["1"]["version"]:
+    if (
+        "16" in results
+        and "1" in results
+        and results["16"]["version"] != results["1"]["version"]
+    ):
         raise RuntimeError("The binary versions differ")
     return results
 
@@ -344,6 +352,7 @@ def runtime(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-only", action="store_true")
+    parser.add_argument("--stage", choices=("prepare", "build16", "build1", "runtime"))
     parser.add_argument("--repetitions", type=int, default=30)
     args = parser.parse_args()
     root = Path(os.environ["UV_CGU_ROOT"]).resolve()
@@ -380,34 +389,59 @@ def main() -> None:
         environment["RUSTFLAGS"] = ""
     else:
         raise RuntimeError(f"Unsupported native target: {target}")
-    write_json(
-        root / "evidence" / "context.json",
-        {
-            "source_revision": SOURCE_REVISION,
-            "experiment_revision": command_output(
-                ["git", "rev-parse", "HEAD"], environment
-            ),
-            "host": host_context(),
-            "target": target,
-            "rustc": command_output(["rustc", "-vV"], environment),
-            "cargo": command_output(["cargo", "-vV"], environment),
-            "rustflags": environment["RUSTFLAGS"],
-            "notes": [
-                "One clean complete PGO pipeline per configuration; order 16 then 1 on the same runner.",
-                "Cargo downloads and corpus preparation occur before build timing; OS page-cache order effects remain possible.",
-                "Existing parser, AST, and Salsa codegen-unit overrides remain at 1 in both configurations.",
-                "Production PGO script and native release flags; Linux final build uses host GNU environment rather than the packaged manylinux container.",
-            ],
-        },
-    )
-    training, held_out = prepare_corpora(root, environment)
-    if not args.runtime_only:
+    if args.stage in (None, "prepare"):
+        write_json(
+            root / "evidence" / "context.json",
+            {
+                "source_revision": SOURCE_REVISION,
+                "experiment_revision": command_output(
+                    ["git", "rev-parse", "HEAD"], environment
+                ),
+                "host": host_context(),
+                "target": target,
+                "rustc": command_output(["rustc", "-vV"], environment),
+                "cargo": command_output(["cargo", "-vV"], environment),
+                "rustflags": environment["RUSTFLAGS"],
+                "notes": [
+                    "One clean complete PGO pipeline per configuration; order 16 then 1 on the same runner.",
+                    "Cargo downloads and corpus preparation occur before build timing; OS page-cache order effects remain possible.",
+                    "Existing parser, AST, and Salsa codegen-unit overrides remain at 1 in both configurations.",
+                    "Production PGO script and native release flags; Linux final build uses host GNU environment rather than the packaged manylinux container.",
+                ],
+            },
+        )
+    if args.stage in (None, "prepare"):
+        training, held_out = prepare_corpora(root, environment)
+    else:
+        corpus = json.loads((root / "evidence" / "corpus.json").read_text())
+        training = [
+            str(root / path)
+            for path in corpus["files"]
+            if Path(path).parts[0] == "corpus"
+        ]
+        held_out = [
+            str(root / path)
+            for path in corpus["files"]
+            if Path(path).parts[0] == "held-out"
+        ]
+        for path, expected in corpus["files"].items():
+            if digest(root / path) != expected:
+                raise RuntimeError(f"Corpus content changed: {path}")
+    if args.stage in (None, "prepare") and not args.runtime_only:
         subprocess.run(
             ["cargo", "fetch", "--locked", "--target", target],
             cwd=REPOSITORY,
             env=environment,
             check=True,
         )
+    if args.stage == "prepare":
+        return
+    if args.stage in ("build16", "build1"):
+        build_binaries(
+            root, environment, training, (int(args.stage.removeprefix("build")),)
+        )
+        return
+    if args.stage is None and not args.runtime_only:
         build_binaries(root, environment, training)
     runtime(root, environment, training, held_out, args.repetitions)
 

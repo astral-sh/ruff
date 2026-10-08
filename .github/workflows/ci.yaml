@@ -1,4 +1,4 @@
-name: Compare Ruff release codegen units
+name: Compare Ruff Windows codegen units by stage
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: ruff-cgu-comparison-${{ github.ref }}
+  group: ruff-cgu-visible-comparison-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -22,16 +22,13 @@ jobs:
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
+    env:
+      UV_CGU_TARGET: ${{ matrix.target }}
+      UV_CGU_ROOT: ${{ runner.temp }}/ruff-cgu-visible-comparison
     strategy:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-unknown-linux-gnu
-            runner: depot-ubuntu-24.04-8
-            python-architecture: x64
-          - target: aarch64-apple-darwin
-            runner: namespace-profile-macos-15
-            python-architecture: arm64
           - target: x86_64-pc-windows-msvc
             runner: namespace-profile-windows-2022-x86-64-16x32
             python-architecture: x64
@@ -48,17 +45,20 @@ jobs:
         run: python -m pip install psutil==7.0.0
       - name: Install Rust toolchain
         run: rustup toolchain install 1.99.0 --profile minimal --component llvm-tools-preview
-      - name: Compare complete PGO builds and runtime
-        run: python -u scripts/compare_codegen_units.py
-        env:
-          UV_CGU_TARGET: ${{ matrix.target }}
-          UV_CGU_ROOT: ${{ runner.temp }}/ruff-cgu-comparison
+      - name: Prepare corpus and dependencies
+        run: python -u scripts/compare_codegen_units.py --stage prepare
+      - name: Build and train with 16 codegen units
+        run: python -u scripts/compare_codegen_units.py --stage build16
+      - name: Build and train with one codegen unit
+        run: python -u scripts/compare_codegen_units.py --stage build1
+      - name: Compare runtime and formatted output
+        run: python -u scripts/compare_codegen_units.py --stage runtime
       - name: Upload measurements and binaries
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ruff-cgu-comparison-${{ matrix.target }}
+          name: ruff-cgu-visible-comparison-${{ matrix.target }}
           path: |
-            ${{ runner.temp }}/ruff-cgu-comparison/evidence
-            ${{ runner.temp }}/ruff-cgu-comparison/binaries
+            ${{ runner.temp }}/ruff-cgu-visible-comparison/evidence
+            ${{ runner.temp }}/ruff-cgu-visible-comparison/binaries
           if-no-files-found: warn
