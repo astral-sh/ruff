@@ -24,7 +24,7 @@ jobs:
     timeout-minutes: 180
     env:
       UV_CGU_TARGET: ${{ matrix.target }}
-      UV_CGU_ROOT: ${{ runner.temp }}/ruff-cgu-visible-comparison
+      UV_CGU_ROOT: ${{ github.workspace }}/target/ruff-cgu-visible-comparison
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +59,6 @@ jobs:
         with:
           name: ruff-cgu-visible-comparison-${{ matrix.target }}
           path: |
-            ${{ runner.temp }}/ruff-cgu-visible-comparison/evidence
-            ${{ runner.temp }}/ruff-cgu-visible-comparison/binaries
+            ${{ github.workspace }}/target/ruff-cgu-visible-comparison/evidence
+            ${{ github.workspace }}/target/ruff-cgu-visible-comparison/binaries
           if-no-files-found: warn
