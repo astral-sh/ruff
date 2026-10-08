@@ -73,7 +73,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = import;
 
         for alias in names {
-            self.infer_definition(alias);
+            let definition = self.index.expect_single_definition(alias);
+            let inferred = infer_definition_types(self.db(), definition);
+            self.extend_definition(definition, inferred);
         }
     }
 

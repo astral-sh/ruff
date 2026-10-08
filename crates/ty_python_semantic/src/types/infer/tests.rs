@@ -12,6 +12,8 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
+use ruff_python_trivia::textwrap::dedent;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -88,6 +90,75 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .primary_annotation()
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
+    );
+}
+
+#[test]
+fn reaching_definitions_follow_inference_across_regions() {
+    let source = dedent(
+        "
+        from __future__ import annotations
+
+        value = str
+        class C:
+            if condition:
+                value = bytes
+            result = value
+            value = float
+            definite = value
+
+        @value
+        def function(argument: value = value):
+            return [value for item in (value,) for other in (value,)]
+        value = int
+        ",
+    );
+    let db = TestDbBuilder::new()
+        .with_file("/src/test.py", &source)
+        .build()
+        .unwrap();
+    let file = system_path_to_file(&db, "/src/test.py").unwrap();
+    let file = program_file(&db, file);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let mut names = ValueLoads { names: Vec::new() };
+    names.visit_body(module.suite());
+
+    let mut by_scope = FxHashMap::default();
+    let actual: Vec<Vec<&str>> = names
+        .names
+        .into_iter()
+        .map(|name| {
+            let expression = ast::ExprRef::Name(name);
+            let scope = index
+                .expression_scope_id(&expression)
+                .to_scope_id(&db, file);
+            let resolutions = by_scope
+                .entry(scope)
+                .or_insert_with(|| reaching_definitions_for_scope(&db, scope));
+            let resolution = resolutions
+                .get(&expression.into())
+                .unwrap_or_else(|| panic!("no resolution for {name:?} in {source}"));
+            resolution
+                .definitions()
+                .iter()
+                .map(|definition| &source[definition.full_range(&db, &module).range()])
+                .collect()
+        })
+        .collect();
+
+    assert_eq!(
+        actual,
+        [
+            vec!["value = bytes", "value = str"], // Class-body fallback
+            vec!["value = float"],                // No fallback
+            vec!["value = str"],                  // Decorator
+            vec!["value = str"],                  // Default
+            vec!["value = str", "value = int"],   // Deferred annotation
+            vec!["value = str", "value = int"],   // First comprehension iterable
+            vec!["value = str", "value = int"],   // Later comprehension iterable
+            vec!["value = str", "value = int"],   // Comprehension body
+        ]
     );
 }
 
@@ -1955,4 +2026,20 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+struct ValueLoads<'ast> {
+    names: Vec<&'ast ast::ExprName>,
+}
+
+impl<'ast> Visitor<'ast> for ValueLoads<'ast> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if let ast::Expr::Name(name) = expression
+            && name.ctx.is_load()
+            && name.id == "value"
+        {
+            self.names.push(name);
+        }
+        walk_expr(self, expression);
+    }
 }
