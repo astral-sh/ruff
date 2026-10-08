@@ -8,6 +8,7 @@ use std::fmt::Write;
 use std::ops::Range;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
+use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
@@ -1821,6 +1822,71 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for <https://github.com/astral-sh/ty/issues/4676>.
+///
+/// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
+/// across the cases can produce many tuple alternatives with wide element unions.
+fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
+    setup_rayon();
+
+    for (name, num_cases) in [
+        ("ty_micro[tuple_class_pattern_captures_8]", 8),
+        ("ty_micro[tuple_class_pattern_captures]", 16),
+    ] {
+        let mut code = String::new();
+        for prefix in ["A", "B"] {
+            for index in 0..num_cases {
+                writeln!(
+                    &mut code,
+                    "
+class {prefix}{index}:
+    value: int | None = None
+"
+                )
+                .ok();
+            }
+        }
+
+        let union = |prefix: &str| {
+            (0..num_cases)
+                .map(|index| format!("{prefix}{index}"))
+                .join(" | ")
+        };
+        writeln!(
+            &mut code,
+            "
+def check(a: {}, b: {}) -> int:
+    match a, b:",
+            union("A"),
+            union("B")
+        )
+        .ok();
+        for index in 0..num_cases {
+            writeln!(
+                &mut code,
+                "
+        case (A{index}(value=v), B{index}() as y):
+            return (v or 0) + (y.value or 0)"
+            )
+            .ok();
+        }
+        code.push_str(
+            "
+        case _:
+            return -1
+",
+        );
+
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| assert_eq!(case.db.check().len(), 0),
+                BatchSize::SmallInput,
+            );
+        });
+    }
+}
+
 /// Regression benchmark for <https://github.com/astral-sh/ty/issues/4596>.
 fn benchmark_nested_class_pattern_capture(criterion: &mut Criterion) {
     setup_rayon();
@@ -2350,6 +2416,7 @@ criterion_group!(
     benchmark_gradual_literal_union_equality,
     benchmark_gradual_intersection_negation,
     benchmark_literal_or_pattern_reachability,
+    benchmark_tuple_class_pattern_captures,
     benchmark_nested_class_pattern_capture,
     benchmark_nested_class_pattern_exhaustiveness,
     benchmark_nested_mapping_pattern_exhaustiveness,
