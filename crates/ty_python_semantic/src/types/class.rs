@@ -3375,7 +3375,7 @@ pub(crate) struct QualifiedClassName<'db> {
 }
 
 impl<'db> QualifiedClassName<'db> {
-    pub(crate) fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
+    fn from_class_literal(db: &'db dyn Db, class: ClassLiteral<'db>) -> Self {
         Self { db, class }
     }
 
