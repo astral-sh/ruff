@@ -574,7 +574,7 @@ impl<'db, 'ast> FixtureRequestContext<'db, 'ast> {
                     self.function_definition,
                     &decorator.expression,
                     parameter_name,
-                    |expression| decorators.expression_type(expression),
+                    |expression| decorators.expression_value_type(db, expression),
                 )
             }) {
                 return true;
@@ -661,7 +661,7 @@ fn mock_patch_count<'db>(
             let new_position = if is_known_class_instance(
                 db,
                 function_definition,
-                decorators.expression_type(&call.func),
+                decorators.expression_value_type(db, &call.func),
                 "_patcher",
                 &[KnownModule::UnittestMock],
             ) {
@@ -671,7 +671,7 @@ fn mock_patch_count<'db>(
                 && is_known_class_instance(
                     db,
                     function_definition,
-                    decorators.expression_type(&attribute.value),
+                    decorators.expression_value_type(db, &attribute.value),
                     "_patcher",
                     &[KnownModule::UnittestMock],
                 )
@@ -686,7 +686,10 @@ fn mock_patch_count<'db>(
                 .is_none_or(|new| {
                     // Typeshed exposes `DEFAULT` as `Any`, so any dynamic value may enable
                     // positional injection.
-                    matches!(decorators.expression_type(new), Some(Type::Dynamic(_)))
+                    matches!(
+                        decorators.expression_value_type(db, new),
+                        Some(Type::Dynamic(_))
+                    )
                 })
         })
         .count()
@@ -1056,7 +1059,7 @@ pub(super) fn fixture_declaration<'db>(
     let inference = function_known_decorators(db, definition);
     let expression = if definition.scope(db).node(db).scope_kind() == ScopeKind::Class
         && matches!(
-            inference.expression_type(first_decorator),
+            inference.expression_value_type(db, first_decorator),
             Some(Type::ClassLiteral(class)) if class.is_known(db, KnownClass::Staticmethod)
         ) {
         // Pytest discovers fixtures on plugin classes through class attribute access. For
@@ -1080,7 +1083,7 @@ pub(super) fn fixture_declaration<'db>(
         ast::Expr::Call(call) => (call.func.as_ref(), Some(&call.arguments)),
         expression => (expression, None),
     };
-    let Type::FunctionLiteral(decorator) = inference.expression_type(callee)? else {
+    let Type::FunctionLiteral(decorator) = inference.expression_value_type(db, callee)? else {
         return None;
     };
     if !matches!(
@@ -1092,7 +1095,7 @@ pub(super) fn fixture_declaration<'db>(
 
     let name = arguments.map_or(FixtureName::Default, |arguments| {
         fixture_name_from_arguments(db, arguments, &|expression| {
-            inference.expression_type(expression)
+            inference.expression_value_type(db, expression)
         })
     });
     Some(FixtureDeclaration { definition, name })

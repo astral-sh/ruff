@@ -508,6 +508,7 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
     let scope = global_scope(&db, file);
     let env = ProgramEnvironment::from_scope(scope);
     let inference = |ty, truthiness: Option<Truthiness>| {
+        let ty = InferredExpressionType::Value(ty);
         (
             ExpressionInference {
                 expressions: [(expression, ty)].into_iter().collect(),
@@ -1202,14 +1203,26 @@ fn function_inference_regions_are_disjoint() -> anyhow::Result<()> {
     };
 
     let annotations = infer_deferred_types(&db, definition);
-    assert!(annotations.try_expression_type(annotation).is_some());
-    assert!(annotations.try_expression_type(default).is_none());
+    assert!(
+        annotations
+            .try_expression_value_type(&db, annotation)
+            .is_some()
+    );
+    assert!(
+        annotations
+            .try_expression_value_type(&db, default)
+            .is_none()
+    );
     let defaults = infer_function_default_types(&db, definition);
-    assert!(defaults.try_expression_type(default).is_some());
-    assert!(defaults.try_expression_type(annotation).is_none());
+    assert!(defaults.try_expression_value_type(&db, default).is_some());
+    assert!(
+        defaults
+            .try_expression_value_type(&db, annotation)
+            .is_none()
+    );
     assert_eq!(
         crate::types::definition_expression_type(&db, definition, default),
-        defaults.expression_type(default)
+        defaults.expression_value_type(&db, default)
     );
     Ok(())
 }

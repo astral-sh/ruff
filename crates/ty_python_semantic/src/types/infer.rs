@@ -57,6 +57,7 @@ pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
+use crate::types::type_form::TypeFormType;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, RecursiveType, StaticClassLiteral, Type, TypeAndQualifiers,
@@ -178,6 +179,66 @@ bitflags::bitflags! {
 }
 
 impl get_size2::GetSize for TypeExpressionFlags {}
+
+/// The interpretation under which an expression's type was inferred.
+///
+/// Type expressions record the type they denote, while value expressions record the type of the
+/// object produced by evaluation. Keeping that distinction lets value consumers treat a type
+/// expression as a type-form object without changing the type used by annotation consumers.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(crate) enum InferredExpressionType<'db> {
+    Value(Type<'db>),
+    TypeExpression(Type<'db>),
+}
+
+impl<'db> InferredExpressionType<'db> {
+    /// Returns the expression's value type, interpreting type expressions as type-form objects.
+    ///
+    /// This is the assumed type-form interpretation, not the precise runtime type: `int` and
+    /// `"int"` both denote `int`, but evaluate to different objects.
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Value(ty) => ty,
+            Self::TypeExpression(ty) => TypeFormType::from_type_expression(db, ty),
+        }
+    }
+
+    /// Returns the denoted type only if this expression was inferred as a type expression.
+    ///
+    /// A value's type does not establish whether its syntax is valid in a type expression.
+    pub(crate) fn denoted_type(self) -> Option<Type<'db>> {
+        match self {
+            Self::Value(_) => None,
+            Self::TypeExpression(ty) => Some(ty),
+        }
+    }
+
+    /// Returns the type in the interpretation used during inference.
+    ///
+    /// This is useful for IDE display and normalization, which retain that interpretation.
+    /// Consumers reasoning about evaluation or annotations should use the corresponding accessor.
+    pub(crate) fn stored_type(self) -> Type<'db> {
+        match self {
+            Self::Value(ty) | Self::TypeExpression(ty) => ty,
+        }
+    }
+
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Type<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        let normalized = self
+            .stored_type()
+            .cycle_normalized(db, env, previous, cycle);
+        match self {
+            Self::Value(_) => Self::Value(normalized),
+            Self::TypeExpression(_) => Self::TypeExpression(normalized),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct TypeAndRange<'db> {
@@ -343,7 +404,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
-    expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expression_types: FrozenMap<ExpressionNodeKey, InferredExpressionType<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     implicit_aliases: Box<[Definition<'db>]>,
@@ -354,16 +415,20 @@ pub(crate) struct FunctionDecoratorInference<'db> {
 }
 
 impl<'db> FunctionDecoratorInference<'db> {
-    pub(crate) fn expression_type(
+    pub(crate) fn expression_value_type(
         &self,
+        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
-        self.expression_types.get(&expression.into()).copied()
+        self.expression_types
+            .get(&expression.into())
+            .copied()
+            .map(|ty| ty.value_type(db))
     }
 
     fn expression_types(
         &self,
-    ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
+    ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, InferredExpressionType<'db>)> + '_ {
         self.expression_types.iter().copied()
     }
 
@@ -633,7 +698,7 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     tcx: TypeContext<'db>,
 ) -> Type<'db> {
     let inference = infer_expression_types(db, expression, tcx);
-    inference.expression_type(expression.node_ref(db))
+    inference.expression_value_type(db, expression.node_ref(db))
 }
 
 /// Infers the type of an expression where the expression might come from another file.
@@ -667,7 +732,7 @@ fn infer_expression_type_impl<'db>(db: &'db dyn Db, input: InferExpression<'db>)
     // It's okay to call the "same file" version here because we're inside a salsa query.
     let inference = infer_expression_types_impl(db, input);
 
-    inference.expression_type(expression.node_ref(db))
+    inference.expression_value_type(db, expression.node_ref(db))
 }
 
 /// Infer all types for a [`Statement`].
@@ -1053,7 +1118,7 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenValueMap<ExpressionNodeKey, InferredExpressionType<'db>>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -1105,7 +1170,12 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         self.expressions.map_values(|expr, ty| {
-            ty.cycle_normalized(db, env, previous_inference.expression_type(expr), cycle)
+            ty.cycle_normalized(
+                db,
+                env,
+                previous_inference.stored_expression_type(expr),
+                cycle,
+            )
         });
 
         if cycle.iteration() > crate::TAINTED_CYCLES
@@ -1141,19 +1211,47 @@ impl<'db> ScopeInference<'db> {
             .map_or(&[], |extra| &extra.implicit_aliases)
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
+    fn stored_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.try_stored_expression_type(expression)
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn try_expression_type(
+    pub(crate) fn try_stored_expression_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
+            .map(InferredExpressionType::stored_type)
             .or_else(|| self.fallback_type())
+    }
+
+    /// Returns the value type, including the assumed type-form interpretation of type expressions.
+    pub(crate) fn expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .map(|ty| ty.value_type(db))
+            .or_else(|| self.fallback_type())
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Returns the denoted type of an expression inferred in a type-expression position.
+    pub(crate) fn type_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .and_then(InferredExpressionType::denoted_type)
+            .or_else(|| self.fallback_type())
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Get qualifiers for an annotation expression.
@@ -1224,7 +1322,7 @@ impl<'db> InferredDeclaration<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, InferredExpressionType<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -1680,7 +1778,7 @@ impl<'db> DefinitionInference<'db> {
         }
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
+            let previous_ty = previous_inference.stored_expression_type(*expr);
             *ty = ty.cycle_normalized(db, &env, previous_ty, cycle);
         }
         self.types = std::mem::take(&mut self.types).cycle_normalized(
@@ -1749,8 +1847,8 @@ impl<'db> DefinitionInference<'db> {
                 .extra
                 .as_deref()
                 .and_then(DefinitionInferenceExtra::comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
+            |expression| self.expression_value_type(db, expression).bool(db, env),
+            |expression| previous.expression_value_type(db, expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
             let mut extra = self
@@ -1764,18 +1862,54 @@ impl<'db> DefinitionInference<'db> {
         }
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
+    fn stored_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .map(InferredExpressionType::stored_type)
+            .or_else(|| self.fallback_type())
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn try_expression_type(
+    /// Returns the value type, including the assumed type-form interpretation of type expressions.
+    pub(crate) fn expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.try_expression_value_type(db, expression)
+            .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn try_expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .map(|ty| ty.value_type(db))
+            .or_else(|| self.fallback_type())
+    }
+
+    /// Returns the denoted type of an expression inferred in a type-expression position.
+    pub(crate) fn type_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.try_type_expression_type(expression)
+            .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn try_type_expression_type(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
+            .and_then(InferredExpressionType::denoted_type)
             .or_else(|| self.fallback_type())
     }
 
@@ -1962,7 +2096,7 @@ fn widen_comparison_truthiness(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, InferredExpressionType<'db>>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -2072,7 +2206,7 @@ impl<'db> ExpressionInference<'db> {
         }
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous.expression_type(*expr);
+            let previous_ty = previous.stored_expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
 
@@ -2113,23 +2247,34 @@ impl<'db> ExpressionInference<'db> {
                 .extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
+            |expression| self.expression_value_type(db, expression).bool(db, env),
+            |expression| previous.expression_value_type(db, expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
     }
 
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    /// Returns the value type, including the assumed type-form interpretation of type expressions.
+    pub(crate) fn expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
         self.expressions
             .get(&expression.into())
             .copied()
+            .map(|ty| ty.value_type(db))
             .or_else(|| self.fallback_type())
+            .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
+    fn stored_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .map(InferredExpressionType::stored_type)
+            .or_else(|| self.fallback_type())
             .unwrap_or_else(Type::unknown)
     }
 
@@ -2176,11 +2321,19 @@ pub(crate) enum StatementInference<'db> {
 }
 
 impl<'db> StatementInference<'db> {
-    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
+    fn expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
         match self {
-            StatementInference::Expression(inference) => inference.expression_type(expression),
-            StatementInference::Definition(_, inference) => inference.expression_type(expression),
-            StatementInference::Other(inference) => inference.expression_type(expression),
+            StatementInference::Expression(inference) => {
+                inference.expression_value_type(db, expression)
+            }
+            StatementInference::Definition(_, inference) => {
+                inference.expression_value_type(db, expression)
+            }
+            StatementInference::Other(inference) => inference.expression_value_type(db, expression),
         }
     }
 
@@ -2206,7 +2359,7 @@ impl<'db> StatementInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct StatementInferenceInner<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenMap<ExpressionNodeKey, InferredExpressionType<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -2292,7 +2445,7 @@ impl<'db> StatementInferenceInner<'db> {
         }
 
         for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
+            let previous_ty = previous_inference.stored_expression_type(*expr);
             *ty = ty.cycle_normalized(db, env, previous_ty, cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
@@ -2358,24 +2511,35 @@ impl<'db> StatementInferenceInner<'db> {
                 .extra
                 .as_deref()
                 .map(|extra| &extra.comparison_truthiness),
-            |expression| self.expression_type(expression).bool(db, env),
-            |expression| previous.expression_type(expression).bool(db, env),
+            |expression| self.expression_value_type(db, expression).bool(db, env),
+            |expression| previous.expression_value_type(db, expression).bool(db, env),
         );
         if comparison_truthiness.iter().next().is_some() {
             self.extra.get_or_insert_default().comparison_truthiness = comparison_truthiness;
         }
     }
 
-    fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
-            .unwrap_or_else(Type::unknown)
-    }
-
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    fn stored_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.expressions
             .get(&expression.into())
             .copied()
+            .map(InferredExpressionType::stored_type)
             .or_else(|| self.fallback_type())
+            .unwrap_or_else(Type::unknown)
+    }
+
+    /// Returns the value type, including the assumed type-form interpretation of type expressions.
+    fn expression_value_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.expressions
+            .get(&expression.into())
+            .copied()
+            .map(|ty| ty.value_type(db))
+            .or_else(|| self.fallback_type())
+            .unwrap_or_else(Type::unknown)
     }
 
     fn collection_use_constraints(

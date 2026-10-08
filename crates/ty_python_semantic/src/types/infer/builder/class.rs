@@ -67,7 +67,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             for base in class.bases() {
                 let ty = if let ast::Expr::Starred(starred) = base {
                     let ty = self.infer_expression(&starred.value, TypeContext::default());
-                    self.store_expression_type(base, ty);
+                    self.store_expression_value_type(base, ty);
                     ty
                 } else {
                     self.infer_expression(base, TypeContext::default())
@@ -225,7 +225,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             if decorator_ty.is_unknown()
                 && let ast::Expr::Call(call) = &decorator.expression
                 && self
-                    .expression_type(&call.func)
+                    .expression_value_type(&call.func)
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {

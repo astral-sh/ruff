@@ -1040,7 +1040,8 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, file);
 
-        infer_complete_scope_types(model.db, scope).try_expression_type(*self)
+        // IDE features show the denoted type for annotations and the value type for expressions.
+        infer_complete_scope_types(model.db, scope).try_stored_expression_type(*self)
     }
 }
 

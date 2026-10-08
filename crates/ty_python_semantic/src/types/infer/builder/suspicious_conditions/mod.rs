@@ -471,7 +471,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             self.comparison_truthiness
                 .get(&node.into())
                 .copied()
-                .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
+                .or_else(|| self.expression_value_type(node).bool_if_inhabited(db, env))
         })
         .unwrap_or(Truthiness::Ambiguous)
     }
@@ -836,7 +836,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let is_candidate = |operand: &ast::Expr| {
             self.truthiness_test_of_none_union_candidate(
                 operand,
-                ExpandedType::new(db, env, self.expression_type(operand)),
+                ExpandedType::new(db, env, self.expression_value_type(operand)),
             )
             .is_some()
         };
@@ -951,7 +951,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &'expr ast::Expr,
         evaluation: ExpressionContext,
     ) -> BooleanTest<'expr, 'db> {
-        let value_type = self.expression_type(expression);
+        let value_type = self.expression_value_type(expression);
         let truthiness = match evaluation {
             ExpressionContext::Condition => self.condition_truthiness(expression),
             ExpressionContext::Value => value_type.bool(self.db(), self.program_environment()),
@@ -1229,7 +1229,7 @@ impl<'ast> Visitor<'ast> for SubexpressionChecker<'_, 'ast, '_> {
             return;
         }
 
-        if builder.try_expression_type(expression).is_none() {
+        if builder.try_expression_value_type(expression).is_none() {
             return;
         }
 
@@ -1310,13 +1310,13 @@ fn suite_ends_with_exit(
                 if let Some(StatementCall { call, is_await }) =
                     StatementCall::from_expression(value) =>
             {
-                let callable_type = builder.expression_type(&call.func);
+                let callable_type = builder.expression_value_type(&call.func);
                 // In a statically unreachable branch, even an ordinary callable can have type
                 // `Never`. Preserve the exemption in that case to avoid false positives on
                 // defensive checks made unreachable by type annotations.
                 callable_type.is_never()
                     || is_non_terminal_call(db, env, callable_type, is_await, || {
-                        builder.expression_type(value)
+                        builder.expression_value_type(value)
                     })
                     .is_always_false()
             }
@@ -1327,7 +1327,7 @@ fn suite_ends_with_exit(
                     // `NotImplementedType`, so an ordinary return *can* suppress a diagnostic here.
                     // We prioritise minimising false positives over minimising false negatives
                     // when recognizing potentially deliberate defensive checks.
-                    builder.expression_type(expr).is_assignable_to(
+                    builder.expression_value_type(expr).is_assignable_to(
                         db,
                         env,
                         KnownClass::NotImplementedType.to_instance(db, env),

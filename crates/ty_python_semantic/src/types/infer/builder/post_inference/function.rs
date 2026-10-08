@@ -33,7 +33,7 @@ use ty_python_core::definition::Definition;
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
     definition: Definition<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_type_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -50,9 +50,19 @@ pub(crate) fn check_function_definition<'db>(
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
-    check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
-    check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
-    check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+    check_pep695_function_legacy_typevars(context, last_definition, file_type_expression_type);
+    check_legacy_typevar_defaults(
+        context,
+        last_definition,
+        &signature,
+        file_type_expression_type,
+    );
+    check_legacy_typevar_ordering(
+        context,
+        last_definition,
+        &signature,
+        file_type_expression_type,
+    );
 }
 
 /// Check that a nominal class's exposed methods respect its declared type-parameter variance.
@@ -256,7 +266,7 @@ fn check_method_typevar_variance<'db>(
 fn check_pep695_function_legacy_typevars<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_type_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
     let node = last_definition.node(db, context.file(), context.module());
@@ -266,20 +276,22 @@ fn check_pep695_function_legacy_typevars<'db>(
     let env = context.program_environment();
     let mut has_legacy_default = false;
     for default in type_params.iter().filter_map(ast::TypeParam::default) {
-        let Some(typevar) = find_over_type(db, env, file_expression_type(default), false, |ty| {
-            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
-                && matches!(
-                    typevar.kind(db),
-                    TypeVarKind::LegacyTypeVar
-                        | TypeVarKind::Pep613Alias
-                        | TypeVarKind::LegacyParamSpec
-                )
-            {
-                Some(typevar)
-            } else {
-                None
-            }
-        }) else {
+        let Some(typevar) =
+            find_over_type(db, env, file_type_expression_type(default), false, |ty| {
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                    && matches!(
+                        typevar.kind(db),
+                        TypeVarKind::LegacyTypeVar
+                            | TypeVarKind::Pep613Alias
+                            | TypeVarKind::LegacyParamSpec
+                    )
+                {
+                    Some(typevar)
+                } else {
+                    None
+                }
+            })
+        else {
             continue;
         };
 
@@ -308,7 +320,8 @@ fn check_pep695_function_legacy_typevars<'db>(
         .map(|typevar| typevar.typevar(db))
         .filter(|typevar| !typevar.is_self(db))
     {
-        let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
+        let range =
+            find_typevar_annotation_range(context, node, typevar, file_type_expression_type);
         report_pep695_function_legacy_typevar(context, typevar, range);
     }
 }
@@ -395,7 +408,7 @@ fn check_legacy_typevar_defaults<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_type_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -447,7 +460,7 @@ fn check_legacy_typevar_defaults<'db>(
         let node = last_definition.node(db, context.file(), context.module());
 
         let primary_range =
-            find_typevar_annotation_range(context, node, typevar, file_expression_type);
+            find_typevar_annotation_range(context, node, typevar, file_type_expression_type);
 
         let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range)
         else {
@@ -498,7 +511,7 @@ fn find_typevar_annotation_range<'db>(
     context: &InferContext<'db, '_>,
     node: &ast::StmtFunctionDef,
     typevar: TypeVarInstance<'db>,
-    file_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
+    file_type_expression_type: impl Fn(&ast::Expr) -> Type<'db>,
 ) -> TextRange {
     let db = context.db();
     let env = context.program_environment();
@@ -508,7 +521,7 @@ fn find_typevar_annotation_range<'db>(
         .iter()
         .filter_map(ast::AnyParameterRef::annotation)
         .chain(node.returns.as_deref())
-        .find(|ann| file_expression_type(ann).references_typevar(db, env, typevar_id))
+        .find(|ann| file_type_expression_type(ann).references_typevar(db, env, typevar_id))
         .map(Ranged::range)
         .unwrap_or_else(|| node.name.range())
 }
@@ -522,7 +535,7 @@ fn check_legacy_typevar_ordering<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_type_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     struct State<'db> {
         typevar_with_default: TypeVarInstance<'db>,
@@ -581,7 +594,7 @@ fn check_legacy_typevar_ordering<'db>(
         context,
         node,
         state.invalid_later_tvars[0],
-        file_expression_type,
+        file_type_expression_type,
     );
 
     let Some(builder) = context.report_lint(&INVALID_TYPE_VARIABLE_DEFAULT, primary_range) else {
@@ -617,7 +630,7 @@ fn check_legacy_typevar_ordering<'db>(
         context,
         node,
         state.typevar_with_default,
-        file_expression_type,
+        file_type_expression_type,
     );
 
     diagnostic.annotate(context.secondary(secondary_range).message(format_args!(
