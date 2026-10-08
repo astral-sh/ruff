@@ -641,8 +641,14 @@ impl<'db> ProtocolInterfaceView<'db> {
                 materialized(ProtocolMemberAccessMode::Class).materialized_types(db, &mapping)
                     != original(ProtocolMemberAccessMode::Class).materialized_types(db, &mapping)
             };
-            if let (ProtocolMemberKind::Method(..), Some(definition)) =
-                (member.data.kind, member.data.definition)
+            // Descriptor access can specialize callable signatures before their comparison
+            // begins. Guard the proof that materialization leaves these requirements unchanged;
+            // a recursive preparation does not establish subtyping or equality.
+            if let Some(definition) = member.data.definition
+                && matches!(
+                    member.data.kind,
+                    ProtocolMemberKind::Method(..) | ProtocolMemberKind::Property { .. }
+                )
             {
                 relations.visit(
                     &SignatureRelationKey::protocol_member(
@@ -1276,12 +1282,24 @@ impl<'db> ProtocolAnnotation<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Type<'db>,
     ) -> Type<'db> {
+        self.bind_self_with_visitor(db, &ApplyTypeMappingVisitor::new(env), self_type)
+    }
+
+    fn bind_self_with_visitor(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        self_type: Type<'db>,
+    ) -> Type<'db> {
+        let env = visitor.env;
         if !self.ty.contains_self(db, env) {
             return self.ty;
         }
-        self.ty.apply_type_mapping(
+        // Binding follows materialization, so it needs a separate transformation cache while
+        // retaining the same recursive relation obligations.
+        let binding_visitor = visitor.for_new_materialization_root();
+        self.ty.apply_type_mapping_impl(
             db,
-            env,
             &TypeMapping::BindSelf(SelfBinding::new(
                 db,
                 env,
@@ -1289,6 +1307,7 @@ impl<'db> ProtocolAnnotation<'db> {
                 self.self_binding_context,
             )),
             TypeContext::default(),
+            &binding_visitor,
         )
     }
 
@@ -1697,7 +1716,7 @@ impl<'db> ProtocolMemberReadAccess<'db> {
             ..annotation
         };
         Some(self_type.map_or(annotation.ty, |self_type| {
-            annotation.bind_self(db, env, self_type)
+            annotation.bind_self_with_visitor(db, visitor, self_type)
         }))
     }
 }
@@ -1781,13 +1800,26 @@ fn cycle_normalized_optional_type<'db>(
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
+enum ProtocolDescriptorBinding {
+    General,
+    /// Access binds function signatures without selecting a user-defined `__get__` overload.
+    IntrinsicCallable,
+}
+
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ProtocolMemberData<'db> {
     kind: ProtocolMemberKind<'db>,
     qualifiers: TypeQualifiers,
     definition: Option<Definition<'db>>,
+    descriptor_binding: ProtocolDescriptorBinding,
 }
 
 impl<'db> ProtocolMemberData<'db> {
+    fn supports_signature_preparation_guard(self) -> bool {
+        matches!(self.kind, ProtocolMemberKind::Method(..))
+            || self.descriptor_binding == ProtocolDescriptorBinding::IntrinsicCallable
+    }
+
     fn method(
         db: &'db dyn Db,
         callable: CallableType<'db>,
@@ -1805,6 +1837,7 @@ impl<'db> ProtocolMemberData<'db> {
             kind: ProtocolMemberKind::Method(Type::Callable(callable), method_kind),
             qualifiers: TypeQualifiers::default(),
             definition,
+            descriptor_binding: ProtocolDescriptorBinding::General,
         }
     }
 
@@ -1817,6 +1850,7 @@ impl<'db> ProtocolMemberData<'db> {
             kind: ProtocolMemberKind::Property { read, write },
             qualifiers: TypeQualifiers::default(),
             definition,
+            descriptor_binding: ProtocolDescriptorBinding::General,
         }
     }
 
@@ -1832,6 +1866,7 @@ impl<'db> ProtocolMemberData<'db> {
             }),
             qualifiers,
             definition,
+            descriptor_binding: ProtocolDescriptorBinding::General,
         }
     }
 
@@ -1846,6 +1881,11 @@ impl<'db> ProtocolMemberData<'db> {
             kind: self.kind.cycle_normalized(db, env, previous.kind, cycle),
             qualifiers: self.qualifiers,
             definition: self.definition,
+            descriptor_binding: if self.descriptor_binding == previous.descriptor_binding {
+                self.descriptor_binding
+            } else {
+                ProtocolDescriptorBinding::General
+            },
         }
     }
 
@@ -1862,6 +1902,7 @@ impl<'db> ProtocolMemberData<'db> {
                 .recursive_type_normalized_impl(db, env, div, nested)?,
             qualifiers: self.qualifiers,
             definition: self.definition,
+            descriptor_binding: self.descriptor_binding,
         })
     }
 
@@ -1878,6 +1919,7 @@ impl<'db> ProtocolMemberData<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             qualifiers: self.qualifiers,
             definition: self.definition,
+            descriptor_binding: self.descriptor_binding,
         }
     }
 
@@ -2612,11 +2654,12 @@ fn property_set_member_type<'db>(
 /// Derive the observable instance capabilities of a descriptor-decorated protocol member.
 fn descriptor_decorated_protocol_member<'db>(
     db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
+    visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     descriptor_ty: Type<'db>,
     protocol: ClassType<'db>,
     definition: Option<Definition<'db>>,
 ) -> Option<ProtocolMemberData<'db>> {
+    let env = visitor.env;
     let descriptor_ty = descriptor_ty.resolve_type_alias(db);
 
     // Applying a generic descriptor decorator to a method that refers to an enclosing type
@@ -2638,6 +2681,27 @@ fn descriptor_decorated_protocol_member<'db>(
     };
 
     let receiver_ty = Type::instance(db, env, protocol);
+    let context = visitor
+        .signature_relation_visitor
+        .as_ref()
+        .map(|relations| visitor.constraint_relation_context(relations));
+    if let Some(read_ty) = descriptor_ty.function_like_dunder_get_with_context(
+        db,
+        env,
+        Some(receiver_ty),
+        Some(receiver_ty.to_meta_type(db, env)),
+        context.as_ref(),
+    ) {
+        let mut member = ProtocolMemberData::property(
+            Some(ProtocolPropertyType::with_definition(read_ty, definition)),
+            None,
+            definition,
+        );
+        if descriptor_ty.has_intrinsic_callable_binding(db) {
+            member.descriptor_binding = ProtocolDescriptorBinding::IntrinsicCallable;
+        }
+        return Some(member);
+    }
     let read_ty = descriptor_ty
         .try_call_dunder_get(
             db,
@@ -3347,20 +3411,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             || check_access(ProtocolMemberAccessMode::Class),
                         )
                     };
-                    // Method specialization precedes overload comparison. Guard the whole
-                    // method preparation separately so the first comparison still checks each
+                    // Method specialization and intrinsic descriptor binding precede overload
+                    // comparison. Guard their preparation so the first comparison still checks each
                     // overload, including its finite parameter and return requirements.
-                    if let (
-                        ProtocolMemberKind::Method(..),
-                        ProtocolMemberKind::Method(..),
-                        Some(source_definition),
-                        Some(target_definition),
-                    ) = (
-                        source_member.data.kind,
-                        target_member.data.kind,
-                        source_member.data.definition,
-                        target_member.data.definition,
-                    ) {
+                    if let (Some(source_definition), Some(target_definition)) =
+                        (source_member.data.definition, target_member.data.definition)
+                        && source_member.data.supports_signature_preparation_guard()
+                        && target_member.data.supports_signature_preparation_guard()
+                    {
                         self.signature_relation_visitor.visit(
                             &SignatureRelationKey::protocol_member(
                                 source_definition,
@@ -3592,7 +3650,7 @@ impl<'db> ProtocolMemberCandidate<'db> {
     fn into_member(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         class: ClassType<'db>,
     ) -> ProtocolMemberData<'db> {
         let Self {
@@ -3627,7 +3685,7 @@ impl<'db> ProtocolMemberCandidate<'db> {
                 && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
             {
                 if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(db, env, ty, class, definition)
+                    descriptor_decorated_protocol_member(db, visitor, ty, class, definition)
                 {
                     descriptor
                 } else {
@@ -3778,6 +3836,7 @@ fn cached_protocol_interface<'db>(
 ) -> ProtocolInterface<'db> {
     let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
     let mut members = BTreeMap::default();
+    let visitor = ApplyTypeMappingVisitor::new(&env);
 
     ProtocolClass(class).for_each_member_candidate(
         db,
@@ -3791,7 +3850,7 @@ fn cached_protocol_interface<'db>(
             let specialization =
                 specialization.map(|specialization| specialization.with_typevar_bounds(db));
             let candidate = candidate.apply_specialization(db, specialization);
-            let member = candidate.into_member(db, &env, class);
+            let member = candidate.into_member(db, &visitor, class);
 
             members.insert(name.clone(), member);
         },
@@ -3856,7 +3915,7 @@ fn protocol_member_with_visitor<'db>(
                         visitor,
                     );
                 }
-                member = Some(candidate.into_member(db, env, class));
+                member = Some(candidate.into_member(db, visitor, class));
             }
         },
     );

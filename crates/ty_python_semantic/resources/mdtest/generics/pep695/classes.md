@@ -2551,6 +2551,61 @@ def invalid[S: Implementation[str]](x: S) -> P[int]:
     return x  # error: [invalid-return-type]
 ```
 
+## Decorators returning callable unions
+
+A decorator can preserve a method's parameters in one callable alternative and allow arbitrary
+parameters in another. Calling the resulting union still requires arguments accepted by both
+alternatives, including when the method refers to its own protocol.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, Protocol, Self
+
+def wrap[**P, R](f: Callable[P, R]) -> Callable[P, R] | Callable[..., R]:
+    return f
+
+class A[T](Protocol):
+    @wrap
+    def f[U](self, other: A[U]) -> A[U]: ...
+
+def check(x: A[int]):
+    x.f(x)  # no diagnostic
+    x.f(1)  # error: [invalid-argument-type]
+```
+
+The same applies when an outer `classmethod` binds the callable alternatives to the class.
+
+```py
+class Factory[T](Protocol):
+    @classmethod
+    @wrap
+    def combine[U](cls, other: Factory[U]) -> Self | Factory[U]: ...
+
+def check_classmethod(x: Factory[int]):
+    x.combine(x)  # no diagnostic
+    x.combine(1)  # error: [invalid-argument-type]
+```
+
+Recursive references do not hide a finite return-type mismatch in a decorated method.
+
+```py
+class Finite[T](Protocol):
+    @wrap
+    def value(self) -> T: ...
+    def child(self) -> Finite[T]: ...
+
+def valid(x: Finite[int]) -> Finite[int]:
+    reveal_type(x.value())  # revealed: int
+    return x  # no diagnostic
+
+def invalid(x: Finite[str]) -> Finite[int]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Materializing a bound receiver requirement
 
 A bound method has already captured its receiver. Materializing its callable type preserves the

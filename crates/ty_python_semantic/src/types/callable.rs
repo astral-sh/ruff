@@ -6,10 +6,11 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, ConstraintRelationContext,
+        FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
@@ -54,6 +55,21 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Whether descriptor binding exposes only declared callable signatures. Arbitrary callable
+    /// instances wrapped in a staticmethod or classmethod can still select their own overloads.
+    pub(super) fn has_intrinsic_callable_binding(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::FunctionLiteral(_) => true,
+            Type::Callable(callable) => callable.is_method_like(db),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.has_intrinsic_callable_binding(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).has_intrinsic_callable_binding(db),
+            _ => false,
+        }
+    }
+
     /// Model the effect of `__get__` on functions, staticmethods, and
     /// classmethods.
     ///
@@ -66,17 +82,30 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
+        self.function_like_dunder_get_with_context(db, env, instance, owner, None)
+    }
+
+    /// Binds intrinsic descriptors while preserving the proof used to normalize their union.
+    pub(super) fn function_like_dunder_get_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Option<Type<'db>>,
+        context: Option<&ConstraintRelationContext<'db>>,
+    ) -> Option<Type<'db>> {
         // ParamSpec specialization can produce a union of function descriptors.
         match self {
             Type::Union(union) => {
-                return union.try_map(db, env, |alternative| {
-                    alternative.function_like_dunder_get(db, env, instance, owner)
+                return union.try_map_with_context(db, env, context, |alternative| {
+                    alternative
+                        .function_like_dunder_get_with_context(db, env, instance, owner, context)
                 });
             }
             Type::TypeAlias(alias) => {
                 return alias
                     .value_type(db)
-                    .function_like_dunder_get(db, env, instance, owner);
+                    .function_like_dunder_get_with_context(db, env, instance, owner, context);
             }
             _ => {}
         }

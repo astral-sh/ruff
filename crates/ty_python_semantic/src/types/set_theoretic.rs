@@ -313,7 +313,7 @@ impl<'db> UnionType<'db> {
         env: &ProgramEnvironment<'db>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let Ok(mapped) = self.try_map_impl(db, env, |element| {
+        let Ok(mapped) = self.try_map_impl(db, env, None, |element| {
             Ok::<_, Infallible>(transform_fn(element))
         });
         mapped
@@ -372,9 +372,20 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        self.try_map_with_context(db, env, None, transform_fn)
+    }
+
+    /// Rebuilds a mapped union without leaving the relation that requested the transformation.
+    pub(super) fn try_map_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        self.try_map_impl(db, env, |element| transform_fn(element).ok_or(()))
+        self.try_map_impl(db, env, context, |element| transform_fn(element).ok_or(()))
             .ok()
     }
 
@@ -382,6 +393,7 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
     ) -> Result<Type<'db>, E> {
         let elements = self.elements(db);
@@ -391,6 +403,9 @@ impl<'db> UnionType<'db> {
             // The builder unpacks `TypeAlias` nodes but preserves structural recursive types.
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
                 let mut builder = UnionBuilder::new(db, env);
+                if let Some(context) = context {
+                    builder = builder.with_relation_context(context);
+                }
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }
