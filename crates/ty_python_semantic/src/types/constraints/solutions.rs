@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::marker::PhantomData;
 use std::ops::{ControlFlow, Range};
 
@@ -156,22 +156,22 @@ impl<B> Break<B> {
 }
 
 pub(super) struct SolutionWalker<'db, L> {
-    source_orders: FxIndexSet<AtomicConstraintId>,
+    source_orders: RefCell<FxIndexSet<AtomicConstraintId>>,
     /// The relation before non-inferable variables are projected away. Used to recover the
     /// original upper bounds for diagnostics, since projected paths can contain derived bounds
     /// that obscure the original evidence.
     original_node: NodeId,
     inferable: TypeVarSet<'db>,
     inferable_support: Support,
-    limits: L,
+    limits: RefCell<L>,
 
-    declared_constraint_solutions: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+    declared_constraint_solutions: RefCell<FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>>,
 
     /// Nodes that we have already explored. We can't cache this only on the node ID, since the
     /// constraints that are in scope when we encounter the node can affect how we interpret its
     /// downstream edges. But we also don't want to consider _all_ of the constraints on the path;
     /// we only want to consider the ones that are relevant to the node and its descendants.
-    explored_nodes: FxHashSet<ExploredNodeKey>,
+    explored_nodes: RefCell<FxHashSet<ExploredNodeKey>>,
 
     /// Candidate solutions for each satisfiable path in the BDD.
     ///
@@ -180,7 +180,7 @@ pub(super) struct SolutionWalker<'db, L> {
     /// candidate solution for satisfiable paths that do _not_ satisfy the upper bounds and
     /// constraints. Those paths will have a [`validity`][CandidateSolution::validity] of
     /// [`Invalid`][SolutionValidity::Invalid].
-    pending: Vec<PendingCandidateSolution<'db>>,
+    pending: RefCell<Vec<PendingCandidateSolution<'db>>>,
 
     _phantom: PhantomData<&'db ()>,
 }
@@ -205,14 +205,14 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     ) -> Self {
         let inferable_support = Support::from_typevar_set(db, storage, inferable);
         Self {
-            source_orders,
+            source_orders: RefCell::new(source_orders),
             original_node,
             inferable,
             inferable_support,
-            limits,
-            declared_constraint_solutions: FxHashMap::default(),
-            explored_nodes: FxHashSet::default(),
-            pending: Vec::default(),
+            limits: RefCell::new(limits),
+            declared_constraint_solutions: RefCell::new(FxHashMap::default()),
+            explored_nodes: RefCell::new(FxHashSet::default()),
+            pending: RefCell::new(Vec::default()),
             _phantom: PhantomData,
         }
     }
@@ -314,7 +314,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                     assignment.constraint().into_inner().ordering()
                 });
                 let key = (polarity, node, relevant_path);
-                ControlFlow::Continue(this.explored_nodes.insert(key))
+                ControlFlow::Continue(this.explored_nodes.borrow_mut().insert(key))
             },
             &|this, storage, path, polarity, node| {
                 // Next see if anything in this node can affect the solution we've already
@@ -405,7 +405,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         prune_path: &PrunePath<'_, 'db, L, Break<L::Break>>,
         process_satisfied: &ProcessSatisfied<'_, 'db, L, Break<L::Break>>,
     ) -> ControlFlow<Break<L::Break>> {
-        self.limits.visit_node().map_break(Break::Limits)?;
+        self.limits
+            .borrow_mut()
+            .visit_node()
+            .map_break(Break::Limits)?;
         if let (Polarity::Positive, ALWAYS_FALSE) | (Polarity::Negative, ALWAYS_TRUE) =
             (polarity, node)
         {
@@ -630,9 +633,12 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
     ) -> R {
         let identity = bound_typevar.identity(db);
         self.declared_constraint_solutions
+            .borrow_mut()
             .insert(identity, declared_constraint_solution);
         let result = f(self);
-        self.declared_constraint_solutions.remove(&identity);
+        self.declared_constraint_solutions
+            .borrow_mut()
+            .remove(&identity);
         result
     }
 
@@ -648,7 +654,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let Some((constraint, constraints)) = constraints.split_first() else {
             return process_satisfied(self, storage, path);
         };
-        self.source_orders.insert(*constraint);
+        self.source_orders.borrow_mut().insert(*constraint);
         path.walk_edge(
             db,
             env,
@@ -763,7 +769,10 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let mut upper_bounds = Vec::new();
         let mut current = self.original_node;
         loop {
-            self.limits.visit_node().map_break(Break::Limits)?;
+            self.limits
+                .borrow_mut()
+                .visit_node()
+                .map_break(Break::Limits)?;
             let interior = match current.node() {
                 Node::AlwaysTrue => break,
                 Node::AlwaysFalse => {
@@ -793,6 +802,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             if let Some(upper) = constraint.upper_bound_for(db, bound_typevar) {
                 let order = self
                     .source_orders
+                    .borrow()
                     .get_index_of(&constraint_id)
                     .unwrap_or(usize::MAX);
                 upper_bounds.push((order, upper));
@@ -1048,7 +1058,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 // We're eligible to return a family solution, but first we need to find it! First
                 // check any remaining constrained typevars with _no_ validity assignment for this
                 // typevar.
-                let previously_pending = self.pending.len();
+                let previously_pending = self.pending.borrow().len();
                 let has_family_solution = Cell::new(false);
                 let individual_solution_is_required = Cell::new(false);
                 self.validate_constrained(
@@ -1141,13 +1151,13 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 // didn't find any family solutions at all, we have to fall through and look for
                 // individual solutions. Before proceeding, we remove any potential family
                 // solutions we might have found during our search.
-                self.pending.truncate(previously_pending);
+                self.pending.borrow_mut().truncate(previously_pending);
             }
         }
 
         // We cannot return only family solutions, so also check which individual declared
         // constraints can be used in the solution.
-        let previously_pending = self.pending.len();
+        let previously_pending = self.pending.borrow().len();
         let has_lower_bound_evidence = path.positive_constraints().any(|(constraint, _)| {
             let constraint = storage.atomic_constraint_data(constraint);
             constraint.lower_bound_for(db, bound_typevar).is_some()
@@ -1185,7 +1195,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         for (idx, declared_constraint) in
             constrained_typevar.declared_constraints.iter().enumerate()
         {
-            let start = self.pending.len();
+            let start = self.pending.borrow().len();
             if preferred == Some(idx) {
                 // We already checked this one above.
                 constraint_satisfied.push(false);
@@ -1204,7 +1214,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 constrained,
                 process_satisfied,
             )?;
-            let end = self.pending.len();
+            let end = self.pending.borrow().len();
             constraint_satisfied.push(satisfied);
             constraint_solutions.push(start..end);
         }
@@ -1232,8 +1242,9 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         // ambiguity.
         if let Some(best) = preferred {
             let solutions = &constraint_solutions[best];
-            self.pending.truncate(solutions.end);
-            self.pending.drain(previously_pending..solutions.start);
+            let mut pending = self.pending.borrow_mut();
+            pending.truncate(solutions.end);
+            pending.drain(previously_pending..solutions.start);
         }
 
         ControlFlow::Continue(())
@@ -1332,6 +1343,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
             .map(|(constraint, source_constraint)| {
                 let source_order = self
                     .source_orders
+                    .borrow()
                     .get_index_of(&source_constraint)
                     .expect("every TDD constraint should have a source order");
                 (constraint, source_order)
@@ -1405,6 +1417,7 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
                 let mut solution = solver.finish(db, env, storage, bound_typevar)?;
                 let argument = match self
                     .declared_constraint_solutions
+                    .borrow()
                     .get(&bound_typevar.identity(db))
                 {
                     Some(&ty) => {
@@ -1457,8 +1470,11 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         let Some(pending) = self.pending_candidate_solution(db, env, storage, path, None) else {
             return ControlFlow::Continue(false);
         };
-        self.limits.satisfied_path().map_break(Break::Limits)?;
-        self.pending.push(pending);
+        self.limits
+            .borrow_mut()
+            .satisfied_path()
+            .map_break(Break::Limits)?;
+        self.pending.borrow_mut().push(pending);
         ControlFlow::Continue(true)
     }
 
@@ -1503,7 +1519,8 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
 
         // Construct diagnostic lower bounds in the same stable source order as normal solutions.
         let mut inference_constraints: Vec<_> = path.positive_constraints().collect();
-        inference_constraints.sort_by_key(|(_, source)| self.source_orders.get_index_of(source));
+        inference_constraints
+            .sort_by_key(|(_, source)| self.source_orders.borrow().get_index_of(source));
         for (bound_typevar, constrained_typevar) in constrained {
             let Some(evidence) = Self::candidate_evidence(
                 db,
@@ -1574,33 +1591,33 @@ impl<'db, L: SolutionLimits> SolutionWalker<'db, L> {
         if let Some(pending) =
             self.pending_candidate_solution(db, env, storage, path, Some(&violations))
         {
-            self.limits.satisfied_path().map_break(Break::Limits)?;
-            self.pending.push(pending);
+            self.limits
+                .borrow_mut()
+                .satisfied_path()
+                .map_break(Break::Limits)?;
+            self.pending.borrow_mut().push(pending);
         }
         ControlFlow::Continue(())
     }
 
-    pub(super) fn finish(mut self) -> CandidateSolutions<'db> {
-        if self.pending.is_empty() {
+    pub(super) fn finish(self) -> CandidateSolutions<'db> {
+        let mut pending = self.pending.into_inner();
+        if pending.is_empty() {
             return CandidateSolutions::Unsatisfiable;
         }
-        if let [single] = self.pending.as_slice()
+        if let [single] = pending.as_slice()
             && single.candidate.typevars.is_empty()
         {
             return CandidateSolutions::Unconstrained;
         }
 
-        self.pending.sort_by(|pending1, pending2| {
+        pending.sort_by(|pending1, pending2| {
             let source_orders1 = pending1.source_orders.iter().copied();
             let source_orders2 = pending2.source_orders.iter().copied();
             source_orders1.cmp(source_orders2)
         });
 
-        let result = self
-            .pending
-            .drain(..)
-            .map(|pending| pending.candidate)
-            .collect();
+        let result = pending.drain(..).map(|pending| pending.candidate).collect();
         CandidateSolutions::Constrained(result)
     }
 }
