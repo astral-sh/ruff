@@ -894,6 +894,10 @@ enum SignatureRelationPhase {
     Signature,
     /// Preparing protocol methods, before comparing their bound and specialized overloads.
     ProtocolMember,
+    /// An optional normalization proof preparing a protocol member.
+    ProtocolMemberNormalization {
+        materializations: (Option<MaterializationKind>, Option<MaterializationKind>),
+    },
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -924,6 +928,23 @@ impl<'db> SignatureRelationKey<'db> {
             relation,
             typevar_evaluation,
             phase: SignatureRelationPhase::ProtocolMember,
+        }
+    }
+
+    pub(super) fn protocol_member_normalization(
+        source: (Definition<'db>, Option<MaterializationKind>),
+        target: (Definition<'db>, Option<MaterializationKind>),
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+    ) -> Self {
+        Self {
+            source_definitions: smallvec_inline![source.0],
+            target_definition: target.0,
+            relation,
+            typevar_evaluation,
+            phase: SignatureRelationPhase::ProtocolMemberNormalization {
+                materializations: (source.1, target.1),
+            },
         }
     }
 
@@ -987,6 +1008,20 @@ pub(crate) struct SignatureRelationVisitor<'db>(Rc<SignatureRelationState<'db>>)
 struct SignatureRelationState<'db> {
     active: ActiveRecursionDetector<SignatureRelationKey<'db>>,
     circular_proofs: Cell<u64>,
+    // An optional normalization permits conservative failure, but is not itself a recursive
+    // obligation. It must not make `is_active` bypass the cached simplifier's cycle recovery.
+    normalizing: Cell<bool>,
+}
+
+struct NormalizationProofScope<'a> {
+    active: &'a Cell<bool>,
+    previous: bool,
+}
+
+impl Drop for NormalizationProofScope<'_> {
+    fn drop(&mut self) {
+        self.active.set(self.previous);
+    }
 }
 
 impl<'db> SignatureRelationVisitor<'db> {
@@ -994,10 +1029,18 @@ impl<'db> SignatureRelationVisitor<'db> {
         !self.0.active.is_empty()
     }
 
+    pub(super) fn is_normalizing(&self) -> bool {
+        self.0.normalizing.get()
+    }
+
     /// The result of a relation may close a recursive proof coinductively, but such a proof
     /// cannot justify eliminating an element from the type being constructed.
     pub(super) fn without_circular_proof<T>(&self, work: impl FnOnce() -> T) -> Option<T> {
         let before = self.0.circular_proofs.get();
+        let _scope = NormalizationProofScope {
+            active: &self.0.normalizing,
+            previous: self.0.normalizing.replace(true),
+        };
         let result = work();
         (before == self.0.circular_proofs.get()).then_some(result)
     }

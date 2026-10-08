@@ -2801,6 +2801,73 @@ def infer[T](callback: Callable[[P[T]], None]) -> T:
 reveal_type(infer(consume))  # revealed: int
 ```
 
+## Recursive callable unions returned by descriptors
+
+A descriptor can return callable alternatives whose signatures refer to the protocol declaring it.
+Calls must satisfy both alternatives' parameter requirements.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, Protocol
+
+class Descriptor[**P, R]:
+    def __get__(self, instance: object, owner: type[object] | None = None) -> Callable[P, R] | Callable[..., R]:
+        raise NotImplementedError
+
+def wrap[**P, R](f: Callable[P, R]) -> Descriptor[P, R]:
+    raise NotImplementedError
+
+class A[T](Protocol):
+    @wrap
+    def f[U](self, other: A[U]) -> A[U]: ...
+```
+
+This descriptor returns the original parameter list, so callers supply both arguments.
+
+```py
+def calls(x: A[int]):
+    x.f(x, x)  # no diagnostic
+    x.f(x, 1)  # error: [invalid-argument-type]
+```
+
+## Nested protocol arguments in descriptor return types
+
+Comparing callable-valued descriptor requirements checks the innermost return type, even when the
+same protocol declarations recur at multiple levels.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, Protocol
+
+class Value[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    def __get__(self, instance: object, owner: type[object] | None = None) -> Callable[[], T] | Callable[..., T]:
+        raise NotImplementedError
+
+class P[T](Protocol):
+    @Value
+    def value(self) -> T: ...
+
+class Q[T](Protocol):
+    @Value
+    def value(self) -> T: ...
+
+def valid(x: Q[Q[int]]) -> P[P[int]]:
+    reveal_type(x.value().value())  # revealed: int
+    return x  # no diagnostic
+
+def invalid(x: Q[Q[int]]) -> P[P[str]]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Specializing protocol attributes to methods
 
 An attribute specialized to a function is checked as a method. The bound signatures match even

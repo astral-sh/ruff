@@ -5027,6 +5027,19 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
+        self.try_call_dunder_get_with_context(db, env, instance, owner, None)
+    }
+
+    /// Keeps descriptor overload selection in an enclosing relation without caching a result
+    /// that depends on that relation's unfinished obligations.
+    fn try_call_dunder_get_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        instance: Option<Type<'db>>,
+        owner: Type<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
+    ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _, _, _| Ok(None), heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -5036,8 +5049,20 @@ impl<'db> Type<'db> {
             owner: Type<'db>,
         ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
             let env = &ProgramEnvironment::from_program(program);
+            try_call_dunder_get_impl(db, env, ty, instance, owner, None)
+        }
+
+        fn try_call_dunder_get_impl<'db>(
+            db: &'db dyn Db,
+            env: &ProgramEnvironment<'db>,
+            ty: Type<'db>,
+            instance: Option<Type<'db>>,
+            owner: Type<'db>,
+            context: Option<&ConstraintRelationContext<'db>>,
+        ) -> Result<Option<DescriptorGetResult<'db>>, DescriptorGetError<'db>> {
             if let Some(fallback) = ty.materialized_divergent_fallback() {
-                return fallback.try_call_dunder_get(db, env, instance, owner);
+                return fallback
+                    .try_call_dunder_get_with_context(db, env, instance, owner, context);
             }
 
             if let Some(dynamic) = ty.dynamic_descriptor_type() {
@@ -5049,13 +5074,16 @@ impl<'db> Type<'db> {
 
             if let Some(union) = ty.as_union_like(db) {
                 let mut return_types = UnionBuilder::new(db, env);
+                if let Some(context) = context {
+                    return_types = return_types.with_relation_context(context);
+                }
                 let mut error = None;
                 let mut any_descriptor = false;
                 let mut all_data_descriptors = true;
 
                 for alternative in union.elements(db) {
                     let result = alternative
-                        .try_call_dunder_get(db, env, instance, owner)
+                        .try_call_dunder_get_with_context(db, env, instance, owner, context)
                         .unwrap_or_else(|failure| {
                             error = error.or(Some(failure.context));
                             Some(failure.fallback())
@@ -5125,10 +5153,11 @@ impl<'db> Type<'db> {
             } else {
                 AttributeKind::NormalOrNonDataDescriptor
             };
-            let (return_type, error) = match descr_get.try_call(
+            let (return_type, error) = match descr_get.try_call_with_context(
                 db,
                 env,
                 &CallArguments::positional([ty, instance_ty, owner]),
+                context,
             ) {
                 Ok(bindings) => (bindings.return_type(db, env), None),
                 Err(error) => (
@@ -5141,7 +5170,14 @@ impl<'db> Type<'db> {
             let return_type = if descr_get_boundness == Definedness::AlwaysDefined {
                 return_type
             } else {
-                UnionType::from_two_elements(db, env, return_type, ty)
+                match context {
+                    Some(context) => UnionBuilder::new(db, env)
+                        .with_relation_context(context)
+                        .add(return_type)
+                        .add(ty)
+                        .build(),
+                    None => UnionType::from_two_elements(db, env, return_type, ty),
+                }
             };
 
             descriptor_get_result(return_type, kind, error)
@@ -5166,7 +5202,9 @@ impl<'db> Type<'db> {
         // Bind known callable descriptors outside the tracked lookup. Checking a protocol
         // receiver can recursively access this method; the lookup's `None` cycle value would
         // leave it unbound and falsely reject the protocol match.
-        if let Some(return_type) = self.function_like_dunder_get(db, env, instance, Some(owner)) {
+        if let Some(return_type) =
+            self.function_like_dunder_get_with_context(db, env, instance, Some(owner), context)
+        {
             return Ok(Some(DescriptorGetResult {
                 return_type,
                 kind: AttributeKind::NormalOrNonDataDescriptor,
@@ -5182,7 +5220,12 @@ impl<'db> Type<'db> {
             }));
         }
 
-        try_call_dunder_get_inner(db, env.program(db), self, instance, owner)
+        match context {
+            Some(context) => {
+                try_call_dunder_get_impl(db, env, self, instance, owner, Some(context))
+            }
+            None => try_call_dunder_get_inner(db, env.program(db), self, instance, owner),
+        }
     }
 
     /// Look up `__get__` on the meta-type of `attribute`, and call it with `attribute`, `instance`,
@@ -8088,7 +8131,19 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
-        let constraints = ConstraintSetBuilder::new();
+        self.try_call_with_context(db, env, argument_types, None)
+    }
+
+    fn try_call_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument_types: &CallArguments<'_, 'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
+    ) -> Result<Bindings<'db>, CallError<'db>> {
+        let constraints = context.map_or_else(ConstraintSetBuilder::new, |context| {
+            ConstraintSetBuilder::new_with_relation_context(context.clone())
+        });
         self.bindings(db, env)
             .match_parameters(db, env, argument_types)
             .check_types(

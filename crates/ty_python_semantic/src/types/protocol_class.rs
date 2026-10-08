@@ -2707,11 +2707,12 @@ fn descriptor_decorated_protocol_member<'db>(
         return Some(member);
     }
     let read_ty = descriptor_ty
-        .try_call_dunder_get(
+        .try_call_dunder_get_with_context(
             db,
             env,
             Some(receiver_ty),
             receiver_ty.to_meta_type(db, env),
+            context.as_ref(),
         )
         .unwrap_or_else(|error| Some(error.fallback()))?
         .return_type;
@@ -3418,7 +3419,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // Method specialization and intrinsic descriptor binding precede overload
                     // comparison. Guard their preparation so the first comparison still checks each
                     // overload, including its finite parameter and return requirements.
-                    if let (Some(source_definition), Some(target_definition)) =
+                    if self.signature_relation_visitor.is_normalizing()
+                        && let (Some(source_definition), Some(target_definition)) =
+                            (source_member.data.definition, target_member.data.definition)
+                        && (!source_member.data.supports_signature_preparation_guard()
+                            || !target_member.data.supports_signature_preparation_guard())
+                    {
+                        // Descriptor selection and read materialization can recursively start
+                        // the same optional normalization. Decline that proof before preparing
+                        // the member again; the circular marker also prevents a negated failure
+                        // from justifying a rewrite. Ordinary compatibility is still checked.
+                        let key = SignatureRelationKey::protocol_member_normalization(
+                            (source_definition, source_member.materialization),
+                            (target_definition, target_member.materialization),
+                            self.relation,
+                            self.typevar_evaluation,
+                        );
+                        self.signature_relation_visitor
+                            .visit(&key, || self.never(), work)
+                    } else if let (Some(source_definition), Some(target_definition)) =
                         (source_member.data.definition, target_member.data.definition)
                         && source_member.data.supports_signature_preparation_guard()
                         && target_member.data.supports_signature_preparation_guard()

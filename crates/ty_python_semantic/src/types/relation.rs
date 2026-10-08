@@ -819,8 +819,15 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
-        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let context = constraints.relation_context();
+        let signature_relation_visitor = context
+            .as_ref()
+            .map(|context| context.signature_relations.clone())
+            .unwrap_or_default();
+        let materialization_visitor = context.as_ref().map_or_else(
+            || ApplyTypeMappingVisitor::new(env),
+            |context| context.mapping_visitor(env),
+        );
         let checker = TypeRelationChecker {
             env,
             constraints,

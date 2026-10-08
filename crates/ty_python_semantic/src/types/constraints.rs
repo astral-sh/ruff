@@ -86,6 +86,7 @@
 //!
 //! [duboc]: https://gldubc.github.io/#thesis
 
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::convert::Infallible;
@@ -105,6 +106,8 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
+use crate::types::relation::TypeRelation;
+use crate::types::set_theoretic::UnionBuilder;
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarSet,
 };
@@ -113,8 +116,8 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, ConstraintRelationContext, DynamicType, IntersectionType, Type, TypePair,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    BoundTypeVarInstance, ConstraintRelationContext, DynamicType, IntersectionType,
+    MaterializationKind, Type, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -1048,6 +1051,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
     }
 
+    /// Returns owned proof state for a nested operation without retaining a storage borrow.
+    pub(super) fn relation_context(&self) -> Option<ConstraintRelationContext<'db>> {
+        self.storage.borrow().relation_context.clone()
+    }
+
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
     /// callback that constructs a [`ConstraintSet`]. We then package that constraint set up with
     /// the storage arenas from this builder.
@@ -1881,9 +1889,26 @@ impl<'db> UpperBound<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         ty: Type<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
     ) -> bool {
-        self.iter_clauses()
-            .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause))
+        let Some(context) = context else {
+            return self
+                .iter_clauses()
+                .all(|clause| ty.is_constraint_set_assignable_to(db, env, clause));
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        self.iter_clauses().all(|clause| {
+            context
+                .check_relation(
+                    db,
+                    env,
+                    &constraints,
+                    ty,
+                    clause,
+                    TypeRelation::Assignability,
+                )
+                .is_always_satisfied(db, env, TypeVarSet::None)
+        })
     }
 
     /// Returns the constraints under which `lower` is assignable to every stored upper clause.
@@ -1896,8 +1921,25 @@ impl<'db> UpperBound<'db> {
     ) -> (NodeId, Option<SourceOrderId>) {
         let mut node = ALWAYS_TRUE;
         let mut source_order = None;
+        let context = storage.relation_context.clone();
         for clause in self.iter_clauses() {
-            let when_clause = lower.when_constraint_set_assignable_to_owned(db, env, clause);
+            let when_clause = match &context {
+                Some(context) => {
+                    let constraints =
+                        ConstraintSetBuilder::new_with_relation_context(context.clone());
+                    Cow::Owned(constraints.into_owned(|constraints| {
+                        context.check_relation(
+                            db,
+                            env,
+                            constraints,
+                            lower,
+                            clause,
+                            TypeRelation::Assignability,
+                        )
+                    }))
+                }
+                None => lower.when_constraint_set_assignable_to_owned(db, env, clause),
+            };
             let (clause_node, clause_source_order) = storage.load(db, env, &when_clause);
             node = node.and(storage, clause_node);
             source_order = storage.ordered_source_order(source_order, clause_source_order);
@@ -3019,6 +3061,8 @@ impl<'db> CandidateTypeVarSolver<'db> {
             validity_lower,
             mut upper,
         } = self;
+        let context = storage.relation_context.clone();
+        let mapping = context.as_ref().map(|context| context.mapping_visitor(env));
 
         // Classify the original evidence bounds before aggregation, as gradual and static argument
         // evidence may collapse into a single gradual union.
@@ -3035,19 +3079,24 @@ impl<'db> CandidateTypeVarSolver<'db> {
                 evidence.peek().is_some()
                     && evidence.all(|ty| {
                         ty.is_type_var()
-                            || ty.bottom_materialization(db, env) != ty.top_materialization(db, env)
+                            || match &mapping {
+                                Some(mapping) => {
+                                    ty.materialize(db, MaterializationKind::Bottom, mapping)
+                                        != ty.materialize(db, MaterializationKind::Top, mapping)
+                                }
+                                None => {
+                                    ty.bottom_materialization(db, env)
+                                        != ty.top_materialization(db, env)
+                                }
+                            }
                     })
             });
 
-        let evidence_lower =
-            (!evidence_lower.is_empty()).then(|| UnionType::from_elements(db, env, evidence_lower));
-        let mixed_lower =
-            (!mixed_lower.is_empty()).then(|| UnionType::from_elements(db, env, mixed_lower));
-        let validity_lower = if validity_lower.is_empty() {
-            Type::Never
-        } else {
-            UnionType::from_elements(db, env, validity_lower)
-        };
+        let evidence_lower = (!evidence_lower.is_empty())
+            .then(|| union_lower_bounds(db, env, evidence_lower, context.as_ref()));
+        let mixed_lower = (!mixed_lower.is_empty())
+            .then(|| union_lower_bounds(db, env, mixed_lower, context.as_ref()));
+        let validity_lower = union_lower_bounds(db, env, validity_lower, context.as_ref());
         upper.shrink_to_fit();
 
         let range = CandidateTypeVarSolution {
@@ -3059,8 +3108,11 @@ impl<'db> CandidateTypeVarSolver<'db> {
             has_only_non_concrete_evidence,
             selected_declared_constraint: None,
         };
-        let lower = range.effective_lower(db, env);
-        if !range.upper.is_satisfied_by(db, env, lower) {
+        let lower = range.effective_lower_with_context(db, env, context.as_ref());
+        if !range
+            .upper
+            .is_satisfied_by(db, env, lower, context.as_ref())
+        {
             let (when_upper, source_order) = range.upper.when_satisfied_by(db, env, storage, lower);
             if when_upper.is_never_satisfied(db, env, storage, TypeVarSet::None, source_order) {
                 // This path does not satisfy the accumulated upper bound, and is
@@ -3071,6 +3123,32 @@ impl<'db> CandidateTypeVarSolver<'db> {
 
         Some(range)
     }
+}
+
+/// Combines candidate lower bounds without leaving the proof that produced them.
+fn union_lower_bounds<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    bounds: impl IntoIterator<Item = Type<'db>>,
+    context: Option<&ConstraintRelationContext<'db>>,
+) -> Type<'db> {
+    let Some(context) = context else {
+        return UnionType::from_elements(db, env, bounds);
+    };
+    let mut bounds = bounds.into_iter();
+    let Some(first) = bounds.next() else {
+        return Type::Never;
+    };
+    let Some(second) = bounds.next() else {
+        return first;
+    };
+    let mut builder = UnionBuilder::new(db, env).with_relation_context(context);
+    builder.add_in_place(first);
+    builder.add_in_place(second);
+    for bound in bounds {
+        builder.add_in_place(bound);
+    }
+    builder.build()
 }
 
 /// The result of selecting a type for one typevar on one constraint path.
@@ -3188,6 +3266,15 @@ impl<'db> CandidateTypeVarSolution<'db> {
     }
 
     fn effective_lower(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        self.effective_lower_with_context(db, env, None)
+    }
+
+    fn effective_lower_with_context(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
+    ) -> Type<'db> {
         if self.evidence_lower.is_none() && self.mixed_lower.is_none() {
             return self.validity_lower;
         }
@@ -3198,7 +3285,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
             return lower;
         }
 
-        UnionType::from_elements(
+        union_lower_bounds(
             db,
             env,
             [
@@ -3206,6 +3293,7 @@ impl<'db> CandidateTypeVarSolution<'db> {
                 self.mixed_lower.unwrap_or(Type::Never),
                 self.validity_lower,
             ],
+            context,
         )
     }
 
@@ -3854,9 +3942,13 @@ impl<'db> CandidateSolutions<'db> {
         // Prefer the lower bound (often the concrete actual type seen) over the
         // upper bound (which may include TypeVar bounds/constraints). The upper bound
         // should only be used as a fallback when no concrete type was inferred.
-        let lower = path_bound.effective_lower(db, env);
+        let context = builder.relation_context();
+        let lower = path_bound.effective_lower_with_context(db, env, context.as_ref());
         if path_bound.has_lower_inference() {
-            if !path_bound.upper.is_satisfied_by(db, env, lower) {
+            if !path_bound
+                .upper
+                .is_satisfied_by(db, env, lower, context.as_ref())
+            {
                 let mut storage = builder.storage.borrow_mut();
                 let (when_upper, source_order) =
                     path_bound
