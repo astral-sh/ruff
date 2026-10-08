@@ -798,15 +798,18 @@ pub(super) fn walk_protocol_instance_interface<
     visitor: &V,
 ) {
     for member in interface.members(db) {
-        walk_protocol_instance_member(db, &member, receiver_ty, visitor);
+        walk_protocol_instance_member(db, &member, Some(receiver_ty), visitor);
     }
 }
 
-/// Walks the types of a protocol member after binding any implicit receiver to `receiver_ty`.
+/// Walks a protocol member's types, removing its implicit receiver parameter.
+///
+/// Supplying a receiver also substitutes `Self`. Without one, the declared `Self` types remain
+/// available for structural inspection without normalizing their enclosing unions or intersections.
 pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     member: &ProtocolMember<'db>,
-    receiver_ty: Type<'db>,
+    receiver_ty: Option<Type<'db>>,
     visitor: &V,
 ) {
     let env = visitor.program_environment();
@@ -824,16 +827,12 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                     && kind != ProtocolMethodKind::Static
                 {
                     let runtime_type = if kind == ProtocolMethodKind::Class {
-                        receiver_ty.to_meta_type(db, env)
+                        receiver_ty.map(|receiver| receiver.to_meta_type(db, env))
                     } else {
                         receiver_ty
                     };
-                    let signature = signature.bind_self_with_receiver(
-                        db,
-                        env,
-                        Some(runtime_type),
-                        Some(receiver_ty),
-                    );
+                    let signature =
+                        signature.bind_self_with_receiver(db, env, runtime_type, receiver_ty);
                     walk_signature(db, &signature, visitor);
                 } else {
                     walk_signature(db, signature, visitor);
@@ -844,7 +843,7 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
             walk_protocol_member_access(
                 db,
                 member.access(db, ProtocolMemberAccessMode::Instance),
-                Some(receiver_ty),
+                receiver_ty,
                 visitor,
             );
         }
@@ -855,7 +854,12 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
                 }),
                 ..attribute
             };
-            visitor.visit_type(db, attribute.bind_self(db, env, receiver_ty));
+            visitor.visit_type(
+                db,
+                receiver_ty.map_or(attribute.ty, |receiver| {
+                    attribute.bind_self(db, env, receiver)
+                }),
+            );
         }
     }
 }

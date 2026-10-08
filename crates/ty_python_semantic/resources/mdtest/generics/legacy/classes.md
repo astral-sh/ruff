@@ -3347,6 +3347,46 @@ def incompatible(x: S) -> Finite[int]:
     return x  # error: [invalid-return-type]
 ```
 
+## Recursive protocol methods excluding `Self`
+
+Generic protocol comparisons support recursive return annotations that exclude `Self`.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Protocol, Self, TypeVar
+
+T = TypeVar("T", covariant=True)
+
+class A(Protocol[T]):
+    def f(self) -> A[T] & ~Self: ...
+
+def check(x: A[int]) -> A[T]:
+    return x  # no diagnostic
+```
+
+Non-recursive methods still determine type arguments, including when the recursive method is
+inherited.
+
+```py
+class Valued(A[T], Protocol[T]):
+    def value(self) -> T: ...
+
+def infer(x: Valued[T]) -> T:
+    return x.value()
+
+def valid(x: Valued[int]):
+    reveal_type(infer(x))  # revealed: int
+
+def invalid(x: Valued[str]) -> Valued[int]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Constrained type variables in nested protocol receivers
 
 A method's receiver can require a nested protocol whose type argument is constrained. Each listed

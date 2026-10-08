@@ -788,7 +788,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
         if has_property && has_explicit_receiver {
             return false;
         }
-        walk_protocol_instance_member(db, &template_member, receiver, &visitor);
+        walk_protocol_instance_member(db, &template_member, Some(receiver), &visitor);
         if visitor.invalid.get() {
             return false;
         }
@@ -1270,12 +1270,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_interface = source_protocol.interface(db);
         let target_interface = protocol.interface(db);
-        let target_non_recursive = non_recursive_protocol_interface(
-            db,
-            target_interface,
-            identity_protocol,
-            Type::ProtocolInstance(protocol),
-        );
+        let target_non_recursive =
+            non_recursive_protocol_interface(db, target_interface, identity_protocol);
 
         if target_non_recursive == target_interface.base() {
             return None;
@@ -1404,6 +1400,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 /// Returns the finite members of a protocol interface, omitting members that refer back to its
 /// class-backed origin or a protocol base. Type aliases are expanded, but lazy protocol attributes
 /// are not visited.
+/// `Self` references are inspected through their declared bounds: substituting the receiver could
+/// simplify an intersection and re-enter the protocol comparison before recursion is classified.
 ///
 /// For example, `value` is retained while `child` is omitted:
 ///
@@ -1417,7 +1415,6 @@ fn non_recursive_protocol_interface<'db>(
     db: &'db dyn Db,
     interface: ProtocolInterfaceView<'db>,
     protocol: ProtocolClass<'db>,
-    receiver_ty: Type<'db>,
 ) -> ProtocolInterface<'db> {
     struct ProtocolReferenceFinder<'a, 'db> {
         env: &'a ProgramEnvironment<'db>,
@@ -1479,7 +1476,7 @@ fn non_recursive_protocol_interface<'db>(
             recursion_guard: TypeCollector::default(),
             active_aliases: ActiveRecursionDetector::default(),
         };
-        walk_protocol_instance_member(db, member, receiver_ty, &visitor);
+        walk_protocol_instance_member(db, member, None, &visitor);
         !visitor.found.get()
     })
 }
@@ -2066,8 +2063,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ) -> Option<&'db OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
-        let non_recursive =
-            non_recursive_protocol_interface(db, interface, origin, Type::ProtocolInstance(target));
+        let non_recursive = non_recursive_protocol_interface(db, interface, origin);
         let target = interface.with_interface(non_recursive);
         if target.member_count(db) == 0 {
             return None;
