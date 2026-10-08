@@ -72,13 +72,12 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, CycleDetector, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
-    GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SelfBinding, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    is_property_method, list_members,
+    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
+    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -8184,44 +8183,6 @@ impl<'db> Binding<'db> {
         env: &ProgramEnvironment<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
-        if self.constructor_context.is_none()
-            && let Type::BoundMethod(method) = self.signature_type
-            && self.signature.generic_context.is_some_and(|context| {
-                context
-                    .variables(db)
-                    .any(|variable| variable.typevar(db).is_self(db))
-            })
-            && self
-                .signature
-                .parameters()
-                .iter()
-                .enumerate()
-                .any(|(index, parameter)| {
-                    (index > 0 || !parameter.is_positional())
-                        && parameter.annotated_type().contains_self(db, env)
-                })
-        {
-            // Other arguments cannot widen the receiver's `Self`, including an enclosing
-            // `Self` passed through `super()`. Bind it before parameter matching, which can
-            // retain element annotations from unpacked tuples. When only the receiver and
-            // return type mention `Self`, normal receiver inference supplies its specialization.
-            let mapping = TypeMapping::BindSelf(SelfBinding::new(
-                db,
-                env,
-                method.typing_self_type(db),
-                self.signature.definition().map(BindingContext::Definition),
-            ));
-            self.signature = self.signature.apply_type_mapping_impl(
-                db,
-                &mapping,
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::new(env),
-            );
-            self.return_ty =
-                self.return_ty
-                    .apply_type_mapping(db, env, &mapping, TypeContext::default());
-        }
-
         let parameters = self.signature.parameters();
         let mut matcher = ArgumentMatcher::new(arguments, parameters, &mut self.errors);
         let mut keywords_arguments = vec![];
