@@ -5904,7 +5904,7 @@ struct CallInference<'a, 'db> {
     return_ty: Type<'db>,
     /// Whether a partial may leave variadic arguments for a later call.
     is_partial_application: bool,
-    constructor_kind: Option<ConstructorCallableKind>,
+    is_constructor: bool,
     /// Type variables from the signature that this call is allowed to solve.
     inferable_typevars: TypeVarSet<'db>,
 }
@@ -6250,7 +6250,7 @@ impl<'db> CallInference<'_, 'db> {
         let env = self.env;
         // TODO: Project correlated alternatives through constructor stages and partial signatures.
         // Their remaining parameters and return types must use the same specialization.
-        if self.is_partial_application || self.constructor_kind.is_some() {
+        if self.is_partial_application || self.is_constructor {
             return None;
         }
         let TypeVarInferenceSolutions::Alternatives(alternatives) = inference.solutions(db) else {
@@ -6324,11 +6324,10 @@ impl<'db> CallInference<'_, 'db> {
             .collect();
 
         let mut validated = Vec::with_capacity(specializations.len());
-        for specialization in specializations {
+        'specializations: for specialization in specializations {
             // Recheck the original relations, including requirements that recursive protocol
             // inference may omit. Even complete ordinary assignability constraints would not
             // establish the overload-order guarantees needed to intersect return types.
-            let mut accepts_arguments = true;
             for (relation, contributes_to_inference) in &relations {
                 let actual = relation
                     .argument_type
@@ -6348,13 +6347,10 @@ impl<'db> CallInference<'_, 'db> {
                     actual.is_assignable_to(db, env, formal)
                 };
                 if !accepts {
-                    accepts_arguments = false;
-                    break;
+                    continue 'specializations;
                 }
             }
-            if accepts_arguments {
-                validated.push(specialization);
-            }
+            validated.push(specialization);
         }
 
         (!validated.is_empty()).then_some(validated)
@@ -8720,7 +8716,7 @@ impl<'db> Binding<'db> {
             call_expression_tcx,
             return_ty: self.return_ty,
             is_partial_application: self.is_partial_application,
-            constructor_kind: self.constructor_context.map(ConstructorContext::kind),
+            is_constructor: self.constructor_context.is_some(),
             inferable_typevars: self
                 .signature
                 .generic_context
@@ -10896,5 +10892,86 @@ impl<'db> ClassInfoValidator<'_, 'db> {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem;
+
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::global_symbol;
+    use crate::types::constraints::resolution::SolutionType::Resolved;
+    use crate::types::generics::TypeVarInferenceSolutions;
+
+    fn call_inference<'db>(
+        db: &'db TestDb,
+        callable: Type<'db>,
+        arguments: impl IntoIterator<Item = Type<'db>>,
+        type_context: TypeContext<'db>,
+    ) -> anyhow::Result<TypeVarInference<'db>> {
+        let env = db.program_environment();
+        let arguments = CallArguments::positional(arguments);
+        let constraints = ConstraintSetBuilder::new();
+        let bindings = callable
+            .bindings(db, &env)
+            .match_parameters(db, &env, &arguments)
+            .check_types(db, &env, &constraints, &arguments, type_context, &[])
+            .map_err(|error| anyhow::anyhow!("call binding failed: {error:?}"))?;
+        let (_, binding) = bindings
+            .iter_flat()
+            .flat_map(CallableBinding::matching_overloads)
+            .exactly_one()
+            .map_err(|_| anyhow::anyhow!("expected one matching call binding"))?;
+        binding
+            .inference
+            .ok_or_else(|| anyhow::anyhow!("expected generic call inference"))
+    }
+
+    #[test]
+    fn contextual_preference_preserves_incomplete_inference() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+
+def make[T, U](value: T) -> tuple[list[T], U, U]:
+    raise NotImplementedError
+
+expected: tuple[list[object], A | B, C | D | E]
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "make").place.expect_type();
+        let expected = global_symbol(db, file, "expected").place.expect_type();
+        let int = KnownClass::Int.to_instance(db, &env);
+
+        // The contextual upper bound for U is (A | B) & (C | D | E): six non-disjoint
+        // terms exceed the four-term construction budget. T still has the preferred type object.
+        // Selecting that preference must preserve the contextual family's incompleteness,
+        // even though only one argument-inference alternative remains.
+        let inference = call_inference(db, callable, [int], expected.into())?;
+        let TypeVarInferenceSolutions::Incomplete(paths) = inference.solutions(db) else {
+            anyhow::bail!(
+                "expected incomplete inference, got {:?}",
+                inference.solutions(db)
+            );
+        };
+        assert_eq!(
+            paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
+            [[Some(Resolved(Type::object())), None].as_slice()]
+        );
+        Ok(())
     }
 }
