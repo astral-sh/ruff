@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member::{Member, inherited_default_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -2925,7 +2925,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations. A dynamic base
     /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
     /// Final declarations are handled by override diagnostics instead of supplying context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    pub(super) fn default_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
@@ -2939,14 +2939,28 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
             let (base, specialization) = base.static_class_literal(db)?;
             let scope = base.body_scope(db);
-            let Some(symbol) = place_table(db, scope).symbol_id(name) else {
-                continue;
-            };
+            let symbol = place_table(db, scope).symbol_id(name);
             let use_def = use_def_map(db, scope);
-            let declarations = use_def.end_of_scope_symbol_declarations(symbol);
-            let declared = place_from_declarations(db, &self.env, declarations.clone())
-                .ignore_conflicting_declarations();
-            let declaration = if declared.is_undefined() {
+            if let Some(symbol) = symbol {
+                let declarations = use_def.end_of_scope_symbol_declarations(symbol);
+                let declared = place_from_declarations(db, &self.env, declarations.clone())
+                    .ignore_conflicting_declarations();
+                if !declared.is_undefined() {
+                    return (!declared.qualifiers.contains(TypeQualifiers::FINAL)
+                        && declarations.contains_only_annotated_assignments(db))
+                    .then(|| {
+                        declared.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                    });
+                }
+            }
+
+            if let Some(declared) = base.implicit_instance_declaration(db, name) {
+                return (!declared.qualifiers.contains(TypeQualifiers::FINAL)).then(|| {
+                    declared.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                });
+            }
+
+            if let Some(symbol) = symbol {
                 let mut bindings = use_def.end_of_scope_symbol_bindings(symbol);
                 let predicates = bindings.predicates();
                 let constraints = bindings.reachability_constraints();
@@ -2958,15 +2972,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 }) {
                     continue;
                 }
-                inherited_class_body_declaration(db, scope, symbol)
-            } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(declared)
-            };
-            return declaration.map(|declaration| {
-                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
-            });
+                return inherited_default_declaration(db, scope, symbol).map(|declaration| {
+                    declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
+                });
+            }
         }
         None
     }
