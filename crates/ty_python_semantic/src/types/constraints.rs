@@ -938,14 +938,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .for_each_unique_constraint(&storage, &mut |constraint_id| {
                 constraints.push(constraint_id);
             });
-        // Mapping can intern constraints and typevars. Preserve their source order rather than
-        // letting the old diagram's variable order determine the rebuilt diagram's ordering.
+        // Intern fresh copies in their originals' arena order. Reordering them by source
+        // position can exponentially expand the TDD during reconstruction. Source order is
+        // retained separately when rebuilding the sidecar below.
         let source_orders = storage.calculate_source_orders(self.source_order);
-        constraints.sort_unstable_by_key(|constraint| {
-            constraint
-                .as_atomic(&storage)
-                .and_then(|constraint| source_orders.get_index_of(&constraint))
-        });
+        constraints.sort_unstable_by_key(|constraint| constraint.index());
         drop(storage);
 
         // Source-order entries refer to atomic constraints, including those inside existential
