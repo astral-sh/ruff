@@ -2140,12 +2140,20 @@ impl<'db> FmtDetailed<'db> for DisplayGenericAlias<'_, 'db> {
                 .display_with(db, self.env, self.settings.clone())
                 .fmt_detailed(f)
         } else {
-            let prefix_details = match self.specialization.materialization_kind(db) {
+            // Substitution keeps materialization lazy, since checking equivalence there can
+            // recursively request the type being constructed. At display time the type is
+            // complete, so omit a wrapper when none of its arguments changes.
+            let materialization_kind = self.specialization.materialization_kind(db).filter(|_| {
+                self.specialization.types(db).iter().any(|ty| {
+                    !ty.is_equivalent_to(db, self.env, ty.top_materialization(db, self.env))
+                })
+            });
+            let prefix_details = match materialization_kind {
                 None => None,
                 Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
                 Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
             };
-            let suffix = match self.specialization.materialization_kind(db) {
+            let suffix = match materialization_kind {
                 None => "",
                 Some(_) => "]",
             };

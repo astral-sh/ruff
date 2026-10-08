@@ -27,7 +27,7 @@ pub(super) enum TypeNormalization {
     /// Simplify types using subtype and disjointness relations.
     #[default]
     Semantic,
-    /// Flatten unions and apply elementary identities without unfolding recursive definitions.
+    /// Flatten unions and restore DNF without unfolding recursive definitions.
     ///
     /// A projection used by a type relation must finish constructing its result before another
     /// relation can inspect it. Otherwise, simplifying the projection can recursively request
@@ -307,9 +307,12 @@ impl<'db> UnionType<'db> {
                 self.recursively_defined(db),
             ))
         } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            })
+            self.map_leave_aliases_with_normalization(
+                db,
+                visitor.env,
+                visitor.normalization,
+                |element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
         }
     }
 
@@ -332,28 +335,33 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_leave_aliases_with_normalization(
+            db,
+            env,
+            TypeNormalization::Semantic,
+            transform_fn,
+        )
+    }
+
+    fn map_leave_aliases_with_normalization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        normalization: TypeNormalization,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let elements = self.elements(db);
-        let mut iter = elements.iter().enumerate();
-        while let Some((i, ty)) = iter.next() {
-            let new_ty = transform_fn(ty);
-            if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
-                for prev in &elements[..i] {
-                    builder.add_in_place(*prev);
-                }
-                builder.add_in_place(new_ty);
-                for (_, element) in iter {
-                    builder.add_in_place(transform_fn(element));
-                }
-                return builder
-                    .or_recursively_defined(self.recursively_defined(db))
-                    .build();
-            }
+        // A structural substitution can leave redundancies that only semantic comparisons
+        // can remove. Reconsider them even when this mapping leaves the elements unchanged.
+        let mut builder = UnionBuilder::new(db, env)
+            .unpack_aliases(false)
+            .normalization(normalization)
+            .or_recursively_defined(self.recursively_defined(db));
+        for element in self.elements(db) {
+            builder.add_in_place(transform_fn(element));
         }
-
-        Type::Union(self)
+        builder.build()
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -1124,7 +1132,8 @@ impl<'db> IntersectionType<'db> {
             }
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            let mut builder =
+                IntersectionBuilder::new(db, visitor.env).normalization(visitor.normalization);
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,

@@ -2390,6 +2390,8 @@ impl<'db> Bindings<'db> {
                             };
                             let Some(callables) =
                                 ty.try_upcast_to_callable(db, env).map(|callables| {
+                                    let callables =
+                                        callables.map(|callable| callable.normalized(db, env));
                                     if into_callable == KnownFunction::IntoRegularCallable {
                                         callables.map(|callable| callable.into_regular(db))
                                     } else {

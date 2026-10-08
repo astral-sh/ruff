@@ -38,10 +38,11 @@ use crate::types::visitor::{
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass,
-    KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    UnionAccumulator, UnionType, binding_type, infer_definition_types, inferred_declaration,
+    ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
+    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
+    inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1143,8 +1144,9 @@ pub struct Specialization<'db> {
     /// and is represented here with `Some(MaterializationKind::Top)`. Similarly,
     /// `Bottom[A[Any]]` is a subtype of all materializations of `A[Any]`, and is represented
     /// with `Some(MaterializationKind::Bottom)`.
-    /// The `materialization_kind` field may be non-`None` only if the specialization contains
-    /// dynamic types in invariant positions or positions with constrained type variables.
+    /// A lazy materialization can remain in invariant or constrained positions when structural
+    /// normalization cannot prove it unchanged. This includes static recursive arguments with a
+    /// distinct representation; relations interpret the marker by comparing argument bounds.
     #[returns(copy)]
     pub(crate) materialization_kind: Option<MaterializationKind>,
 
@@ -1421,7 +1423,15 @@ impl<'db> Specialization<'db> {
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::declared(tcx.get(i).copied());
-            if type_mapping.is_structural() {
+            // Ordinary substitutions act identically in every variance position. In
+            // particular, unfolding a recursive constructor must not infer its variance
+            // merely to substitute that constructor's arguments into its body.
+            if !matches!(
+                type_mapping,
+                TypeMapping::Materialize(_)
+                    | TypeMapping::ApplySpecializationWithMaterialization { .. }
+                    | TypeMapping::Promote(..)
+            ) {
                 return ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
             }
             match (typevar.variance(db), type_mapping) {
@@ -1569,14 +1579,21 @@ impl<'db> Specialization<'db> {
         if self.materialization_kind(db).is_some() {
             return self;
         }
-        let mut has_unsimplified_dynamic_typevar = false;
+        let mut has_unsimplified_materialization = false;
         let types = self.map_types(db, |_, bound_typevar, vartype| {
             let variance = specialization_variance(db, bound_typevar);
             let top_materialization = vartype.materialize(db, MaterializationKind::Top, visitor);
-            // Equivalence can recursively inspect a protocol's requirements. Only check it when
-            // the result affects this materialization.
-            let has_dynamic_type = LazyCell::new(|| {
-                !visitor.is_equivalent_to_materialization(db, vartype, top_materialization)
+            // Construction cannot inspect a recursive declaration to simplify its own
+            // arguments. Ordinary observation may use semantic equivalence.
+            let materialization_changes_argument = LazyCell::new(|| {
+                vartype != top_materialization
+                    && (visitor.normalization
+                        == super::set_theoretic::TypeNormalization::Structural
+                        || !visitor.is_equivalent_to_materialization(
+                            db,
+                            vartype,
+                            top_materialization,
+                        ))
             });
 
             match variance {
@@ -1586,9 +1603,10 @@ impl<'db> Specialization<'db> {
                     top_materialization
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant
-                    if bound_typevar.typevar(db).is_constrained(db) && *has_dynamic_type =>
+                    if bound_typevar.typevar(db).is_constrained(db)
+                        && *materialization_changes_argument =>
                 {
-                    has_unsimplified_dynamic_typevar = true;
+                    has_unsimplified_materialization = true;
                     vartype
                 }
                 TypeVarVariance::Covariant | TypeVarVariance::Contravariant => {
@@ -1602,20 +1620,18 @@ impl<'db> Specialization<'db> {
 
                     if effective_materialization_kind == MaterializationKind::Top
                         && let Some(upper_bound) = bound_typevar.top_materialized_upper_bound(db)
-                        && *has_dynamic_type
+                        && *materialization_changes_argument
                     {
-                        IntersectionType::from_two_elements(
-                            db,
-                            visitor.env,
-                            materialized,
-                            upper_bound,
-                        )
+                        IntersectionBuilder::new(db, visitor.env)
+                            .normalization(visitor.normalization)
+                            .positive_elements([materialized, upper_bound])
+                            .build()
                     } else {
                         materialized
                     }
                 }
                 TypeVarVariance::Invariant => {
-                    has_unsimplified_dynamic_typevar |= *has_dynamic_type;
+                    has_unsimplified_materialization |= *materialization_changes_argument;
                     vartype
                 }
             }
@@ -1631,7 +1647,7 @@ impl<'db> Specialization<'db> {
             )
         });
         let new_materialization_kind =
-            has_unsimplified_dynamic_typevar.then_some(materialization_kind);
+            has_unsimplified_materialization.then_some(materialization_kind);
         // Keep this check in sync with every field that can be transformed above.
         let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
             && tuple_inner == original_tuple_inner
