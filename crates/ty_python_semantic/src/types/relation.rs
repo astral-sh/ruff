@@ -21,8 +21,8 @@ use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, StaticClassLiteral,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -206,6 +206,62 @@ pub(crate) enum TypeVarEvaluation {
     ///
     /// This is currently opt-in, but will eventually replace eager type-variable evaluation.
     Lazy,
+}
+
+/// Return the class origin of a nominal instance defined by a `class` statement.
+///
+/// Instances of [`KnownClass`] and instances with their own tuple specification return `None`.
+fn ordinary_nominal_origin<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> Option<StaticClassLiteral<'db>> {
+    let Type::NominalInstance(instance) = ty else {
+        return None;
+    };
+    if instance.known_class(db).is_some() || instance.own_tuple_spec(db).is_some() {
+        return None;
+    }
+    let ClassLiteral::Static(class) = instance.class_literal(db, env) else {
+        return None;
+    };
+    Some(class)
+}
+
+/// Return whether a generic target positive has an ordinary nominal origin missing from every
+/// source positive. Return `false` unless the source positives are nonempty and all have ordinary
+/// nominal origins whose classes have no explicit bases.
+// Keep the proof's loop variables out of the common redundancy cache lookup.
+#[inline(never)]
+fn has_missing_generic_nominal_bound<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: IntersectionType<'db>,
+    target: IntersectionType<'db>,
+) -> bool {
+    // With only nominal source positives, each nominal target positive needs a matching
+    // source positive. Classes without explicit bases can supply only their own origin or
+    // object, which the helper excludes. A missing origin proves failure without inspecting
+    // arguments, exclusions, or MROs. Keep matching origins and inheritance on the full path.
+    !source.positive(db).is_empty()
+        && target.positive(db).iter().any(|&target| {
+            // The proof also applies to non-generic targets, but this extra filtering
+            // costs more than it saves for them: their general relation already avoids
+            // recursion guards and specialization checks.
+            let Type::NominalInstance(instance) = target else {
+                return false;
+            };
+            if !instance.is_definition_generic(db) {
+                return false;
+            }
+            let Some(target) = ordinary_nominal_origin(db, env, target) else {
+                return false;
+            };
+            source.positive(db).iter().all(|&source| {
+                ordinary_nominal_origin(db, env, source)
+                    .is_some_and(|source| source != target && !source.has_explicit_bases(db))
+            })
+        })
 }
 
 #[salsa::tracked]
@@ -692,6 +748,14 @@ impl<'db> Type<'db> {
 
         if self == other {
             return true;
+        }
+
+        // Avoid creating a cached relation query for comparisons that class origins alone can
+        // reject. The general relation below would also return false; this is only a shortcut.
+        if let (Type::Intersection(source), Type::Intersection(target)) = (self, other)
+            && has_missing_generic_nominal_bound(db, env, source, target)
+        {
+            return false;
         }
 
         let program = env.program(db);
