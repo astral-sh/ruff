@@ -163,6 +163,27 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Prepares callable signatures whose receiver requirements will be checked by a relation.
+    /// Keeping receiver inference deferred prevents callable construction from reentering the
+    /// comparison before the signature recursion guard is active.
+    pub(super) fn try_upcast_to_callable_for_relation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+    ) -> Option<CallableTypes<'db>> {
+        self.try_upcast_to_callable_with_policy_and_context(
+            db,
+            env,
+            policy,
+            &CallableUpcastContext {
+                defer_receiver_inference: true,
+                ..CallableUpcastContext::default()
+            },
+            None,
+        )
+    }
+
     fn try_upcast_to_callable_with_policy_and_context(
         self,
         db: &'db dyn Db,
@@ -227,7 +248,13 @@ impl<'db> Type<'db> {
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
+            Type::BoundMethod(bound_method) => {
+                if context.defer_receiver_inference {
+                    bound_method.callables_for_relation(db)
+                } else {
+                    bound_method.callables(db).cloned()
+                }
+            }
 
             Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
                 TypeVarBoundOrConstraints::UpperBound(bound) => bound
@@ -442,6 +469,7 @@ impl<'db> Type<'db> {
 
 #[derive(Debug, Default)]
 struct CallableUpcastContext<'db> {
+    defer_receiver_inference: bool,
     recursive_definition: Option<Definition<'db>>,
     active: ActiveRecursionDetector<Type<'db>>,
 }
@@ -939,11 +967,17 @@ impl<'db> CallableType<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> CallableType<'db> {
         self.with_signatures(
             db,
-            self.signatures(db)
-                .apply_self_with_receiver(db, env, receiver_type, self_type),
+            self.signatures(db).apply_self_with_receiver(
+                db,
+                env,
+                receiver_type,
+                self_type,
+                visitor,
+            ),
         )
     }
 

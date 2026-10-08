@@ -938,21 +938,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .materialization_visitor
                 .for_new_materialization_root()
                 .with_signature_relations(self.signature_relation_visitor);
-            let can_use_nominal_result_directly =
-                nominally_satisfied.is_never_satisfied(db, env, self.inferable)
-                    || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
-                        || !protocol.materialization_changes_requirements(
+            let can_use_nominal_result_directly = nominally_satisfied
+                .is_trivially_never_satisfied()
+                || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
+                    || !protocol.materialization_changes_requirements(
+                        db,
+                        &requirements_visitor,
+                        protocol,
+                    ))
+                    && !source_protocol.is_some_and(|source| {
+                        source.materialization_changes_requirements(
                             db,
                             &requirements_visitor,
                             protocol,
-                        ))
-                        && !source_protocol.is_some_and(|source| {
-                            source.materialization_changes_requirements(
-                                db,
-                                &requirements_visitor,
-                                protocol,
-                            )
-                        }));
+                        )
+                    }));
 
             if can_use_nominal_result_directly
                 && result
@@ -1321,6 +1321,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // because `T` is invariant. Requiring the finite constraints to imply that comparison
         // catches the missing bound: allowing every supertype of `str` is not enough to prove
         // `T` must equal `str`.
+        // This is only an optimization of the full structural relation. Use terminal TDD
+        // facts here: asking the solver to prove the implication can itself expand recursive
+        // protocol signatures before their comparison guard is active.
         if is_materialized
             && (target_alias
                 .specialization(db)
@@ -1335,7 +1338,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
                 || !structurally_satisfied
                     .implies(db, self.constraints, || nominally_satisfied)
-                    .is_always_satisfied(db, env, self.inferable))
+                    .is_trivially_always_satisfied())
         {
             return None;
         }
@@ -1344,7 +1347,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // expanding recursive members. If it cannot reject, the caller checks the full
         // interface instead.
         (self.typevar_evaluation == TypeVarEvaluation::Lazy
-            || structurally_satisfied.is_never_satisfied(db, env, self.inferable))
+            || structurally_satisfied.is_trivially_never_satisfied())
         .then_some(structurally_satisfied)
     }
 

@@ -263,6 +263,29 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
+    /// Prepares a method for signature comparison without solving its receiver requirements.
+    /// The signature relation evaluates those requirements under its recursion guard.
+    pub(super) fn callables_for_relation(self, db: &'db dyn Db) -> Option<CallableTypes<'db>> {
+        let env = ProgramEnvironment::from_program(self.program(db));
+        self.func(db)
+            .try_upcast_to_callable_for_relation(db, &env, super::UpcastPolicy::default())
+            .map(|callables| {
+                callables.map(|callable| {
+                    callable
+                        .with_signatures(
+                            db,
+                            callable.signatures(db).bind_self_with_receiver(
+                                db,
+                                &env,
+                                Some(self.signature_receiver(db)),
+                                Some(self.typing_self_type(db)),
+                            ),
+                        )
+                        .into_regular(db)
+                })
+            })
+    }
+
     pub(crate) fn callables_with_receiver(
         self,
         db: &'db dyn Db,
@@ -345,8 +368,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
             })
             .and(db, self.constraints, || {
-                let (Some(source), Some(target)) = (source.callables(db), target.callables(db))
-                else {
+                let (Some(source), Some(target)) = (
+                    source.callables_for_relation(db),
+                    target.callables_for_relation(db),
+                ) else {
                     return self.never();
                 };
                 self.check_type_pair(

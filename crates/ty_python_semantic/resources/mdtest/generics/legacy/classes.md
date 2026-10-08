@@ -3187,6 +3187,88 @@ def foo(x: A[int]):
     reveal_type(x.f().f())  # revealed: A[int & ~A[A[int & Any]] & ~A[A[int & Any & ~A[A[int & Any]]]]]
 ```
 
+## Recursive protocol methods with generic receivers
+
+The mutable member makes this protocol invariant, so binding the receiver determines the method's
+type parameter. Repeated calls preserve each exclusion introduced by the return annotation.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class P(Protocol[T]):
+    value: T
+    def f(self: P[U]) -> P[U & ~P[U & Any]]: ...
+
+def dynamic(x: P[Any]):
+    reveal_type(x.f().f())  # revealed: P[Any & ~P[Any] & ~P[Any & ~P[Any]]]
+
+def generic(x: P[T]):
+    reveal_type(x.f().f())  # revealed: P[T@generic & ~P[T@generic & Any] & ~P[T@generic & Any & ~P[T@generic & Any]]]
+```
+
+## Nested generic receivers on recursive protocols
+
+An explicit receiver can require another specialization of the same protocol. Binding a matching
+receiver infers the inner type argument; an unconstrained type argument does not satisfy that
+requirement.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+
+class N(Protocol[T]):
+    value: T
+    def f(self: N[N[U]]) -> N[U & ~N[U & Any]]: ...
+
+def valid(x: N[N[int]]):
+    reveal_type(x.f())  # revealed: N[int & ~N[int & Any]]
+
+def invalid(x: N[T]):
+    x.f()  # error: [invalid-argument-type]
+```
+
+## Materializing a bound receiver requirement
+
+A bound method has already captured its receiver. Materializing its callable type preserves the
+receiver's compatibility with the explicit annotation.
+
+```py
+from typing import Any, Callable, Generic, TypeVar
+from ty_extensions import Bottom, Top, static_assert
+from ty_extensions._internal import RegularCallableTypeOf, is_subtype_of
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    value: T
+
+class IntBox(Box[int]):
+    def method(self: Box[Any]) -> None: ...
+
+static_assert(is_subtype_of(RegularCallableTypeOf[IntBox().method], Callable[[], None]))
+static_assert(is_subtype_of(Top[RegularCallableTypeOf[IntBox().method]], Callable[[], None]))
+static_assert(is_subtype_of(Bottom[RegularCallableTypeOf[IntBox().method]], Callable[[], None]))
+```
+
 ## Recursive protocol members introduced by type arguments
 
 A property declared as `T` can become recursive after specialization. Finite overloaded requirements

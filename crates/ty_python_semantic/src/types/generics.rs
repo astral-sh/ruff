@@ -1976,8 +1976,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             self.constraints,
                             self.provenance,
                             typevar,
-                            ty.top_materialization(db, env),
-                            ty.bottom_materialization(db, env),
+                            ty.materialize(
+                                db,
+                                MaterializationKind::Top,
+                                self.materialization_visitor,
+                            ),
+                            ty.materialize(
+                                db,
+                                MaterializationKind::Bottom,
+                                self.materialization_visitor,
+                            ),
                         )
                     } else {
                         ConstraintSet::constrain_typevar_equivalence_bound(
@@ -2201,11 +2209,14 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     // These variables stand for specializations we have yet to choose. Keep
                     // their declared domains intact: materializing `T: Any` to `T: Never`
                     // would incorrectly rule out the valid choice `T = str`.
+                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     let materialization_visitor = ApplyTypeMappingVisitor {
                         materialize_typevar_bounds_and_defaults: false,
-                        ..ApplyTypeMappingVisitor::new(self.env)
+                        ..checker
+                            .materialization_visitor
+                            .for_new_materialization_root()
+                            .with_signature_relations(checker.signature_relation_visitor)
                     };
-                    let mut checker = self.as_relation_checker(TypeRelation::Subtyping);
                     checker.typevar_evaluation = TypeVarEvaluation::Lazy;
                     checker.materialization_visitor = &materialization_visitor;
                     let result = self

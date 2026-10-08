@@ -237,7 +237,7 @@ fn check_inherited_method_conflicts<'db>(
         'members: for member in members {
             let name = &member.member.name;
             if is_mangled_private(name.as_str())
-                || is_constructor_like_method(name.as_str())
+                || is_constructor_like_method(db, class_specialized, name.as_str())
                 || !seen_names.insert(name.clone())
             {
                 continue;
@@ -739,7 +739,7 @@ fn check_class_declaration<'db>(
             // marked with the decorator.
             if configuration.check_missing_overrides()
                 && missing_override_target.is_none()
-                && !is_constructor_like_method(&member.name)
+                && !is_constructor_like_method(db, class, &member.name)
             {
                 missing_override_target = Some(MissingOverrideTarget::for_superclass(
                     db,
@@ -888,7 +888,7 @@ fn check_class_declaration<'db>(
             };
 
             // Constructor signatures may differ unless `@override` requests compatibility.
-            if is_constructor_like_method(&member.name)
+            if is_constructor_like_method(db, class, &member.name)
                 && !subclass_function.has_known_decorator(db, FunctionDecorators::OVERRIDE)
             {
                 continue;
@@ -1486,11 +1486,16 @@ pub(super) enum MethodKind<'db> {
     NotSynthesized,
 }
 
-fn is_constructor_like_method(name: &str) -> bool {
+/// Constructor signatures may differ across inheritance, including a metaclass's `__call__`.
+fn is_constructor_like_method<'db>(db: &'db dyn Db, class: ClassType<'db>, name: &str) -> bool {
     matches!(
         name,
         "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-    )
+    ) || name == "__call__"
+        && class
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .any(|base| base.known(db) == Some(KnownClass::Type))
 }
 
 bitflags! {

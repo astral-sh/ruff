@@ -613,8 +613,9 @@ impl<'db> ProtocolInterfaceView<'db> {
                 return false;
             };
             let compare = || {
-                let mapping =
-                    ApplyTypeMappingVisitor::new(visitor.env).with_signature_relations(relations);
+                let mapping = visitor
+                    .for_new_materialization_root()
+                    .with_signature_relations(relations);
                 let data = member.data_for_relation(db, &mapping);
                 let original = |mode| ProtocolMemberAccess {
                     declaration: data,
@@ -2730,6 +2731,21 @@ fn protocol_member_read_type<'db>(
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
+    /// Binds a protocol comparison's receiver while retaining its active recursive obligations.
+    fn bind_protocol_receiver(
+        &self,
+        db: &'db dyn Db,
+        callable: CallableType<'db>,
+        receiver_type: Type<'db>,
+        self_type: Type<'db>,
+    ) -> CallableType<'db> {
+        let visitor = self
+            .materialization_visitor
+            .for_new_materialization_root()
+            .with_signature_relations(self.signature_relation_visitor);
+        callable.apply_self_with_receiver(db, self.env, receiver_type, self_type, &visitor)
+    }
+
     fn check_protocol_member_read(
         &self,
         db: &'db dyn Db,
@@ -2809,22 +2825,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         };
         if required.mode == ProtocolMemberAccessMode::Instance {
             attribute_type
-                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
+                .try_upcast_to_callable_for_relation(db, env, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
                     self.check_callables_vs_callable(
                         db,
                         &callables.map(|callable| {
-                            protocol_apply_self_with_receiver(
+                            self.bind_protocol_receiver(
                                 db,
-                                env.program(db),
                                 callable,
                                 implementation_receiver_binding_ty,
                                 implementation_self_binding_ty,
                             )
                         }),
-                        protocol_apply_self_with_receiver(
+                        self.bind_protocol_receiver(
                             db,
-                            env.program(db),
                             required_callable,
                             protocol_receiver_binding_ty,
                             protocol_self_binding_ty,
@@ -2833,7 +2847,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 })
         } else if member.is_instance_method(db) {
             attribute_type
-                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
+                .try_upcast_to_callable_for_relation(db, env, UpcastPolicy::from(self.relation))
                 .when_some_and(db, self.constraints, |callables| {
                     callables.iter().when_all(db, self.constraints, |callable| {
                         if callable.is_function_like(db) {
@@ -2878,9 +2892,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             self.check_type_pair(
                 db,
                 attribute_type,
-                Type::Callable(protocol_apply_self_with_receiver(
+                Type::Callable(self.bind_protocol_receiver(
                     db,
-                    env.program(db),
                     required_callable,
                     protocol_receiver_binding_ty,
                     protocol_self_binding_ty,
@@ -3154,9 +3167,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 if matches!(access.declaration.kind, ProtocolMemberKind::Method(..))
                     && let Type::Callable(callable) = ty
                 {
-                    Some(Type::Callable(protocol_apply_self_with_receiver(
+                    Some(Type::Callable(self.bind_protocol_receiver(
                         db,
-                        env.program(db),
                         callable,
                         source_type,
                         source_type,
@@ -3259,10 +3271,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 let result = source_member.when_some_and(db, self.constraints, |source_member| {
                     let work = || {
-                        let source_visitor = ApplyTypeMappingVisitor::new(env)
+                        let source_visitor = self
+                            .materialization_visitor
+                            .for_new_materialization_root()
                             .with_signature_relations(self.signature_relation_visitor);
                         let source_data = source_member.data_for_relation(db, &source_visitor);
-                        let target_visitor = ApplyTypeMappingVisitor::new(env)
+                        let target_visitor = self
+                            .materialization_visitor
+                            .for_new_materialization_root()
                             .with_signature_relations(self.signature_relation_visitor);
                         let target_data = target_member.data_for_relation(db, &target_visitor);
                         let check_access = |mode| {
@@ -3403,13 +3419,23 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             }
 
             let Some(callables) =
-                ty.try_upcast_to_callable_with_policy(db, env, UpcastPolicy::Sound)
+                ty.try_upcast_to_callable_for_relation(db, env, UpcastPolicy::Sound)
             else {
                 return self.never();
             };
 
             callables.iter().when_all(db, self.constraints, |callable| {
-                if !callable_has_only_non_never_returns(db, *callable) {
+                let checker = self.as_relation_checker(TypeRelation::Assignability);
+                let signatures = callable
+                    .signatures(db)
+                    .iter()
+                    .filter(|signature| signature.receiver_is_applicable(db, &checker))
+                    .collect::<Vec<_>>();
+                if signatures.is_empty()
+                    || signatures
+                        .iter()
+                        .any(|signature| signature.return_ty.resolve_type_alias(db).is_never())
+                {
                     return self.never();
                 }
 
@@ -3420,10 +3446,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     .signatures(db)
                     .iter()
                     .when_all(db, self.constraints, |method_signature| {
-                        callable.signatures(db).iter().when_all(
-                            db,
-                            self.constraints,
-                            |callable_signature| {
+                        signatures
+                            .iter()
+                            .when_all(db, self.constraints, |callable_signature| {
                                 let result = self.check_type_pair(
                                     db,
                                     method_signature.return_ty,
@@ -3438,8 +3463,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                                     });
                                 }
                                 result
-                            },
-                        )
+                            })
                     })
             })
         };
@@ -3848,24 +3872,6 @@ fn protocol_bind_self<'db>(
                 .bind_self_with_receiver(db, &env, self_type, self_type),
         )
         .into_regular(db)
-}
-
-/// Cache receiver and `Self` binding only for protocol-member compatibility checks.
-#[salsa::tracked(
-    returns(copy),
-    cycle_initial=|db, _, _, _, _, _| CallableType::bottom(db),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn protocol_apply_self_with_receiver<'db>(
-    db: &'db dyn Db,
-    program: Program<'db>,
-    callable: CallableType<'db>,
-    receiver_type: Type<'db>,
-    self_type: Type<'db>,
-) -> CallableType<'db> {
-    let env = ProgramEnvironment::from_program(program);
-
-    callable.apply_self_with_receiver(db, &env, receiver_type, self_type)
 }
 
 /// Return `true` if a callable has at least one overload and none return `Never`.

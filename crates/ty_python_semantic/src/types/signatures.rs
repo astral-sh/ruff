@@ -24,9 +24,11 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
+use crate::types::constraints::projection::SolutionBudget;
+use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
-    IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
+    IteratorConstraintsExtension, PathBoundSolution, SolutionPaths, Solutions,
 };
 use crate::types::cyclic::ActiveRecursionDetector;
 use crate::types::generics::{
@@ -119,28 +121,172 @@ pub struct CallableSignature<'db> {
     pub(crate) overloads: SmallVec<[Signature<'db>; 1]>,
 }
 
+#[derive(Clone, Copy, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
+struct ReceiverRequirement<'db> {
+    receiver: Type<'db>,
+    annotation: Type<'db>,
+    binding: ReceiverBinding,
+}
+
+#[derive(Clone, Copy, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
+enum ReceiverBinding {
+    /// The callable has captured an actual receiver, whose requirement is already fixed.
+    Captured,
+    /// A protocol member still requires a receiver supplied by its eventual implementation.
+    Unbound,
+}
+
+/// Requirements introduced by binding a receiver, evaluated by call inference or signature comparison.
+/// Retaining their operands lets signature comparisons use the active recursion guard.
+#[derive(Clone, Debug, get_size2::GetSize, PartialEq, Eq, Hash, salsa::SalsaValue)]
+struct ReceiverConstraints<'db>(Box<[ReceiverRequirement<'db>]>);
+
+impl<'db> ReceiverConstraints<'db> {
+    fn new(
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        annotation: Type<'db>,
+        binding: ReceiverBinding,
+    ) -> Option<Self> {
+        (!receiver.is_trivially_constraint_set_assignable_to(db, annotation)).then(|| {
+            Self(Box::new([ReceiverRequirement {
+                receiver,
+                annotation,
+                binding,
+            }]))
+        })
+    }
+
+    fn impossible() -> Self {
+        Self(Box::new([ReceiverRequirement {
+            receiver: Type::object(),
+            annotation: Type::Never,
+            binding: ReceiverBinding::Captured,
+        }]))
+    }
+
+    fn types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
+        self.0
+            .iter()
+            .flat_map(|requirement| [requirement.receiver, requirement.annotation])
+    }
+
+    fn when_satisfied<'c>(
+        &self,
+        db: &'db dyn Db,
+        checker: &TypeRelationChecker<'_, 'c, 'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        // Receiver annotations constrain which object can bind the method. They use
+        // assignability even when the surrounding callable comparison checks subtyping.
+        let mut receiver_checker = checker.clone();
+        receiver_checker.relation = TypeRelation::Assignability;
+        receiver_checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        self.0.iter().when_all(
+            db,
+            checker.constraints,
+            |&ReceiverRequirement {
+                 receiver,
+                 annotation,
+                 ..
+             }| {
+                let receiver_typevar = match annotation {
+                    Type::TypeVar(typevar) => Some(typevar),
+                    Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
+                    _ => None,
+                };
+                let domain = receiver_typevar.map_or_else(
+                    || receiver_checker.always(),
+                    |typevar| {
+                        Signature::receiver_domain_when_satisfied(
+                            db,
+                            &receiver_checker,
+                            receiver,
+                            typevar,
+                        )
+                    },
+                );
+                domain.and(db, checker.constraints, || {
+                    receiver_checker.check_type_pair(db, receiver, annotation)
+                })
+            },
+        )
+    }
+
+    fn map(
+        &self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Option<Self> {
+        // Materialization leaves an already captured receiver's requirement unchanged. A
+        // protocol member has not captured a receiver yet: its annotation is still part of
+        // the interface being materialized, and constrains the eventual implementation.
+        let specialization = match type_mapping {
+            TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
+                Some(TypeMapping::ApplySpecialization(*specialization))
+            }
+            _ => None,
+        };
+        let captured_mapping = match type_mapping {
+            TypeMapping::Materialize(_) => None,
+            _ => Some(specialization.as_ref().unwrap_or(type_mapping)),
+        };
+        let pairs =
+            self.0
+                .iter()
+                .filter_map(
+                    |&ReceiverRequirement {
+                         receiver,
+                         annotation,
+                         binding,
+                     }| {
+                        let receiver = captured_mapping.map_or(receiver, |mapping| {
+                            receiver.apply_type_mapping_impl(db, mapping, tcx, visitor)
+                        });
+                        let annotation_mapping = match binding {
+                            ReceiverBinding::Captured => captured_mapping,
+                            ReceiverBinding::Unbound => Some(type_mapping),
+                        };
+                        let annotation = annotation_mapping.map_or(annotation, |mapping| {
+                            annotation.apply_type_mapping_impl(db, mapping, tcx, visitor)
+                        });
+                        (!receiver.is_trivially_constraint_set_assignable_to(db, annotation))
+                            .then_some(ReceiverRequirement {
+                                receiver,
+                                annotation,
+                                binding,
+                            })
+                    },
+                )
+                .collect::<Box<[_]>>();
+        (!pairs.is_empty()).then_some(Self(pairs))
+    }
+
+    /// Marks the requirements as fixed after replacing the protocol's placeholder receiver.
+    fn capture(mut self) -> Self {
+        for requirement in &mut self.0 {
+            requirement.binding = ReceiverBinding::Captured;
+        }
+        self
+    }
+}
+
 fn merge_receiver_constraints<'db>(
-    db: &'db dyn Db,
-    env: &ProgramEnvironment<'db>,
-    first: Option<&OwnedConstraintSet<'db>>,
-    second: Option<&OwnedConstraintSet<'db>>,
-) -> Option<OwnedConstraintSet<'db>> {
-    // Only discard sets whose root is the `always` terminal. A false negative from this cheap check
-    // merely falls through to the merge below. Retaining such a nonterminal set is also important:
-    // its presence makes signature comparison use lazy typevar evaluation.
-    match (
-        first.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-        second.filter(|constraints| !constraints.is_trivially_always_satisfied()),
-    ) {
+    first: Option<&ReceiverConstraints<'db>>,
+    second: Option<&ReceiverConstraints<'db>>,
+) -> Option<ReceiverConstraints<'db>> {
+    match (first, second) {
         (None, None) => None,
-        (Some(constraints), None) | (None, Some(constraints)) => Some((*constraints).clone()),
+        (Some(constraints), None) | (None, Some(constraints)) => Some(constraints.clone()),
         (Some(first), Some(second)) => {
-            let constraints = ConstraintSetBuilder::new();
-            Some(constraints.into_owned(|builder| {
-                builder
-                    .load(db, env, first)
-                    .and(db, builder, || builder.load(db, env, second))
-            }))
+            let mut pairs = first.0.to_vec();
+            for pair in &second.0 {
+                if !pairs.contains(pair) {
+                    pairs.push(*pair);
+                }
+            }
+            Some(ReceiverConstraints(pairs.into_boxed_slice()))
         }
     }
 }
@@ -395,8 +541,6 @@ impl<'db> CallableSignature<'db> {
                                         visitor,
                                     );
                                     merge_receiver_constraints(
-                                        db,
-                                        env,
                                         signature.receiver_constraints(),
                                         mapped.as_ref(),
                                     )
@@ -565,13 +709,14 @@ impl<'db> CallableSignature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         Self {
             overloads: self
                 .overloads
                 .iter()
                 .map(|signature| {
-                    signature.apply_self_with_receiver(db, env, receiver_type, self_type)
+                    signature.apply_self_with_receiver(db, env, receiver_type, self_type, visitor)
                 })
                 .collect(),
         }
@@ -685,7 +830,7 @@ struct SignatureExtras<'db> {
     source_overload_index: Option<NonZeroU32>,
 
     /// The constraint introduced by binding an explicitly annotated receiver, if any.
-    receiver_constraints: Option<OwnedConstraintSet<'db>>,
+    receiver_constraints: Option<ReceiverConstraints<'db>>,
 
     /// Whether this signature is part of the value assigned to a `ParamSpec`.
     ///
@@ -700,7 +845,7 @@ struct SignatureExtras<'db> {
 impl<'db> SignatureExtras<'db> {
     fn new(
         source_overload_index: Option<NonZeroU32>,
-        receiver_constraints: Option<OwnedConstraintSet<'db>>,
+        receiver_constraints: Option<ReceiverConstraints<'db>>,
         is_paramspec_value: bool,
     ) -> Option<Box<Self>> {
         (source_overload_index.is_some() || receiver_constraints.is_some() || is_paramspec_value)
@@ -1164,6 +1309,15 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         delta: u32,
     ) -> Self {
+        self.freshen_bound_typevars_with_visitor(db, delta, &ApplyTypeMappingVisitor::new(env))
+    }
+
+    fn freshen_bound_typevars_with_visitor(
+        &self,
+        db: &'db dyn Db,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
         let Some(generic_context) = self.generic_context else {
             return self.clone();
         };
@@ -1175,7 +1329,7 @@ impl<'db> Signature<'db> {
                 delta,
             },
             TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(env),
+            visitor,
         )
     }
 
@@ -1352,9 +1506,9 @@ impl<'db> Signature<'db> {
         let receiver_constraint = if impossible_receiver {
             // Keep the signature for bound-method diagnostics, but make it incompatible with
             // callable contracts: no parameter can receive the implicit positional argument.
-            Some(std::borrow::Cow::Owned(OwnedConstraintSet::default()))
+            Some(ReceiverConstraints::impossible())
         } else {
-            explicit_receiver.map(|parameter| {
+            explicit_receiver.and_then(|parameter| {
                 let receiver = receiver_type.unwrap_or_else(|| {
                     Type::TypeVar(BoundTypeVarInstance::synthetic_self(
                         db,
@@ -1378,28 +1532,20 @@ impl<'db> Signature<'db> {
                 } else {
                     parameter.annotated_type()
                 };
-                // TODO: Also intersect nested receiver type variables, such as the `T` in
-                // `self: list[T]`, with their valid specializations when constructing or solving the
-                // receiver constraint set.
-                let receiver_typevar = match annotation {
-                    Type::TypeVar(typevar) => Some(typevar),
-                    Type::TypeAlias(_) => annotation.resolve_type_alias(db).as_typevar(),
-                    _ => None,
-                };
-                if receiver_typevar.is_some_and(|typevar| {
-                    Self::receiver_violates_typevar_domain(db, env, receiver, typevar)
-                }) {
-                    return std::borrow::Cow::Owned(OwnedConstraintSet::default());
-                }
-                receiver.when_constraint_set_assignable_to_owned(db, env, annotation)
+                ReceiverConstraints::new(
+                    db,
+                    receiver,
+                    annotation,
+                    if receiver_type.is_some() {
+                        ReceiverBinding::Captured
+                    } else {
+                        ReceiverBinding::Unbound
+                    },
+                )
             })
         };
-        let receiver_constraints = merge_receiver_constraints(
-            db,
-            env,
-            self.receiver_constraints(),
-            receiver_constraint.as_deref(),
-        );
+        let receiver_constraints =
+            merge_receiver_constraints(self.receiver_constraints(), receiver_constraint.as_ref());
         if let Some(self_type) = typing_self_type
             && self.needs_self_mapping(db, env, parameters.as_slice())
         {
@@ -1429,38 +1575,44 @@ impl<'db> Signature<'db> {
         }
     }
 
-    /// Returns whether a concrete receiver violates a direct receiver type variable's domain.
-    ///
-    /// Unbounded or non-concrete receivers do not provably violate the domain and return `false`,
-    /// leaving the original receiver relation available to normal inference. Transparent PEP 695
-    /// receiver aliases are resolved by the caller before this check.
+    /// Checks a concrete receiver against a direct type variable's bounds before using it
+    /// as a candidate specialization of that variable.
     ///
     /// ```python
     /// class C:
     ///     def method[T: int](self: T) -> None: ...
     /// ```
-    fn receiver_violates_typevar_domain(
+    fn receiver_domain_when_satisfied<'c>(
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        checker: &TypeRelationChecker<'_, 'c, 'db>,
         receiver: Type<'db>,
         typevar: BoundTypeVarInstance<'db>,
-    ) -> bool {
+    ) -> ConstraintSet<'db, 'c> {
+        let env = checker.env;
         let Some(domain) = typevar.typevar(db).bound_or_constraints(db, env) else {
-            return false;
+            return checker.always();
         };
         if receiver.has_typevar(db, env) {
-            return false;
+            return checker.always();
         }
 
-        !match domain {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                receiver.is_assignable_to(db, env, bound.top_materialization(db, env))
-            }
-            TypeVarBoundOrConstraints::Constraints(constraints) => {
-                constraints.elements(db).iter().any(|constraint| {
-                    receiver.is_assignable_to(db, env, constraint.top_materialization(db, env))
-                })
-            }
+        let mut domain_checker = checker.clone();
+        domain_checker.typevar_evaluation = TypeVarEvaluation::Eager;
+        domain_checker.inferable = TypeVarSet::None;
+        let check_bound = |bound: Type<'db>| {
+            let bound = bound.materialize(
+                db,
+                MaterializationKind::Top,
+                checker.materialization_visitor,
+            );
+            domain_checker.check_type_pair(db, receiver, bound)
+        };
+        match domain {
+            TypeVarBoundOrConstraints::UpperBound(bound) => check_bound(bound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                .elements(db)
+                .iter()
+                .when_any(db, checker.constraints, |&bound| check_bound(bound)),
         }
     }
 
@@ -1485,21 +1637,28 @@ impl<'db> Signature<'db> {
         };
 
         let constraints = ConstraintSetBuilder::new();
-        let when = constraints.load(db, env, receiver_constraints);
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let signature_visitor = SignatureRelationVisitor::default();
+        let mapping_visitor = ApplyTypeMappingVisitor::new(env);
+        let checker = TypeRelationChecker::constraint_set_assignability(
+            env,
+            &constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_visitor,
+            &mapping_visitor,
+        );
+        let when = receiver_constraints.when_satisfied(db, &checker);
         let inferable = self.inferable_typevars(db);
 
-        match when.solutions(db, env, inferable) {
+        let multiple_paths = match when.solutions(db, env, inferable) {
             Ok(Solutions::Unsatisfiable(_)) => return None,
             Ok(Solutions::Unconstrained) | Err(_) => {
                 return Some(CallableSignature::single(self.clone()));
             }
-            // Each receiver path can leave a different type variable unconstrained. Preserve the
-            // original relation instead of combining those independent solutions.
-            Ok(Solutions::Constrained(solutions)) if solutions.as_slice().len() > 1 => {
-                return Some(CallableSignature::single(self.clone()));
-            }
-            Ok(Solutions::Constrained(_)) => {}
-        }
+            Ok(Solutions::Constrained(solutions)) => solutions.as_slice().len() > 1,
+        };
 
         let Some(generic_context) = self.generic_context else {
             return Some(CallableSignature::single(self.clone()));
@@ -1507,34 +1666,80 @@ impl<'db> Signature<'db> {
 
         let mut builder = SpecializationBuilder::new(db, env, &constraints, generic_context);
         builder.add_constraint_set(when).ok()?;
-        let concrete_class_receiver =
-            matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
-        let specialization = builder.build_merged_with(|typevar, bounds| {
-            if let Some(bounds) = bounds
-                && bounds.as_exact(db, env).is_some()
-                && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
-            {
-                return Some(solution);
-            }
+        let specialization = if multiple_paths {
+            // Different receiver paths can leave different variables unconstrained. Only bind
+            // a variable when every complete path determines the same exact type for it.
+            let Ok(Solutions::Constrained(SolutionPaths::Complete(paths))) = when.solutions_with(
+                db,
+                env,
+                inferable,
+                SolutionBudget::default(),
+                |_, bounds| {
+                    bounds
+                        .as_exact(db, env)
+                        .map_or(PathBoundSolution::Unsolved, PathBoundSolution::Solved)
+                },
+            ) else {
+                return Some(CallableSignature::single(self.clone()));
+            };
+            let paths = paths
+                .into_iter()
+                .map(|path| {
+                    let resolved = resolve_solution(db, env, inferable, &path.solved_typevars);
+                    path.solved_typevars
+                        .into_iter()
+                        .zip(resolved)
+                        .map(|(binding, ty)| (binding.bound_typevar.identity(db), ty))
+                        .collect::<FxHashMap<_, _>>()
+                })
+                .collect::<Vec<_>>();
+            generic_context.specialize_recursive(
+                db,
+                generic_context.variables(db).map(|variable| {
+                    let identity = variable.identity(db);
+                    let agreed = paths.first().and_then(|path| path.get(&identity)).copied();
+                    Some(match agreed {
+                        Some(SolutionType::Resolved(ty))
+                            if paths
+                                .iter()
+                                .all(|path| path.get(&identity).copied() == agreed) =>
+                        {
+                            ty
+                        }
+                        _ => Type::TypeVar(variable),
+                    })
+                }),
+            )
+        } else {
+            let concrete_class_receiver =
+                matches!(receiver_type, Type::ClassLiteral(_) | Type::GenericAlias(_));
+            builder.build_merged_with(|typevar, bounds| {
+                if let Some(bounds) = bounds
+                    && bounds.as_exact(db, env).is_some()
+                    && let Some(solution) =
+                        CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                {
+                    return Some(solution);
+                }
 
-            if let Some(bounds) = bounds
-                && concrete_class_receiver
-                && bound_signature
-                    .variance_of(db, env, typevar.identity(db))
-                    .evaluate(db)
-                    .is_covariant()
-                && bounds
-                    .inference_lower(db, env)
-                    .is_some_and(|lower| !lower.is_never())
-                && let Some(solution) =
-                    CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
-            {
-                return Some(solution);
-            }
+                if let Some(bounds) = bounds
+                    && concrete_class_receiver
+                    && bound_signature
+                        .variance_of(db, env, typevar.identity(db))
+                        .evaluate(db)
+                        .is_covariant()
+                    && bounds
+                        .inference_lower(db, env)
+                        .is_some_and(|lower| !lower.is_never())
+                    && let Some(solution) =
+                        CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
+                {
+                    return Some(solution);
+                }
 
-            Some(Type::TypeVar(typevar))
-        });
+                Some(Type::TypeVar(typevar))
+            })
+        };
 
         let type_mapping =
             TypeMapping::ApplySpecialization(ApplySpecialization::specialization(specialization));
@@ -1762,6 +1967,7 @@ impl<'db> Signature<'db> {
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         self_type: Type<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         let binding_context = self.definition.map(BindingContext::Definition);
         let receiver_mapping = TypeMapping::BindSelf(SelfBinding::new(
@@ -1772,9 +1978,8 @@ impl<'db> Signature<'db> {
         ));
         let self_mapping =
             TypeMapping::BindSelf(SelfBinding::new(db, env, self_type, binding_context));
-        let receiver_visitor = ApplyTypeMappingVisitor::new(env);
-        let self_visitor = ApplyTypeMappingVisitor::new(env);
-        let inferable = self.inferable_typevars(db);
+        let receiver_visitor = visitor.for_new_materialization_root();
+        let self_visitor = visitor.for_new_materialization_root();
         let receiver_constraints = self
             .map_receiver_constraints(
                 db,
@@ -1782,20 +1987,10 @@ impl<'db> Signature<'db> {
                 TypeContext::default(),
                 &receiver_visitor,
             )
-            .map(|constraints| {
-                Self::map_constraints(
-                    db,
-                    &constraints,
-                    &self_mapping,
-                    TypeContext::default(),
-                    &self_visitor,
-                )
+            .and_then(|constraints| {
+                constraints.map(db, &self_mapping, TypeContext::default(), &self_visitor)
             })
-            .filter(|constraints| {
-                !constraints.query(|_builder, constraints| {
-                    constraints.is_always_satisfied(db, env, inferable)
-                })
-            });
+            .map(ReceiverConstraints::capture);
         if !self.needs_self_mapping(db, env, self.parameters.as_slice()) {
             return Self {
                 extras: SignatureExtras::new(
@@ -1832,6 +2027,23 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Returns whether at least one specialization can satisfy this bound receiver.
+    /// Disjointness checks use this to exclude inapplicable overloads before comparing returns.
+    pub(super) fn receiver_is_applicable<'c>(
+        &self,
+        db: &'db dyn Db,
+        checker: &TypeRelationChecker<'_, 'c, 'db>,
+    ) -> bool {
+        let inferable = checker.inferable.merge(db, self.inferable_typevars(db));
+        let mut checker = checker.with_inferable_typevars(inferable);
+        checker.relation = TypeRelation::Assignability;
+        checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        let when = checker.with_signature_recursion_guard(self, self, |checker| {
+            self.receiver_constraints_when_satisfied(db, checker)
+        });
+        !when.is_never_satisfied(db, checker.env, inferable)
+    }
+
     fn receiver_constraints_when_satisfied<'c>(
         &self,
         db: &'db dyn Db,
@@ -1840,9 +2052,44 @@ impl<'db> Signature<'db> {
         let Some(constraints) = self.receiver_constraints() else {
             return checker.always();
         };
-        checker
-            .constraints
-            .load_with_provenance(db, checker.env, constraints, checker.provenance)
+        // These variables are existentially quantified after comparing the signatures. Retain
+        // their declared domains so a nested receiver such as `Box[T]` cannot choose an invalid
+        // specialization of a constrained or bounded method type variable.
+        constraints
+            .when_satisfied(db, checker)
+            .and(db, checker.constraints, || {
+                self.generic_context
+                    .into_iter()
+                    .flat_map(|context| context.variables(db))
+                    .when_all(db, checker.constraints, |typevar| {
+                        match typevar.typevar(db).bound_or_constraints(db, checker.env) {
+                            None => checker.always(),
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                ConstraintSet::constrain_typevar_upper_bound(
+                                    db,
+                                    checker.env,
+                                    checker.constraints,
+                                    ConstraintProvenance::Validity,
+                                    typevar,
+                                    bound,
+                                )
+                            }
+                            Some(TypeVarBoundOrConstraints::Constraints(choices)) => choices
+                                .elements(db)
+                                .iter()
+                                .when_any(db, checker.constraints, |&choice| {
+                                    ConstraintSet::constrain_typevar_equivalence_bound(
+                                        db,
+                                        checker.env,
+                                        checker.constraints,
+                                        ConstraintProvenance::Validity,
+                                        typevar,
+                                        choice,
+                                    )
+                                }),
+                        }
+                    })
+            })
     }
 
     fn map_receiver_constraints(
@@ -1851,40 +2098,15 @@ impl<'db> Signature<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Option<OwnedConstraintSet<'db>> {
-        let constraints =
-            Self::map_constraints(db, self.receiver_constraints()?, type_mapping, tcx, visitor);
-        (!constraints.query(|_builder, constraints| {
-            constraints.is_always_satisfied(db, visitor.env, self.inferable_typevars(db))
-        }))
-        .then_some(constraints)
-    }
-
-    fn map_constraints(
-        db: &'db dyn Db,
-        constraints: &OwnedConstraintSet<'db>,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> OwnedConstraintSet<'db> {
-        if !constraints
-            .types()
-            .any(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor) != ty)
-        {
-            return constraints.clone();
-        }
-
-        let builder = ConstraintSetBuilder::new();
-        builder.into_owned(|builder| {
-            let constraints = builder.load(db, visitor.env, constraints);
-            constraints.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-        })
+    ) -> Option<ReceiverConstraints<'db>> {
+        self.receiver_constraints()?
+            .map(db, type_mapping, tcx, visitor)
     }
 
     pub(super) fn receiver_constraint_types(&self) -> impl Iterator<Item = Type<'db>> + '_ {
         self.receiver_constraints()
             .into_iter()
-            .flat_map(OwnedConstraintSet::types)
+            .flat_map(ReceiverConstraints::types)
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
@@ -2251,7 +2473,7 @@ impl<'db> Signature<'db> {
             .and_then(|extras| extras.source_overload_index)
     }
 
-    fn receiver_constraints(&self) -> Option<&OwnedConstraintSet<'db>> {
+    fn receiver_constraints(&self) -> Option<&ReceiverConstraints<'db>> {
         self.extras
             .as_ref()
             .and_then(|extras| extras.receiver_constraints.as_ref())
@@ -2431,7 +2653,26 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &CallableSignature<'db>,
         target: &CallableSignature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        self.check_callable_signature_pair_inner(db, &source.overloads, &target.overloads)
+        let applicable;
+        let source_overloads = if source.overloads.len() > 1
+            && source
+                .overloads
+                .iter()
+                .any(|signature| signature.receiver_constraints().is_some())
+        {
+            // Receiver inference is deferred when preparing a method for this relation.
+            // Remove overloads that cannot bind before selecting an overload or its diagnostics.
+            applicable = source
+                .overloads
+                .iter()
+                .filter(|signature| signature.receiver_is_applicable(db, self))
+                .cloned()
+                .collect::<Vec<_>>();
+            applicable.as_slice()
+        } else {
+            &source.overloads
+        };
+        self.check_callable_signature_pair_inner(db, source_overloads, &target.overloads)
     }
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
@@ -2640,6 +2881,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let mut checker = self.clone();
+        // Preserve receiver-scoped variables until the signature's inference and quantification.
+        if source.receiver_constraints().is_some() || target.receiver_constraints().is_some() {
+            checker.typevar_evaluation = TypeVarEvaluation::Lazy;
+        }
+        checker.with_signature_recursion_guard(source, target, |checker| {
+            checker.check_signature_pair_guarded(db, source, target)
+        })
+    }
+
+    fn check_signature_pair_guarded(
+        &self,
+        db: &'db dyn Db,
+        source: &Signature<'db>,
+        target: &Signature<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let env = self.env;
         // In lazy comparisons, a captured parameter list refers to typevars owned by the
         // surrounding call inference. Preserve constraints on those variables instead of
@@ -2662,7 +2919,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
         {
-            freshened_source = source.freshen_bound_typevars(db, env, delta);
+            freshened_source =
+                source.freshen_bound_typevars_with_visitor(db, delta, self.materialization_visitor);
             &freshened_source
         } else {
             source
@@ -2674,7 +2932,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .max_typevar_freshness_matching_generic_context(db, generic_context)
                 .map(|freshness| freshness.increment().value())
         {
-            freshened_target = target.freshen_bound_typevars(db, env, delta);
+            freshened_target =
+                target.freshen_bound_typevars_with_visitor(db, delta, self.materialization_visitor);
             &freshened_target
         } else {
             target
@@ -2691,24 +2950,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
-        let mut checker = self.with_inferable_typevars(inferable);
-        // Every nonterminal receiver constraint constrains at least one typevar. Terminal `always`
-        // sets are discarded when receiver constraints are merged, so presence alone is enough to
-        // require lazy typevar evaluation here.
-        if source.receiver_constraints().is_some() || target.receiver_constraints().is_some() {
-            checker.typevar_evaluation = TypeVarEvaluation::Lazy;
-        }
-        let when = checker.with_signature_recursion_guard(source, target, || {
-            source
-                .receiver_constraints_when_satisfied(db, &checker)
-                .and(db, self.constraints, || {
-                    target
-                        .receiver_constraints_when_satisfied(db, &checker)
-                        .and(db, self.constraints, || {
-                            checker.check_signature_pair_inner(db, source, target)
-                        })
-                })
-        });
+        let checker = self.with_inferable_typevars(inferable);
+        let when = source
+            .receiver_constraints_when_satisfied(db, &checker)
+            .and(db, self.constraints, || {
+                target
+                    .receiver_constraints_when_satisfied(db, &checker)
+                    .and(db, self.constraints, || {
+                        checker.check_signature_pair_inner(db, source, target)
+                    })
+            });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
         // we produce, we reduce it back down to the inferable set that the caller asked about.
@@ -2717,19 +2968,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         when.reduce_inferable(db, env, self.constraints, signature_inferable)
     }
 
+    /// Runs a signature obligation with the same recursion context for relations and mappings.
+    /// Receiver validation and signature preparation can materialize types, whose simplification
+    /// may compare this signature again. The supplied checker keeps those nested comparisons in
+    /// the active proof instead of starting a separate signature recursion guard.
     fn with_signature_recursion_guard(
         &self,
         source: &Signature<'db>,
         target: &Signature<'db>,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+        work: impl FnOnce(&TypeRelationChecker<'_, 'c, 'db>) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
+        let mapping = self
+            .materialization_visitor
+            .for_new_materialization_root()
+            .with_signature_relations(self.signature_relation_visitor);
+        let mut checker = self.clone();
+        checker.materialization_visitor = &mapping;
         let Some(key) = SignatureRelationKey::from_signatures(
             source,
             target,
             self.relation,
             self.typevar_evaluation,
         ) else {
-            return work();
+            return work(&checker);
         };
 
         // Signature recursion through recursive protocols is coinductive in the same way as
@@ -2739,7 +3000,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // the finite layer still bubbles out of `work`, because only exact active revisits take
         // this branch and the result is not memoized.
         self.signature_relation_visitor
-            .visit(&key, || self.always(), work)
+            .visit(&key, || self.always(), || work(&checker))
     }
 
     fn check_signature_return_pair(
@@ -6490,14 +6751,17 @@ mod tests {
     #[test]
     fn always_satisfied_receiver_constraints_are_discarded() {
         let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
         assert!(
-            merge_receiver_constraints(db, &env, Some(&OwnedConstraintSet::always()), None,)
-                .is_none()
+            ReceiverConstraints::new(
+                &db,
+                Type::object(),
+                Type::object(),
+                ReceiverBinding::Captured,
+            )
+            .is_none()
         );
         assert!(
-            merge_receiver_constraints(db, &env, None, Some(&OwnedConstraintSet::always()),)
+            ReceiverConstraints::new(&db, Type::any(), Type::object(), ReceiverBinding::Captured,)
                 .is_none()
         );
     }

@@ -234,6 +234,55 @@ class Undecorated(Parent):
     def __new__(cls, value: str) -> Undecorated: ...
 ```
 
+## Metaclass constructor signatures
+
+A metaclass's `__call__` defines a constructor, so its signature can differ from the superclass
+signature. An explicit `@override` still requires compatibility.
+
+```pyi
+from typing_extensions import override
+
+class ParentMeta(type):
+    def __call__(cls, value: int) -> object: ...
+
+class ChangedMeta(ParentMeta):
+    def __call__(cls, value: str) -> object: ...  # no diagnostic
+
+class CompatibleMeta(ParentMeta):
+    @override
+    def __call__(cls, value: int) -> object: ...  # no diagnostic
+
+class IncompatibleMeta(ParentMeta):
+    @override
+    def __call__(cls, value: str) -> object: ...  # snapshot: invalid-method-override
+```
+
+```snapshot
+error[invalid-method-override]: Invalid override of method `__call__`
+  --> src/mdtest_snippet.pyi:15:9
+   |
+15 |     def __call__(cls, value: str) -> object: ...  # snapshot: invalid-method-override
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `ParentMeta.__call__`
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 4 |     def __call__(cls, value: int) -> object: ...
+   |         ----------------------------------- `ParentMeta.__call__` defined here
+info: parameter `value` has an incompatible type: `int` is not assignable to `str`
+info: This violates the Liskov Substitution Principle
+```
+
+An ordinary class's `__call__` describes calls to its instances and retains the usual override
+requirements, including without `@override`:
+
+```pyi
+class Parent:
+    def __call__(self, value: int) -> object: ...
+
+class Child(Parent):
+    def __call__(self, value: str) -> object: ...  # error: [invalid-method-override]
+```
+
 ## Constructor overrides with `Self` parameters
 
 `Self` is a type variable bounded by the class that defines the method. The parent's constructor
@@ -669,7 +718,8 @@ missing-override-decorator = "error"
 ```
 
 This rule requires the `@override` decorator on any method that overrides a superclass member, with
-the exception of `__init__`, `__new__`, `__init_subclass__`, or `__post_init__`.
+the exception of `__init__`, `__new__`, `__init_subclass__`, `__post_init__`, and a metaclass's
+`__call__`.
 
 ```py
 from abc import ABC, abstractmethod

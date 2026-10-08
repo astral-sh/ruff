@@ -49,6 +49,31 @@ reveal_type(generic_context(C))
 reveal_type(C(1))
 ```
 
+Type variables nested in an explicit receiver annotation must satisfy their declared bounds or
+constraints when the bound method is assigned to a callable type:
+
+```py
+Bounded = TypeVar("Bounded", bound=int)
+Constrained = TypeVar("Constrained", int, str)
+
+class InvalidNestedBoundedReceiver(list[str]):
+    def method(self: list[Bounded]) -> None: ...
+
+class ValidNestedBoundedReceiver(list[int]):
+    def method(self: list[Bounded]) -> None: ...
+
+class InvalidUnionConstrainedReceiver:
+    def method(self: Constrained | None) -> None: ...
+
+class ValidUnionConstrainedReceiver(str):
+    def method(self: Constrained | None) -> None: ...
+
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+valid_nested_bound: Callable[[], None] = ValidNestedBoundedReceiver().method  # no diagnostic
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
+valid_union_constraints: Callable[[], None] = ValidUnionConstrainedReceiver().method  # no diagnostic
+```
+
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
 
 ```py

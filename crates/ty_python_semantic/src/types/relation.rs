@@ -21,8 +21,8 @@ use crate::types::typevar::TypeVarDomain;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
+    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -528,7 +528,11 @@ impl<'db> Type<'db> {
 
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
     /// before constructing the relation checker.
-    fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(super) fn is_trivially_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
         if self.materialized_divergent_fallback().is_none() && self == target {
             return true;
         }
@@ -1439,7 +1443,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // situations.
                 let source_ty = match self.relation {
                     TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => source,
-                    TypeRelation::Assignability => source.bottom_materialization(db, self.env),
+                    TypeRelation::Assignability => source.materialize(
+                        db,
+                        MaterializationKind::Bottom,
+                        self.materialization_visitor,
+                    ),
                 };
                 intersection
                     .negative(db)
@@ -1447,9 +1455,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     .when_all(db, self.constraints, |&negative| {
                         let negative = match self.relation {
                             TypeRelation::Subtyping | TypeRelation::Redundancy { .. } => negative,
-                            TypeRelation::Assignability => {
-                                negative.bottom_materialization(db, self.env)
-                            }
+                            TypeRelation::Assignability => negative.materialize(
+                                db,
+                                MaterializationKind::Bottom,
+                                self.materialization_visitor,
+                            ),
                         };
                         self.as_disjointness_checker()
                             .check_type_pair(db, source_ty, negative)
@@ -1762,7 +1772,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
                 let upper = if self.relation.is_subtyping() {
-                    target.bottom_materialization(db, env)
+                    target.materialize(
+                        db,
+                        MaterializationKind::Bottom,
+                        self.materialization_visitor,
+                    )
                 } else {
                     target
                 };
@@ -1776,7 +1790,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
                 let lower = if self.relation.is_subtyping() {
-                    source.top_materialization(db, env)
+                    source.materialize(db, MaterializationKind::Top, self.materialization_visitor)
                 } else {
                     source
                 };
@@ -2364,7 +2378,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // Upcast the type variable directly rather than promoting it to its upper bound,
                 // such that `Self` in the callable signature refers back to the original type variable.
                 if let Type::Callable(target_callable) = target
-                    && let Some(callables) = source.try_upcast_to_callable_with_policy(
+                    && let Some(callables) = source.try_upcast_to_callable_for_relation(
                         db,
                         env,
                         UpcastPolicy::from(self.relation),
@@ -2516,7 +2530,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     } else {
                         target_callable
                     };
-                    let Some(callables) = source.try_upcast_to_callable_with_policy(
+                    let Some(callables) = source.try_upcast_to_callable_for_relation(
                         db,
                         env,
                         UpcastPolicy::from(self.relation),
