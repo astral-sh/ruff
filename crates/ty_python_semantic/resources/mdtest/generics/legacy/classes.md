@@ -3321,6 +3321,95 @@ def invalid_generic(x: A[T]) -> None:
     x.f()  # error: [invalid-argument-type]
 ```
 
+## Decorated recursive protocol methods
+
+A transparent decorator preserves a recursive classmethod's receiver and return annotation.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, ParamSpec, Protocol, Self, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+def wrap(f: Callable[P, R]) -> Callable[P, R]:
+    return f
+
+class A(Protocol[T_co]):
+    @classmethod
+    @wrap
+    def combine(cls, other: A[U]) -> Self | A[U]: ...
+
+def check(x: A[int]):
+    x.combine(x)  # no diagnostic
+    reveal_type(x.combine(x))  # revealed: A[int] | A[Unknown]
+```
+
+A decorated function can also satisfy a recursive callback protocol.
+
+```py
+class Callback(Protocol[T_co]):
+    def __call__(self, other: Callback[U]) -> Self | Callback[U]: ...
+
+@wrap
+def identity(other: Callback[U]) -> Callback[U]:
+    return other
+
+callback: Callback[int] = identity  # no diagnostic
+```
+
+## Decorated overloads on recursive protocol methods
+
+Wrapping an overloaded method preserves every overload. A recursive return in one overload does not
+hide an incompatible return type in another.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Any, Callable, Generic, Literal, ParamSpec, Protocol, Self, TypeVar, overload
+
+Params = ParamSpec("Params")
+R = TypeVar("R")
+T_co = TypeVar("T_co", covariant=True)
+U = TypeVar("U")
+
+def wrap(f: Callable[Params, R]) -> Callable[Params, R]:
+    return f
+
+class P(Protocol[T_co]):
+    @overload
+    def combine(self, other: P[U], marker: Literal[0]) -> Self | P[U]: ...
+    @overload
+    def combine(self, other: object, marker: Literal[1]) -> T_co: ...
+
+class Implementation(Generic[T_co]):
+    @overload
+    def method(self, other: P[U], marker: Literal[0]) -> Self | P[U]: ...
+    @overload
+    def method(self, other: object, marker: Literal[1]) -> T_co: ...
+    def method(self, other: object, marker: int) -> Any: ...
+
+    combine = wrap(method)
+
+def valid(x: Implementation[int]) -> P[int]:
+    reveal_type(x.combine(x, 1))  # revealed: int
+    return x  # no diagnostic
+
+S = TypeVar("S", bound=Implementation[str])
+
+def invalid(x: S) -> P[int]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Materializing a bound receiver requirement
 
 A bound method has already captured its receiver. Materializing its callable type preserves the

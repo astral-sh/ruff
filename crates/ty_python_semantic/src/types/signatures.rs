@@ -881,7 +881,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     // under ever-growing specializations. We key the guard on declaration identity so it can
     // break that active cycle, while synthetic `Callable[...]` signatures still fall through to
     // the ordinary relation logic because they do not carry definitions.
-    source_definition: Definition<'db>,
+    source_definitions: SmallVec<[Definition<'db>; 1]>,
     target_definition: Definition<'db>,
     relation: TypeRelation,
     typevar_evaluation: TypeVarEvaluation,
@@ -892,7 +892,7 @@ pub(crate) struct SignatureRelationKey<'db> {
 enum SignatureRelationPhase {
     /// Relating individual overloads after receiver binding and specialization.
     Signature,
-    /// Preparing protocol methods, before the signatures of their overloads are available.
+    /// Preparing protocol methods, before comparing their bound and specialized overloads.
     ProtocolMember,
 }
 
@@ -904,7 +904,7 @@ impl<'db> SignatureRelationKey<'db> {
         typevar_evaluation: TypeVarEvaluation,
     ) -> Option<Self> {
         Some(Self {
-            source_definition: source.definition?,
+            source_definitions: smallvec_inline![source.definition?],
             target_definition: target.definition?,
             relation,
             typevar_evaluation,
@@ -919,11 +919,60 @@ impl<'db> SignatureRelationKey<'db> {
         typevar_evaluation: TypeVarEvaluation,
     ) -> Self {
         Self {
-            source_definition,
+            source_definitions: smallvec_inline![source_definition],
             target_definition,
             relation,
             typevar_evaluation,
             phase: SignatureRelationPhase::ProtocolMember,
+        }
+    }
+
+    /// Recovers declaration identity after a decorator replaces a function with its callable
+    /// signatures. Every overload contributes to the key, so preparing one overload set cannot
+    /// close a recursive comparison involving a different set.
+    pub(super) fn protocol_member_from_type(
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target_definition: Definition<'db>,
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+    ) -> Option<Self> {
+        match source {
+            Type::FunctionLiteral(function) => Some(Self::protocol_member(
+                function.last_definition(db),
+                target_definition,
+                relation,
+                typevar_evaluation,
+            )),
+            Type::BoundMethod(method) => Self::protocol_member_from_type(
+                db,
+                method.func(db),
+                target_definition,
+                relation,
+                typevar_evaluation,
+            ),
+            Type::Callable(callable) => {
+                let mut source_definitions = callable
+                    .signatures(db)
+                    .iter()
+                    .map(Signature::definition)
+                    .collect::<Option<SmallVec<[_; 1]>>>()?;
+                if source_definitions.is_empty() {
+                    return None;
+                }
+                // Signature expansion can repeat an overload's declaration. Its preparation
+                // identity is independent of those copies and their current specializations.
+                source_definitions.sort_unstable();
+                source_definitions.dedup();
+                Some(Self {
+                    source_definitions,
+                    target_definition,
+                    relation,
+                    typevar_evaluation,
+                    phase: SignatureRelationPhase::ProtocolMember,
+                })
+            }
+            _ => None,
         }
     }
 }

@@ -2803,13 +2803,15 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         }
 
-        let source_definition = match attribute_type {
-            Type::FunctionLiteral(function) => Some(function.last_definition(db)),
-            Type::BoundMethod(method) => method
-                .function(db)
-                .map(|function| function.last_definition(db)),
-            _ => None,
-        };
+        let key = member.data.definition.and_then(|target_definition| {
+            SignatureRelationKey::protocol_member_from_type(
+                db,
+                attribute_type,
+                target_definition,
+                self.relation,
+                self.typevar_evaluation,
+            )
+        });
         let work = || {
             self.check_protocol_method_read(
                 db,
@@ -2820,22 +2822,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 protocol_self_binding_ty,
             )
         };
-        // Binding `Self` can simplify an intersection that asks whether the implementation
+        // Binding `Self` can simplify a union or intersection that asks whether the implementation
         // satisfies this protocol again. Enter the same preparation guard used for protocol
         // interface pairs before binding either method; overload comparisons remain separate.
-        if let (Some(source_definition), Some(target_definition)) =
-            (source_definition, member.data.definition)
-        {
-            self.signature_relation_visitor.visit(
-                &SignatureRelationKey::protocol_member(
-                    source_definition,
-                    target_definition,
-                    self.relation,
-                    self.typevar_evaluation,
-                ),
-                || self.always(),
-                work,
-            )
+        if let Some(key) = key {
+            self.signature_relation_visitor
+                .visit(&key, || self.always(), work)
         } else {
             work()
         }
