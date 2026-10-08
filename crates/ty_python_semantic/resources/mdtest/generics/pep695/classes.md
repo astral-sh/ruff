@@ -2306,6 +2306,30 @@ def foo(x: A[int]):
     reveal_type(x.f().f())  # revealed: A[int & ~A[A[int & Any]] & ~A[A[int & Any & ~A[A[int & Any]]]]]
 ```
 
+## Recursive exclusions for constrained type variables
+
+A recursive protocol exclusion preserves the constrained type variable, so the result remains
+correlated with the caller's original choice of constraint.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Protocol
+
+class A[T](Protocol):
+    def f(self) -> T & ~A[T]: ...
+
+def check[S: (A[int], int)](x: A[S]) -> S:
+    result = x.f()
+    reveal_type(result)  # revealed: S@check & ~A[S@check]
+    return result  # no diagnostic
+```
+
 ## Recursive protocol methods with generic receivers
 
 The mutable member makes this protocol invariant, so binding the receiver determines the method's

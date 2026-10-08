@@ -2665,11 +2665,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
             let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
             for negative in &self.negative {
                 // This linear search should be fine as long as we don't encounter typevars with
-                // thousands of constraints.
-                let matching_constraints = constraints
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, c)| c.is_subtype_of(db, env, *negative));
+                // thousands of constraints. As with other intersection elements, a circular proof
+                // cannot eliminate a constraint.
+                let matching_constraints =
+                    constraints.iter().enumerate().filter(|(_, constraint)| {
+                        simplify_intersection_pair_with_relations(
+                            db,
+                            env,
+                            **constraint,
+                            *negative,
+                            IntersectionPolarity::Mixed,
+                            relations,
+                        ) == IntersectionSimplification::Disjoint
+                    });
                 for (constraint_index, _) in matching_constraints {
                     remaining_constraints[constraint_index] = None;
                 }
