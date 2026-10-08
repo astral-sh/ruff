@@ -41,6 +41,14 @@ impl RuntimeSemantics {
     pub(crate) fn combine(self, other: RuntimeSemantics) -> RuntimeSemantics {
         self.min(other)
     }
+
+    pub fn is_required(self) -> bool {
+        matches!(self, RuntimeSemantics::Required)
+    }
+
+    pub fn is_default(self) -> bool {
+        matches!(self, RuntimeSemantics::Default)
+    }
 }
 
 impl Display for RuntimeSemantics {
@@ -59,6 +67,7 @@ pub struct Settings {
     pub exempt_modules: Vec<String>,
     pub runtime_evaluated_base_classes: FxHashMap<String, RuntimeSemantics>,
     pub runtime_evaluated_decorators: FxHashMap<String, RuntimeSemantics>,
+    pub runtime_evaluated_generic_subscripts: FxHashMap<String, RuntimeSemantics>,
     pub quote_annotations: bool,
 }
 
@@ -69,6 +78,7 @@ impl Default for Settings {
             exempt_modules: vec!["typing".to_string(), "typing_extensions".to_string()],
             runtime_evaluated_base_classes: FxHashMap::default(),
             runtime_evaluated_decorators: FxHashMap::default(),
+            runtime_evaluated_generic_subscripts: FxHashMap::default(),
             quote_annotations: false,
         }
     }
@@ -84,6 +94,7 @@ impl Display for Settings {
                 self.exempt_modules | array,
                 self.runtime_evaluated_base_classes | map,
                 self.runtime_evaluated_decorators | map,
+                self.runtime_evaluated_generic_subscripts | map,
                 self.quote_annotations
             ]
         }
