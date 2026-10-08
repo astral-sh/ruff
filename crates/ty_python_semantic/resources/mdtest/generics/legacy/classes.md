@@ -3272,10 +3272,10 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
-## Specialized receiver attribute overrides
+## Attribute annotations in generic constructors
 
-Receiver declarations retain the specialization of their defining class when checking a subclass
-annotation.
+For a subclass of `Base[int]`, the constructor annotation gives `value` the type `int`. A subclass
+can repeat that annotation.
 
 ```py
 from typing import Generic, TypeVar
@@ -3288,8 +3288,13 @@ class Base(Generic[T]):
 
 class Same(Base[int]):
     def __init__(self) -> None:
-        self.value: int = 0
+        self.value: int = 0  # no diagnostic
+```
 
+Narrowing to `bool` would prevent writes of other integers. An unrelated type such as `str` also
+fails to preserve the inherited type.
+
+```py
 class Narrow(Base[int]):
     def __init__(self) -> None:
         self.value: bool = True  # error: [invalid-mutable-override]

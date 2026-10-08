@@ -3342,8 +3342,8 @@ class Child(Base):
 
 ## Attributes declared in methods
 
-An annotation on a method receiver declares an attribute contract just like a class-body annotation.
-Plain initialization does not redeclare the inherited type.
+An annotation on `self.value` declares an attribute just like an annotation in the class body. A
+subclass can repeat the same annotation.
 
 ```py
 class Base:
@@ -3352,32 +3352,48 @@ class Base:
 
 class Same(Base):
     def __init__(self) -> None:
-        self.value: int = 1
+        self.value: int = 1  # no diagnostic
+```
 
+An incompatible type is rejected. Narrowing to `bool` also violates the mutable-override rule: code
+using the base class can assign any `int` to the attribute.
+
+```py
 class Incompatible(Base):
     def __init__(self) -> None:
         self.value: str = ""  # error: [invalid-attribute-override]
 
-class Grandchild(Incompatible):
-    def __init__(self) -> None:
-        self.value: str = ""  # no diagnostic
-
 class Narrow(Base):
     def __init__(self) -> None:
         self.value: bool = True  # error: [invalid-mutable-override]
+```
 
+An assignment without an annotation does not change the inherited type.
+
+```py
 class Initialized(Base):
     def __init__(self) -> None:
-        self.value = True
+        self.value = True  # no diagnostic
+```
 
+An annotation in the subclass's body is also checked against the base's constructor annotation.
+
+```py
 class ClassBodyOverride(Base):
     value: str  # error: [invalid-attribute-override]
 ```
 
+Repeating an incompatible annotation in a further subclass does not report the same error again.
+
+```py
+class Grandchild(Incompatible):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+```
+
 ## Method annotations overriding class-body declarations
 
-A subclass receiver annotation is checked against the base declaration even when ordinary member
-lookup still prefers the inherited class-body annotation.
+An annotation on `self.value` must also be compatible with an annotation in the base class body.
 
 ```py
 class Base:
@@ -3388,48 +3404,24 @@ class Child(Base):
         self.value: bool = True  # error: [invalid-mutable-override]
 ```
 
-## Unannotated classmethod assignments
-
-Checking receiver declarations does not require inferring unannotated classmethod assignments. In
-particular, a subclass can lazily initialize an inherited cache that starts as `None`.
-
-```toml
-[rules]
-redundant-condition-strict = "error"
-```
-
-```py
-class TaskContext:
-    _taskContext = None
-
-class BarrierTaskContext(TaskContext):
-    @classmethod
-    def _getOrCreate(cls):
-        if not isinstance(cls._taskContext, BarrierTaskContext):  # no diagnostic
-            cls._taskContext = BarrierTaskContext()
-```
-
 ## Slots preserve inherited declarations
 
-Unannotated assignments to a slot do not replace an inherited annotation. Overrides of that slot
-must still preserve the declared type.
+A subclass can add a slot for an inherited attribute. Assignments to that slot do not replace the
+inherited annotation, so an override must still accept the declared type.
 
 ```py
-class Array: ...
-class PandasIndexingAdapter: ...
+class Base:
+    value: int
 
-class NamedArray:
-    _data: Array
+class Slotted(Base):
+    __slots__ = ("value",)
 
-class Variable(NamedArray):
-    __slots__ = ("_data",)
+    def set_untyped(self, value):
+        self.value = value
 
-    def data(self, data):
-        self._data = data
+    def set_typed(self, value: int):
+        self.value = value
 
-    def load(self, data: Array):
-        self._data = data
-
-class IndexVariable(Variable):
-    _data: PandasIndexingAdapter  # error: [invalid-attribute-override]
+class Child(Slotted):
+    value: str  # error: [invalid-attribute-override]
 ```

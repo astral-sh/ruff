@@ -578,3 +578,24 @@ class Cached:
 
 reveal_type(Cached().metadata)  # revealed: int
 ```
+
+## Lazy initialization in a classmethod
+
+The inherited cache starts as `None`. A subclass can replace it with an instance of its own type, so
+the initialization branch is reachable.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class Context:
+    current = None
+
+class ChildContext(Context):
+    @classmethod
+    def get(cls):
+        if not isinstance(cls.current, ChildContext):  # no diagnostic
+            cls.current = ChildContext()
+```
