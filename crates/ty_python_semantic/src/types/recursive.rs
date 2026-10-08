@@ -66,6 +66,7 @@ use ty_python_core::place_table;
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
 use super::relation::{TypeRelation, TypeRelationChecker};
+use super::set_theoretic::TypeNormalization;
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::{
@@ -384,12 +385,25 @@ impl<'db> RecursiveType<'db> {
             &ApplyTypeMappingVisitor::new(&env),
         );
         match self.arguments(db) {
-            Some(arguments) => unfolded.apply_type_mapping(
-                db,
-                &env,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(arguments)),
-                TypeContext::default(),
-            ),
+            Some(arguments) => {
+                let specialization = ApplySpecialization::TypeAlias(arguments);
+                let mapping = match arguments.materialization_kind(db) {
+                    Some(materialization_kind) => {
+                        TypeMapping::ApplySpecializationWithMaterialization {
+                            specialization,
+                            materialization_kind,
+                        }
+                    }
+                    None => TypeMapping::ApplySpecialization(specialization),
+                };
+                unfolded.apply_type_mapping_impl(
+                    db,
+                    &mapping,
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::new(&env)
+                        .with_normalization(TypeNormalization::Structural),
+                )
+            }
             None => unfolded,
         }
     }
@@ -402,6 +416,16 @@ impl<'db> RecursiveType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if matches!(mapping, TypeMapping::Normalize) {
+            return Type::Recursive(
+                self.with_arguments(
+                    db,
+                    self.arguments(db).map(|arguments| {
+                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                    }),
+                ),
+            );
+        }
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),
@@ -439,6 +463,15 @@ impl<'db> RecursiveType<'db> {
             | TypeMapping::ReplaceSelf { .. } => {
                 // These mappings substitute free variables, which are captured by the alias's
                 // arguments. Its formal body must remain independent of the calling context.
+                let structural;
+                let visitor = if visitor.normalization == TypeNormalization::Semantic {
+                    structural = ApplyTypeMappingVisitor::new(visitor.env)
+                        .with_recursion_context(visitor.recursion_context)
+                        .with_normalization(TypeNormalization::Structural);
+                    &structural
+                } else {
+                    visitor
+                };
                 let arguments = self
                     .arguments(db)
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));

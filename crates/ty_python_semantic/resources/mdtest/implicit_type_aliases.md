@@ -3041,6 +3041,57 @@ def inspect(value: Growing[int]):
         reveal_type(value[0][0])  # revealed: int | Growing[list[list[int]]]
 ```
 
+### Intersections in recursive callable arguments
+
+Each call substitutes the current type argument into an intersection containing another recursive
+reference. The substitution preserves the alias, and the invariant list element still distinguishes
+compatible and incompatible assignments after two calls.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T")
+Node = tuple[list[T], Callable[[], "Node[T & ~Node[T & Any]]"]]
+
+def check(value: Node[int], gradual: Node[Any]):
+    valid: list[int] = value[1]()[1]()[0]  # no diagnostic
+    invalid: list[str] = value[1]()[1]()[0]  # error: [invalid-assignment]
+    gradual_value: list[Any] = gradual[1]()[1]()[0]  # no diagnostic
+```
+
+### Nested recursive references in callable arguments
+
+A recursive reference can itself be a type argument to another occurrence of the alias. Comparing
+the invariant list elements preserves these nested applications without expanding them indefinitely.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T")
+Node = tuple[list[T], Callable[[], "Node[T & ~Node[Node[T & Any]]]"]]
+
+def check(value: Node[int], gradual: Node[Any]):
+    valid: list[int] = value[1]()[1]()[0]  # no diagnostic
+    invalid: list[str] = value[1]()[1]()[0]  # error: [invalid-assignment]
+    gradual_value: list[Any] = gradual[1]()[1]()[0]  # no diagnostic
+```
+
 ### Projection through a recursive alias argument
 
 Projecting a generic member through a recursive alias keeps the recursive result closed:

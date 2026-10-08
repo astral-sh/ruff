@@ -19,7 +19,8 @@
 //!   * An intersection containing two non-overlapping types simplifies to [`Type::Never`].
 //!
 //! Relation-based intersection simplifications require a non-circular proof. During inference
-//! cycles, an intersection can retain redundant or contradictory elements instead.
+//! cycles and structural substitution, an intersection can retain redundant or contradictory
+//! elements instead. Structural substitution restores DNF without inspecting type definitions.
 //!
 //! The implication of these invariants is that a [`UnionBuilder`] does not necessarily build a
 //! [`Type::Union`]. For example, if only one type is added to the [`UnionBuilder`], `build()` will
@@ -729,8 +730,30 @@ impl<'db> UnionBuilder<'db> {
         self.add_in_place_impl(ty, &mut vec![]);
     }
 
-    /// Join already-constructed types without querying the relationships between their atoms.
+    /// Restore DNF after substitution without unfolding aliases or querying type relations.
     fn add_structural(&mut self, ty: Type<'db>) {
+        match ty {
+            Type::Union(union) => {
+                self.recursively_defined = self
+                    .recursively_defined
+                    .or(union.recursively_defined(self.db));
+                for element in union.elements(self.db) {
+                    self.add_structural(*element);
+                }
+            }
+            Type::Intersection(_) => {
+                let normalized = IntersectionBuilder::new(self.db, &self.env)
+                    .normalization(TypeNormalization::Structural)
+                    .add_positive(ty)
+                    .build();
+                self.add_structural_dnf(normalized);
+            }
+            _ => self.add_structural_dnf(ty),
+        }
+    }
+
+    /// Add an already-normalized branch without normalizing its intersection a second time.
+    fn add_structural_dnf(&mut self, ty: Type<'db>) {
         if let Type::LiteralValue(literal) = ty {
             self.recursively_defined = self.recursively_defined.or(literal.recursively_defined());
         }
@@ -739,7 +762,7 @@ impl<'db> UnionBuilder<'db> {
             Type::Union(union) => {
                 self.recursively_defined = self.recursively_defined.or(union.recursively_defined(self.db));
                 for element in union.elements(self.db) {
-                    self.add_structural(*element);
+                    self.add_structural_dnf(*element);
                 }
             }
             _ if ty == Type::object() => self.collapse_to_object(),
@@ -1279,8 +1302,8 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::Type(Type::LiteralValue(literal))
                     if self.normalization == TypeNormalization::Structural =>
                 {
-                    // Flattening a recursive union must retain literal provenance even when
-                    // only one element remains. Updating that flag can expose duplicates.
+                    // Flattening a recursive union must retain the literal's provenance even
+                    // when only one element remains. Updating that flag can expose duplicates.
                     let literal =
                         Type::LiteralValue(literal.with_recursively_defined(recursively_defined));
                     if !types.contains(&literal) {
@@ -1364,6 +1387,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
+    normalization: TypeNormalization,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1373,7 +1397,13 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
+            normalization: TypeNormalization::Semantic,
         }
+    }
+
+    pub(in crate::types) fn normalization(mut self, normalization: TypeNormalization) -> Self {
+        self.normalization = normalization;
+        self
     }
 
     /// Add DNF branches, dropping `Never` and duplicate branches so later distribution does not
@@ -1510,7 +1540,9 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> ControlFlow<L::Break> {
         let db = self.db;
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_)
+                if self.normalization == TypeNormalization::Semantic =>
+            {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1549,7 +1581,9 @@ impl<'db> IntersectionBuilder<'db> {
                     self.add_negative_impl::<L>(*neg, seen_aliases)?;
                 }
             }
-            Type::EnumComplement(complement) => {
+            Type::EnumComplement(complement)
+                if self.normalization == TypeNormalization::Semantic =>
+            {
                 let intersection = complement.to_intersection(db, &self.env);
                 self.add_positive_impl::<L>(intersection, seen_aliases)?;
             }
@@ -1557,7 +1591,10 @@ impl<'db> IntersectionBuilder<'db> {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
                 for inner in &mut self.intersections {
-                    inner.add_positive(db, &self.env, ty);
+                    match self.normalization {
+                        TypeNormalization::Semantic => inner.add_positive(db, &self.env, ty),
+                        TypeNormalization::Structural => inner.add_positive_structural(ty),
+                    }
                 }
             }
         }
@@ -1582,7 +1619,9 @@ impl<'db> IntersectionBuilder<'db> {
         let db = self.db;
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_) => {
+            Type::TypeAlias(_) | Type::Recursive(_)
+                if self.normalization == TypeNormalization::Semantic =>
+            {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1630,13 +1669,18 @@ impl<'db> IntersectionBuilder<'db> {
                 self.intersections = distributed.into_iter().collect();
                 self.has_disjunction = has_disjunction;
             }
-            Type::EnumComplement(complement) => {
+            Type::EnumComplement(complement)
+                if self.normalization == TypeNormalization::Semantic =>
+            {
                 let intersection = complement.to_intersection(db, &self.env);
                 self.add_negative_impl::<L>(intersection, seen_aliases)?;
             }
             _ => {
                 for inner in &mut self.intersections {
-                    inner.add_negative(db, &self.env, ty);
+                    match self.normalization {
+                        TypeNormalization::Semantic => inner.add_negative(db, &self.env, ty),
+                        TypeNormalization::Structural => inner.add_negative_structural(ty),
+                    }
                 }
             }
         }
@@ -1656,6 +1700,14 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn build(self) -> Type<'db> {
         let db = self.db;
+        if self.normalization == TypeNormalization::Structural {
+            let mut union =
+                UnionBuilder::new(db, &self.env).normalization(TypeNormalization::Structural);
+            for inner in self.intersections {
+                union.add_structural_dnf(inner.build_structural(db));
+            }
+            return union.build();
+        }
         UnionType::from_elements(
             db,
             &self.env,
@@ -1810,6 +1862,62 @@ struct InnerIntersectionBuilder<'db> {
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
+    fn add_positive_structural(&mut self, ty: Type<'db>) {
+        if self.contains_never() {
+            return;
+        }
+        if ty.is_never() {
+            *self = Self::default();
+            self.positive.insert(Type::Never);
+            return;
+        }
+        if self.positive.iter().any(Type::is_pending_narrowing) {
+            return;
+        }
+        // Keep the same representation of inference-cycle markers as ordinary construction:
+        // a divergent marker stands alone, and pending narrowing takes precedence over it.
+        if ty.is_divergent() {
+            *self = Self::default();
+            self.positive.insert(ty);
+            return;
+        }
+        if !self.positive.iter().any(Type::is_divergent) && ty != Type::object() {
+            self.positive.insert(ty);
+        }
+    }
+
+    fn add_negative_structural(&mut self, ty: Type<'db>) {
+        if self.contains_never()
+            || (self.positive.iter().any(Type::is_divergent) && !ty.is_pending_narrowing())
+        {
+            return;
+        }
+        if ty == Type::object() {
+            self.add_positive_structural(Type::Never);
+        } else if let Some(negated) = ty.negated_divergent() {
+            *self = Self::default();
+            self.positive.insert(negated);
+        } else if matches!(ty, Type::Dynamic(_)) {
+            self.add_positive_structural(ty);
+        } else if !ty.is_never() {
+            // Identity alone does not prove `T & ~T` empty: T can contain gradual types.
+            // Determining that T is fully static would require inspecting its definition.
+            self.negative.insert(ty);
+        }
+    }
+
+    fn build_structural(mut self, db: &'db dyn Db) -> Type<'db> {
+        match (self.positive.len(), self.negative.len()) {
+            (0, 0) => Type::object(),
+            (1, 0) => self.positive[0],
+            _ => {
+                self.positive.shrink_to_fit();
+                self.negative.shrink_to_fit();
+                Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
+            }
+        }
+    }
+
     fn contains_never(&self) -> bool {
         self.positive.contains(&Type::Never)
     }
@@ -2426,7 +2534,7 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        Signature, StringLiteralType, Truthiness, TypePair,
+        Signature, StringLiteralType, Truthiness, TypeContext, TypeMapping, TypePair,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -2495,6 +2603,193 @@ mod tests {
         assert!(flattened.elements(db).iter().all(|element| {
             matches!(element, Type::LiteralValue(literal) if literal.recursively_defined().is_yes())
         }));
+    }
+
+    #[test]
+    fn structural_construction_restores_constants_and_duplicates() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let union = || UnionBuilder::new(&db, &env).normalization(TypeNormalization::Structural);
+        let intersection =
+            || IntersectionBuilder::new(&db, &env).normalization(TypeNormalization::Structural);
+        let atom = Type::any();
+        let nested = Type::Union(UnionType::new(
+            &db,
+            vec![Type::Never, atom, atom].into_boxed_slice(),
+            RecursivelyDefined::No,
+        ));
+
+        assert_eq!(union().build(), Type::Never);
+        assert_eq!(union().add(nested).add(atom).build(), atom);
+        assert_eq!(
+            nested.expect_union().map_leave_aliases_with_normalization(
+                &db,
+                &env,
+                TypeNormalization::Structural,
+                |ty| *ty,
+            ),
+            atom,
+        );
+        assert_eq!(intersection().build(), Type::object());
+        assert_eq!(intersection().add_positive(nested).build(), atom);
+        assert_eq!(
+            intersection().add_positive(atom).add_negative(atom).build(),
+            atom,
+        );
+        for (left, right) in [(atom, Type::object()), (Type::object(), atom)] {
+            assert_eq!(union().add(left).add(right).build(), Type::object());
+            assert_eq!(
+                intersection().positive_elements([left, right]).build(),
+                atom
+            );
+        }
+        for (left, right) in [(atom, Type::Never), (Type::Never, atom)] {
+            assert_eq!(union().add(left).add(right).build(), atom);
+            assert_eq!(
+                intersection().positive_elements([left, right]).build(),
+                Type::Never,
+            );
+        }
+        assert_eq!(
+            intersection().add_negative(Type::Never).build(),
+            Type::object()
+        );
+        assert_eq!(
+            intersection().add_negative(Type::object()).build(),
+            Type::Never
+        );
+
+        let literal = LiteralValueType::unpromotable(1_i64);
+        let recursive_literal = literal.with_recursively_defined(RecursivelyDefined::Yes);
+        let recursive_union = Type::Union(UnionType::new(
+            &db,
+            vec![
+                Type::LiteralValue(literal),
+                Type::LiteralValue(recursive_literal),
+            ]
+            .into_boxed_slice(),
+            RecursivelyDefined::Yes,
+        ));
+        assert_eq!(
+            union().add(recursive_union).build(),
+            Type::LiteralValue(recursive_literal)
+        );
+    }
+
+    #[test]
+    fn structural_construction_distributes_without_comparing_atoms() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let union = || UnionBuilder::new(&db, &env).normalization(TypeNormalization::Structural);
+        let intersection =
+            || IntersectionBuilder::new(&db, &env).normalization(TypeNormalization::Structural);
+        let [a, b, c] = [1, 2, 3].map(Type::int_literal);
+
+        // `a & (b | c)` retains both branches even though semantic comparison could
+        // prove these particular atoms disjoint.
+        let distributed = intersection()
+            .add_positive(a)
+            .add_positive(union().add(b).add(c).build())
+            .build();
+        let ab = intersection().positive_elements([a, b]).build();
+        let ac = intersection().positive_elements([a, c]).build();
+        assert_eq!(distributed.expect_union().elements(&db), &[ab, ac]);
+
+        let negated = intersection()
+            .add_positive(a)
+            .add_negative(intersection().add_positive(b).add_negative(c).build())
+            .build();
+        let a_not_b = intersection().add_positive(a).add_negative(b).build();
+        assert_eq!(negated.expect_union().elements(&db), &[a_not_b, ac]);
+
+        let disjunction = union().add(a).add(b).build();
+        let double_negation = intersection()
+            .add_negative(intersection().add_negative(disjunction).build())
+            .build();
+        assert_eq!(double_negation, disjunction);
+    }
+
+    #[test]
+    fn semantic_observation_normalizes_structural_unions() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let int = KnownClass::Int.to_instance(&db, &env);
+        let union = UnionBuilder::new(&db, &env)
+            .normalization(TypeNormalization::Structural)
+            .add(Type::int_literal(1))
+            .add(int)
+            .build();
+        assert!(union.is_union());
+        let tuple = Type::heterogeneous_tuple(&db, &env, [union]);
+        assert_eq!(
+            tuple.apply_type_mapping(&db, &env, &TypeMapping::Normalize, TypeContext::default()),
+            Type::heterogeneous_tuple(&db, &env, [int]),
+        );
+    }
+
+    #[test]
+    fn structural_construction_preserves_gradual_complements_without_queries() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "\
+            type Alias = int
+            Recursive = tuple['Recursive']
+            x: Recursive
+            ",
+        )
+        .unwrap();
+        let env = db.program_environment();
+        let file = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let module = ProgramFile::new(&db, file, env.program(&db));
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+            global_symbol(&db, module, "Alias").place.expect_type()
+        else {
+            panic!("Expected a type alias");
+        };
+        let recursive = global_symbol(&db, module, "x").place.expect_type();
+        assert!(matches!(recursive, Type::Recursive(_)));
+        let tuple = Type::heterogeneous_tuple(&db, &env, [Type::any()]);
+        let mut events_db = db.clone();
+        events_db.clear_salsa_events();
+
+        for atom in [tuple, Type::TypeAlias(alias), recursive] {
+            // Identity is enough to remove duplicates of the same sign. It is not enough
+            // to remove opposite signs: an alias or a container can include gradual types.
+            let both = IntersectionBuilder::new(&db, &env)
+                .normalization(TypeNormalization::Structural)
+                .add_positive(atom)
+                .add_positive(atom)
+                .add_negative(atom)
+                .add_negative(atom)
+                .build();
+            let Type::Intersection(both) = both else {
+                panic!("Expected both signs of the same atom to be preserved");
+            };
+            assert_eq!(
+                both.positive(&db).iter().copied().collect::<Vec<_>>(),
+                [atom]
+            );
+            assert_eq!(
+                both.negative(&db).iter().copied().collect::<Vec<_>>(),
+                [atom]
+            );
+            let union = UnionBuilder::new(&db, &env)
+                .normalization(TypeNormalization::Structural)
+                .add(Type::Intersection(both))
+                .add(atom)
+                .build();
+            assert_eq!(
+                union.expect_union().elements(&db),
+                &[Type::Intersection(both), atom]
+            );
+        }
+        assert!(
+            events_db
+                .take_salsa_events()
+                .iter()
+                .all(|event| !matches!(event.kind, salsa::EventKind::WillExecute { .. }))
+        );
     }
 
     #[test]

@@ -2405,7 +2405,7 @@ impl<'db> StatementInferenceInner<'db> {
 
 bitflags::bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct InferenceFlags: u16 {
+    pub(crate) struct InferenceFlags: u32 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
         /// In most contexts inside type expressions, bare `ParamSpec`s are not allowed.
@@ -2460,6 +2460,10 @@ bitflags::bitflags! {
 
         /// Whether the visitor is currently visiting an explicit `__init__` receiver annotation.
         const IN_INIT_RECEIVER_ANNOTATION = 1 << 15;
+
+        /// Whether this expression constructs an implicit alias before binding its recursive references.
+        /// Keep set operations structural until the constructor body has been closed.
+        const IN_ALIAS_CONSTRUCTOR = 1 << 16;
     }
 }
 

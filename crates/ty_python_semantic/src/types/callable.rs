@@ -929,6 +929,16 @@ impl<'db> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::FunctionLike)
     }
 
+    /// Normalize the stored signatures when an operation exposes this callable's type.
+    pub(super) fn normalized(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Normalize,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+    }
+
     pub(crate) fn into_dunder_paramspec(self, db: &'db dyn Db) -> CallableType<'db> {
         self.with_kind(db, CallableTypeKind::DunderParamSpec)
     }

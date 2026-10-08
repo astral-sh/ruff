@@ -25,6 +25,7 @@ use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
     implicit_alias_parameters, infer_implicit_alias_type,
 };
+use crate::types::set_theoretic::TypeNormalization;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
@@ -54,18 +55,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // A resolved non-recursive value already describes the alias. Gradual types, unions,
         // and quoted aliases can hide recursive references, so they still need inference.
         // Even a valid union can have lost a cyclic member during value inference.
-        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
-            matches!(
-                ty,
-                Type::Dynamic(_)
-                    | Type::Divergent(_)
-                    | Type::Recursive(_)
-                    | Type::TypeAlias(_)
-                    | Type::KnownInstance(
-                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
-                    )
-            )
-        }) {
+        // A constructor must refer to other constructors even if their runtime-value query has
+        // already expanded the reference. Otherwise each inference iteration can embed another
+        // copy of a recursive callable's signature before the binder gets a chance to close it.
+        if !self
+            .inference_flags()
+            .contains(InferenceFlags::IN_ALIAS_CONSTRUCTOR)
+            && !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
+                matches!(
+                    ty,
+                    Type::Dynamic(_)
+                        | Type::Divergent(_)
+                        | Type::Recursive(_)
+                        | Type::TypeAlias(_)
+                        | Type::KnownInstance(
+                            KnownInstanceType::UnionType(_)
+                                | KnownInstanceType::LiteralStringAlias(_)
+                        )
+                )
+            })
+        {
             return None;
         }
         if definition.kind(db).is_import() {
@@ -134,7 +143,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         value: &ast::Expr,
     ) -> ImplicitAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
-        self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        self.context.inference_flags |=
+            InferenceFlags::IN_TYPE_ALIAS | InferenceFlags::IN_ALIAS_CONSTRUCTOR;
         let ty = self.infer_type_expression(value);
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
@@ -168,6 +178,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     const fn type_expression_context(&self) -> &'static str {
         self.inference_flags().type_expression_context()
+    }
+
+    /// Recursive declarations must finish construction before their types can be compared.
+    fn type_expression_normalization(&self) -> TypeNormalization {
+        if self
+            .inference_flags()
+            .contains(InferenceFlags::IN_ALIAS_CONSTRUCTOR)
+        {
+            TypeNormalization::Structural
+        } else {
+            TypeNormalization::Semantic
+        }
+    }
+
+    fn negate_type_expression(&self, ty: Type<'db>) -> Type<'db> {
+        match self.type_expression_normalization() {
+            TypeNormalization::Semantic => ty.negate(self.db(), self.program_environment()),
+            TypeNormalization::Structural => {
+                IntersectionBuilder::new(self.db(), self.program_environment())
+                    .normalization(TypeNormalization::Structural)
+                    .add_negative(ty)
+                    .build()
+            }
+        }
     }
 
     /// Infer the type of a type expression.
@@ -555,7 +589,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
 
-                        UnionType::from_elements_leave_aliases(db, env, [left_ty, right_ty])
+                        UnionBuilder::new(db, env)
+                            .unpack_aliases(false)
+                            .normalization(self.type_expression_normalization())
+                            .add(left_ty)
+                            .add(right_ty)
+                            .build()
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -594,7 +633,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
 
-                        IntersectionType::from_two_elements(db, env, left_ty, right_ty)
+                        match self.type_expression_normalization() {
+                            TypeNormalization::Semantic => {
+                                IntersectionType::from_two_elements(db, env, left_ty, right_ty)
+                            }
+                            TypeNormalization::Structural => IntersectionBuilder::new(db, env)
+                                .normalization(TypeNormalization::Structural)
+                                .positive_elements([left_ty, right_ty])
+                                .build(),
+                        }
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -901,7 +948,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                operand_ty.negate(db, env)
+                self.negate_type_expression(operand_ty)
             }
 
             ast::Expr::UnaryOp(unary) => {
@@ -2382,7 +2429,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionBuilder::new(db, env)
+                    .unpack_aliases(false)
+                    .normalization(self.type_expression_normalization())
+                    .add(param_type)
+                    .add(Type::none(db, env))
+                    .build()
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject
@@ -2393,10 +2445,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 let mut has_unpacked_typevartuple = false;
-                let union_ty = UnionType::from_elements_leave_aliases(
-                    db,
-                    env,
-                    arguments.iter().map(|argument| {
+                let normalization = self.type_expression_normalization();
+                let union_ty = arguments
+                    .iter()
+                    .map(|argument| {
                         let ty = self.infer_type_expression(argument);
                         if self
                             .type_expression_flags(argument)
@@ -2431,8 +2483,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
                         ty
-                    }),
-                );
+                    })
+                    .fold(
+                        UnionBuilder::new(db, env)
+                            .unpack_aliases(false)
+                            .normalization(normalization),
+                        UnionBuilder::add,
+                    )
+                    .build();
                 let ty = if has_unpacked_typevartuple {
                     Type::object()
                 } else {
@@ -2456,7 +2514,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
                 let num_arguments = arguments.len();
                 let negated_type = if num_arguments == 1 {
-                    self.infer_type_expression(&arguments[0]).negate(db, env)
+                    let argument = self.infer_type_expression(&arguments[0]);
+                    self.negate_type_expression(argument)
                 } else {
                     if !self.in_string_annotation() {
                         for argument in arguments {
@@ -2484,9 +2543,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
 
                 let ty = elements
-                    .fold(IntersectionBuilder::new(db, env), |builder, element| {
-                        builder.add_positive(self.infer_type_expression(element))
-                    })
+                    .fold(
+                        IntersectionBuilder::new(db, env)
+                            .normalization(self.type_expression_normalization()),
+                        |builder, element| {
+                            builder.add_positive(self.infer_type_expression(element))
+                        },
+                    )
                     .build();
 
                 if matches!(arguments_slice, ast::Expr::Tuple(_)) {

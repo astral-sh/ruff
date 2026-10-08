@@ -59,7 +59,7 @@ pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
 pub use self::set_theoretic::{IntersectionType, UnionType};
-use self::set_theoretic::{KnownUnion, RecursivelyDefined};
+use self::set_theoretic::{KnownUnion, RecursivelyDefined, TypeNormalization};
 pub(crate) use self::signatures::Signature;
 pub use self::signatures::{ParameterDefault, ParameterKind};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
@@ -513,6 +513,7 @@ type MaterializationEquivalenceVisitor<'db> =
 /// reuse the result of another.
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
+    normalization: TypeNormalization,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
@@ -530,6 +531,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     fn new(env: &'env ProgramEnvironment<'db>) -> Self {
         Self {
             env,
+            normalization: TypeNormalization::Semantic,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
@@ -545,6 +547,12 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
 
     fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
         self.recursion_context = context;
+        self
+    }
+
+    /// Select how closed set-theoretic types are rebuilt during this substitution.
+    fn with_normalization(mut self, normalization: TypeNormalization) -> Self {
+        self.normalization = normalization;
         self
     }
 
@@ -608,6 +616,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            normalization: self.normalization,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -2868,6 +2877,17 @@ impl<'db> Type<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        // Materialization substitutes gradual components. Re-entering subtyping to simplify
+        // the constructed result would ask for this same materialization before it is complete.
+        let structural;
+        let visitor = if visitor.normalization == TypeNormalization::Semantic {
+            structural = visitor
+                .for_new_materialization_root()
+                .with_normalization(TypeNormalization::Structural);
+            &structural
+        } else {
+            visitor
+        };
         self.apply_type_mapping_impl(
             db,
             &TypeMapping::Materialize(materialization_kind),
@@ -9450,7 +9470,14 @@ impl<'db> Type<'db> {
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::new(env))
+        let visitor = ApplyTypeMappingVisitor::new(env).with_normalization(
+            if matches!(type_mapping, TypeMapping::Materialize(_)) {
+                TypeNormalization::Structural
+            } else {
+                TypeNormalization::Semantic
+            },
+        );
+        self.apply_type_mapping_impl(db, type_mapping, tcx, &visitor)
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -9465,6 +9492,8 @@ impl<'db> Type<'db> {
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            // NewType's underlying class belongs to its declaration, not this occurrence.
+            TypeMapping::Normalize if matches!(self, Type::NewTypeInstance(_)) => return self,
             _ => {}
         }
 
@@ -9792,6 +9821,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
+                | TypeMapping::Normalize
                 | TypeMapping::Promote(PromotionMode::Off, _)
                 | TypeMapping::Promote(
                     PromotionMode::On,
@@ -9813,6 +9843,7 @@ impl<'db> Type<'db> {
                 | TypeMapping::Promote(..)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
+                | TypeMapping::Normalize
                 | TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -11131,6 +11162,12 @@ impl<'db> SelfBinding<'db> {
 /// literal).
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
+    /// Normalize closed composite types while preserving declaration-backed types.
+    ///
+    /// Recursive substitution preserves unions and intersections structurally. An operation that
+    /// observes the resulting type can then remove semantic redundancies. Aliases and recursive
+    /// constructors retain their identities; only their stored arguments are normalized.
+    Normalize,
     /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Applies a specialization and materializes only substituted typevars.
@@ -11222,6 +11259,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 }
             }
             TypeMapping::Promote(..)
+            | TypeMapping::Normalize
             | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -11268,6 +11306,7 @@ impl<'db> TypeMapping<'_, 'db> {
             },
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
+            | TypeMapping::Normalize
             | TypeMapping::ApplyRecursiveSubstitution(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
@@ -12335,9 +12374,10 @@ impl<'db> TypeIsType<'db> {
                     return Type::TypeIs(self);
                 }
 
-                // `TypeIs` with a static argument is equivalent to its top and bottom materializations.
+                // Identical arguments prove materialization is a no-op. Other equivalences
+                // are checked when comparing the retained materialization, not while building it.
                 let top = argument.materialize(db, MaterializationKind::Top, visitor);
-                if visitor.is_equivalent_to_materialization(db, argument, top) {
+                if argument == top {
                     return Type::TypeIs(self);
                 }
 

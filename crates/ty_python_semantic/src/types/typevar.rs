@@ -388,40 +388,22 @@ impl<'db> TypeVarInstance<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        let original_bound = self.bound_or_constraints(db, visitor.env);
+        let bound =
+            original_bound.map(|bound| bound.materialize_impl(db, materialization_kind, visitor));
+        let original_default = self.default_type(db, visitor.env);
+        let default = original_default.map(|ty| ty.materialize(db, materialization_kind, visitor));
+        // Resolving lazy metadata is not itself a change to the type variable. Preserve its
+        // identity when materializing the evaluated bound and default changes neither type.
+        if bound == original_bound && default == original_default {
+            return self;
+        }
         Self::new(
             db,
             self.identity(db),
-            self._bound_or_constraints(db)
-                .and_then(|bound_or_constraints| match bound_or_constraints {
-                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
-                        bound_or_constraints
-                            .materialize_impl(db, materialization_kind, visitor)
-                            .into(),
-                    ),
-                    TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => {
-                        self.lazy_bound(db, visitor.env).map(|bound| {
-                            TypeVarBoundOrConstraints::UpperBound(bound)
-                                .materialize_impl(db, materialization_kind, visitor)
-                                .into()
-                        })
-                    }
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
-                        self.lazy_constraints(db, visitor.env).map(|constraints| {
-                            TypeVarBoundOrConstraints::Constraints(constraints)
-                                .materialize_impl(db, materialization_kind, visitor)
-                                .into()
-                        })
-                    }
-                }),
+            bound.map(TypeVarBoundOrConstraintsEvaluation::Eager),
             self.explicit_variance(db),
-            self._default(db).and_then(|default| match default {
-                TypeVarDefaultEvaluation::Eager(ty) => {
-                    Some(ty.materialize(db, materialization_kind, visitor).into())
-                }
-                TypeVarDefaultEvaluation::Lazy => self
-                    .lazy_default(db, visitor.env)
-                    .map(|ty| ty.materialize(db, materialization_kind, visitor).into()),
-            }),
+            default.map(TypeVarDefaultEvaluation::Eager),
         )
     }
 
@@ -797,11 +779,6 @@ impl<'db> TypeVarInstance<'db> {
         };
 
         Some(ty)
-    }
-
-    fn lazy_default(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
-        let visitor = TypeVarDefaultVisitor::new(None);
-        self.lazy_default_impl(db, env, &visitor)
     }
 
     fn lazy_default_impl(
@@ -1454,6 +1431,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::Promote(..)
+            | TypeMapping::Normalize
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
