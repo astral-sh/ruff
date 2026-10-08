@@ -3146,6 +3146,36 @@ def check(base: Neutral, child: Frozen) -> None:
     child.value = 1  # error: [invalid-assignment]
 ```
 
+## Inherited frozen fields overriding neutral bases
+
+A frozen field can retain its contract when inherited alongside another base. The neutral
+dataclass-transform base permits the field to become read-only in both descendants.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class FrozenOrThawed(type): ...
+
+class EntityDescription(metaclass=FrozenOrThawed):
+    unit_of_measurement: None
+
+class Capability: ...
+
+class SensorDescription(EntityDescription):
+    unit_of_measurement: None
+
+class Combined(Capability, SensorDescription): ...  # no diagnostic
+
+def check(description: Combined) -> None:
+    description.unit_of_measurement = None  # error: [invalid-assignment]
+
+class PropertyDescription(EntityDescription):
+    @property
+    def unit_of_measurement(self) -> None:  # error: [invalid-property-type-override]
+        return None
+```
+
 ## Descriptors preserving instance access
 
 A descriptor may replace an ordinary attribute when its instance reads and writes preserve the
@@ -3505,4 +3535,42 @@ class String:
     value: str
 
 class Conflict(String, Gradual): ...  # error: [invalid-attribute-override]
+```
+
+## Inherited checks preserve lazy class-property initialization
+
+Unannotated assignments in a class-property getter do not introduce declarations for inherited
+override checking. The getter can initialize a cache created by the metaclass.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+def pkg_dir_to_pkg_name(dirname: str) -> str:
+    return dirname
+
+class classproperty:
+    def __init__(self, callback):
+        self.callback = callback
+
+    def __get__(self, instance, owner):
+        return self.callback(owner)
+
+class PackageMeta(type):
+    def __new__(cls, name, bases, attr_dict):
+        attr_dict["_name"] = None
+        return super(PackageMeta, cls).__new__(cls, name, bases, attr_dict)
+
+class WindowsRPath: ...
+class PackageViewMixin: ...
+
+class PackageBase(WindowsRPath, PackageViewMixin, metaclass=PackageMeta):
+    @classproperty
+    def name(cls):
+        if cls._name is None:  # no diagnostic
+            pkg_module = cls.__module__
+            cls.__qualname__  # error: [unresolved-attribute]
+            cls._name = pkg_dir_to_pkg_name(pkg_module)
 ```

@@ -31,6 +31,7 @@ struct AttributeContract<'db> {
     write: Option<Type<'db>>,
     is_property: bool,
     is_method: bool,
+    is_frozen_field: bool,
     qualifiers: TypeQualifiers,
 }
 
@@ -195,6 +196,8 @@ fn attribute_contract<'db>(
         },
         is_property,
         is_method,
+        is_frozen_field: literal.is_frozen_dataclass(db) == Some(true)
+            && literal.is_own_dataclass_instance_field(db, name),
         qualifiers,
     })
 }
@@ -282,18 +285,13 @@ fn attribute_violation<'db>(
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
     // fields can become read-only there, even though writes to the base are allowed.
+    // Preserve this permission when that frozen field is inherited by another subclass.
     if !target.is_property
         && target_receiver
             .nominal_class(db, env)
             .and_then(|class| class.static_class_literal(db))
             .is_some_and(|(literal, _)| literal.is_neutral_dataclass(db))
-        && receiver
-            .nominal_class(db, env)
-            .and_then(|class| class.static_class_literal(db))
-            .is_some_and(|(literal, _)| {
-                literal.is_frozen_dataclass(db) == Some(true)
-                    && literal.is_own_dataclass_instance_field(db, name)
-            })
+        && source.is_frozen_field
     {
         return None;
     }
@@ -565,6 +563,7 @@ fn already_inherited<'db>(
             };
             if inherited.read != source.read
                 || inherited.write != source.write
+                || inherited.is_frozen_field != source.is_frozen_field
                 || inherited.qualifiers != source.qualifiers
             {
                 return false;
@@ -634,6 +633,14 @@ pub(super) fn check_inherited_conflicts<'db>(
         class_type
             .own_instance_attribute_names(db)
             .iter()
+            .filter(|name| {
+                attribute_declarations(db, class.body_scope(db), name).any(
+                    |(mut declarations, _)| {
+                        declarations
+                            .any(|declaration| declaration.declaration.definition().is_some())
+                    },
+                )
+            })
             .filter(|name| {
                 matches!(class_type.own_instance_member(db, env, name).inner.place,
             Place::Defined(place) if place.origin == TypeOrigin::Declared)
