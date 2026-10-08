@@ -275,6 +275,37 @@ reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 reveal_type(WithDefault[str, str, str]())  # revealed: WithDefault[Unknown, Unknown]
 ```
 
+## Attribute presence on specialized class objects
+
+Specializing a class preserves its class bindings. Methods and property objects remain present on
+the class, even when a property getter can raise `AttributeError` on instances.
+
+```py
+class Box[T]:
+    size = 1
+
+    def method(self) -> None: ...
+    @property
+    def value(self) -> T:
+        raise AttributeError
+
+specialized = Box[int]
+if not hasattr(specialized, "size"):
+    reveal_type(specialized)  # revealed: Never
+if not hasattr(specialized, "method"):
+    reveal_type(specialized)  # revealed: Never
+if not hasattr(specialized, "value"):
+    reveal_type(specialized)  # revealed: Never
+
+def check(cls: type[Box[int]]) -> None:
+    if not hasattr(cls, "size"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "method"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: Never
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the

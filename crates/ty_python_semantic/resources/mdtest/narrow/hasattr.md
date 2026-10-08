@@ -384,3 +384,386 @@ def check_default(value: object) -> None:
     if isinstance(value, WithDefault) and not hasattr(value, "value"):
         reveal_type(value)  # revealed: Never
 ```
+
+## Known module attributes
+
+Unconditional module bindings make negative checks unreachable. Module-level declarations in stubs
+also establish presence, even when their type is `Any`.
+
+`implementation.py`:
+
+```py
+value = 1
+
+def function() -> None: ...
+def condition() -> bool:
+    return True
+
+if condition():
+    conditional = 1
+```
+
+`interface.pyi`:
+
+```pyi
+from typing import Any
+
+value: int
+dynamic: Any
+
+def function() -> None: ...
+```
+
+`main.py`:
+
+```py
+import implementation
+import interface
+
+if not hasattr(implementation, "value"):
+    reveal_type(implementation)  # revealed: Never
+if not hasattr(implementation, "function"):
+    reveal_type(implementation)  # revealed: Never
+if not hasattr(implementation, "conditional"):
+    reveal_type(implementation)  # revealed: <module 'implementation'>
+if not hasattr(interface, "value"):
+    reveal_type(interface)  # revealed: Never
+if not hasattr(interface, "dynamic"):
+    reveal_type(interface)  # revealed: Never
+if not hasattr(interface, "function"):
+    reveal_type(interface)  # revealed: Never
+```
+
+## Uninitialized module attributes
+
+An annotation in a source module does not initialize the attribute.
+
+`annotated.py`:
+
+```py
+value: int
+```
+
+`main.py`:
+
+```py
+import annotated
+
+if not hasattr(annotated, "value"):
+    reveal_type(annotated)  # revealed: <module 'annotated'>
+```
+
+## Optional module metadata
+
+Built-in modules can lack `__file__`, and modules that are not packages lack `__path__`.
+
+`ordinary.py`:
+
+```py
+pass
+```
+
+`main.py`:
+
+```py
+import ordinary
+import sys
+
+if not hasattr(sys, "__file__"):
+    reveal_type(sys)  # revealed: <module 'sys'>
+if not hasattr(ordinary, "__path__"):
+    reveal_type(ordinary)  # revealed: <module 'ordinary'>
+```
+
+## Dynamic module attributes
+
+A module's `__getattr__` can raise `AttributeError`, so it does not establish presence of arbitrary
+attributes.
+
+`dynamic.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    raise AttributeError(name)
+```
+
+`main.py`:
+
+```py
+import dynamic
+
+if not hasattr(dynamic, "missing"):
+    reveal_type(dynamic)  # revealed: <module 'dynamic'>
+```
+
+## Known class-object attributes
+
+Class bindings, including inherited methods and values, make negative checks unreachable on class
+objects. They can also distinguish alternatives in a union of class types.
+
+```py
+class Base:
+    value = 1
+
+    def method(self) -> None: ...
+
+class Derived(Base): ...
+class Other: ...
+
+if not hasattr(Derived, "value"):
+    reveal_type(Derived)  # revealed: Never
+if not hasattr(Derived, "method"):
+    reveal_type(Derived)  # revealed: Never
+
+def check(cls: type[Derived]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "method"):
+        reveal_type(cls)  # revealed: Never
+
+def check_union(cls: type[Derived] | type[Other]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[Other]
+```
+
+## Instance attributes on class objects
+
+An instance annotation or assignment does not create a binding on the class object. Assignments
+through `cls` also do not establish presence before that method runs.
+
+```py
+class InstanceAttributes:
+    declared: int
+
+    def __init__(self) -> None:
+        self.initialized = 1
+
+    @classmethod
+    def initialize_class(cls) -> None:
+        cls.class_value = 1
+
+if not hasattr(InstanceAttributes, "declared"):
+    reveal_type(InstanceAttributes)  # revealed: <class 'InstanceAttributes'>
+if not hasattr(InstanceAttributes, "initialized"):
+    reveal_type(InstanceAttributes)  # revealed: <class 'InstanceAttributes'>
+
+def check(cls: type[InstanceAttributes]) -> None:
+    if not hasattr(cls, "declared"):
+        reveal_type(cls)  # revealed: type[InstanceAttributes]
+    if not hasattr(cls, "initialized"):
+        reveal_type(cls)  # revealed: type[InstanceAttributes]
+    if not hasattr(cls, "class_value"):
+        reveal_type(cls)  # revealed: type[InstanceAttributes]
+```
+
+## Descriptor objects on classes
+
+Properties and slot descriptors are present on their defining classes, even when the corresponding
+instance attributes can be absent.
+
+```py
+class WithDescriptors:
+    __slots__ = ("slot",)
+    slot: int
+
+    @property
+    def value(self) -> int:
+        raise AttributeError
+
+if not hasattr(WithDescriptors, "slot"):
+    reveal_type(WithDescriptors)  # revealed: Never
+if not hasattr(WithDescriptors, "value"):
+    reveal_type(WithDescriptors)  # revealed: Never
+
+def check(cls: type[WithDescriptors]) -> None:
+    if not hasattr(cls, "slot"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: Never
+```
+
+## Stub property objects on classes
+
+Property declarations in stubs also establish presence on class objects. This lets a negative check
+distinguish class types with different property declarations.
+
+`classes.pyi`:
+
+```pyi
+class Array:
+    @property
+    def length(self) -> int: ...
+
+class Scalar: ...
+```
+
+`main.py`:
+
+```py
+from classes import Array, Scalar
+
+if not hasattr(Array, "length"):
+    reveal_type(Array)  # revealed: Never
+
+def check(cls: type[Array] | type[Scalar]) -> None:
+    if not hasattr(cls, "length"):
+        reveal_type(cls)  # revealed: type[Scalar]
+```
+
+## Protocol property implementations
+
+A protocol's property object is present on the protocol class itself. Classes implementing that
+protocol can instead use an instance attribute, so the property need not exist on their class
+objects. Method contracts still establish presence on implementing classes.
+
+```py
+from typing import Protocol
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> int: ...
+    def method(self) -> None: ...
+
+if not hasattr(HasValue, "value"):
+    reveal_type(HasValue)  # revealed: Never
+
+def check(cls: type[HasValue]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[HasValue]
+    if not hasattr(cls, "method"):
+        reveal_type(cls)  # revealed: Never
+```
+
+## Enum properties
+
+Unlike a built-in `property`, `enum.property` can raise `AttributeError` when accessed on its
+defining class.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, property as enum_property
+
+class Choice(Enum):
+    @enum_property
+    def label(self) -> str:
+        return "item"
+
+if not hasattr(Choice, "label"):
+    reveal_type(Choice)  # revealed: <class 'Choice'>
+
+def check(cls: type[Choice]) -> None:
+    if not hasattr(cls, "label"):
+        reveal_type(cls)  # revealed: type[Choice]
+```
+
+## Metaclass attributes
+
+Ordinary metaclass values and methods establish presence on class objects. A metaclass's
+`__getattr__` does not establish presence of arbitrary attributes, and a property getter can also
+raise `AttributeError`.
+
+```py
+class Meta(type):
+    bound = 1
+
+    def method(cls) -> None: ...
+    def __getattr__(cls, name: str) -> int:
+        raise AttributeError(name)
+
+    @property
+    def value(cls) -> int:
+        raise AttributeError
+
+class Dynamic(metaclass=Meta): ...
+
+if not hasattr(Dynamic, "bound"):
+    reveal_type(Dynamic)  # revealed: Never
+if not hasattr(Dynamic, "method"):
+    reveal_type(Dynamic)  # revealed: Never
+if not hasattr(Dynamic, "missing"):
+    reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
+if not hasattr(Dynamic, "value"):
+    reveal_type(Dynamic)  # revealed: <class 'Dynamic'>
+
+def check(cls: type[Dynamic]) -> None:
+    if not hasattr(cls, "bound"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "method"):
+        reveal_type(cls)  # revealed: Never
+    if not hasattr(cls, "missing"):
+        reveal_type(cls)  # revealed: type[Dynamic]
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[Dynamic]
+```
+
+A metaclass property takes precedence over a value assigned in the class body, so that value does
+not establish presence either.
+
+```py
+class OwnValue(metaclass=Meta):
+    value = 1
+
+if not hasattr(OwnValue, "value"):
+    reveal_type(OwnValue)  # revealed: <class 'OwnValue'>
+
+def check_own_value(cls: type[OwnValue]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[OwnValue]
+```
+
+## Class descriptors shadowing metaclass values
+
+A class descriptor takes precedence over an ordinary metaclass value. Its getter can raise
+`AttributeError` even though the metaclass provides a value with the same name.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        raise AttributeError
+
+class Meta(type):
+    value = 1
+
+class WithDescriptor(metaclass=Meta):
+    value = Descriptor()
+
+if not hasattr(WithDescriptor, "value"):
+    reveal_type(WithDescriptor)  # revealed: <class 'WithDescriptor'>
+
+def check(cls: type[WithDescriptor]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[WithDescriptor]
+```
+
+## Opaque metaclass descriptors
+
+A metaclass attribute typed as `object` could be a data descriptor whose getter takes precedence
+over a class-body value and raises `AttributeError`.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        raise AttributeError
+
+    def __set__(self, instance: object, value: object) -> None: ...
+
+def make_descriptor() -> object:
+    return Descriptor()
+
+class Meta(type):
+    value = make_descriptor()
+
+class OwnValue(metaclass=Meta):
+    value = 1
+
+if not hasattr(OwnValue, "value"):
+    reveal_type(OwnValue)  # revealed: <class 'OwnValue'>
+
+def check(cls: type[OwnValue]) -> None:
+    if not hasattr(cls, "value"):
+        reveal_type(cls)  # revealed: type[OwnValue]
+```

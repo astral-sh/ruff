@@ -6,24 +6,25 @@ use crate::place::{
 };
 use crate::types::{
     ClassBase, ClassType, KnownInstanceType, MemberLookupKey, MemberLookupPolicy,
-    ProgramEnvironment, Type, TypeVarBoundOrConstraints,
+    ModuleLiteralType, ProgramEnvironment, PropertyInstanceClass, Type, TypeVarBoundOrConstraints,
     class::{CodeGeneratorKind, MroLookup},
     infer::nearest_enclosing_class,
 };
 use ty_python_core::{
+    ProgramFile,
     definition::{DefinitionKind, DefinitionState},
-    place_table,
+    global_scope, place_table,
     scope::ScopeId,
     semantic_index,
     symbol::ScopedSymbolId,
     use_def_map,
 };
 
-/// Whether class bindings or a protocol method contract establish an attribute's presence.
+/// Whether module members, class bindings, or protocol methods establish an attribute's presence.
 ///
 /// Instance annotations and assignments do not establish presence because we do not check
-/// definite initialization. Descriptors other than ordinary methods can raise `AttributeError`
-/// when accessed, even when the descriptor itself is bound on the class.
+/// definite initialization. For instance access, descriptors other than ordinary methods can
+/// raise `AttributeError`, even when the descriptor itself is bound on the class.
 pub(super) fn has_definitely_present_attribute<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -43,8 +44,18 @@ fn has_definitely_present_attribute_impl<'db>(db: &'db dyn Db, key: MemberLookup
     let has_attribute = |ty| has_definitely_present_attribute(db, &env, ty, name);
 
     match key.ty(db) {
-        Type::NominalInstance(instance) => {
-            has_definitely_bound_class_attribute(db, &env, instance.class(db, &env), name)
+        Type::NominalInstance(instance) => has_definitely_bound_class_attribute(
+            db,
+            &env,
+            instance.class(db, &env),
+            name,
+            ClassAttributeAccess::Instance,
+        ),
+        Type::ModuleLiteral(module) => {
+            has_definitely_present_module_attribute(db, &env, module, name)
+        }
+        ty @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)) => {
+            has_definitely_present_class_object_attribute(db, &env, ty, name)
         }
         Type::ProtocolInstance(protocol) => protocol
             .interface(db)
@@ -70,11 +81,114 @@ fn has_definitely_present_attribute_impl<'db>(db: &'db dyn Db, key: MemberLookup
     }
 }
 
+fn has_definitely_present_module_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    module: ModuleLiteralType<'db>,
+    name: &str,
+) -> bool {
+    let Some(file) = module.module(db).file(db) else {
+        return false;
+    };
+    let scope = global_scope(db, ProgramFile::new(db, file, env.program(db)));
+    let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+        return false;
+    };
+
+    // Explicit stub declarations describe a module's public interface. In Python source,
+    // only bindings establish presence: a bare annotation does not initialize a global.
+    // Avoid ordinary member lookup, whose ModuleType and `__getattr__` fallbacks can provide
+    // attributes such as `__path__` or `__file__` that this module does not actually have.
+    if file.is_stub(db) {
+        place_by_id(
+            db,
+            scope,
+            symbol.into(),
+            RequiresExplicitReExport::Yes,
+            ConsideredDefinitions::EndOfScope,
+        )
+        .place
+        .is_definitely_bound()
+    } else {
+        place_from_bindings(
+            db,
+            env,
+            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+        )
+        .place
+        .is_definitely_bound()
+    }
+}
+
+fn has_definitely_present_class_object_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    name: &str,
+) -> bool {
+    let Some(instance) = ty.to_instance_approximation(db, env) else {
+        return false;
+    };
+    let Some(class) = instance.nominal_class(db, env) else {
+        return false;
+    };
+    if matches!(ty, Type::SubclassOf(_)) && class.is_protocol(db) {
+        // Structural implementations need not inherit the protocol's class bindings. Its
+        // method contracts still apply, but properties can be implemented by instance storage.
+        return has_definitely_present_attribute(db, env, instance, name);
+    }
+
+    // A data descriptor on the metaclass takes precedence over the class's own bindings.
+    // Unlike a property stored in the class namespace, this getter runs during class access.
+    if ty
+        .class_member_with_policy(db, env, name, MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+        .ignore_possibly_undefined()
+        .is_some_and(|member| {
+            member.resolve_type_alias(db).is_object()
+                || !member.is_definitely_non_data_descriptor(db, env)
+        })
+    {
+        return false;
+    }
+
+    if has_definitely_bound_class_attribute(db, env, class, name, ClassAttributeAccess::Class) {
+        return true;
+    }
+    if !class
+        .class_member(db, env, name, MemberLookupPolicy::REQUIRE_CONCRETE)
+        .place
+        .is_undefined()
+    {
+        // An uncertain class binding can shadow an otherwise safe metaclass attribute.
+        return false;
+    }
+    ty.to_meta_type(db, env)
+        .to_instance_approximation(db, env)
+        .and_then(|metaclass| metaclass.nominal_class(db, env))
+        .is_some_and(|metaclass| {
+            has_definitely_bound_class_attribute(
+                db,
+                env,
+                metaclass,
+                name,
+                ClassAttributeAccess::Instance,
+            )
+        })
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ClassAttributeAccess {
+    Instance,
+    Class,
+}
+
 fn has_definitely_bound_class_attribute<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     class: ClassType<'db>,
     name: &str,
+    access: ClassAttributeAccess,
 ) -> bool {
     for base in class.iter_mro(db) {
         let class = match base {
@@ -86,7 +200,7 @@ fn has_definitely_bound_class_attribute<'db>(
             return false;
         };
         if class.has_own_slot_descriptor(db, name) {
-            return false;
+            return access == ClassAttributeAccess::Class;
         }
 
         let scope = class.body_scope(db);
@@ -129,6 +243,14 @@ fn has_definitely_bound_class_attribute<'db>(
         else {
             continue;
         };
+        if access == ClassAttributeAccess::Class
+            && (matches!(binding.ty, Type::SlotDescriptor(_))
+                || matches!(binding.ty, Type::PropertyInstance(property) if matches!(property.instance_class(db), PropertyInstanceClass::Builtin)))
+        {
+            // Class access returns the descriptor itself without reading instance storage or
+            // invoking a property getter.
+            return binding.definedness == Definedness::AlwaysDefined;
+        }
         return binding.definedness == Definedness::AlwaysDefined
             // An `object` return annotation can hide a descriptor supplied by a factory.
             && !binding.ty.resolve_type_alias(db).is_object()
