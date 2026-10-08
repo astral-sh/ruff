@@ -3387,3 +3387,49 @@ class Child(Base):
     def __init__(self) -> None:
         self.value: bool = True  # error: [invalid-mutable-override]
 ```
+
+## Unannotated classmethod assignments
+
+Checking receiver declarations does not require inferring unannotated classmethod assignments. In
+particular, a subclass can lazily initialize an inherited cache that starts as `None`.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+class TaskContext:
+    _taskContext = None
+
+class BarrierTaskContext(TaskContext):
+    @classmethod
+    def _getOrCreate(cls):
+        if not isinstance(cls._taskContext, BarrierTaskContext):  # no diagnostic
+            cls._taskContext = BarrierTaskContext()
+```
+
+## Slots preserve inherited declarations
+
+Unannotated assignments to a slot do not replace an inherited annotation. Overrides of that slot
+must still preserve the declared type.
+
+```py
+class Array: ...
+class PandasIndexingAdapter: ...
+
+class NamedArray:
+    _data: Array
+
+class Variable(NamedArray):
+    __slots__ = ("_data",)
+
+    def data(self, data):
+        self._data = data
+
+    def load(self, data: Array):
+        self._data = data
+
+class IndexVariable(Variable):
+    _data: PandasIndexingAdapter  # error: [invalid-attribute-override]
+```

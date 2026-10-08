@@ -6,7 +6,7 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use ty_python_core::definition::Definition;
 
 use crate::{
-    Db, ProgramEnvironment,
+    Db, ProgramEnvironment, attribute_declarations,
     place::{Place, TypeOrigin},
     types::{
         ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
@@ -71,7 +71,16 @@ fn attribute_contract<'db>(
         return None;
     }
     let class_member = owner.own_class_member(db, env, None, name).inner;
-    let instance_member = owner.own_instance_member(db, env, name).inner;
+    let instance_member = if matches!(
+        class_member.place.ignore_possibly_undefined(),
+        Some(Type::SlotDescriptor(_))
+    ) {
+        // A slot provides storage for the inherited instance contract. Unannotated writes
+        // in this class do not replace an ancestor's declared type.
+        owner.instance_member(db, env, name)
+    } else {
+        owner.own_instance_member(db, env, name).inner
+    };
     let own_place = match (class_member.place, instance_member.place) {
         (Place::Defined(place), _) | (_, Place::Defined(place)) => place,
         (Place::Undefined, Place::Undefined) => return None,
@@ -442,8 +451,20 @@ pub(super) fn check_instance_overrides<'db>(
 ) {
     let db = context.db();
     let env = &context.program_environment();
+    let Some((literal, _)) = class.static_class_literal(db) else {
+        return;
+    };
     for name in class.own_instance_attribute_names(db) {
-        if is_mangled_private(name) || !class.own_class_member(db, env, None, name).is_undefined() {
+        // Ordinary assignments introduce no override contract. Do not infer their method
+        // bodies just to discard the inferred type; a lazy cache can depend on its own reads.
+        if is_mangled_private(name)
+            || !attribute_declarations(db, literal.body_scope(db), name).any(
+                |(mut declarations, _)| {
+                    declarations.any(|declaration| declaration.declaration.definition().is_some())
+                },
+            )
+            || !class.own_class_member(db, env, None, name).is_undefined()
+        {
             continue;
         }
         // Avoid inferring method bodies for names that do not override anything.
