@@ -3181,6 +3181,169 @@ class Independent(Inferred):
 reveal_type(Independent.value)  # revealed: str
 ```
 
+### Inherited declarations after a dynamic base
+
+An unannotated subclass default retains the annotation from a concrete base, even when an earlier
+base is `Any`. The annotation provides context for the default and determines its type on access.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+    items: list[int] = []
+
+class Child(Any, Base):
+    value = "child"
+    items = []
+
+reveal_type(Child.value)  # revealed: int | str
+reveal_type(Child.items)  # revealed: list[int]
+
+def check(child: Child) -> None:
+    reveal_type(child.value)  # revealed: int | str
+    child.value = 1
+```
+
+An incompatible default is rejected:
+
+```py
+class Invalid(Any, Base):
+    value = []  # error: [invalid-assignment]
+```
+
+The concrete base's annotation is also retained when it comes before `Any`:
+
+```py
+class DynamicLast(Base, Any):
+    value = "child"
+
+reveal_type(DynamicLast.value)  # revealed: int | str
+```
+
+### Dynamically typed base expressions
+
+A base expression with type `Any` also leaves a concrete base's annotation available.
+
+```py
+from typing import Any
+
+class Dynamic: ...
+
+DynamicBase: Any = Dynamic
+
+class Base:
+    value: int | str = 0
+
+class Child(DynamicBase, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(DynamicBase, Base):
+    value = []  # error: [invalid-assignment]
+```
+
+The same applies when the base expression has an unknown type:
+
+```py
+def unknown_base(base):
+    class Child(base, Base):
+        value = "child"
+
+    reveal_type(Child.value)  # revealed: int | str
+```
+
+### Dynamic bases without a subclass default
+
+A dynamic base can still affect ordinary attribute lookup when the subclass does not supply a
+default.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Child(Any, Base): ...
+
+reveal_type(Child.value)  # revealed: (int & Any) | (str & Any)
+reveal_type(Child().value)  # revealed: (int & Any) | (str & Any)
+```
+
+### Dynamic bases and unannotated members
+
+An earlier concrete base with an unannotated member still masks a later annotation.
+
+```py
+from typing import Any
+
+class Inferred:
+    value = 0
+
+class Annotated:
+    value: int | str = 0
+
+class Child(Any, Inferred, Annotated):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: str
+```
+
+If no concrete base declares the attribute, the subclass default uses its inferred type:
+
+```py
+class NoAnnotation(Any):
+    value = "child"
+
+reveal_type(NoAnnotation.value)  # revealed: str
+```
+
+### Dynamic bases and inherited class variables
+
+The inherited `ClassVar` qualifier still prevents writes through instances.
+
+```py
+from typing import Any, ClassVar
+
+class Base:
+    value: ClassVar[int | str] = 0
+
+class Child(Any, Base):
+    value = "child"
+
+reveal_type(Child.value)  # revealed: int | str
+Child.value = 1
+Child().value = 1  # error: [invalid-attribute-access]
+```
+
+### Dynamic bases and inherited defaults
+
+The first base that supplies a default determines its annotation. That annotation can come from an
+ancestor, even when the first base has an earlier dynamic base and another base has a different
+annotation for the same attribute.
+
+```py
+from typing import Any
+
+class Base:
+    value: int | str = 0
+
+class Intermediate(Any, Base):
+    value = "intermediate"
+
+class Other:
+    value: bytes = b""
+
+class Child(Intermediate, Other):
+    value = 1
+
+reveal_type(Child.value)  # revealed: int | str
+
+class Invalid(Intermediate, Other):
+    value = b"wrong"  # error: [invalid-assignment]
+```
+
 ### Augmented assignments retain inherited declarations
 
 Updating a subclass default with augmented assignment preserves its inherited annotation, just like
