@@ -3332,9 +3332,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         self.with_recursion_guard(db, left, right, || {
             let negative_elements = intersection.negative(db);
             let subtyping_checker = self.as_relation_checker(TypeRelation::Subtyping);
+
             (
-                // Test an exact exclusion before unrelated positive components. Gradual types
-                // need the full reflexive subtyping check: `Any` is not a subtype of itself.
+                // As an optimization, test an exact exclusion before unrelated positive components.
+                // Gradual types need the full reflexive subtyping check: `Any` is not a subtype of itself.
                 ConstraintSet::from_bool(self.constraints, negative_elements.contains(&other)).and(
                     db,
                     self.constraints,
@@ -3348,13 +3349,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     .when_any(db, self.constraints, |&pos_ty| {
                         self.check_type_pair(db, pos_ty, other)
                     })
-                    // A & B & Not[C] is disjoint from C
-                    .or(db, self.constraints, || {
-                        negative_elements
-                            .iter()
-                            .when_any(db, self.constraints, |&neg_ty| {
-                                subtyping_checker.check_type_pair(db, other, neg_ty)
-                            })
+            })
+            .or(db, self.constraints, || {
+                // A & B & Not[C] is disjoint from C
+                negative_elements
+                    .iter()
+                    .when_any(db, self.constraints, |&neg_ty| {
+                        subtyping_checker.check_type_pair(db, other, neg_ty)
                     })
             })
         })
