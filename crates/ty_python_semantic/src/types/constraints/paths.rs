@@ -1344,7 +1344,7 @@ mod tests {
                 remaining_paths,
                 remaining_visits,
             };
-            let mut walker = SolutionWalker::new(
+            let walker = SolutionWalker::new(
                 db,
                 &mut storage,
                 source_orders.clone(),
@@ -1367,7 +1367,7 @@ mod tests {
             drop(walker);
 
             let limits = UnboundedSolutionLimits;
-            let mut walker = SolutionWalker::new(
+            let walker = SolutionWalker::new(
                 db,
                 &mut storage,
                 source_orders.clone(),
