@@ -271,7 +271,7 @@ impl RedundantConditionContext {
                     builder.db(),
                     builder.program_file(),
                     expression,
-                    |expr| builder.expression_type(expr),
+                    |expr| builder.expression_value_type(expr),
                 )
             }),
         }
@@ -764,7 +764,7 @@ fn definition_contains_special_cased_condition<'db>(
         DefinitionKind::AugmentedAssignment(assignment) => {
             let assignment = assignment.node(&module);
             if place_condition_definition_info(db, program_file, &assignment.target, |expr| {
-                infer_definition_types(db, definition).expression_type(expr)
+                infer_definition_types(db, definition).expression_value_type(db, expr)
             })
             .contains_special_cased_condition
             {
@@ -816,11 +816,11 @@ fn definition_contains_special_cased_condition<'db>(
                     .get_or_insert_with(|| {
                         infer_expression_types(db, standalone, TypeContext::default())
                     })
-                    .expression_type(expr)
+                    .expression_value_type(db, expr)
             } else {
                 definition_inference
                     .get_or_insert_with(|| infer_definition_types(db, definition))
-                    .expression_type(expr)
+                    .expression_value_type(db, expr)
             }
         })
     })
@@ -901,7 +901,7 @@ fn predicate_contains_special_cased_condition<'db>(
                 .get_or_insert_with(|| {
                     infer_expression_types(db, expression, TypeContext::default())
                 })
-                .expression_type(expr)
+                .expression_value_type(db, expr)
         })
     })
 }

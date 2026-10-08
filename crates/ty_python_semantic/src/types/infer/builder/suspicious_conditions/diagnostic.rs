@@ -24,7 +24,7 @@ use ty_python_core::{
     definition::{Definition, DefinitionKind},
     place::PlaceExpr,
     predicate::{Predicate, PredicateNode},
-    scope::FileScopeId,
+    scope::{FileScopeId, ScopeId},
     semantic_index,
 };
 
@@ -39,7 +39,7 @@ use crate::{
         MemberLookupPolicy, Type, UnionType,
         call::bind::CallableDescription,
         context::InferContext,
-        definition_expression_type_in_scope,
+        definition_expression_type_in_scope, definition_type_expression_type_in_scope,
         diagnostic::typing_module_for_fix,
         enum_metadata,
         function::KnownFunction,
@@ -153,8 +153,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let Some((left, _, single_comparator)) = compare.as_single()
             {
                 if let (Type::LiteralValue(left_type), Type::LiteralValue(right_type)) = (
-                    self.expression_type(left),
-                    self.expression_type(single_comparator),
+                    self.expression_value_type(left),
+                    self.expression_value_type(single_comparator),
                 ) && ((left_type.is_string() && (right_type.is_bytes() || right_type.is_int()))
                     || ((left_type.is_bytes() || left_type.is_int()) && right_type.is_string()))
                 {
@@ -162,7 +162,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // cite their nominal-instance supertypes rather than their `Literal` types,
                     // since their `Literal` types look quite similar in their display representations.
                     for node in [left, single_comparator] {
-                        if let Some(class) = self.expression_type(node).nominal_class(db, env) {
+                        if let Some(class) = self.expression_value_type(node).nominal_class(db, env)
+                        {
                             diagnostic.annotate(
                                 self.context
                                     .secondary(node)
@@ -185,7 +186,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 diagnostic.annotate(self.context.secondary(node).message(
                                     format_args!(
                                         "Has type `{}`",
-                                        self.expression_type(node).display(db, env)
+                                        self.expression_value_type(node).display(db, env)
                                     ),
                                 ));
                             }
@@ -291,7 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let definition_info =
                 condition_definition_info(db, self.program_file(), test, |expr| {
-                    self.expression_type(expr)
+                    self.expression_value_type(expr)
                 });
 
             let mut first_party_annotation = None;
@@ -863,11 +864,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             && let ast::Arguments { args, keywords, .. } = &call.arguments
             && keywords.is_empty()
             && let [single_arg] = &**args
-            && let Type::FunctionLiteral(function) = self.expression_type(&call.func)
+            && let Type::FunctionLiteral(function) = self.expression_value_type(&call.func)
             && function.is_known(db, KnownFunction::Len)
-            && self.expression_type(other).is_int_literal()
+            && self.expression_value_type(other).is_int_literal()
         {
-            let arg_type = self.expression_type(single_arg);
+            let arg_type = self.expression_value_type(single_arg);
             let length = arg_type.len(db, env)?.as_int_literal()?;
             Some((single_arg, arg_type, length))
         } else {
@@ -933,15 +934,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             DefinitionKind::Parameter(parameter) => parameter.annotation(module)?,
             _ => return None,
         };
-        (self.annotation_expression_type(definition, annotation)? == inferred_type)
+        let scope = self.annotation_expression_scope(definition, annotation)?;
+        (definition_type_expression_type_in_scope(db, definition, annotation, scope)
+            == inferred_type)
             .then_some(annotation)
     }
 
-    fn annotation_expression_type(
+    fn annotation_expression_scope(
         &self,
         definition: Definition<'db>,
         expression: &ast::Expr,
-    ) -> Option<Type<'db>> {
+    ) -> Option<ScopeId<'db>> {
         let db = self.db();
         let file = definition.program_file(db);
         let index = semantic_index(db, file);
@@ -949,12 +952,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let module = parsed_module(db, definition.python_file(db)).load(db);
             index.annotation_parent_scope_id(&module, expression)
         })?;
-        Some(definition_expression_type_in_scope(
-            db,
-            definition,
-            expression,
-            scope.to_scope_id(db, file),
-        ))
+        Some(scope.to_scope_id(db, file))
     }
 
     /// Locate the iterable name and its element annotation so a fix can change only the name.
@@ -974,10 +972,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.iterable_annotation_ranges(definition, parsed.expr())
             }
             ast::Expr::Subscript(subscript) => {
-                let known_class = self
-                    .annotation_expression_type(definition, &subscript.value)?
-                    .as_class_literal()?
-                    .known(db)?;
+                let scope = self.annotation_expression_scope(definition, &subscript.value)?;
+                let known_class =
+                    definition_expression_type_in_scope(db, definition, &subscript.value, scope)
+                        .as_class_literal()?
+                        .known(db)?;
 
                 (known_class == KnownClass::Iterable).then_some(IterableAnnotationRanges {
                     origin: subscript.value.range(),
@@ -1031,7 +1030,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let definition_info =
                 condition_definition_info(db, self.program_file(), node, |expr| {
-                    self.expression_type(expr)
+                    self.expression_value_type(expr)
                 });
 
             if let Some(single_definition) = definition_info.single_definition() {
@@ -1515,7 +1514,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         candidates.into_iter().flatten().find_map(|candidate| {
             let name = candidate.as_name_expr()?;
-            let ty = self.expression_type(candidate);
+            let ty = self.expression_value_type(candidate);
             if ty.is_never()
                 || !self
                     .type_before_if_chain(name)?

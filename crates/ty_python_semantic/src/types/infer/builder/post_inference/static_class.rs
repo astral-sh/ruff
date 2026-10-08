@@ -144,7 +144,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     ty: Type<'db>,
     class_node: &ast::StmtClassDef,
     index: &SemanticIndex<'db>,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    file_expression_value_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
 
@@ -241,7 +241,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     let is_protocol = class.is_protocol(db);
 
     if let Some(disjoint_base_decorator) = class_node.decorator_list.iter().find(|decorator| {
-        file_expression_type(&decorator.expression)
+        file_expression_value_type(&decorator.expression)
             .as_function_literal()
             .is_some_and(|function| function.is_known(db, KnownFunction::DisjointBase))
     }) {
@@ -640,7 +640,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     if class.total_ordering(db) && !class.has_ordering_method_in_mro(db, None) {
         // Find the `@total_ordering` decorator to report the diagnostic at its location
         if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
-            file_expression_type(&decorator.expression)
+            file_expression_value_type(&decorator.expression)
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::TotalOrdering))
         }) {
@@ -762,7 +762,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
                 match keyword.arg.as_deref() {
                     Some(arg_name @ ("total" | "closed")) => {
-                        let passed_type = file_expression_type(&keyword.value);
+                        let passed_type = file_expression_value_type(&keyword.value);
                         if !keyword.value.is_boolean_literal_expr()
                             && let Some(builder) =
                                 context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
@@ -817,11 +817,11 @@ pub(crate) fn check_static_class_definitions<'db>(
                     // We mimic the runtime behaviour and discard the metaclass argument
                     Some(name) if name.id.as_str() == "metaclass" => None,
                     Some(name) => {
-                        let ty = file_expression_type(&keyword.value);
+                        let ty = file_expression_value_type(&keyword.value);
                         Some((Argument::Keyword(name.id.as_str()), Some(ty)))
                     }
                     None => {
-                        let ty = file_expression_type(&keyword.value);
+                        let ty = file_expression_value_type(&keyword.value);
                         Some((Argument::Keywords, Some(ty)))
                     }
                 })
@@ -1443,7 +1443,7 @@ fn check_final_class_abstract_methods<'db>(
             .iter()
             .find(|decorator| {
                 definition_types
-                    .expression_type(&decorator.expression)
+                    .expression_value_type(db, &decorator.expression)
                     .as_function_literal()
                     .is_some_and(|function| function.is_known(db, KnownFunction::Final))
             })

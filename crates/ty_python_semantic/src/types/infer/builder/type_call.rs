@@ -142,7 +142,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let all_keys_are_string_literals = dict.items.iter().all(|item| {
                     item.key
                         .as_ref()
-                        .is_some_and(|k| self.expression_type(k).is_string_literal())
+                        .is_some_and(|k| self.expression_value_type(k).is_string_literal())
                 });
                 let members = dict
                     .items
@@ -150,10 +150,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .filter_map(|item| {
                         // Only extract items with string literal keys.
                         let key_expr = item.key.as_ref()?;
-                        let key_name = self.expression_type(key_expr).as_string_literal()?;
+                        let key_name = self.expression_value_type(key_expr).as_string_literal()?;
                         let key_name = ast::name::Name::new(key_name.value(db));
                         // Get the already-inferred type from when we inferred the dict above.
-                        let value_ty = self.expression_type(&item.value);
+                        let value_ty = self.expression_value_type(&item.value);
                         Some((key_name, value_ty))
                     })
                     .collect();

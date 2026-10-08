@@ -8,7 +8,7 @@ use crate::{
         DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
         TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
         cyclic::CycleDetector,
-        definition_expression_type,
+        definition_expression_type, definition_type_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
         variance::{VarianceInferable, VarianceOrigin},
@@ -227,7 +227,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
         let definition = self.definition(db);
 
-        definition_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
+        definition_type_expression_type(db, definition, &type_alias_stmt_node.node(&module).value)
     }
 
     fn apply_specialization(
@@ -345,7 +345,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
             return Type::unknown();
         };
-        definition_expression_type(db, definition, value_arg)
+        definition_type_expression_type(db, definition, value_arg)
     }
 
     fn apply_specialization(

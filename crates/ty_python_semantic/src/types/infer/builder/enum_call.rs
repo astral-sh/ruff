@@ -417,7 +417,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ));
         }
 
-        let name_ty = self.expression_type(name_arg);
+        let name_ty = self.expression_value_type(name_arg);
         let name = name_ty
             .as_string_literal()
             .map(|name_literal| name_literal.value(db));
@@ -473,7 +473,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         base_class: KnownClass,
     ) -> Option<&'db str> {
         let db = self.db();
-        let name_type = self.expression_type(name_arg);
+        let name_type = self.expression_value_type(name_arg);
 
         let Some(name_literal) = name_type.as_string_literal() else {
             let env = self.program_environment();
@@ -497,7 +497,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     fn infer_enum_start_argument(&mut self, value: &ast::Expr) -> EnumStart {
         let db = self.db();
-        let ty = self.expression_type(value);
+        let ty = self.expression_value_type(value);
         if let Some(literal) = ty.as_int_literal() {
             return EnumStart::Literal(literal);
         }
@@ -523,7 +523,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         base_class: KnownClass,
     ) -> (Option<Type<'db>>, bool) {
         let db = self.db();
-        let ty = self.expression_type(value);
+        let ty = self.expression_value_type(value);
         let env = self.program_environment();
         if let Some(class_lit) = ty.as_class_literal() {
             if class_lit.is_typed_dict(db)
@@ -659,7 +659,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         base_class: KnownClass,
     ) -> EnumMembersArgParseResult<'db> {
         let db = self.db();
-        let ty = self.expression_type(names_arg);
+        let ty = self.expression_value_type(names_arg);
         if let Some(string_lit) = ty.as_string_literal() {
             let s = string_lit.value(db);
             let names: Vec<Name> = s
@@ -800,7 +800,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let Some(key) = &item.key else {
                 return EnumMembersArgParseResult::Invalid;
             };
-            let key_ty = self.expression_type(key);
+            let key_ty = self.expression_value_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
                 if key_ty.is_dynamic()
                     || key_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
@@ -811,7 +811,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return EnumMembersArgParseResult::Invalid;
             };
             let name = Name::new(string_lit.value(db));
-            let raw_value = self.expression_type(&item.value);
+            let raw_value = self.expression_value_type(&item.value);
             let value = if raw_value.is_instance_of(db, KnownClass::Auto) {
                 next_auto_value(&self.context, base_class, name.as_str(), last_int_value)
             } else {
@@ -841,9 +841,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         };
         let db = self.db();
-        let name_ty = self.expression_type(name_expr);
+        let name_ty = self.expression_value_type(name_expr);
         let name = Name::new(name_ty.as_string_literal()?.value(db));
-        let value = self.expression_type(value_expr);
+        let value = self.expression_value_type(value_expr);
         Some((name, value))
     }
 
@@ -861,7 +861,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let [name_expr, _value_expr] = &**pair else {
             return false;
         };
-        let name_ty = self.expression_type(name_expr);
+        let name_ty = self.expression_value_type(name_expr);
         let env = self.program_environment();
         name_ty.is_dynamic()
             || name_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
@@ -873,7 +873,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// pairs, opaque explicit pairs, and definitely invalid elements.
     fn classify_sequence_enum_member(&mut self, elt: &ast::Expr) -> SequenceEnumMember<'db> {
         let db = self.db();
-        let ty = self.expression_type(elt);
+        let ty = self.expression_value_type(elt);
         if let Some(string_lit) = ty.as_string_literal() {
             return SequenceEnumMember::NameKnown(Name::new(string_lit.value(db)));
         }
@@ -897,7 +897,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let base_name = base_class.name(self.program_environment().python_version(db));
-        let names_ty = self.expression_type(names_arg);
+        let names_ty = self.expression_value_type(names_arg);
         if let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, names_arg) {
             let env = self.program_environment();
             let mut diagnostic = builder.into_diagnostic(format_args!(

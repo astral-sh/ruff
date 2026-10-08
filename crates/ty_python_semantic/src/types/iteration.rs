@@ -100,7 +100,7 @@ fn iterable_factory_definition<'db>(
     let expression = semantic_index(db, context.program_file()).try_expression(call)?;
     let inference = infer_expression_types(db, expression, TypeContext::default());
     let bindings = inference
-        .expression_type(call.func.as_ref())
+        .expression_value_type(db, call.func.as_ref())
         .bindings(db, context.program_environment());
     let [overload] = bindings.single_element()?.overloads() else {
         return None;
