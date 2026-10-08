@@ -374,7 +374,7 @@ impl<'db> Type<'db> {
             &ApplyTypeMappingVisitor::new(env),
         )
         .check_attribute_write(db, self, name, value_ty)
-        .is_always_satisfied(db, env)
+        .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     /// Re-run the assignability check with error context collection enabled.
