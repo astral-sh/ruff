@@ -2115,11 +2115,9 @@ The attribute stored by the metaclass also shadows a descriptor inherited from a
 that non-data class attribute and an instance assignment remain possible:
 
 ```py
-from typing import Literal
-
 class InheritedGeneratedProperty:
     @property
-    def generated(self) -> Literal["property"]:
+    def generated(self) -> object:
         return "property"
 
 class StringStoringMeta(type):
@@ -2133,7 +2131,6 @@ class InitializesShadowedGenerated:
     def __init__(self) -> None:
         self.generated: bytes = b"instance"
 
-# error: [invalid-property-type-override]
 class ShadowsInheritedGeneratedProperty(
     InitializesShadowedGenerated, InheritedGeneratedProperty, metaclass=StringStoringMeta
 ): ...
@@ -2145,6 +2142,8 @@ If the metaclass instead stores a data descriptor on the new class, the descript
 over an instance assignment:
 
 ```py
+from typing import Literal
+
 class GeneratedDescriptor:
     def __get__(self, instance: object, owner: type | None = None) -> Literal["descriptor"]:
         return "descriptor"
