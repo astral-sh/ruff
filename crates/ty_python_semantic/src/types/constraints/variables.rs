@@ -7,13 +7,13 @@ use std::marker::PhantomData;
 use itertools::{Either, Itertools};
 use salsa::plumbing::AsId;
 
-use crate::types::Type;
 use crate::types::constraints::support::Support;
 use crate::types::constraints::{
     ALWAYS_FALSE, ALWAYS_TRUE, ConstraintSetStorage, Node, NodeId, SourceOrderId,
     max_constructor_and_typevar_depth, wobble_index,
 };
 use crate::types::typevar::{BoundTypeVarInstance, TypeVarDomain};
+use crate::types::{ApplyTypeMappingVisitor, GenericContext, Type, TypeContext, TypeMapping};
 use crate::{Db, ProgramEnvironment};
 
 /// The _provenance_ of a BDD constraint.
@@ -156,6 +156,44 @@ impl<'db> From<AtomicConstraint<'db>> for Constraint<'db> {
 }
 
 impl<'db> AtomicConstraint<'db> {
+    pub(super) fn freshen_bound_typevars(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let mapping = TypeMapping::FreshenBoundTypeVars {
+            generic_context,
+            delta,
+        };
+        let typevar = |var: BoundTypeVarInstance<'db>| {
+            var.freshen_bound_typevars(db, generic_context, delta, visitor)
+        };
+        let bound = |ty: Type<'db>| {
+            ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor)
+        };
+        match self {
+            Self::ConcreteLower(c) => {
+                ConcreteLowerBound::new(c.provenance, typevar(c.typevar), bound(c.bound)).into()
+            }
+            Self::ConcreteUpper(c) => {
+                ConcreteUpperBound::new(c.provenance, typevar(c.typevar), bound(c.bound)).into()
+            }
+            Self::ConcreteEquivalence(c) => {
+                ConcreteEquivalenceBound::new(c.provenance, typevar(c.typevar), bound(c.bound))
+                    .into()
+            }
+            Self::TypeVarRange(c) => {
+                TypeVarRangeBound::new(db, c.provenance, typevar(c.left), typevar(c.right)).into()
+            }
+            Self::TypeVarEquivalence(c) => {
+                TypeVarEquivalenceBound::new(db, c.provenance, typevar(c.left), typevar(c.right))
+                    .into()
+            }
+        }
+    }
+
     /// Returns the constraints that model the requirement that `bound` must be assignable to
     /// `typevar`. Union lower bounds are broken apart into separate constraints. Returns no
     /// constraints when the relationship always holds (e.g. when comparing a typevar with itself).

@@ -106,7 +106,7 @@ use ty_static::EnvVars;
 use crate::types::class::GenericAlias;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget};
 use crate::types::constraints::support::{Support, SupportId};
-use crate::types::generics::{Specialization, walk_specialization_types};
+use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarConstraints, TypeVarInstance, TypeVarNonce, TypeVarSet,
 };
@@ -115,8 +115,8 @@ use crate::types::visitor::{
     walk_non_atomic_type,
 };
 use crate::types::{
-    BoundTypeVarInstance, DynamicType, IntersectionType, RecursiveType, Type, TypeAliasType,
-    TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DynamicType, IntersectionType, RecursiveType,
+    Type, TypeAliasType, TypePair, TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -577,6 +577,118 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node == ALWAYS_TRUE
     }
 
+    /// Gives each existential binder a fresh identity while preserving the free typevars.
+    ///
+    /// Reusing a cached relation can put its quantifiers in several independently checked scopes.
+    /// Their witnesses must not constrain each other through a shared bound-typevar identity.
+    pub(super) fn freshen_quantified_typevars(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Self {
+        fn collect(
+            storage: &ConstraintSetStorage<'_>,
+            node: NodeId,
+            seen: &mut FxHashSet<ConstraintId>,
+            locals: &mut Support,
+        ) {
+            node.for_each_unique_constraint(storage, &mut |id| {
+                if seen.insert(id)
+                    && let Constraint::Existential(existential) = storage.constraint_data(id)
+                {
+                    *locals |= &existential.locals;
+                    collect(storage, existential.body, seen, locals);
+                }
+            });
+        }
+        let storage = self.builder.storage.borrow();
+        let mut locals = Support::default();
+        collect(&storage, self.node, &mut FxHashSet::default(), &mut locals);
+        let variables = || locals.iter().map(|id| storage.typevar_data(id));
+        let Some(min_freshness) = variables().map(|var| var.freshness(db)).min() else {
+            return self;
+        };
+        let max_local_freshness = variables()
+            .map(|var| var.freshness(db))
+            .max()
+            .unwrap_or(min_freshness);
+        let max_freshness = storage
+            .node_support(self.node)
+            .into_iter()
+            .flat_map(Support::iter)
+            .map(|id| storage.typevar_data(id).freshness(db))
+            .chain(self.builder.signature_typevar_freshness.get())
+            .fold(max_local_freshness, TypeVarNonce::max);
+        let delta = max_freshness.increment().value() - min_freshness.value();
+        let generic_context = GenericContext::from_typevar_instances(db, env, variables());
+        drop(storage);
+
+        self.builder
+            .signature_typevar_freshness
+            .set(Some(max_local_freshness.add(delta)));
+        self.freshen_quantified_typevars_impl(
+            db,
+            generic_context,
+            delta,
+            &ApplyTypeMappingVisitor::new(env),
+            &mut FxHashMap::default(),
+        )
+    }
+
+    fn freshen_quantified_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+        delta: u32,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+    ) -> Self {
+        let env = visitor.env;
+        self.map_constraints(
+            mapped_constraints,
+            |constraint, mapped_constraints| match constraint {
+                Constraint::Atomic(atomic) => Constraint::Atomic(atomic.freshen_bound_typevars(
+                    db,
+                    generic_context,
+                    delta,
+                    visitor,
+                ))
+                .new_node(db, env, &mut self.builder.storage.borrow_mut()),
+                Constraint::Existential(existential) => {
+                    let body =
+                        Self::from_node(self.builder, existential.body, existential.source_order)
+                            .freshen_quantified_typevars_impl(
+                                db,
+                                generic_context,
+                                delta,
+                                visitor,
+                                mapped_constraints,
+                            );
+                    let mut storage = self.builder.storage.borrow_mut();
+                    let locals = Support::from_typevars(existential.locals.iter().map(|id| {
+                        let var = storage.typevar_data(id).freshen_bound_typevars(
+                            db,
+                            generic_context,
+                            delta,
+                            visitor,
+                        );
+                        storage.intern_typevar(db, var)
+                    }));
+                    let Some(existential) = ExistentialBound::new(
+                        &storage,
+                        existential.provenance,
+                        locals,
+                        body.node,
+                        body.source_order,
+                    ) else {
+                        return (body.node, body.source_order);
+                    };
+                    Constraint::Existential(existential).new_node(db, env, &mut storage)
+                }
+            },
+        )
+    }
+
     /// Returns whether this constraint set mentions the given type-variable identity.
     pub(super) fn mentions_typevar(self, typevar: BoundTypeVarInstance<'db>) -> bool {
         let storage = self.builder.storage.borrow();
@@ -772,6 +884,107 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
+    fn map_constraints(
+        self,
+        mapped_constraints: &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+        mut map: impl FnMut(
+            Constraint<'db>,
+            &mut FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+        ) -> (NodeId, Option<SourceOrderId>),
+    ) -> Self {
+        fn rebuild_node(
+            storage: &mut ConstraintSetStorage<'_>,
+            old_node: NodeId,
+            mapped_constraints: &FxHashMap<ConstraintId, (NodeId, Option<SourceOrderId>)>,
+            mapped_nodes: &mut FxHashMap<NodeId, NodeId>,
+        ) -> NodeId {
+            if old_node.is_terminal() {
+                return old_node;
+            }
+            if let Some(mapped) = mapped_nodes.get(&old_node) {
+                return *mapped;
+            }
+
+            let old_interior = storage.interior_node_data(old_node);
+            let (condition, _) = mapped_constraints[&old_interior.constraint];
+            let if_true = rebuild_node(
+                storage,
+                old_interior.if_true,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let if_uncertain = rebuild_node(
+                storage,
+                old_interior.if_uncertain,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let if_false = rebuild_node(
+                storage,
+                old_interior.if_false,
+                mapped_constraints,
+                mapped_nodes,
+            );
+            let mapped = condition.ite_uncertain(storage, if_true, if_uncertain, if_false);
+            mapped_nodes.insert(old_node, mapped);
+            mapped
+        }
+
+        // We have to collect this into a temporary vec since we can't hold an open borrow on the
+        // storage during the map calls below, since they also need to borrow the storage.
+        let storage = self.builder.storage.borrow();
+        let mut constraints = SmallVec::<[_; 8]>::new();
+        self.node
+            .for_each_unique_constraint(&storage, &mut |constraint_id| {
+                constraints.push(constraint_id);
+            });
+        // Mapping can intern constraints and typevars. Preserve their source order rather than
+        // letting the old diagram's variable order determine the rebuilt diagram's ordering.
+        let source_orders = storage.calculate_source_orders(self.source_order);
+        constraints.sort_unstable_by_key(|constraint| {
+            constraint
+                .as_atomic(&storage)
+                .and_then(|constraint| source_orders.get_index_of(&constraint))
+        });
+        drop(storage);
+
+        // Source-order entries refer to atomic constraints, including those inside existential
+        // bodies. Share their mappings with recursive calls so rebuilding the outer source order
+        // preserves those entries, even when the atoms only occur inside a quantifier.
+        for constraint_id in constraints {
+            if mapped_constraints.contains_key(&constraint_id) {
+                continue;
+            }
+            let storage = self.builder.storage.borrow();
+            let constraint = storage.constraint_data(constraint_id).clone();
+            drop(storage);
+            let mapped = map(constraint, mapped_constraints);
+            mapped_constraints.insert(constraint_id, mapped);
+        }
+
+        let mut storage = self.builder.storage.borrow_mut();
+        let source_order = source_orders
+            .into_iter()
+            .fold(None, |source_order, constraint| {
+                mapped_constraints.get(&constraint.into_inner()).map_or(
+                    source_order,
+                    |(_, mapped_source_order)| {
+                        storage.ordered_source_order(source_order, *mapped_source_order)
+                    },
+                )
+            });
+        Self::from_node(
+            self.builder,
+            rebuild_node(
+                &mut storage,
+                self.node,
+                mapped_constraints,
+                &mut FxHashMap::default(),
+            ),
+            source_order,
+        )
+    }
+
     /// Universally abstracts constraints involving the given type variables from this TDD.
     ///
     /// This is the Boolean dual of [`Self::reduce_inferable`]. Declared type variable bounds and
@@ -862,9 +1075,9 @@ impl Debug for ConstraintSet<'_, '_> {
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
-    /// Maximum freshness reserved by signature comparisons. Independent comparisons, including
-    /// recursive protocol member checks, can contribute existential scopes to the same constraint
-    /// set. Sharing this bound keeps their signature-local typevars distinct.
+    /// Maximum freshness reserved by signature comparisons and cached quantifiers. Independent
+    /// comparisons, including recursive protocol member checks, can contribute existential scopes
+    /// to the same constraint set. Sharing this bound keeps their local typevars distinct.
     pub(super) signature_typevar_freshness: Cell<Option<TypeVarNonce>>,
 }
 
