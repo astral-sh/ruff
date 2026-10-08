@@ -31,7 +31,8 @@ use super::{
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
     OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_unpack_types,
+    infer_definition_types, infer_expression_types, infer_function_default_types,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -588,6 +589,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_and_extend_definition(
+        &mut self,
+        definition: Definition<'db>,
+    ) -> &'db DefinitionInference<'db> {
+        let inference = infer_definition_types(self.db(), definition);
+        self.extend_definition(definition, inference);
+        inference
+    }
+
+    fn infer_and_extend_deferred_definition(&mut self, definition: Definition<'db>) {
+        let inference = infer_deferred_types(self.db(), definition);
+        self.extend_definition(definition, inference);
+    }
+
+    fn infer_and_extend_function_defaults(&mut self, definition: Definition<'db>) {
+        let inference = infer_function_default_types(self.db(), definition);
+        self.extend_definition(definition, inference);
+    }
+
     fn extend_definition(
         &mut self,
         definition: Definition<'db>,
@@ -664,6 +684,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_and_extend_statement(&mut self, statement: Statement<'db>) {
+        let inference = infer_statement_types(self.db(), statement);
+        self.extend_statement(&inference);
+    }
+
     fn extend_statement(&mut self, inference: &StatementInference<'db>) {
         let inference = match inference {
             StatementInference::Other(inference) => inference,
@@ -703,6 +728,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
         }
+    }
+
+    fn infer_and_extend_expression(
+        &mut self,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ExpressionInference<'db> {
+        let inference = infer_expression_types(self.db(), expression, tcx);
+        self.extend_expression(inference);
+        inference
+    }
+
+    fn infer_and_extend_expression_without_bindings(
+        &mut self,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ExpressionInference<'db> {
+        let inference = infer_expression_types(self.db(), expression, tcx);
+        self.extend_expression_without_bindings(inference);
+        inference
     }
 
     fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
@@ -818,6 +863,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|(definition, ty)| (*definition, *ty)),
             );
         }
+    }
+
+    fn infer_and_extend_scope(
+        &mut self,
+        scope: ScopeId<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ScopeInference<'db> {
+        let inference = infer_scope_types(self.db(), scope, tcx);
+        self.extend_scope(inference);
+        inference
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
@@ -1175,7 +1230,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let DefinitionKind::Function(function) = definition.kind(self.db()) {
                 self.extend_function_deferred(*definition, function.node(self.module()));
             } else {
-                self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+                self.infer_and_extend_deferred_definition(*definition);
             }
         }
 
@@ -2250,8 +2305,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        let result = infer_definition_types(self.db(), definition);
-        self.extend_definition(definition, result);
+        self.infer_and_extend_definition(definition);
     }
 
     fn infer_type_alias_definition(
@@ -3006,17 +3060,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for target in targets {
             if let Some(unpack) = self.index.try_unpack(target) {
-                let inference =
-                    infer_expression_types(self.db(), shared_value, TypeContext::default());
-                self.extend_expression_without_bindings(inference);
+                self.infer_and_extend_expression_without_bindings(
+                    shared_value,
+                    TypeContext::default(),
+                );
 
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
-                    let inference = infer_expression_types(builder.db(), shared_value, tcx);
-                    builder.extend_expression_without_bindings(inference);
+                    let inference =
+                        builder.infer_and_extend_expression_without_bindings(shared_value, tcx);
                     inference.expression_type(value.as_ref())
                 });
             }
@@ -3524,15 +3579,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
-                    let inference = infer_expression_types(self.db(), standalone_expression, tcx);
-                    match assignment.owner() {
+                    let inference = match assignment.owner() {
                         BindingsOwner::Definition => {
-                            self.extend_expression(inference);
+                            self.infer_and_extend_expression(standalone_expression, tcx)
                         }
-                        BindingsOwner::Statement => {
-                            self.extend_expression_without_bindings(inference);
-                        }
-                    }
+                        BindingsOwner::Statement => self
+                            .infer_and_extend_expression_without_bindings(
+                                standalone_expression,
+                                tcx,
+                            ),
+                    };
                     inference.expression_type(value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
@@ -6454,8 +6510,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_standalone_statement_impl(&mut self, standalone_statement: Statement<'db>) {
-        let types = infer_statement_types(self.db(), standalone_statement);
-        self.extend_statement(&types);
+        self.infer_and_extend_statement(standalone_statement);
     }
 
     fn infer_optional_expression(
@@ -6608,8 +6663,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
-        self.extend_expression(types);
+        let types = self.infer_and_extend_expression(standalone_expression, tcx);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
@@ -8252,8 +8306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
         let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, yield_tcx);
-        self.extend_scope(inference);
+        let inference = self.infer_and_extend_scope(scope, yield_tcx);
         let yield_type = self.comprehension_element_type(elt, inference);
 
         if evaluation_mode.is_async() {
@@ -8332,8 +8385,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let inference = self.infer_and_extend_scope(scope, tcx);
 
         self.infer_comprehension_specialization(
             KnownClass::List,
@@ -8373,8 +8425,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let inference = self.infer_and_extend_scope(scope, tcx);
 
         self.infer_comprehension_specialization(
             KnownClass::Set,
@@ -8415,8 +8466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let inference = self.infer_and_extend_scope(scope, tcx);
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
@@ -8690,8 +8740,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
-            let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(definition, result);
+            let result = self.infer_and_extend_definition(definition);
             result.binding_type(definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
@@ -8934,8 +8983,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::declared(None)
         };
 
-        let inference = infer_scope_types(self.db(), scope, return_tcx);
-        self.extend_scope(inference);
+        let inference = self.infer_and_extend_scope(scope, return_tcx);
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
