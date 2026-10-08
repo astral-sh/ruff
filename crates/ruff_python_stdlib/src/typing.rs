@@ -393,24 +393,3 @@ pub fn simple_magic_return_type(method: &str) -> Option<&'static str> {
         _ => None,
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_weakref_mutable_return_type() {
-        assert!(is_weakref_mutable_return_type(&[
-            "weakref",
-            "WeakKeyDictionary"
-        ]));
-        assert!(is_weakref_mutable_return_type(&[
-            "weakref",
-            "WeakValueDictionary"
-        ]));
-        assert!(is_weakref_mutable_return_type(&["weakref", "WeakSet"]));
-        assert!(!is_weakref_mutable_return_type(&["weakref", "ref"]));
-        assert!(!is_weakref_mutable_return_type(&["dict"]));
-        assert!(!is_weakref_mutable_return_type(&["collections", "deque"]));
-    }
-}

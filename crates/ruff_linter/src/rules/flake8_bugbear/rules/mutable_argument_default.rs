@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
 use ruff_python_semantic::analyze::typing::{
-    is_immutable_annotation, is_mutable_expr, is_mutable_func, is_weakref_mutable_func,
+    is_immutable_annotation, is_mutable_expr, is_weakref_mutable_func,
 };
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
@@ -164,11 +164,10 @@ fn is_guaranteed_mutable_expr(
         Expr::Named(ast::ExprNamed { value, .. }) => {
             is_guaranteed_mutable_expr(value, semantic, weakref_types_enabled)
         }
-        Expr::Call(ast::ExprCall { func, .. }) if weakref_types_enabled => {
-            is_mutable_func(map_subscript(func), semantic)
-                || is_weakref_mutable_func(map_subscript(func), semantic)
+        _ => {
+            is_mutable_expr(expr, semantic)
+                || (weakref_types_enabled && is_weakref_mutable_expr(expr, semantic))
         }
-        _ => is_mutable_expr(expr, semantic),
     }
 }
 
