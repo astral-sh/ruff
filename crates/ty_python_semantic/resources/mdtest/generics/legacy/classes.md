@@ -3727,6 +3727,49 @@ exact_class: type[Just[object]] = object  # no diagnostic
 subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
 ```
 
+## Multiple inherited recursive protocol methods
+
+A subclass with several inherited recursive methods satisfies the matching protocol specialization.
+An arbitrary type argument does not satisfy `Chain[int]`.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def first(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def second(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def third(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Concrete(Chain[T]): ...
+
+def check(value: Concrete[T]) -> None:
+    matching: Chain[T] = value  # no diagnostic
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:22:32
+   |
+22 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
+```
+
 ## Recursive protocol receiver restrictions
 
 An implementation can use the same receiver restriction as a generic protocol. Its other parameters

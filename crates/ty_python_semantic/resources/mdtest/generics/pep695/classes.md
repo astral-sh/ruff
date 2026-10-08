@@ -2834,6 +2834,46 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Multiple inherited recursive protocol methods
+
+A subclass with several inherited recursive methods satisfies the matching protocol specialization.
+An arbitrary type argument does not satisfy `Chain[int]`.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable
+from typing import Protocol
+
+class Chain[T](Protocol):
+    def value(self) -> T:
+        raise NotImplementedError
+    def first[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def second[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def third[A](self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Concrete[T](Chain[T]): ...
+
+def check[T](value: Concrete[T]) -> None:
+    matching: Chain[T] = value  # no diagnostic
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:19:32
+   |
+19 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
+```
+
 ## Recursive protocol receiver restrictions
 
 An implementation can use the same receiver restriction as a generic protocol. Its other parameters
