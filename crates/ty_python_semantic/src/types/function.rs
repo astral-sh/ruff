@@ -1509,6 +1509,7 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns the [`Definition`] for the last overload or implementation in this function.
+    #[salsa::tracked(returns(copy))]
     pub(crate) fn last_definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.literal(db).last_definition.definition(db)
     }

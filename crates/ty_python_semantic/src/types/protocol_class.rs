@@ -2803,6 +2803,54 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 });
         }
 
+        let source_definition = match attribute_type {
+            Type::FunctionLiteral(function) => Some(function.last_definition(db)),
+            Type::BoundMethod(method) => method
+                .function(db)
+                .map(|function| function.last_definition(db)),
+            _ => None,
+        };
+        let work = || {
+            self.check_protocol_method_read(
+                db,
+                ty,
+                attribute_type,
+                member,
+                required,
+                protocol_self_binding_ty,
+            )
+        };
+        // Binding `Self` can simplify an intersection that asks whether the implementation
+        // satisfies this protocol again. Enter the same preparation guard used for protocol
+        // interface pairs before binding either method; overload comparisons remain separate.
+        if let (Some(source_definition), Some(target_definition)) =
+            (source_definition, member.data.definition)
+        {
+            self.signature_relation_visitor.visit(
+                &SignatureRelationKey::protocol_member(
+                    source_definition,
+                    target_definition,
+                    self.relation,
+                    self.typevar_evaluation,
+                ),
+                || self.always(),
+                work,
+            )
+        } else {
+            work()
+        }
+    }
+
+    fn check_protocol_method_read(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        attribute_type: Type<'db>,
+        member: &ProtocolMember<'db>,
+        required: ProtocolMemberAccess<'db>,
+        protocol_self_binding_ty: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let env = self.env;
         let implementation_self_binding_ty = ty
             .to_instance_approximation(db, env)
             .or_else(|| ty.literal_fallback_instance(db, env))
@@ -2817,9 +2865,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 (implementation_self_binding_ty, protocol_self_binding_ty)
             };
 
+        let visitor = self
+            .materialization_visitor
+            .for_new_materialization_root()
+            .with_signature_relations(self.signature_relation_visitor);
         let Some(Type::Callable(required_callable)) = required
             .read()
-            .and_then(|read| read.result_type(db, env, None))
+            .and_then(|read| read.result_type_with_visitor(db, &visitor, None))
         else {
             return self.never();
         };

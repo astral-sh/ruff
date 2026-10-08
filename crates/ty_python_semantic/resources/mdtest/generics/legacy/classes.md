@@ -3246,6 +3246,51 @@ def invalid(x: N[T]):
     x.f()  # error: [invalid-argument-type]
 ```
 
+## Recursive protocol methods returning `Self` intersections
+
+A protocol method can intersect `Self` with another specialization of the same protocol. Binding the
+receiver preserves the recursive method requirements.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Protocol, Self, TypeVar
+
+T = TypeVar("T", covariant=True)
+U = TypeVar("U")
+
+class P(Protocol[T]):
+    def combine(self, other: P[U]) -> Self & P[U]: ...
+
+def generic(x: P[T]):
+    x.combine(x)  # no diagnostic
+    reveal_type(x.combine(x))  # revealed: P[T@generic & Unknown]
+```
+
+Recursive method comparisons still check ordinary parameter types, including when the source is a
+type variable bounded by the protocol.
+
+```py
+T_contra = TypeVar("T_contra", contravariant=True)
+
+class Finite(Protocol[T_contra]):
+    def combine(self, other: Finite[U], value: T_contra) -> Self & Finite[U]: ...
+
+def concrete(x: Finite[int]):
+    reveal_type(x.combine(x, 1))  # revealed: Finite[int | Unknown]
+    x.combine(x, "wrong")  # error: [invalid-argument-type]
+
+S = TypeVar("S", bound=Finite[str])
+
+def incompatible(x: S) -> Finite[int]:
+    return x  # error: [invalid-return-type]
+```
+
 ## Materializing a bound receiver requirement
 
 A bound method has already captured its receiver. Materializing its callable type preserves the
