@@ -65,9 +65,10 @@
 //! A reference stores the declaration and its arguments without asking for those members. Thus
 //! specializing `P[T]` substitutes its arguments without recursively specializing `P`'s methods.
 
+use std::cell::{Cell, RefCell};
+
 use rustc_hash::FxHashSet;
 use salsa::plumbing::AsId;
-use std::cell::{Cell, RefCell};
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
 use ty_python_core::semantic_index;
@@ -82,19 +83,11 @@ use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{self, TypeVisitor};
 use super::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    GenericContext, MaterializationKind, SelfBinding, Type, TypeContext, TypeMapping, TypedDictType, VarianceTerm,
+    GenericContext, MaterializationKind, SelfBinding, Type, TypeContext, TypeMapping,
+    TypedDictType, VarianceTerm,
 };
 use super::{ClassType, GenericAlias, ProtocolInstanceType, StaticClassLiteral};
 use crate::{Db, ProgramEnvironment};
-
-/// An owned substitution captured by a delayed operation. The keys retain their original
-/// binding scopes; replacing a free variable after materialization must not move that
-/// replacement beneath the materialization.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub struct RecursiveSpecialization<'db> {
-    base: RecursiveSpecializationBase<'db>,
-    overrides: Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 enum RecursiveSpecializationBase<'db> {
@@ -110,6 +103,15 @@ enum RecursiveSpecializationBase<'db> {
     },
     Single(BoundTypeVarInstance<'db>, Type<'db>),
     ReturnCallables(Box<[(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)]>),
+}
+
+/// An owned substitution captured by a delayed operation. The keys retain their original
+/// binding scopes; replacing a free variable after materialization must not move that
+/// replacement beneath the materialization.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct RecursiveSpecialization<'db> {
+    base: RecursiveSpecializationBase<'db>,
+    overrides: Box<[(BoundTypeVarInstance<'db>, Type<'db>)]>,
 }
 
 impl<'db> RecursiveSpecialization<'db> {
@@ -777,8 +779,12 @@ impl<'db> RecursiveType<'db> {
             proven: Cell<bool>,
         }
         impl<'db> TypeVisitor<'db> for StaticCaptures<'_, 'db> {
-            fn program_environment(&self) -> &ProgramEnvironment<'db> { self.env }
-            fn should_visit_lazy_type_attributes(&self) -> bool { false }
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 if self.proven.get() && !structurally_static(db, self.env, ty) {
                     self.proven.set(false);
@@ -793,12 +799,19 @@ impl<'db> RecursiveType<'db> {
                 RecursiveOperation::Specialize(..) | RecursiveOperation::BindSelf(..)
                     if materialization.is_some() =>
                 {
-                    let captures = StaticCaptures { env, proven: Cell::new(true) };
+                    let captures = StaticCaptures {
+                        env,
+                        proven: Cell::new(true),
+                    };
                     operation.visit_types(db, &captures);
-                    if !captures.proven.get() { materialization = None; }
+                    if !captures.proven.get() {
+                        materialization = None;
+                    }
                 }
                 RecursiveOperation::Freshen(..) => {}
-                RecursiveOperation::BindLegacy(..) | RecursiveOperation::ReplaceSelf(..) => materialization = None,
+                RecursiveOperation::BindLegacy(..) | RecursiveOperation::ReplaceSelf(..) => {
+                    materialization = None;
+                }
                 _ => {}
             }
         }
@@ -856,7 +869,10 @@ impl<'db> RecursiveType<'db> {
     fn captured_variables(self, db: &'db dyn Db) -> (Box<[Type<'db>]>, bool) {
         let (variables, complete) = match self.body(db) {
             RecursiveBody::Inferred(body) => stored_variables(db, &self.environment(db), body),
-            RecursiveBody::Protocol(origin) => (enclosing_type_variables(db, origin.definition(db)).collect(), true),
+            RecursiveBody::Protocol(origin) => (
+                enclosing_type_variables(db, origin.definition(db)).collect(),
+                true,
+            ),
         };
         let variables = variables
             .into_iter()

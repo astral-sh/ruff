@@ -6,7 +6,9 @@ use std::cell::Cell;
 use std::debug_assert_matches;
 use std::marker::PhantomData;
 
-use super::protocol_class::{ProtocolInterface, ProtocolInterfaceOperations, ProtocolInterfaceView, StructuralMemberPriority};
+use super::protocol_class::{
+    ProtocolInterface, ProtocolInterfaceOperations, ProtocolInterfaceView, StructuralMemberPriority,
+};
 use super::recursive::RecursiveOperation;
 use super::set_theoretic::TypeNormalization;
 use super::{
@@ -858,19 +860,28 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if source_origin != target_origin {
             return false;
         }
-        let kinds = (source.materialization_kind(db), target.materialization_kind(db));
+        let kinds = (
+            source.materialization_kind(db),
+            target.materialization_kind(db),
+        );
         // Every gradual type lies between its bottom and top materializations, and is
         // assignable to and from either one.
         match kinds {
             (None | Some(MaterializationKind::Bottom), Some(MaterializationKind::Top))
             | (Some(MaterializationKind::Bottom), None) => return true,
-            (Some(MaterializationKind::Top), None)
-            | (None, Some(MaterializationKind::Bottom)) if self.relation.is_assignability() => {
+            (Some(MaterializationKind::Top), None) | (None, Some(MaterializationKind::Bottom))
+                if self.relation.is_assignability() =>
+            {
                 // An invariant enclosing specialization can carry another materialization.
                 // That origin is not the original gradual type to which these laws apply.
-                if source_origin.static_class_literal(db).is_some_and(|(_, specialization)| {
-                    specialization.is_none_or(|specialization| specialization.materialization_kind(db).is_none())
-                }) {
+                if source_origin
+                    .static_class_literal(db)
+                    .is_some_and(|(_, specialization)| {
+                        specialization.is_none_or(|specialization| {
+                            specialization.materialization_kind(db).is_none()
+                        })
+                    })
+                {
                     return true;
                 }
             }
@@ -1871,9 +1882,9 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn materialized_origin(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
         match self.inner {
             Protocol::Materialized(materialized) => Some(materialized.origin(db)),
-            Protocol::FromInterface(protocol) => {
-                self.has_materialized_requirements(db).then(|| protocol.origin(db))
-            }
+            Protocol::FromInterface(protocol) => self
+                .has_materialized_requirements(db)
+                .then(|| protocol.origin(db)),
             Protocol::FromClass(_) | Protocol::Synthesized(_) => None,
         }
     }
@@ -2061,9 +2072,13 @@ impl<'db> ProtocolInstanceType<'db> {
                 let interface = ProtocolInterfaceView::new(
                     protocol.interface(db),
                     protocol.materialization(db),
-                ).with_operations(protocol.operations(db));
+                )
+                .with_operations(protocol.operations(db));
                 if interface.includes_member(db, name) {
-                    let receiver = Type::instance(db, env, *protocol.origin(db));
+                    let receiver = protocol
+                        .recursive_origin(db)
+                        .map(Type::Recursive)
+                        .unwrap_or_else(|| Type::instance(db, env, *protocol.origin(db)));
                     interface.instance_member_with_receiver(db, env, receiver, name)
                 } else {
                     protocol.origin(db).instance_member(db, env, name)
@@ -2098,38 +2113,77 @@ impl<'db> ProtocolInstanceType<'db> {
                 synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
             Protocol::FromInterface(protocol) => {
-                let origin = protocol.origin(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                let origin =
+                    protocol
+                        .origin(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 let operation = match type_mapping {
-                    TypeMapping::Materialize(kind) => Some(RecursiveOperation::Materialize(*kind, visitor.materialize_typevar_bounds_and_defaults)),
-                    _ if protocol.operations(db).is_some() => RecursiveOperation::substitution(type_mapping),
+                    TypeMapping::Materialize(kind) => Some(RecursiveOperation::Materialize(
+                        *kind,
+                        visitor.materialize_typevar_bounds_and_defaults,
+                    )),
+                    _ if protocol.operations(db).is_some() => {
+                        RecursiveOperation::substitution(type_mapping)
+                    }
                     _ => None,
                 };
-                if operation.as_ref().is_some_and(|operation| !matches!(operation, RecursiveOperation::Materialize(..))) {
+                if operation.as_ref().is_some_and(|operation| {
+                    !matches!(operation, RecursiveOperation::Materialize(..))
+                }) {
                     // Repeated specialization must reach a structural fixed point. An unrelated
                     // substitution changes neither the declaration nor the captured values in
                     // its operation program, so recording it would only create fresh identities.
                     let mut structural = ApplyTypeMappingVisitor::new(visitor.env)
                         .with_recursion_context(visitor.recursion_context)
                         .with_normalization(TypeNormalization::Structural);
-                    structural.materialize_typevar_bounds_and_defaults = visitor.materialize_typevar_bounds_and_defaults;
+                    structural.materialize_typevar_bounds_and_defaults =
+                        visitor.materialize_typevar_bounds_and_defaults;
                     if origin == protocol.origin(db)
-                        && protocol.interface(db).apply_type_mapping_impl(db, type_mapping, tcx, &structural) == protocol.interface(db)
-                        && protocol.operations(db).map(|operations| operations.map_types(db, type_mapping, &structural)) == protocol.operations(db)
+                        && protocol.interface(db).apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            &structural,
+                        ) == protocol.interface(db)
+                        && protocol
+                            .operations(db)
+                            .map(|operations| operations.map_types(db, type_mapping, &structural))
+                            == protocol.operations(db)
                     {
                         return self;
                     }
                 }
                 let (interface, operations) = match operation {
-                    Some(operation) => (protocol.interface(db), Some(ProtocolInterfaceOperations::append(db, protocol.operations(db), operation))),
+                    Some(operation) => (
+                        protocol.interface(db),
+                        Some(ProtocolInterfaceOperations::append(
+                            db,
+                            protocol.operations(db),
+                            operation,
+                        )),
+                    ),
                     None => (
-                        protocol.interface(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                        protocol.operations(db).map(|operations| operations.map_types(db, type_mapping, visitor)),
+                        protocol.interface(db).apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
+                        protocol
+                            .operations(db)
+                            .map(|operations| operations.map_types(db, type_mapping, visitor)),
                     ),
                 };
-                let materialization = operations.and_then(|operations| operations.terminal_materialization(db));
+                let materialization =
+                    operations.and_then(|operations| operations.terminal_materialization(db));
                 Self {
                     inner: Protocol::FromInterface(ClassProtocolInterface::new(
-                        db, origin, interface, materialization, operations, None,
+                        db,
+                        origin,
+                        interface,
+                        materialization,
+                        operations,
+                        None,
                     )),
                     _phantom: PhantomData,
                 }
@@ -2282,7 +2336,8 @@ impl<'db> Protocol<'db> {
         match self {
             Self::FromClass(class) => ProtocolInterfaceView::new(class.interface(db), None),
             Self::FromInterface(protocol) => {
-                ProtocolInterfaceView::new(protocol.interface(db), protocol.materialization(db)).with_operations(protocol.operations(db))
+                ProtocolInterfaceView::new(protocol.interface(db), protocol.materialization(db))
+                    .with_operations(protocol.operations(db))
             }
             Self::Synthesized(synthesized) => {
                 ProtocolInterfaceView::new(synthesized.interface(), None)

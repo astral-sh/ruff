@@ -1761,9 +1761,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             return self.always();
         }
 
-        if let (Some(source), Some(target)) =
-            (source.as_protocol_instance(db), target.as_protocol_instance(db))
-            && self.protocol_materializations_relate(db, source, target)
+        if let (Some(source), Some(target)) = (
+            source.as_protocol_instance(db),
+            target.as_protocol_instance(db),
+        ) && self.protocol_materializations_relate(db, source, target)
         {
             return self.always();
         }

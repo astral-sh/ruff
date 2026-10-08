@@ -2892,15 +2892,15 @@ def annotated_generic_protocol_classes(
     reveal_type(aliased_bottom)  # revealed: type[Bottom[GenericMutable[Any]]]
 ```
 
-Materializing the enclosing `Box[Any]` affects the protocol's specialization separately from its
-explicit `Top` or `Bottom` annotation. Matching specializations do not make these argument types
-compatible:
+A protocol materialized after its type argument is already `Any` retains that materialization when
+its enclosing class is specialized. These arguments remain incompatible with the opposite
+materialization:
 
 ```py
 class Box[T]:
     value: MutableAlias[T]
-    top_value: Top[GenericMutable[T]]
-    def accept_bottom(self, value: Bottom[GenericMutable[T]]) -> None: ...
+    top_value: Top[GenericMutable[Any]]
+    def accept_bottom(self, value: Bottom[GenericMutable[Any]]) -> None: ...
     def accept(self, value: MutableAlias[T]) -> None: ...
 
 def compare_alias_materializations(top: Top[Box[Any]], bottom: Bottom[Box[Any]]) -> None:
@@ -2924,8 +2924,8 @@ class P[T](Protocol):
 
 class Box[T]:
     value: P[T]
-    top_value: Top[P[T]]
-    def accept_bottom(self, value: Bottom[P[T]]) -> None: ...
+    top_value: Top[P[Any]]
+    def accept_bottom(self, value: Bottom[P[Any]]) -> None: ...
     def accept(self, value: P[T]) -> None: ...
 
 def compare(top: Top[Box[Any]], bottom: Bottom[Box[Any]]) -> None:
@@ -2940,13 +2940,47 @@ class LegacyP(Protocol[T]):
 
 class LegacyBox(Generic[T]):
     value: LegacyP[T]
-    top_value: Top[LegacyP[T]]
-    def accept_bottom(self, value: Bottom[LegacyP[T]]) -> None: ...
+    top_value: Top[LegacyP[Any]]
+    def accept_bottom(self, value: Bottom[LegacyP[Any]]) -> None: ...
     def accept(self, value: LegacyP[T]) -> None: ...
 
 def compare_legacy(top: Top[LegacyBox[Any]], bottom: Bottom[LegacyBox[Any]]) -> None:
     bottom.accept_bottom(top.value)  # error: [invalid-argument-type]
     top.accept(bottom.top_value)  # error: [invalid-argument-type]
+```
+
+Materializing a protocol with a free class parameter preserves that parameter. A later class
+specialization materializes the replacement in each member's variance position, so these calls have
+matching read and write requirements:
+
+```py
+class OpenBox[T]:
+    value: P[T]
+    top_value: Top[P[T]]
+    def accept_bottom(self, value: Bottom[P[T]]) -> None: ...
+    def accept(self, value: P[T]) -> None: ...
+
+def compare_open(top: Top[OpenBox[Any]], bottom: Bottom[OpenBox[Any]]) -> None:
+    reveal_type(top.value.get())  # revealed: object
+    reveal_type(top.value.set)  # revealed: bound method Top[P[Any]].set(value: Never) -> None
+    reveal_type(bottom.top_value.get)  # revealed: () -> Never
+    reveal_type(bottom.top_value.set)  # revealed: (value: object) -> None
+    bottom.accept_bottom(top.value)  # no diagnostic
+    top.accept(bottom.top_value)  # no diagnostic
+
+class LegacyOpenBox(Generic[T]):
+    value: LegacyP[T]
+    top_value: Top[LegacyP[T]]
+    def accept_bottom(self, value: Bottom[LegacyP[T]]) -> None: ...
+    def accept(self, value: LegacyP[T]) -> None: ...
+
+def compare_legacy_open(top: Top[LegacyOpenBox[Any]], bottom: Bottom[LegacyOpenBox[Any]]) -> None:
+    reveal_type(top.value.get())  # revealed: object
+    reveal_type(top.value.set)  # revealed: bound method Top[LegacyP[Any]].set(value: Never) -> None
+    reveal_type(bottom.top_value.get)  # revealed: () -> Never
+    reveal_type(bottom.top_value.set)  # revealed: (value: object) -> None
+    bottom.accept_bottom(top.value)  # no diagnostic
+    top.accept(bottom.top_value)  # no diagnostic
 ```
 
 ### Nested generic protocols
@@ -3485,7 +3519,8 @@ def inspect_legacy(node: LegacyNode[int]) -> None:
     reveal_type(node.value())  # revealed: Any | int
 ```
 
-An interface can also be provisional when recursive specializations are compared:
+An interface can also be provisional when recursive specializations are compared. The gradual
+`payload` prevents subtyping even though the matching finite requirements establish assignability:
 
 ```py
 class FallbackNode[T, U](Protocol):
@@ -3493,11 +3528,12 @@ class FallbackNode[T, U](Protocol):
     def value(self) -> U | int: ...
     @property
     def child(self) -> FallbackNode[T | list[T], U | int]: ...
-    check: None = static_assert(not is_assignable_to("Top[FallbackNode[object, str | int]]", "FallbackNode[object, str]"))
+    check: None = static_assert(not is_subtype_of("Top[FallbackNode[object, str | int]]", "FallbackNode[object, str]"))
     @property
     def payload(self) -> Any: ...
 
-static_assert(not is_assignable_to(Top[FallbackNode[object, str | int]], FallbackNode[object, str]))
+static_assert(not is_subtype_of(Top[FallbackNode[object, str | int]], FallbackNode[object, str]))
+static_assert(is_assignable_to(Top[FallbackNode[object, str | int]], FallbackNode[object, str]))
 
 U_co = TypeVar("U_co", covariant=True)
 
@@ -3507,12 +3543,13 @@ class LegacyFallbackNode(Protocol[T_co, U_co]):
     @property
     def child(self) -> LegacyFallbackNode[T_co | list[T_co], U_co | int]: ...
     check: None = static_assert(
-        not is_assignable_to("Top[LegacyFallbackNode[object, str | int]]", "LegacyFallbackNode[object, str]")
+        not is_subtype_of("Top[LegacyFallbackNode[object, str | int]]", "LegacyFallbackNode[object, str]")
     )
     @property
     def payload(self) -> Any: ...
 
-static_assert(not is_assignable_to(Top[LegacyFallbackNode[object, str | int]], LegacyFallbackNode[object, str]))
+static_assert(not is_subtype_of(Top[LegacyFallbackNode[object, str | int]], LegacyFallbackNode[object, str]))
+static_assert(is_assignable_to(Top[LegacyFallbackNode[object, str | int]], LegacyFallbackNode[object, str]))
 ```
 
 ### Materialization during protocol interface inference

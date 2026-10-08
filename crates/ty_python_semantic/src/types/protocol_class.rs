@@ -7,14 +7,14 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::call::CallArguments;
 use crate::types::attribute_write::{
     DescriptorSetterDomain, ProtocolMemberWriteRequirement, descriptor_setter_domain,
     property_setter_value_type,
 };
+use crate::types::call::CallArguments;
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
-use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::recursive::RecursiveOperation;
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, TypeNormalization, UpcastPolicy};
 use crate::{
@@ -455,7 +455,8 @@ impl<'db> ProtocolInterfaceOperations<'db> {
         previous: Option<Self>,
         operation: RecursiveOperation<'db>,
     ) -> Self {
-        let mut operations = previous.map_or_else(Vec::new, |previous| previous.operations(db).to_vec());
+        let mut operations =
+            previous.map_or_else(Vec::new, |previous| previous.operations(db).to_vec());
         if let Some(previous) = previous
             && let RecursiveOperation::Materialize(_, bounds) = operation
             && let Some(RecursiveOperation::Materialize(_, previous_bounds)) = operations.last()
@@ -475,7 +476,10 @@ impl<'db> ProtocolInterfaceOperations<'db> {
     }
 
     pub(super) fn requires_replay(self, db: &'db dyn Db) -> bool {
-        !matches!(self.operations(db).as_ref(), [] | [RecursiveOperation::Materialize(_, true)])
+        !matches!(
+            self.operations(db).as_ref(),
+            [] | [RecursiveOperation::Materialize(_, true)]
+        )
     }
 
     pub(super) fn map_types(
@@ -484,11 +488,22 @@ impl<'db> ProtocolInterfaceOperations<'db> {
         mapping: &TypeMapping<'_, 'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        Self::new(db, self.operations(db).iter().map(|operation| operation.map_types(db, mapping, visitor)).collect::<Box<[_]>>())
+        Self::new(
+            db,
+            self.operations(db)
+                .iter()
+                .map(|operation| operation.map_types(db, mapping, visitor))
+                .collect::<Box<[_]>>(),
+        )
     }
 
     fn without_materialization(self, db: &'db dyn Db) -> Option<Self> {
-        let operations: Box<[_]> = self.operations(db).iter().filter(|operation| !matches!(operation, RecursiveOperation::Materialize(..))).cloned().collect();
+        let operations: Box<[_]> = self
+            .operations(db)
+            .iter()
+            .filter(|operation| !matches!(operation, RecursiveOperation::Materialize(..)))
+            .cloned()
+            .collect();
         (!operations.is_empty()).then(|| Self::new(db, operations))
     }
 
@@ -500,7 +515,8 @@ impl<'db> ProtocolInterfaceOperations<'db> {
         write: bool,
     ) -> Type<'db> {
         for operation in self.operations(db) {
-            let mut visitor = ApplyTypeMappingVisitor::new(env).with_normalization(TypeNormalization::Structural);
+            let mut visitor =
+                ApplyTypeMappingVisitor::new(env).with_normalization(TypeNormalization::Structural);
             if let RecursiveOperation::Materialize(_, bounds) = operation {
                 visitor.materialize_typevar_bounds_and_defaults = *bounds;
             }
@@ -536,7 +552,10 @@ impl<'db> ProtocolInterfaceView<'db> {
         }
     }
 
-    pub(super) const fn with_operations(mut self, operations: Option<ProtocolInterfaceOperations<'db>>) -> Self {
+    pub(super) const fn with_operations(
+        mut self,
+        operations: Option<ProtocolInterfaceOperations<'db>>,
+    ) -> Self {
         self.operations = operations;
         self
     }
@@ -644,7 +663,9 @@ impl<'db> ProtocolInterfaceView<'db> {
                 name: materialized.name,
                 data: materialized.data,
                 materialization: None,
-                operations: materialized.operations.and_then(|operations| operations.without_materialization(db)),
+                operations: materialized
+                    .operations
+                    .and_then(|operations| operations.without_materialization(db)),
             };
 
             if materialized
@@ -842,25 +863,37 @@ pub(super) fn walk_protocol_instance_member<'db, V: super::visitor::TypeVisitor<
     match member.data.kind {
         ProtocolMemberKind::Method(method, kind) => {
             let method = if let Type::Callable(callable) = method {
-                let signatures = CallableSignature::from_overloads(callable.signatures(db).iter().map(|signature| {
-                    if signature.has_implicit_positional_receiver_annotation()
-                        && kind != ProtocolMethodKind::Static
-                    {
-                        let runtime_type = if kind == ProtocolMethodKind::Class {
-                            receiver_ty.to_meta_type(db, env)
+                let signatures = CallableSignature::from_overloads(
+                    callable.signatures(db).iter().map(|signature| {
+                        if signature.has_implicit_positional_receiver_annotation()
+                            && kind != ProtocolMethodKind::Static
+                        {
+                            let runtime_type = if kind == ProtocolMethodKind::Class {
+                                receiver_ty.to_meta_type(db, env)
+                            } else {
+                                receiver_ty
+                            };
+                            signature.bind_self_with_receiver(
+                                db,
+                                env,
+                                Some(runtime_type),
+                                Some(receiver_ty),
+                            )
                         } else {
-                            receiver_ty
-                        };
-                        signature.bind_self_with_receiver(db, env, Some(runtime_type), Some(receiver_ty))
-                    } else {
-                        signature.clone()
-                    }
-                }));
+                            signature.clone()
+                        }
+                    }),
+                );
                 Type::Callable(callable.with_signatures(db, signatures))
             } else {
                 method
             };
-            visitor.visit_type(db, member.access(ProtocolMemberAccessMode::Instance).materialize_type(db, env, method));
+            visitor.visit_type(
+                db,
+                member
+                    .access(ProtocolMemberAccessMode::Instance)
+                    .materialize_type(db, env, method),
+            );
         }
         ProtocolMemberKind::Property { .. } => {
             walk_protocol_member_access(
@@ -1533,26 +1566,53 @@ impl<'db> ProtocolPropertyType<'db> {
         env: &ProgramEnvironment<'db>,
         operations: ProtocolInterfaceOperations<'db>,
     ) -> Option<ProtocolAnnotation<'db>> {
-        if let Self::Descriptor { descriptor, mut receiver, access: ProtocolDescriptorAccess::Get } = self {
-            let getter = descriptor.ty.member_lookup_with_policy(
-                db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            ).place.ignore_possibly_undefined()?;
+        if let Self::Descriptor {
+            descriptor,
+            mut receiver,
+            access: ProtocolDescriptorAccess::Get,
+        } = self
+        {
+            let getter = descriptor
+                .ty
+                .member_lookup_with_policy(
+                    db,
+                    env,
+                    "__get__",
+                    MemberLookupPolicy::REQUIRE_CONCRETE | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                )
+                .place
+                .ignore_possibly_undefined()?;
             let mut callables = getter.try_upcast_to_callable(db, env)?;
             for operation in operations.operations(db) {
-                let mut visitor = ApplyTypeMappingVisitor::new(env).with_normalization(TypeNormalization::Structural);
+                let mut visitor = ApplyTypeMappingVisitor::new(env)
+                    .with_normalization(TypeNormalization::Structural);
                 if let RecursiveOperation::Materialize(kind, bounds) = operation {
                     visitor.materialize_typevar_bounds_and_defaults = *bounds;
                     callables = callables.map(|callable| {
-                        let signatures = CallableSignature::from_overloads(callable.signatures(db).iter().map(|signature| {
-                            let result = signature.return_ty.materialize(db, *kind, &visitor);
-                            signature.clone().with_return_type(result)
-                        }));
+                        let signatures = CallableSignature::from_overloads(
+                            callable.signatures(db).iter().map(|signature| {
+                                let result = signature.return_ty.materialize(db, *kind, &visitor);
+                                signature.clone().with_return_type(result)
+                            }),
+                        );
                         callable.with_signatures(db, signatures)
                     });
                 } else {
                     operation.with_mapping(|mapping| {
-                        receiver = receiver.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-                        callables = callables.clone().map(|callable| callable.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor));
+                        receiver = receiver.apply_type_mapping_impl(
+                            db,
+                            &mapping,
+                            TypeContext::default(),
+                            &visitor,
+                        );
+                        callables = callables.clone().map(|callable| {
+                            callable.apply_type_mapping_impl(
+                                db,
+                                &mapping,
+                                TypeContext::default(),
+                                &visitor,
+                            )
+                        });
                     });
                 }
             }
@@ -1717,7 +1777,9 @@ impl<'a, 'db> ProtocolMemberAccess<'a, 'db> {
     ) -> Type<'db> {
         match self.operations {
             Some(operations) => operations.apply(db, env, ty, false),
-            None => self.materialization.map_or(ty, |kind| ty.materialization(db, env, kind)),
+            None => self
+                .materialization
+                .map_or(ty, |kind| ty.materialization(db, env, kind)),
         }
     }
 
@@ -1882,7 +1944,9 @@ impl<'db> ProtocolMemberReadAccess<'_, 'db> {
                 let read = read?;
                 if let Some(operations) = self.access.operations {
                     let annotation = read.annotation_with_operations(db, env, operations)?;
-                    return Some(self_type.map_or(annotation.ty, |self_type| annotation.bind_self(db, env, self_type)));
+                    return Some(self_type.map_or(annotation.ty, |self_type| {
+                        annotation.bind_self(db, env, self_type)
+                    }));
                 }
                 read.annotation(db, env)?
             }
@@ -1918,7 +1982,9 @@ impl<'db> ProtocolMemberWriteAccess<'db> {
         let annotation = ProtocolAnnotation {
             ty: match self.operations {
                 Some(operations) => operations.apply(db, env, annotation.ty, true),
-                None => self.materialization.map_or(annotation.ty, |kind| annotation.ty.materialization(db, env, kind)),
+                None => self.materialization.map_or(annotation.ty, |kind| {
+                    annotation.ty.materialization(db, env, kind)
+                }),
             },
             ..annotation
         };

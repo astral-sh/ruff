@@ -200,7 +200,10 @@ impl<'db> ShapeObserver<'db> {
             Type::Recursive(recursive) => {
                 let definition = recursive.definition(db);
                 let Some(body) = recursive.shape_body(db) else {
-                    return ShapeDependencies { error: Some(TupleShapeError::NotTuple), ..ShapeDependencies::default() };
+                    return ShapeDependencies {
+                        error: Some(TupleShapeError::NotTuple),
+                        ..ShapeDependencies::default()
+                    };
                 };
                 let body = self.declaration(db, definition, |_| body);
                 result.error = body.error;

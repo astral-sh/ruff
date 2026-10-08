@@ -91,7 +91,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .replace(InferenceFlags::CHECK_UNBOUND_TYPEVARS, true);
         // Comparing members while constructing a protocol can request the same unfinished
         // interface. Keep its annotations structural; relations inspect the closed interface.
-        let protocol_constructor = self.inference_flags().contains(InferenceFlags::IN_PROTOCOL_CONSTRUCTOR)
+        let protocol_constructor = self
+            .inference_flags()
+            .contains(InferenceFlags::IN_PROTOCOL_CONSTRUCTOR)
             || nearest_enclosing_class(self.db(), self.index, self.scope())
                 .is_some_and(|class| class.is_protocol(self.db()));
         let previous_protocol_constructor = self.context.inference_flags.replace(

@@ -3102,5 +3102,42 @@ def inspect(gradual: Outer[Any], static: Outer[int], value: Any):
     text: str = static.materialized(value)[0]  # error: [invalid-assignment]
 ```
 
+## Materialized protocols retain captured class parameters
+
+A materialized protocol preserves captured parameters until its enclosing method is specialized.
+Recursive members retain the same ordering of materialization and substitution.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Protocol
+from ty_extensions import Top
+
+class P[U](Protocol):
+    value: U
+    dynamic: Any
+    child: "P[U]"
+
+class Holder[V]:
+    def materialized(self, value: Top[P[V]]) -> Top[P[V]]:
+        return value
+
+def inspect(gradual: Holder[Any], static: Holder[int], value: Any):
+    reveal_type(gradual.materialized(value).value)  # revealed: Any
+    reveal_type(gradual.materialized(value).dynamic)  # revealed: object
+    reveal_type(gradual.materialized(value).child.value)  # revealed: Any
+    reveal_type(gradual.materialized(value).child.dynamic)  # revealed: object
+    reveal_type(static.materialized(value).value)  # revealed: int
+    integer: int = gradual.materialized(value).value  # no diagnostic
+    text: str = static.materialized(value).value  # error: [invalid-assignment]
+    gradual.materialized(value).value = 1  # no diagnostic
+    gradual.materialized(value).dynamic = 1  # error: [invalid-assignment]
+    gradual.materialized(value).child.value = 1  # no diagnostic
+    gradual.materialized(value).child.dynamic = 1  # error: [invalid-assignment]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

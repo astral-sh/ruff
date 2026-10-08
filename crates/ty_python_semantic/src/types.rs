@@ -9774,7 +9774,9 @@ impl<'db> Type<'db> {
                 }))
             }),
 
-            Type::ProtocolInstance(instance) if let Some(origin) = instance.recursive_origin(db) => {
+            Type::ProtocolInstance(instance)
+                if let Some(origin) = instance.recursive_origin(db) =>
+            {
                 origin.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 

@@ -37,8 +37,8 @@ use crate::{
                 validate_paramspec_components,
             },
             function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
-            original_class_type,
+            infer_function_default_types, infer_statement_types, nearest_enclosing_class,
+            nearest_enclosing_function, original_class_type,
         },
         infer_definition_types,
         list_members::all_members,
@@ -897,7 +897,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Parameter and return annotations use the type-expression entry point directly.
         // Like attribute annotations, they construct the protocol before any structural proof
         // may inspect its members.
-        let protocol_constructor = self.inference_flags().contains(InferenceFlags::IN_PROTOCOL_CONSTRUCTOR)
+        let protocol_constructor = self
+            .inference_flags()
+            .contains(InferenceFlags::IN_PROTOCOL_CONSTRUCTOR)
             || nearest_enclosing_class(self.db(), self.index, self.scope())
                 .is_some_and(|class| class.is_protocol(self.db()));
         let previous_protocol_constructor = self.context.inference_flags.replace(
