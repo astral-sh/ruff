@@ -538,6 +538,23 @@ def expanded_tuples(values: list[str]):
     reveal_type(last)  # revealed: Literal[False]
 ```
 
+A protocol's tuple-valued member does not prevent promotion of tuple literals collected alongside
+the protocol instance.
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    pair: tuple[int, int]
+
+def _(value: P) -> None:
+    first, *rest = [0, (1,), (2, 3), value]
+    reveal_type(rest)  # revealed: list[P | tuple[int, ...]]
+
+    first, *rest = (0, (1,), (2, 3), value)
+    reveal_type(rest)  # revealed: list[P | tuple[int, ...]]
+```
+
 ### Starred expressions on the right-hand side
 
 A starred element can contribute an unknown number of values. The literal's AST length does not
