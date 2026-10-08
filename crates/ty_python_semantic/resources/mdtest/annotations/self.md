@@ -431,8 +431,8 @@ reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 
 ### Union arguments containing `Self`
 
-An argument matching another union member does not need to satisfy `Self`'s bound. `Self` remains
-fixed to the receiver, preserving the subclass return type.
+The receiver and argument jointly determine `Self`. An argument member matching `int` contributes no
+evidence for `Self` and does not need to satisfy its bound.
 
 ```py
 from typing import Self
@@ -448,13 +448,14 @@ def check(value: Circle | int):
     reveal_type(Circle.ensure(value))  # revealed: Circle
 ```
 
-Passing a base-class instance cannot widen `Self` to accept an incompatible argument:
+An inherited method can infer the base class from another argument. `Self = Shape` satisfies the
+declared bound and accepts both the subclass receiver and a base-class argument:
 
 ```py
-Circle.ensure(Shape())  # error: [invalid-argument-type]
+reveal_type(Circle.ensure(Shape()))  # revealed: Shape
 
-def invalid_receiver(value: Shape | int):
-    Circle.ensure(value)  # error: [invalid-argument-type]
+def base_argument(value: Shape | int):
+    reveal_type(Circle.ensure(value))  # revealed: Shape
 ```
 
 We also reject a union containing an unrelated type:
