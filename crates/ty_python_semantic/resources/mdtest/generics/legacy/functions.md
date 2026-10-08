@@ -466,6 +466,9 @@ def invalid_argument_with_context(value: Callable[[], S]) -> list[str]:
 
 ## Inferring a bound from a narrowed protocol
 
+Narrowing to `Text` supplies a `str` return type that satisfies the bound, even when the original
+`Source[S]` does not.
+
 ```py
 from typing import Protocol, TypeVar
 
@@ -485,8 +488,7 @@ def require_text(value: Source[T]) -> T:
 
 def narrowed(value: Source[S]) -> None:
     if isinstance(value, Text):
-        # TODO(#28677): Accept the compatible `Text` alternative when inferring the bound.
-        require_text(value)  # error: [invalid-argument-type]
+        reveal_type(require_text(value))  # revealed: str
 ```
 
 ## Inferring a constrained typevar
