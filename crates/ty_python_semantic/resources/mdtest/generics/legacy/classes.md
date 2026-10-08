@@ -1035,7 +1035,7 @@ class C(Generic[T]):
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 ```
 
@@ -1165,11 +1165,7 @@ class Box(Generic[T, U]):
         return result
 
     def wrong_wrap(self, value: T) -> "Box[T, T]":
-        # TODO: Only report the return error. The explicitly specialized constructor accepts
-        # `value: T` and `self: Self`; the incompatible return context should not reject them.
-        # error: [invalid-argument-type]
-        # error: [invalid-return-type]
-        return Box[T, Self](value, self)
+        return Box[T, Self](value, self)  # error: [invalid-return-type]
 ```
 
 ### Constructing through a classmethod receiver
@@ -1513,7 +1509,7 @@ class's own type variables.
 class Remapped(Generic[T]):
     def __init__(self: "Remapped[list[V]]", value: V) -> None: ...
 
-reveal_type(Remapped(1))  # revealed: Remapped[list[Literal[1]]]
+reveal_type(Remapped(1))  # revealed: Remapped[list[int]]
 ```
 
 ### Type variables from enclosing scopes in `__init__` receiver annotations

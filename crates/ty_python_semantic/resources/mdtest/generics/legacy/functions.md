@@ -1398,7 +1398,11 @@ def infer_pair(value: Pair[T]) -> T:
 
 def check_pair(value: GradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+    result = infer_pair(value)
+    reveal_type(result)  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any]
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
@@ -1826,6 +1830,33 @@ However, if we pass something that does not match _any_ union element, we do emi
 ```py
 # error: [invalid-argument-type]
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+```
+
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V", default=Never)
+
+def concat(left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider(left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
 ```
 
 ## Inferring nested generic function calls
@@ -2990,7 +3021,11 @@ def first(x: Sequence[T]) -> T:
 # An intersection where both positive elements satisfy the bound.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
     # TODO: Refine the return type per specialization to reveal Sub1 & Sub2.
-    reveal_type(first(x))  # revealed: Sub1 | Sub2
+    result = first(x)
+    reveal_type(result)  # revealed: Sub1 | Sub2
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(first(x))  # revealed: Sub1
 
 # An intersection with one positive element that satisfies the bound and one that doesn't.
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
@@ -2999,7 +3034,11 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
 # An intersection with two positive elements that satisfy the bound and one that doesn't.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
     # TODO: Refine the return type per specialization to reveal Sub1 & Sub2.
-    reveal_type(first(x))  # revealed: Sub1 | Sub2
+    result = first(x)
+    reveal_type(result)  # revealed: Sub1 | Sub2
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(first(x))  # revealed: Sub1
 
 # Both rejected alternatives contribute to the bound violation.
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
@@ -3058,7 +3097,11 @@ def element(sink: Sink[T]) -> T:
 def _(sink: Intersection[Sink[A], Sink[B]]) -> None:
     # TODO: Validate and refine each specialization separately to accept this call and reveal A & B.
     # error: [invalid-argument-type] "Expected `Sink[A | B]`"
-    reveal_type(element(sink))  # revealed: A | B
+    result = element(sink)
+    reveal_type(result)  # revealed: A | B
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(element(sink))  # revealed: A
 ```
 
 Assignments to different type variables remain correlated within an alternative. Selecting the
@@ -3148,9 +3191,16 @@ def constrained(source: Source[ConstrainedT]) -> ConstrainedT:
 
 def _(both: Intersection[Source[A], Source[B]], mixed: Intersection[Source[A], Source[C]]) -> None:
     # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(bounded(both))  # revealed: A | B
+    bounded_result = bounded(both)
+    reveal_type(bounded_result)  # revealed: A | B
     # TODO: Refine the return type per specialization to reveal A & B.
-    reveal_type(constrained(both))  # revealed: A | B
+    constrained_result = constrained(both)
+    reveal_type(constrained_result)  # revealed: A | B
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(bounded(both))  # revealed: A
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(constrained(both))  # revealed: A
     reveal_type(bounded(mixed))  # revealed: A
     reveal_type(constrained(mixed))  # revealed: A
 ```
