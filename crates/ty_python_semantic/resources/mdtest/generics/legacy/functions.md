@@ -1639,10 +1639,10 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 
 class P(Generic[T]):
-    x: T
+    p: T
 
 class Q(Generic[T]):
-    x: T
+    q: T
 
 def extract_t(x: P[T] | Q[T]) -> T:
     raise NotImplementedError
@@ -1691,7 +1691,6 @@ single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, 
 both types in a call to `extract_both`:
 
 ```py
-# error: [invalid-attribute-override]
 class PandQ(P[int], Q[str]):
     pass
 
