@@ -1816,6 +1816,45 @@ fn dependency_implicit_class_member() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn conditional_keyword_dictionary_expansion_limit() -> anyhow::Result<()> {
+    fn tree(start: usize, count: usize, total: usize, last: &str) -> String {
+        if count == 1 {
+            return if start + 1 == total {
+                last.to_owned()
+            } else {
+                format!("{{\"x\": {start}}}")
+            };
+        }
+        let left = count / 2;
+        format!(
+            "({} if flags[{}] else {})",
+            tree(start, left, total, last),
+            start + left - 1,
+            tree(start + left, count - left, total, last),
+        )
+    }
+
+    let mut db = setup_db();
+    for (count, last, expected) in [
+        (256, "{\"x\": 255}", "int"),
+        (257, "{\"x\": 256}", "Unknown"),
+        (258, "dict(x=1)", "int"),
+    ] {
+        let expression = tree(0, count, count, last);
+        db.write_dedented(
+            "src/main.py",
+            &format!(
+                "from typing_extensions import reveal_type\n\
+                 def f(*, x: int) -> int: return x\n\
+                 def test(flags: list[bool]) -> None:\n    reveal_type(f(**{expression}))\n"
+            ),
+        )?;
+        assert_revealed_type(&db, "src/main.py", expected);
+    }
+    Ok(())
+}
+
 /// Inferring the result of a call-expression shouldn't need to re-run after
 /// a trivial change to the function's file (e.g. by adding a docstring to the function).
 #[test]

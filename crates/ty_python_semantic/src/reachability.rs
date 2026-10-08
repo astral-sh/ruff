@@ -1971,7 +1971,7 @@ pub(crate) fn analyze_condition_expression(
     },
     heap_size = get_size2::GetSize::get_heap_size
 )]
-fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
+pub(crate) fn analyze_condition<'db>(db: &'db dyn Db, expression: Expression<'db>) -> Truthiness {
     let env = ProgramEnvironment::from_scope(expression.scope(db));
     let module = parsed_module(db, expression.python_file(db)).load(db);
     let inference = infer_expression_types(db, expression, TypeContext::default());

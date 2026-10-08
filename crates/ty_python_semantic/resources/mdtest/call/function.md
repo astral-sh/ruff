@@ -684,10 +684,51 @@ info: Function defined here
   |     ^^^^         ------ Parameter declared here
 ```
 
+### Conditional dictionary arguments
+
+For the conditional dictionary literals below, ty checks each branch as a separate argument list. A
+key present in only one branch cannot satisfy a required parameter in another branch.
+
+```py
+def pair(x: int, *, y: str = "", optional: bool = False) -> None: ...
+def conditional(flag: bool, other: bool) -> None:
+    pair(**({"x": 1, "y": "two"} if flag else {"x": 2}))  # no diagnostic
+    pair(x=1, **({"y": "two"} if flag else {}))  # no diagnostic
+    pair(**({"x": 1} if flag else {}))  # error: [missing-argument]
+    pair(**({"x": 1} if flag else {"x": "wrong"}))  # error: [invalid-argument-type]
+    pair(**({"x": 1} if flag else {"x": 2, "extra": 3}))  # error: [unknown-argument]
+    pair(x=1, **({} if flag else {"x": 2}))  # error: [parameter-already-assigned]
+    pair(**({"x": 1} if flag else {"x": 2} if other else {}))  # error: [missing-argument]
+    pair(**({"x": 1} if flag else {"x": 2}), **({"y": "two"} if other else {}))  # no diagnostic
+
+    kwargs = {"x": 1, "y": "two"} if flag else {"x": 2}
+    pair(**kwargs, optional=True)  # no diagnostic
+
+    missing = {"x": 1} if flag else {}
+    pair(**missing)  # error: [missing-argument]
+
+    invalid = {"x": 1} if flag else {"x": "wrong"}
+    # snapshot: invalid-argument-type
+    pair(**invalid)
+```
+
+```snapshot
+error[invalid-argument-type]: Argument to function `pair` is incorrect
+  --> src/mdtest_snippet.py:20:10
+   |
+20 |     pair(**invalid)
+   |          ^^^^^^^^^ Expected `int`, found `Literal["wrong"]`
+info: Function defined here
+ --> src/mdtest_snippet.py:1:5
+  |
+1 | def pair(x: int, *, y: str = "", optional: bool = False) -> None: ...
+  |     ^^^^ ------ Parameter declared here
+```
+
 ### Statically selected dictionary arguments
 
-Conditional dictionary arguments currently leave the possible keys open. This is undesirable:
-missing arguments can go unreported even when the selected dictionary is empty.
+An unreachable branch does not contribute arguments, including when the dictionary is assigned to a
+local variable before the call. Conditions that can have either outcome retain both alternatives.
 
 ```py
 def takes_value(*, value: int) -> None: ...
@@ -696,13 +737,66 @@ def selected(flag: bool) -> None:
     takes_value(**({"extra": 1} if False else {"value": 1}))  # no diagnostic
     takes_value(**({"value": "wrong"} if flag and False else {"value": 1}))  # no diagnostic
     takes_value(**({"value": 1} if flag or True else {}))  # no diagnostic
-    takes_value(**({"value": 1} if flag else {}))  # no diagnostic
+    takes_value(**({"value": 1} if flag else {}))  # error: [missing-argument]
 
     kwargs = {"extra": 1} if False else {"value": 1}
     takes_value(**kwargs)  # no diagnostic
 
     missing = {"value": 1} if False else {}
-    takes_value(**missing)  # no diagnostic
+    takes_value(**missing)  # error: [missing-argument]
+```
+
+### Conditional dictionaries with special call inference
+
+Special handling for built-in and typing functions applies to each dictionary alternative.
+
+```py
+from typing_extensions import deprecated
+
+class Parent:
+    def value(self) -> int:
+        return 1
+
+class Child(Parent):
+    def value(self, flag: bool = False) -> int:
+        return reveal_type(super(**({} if flag else {})).value())  # revealed: int
+
+def known(flag: bool) -> None:
+    reveal_type(isinstance(1, int, **({} if flag else {})))  # revealed: Literal[True]
+    reveal_type(1, **({} if flag else {}))  # revealed: Literal[1]
+
+    @deprecated("old", **({} if flag else {}))
+    def old() -> None: ...
+    old()  # error: [deprecated] "old"
+```
+
+### Conditional dictionary updates
+
+Updating an initially empty dictionary infers its type from every alternative, regardless of their
+order.
+
+```py
+def updates(flag: bool) -> None:
+    first = {}
+    first.update(**({"first": 1} if flag else {"second": "two"}))
+    reveal_type(first)  # revealed: dict[str, int | str]
+
+    reverse = {}
+    reverse.update(**({"second": "two"} if flag else {"first": 1}))
+    reveal_type(reverse)  # revealed: dict[str, str | int]
+```
+
+### Conditional dictionary exclusions
+
+ty falls back to ordinary dictionary inference if any reachable alternative has a computed key or is
+not a dictionary literal.
+
+```py
+def needs_x(x: int) -> None: ...
+def exclusions(flag: bool, key: str, existing: dict[str, int]) -> None:
+    computed = {key: 1} if flag else {}
+    needs_x(**computed)  # no diagnostic
+    needs_x(**({"extra": 1} if flag else existing))  # no diagnostic
 ```
 
 ### Reassigned local dictionary arguments

@@ -207,7 +207,9 @@ def _(value: int | str) -> None:
 
 ### Expanding conditional dictionary arguments
 
-Conditional dictionary arguments currently lose their individual keys during overload selection.
+The branches of these conditional dictionary literals can select different overloads. ty keeps each
+branch's keys and values together when selecting overloads, then combines the selected return types
+when every branch matches.
 
 ```py
 from typing import Literal, overload
@@ -219,17 +221,73 @@ def choose(*, x: int) -> int: ...
 @overload
 def choose(*, x: str, y: str) -> str: ...
 def choose(*, x: int | str | None = None, y: str = "") -> int | str | None: ...
+def conditional(flag: bool) -> None:
+    reveal_type(choose(**({"x": 1} if flag else {})))  # revealed: int | None
+    reveal_type(choose(**({"x": 1} if flag else {"x": "one", "y": "two"})))  # revealed: int | str
+    kwargs = {"x": 1} if flag else {"x": "one", "y": "two"}
+    reveal_type(choose(**kwargs))  # revealed: int | str
+    choose(**({"x": 1} if flag else {"y": "two"}))  # error: [no-matching-overload]
 ```
 
-Even statically selected branches lose their keys, producing undesirable return types:
+Only the reachable branch participates when the condition is statically known:
 
 ```py
 def selected() -> None:
-    reveal_type(choose(**({"x": 1} if True else {})))  # revealed: Unknown
-    reveal_type(choose(**({"x": 1} if False else {})))  # revealed: Unknown
+    reveal_type(choose(**({"x": 1} if True else {})))  # revealed: int
+    reveal_type(choose(**({"x": 1} if False else {})))  # revealed: None
 
     kwargs = {"x": 1} if False else {"x": "one", "y": "two"}
-    reveal_type(choose(**kwargs))  # revealed: None
+    reveal_type(choose(**kwargs))  # revealed: str
+```
+
+Argument type expansion still applies within each dictionary alternative.
+
+```py
+@overload
+def select(*, value: Literal["a"]) -> int: ...
+@overload
+def select(*, value: Literal["b"]) -> str: ...
+def select(*, value: Literal["a", "b"]) -> int | str:
+    return 1
+
+def values(flag: bool, value: Literal["a", "b"]) -> None:
+    reveal_type(select(**({"value": value} if flag else {"value": "a"})))  # revealed: int | str
+```
+
+Every combination of separately unpacked dictionaries must match.
+
+```py
+@overload
+def combine(*, x: int, y: str = "") -> int: ...
+@overload
+def combine(*, y: str) -> str: ...
+def combine(*, x: int = 0, y: str = "") -> int | str:
+    return x
+
+def independent(first: bool, second: bool) -> None:
+    combine(**({"x": 1} if first else {}), **({"y": "two"} if second else {}))  # error: [no-matching-overload]
+```
+
+These dictionary combinations exceed the argument expansion limit, so ty infers `Unknown` for the
+call.
+
+```py
+def count(**kwargs: int) -> int:
+    return len(kwargs)
+
+def expansion_limit(flag: bool) -> None:
+    result = count(
+        **({"a": 1} if flag else {}),
+        **({"b": 1} if flag else {}),
+        **({"c": 1} if flag else {}),
+        **({"d": 1} if flag else {}),
+        **({"e": 1} if flag else {}),
+        **({"f": 1} if flag else {}),
+        **({"g": 1} if flag else {}),
+        **({"h": 1} if flag else {}),
+        **({"i": 1} if flag else {}),
+    )
+    reveal_type(result)  # revealed: Unknown
 ```
 
 ### Expanding first argument

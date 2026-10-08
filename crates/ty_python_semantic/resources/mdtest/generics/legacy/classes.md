@@ -948,6 +948,28 @@ class Explicit(Generic[T]):
 reveal_type(Explicit(1))  # revealed: Explicit[int]
 ```
 
+### Conditional keyword dictionaries
+
+Each dictionary branch can infer a different constructor specialization.
+
+```py
+from typing import Generic, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+
+class Pair(Generic[A, B]):
+    def __init__(self, *, first: A, second: B) -> None:
+        self.first = first
+        self.second = second
+
+def conditional(flag: bool) -> None:
+    pair = Pair(**({"first": 1, "second": "two"} if flag else {"first": "three", "second": 4}))
+    reveal_type(pair)  # revealed: Pair[int, str] | Pair[str, int]
+    reverse = Pair(**({"first": "three", "second": 4} if flag else {"first": 1, "second": "two"}))
+    reveal_type(reverse)  # revealed: Pair[str, int] | Pair[int, str]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

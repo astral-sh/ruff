@@ -611,6 +611,23 @@ def accepts_dog(value: Dog) -> None: ...
 consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
 ```
 
+### Conditional keyword dictionaries
+
+Each dictionary branch can infer a different constructor specialization.
+
+```py
+class Pair[A, B]:
+    def __init__(self, *, first: A, second: B) -> None:
+        self.first = first
+        self.second = second
+
+def conditional(flag: bool) -> None:
+    pair = Pair(**({"first": 1, "second": "two"} if flag else {"first": "three", "second": 4}))
+    reveal_type(pair)  # revealed: Pair[int, str] | Pair[str, int]
+    reverse = Pair(**({"first": "three", "second": 4} if flag else {"first": 1, "second": "two"}))
+    reveal_type(reverse)  # revealed: Pair[str, int] | Pair[int, str]
+```
+
 ### Constrained constructor inference uses argument evidence
 
 Constructor arguments should select the narrowest compatible declared constraint. A string argument

@@ -630,6 +630,17 @@ pub(crate) struct Bindings<'db> {
     /// `None` means the caller did not provide lexical collision information. `Some([])` means the
     /// caller knows there are no enclosing binding contexts.
     enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+
+    /// Results of expanding conditional keyword dictionaries. Cases retain complete bindings for
+    /// each dictionary combination; `elements` keeps the source callable shape for generic
+    /// inference and IDE queries.
+    keyword_expansion: Option<KeywordCallExpansion<'db>>,
+}
+
+#[derive(Debug, Clone)]
+enum KeywordCallExpansion<'db> {
+    Cases(Box<[Bindings<'db>]>),
+    LimitReached,
 }
 
 /// The set of overload candidates at a given call-site, before argument type inference.
@@ -669,6 +680,9 @@ impl CheckTypesMode {
 
 impl<'db> Bindings<'db> {
     fn as_result(&self, db: &'db dyn Db) -> Result<(), CallErrorKind> {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &self.keyword_expansion {
+            return cases.iter().try_for_each(|case| case.as_result(db));
+        }
         let mut all_ok = true;
         let mut any_binding_error = false;
         let mut all_not_callable = true;
@@ -704,6 +718,11 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         constructor_instance_type: Type<'db>,
     ) {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &mut self.keyword_expansion {
+            for case in cases {
+                case.set_constructor_instance_type_in_place(db, constructor_instance_type);
+            }
+        }
         for element in &mut self.elements {
             for item in &mut element.items {
                 match item {
@@ -779,6 +798,7 @@ impl<'db> Bindings<'db> {
             mut implicit_dunder_init_is_possibly_unbound,
             mut elements,
             enclosing_binding_contexts: _,
+            keyword_expansion: _,
         } = bindings_iter.next().expect("bindings must not be empty");
 
         for bindings in bindings_iter {
@@ -796,6 +816,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             enclosing_binding_contexts: None,
+            keyword_expansion: None,
         }
     }
 
@@ -830,6 +851,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             enclosing_binding_contexts: None,
+            keyword_expansion: None,
         }
     }
 
@@ -966,6 +988,12 @@ impl<'db> Bindings<'db> {
             bindings: &'a Bindings<'db>,
             functions: &mut SmallVec<[(&'a CallableBinding<'db>, OverloadLiteral<'db>); 1]>,
         ) {
+            if let Some(KeywordCallExpansion::Cases(cases)) = &bindings.keyword_expansion {
+                for case in cases {
+                    collect(db, case, functions);
+                }
+                return;
+            }
             for element in &bindings.elements {
                 let start = functions.len();
                 for item in &element.items {
@@ -1060,6 +1088,11 @@ impl<'db> Bindings<'db> {
         &self,
         argument_index: usize,
     ) -> bool {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &self.keyword_expansion {
+            return cases.iter().any(|case| {
+                case.constructor_init_argument_matches_keyword_variadic(argument_index)
+            });
+        }
         self.iter_constructor_items()
             .any(|constructor| constructor.init_argument_matches_keyword_variadic(argument_index))
     }
@@ -1093,6 +1126,39 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    pub(crate) fn visit_evaluated_type_context_callables<'a>(
+        &'a self,
+        visit: &mut impl FnMut(&'a CallableBinding<'db>),
+    ) {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &self.keyword_expansion {
+            for case in cases {
+                case.visit_evaluated_type_context_callables(visit);
+            }
+        } else {
+            self.visit_type_context_callables(visit);
+        }
+    }
+
+    pub(crate) fn visit_evaluated_cases_mut<'a>(
+        &mut self,
+        arguments: &CallArguments<'a, 'db>,
+        visit: &mut impl FnMut(&mut Self, &CallArguments<'a, 'db>),
+    ) {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &mut self.keyword_expansion
+            && let Some(Expansion::Expanded(arguments)) = arguments.expand_keyword_alternatives()
+        {
+            if cases.len() != arguments.len() {
+                self.keyword_expansion = Some(KeywordCallExpansion::LimitReached);
+                return;
+            }
+            for (case, arguments) in cases.iter_mut().zip(&arguments) {
+                case.visit_evaluated_cases_mut(arguments, visit);
+            }
+        } else {
+            visit(self, arguments);
+        }
+    }
+
     /// Visits the given set of overload candidates, invoking the provided callback for each
     /// binding.
     pub(crate) fn visit_overload_set<'a>(
@@ -1123,6 +1189,13 @@ impl<'db> Bindings<'db> {
     /// Returns `true` if every element of the union contains an intersection element with a matching
     /// overload that satisfies the provided closure, or `false` otherwise.
     pub(crate) fn satisfies(&self, f: impl Fn(&Binding<'db>) -> bool) -> bool {
+        self.satisfies_impl(&f)
+    }
+
+    fn satisfies_impl(&self, f: &dyn Fn(&Binding<'db>) -> bool) -> bool {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &self.keyword_expansion {
+            return cases.iter().all(|case| case.satisfies_impl(f));
+        }
         self.elements.iter().all(|element| {
             element
                 .callables()
@@ -1274,6 +1347,16 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             enclosing_binding_contexts: self.enclosing_binding_contexts,
+            keyword_expansion: self.keyword_expansion.map(|expansion| match expansion {
+                KeywordCallExpansion::Cases(cases) => KeywordCallExpansion::Cases(
+                    cases
+                        .into_vec()
+                        .into_iter()
+                        .map(|case| case.map_with(f))
+                        .collect(),
+                ),
+                KeywordCallExpansion::LimitReached => KeywordCallExpansion::LimitReached,
+            }),
             elements: self
                 .elements
                 .into_iter()
@@ -1373,6 +1456,160 @@ impl<'db> Bindings<'db> {
         }
     }
 
+    fn reset_keyword_case(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        arguments: &CallArguments<'_, 'db>,
+        downstream: bool,
+    ) {
+        self.keyword_expansion = None;
+        for item in self.iter_callable_items_mut() {
+            let callable = item.callable_mut();
+            callable.overload_call_result = None;
+            callable.matching_overload_before_type_checking = None;
+            for overload in &mut callable.overloads {
+                overload.reset(db);
+            }
+            callable.match_parameters(db, env, arguments);
+            for overload in &mut callable.overloads {
+                if overload.is_partial_application {
+                    if downstream {
+                        overload.clear_deferred_constructor_errors_for_partial_application();
+                    } else {
+                        overload.prepare_for_partial_application();
+                    }
+                }
+            }
+            if let Some(constructor) = item.as_constructor_mut()
+                && let Some(bindings) = constructor.downstream_constructor_mut()
+            {
+                bindings.reset_keyword_case(db, env, arguments, true);
+            }
+        }
+    }
+
+    fn keyword_expansion_limit_reached(&mut self, index: usize) {
+        self.keyword_expansion = Some(KeywordCallExpansion::LimitReached);
+        for callable in self.iter_flat_mut() {
+            callable.overload_call_result =
+                Some(OverloadCallResult::ArgumentTypeExpansionLimitReached(
+                    index + usize::from(callable.bound_type.is_some()),
+                ));
+        }
+    }
+
+    /// Merge provisional evaluations without changing the source callable or overload indexes.
+    fn merge_keyword_cases(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        cases: &[&Self],
+    ) {
+        for (element_index, element) in self.elements.iter_mut().enumerate() {
+            for (item_index, item) in element.items.iter_mut().enumerate() {
+                let sources = cases
+                    .iter()
+                    .map(|case| &case.elements[element_index].items[item_index]);
+                let callable = item.callable_mut();
+                let snapshotter =
+                    CallableBindingSnapshotter::new((0..callable.overloads.len()).collect());
+                let evaluations = sources
+                    .clone()
+                    .map(|item| {
+                        let callable = item.callable();
+                        snapshotter.take_evaluation(callable, callable.return_type())
+                    })
+                    .collect();
+                callable.matching_overload_before_type_checking = None;
+                callable.merge_expanded_evaluations(db, env, &snapshotter, evaluations);
+
+                if let Some(constructor) = item.as_constructor_mut()
+                    && let Some(downstream) = constructor.downstream_constructor_mut()
+                {
+                    let downstream_cases: Vec<_> = sources
+                        .filter_map(|item| item.as_constructor()?.downstream_constructor())
+                        .collect();
+                    downstream.merge_keyword_cases(db, env, &downstream_cases);
+                }
+            }
+        }
+    }
+
+    #[expect(clippy::too_many_arguments)]
+    fn check_keyword_alternatives<'a>(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
+        call_expression_tcx: TypeContext<'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+        mode: CheckTypesMode,
+        expansion: Expansion<'a, 'db>,
+    ) -> Result<(), CallErrorKind> {
+        let arguments = match expansion {
+            Expansion::LimitReached(index) => {
+                self.keyword_expansion_limit_reached(index);
+                return self.as_result(db);
+            }
+            Expansion::Expanded(arguments) => arguments,
+        };
+        self.keyword_expansion = None;
+        let mut cases = Vec::with_capacity(arguments.len());
+        for arguments in &arguments {
+            let mut case = self.clone();
+            case.reset_keyword_case(db, env, arguments, false);
+            let _ = case.check_types_impl(
+                db,
+                env,
+                constraints,
+                arguments,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+                CheckTypesMode::Provisional,
+            );
+            cases.push(case);
+        }
+        self.merge_keyword_cases(db, env, &cases.iter().collect::<Vec<_>>());
+        if mode.is_provisional() {
+            self.keyword_expansion = Some(KeywordCallExpansion::Cases(cases.into_boxed_slice()));
+            Ok(())
+        } else {
+            self.finalize_keyword_alternatives(
+                db,
+                env,
+                cases,
+                &arguments,
+                dataclass_field_specifiers,
+            )
+        }
+    }
+
+    fn finalize_keyword_alternatives(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut cases: Vec<Self>,
+        arguments: &[CallArguments<'_, 'db>],
+        dataclass_field_specifiers: &[Type<'db>],
+    ) -> Result<(), CallErrorKind> {
+        for (index, arguments) in arguments.iter().enumerate() {
+            let result = cases[index].finalize_argument_inference(
+                db,
+                env,
+                arguments,
+                dataclass_field_specifiers,
+            );
+            if let Err(error) = result {
+                // A concrete failure retains its known-call and downstream-constructor errors.
+                *self = cases.swap_remove(index);
+                return Err(error);
+            }
+        }
+        self.keyword_expansion = Some(KeywordCallExpansion::Cases(cases.into_boxed_slice()));
+        Ok(())
+    }
+
     #[expect(clippy::too_many_arguments)]
     pub(crate) fn check_types_impl(
         &mut self,
@@ -1384,6 +1621,17 @@ impl<'db> Bindings<'db> {
         dataclass_field_specifiers: &[Type<'db>],
         mode: CheckTypesMode,
     ) -> Result<(), CallErrorKind> {
+        if let Some(expansion) = call_arguments.expand_keyword_alternatives() {
+            return self.check_keyword_alternatives(
+                db,
+                env,
+                constraints,
+                call_expression_tcx,
+                dataclass_field_specifiers,
+                mode,
+                expansion,
+            );
+        }
         // Check types for each element (union variant)
         for element in &mut self.elements {
             element.check_types(
@@ -1435,6 +1683,23 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<(), CallErrorKind> {
+        if let Some(expansion) = self.keyword_expansion.take() {
+            match (expansion, call_arguments.expand_keyword_alternatives()) {
+                (KeywordCallExpansion::Cases(cases), Some(Expansion::Expanded(arguments))) => {
+                    return self.finalize_keyword_alternatives(
+                        db,
+                        env,
+                        cases.into_vec(),
+                        &arguments,
+                        dataclass_field_specifiers,
+                    );
+                }
+                (expansion, _) => {
+                    self.keyword_expansion = Some(expansion);
+                    return self.as_result(db);
+                }
+            }
+        }
         self.evaluate_known_cases(db, env, call_arguments, dataclass_field_specifiers);
 
         for constructor in self.iter_constructor_items_mut() {
@@ -1493,6 +1758,17 @@ impl<'db> Bindings<'db> {
     /// For calls with binding errors, this is a type that best approximates the return type. For
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        match &self.keyword_expansion {
+            Some(KeywordCallExpansion::Cases(cases)) => {
+                return UnionType::from_elements(
+                    db,
+                    env,
+                    cases.iter().map(|case| case.return_type(db, env)),
+                );
+            }
+            Some(KeywordCallExpansion::LimitReached) => return Type::unknown(),
+            None => {}
+        }
         UnionType::from_elements(
             db,
             env,
@@ -1565,6 +1841,15 @@ impl<'db> Bindings<'db> {
         context: &CallDiagnosticContext<'_, '_, 'db, '_>,
         node: ast::AnyNodeRef,
     ) {
+        if let Some(KeywordCallExpansion::Cases(cases)) = &self.keyword_expansion {
+            if let Some(case) = cases
+                .iter()
+                .find(|case| case.as_result(context.db()).is_err())
+            {
+                case.report_diagnostics_impl(context, node);
+            }
+            return;
+        }
         let db = context.db();
         let env = context.program_environment();
         // If all elements are not callable, report that the type as a whole is not callable.
@@ -3390,6 +3675,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
             enclosing_binding_contexts: None,
+            keyword_expansion: None,
         }
     }
 }
@@ -4141,14 +4427,7 @@ impl<'db> CallableBinding<'db> {
                 };
 
                 if let Some(return_type) = return_type {
-                    cases.push(ExpandedCallEvaluation {
-                        return_type,
-                        selected_overloads: self
-                            .selected_overloads()
-                            .map(|(index, _)| index)
-                            .collect(),
-                        snapshot: snapshotter.take(self),
-                    });
+                    cases.push(snapshotter.take_evaluation(self, return_type));
                 } else {
                     // No need to check the remaining argument lists if the current argument list
                     // doesn't evaluate successfully. Move on to expanding the next argument type.
@@ -4156,31 +4435,8 @@ impl<'db> CallableBinding<'db> {
                 }
             }
 
-            if cases.len() == expanded_argument_lists.len()
-                && let Some((first, rest)) = cases.split_first()
-            {
-                // The merged view supports consumers that need one binding per overload. Keep
-                // the individual evaluations as well: the same generic overload can infer a
-                // different specialization for each expanded argument list.
-                let mut merged_evaluation_state = first.snapshot.clone();
-                for case in rest {
-                    merged_evaluation_state.update(&case.snapshot);
-                }
-                snapshotter.restore(self, merged_evaluation_state);
-
-                // Every expanded argument list must succeed. Alternative matches within a case
-                // cannot compensate for a different argument list with no matches.
-                self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(
-                    Box::new(ExpandedOverloadCall {
-                        return_type: UnionType::from_elements(
-                            db,
-                            env,
-                            cases.iter().map(|case| case.return_type),
-                        ),
-                        cases: cases.into_boxed_slice(),
-                    }),
-                ));
-
+            if !cases.is_empty() && cases.len() == expanded_argument_lists.len() {
+                self.merge_expanded_evaluations(db, env, &snapshotter, cases);
                 return;
             }
         }
@@ -4190,6 +4446,35 @@ impl<'db> CallableBinding<'db> {
         // argument types. This is necessary because we restore the state to the pre-evaluation
         // snapshot when processing the expanded argument lists.
         snapshotter.restore(self, post_evaluation_snapshot);
+    }
+
+    fn merge_expanded_evaluations(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        snapshotter: &CallableBindingSnapshotter,
+        cases: Vec<ExpandedCallEvaluation<'db>>,
+    ) {
+        let Some((first, rest)) = cases.split_first() else {
+            return;
+        };
+        // The merged view supports consumers that need one binding per overload. Keep each
+        // evaluation too, since a generic overload can infer different specializations.
+        let mut merged = first.snapshot.clone();
+        for case in rest {
+            merged.update(&case.snapshot);
+        }
+        snapshotter.restore(self, merged);
+        self.overload_call_result = Some(OverloadCallResult::ArgumentTypeExpansion(Box::new(
+            ExpandedOverloadCall {
+                return_type: UnionType::from_elements(
+                    db,
+                    env,
+                    cases.iter().map(|case| case.return_type),
+                ),
+                cases: cases.into_boxed_slice(),
+            },
+        )));
     }
 
     /// Returns the set of overload candidates that may contribute to the call evaluation.
@@ -4203,7 +4488,9 @@ impl<'db> CallableBinding<'db> {
         env: &ProgramEnvironment<'db>,
         call_arguments: &CallArguments<'_, 'db>,
     ) -> SmallVec<[usize; 1]> {
-        if self.should_retry_after_provisional_arity(&call_arguments.expansions(db, env)) {
+        if call_arguments.has_keyword_alternatives()
+            || self.should_retry_after_provisional_arity(&call_arguments.expansions(db, env))
+        {
             (0..self.overloads.len()).collect()
         } else {
             self.matching_overloads().map(|(index, _)| index).collect()
@@ -8714,8 +9001,22 @@ struct CallableBindingSnapshotter(Vec<usize>);
 impl CallableBindingSnapshotter {
     /// Creates a new snapshotter for the given indexes of the matched overloads.
     fn new(indexes: Vec<usize>) -> Self {
-        debug_assert!(indexes.len() > 1);
         CallableBindingSnapshotter(indexes)
+    }
+
+    fn take_evaluation<'db>(
+        &self,
+        binding: &CallableBinding<'db>,
+        return_type: Type<'db>,
+    ) -> ExpandedCallEvaluation<'db> {
+        ExpandedCallEvaluation {
+            return_type,
+            selected_overloads: binding
+                .selected_overloads()
+                .map(|(index, _)| index)
+                .collect(),
+            snapshot: self.take(binding),
+        }
     }
 
     /// Takes a snapshot of the current state of the matched overload bindings.
