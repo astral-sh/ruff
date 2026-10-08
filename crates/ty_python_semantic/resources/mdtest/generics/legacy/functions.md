@@ -3131,3 +3131,39 @@ def optional_callback(value: O) -> Callable[[O | None], O | None]:
     # revealed: (O@optional_callback | None, /) -> O@optional_callback | None
     return reveal_type(identity_callback(value))
 ```
+
+## Generic property setter overrides
+
+A method-scoped type variable is inferred for each write, so an unconstrained setter preserves an
+inherited `object` write contract. A setter bounded by `int` rejects some inherited writes.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+I = TypeVar("I", bound=int)
+
+class Base:
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: object) -> None: ...
+
+class GenericSetter(Base):
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: T) -> None: ...
+
+class BoundedSetter(Base):
+    @property
+    def value(self) -> object:
+        return None
+
+    @value.setter
+    def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
+```

@@ -1388,18 +1388,15 @@ class Intermediate(Base):
     # Mypy does not report an error here, but pyright does: "… overrides symbol
     # of same name in class "Base". Variable is mutable so its type is invariant"
     #
-    # We should introduce a diagnostic for this. Whether or not that should be
-    # enabled by default can still be discussed.
+    # The opt-in mutable-override rule rejects this narrowing.
     #
-    # TODO: This should be an error
-    redeclared_with_narrower_type: str
+    redeclared_with_narrower_type: str  # error: [invalid-mutable-override]
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
-    # TODO: This should be an error
-    redeclared_with_wider_type: str | int | None
+    redeclared_with_wider_type: str | int | None  # error: [invalid-attribute-override]
 
     overwritten_in_subclass_body = 1  # error: [invalid-assignment]
 
@@ -3104,8 +3101,7 @@ class Invalid(Base):
     values = ("wrong",)  # error: [invalid-assignment]
 
 class Redeclared(Base):
-    # TODO: Report a Liskov violation for the incompatible redeclaration.
-    value: str = "child"
+    value: str = "child"  # error: [invalid-mutable-override]
 
 reveal_type(Redeclared.value)  # revealed: str
 ```
@@ -3168,7 +3164,7 @@ class Right:
     value: bytes = b""
 
 class Child(Left, Right):
-    value = "child"
+    value = "child"  # error: [invalid-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
@@ -3291,10 +3287,12 @@ class Left(Root):
     value = 1
 
 class Right(Root):
-    value: str = "right"
+    value: str = "right"  # error: [invalid-attribute-override]
 
 class Child(Left, Right):
-    value = "wrong"  # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    # error: [invalid-attribute-override]
+    value = "wrong"
 
 reveal_type(Child.value)  # revealed: int
 ```
