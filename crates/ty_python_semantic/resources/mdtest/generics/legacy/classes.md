@@ -212,6 +212,315 @@ class Child(Base[T]): ...
 child: Child[int]
 ```
 
+## Protocol instances as generic arguments
+
+`Generic` and `Protocol` expect type variables, not protocol instances. This also applies to a
+specialized protocol whose methods use its type parameter:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol
+
+class HasMethod[T](Protocol):
+    def method(self) -> T: ...
+
+def _(value: HasMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+    class C(Generic[value]): ...  # error: [invalid-argument-type]
+    class D(Protocol[value]): ...  # error: [invalid-argument-type]
+```
+
+A method's own type parameter does not make the protocol instance a valid argument either. Here, `U`
+appears in the method signature, but the returned protocol does not use its argument:
+
+```py
+class Q[T](Protocol):
+    value: int
+
+class HasGenericMethod[T](Protocol):
+    def method[U](self, value: U) -> Q[U]: ...
+
+def _(value: HasGenericMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+```
+
+A nested specialization in a method return type is also invalid:
+
+```py
+def _(value: HasMethod[HasMethod[int]]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same applies to a nested specialization in an attribute:
+
+```py
+class P[T](Protocol):
+    value: T
+
+def _(value: P[P[int]]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Finite recursive protocols as generic arguments
+
+`Generic` and `Protocol` reject protocol instances even when their methods are recursive:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol
+
+class P[T](Protocol):
+    def method(self) -> P[int]: ...
+
+def _(value: P[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same restriction applies when the method returns a different specialization of the protocol:
+
+```py
+def _(value: P[str]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A property that swaps its type arguments returns to the original specialization after two steps.
+This finite cycle does not change which arguments are valid:
+
+```py
+class Swapped[A, B](Protocol):
+    @property
+    def next(self) -> Swapped[B, A]: ...
+
+def _(value: Swapped[int, str]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Runtime `TypeVarTuple` arguments
+
+A list is not a valid argument to `Generic` or `Protocol`, even when it contains runtime
+`TypeVarTuple` objects:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVarTuple
+
+def _(value: TypeVarTuple) -> None:
+    Generic[[value]]  # error: [invalid-argument-type]
+    Protocol[[value]]  # error: [invalid-argument-type]
+
+    class GenericBase(Generic[[value]]): ...  # error: [invalid-argument-type]
+    class ProtocolBase(Protocol[[value]]): ...  # error: [invalid-argument-type]
+```
+
+The `typing_extensions` variant has the same behavior:
+
+```py
+from typing_extensions import TypeVarTuple as TypeVarTupleExtensions
+
+def _(value: TypeVarTupleExtensions) -> None:
+    Generic[[value]]  # error: [invalid-argument-type]
+    Protocol[[value]]  # error: [invalid-argument-type]
+```
+
+Naming the list type with an alias does not make the argument valid:
+
+```py
+type Alias = list[TypeVarTuple]
+
+def _(alias: Alias) -> None:
+    Generic[alias]  # error: [invalid-argument-type]
+```
+
+A `NewType` based on that list type is also invalid:
+
+```py
+from typing import NewType
+
+X = NewType("X", list[TypeVarTuple])
+
+def _(newtype: X) -> None:
+    Generic[newtype]  # error: [invalid-argument-type]
+```
+
+Nor does a type variable's bound make the list a valid argument:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=list[TypeVarTuple])
+
+def _(bounded: T) -> None:
+    Generic[bounded]  # error: [invalid-argument-type]
+```
+
+We reject protocol instances even when specialized with `TypeVarTuple`:
+
+```py
+class Unused[T](Protocol):
+    value: int
+
+def _(value: Unused[TypeVarTuple]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The protocol remains invalid if one of its members uses that argument:
+
+```py
+class Used[T](Protocol):
+    value: T
+
+def _(value: Used[TypeVarTuple]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A protocol parameter's bound does not make an instance a valid argument, even when the protocol is
+specialized with `Any`:
+
+```py
+from typing import Any
+
+class Bounded[T: list[TypeVarTuple]](Protocol):
+    def method(self) -> T: ...
+
+def _(value: Bounded[Any]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Type variable defaults in generic arguments
+
+A type-variable default does not restrict values annotated with that type variable. A default
+containing a `TypeVarTuple` therefore does not make these arguments valid:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar, TypeVarTuple
+
+T = TypeVar("T", default=list[TypeVarTuple])
+
+def _(value: T) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+    Protocol[value]  # error: [invalid-argument-type]
+```
+
+## Recursive structural types in generic arguments
+
+A recursive protocol instance is not a valid `Generic` argument, even when its members keep changing
+specialization:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+from typing import Generic, Protocol, TypedDict
+
+class Recursive[T](Protocol):
+    next: Recursive[list[T]]
+
+def _(value: Recursive[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The recursive reference can also appear in a method's return type:
+
+```py
+class RecursiveMethod[T](Protocol):
+    def method(self) -> RecursiveMethod[list[T]]: ...
+
+def _(value: RecursiveMethod[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+The same restriction applies to properties whose return types keep changing specialization:
+
+```py
+class RecursiveProperty[T](Protocol):
+    @property
+    def next(self) -> RecursiveProperty[list[T]]: ...
+
+def _(value: RecursiveProperty[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+Mutually recursive methods can keep changing specialization too. Each round below adds another
+`list` around the argument:
+
+```py
+class Left[T](Protocol):
+    def method(self) -> Right[list[T]]: ...
+
+class Right[U](Protocol):
+    def method(self) -> Left[U]: ...
+
+def _(value: Left[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+We also reject a non-generic protocol instance whose method returns the growing type:
+
+```py
+class Root(Protocol):
+    def method(self) -> Left[int]: ...
+
+def _(value: Root) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+A growing recursive `TypedDict` is also invalid:
+
+```py
+class Payload[T](TypedDict):
+    child: Payload[list[T]]
+
+def _(value: Payload[int]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
+## Recursive bounds in generic arguments
+
+A recursive bound on an unused protocol parameter does not make the protocol instance a valid
+`Generic` argument:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, Protocol
+
+type Recursive[T] = list[Recursive[list[T]]]
+
+class P[T: Recursive[int]](Protocol):
+    def method(self) -> int: ...
+
+def _(value: P[Any]) -> None:
+    Generic[value]  # error: [invalid-argument-type]
+```
+
 ## Specializing classes with unavailable generic context
 
 When an earlier error prevents ty from determining a class's generic context, specializing the class
