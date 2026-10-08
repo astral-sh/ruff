@@ -2421,6 +2421,7 @@ impl NodeId {
                 let source_orders = storage.calculate_source_orders(source_order);
                 let walker = SolutionWalker::new(
                     db,
+                    env,
                     storage,
                     source_orders,
                     inferable,
@@ -2501,6 +2502,7 @@ impl NodeId {
                     let source_orders = storage.calculate_source_orders(source_order);
                     let walker = SolutionWalker::new(
                         db,
+                        env,
                         storage,
                         source_orders,
                         inferable,
@@ -3550,21 +3552,12 @@ impl<'db> CandidateSolutions<'db> {
             return ControlFlow::Continue(path_bounds);
         }
 
-        let walker = SolutionWalker::new(db, storage, source_orders, inferable, limits, node);
+        let walker = SolutionWalker::new(db, env, storage, source_orders, inferable, limits, node);
         // Sequent discovery must also happen in source order. Sorting the collected paths is
         // too late: sequent pairs are not commutative, and TDD traversal order can otherwise
         // discard gradual evidence before solution extraction.
         let mut path = node.path_assignments(db, env, storage, source_order);
-        let node_support = storage.node_support(node).cloned();
-        walker.visit_node(
-            db,
-            env,
-            storage,
-            &mut path,
-            node_support.as_ref(),
-            Polarity::Positive,
-            node,
-        )?;
+        walker.visit_node(db, env, storage, &mut path, Polarity::Positive, node)?;
         ControlFlow::Continue(walker.finish())
     }
 

@@ -1346,6 +1346,7 @@ mod tests {
             };
             let walker = SolutionWalker::new(
                 db,
+                &env,
                 &mut storage,
                 source_orders.clone(),
                 inferable,
@@ -1358,7 +1359,6 @@ mod tests {
                     &env,
                     &mut storage,
                     &mut path,
-                    None,
                     Polarity::Positive,
                     set.node
                 ),
@@ -1369,6 +1369,7 @@ mod tests {
             let limits = UnboundedSolutionLimits;
             let walker = SolutionWalker::new(
                 db,
+                &env,
                 &mut storage,
                 source_orders.clone(),
                 inferable,
@@ -1380,7 +1381,6 @@ mod tests {
                 &env,
                 &mut storage,
                 &mut path,
-                None,
                 Polarity::Positive,
                 set.node,
             );
