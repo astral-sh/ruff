@@ -1,7 +1,14 @@
+use std::collections::VecDeque;
+
+use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
-use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
+use ty_python_core::definition::{
+    Definition, DefinitionKind, DefinitionState, NestedBindingExecution,
+};
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{BindingWithConstraintsIterator, global_scope, place_table, use_def_map};
+use ty_python_core::{
+    BindingWithConstraintsIterator, global_scope, place_table, semantic_index, use_def_map,
+};
 
 use crate::Db;
 use crate::place::{
@@ -18,20 +25,16 @@ use crate::types::ProgramEnvironment;
 /// Resolution also tracks whether values lack explicit definitions, whether the name can be
 /// deleted, and whether lookup crosses a `global` or `nonlocal` declaration.
 #[derive(Debug, Clone, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-pub(crate) struct DefinitionResolution<'db> {
+pub struct DefinitionResolution<'db> {
     definitions: SmallVec<[Definition<'db>; 2]>,
     is_complete: bool,
     may_be_deleted: bool,
     crosses_scope_declaration: bool,
 }
 
-#[allow(
-    dead_code,
-    reason = "definition-resolution metadata is retained for IDE consumers"
-)]
 impl<'db> DefinitionResolution<'db> {
     /// Returns the definitions found by name resolution.
-    pub(crate) fn definitions(&self) -> &[Definition<'db>] {
+    pub fn definitions(&self) -> &[Definition<'db>] {
         &self.definitions
     }
 
@@ -39,18 +42,75 @@ impl<'db> DefinitionResolution<'db> {
     ///
     /// Implicit builtin values are incomplete because no explicit import connects the name
     /// to their definitions. A complete resolution can still leave a name possibly unbound.
-    pub(crate) fn is_complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         self.is_complete
     }
 
     /// Returns whether a reachable deletion may leave the value unbound.
-    pub(crate) fn may_be_deleted(&self) -> bool {
+    pub fn may_be_deleted(&self) -> bool {
         self.may_be_deleted
     }
 
     /// Returns whether resolution crosses a `global` or `nonlocal` declaration.
-    pub(crate) fn crosses_scope_declaration(&self) -> bool {
+    pub fn crosses_scope_declaration(&self) -> bool {
         self.crosses_scope_declaration
+    }
+
+    /// Replaces synthetic bindings with the source definitions they represent.
+    pub(crate) fn source_backed(mut self, db: &'db dyn Db) -> Self {
+        for root in std::mem::take(&mut self.definitions) {
+            if root.kind(db).is_user_visible() {
+                self.push_definition(root);
+                continue;
+            }
+
+            let mut pending = VecDeque::from([root]);
+            let mut seen = FxHashSet::default();
+            let mut has_source = false;
+
+            while let Some(definition) = pending.pop_front() {
+                if !seen.insert(definition) {
+                    continue;
+                }
+                match definition.kind(db) {
+                    DefinitionKind::LoopHeader(_) => {
+                        let header = loop_header_reachability(db, definition);
+                        self.may_be_deleted |= !header.deleted_reachability.is_always_false();
+                        pending.extend(
+                            header
+                                .reachable_bindings
+                                .iter()
+                                .map(|binding| binding.definition),
+                        );
+                    }
+                    DefinitionKind::NestedBindings(nested) => {
+                        let index = semantic_index(db, definition.program_file(db));
+                        for bindings in
+                            nested.visible_binding_sources(index, definition.file_scope(db))
+                        {
+                            if nested.execution == NestedBindingExecution::Eager {
+                                // Like inference, include bindings from later comprehension
+                                // iterations even when the first iteration cannot reach them.
+                                pending.extend(
+                                    bindings.filter_map(|binding| binding.binding.definition()),
+                                );
+                            } else {
+                                let source = Self::from_bindings(db, bindings);
+                                self.may_be_deleted |= source.may_be_deleted;
+                                pending.extend(source.definitions);
+                            }
+                        }
+                    }
+                    kind if kind.is_user_visible() => {
+                        has_source = true;
+                        self.push_definition(definition);
+                    }
+                    _ => self.is_complete = false,
+                }
+            }
+            self.is_complete &= has_source;
+        }
+        self
     }
 
     fn from_place_load_source(
@@ -190,5 +250,49 @@ impl<'db> DefinitionResolution<'db> {
         self.is_complete &= other.is_complete;
         self.may_be_deleted |= other.may_be_deleted;
         self.crosses_scope_declaration |= other.crosses_scope_declaration;
+    }
+}
+
+/// Accumulates the definitions and flags from sources visited during name inference.
+pub(crate) struct DefinitionResolutionBuilder<'db> {
+    resolution: DefinitionResolution<'db>,
+}
+
+impl<'db> DefinitionResolutionBuilder<'db> {
+    pub(crate) fn new() -> Self {
+        Self {
+            resolution: DefinitionResolution {
+                definitions: SmallVec::new(),
+                is_complete: true,
+                may_be_deleted: false,
+                crosses_scope_declaration: false,
+            },
+        }
+    }
+
+    pub(crate) fn add_source(
+        &mut self,
+        db: &'db dyn Db,
+        environment: &ProgramEnvironment<'db>,
+        scope: ScopeId<'db>,
+        source: &PlaceLoadSource<'db>,
+    ) {
+        self.resolution
+            .extend(DefinitionResolution::from_place_load_source(
+                db,
+                environment,
+                scope,
+                source,
+            ));
+    }
+
+    pub(crate) fn mark_incomplete(&mut self) {
+        self.resolution.is_complete = false;
+    }
+
+    pub(crate) fn finish(mut self, crosses_scope_declaration: bool) -> DefinitionResolution<'db> {
+        self.resolution.crosses_scope_declaration |= crosses_scope_declaration;
+        self.resolution.definitions.shrink_to_fit();
+        self.resolution
     }
 }

@@ -17,7 +17,7 @@ use crate::{
             hint_if_stdlib_attribute_exists_on_other_versions,
             hint_if_stdlib_submodule_exists_on_other_versions,
         },
-        infer::TypeInferenceBuilder,
+        infer::{InferenceRegion, TypeInferenceBuilder},
         infer_definition_types,
     },
 };
@@ -389,6 +389,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 self.extend_definition(*definition, inferred);
+                self.extend_reaching_definitions(InferenceRegion::Definition(*definition));
             }
 
             // Star imports can have no definitions, and cycle recovery can omit bindings.
