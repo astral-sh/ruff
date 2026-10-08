@@ -2381,18 +2381,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         let supports_ordered_refinement = |signature: &Signature<'db>| {
             !signature.is_paramspec_value()
                 && signature.parameters().kind() == ParametersKind::Standard
-                && signature.parameters().iter().all(|parameter| {
-                    matches!(
-                        parameter.kind(),
-                        ParameterKind::PositionalOnly {
-                            default_type: None,
-                            ..
-                        } | ParameterKind::PositionalOrKeyword {
-                            default_type: None,
-                            ..
-                        }
-                    )
-                })
+                && signature
+                    .parameters()
+                    .iter()
+                    .all(|parameter| parameter.is_positional() && !parameter.has_default())
                 && signature
                     .parameters()
                     .iter()
