@@ -485,6 +485,12 @@ pub(crate) fn infer_complete_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
 ) -> &'db ScopeInference<'db> {
+    let scope = complete_inference_scope(db, scope);
+    infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
+}
+
+/// Returns the scope that supplies the type context needed to infer `scope`.
+fn complete_inference_scope<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeId<'db> {
     // Scopes that may require type context are inferred during the inference of
     // their outer scope.
     if scope.accepts_type_context(db) {
@@ -494,11 +500,11 @@ pub(crate) fn infer_complete_scope_types<'db>(
         if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
             // Note that nested lambdas or comprehensions may require recursing until we reach
             // an outer scope that is independent of any type context.
-            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, program_file));
+            return complete_inference_scope(db, parent_scope.to_scope_id(db, program_file));
         }
     }
 
-    infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
+    scope
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
