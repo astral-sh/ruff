@@ -252,8 +252,7 @@ pub fn watch_paths(db: &dyn Db, project: Project) -> WatchPaths {
         .map(UvMetadata::workspace_root);
     let virtual_environment = project
         .program_settings(db)
-        .virtual_environment
-        .as_deref()
+        .virtual_environment()
         .filter(|environment| !environment.starts_with(project_path));
 
     // Watch the workspace and project roots and any paths provided by the user on the CLI.

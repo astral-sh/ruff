@@ -327,6 +327,10 @@ mod tests {
         Rule::RuntimeImportInTypeCheckingBlock,
         Path::new("runtime_evaluated_decorators_4.py")
     )]
+    #[test_case(
+        Rule::RuntimeImportInTypeCheckingBlock,
+        Path::new("runtime_evaluated_decorators_5.py")
+    )]
     fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

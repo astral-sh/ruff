@@ -70,10 +70,12 @@ impl Combine for UseUv {
     }
 }
 
-/// Host variables needed by uv integration tests to find executables, Python installations, and caches.
+/// Environment variables for uv integration tests.
 ///
 /// Tests use this allowlist after clearing the inherited environment so host settings such as
-/// `UV_LOCKED` and `PYTHONPATH` cannot affect subprocesses.
+/// `UV_LOCKED` and `PYTHONPATH` cannot affect subprocesses, while retaining executable, Python,
+/// and cache discovery. A fixed resolution cutoff prevents tests from executing newly published
+/// packages, including build dependencies.
 #[allow(
     clippy::disallowed_methods,
     reason = "Test only code, intentionally inherit variables from the host's environment."
@@ -94,6 +96,7 @@ pub fn uv_test_env_vars() -> impl Iterator<Item = (&'static str, String)> {
     ]
     .into_iter()
     .filter_map(|name| std::env::var(name).ok().map(|value| (name, value)))
+    .chain([("UV_EXCLUDE_NEWER", "2026-09-22T00:00:00Z".to_owned())])
 }
 
 #[cfg(test)]

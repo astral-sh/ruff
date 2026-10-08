@@ -58,18 +58,18 @@ Preserve useful human-written comments unless the code change makes them inaccur
 
 ## Running Tests
 
-Run all tests (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
+File-watcher tests rely on operating-system events that some execution environments do not deliver. Do not run tests that depend on these events in a Codex sandbox or another sandbox where these events may not be delivered; for example, the `ty` crate's `file_watching` integration tests can time out waiting for them. The commands below exclude that test binary. It is usually unnecessary to run file-watcher tests locally before filing a change unless you are certain that the change affects file-watching behavior. To run the `file_watching` binary, use an environment that delivers file-watcher events and run `cargo nextest run -p ty --test file_watching` or `cargo test -p ty --test file_watching`, using the snapshot environment variables shown below.
+
+Run the workspace tests except `file_watching` (using `nextest` for faster execution and setting `INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1` to ensure all snapshots are updated):
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run --workspace -E 'not binary(=file_watching)'
 ```
 
-File-watcher tests do not work inside the sandbox. It is usually unnecessary to run them locally before filing a change unless you are certain that the change affects file-watching behavior.
-
-Run tests for a specific crate:
+Run tests for a specific crate. Keep the filter when substituting another crate, including `ty`:
 
 ```sh
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic -E 'not binary(=file_watching)'
 ```
 
 Run a single mdtest file. The path to the mdtest file should be relative to the `crates/ty_python_semantic/resources/mdtest` folder. Include `--test mdtest` to avoid building unrelated test binaries:
@@ -86,12 +86,19 @@ MDTEST_TEST_FILTER="<filter>" INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDA
 
 ### Fallback without nextest
 
-If `cargo nextest` is not available, use `cargo test` with the same environment variables:
+If `cargo nextest` is not available, use `cargo test` with the same environment variables. For the workspace, exclude `ty` and then run its other test targets explicitly. If new non-watcher test targets are added to `ty`, add them to the `ty` command below; `cargo metadata --no-deps --format-version 1` lists each crate's targets:
 
 ```sh
-# Run all tests.
-INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test
+# Run workspace tests outside the ty crate.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test --workspace --exclude ty
 
+# Run ty tests except file_watching.
+INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty --lib --bins --test cli --test self_environment
+```
+
+To run tests for one crate, use the `ty` command above for `ty`; for other crates, use:
+
+```sh
 # Run tests for a specific crate.
 INSTA_FORCE_PASS=1 INSTA_UPDATE=always MDTEST_UPDATE_SNAPSHOTS=1 cargo test -p ty_python_semantic
 

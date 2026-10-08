@@ -1223,6 +1223,59 @@ reveal_type(generic_context(into_regular_callable(A)))
 reveal_type(A(x=1))  # revealed: A[int]
 ```
 
+### Inherited dataclass converters
+
+A subclass specializes an inherited converter's input type for its synthesized methods and attribute
+assignments.
+
+```py
+from typing import Any, Callable, dataclass_transform
+
+def field(*, converter: Callable[..., Any]) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@model
+class Base[T]:
+    @staticmethod
+    def convert(value: T) -> T:
+        return value
+
+    value: T = field(converter=convert)
+
+@model
+class Child(Base[str]): ...
+
+reveal_type(Child.__init__)  # revealed: (self: Child, value: str) -> None
+child = Child("a")
+reveal_type(child.value)  # revealed: str
+Child(1)  # error: [invalid-argument-type]
+
+child.value = "b"  # no diagnostic
+child.value = 1  # error: [invalid-assignment]
+
+reveal_type(Child.__replace__)  # revealed: (self: Child, *, value: str = ...) -> Child
+child.__replace__(value="b")  # no diagnostic
+child.__replace__(value=1)  # error: [invalid-argument-type]
+```
+
+Specialization also propagates through an intermediate generic subclass with a nested field type.
+
+```py
+@model
+class Nested[U](Base[list[U]]): ...
+
+@model
+class Indirect(Nested[str]): ...
+
+reveal_type(Indirect.__init__)  # revealed: (self: Indirect, value: list[str]) -> None
+indirect = Indirect(["a"])
+Indirect([1])  # error: [invalid-argument-type]
+indirect.value = ["b"]  # no diagnostic
+indirect.value = [1]  # error: [invalid-assignment]
+```
+
 ### Class typevar has another typevar as a default
 
 ```py
@@ -2142,6 +2195,219 @@ class Impl[S, R](A[S, R]):
 reveal_type(generic_context(A.get))  # revealed: ty_extensions._internal.GenericContext[Self@get]
 reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.GenericContext[Self@merge, R2@merge]
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
+```
+
+### Recursive protocol intersections
+
+Specializing a recursive protocol method preserves the nested intersection through repeated calls.
+Regression test for <https://github.com/astral-sh/ty/issues/4099>.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+from ty_extensions import Intersection, Not
+
+class A[T](Protocol):
+    def make_invariant(self, value: T) -> T: ...
+    def cause_problems(self) -> A[Intersection[Not[A[T]], A[str]]]: ...
+
+def foo[T](x: A[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[T@foo]]
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[A[str] & ~A[A[str] & ~A[T@foo]]]
+```
+
+Inherited methods also preserve the specialization supplied by their generic base.
+
+```py
+class Nested[T](A[list[T]], Protocol): ...
+
+def inherited[T](x: Nested[T]):
+    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
+```
+
+## Recursive protocol members introduced by type arguments
+
+A property declared as `T` can become recursive after specialization. Finite overloaded requirements
+must be compared before expanding such a property. The `combine` overloads grow both the number of
+alternatives and the recursive type argument on each call.
+
+```py
+from __future__ import annotations
+from typing import Protocol, overload
+
+class S[T](Protocol):
+    @overload
+    def combine[U1](self, v1: U1, /) -> S[T | U1]: ...
+    @overload
+    def combine[U1, U2](self, v1: U1, v2: U2, /) -> S[T | U1 | U2]: ...
+    @overload
+    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> S[T | U1 | U2 | U3]: ...
+    @overload
+    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> S[T | U1 | U2 | U3 | U4]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> S[T | U1 | U2 | U3 | U4 | U5]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
+    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6, U7](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
+    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
+    def combine(self, *values: object) -> S[object]: ...
+
+class D[T](Protocol):
+    @overload
+    def combine[U1](self, v1: U1, /) -> D[T | U1]: ...
+    @overload
+    def combine[U1, U2](self, v1: U1, v2: U2, /) -> D[T | U1 | U2]: ...
+    @overload
+    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> D[T | U1 | U2 | U3]: ...
+    @overload
+    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> D[T | U1 | U2 | U3 | U4]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> D[T | U1 | U2 | U3 | U4 | U5]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
+    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
+    @overload
+    def combine[U1, U2, U3, U4, U5, U6, U7](
+        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
+    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
+    def combine(self, *values: object) -> D[object]: ...
+
+class Source[T](Protocol):
+    @property
+    def a(self) -> T: ...
+    @overload
+    def z(self, v: int) -> int: ...
+    @overload
+    def z(self, v: str) -> str: ...
+    def z(self, v: int | str) -> int | str: ...
+
+class Target[T](Protocol):
+    @property
+    def a(self) -> T: ...
+    @overload
+    def z(self, v: int) -> str: ...
+    @overload
+    def z(self, v: str) -> int: ...
+    def z(self, v: int | str) -> int | str: ...
+
+def f(x: Source[S[int]]) -> Target[D[int]]:
+    return x  # error: [invalid-return-type]
+```
+
+## Specializing descriptor overloads on protocols
+
+A descriptor can select different overloads for different protocol specializations. We specialize
+its declaration before resolving the member type required by the protocol.
+
+```py
+from __future__ import annotations
+from typing import Callable, Protocol, overload
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to
+
+class Descriptor[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> str: ...
+    @overload
+    def __get__(self: Descriptor[str], instance: object, owner: type | None = None) -> bytes: ...
+    def __get__(self, instance: object, owner: type | None = None) -> str | bytes:
+        raise NotImplementedError
+
+class HasValue[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+class BytesValue:
+    @property
+    def value(self) -> bytes:
+        return b"value"
+
+static_assert(is_assignable_to(BytesValue, HasValue[str]))
+static_assert(not is_assignable_to(BytesValue, HasValue[int]))
+```
+
+## Inferring through specialization-dependent protocol descriptors
+
+The descriptor's general overload refers back to `P`, but `P[int].value` is finite. Callback
+inference retains that specialized requirement when it omits recursive protocol members.
+
+```py
+from __future__ import annotations
+from typing import Callable, Protocol, overload
+
+class Descriptor[T]:
+    def __init__(self, getter: Callable[..., T]) -> None: ...
+    @overload
+    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> int: ...
+    @overload
+    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]: ...
+    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]:
+        raise NotImplementedError
+
+class P[T](Protocol):
+    @Descriptor
+    def value(self) -> T: ...
+
+def consume(value: P[int]) -> None: ...
+def infer[T](callback: Callable[[P[T]], None]) -> T:
+    raise NotImplementedError
+
+reveal_type(infer(consume))  # revealed: int
+```
+
+## Specializing protocol attributes to methods
+
+An attribute specialized to a function is checked as a method. The bound signatures match even
+though their unbound receivers have different types.
+
+```py
+from typing import Protocol, cast
+
+def method(self: object) -> int:
+    return 1
+
+class HasMethod[T](Protocol):
+    method: T = cast(T, method)
+
+class Concrete:
+    def method(self) -> int:
+        return 1
+
+def preserve[T](value: HasMethod[T], signature: T) -> HasMethod[T]:
+    return value
+
+reveal_type(preserve(Concrete(), method).method())  # revealed: int
+```
+
+## Specializing protocol attributes to callbacks
+
+A member specialized to an ordinary `__call__` method describes the candidate's call signature. A
+class's `__call__` attribute does not determine what constructing that class returns.
+
+```py
+from typing import Protocol, cast
+
+def call(self: object) -> int:
+    return 1
+
+class Callback[T](Protocol):
+    __call__: T = cast(T, call)
+
+class Concrete:
+    @staticmethod
+    def __call__() -> int:
+        return 1
+
+def preserve[T](value: Callback[T], signature: T) -> Callback[T]:
+    return value
+
+result: int = preserve(Concrete, call)()  # error: [invalid-argument-type]
 ```
 
 ## Subscripting non-generic classes

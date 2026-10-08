@@ -129,7 +129,8 @@ mod variables;
 
 use paths::PathAssignments;
 use solutions::{Polarity, SolutionWalker};
-use variables::{Constraint, ConstraintProvenance};
+use variables::Constraint;
+pub(crate) use variables::ConstraintProvenance;
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -438,6 +439,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
@@ -448,20 +450,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             // TypeVarEquivalenceBound, we'll intern the left/right typevars in a builder-specific
             // stable order.
             storage.intern_typevar(db, typevar);
-            let constraints = Constraint::new_equivalence_bound(
-                db,
-                env,
-                ConstraintProvenance::Evidence,
-                typevar,
-                lower,
-            );
+            let constraints =
+                Constraint::new_equivalence_bound(db, env, provenance, typevar, lower);
             let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
             return Self::from_node(builder, node, source_order);
         }
 
         let constraints = iter::chain(
-            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, lower),
-            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, upper),
+            Constraint::new_lower_bound(db, provenance, typevar, lower),
+            Constraint::new_upper_bound(db, env, provenance, typevar, upper),
         );
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
@@ -472,12 +469,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let constraints =
-            Constraint::new_lower_bound(db, ConstraintProvenance::Evidence, typevar, lower);
+        let constraints = Constraint::new_lower_bound(db, provenance, typevar, lower);
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
@@ -487,12 +484,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
         let mut storage = builder.storage.borrow_mut();
-        let constraints =
-            Constraint::new_upper_bound(db, env, ConstraintProvenance::Evidence, typevar, upper);
+        let constraints = Constraint::new_upper_bound(db, env, provenance, typevar, upper);
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
@@ -502,6 +499,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         builder: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
         typevar: BoundTypeVarInstance<'db>,
         bound: Type<'db>,
     ) -> Self {
@@ -510,13 +508,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         // TypeVarEquivalenceBound, we'll intern the left/right typevars in a builder-specific
         // stable order.
         storage.intern_typevar(db, typevar);
-        let constraints = Constraint::new_equivalence_bound(
-            db,
-            env,
-            ConstraintProvenance::Evidence,
-            typevar,
-            bound,
-        );
+        let constraints = Constraint::new_equivalence_bound(db, env, provenance, typevar, bound);
         let (node, source_order) = Constraint::new_nodes(db, env, &mut storage, constraints);
         Self::from_node(builder, node, source_order)
     }
@@ -774,19 +766,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         Self::from_node(builder, node, source_order)
     }
 
-    /// Recursively marks the constraint set as providing validity constraints.
-    pub(crate) fn with_validity_bounds(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-    ) -> Self {
-        self.map_constraints(|constraint| {
-            constraint
-                .with_provenance(ConstraintProvenance::Validity)
-                .new_node(db, env, &mut self.builder.storage.borrow_mut())
-        })
-    }
-
     /// Applies a type mapping to every constraint in this constraint set.
     pub(crate) fn apply_type_mapping_impl(
         self,
@@ -794,15 +773,6 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         type_mapping: &TypeMapping<'_, 'db>,
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        self.map_constraints(|constraint| {
-            constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor)
-        })
-    }
-
-    fn map_constraints(
-        self,
-        mut map: impl FnMut(Constraint<'db>) -> (NodeId, Option<SourceOrderId>),
     ) -> Self {
         fn rebuild_node(
             storage: &mut ConstraintSetStorage<'_>,
@@ -843,7 +813,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
 
         // We have to collect this into a temporary vec since we can't hold an open borrow on the
-        // storage during the map calls below, since they also need to borrow the storage.
+        // storage during the apply_type_mapping calls below, since they also need to borrow the
+        // storage.
         let storage = self.builder.storage.borrow();
         let mut constraints = SmallVec::<[_; 8]>::new();
         self.node
@@ -859,7 +830,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
         let mut mapped_constraints = FxHashMap::default();
         for (constraint_id, constraint) in constraints {
-            mapped_constraints.insert(constraint_id, map(constraint));
+            mapped_constraints.insert(
+                constraint_id,
+                constraint.apply_type_mapping_impl(db, self.builder, type_mapping, tcx, visitor),
+            );
         }
 
         let mut storage = self.builder.storage.borrow_mut();
@@ -1298,6 +1272,19 @@ impl<'db> ConstraintSetBuilder<'db> {
         let (node, source_order) = storage.load(db, env, other);
         ConstraintSet::from_node(self, node, source_order)
     }
+
+    /// Loads an owned constraint set, replacing the provenance of every constraint.
+    pub(crate) fn load_with_provenance<'c>(
+        &'c self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &OwnedConstraintSet<'db>,
+        provenance: ConstraintProvenance,
+    ) -> ConstraintSet<'db, 'c> {
+        let mut storage = self.storage.borrow_mut();
+        let (node, source_order) = storage.load_with_provenance(db, env, other, Some(provenance));
+        ConstraintSet::from_node(self, node, source_order)
+    }
 }
 
 impl<'db> ConstraintSetStorage<'db> {
@@ -1652,6 +1639,16 @@ impl<'db> ConstraintSetStorage<'db> {
         env: &ProgramEnvironment<'db>,
         other: &OwnedConstraintSet<'db>,
     ) -> (NodeId, Option<SourceOrderId>) {
+        self.load_with_provenance(db, env, other, None)
+    }
+
+    fn load_with_provenance(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: &OwnedConstraintSet<'db>,
+        provenance: Option<ConstraintProvenance>,
+    ) -> (NodeId, Option<SourceOrderId>) {
         fn rebuild_node<'db>(
             storage: &mut ConstraintSetStorage<'db>,
             inner: &OwnedConstraintSetInner<'db>,
@@ -1710,7 +1707,12 @@ impl<'db> ConstraintSetStorage<'db> {
         let constraints: Box<[_]> = inner
             .constraints
             .iter()
-            .map(|old_constraint| old_constraint.new_node(db, env, self))
+            .map(|old_constraint| {
+                let constraint = provenance.map_or(*old_constraint, |provenance| {
+                    old_constraint.with_provenance(provenance)
+                });
+                constraint.new_node(db, env, self)
+            })
             .collect();
 
         let mut source_orders = vec![None; inner.source_orders.len()];
@@ -4805,7 +4807,14 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let env = db.program_environment();
         let ty = bound.to_instance(db, &env);
-        ConstraintSet::constrain_typevar_equivalence_bound(db, &env, builder, bound_typevar, ty)
+        ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            builder,
+            ConstraintProvenance::Evidence,
+            bound_typevar,
+            ty,
+        )
     }
 
     fn create_constraint_set_with_bounds<'db, 'c>(
@@ -4818,15 +4827,31 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         match (lower, upper) {
             (None, None) => ConstraintSet::from_bool(builder, true),
-            (Some(lower), None) => {
-                ConstraintSet::constrain_typevar_lower_bound(db, env, builder, typevar, lower)
-            }
-            (None, Some(upper)) => {
-                ConstraintSet::constrain_typevar_upper_bound(db, env, builder, typevar, upper)
-            }
-            (Some(lower), Some(upper)) => {
-                ConstraintSet::constrain_typevar(db, env, builder, typevar, lower, upper)
-            }
+            (Some(lower), None) => ConstraintSet::constrain_typevar_lower_bound(
+                db,
+                env,
+                builder,
+                ConstraintProvenance::Evidence,
+                typevar,
+                lower,
+            ),
+            (None, Some(upper)) => ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                env,
+                builder,
+                ConstraintProvenance::Evidence,
+                typevar,
+                upper,
+            ),
+            (Some(lower), Some(upper)) => ConstraintSet::constrain_typevar(
+                db,
+                env,
+                builder,
+                ConstraintProvenance::Evidence,
+                typevar,
+                lower,
+                upper,
+            ),
         }
     }
 
@@ -4876,8 +4901,14 @@ mod tests {
         let u = create_typevar(db, "U");
         let builder = ConstraintSetBuilder::new();
         let list_of_u = KnownClass::List.to_specialized_instance(db, &env, &[Type::TypeVar(u)]);
-        let set =
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, t, list_of_u);
+        let set = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Evidence,
+            t,
+            list_of_u,
+        );
 
         let int = KnownClass::Int.to_instance(db, &env);
         let mapped = set.apply_type_mapping_impl(
@@ -4887,8 +4918,14 @@ mod tests {
             &ApplyTypeMappingVisitor::new(&env),
         );
         let list_of_int = KnownClass::List.to_specialized_instance(db, &env, &[int]);
-        let expected =
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &builder, t, list_of_int);
+        let expected = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Evidence,
+            t,
+            list_of_int,
+        );
 
         assert!(
             mapped
@@ -4932,8 +4969,14 @@ mod tests {
         assert!(support.is_complete());
 
         let builder = ConstraintSetBuilder::new();
-        let constraint =
-            ConstraintSet::constrain_typevar_upper_bound(db, &env, &builder, t, actual_bound);
+        let constraint = ConstraintSet::constrain_typevar_upper_bound(
+            db,
+            &env,
+            &builder,
+            ConstraintProvenance::Evidence,
+            t,
+            actual_bound,
+        );
         assert!(constraint.mentions_typevar(t));
         assert!(constraint.mentions_typevar(u));
         assert!(!constraint.mentions_typevar(metadata));
@@ -5528,6 +5571,7 @@ class E: ...
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -5535,6 +5579,7 @@ class E: ...
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -5560,6 +5605,7 @@ class E: ...
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -5567,6 +5613,7 @@ class E: ...
             db,
             &env,
             &builder,
+            ConstraintProvenance::Evidence,
             t,
             KnownClass::Int.to_instance(db, &env),
         );
@@ -5665,7 +5712,15 @@ class E: ...
         let lower = Type::heterogeneous_tuple(db, &env, [Type::any(), str]);
         let upper = Type::heterogeneous_tuple(db, &env, [int, int]);
         let owned = ConstraintSetBuilder::new().into_owned(|builder| {
-            ConstraintSet::constrain_typevar(db, &env, builder, t, lower, upper)
+            ConstraintSet::constrain_typevar(
+                db,
+                &env,
+                builder,
+                ConstraintProvenance::Evidence,
+                t,
+                lower,
+                upper,
+            )
         });
 
         // The answer must not depend on which inferable set was queried first.
@@ -6510,7 +6565,14 @@ class E: ...
         let original = ConstraintSetBuilder::new().into_owned(|builder| {
             let _unused_t_int = create_constraint(db, builder, t, KnownClass::Int);
             let _unused_str = create_constraint(db, builder, unused, KnownClass::Str);
-            ConstraintSet::constrain_typevar_upper_bound(db, &env, builder, t, Type::TypeVar(u))
+            ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                &env,
+                builder,
+                ConstraintProvenance::Evidence,
+                t,
+                Type::TypeVar(u),
+            )
         });
         let reloaded =
             ConstraintSetBuilder::new().into_owned(|builder| builder.load(db, &env, &original));
@@ -6535,7 +6597,14 @@ class E: ...
         let t = create_typevar(db, "T");
         let u = create_typevar(db, "U");
         let source = ConstraintSetBuilder::new().into_owned(|builder| {
-            ConstraintSet::constrain_typevar_upper_bound(db, &env, builder, t, Type::TypeVar(u))
+            ConstraintSet::constrain_typevar_upper_bound(
+                db,
+                &env,
+                builder,
+                ConstraintProvenance::Evidence,
+                t,
+                Type::TypeVar(u),
+            )
         });
         let destination = ConstraintSetBuilder::new()
             .into_owned(|builder| create_constraint(db, builder, u, KnownClass::Int));
@@ -6547,6 +6616,7 @@ class E: ...
                 db,
                 &env,
                 builder,
+                ConstraintProvenance::Evidence,
                 t,
                 Type::TypeVar(u),
             );
@@ -6655,6 +6725,7 @@ class E: ...
                 db,
                 &env,
                 builder,
+                ConstraintProvenance::Evidence,
                 u,
                 Type::TypeVar(t),
             );
@@ -6794,8 +6865,14 @@ class E: ...
         for (lower, upper) in [(Some(str), Some(str)), (None, Some(Type::any()))] {
             let mut expected = None;
             let owned = ConstraintSetBuilder::new().into_owned(|builder| {
-                let earlier =
-                    ConstraintSet::constrain_typevar_lower_bound(db, &env, builder, t, int);
+                let earlier = ConstraintSet::constrain_typevar_lower_bound(
+                    db,
+                    &env,
+                    builder,
+                    ConstraintProvenance::Evidence,
+                    t,
+                    int,
+                );
                 let later = create_constraint_set_with_bounds(db, &env, builder, t, lower, upper);
                 let absorbed = earlier.or(db, builder, || later).and(db, builder, || later);
                 expected = Some(
@@ -6809,7 +6886,14 @@ class E: ...
 
             let builder = ConstraintSetBuilder::new();
             let reloaded = builder.load(db, &env, &owned);
-            let earlier = ConstraintSet::constrain_typevar_lower_bound(db, &env, &builder, t, int);
+            let earlier = ConstraintSet::constrain_typevar_lower_bound(
+                db,
+                &env,
+                &builder,
+                ConstraintProvenance::Evidence,
+                t,
+                int,
+            );
             assert_eq!(
                 Some(
                     reloaded

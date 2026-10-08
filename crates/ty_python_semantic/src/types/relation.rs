@@ -7,8 +7,8 @@ use rustc_hash::FxHashSet;
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
-    ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
-    OwnedConstraintSet,
+    ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
+    OptionConstraintsExtension, OwnedConstraintSet,
 };
 use crate::types::cyclic::{HasIdentity, PairVisitor, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
@@ -337,6 +337,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Subtyping,
             TypeVarEvaluation::Lazy,
+            ConstraintProvenance::Evidence,
         )
     }
 
@@ -405,6 +406,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(relation)),
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&builder),
             disjointness_visitor: &IsDisjointVisitor::default(&builder),
@@ -449,6 +451,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Subtyping,
                     TypeVarEvaluation::Lazy,
+                    ConstraintProvenance::Evidence,
                 )
                 .is_always_satisfied(db, &env, TypeVarSet::None)
         }
@@ -586,6 +589,7 @@ impl<'db> Type<'db> {
                     TypeVarSet::None,
                     TypeRelation::Assignability,
                     TypeVarEvaluation::Lazy,
+                    ConstraintProvenance::Evidence,
                 )
             })
         }
@@ -608,6 +612,23 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        self.when_constraint_set_assignable_to_with_provenance(
+            db,
+            env,
+            target,
+            constraints,
+            ConstraintProvenance::Evidence,
+        )
+    }
+
+    pub(super) fn when_constraint_set_assignable_to_with_provenance<'c>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        provenance: ConstraintProvenance,
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_with_typevar_evaluation(
             db,
             env,
@@ -616,6 +637,7 @@ impl<'db> Type<'db> {
             TypeVarSet::None,
             TypeRelation::Assignability,
             TypeVarEvaluation::Lazy,
+            provenance,
         )
     }
 
@@ -697,6 +719,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             TypeVarEvaluation::Eager,
+            ConstraintProvenance::Evidence,
         )
     }
 
@@ -710,6 +733,7 @@ impl<'db> Type<'db> {
         inferable: TypeVarSet<'db>,
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
+        provenance: ConstraintProvenance,
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
@@ -722,6 +746,7 @@ impl<'db> Type<'db> {
             relation,
             typevar_evaluation,
             context_tree: None,
+            provenance,
             perform_expensive_checks: true,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
@@ -855,6 +880,7 @@ impl<'db> Type<'db> {
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             typevar_evaluation,
             relation_visitor: &relation_visitor,
@@ -908,6 +934,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -931,6 +958,7 @@ impl<'db> Type<'db> {
             constraints: &constraints,
             inferable: TypeVarSet::None,
             context_tree: Some(context.clone()),
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             relation_visitor: &HasRelationToVisitor::default(&constraints),
             disjointness_visitor: &IsDisjointVisitor::default(&constraints),
@@ -961,6 +989,7 @@ impl<'db> Type<'db> {
             constraints,
             inferable,
             context_tree: None,
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: false,
             disjointness_visitor: &disjointness_visitor,
             relation_visitor: &relation_visitor,
@@ -1030,6 +1059,7 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) inferable: TypeVarSet<'db>,
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
+    pub(super) provenance: ConstraintProvenance,
     context_tree: Option<ErrorContextTree<'db>>,
     perform_expensive_checks: bool,
 
@@ -1065,6 +1095,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: None,
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1132,6 +1163,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1155,6 +1187,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             relation_visitor,
             disjointness_visitor,
@@ -1178,17 +1211,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         target: ClassType<'db>,
     ) -> bool {
         let env = self.env;
-        Self::subtyping(
-            env,
-            self.constraints,
-            TypeVarSet::None,
-            self.relation_visitor,
-            self.disjointness_visitor,
-            self.signature_relation_visitor,
-            self.materialization_visitor,
-        )
-        .check_class_pair(db, source, target)
-        .is_always_satisfied(db, env, TypeVarSet::None)
+        let checker = Self {
+            provenance: self.provenance,
+            ..Self::subtyping(
+                env,
+                self.constraints,
+                TypeVarSet::None,
+                self.relation_visitor,
+                self.disjointness_visitor,
+                self.signature_relation_visitor,
+                self.materialization_visitor,
+            )
+        };
+        checker
+            .check_class_pair(db, source, target)
+            .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
     pub(super) const fn is_eager_assignability(&self) -> bool {
@@ -1721,6 +1758,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     db,
                     env,
                     self.constraints,
+                    self.provenance,
                     bound_typevar,
                     upper,
                 );
@@ -1734,6 +1772,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     db,
                     env,
                     self.constraints,
+                    self.provenance,
                     bound_typevar,
                     lower,
                 );
@@ -1937,6 +1976,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.check_type_pair(db, converter_output_type, target)
                             })
                     })
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(source)),
+                Type::KnownInstance(KnownInstanceType::Annotated(target)),
+            ) if source.inner(db).is_recursive_divergent()
+                || target.inner(db).is_recursive_divergent() =>
+            {
+                // Recursive inference preserves an Annotated object while replacing its wrapped
+                // type with Divergent. That approximation must accept another unfolding of the
+                // object, without making distinct concrete Annotated values interchangeable.
+                self.check_relation_in_invariant_position(
+                    db,
+                    source.inner(db),
+                    None,
+                    target.inner(db),
+                    None,
+                )
             }
 
             // The read-only `__func__` and `__wrapped__` attributes expose the complete wrapped
@@ -2962,6 +3019,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
+            provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
@@ -2977,6 +3035,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
+            provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -3007,6 +3066,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     env: &'a ProgramEnvironment<'db>,
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
+    provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
     typevar_evaluation: TypeVarEvaluation,
 
@@ -3033,6 +3093,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             typevar_evaluation: self.typevar_evaluation,
             constraints: self.constraints,
             context_tree: None,
+            provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             inferable: TypeVarSet::None,
             relation_visitor: self.relation_visitor,
@@ -3077,6 +3138,7 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     pub(super) constraints: &'c ConstraintSetBuilder<'db>,
     pub(super) inferable: TypeVarSet<'db>,
     context_tree: Option<ErrorContextTree<'db>>,
+    provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
 
     // N.B. these fields are private to reduce the risk of
@@ -3106,6 +3168,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints,
             inferable,
             context_tree: None,
+            provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             disjointness_visitor,
             relation_visitor,
@@ -3125,6 +3188,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
+            provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
@@ -3163,6 +3227,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         EquivalenceChecker {
             env: self.env,
             constraints: self.constraints,
+            provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
             relation_visitor: self.relation_visitor,
@@ -3265,22 +3330,33 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         other: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.with_recursion_guard(db, left, right, || {
-            intersection
-                .positive(db)
-                .iter()
-                .when_any(db, self.constraints, |&pos_ty| {
-                    self.check_type_pair(db, pos_ty, other)
-                })
-                // A & B & Not[C] is disjoint from C
-                .or(db, self.constraints, || {
-                    intersection
-                        .negative(db)
-                        .iter()
-                        .when_any(db, self.constraints, |&neg_ty| {
-                            self.as_relation_checker(TypeRelation::Subtyping)
-                                .check_type_pair(db, other, neg_ty)
-                        })
-                })
+            let negative_elements = intersection.negative(db);
+            let subtyping_checker = self.as_relation_checker(TypeRelation::Subtyping);
+            (
+                // Test an exact exclusion before unrelated positive components. Gradual types
+                // need the full reflexive subtyping check: `Any` is not a subtype of itself.
+                ConstraintSet::from_bool(self.constraints, negative_elements.contains(&other)).and(
+                    db,
+                    self.constraints,
+                    || subtyping_checker.check_type_pair(db, other, other),
+                )
+            )
+            .or(db, self.constraints, || {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .when_any(db, self.constraints, |&pos_ty| {
+                        self.check_type_pair(db, pos_ty, other)
+                    })
+                    // A & B & Not[C] is disjoint from C
+                    .or(db, self.constraints, || {
+                        negative_elements
+                            .iter()
+                            .when_any(db, self.constraints, |&neg_ty| {
+                                subtyping_checker.check_type_pair(db, other, neg_ty)
+                            })
+                    })
+            })
         })
     }
 
@@ -3661,6 +3737,17 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     )
                 })
             }),
+
+            (
+                Type::KnownInstance(KnownInstanceType::Annotated(left)),
+                Type::KnownInstance(KnownInstanceType::Annotated(right)),
+            ) if left.inner(db).is_recursive_divergent()
+                || right.inner(db).is_recursive_divergent() =>
+            {
+                // A recursive approximation can represent the same Annotated object as a
+                // concrete unfolding, even though their wrapped types differ.
+                self.never()
+            }
 
             // These types are disjoint whenever their represented objects differ.
             (
@@ -4047,12 +4134,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 nontrivial_check(self, || {
                     class
                         .metaclass_instance_type(db, env)
-                        .when_subtype_of(
+                        .has_relation_to_with_typevar_evaluation(
                             db,
                             env,
                             Type::NominalInstance(instance),
                             self.constraints,
                             self.inferable,
+                            TypeRelation::Subtyping,
+                            TypeVarEvaluation::Eager,
+                            self.provenance,
                         )
                         .negate(db, self.constraints)
                 })
