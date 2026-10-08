@@ -17,6 +17,8 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
 use serde::Deserialize;
 
+use crate::{SNAPSHOT_PATH_DELIMITERS, looks_like_escape};
+
 /// Parse the Markdown `source` as a test suite with given `title`.
 ///
 /// `validate_config` is invoked once for every literally-declared `toml` config block
@@ -874,6 +876,34 @@ where
                     );
                 }
 
+                // Single-letter components remain allowed for existing fixtures such as `a/b/c.py`.
+                if let Some(component) = path.rsplit(['/', '\\']).find(|component| {
+                    !matches!(*component, "a" | "b" | "f" | "n" | "r" | "t" | "v")
+                        && looks_like_escape(component)
+                }) {
+                    bail!(
+                        "File path `{path}` in test `{test_name}` has a component `{component}`. \
+                         On Windows, `\\{component}` can be mistaken for an escape sequence in a snapshot. \
+                         Rename the component."
+                    );
+                }
+
+                let without_placeholder = path.replace("<path-to-site-packages>", "");
+                if let Some((_, character)) =
+                    without_placeholder.char_indices().find(|(index, c)| {
+                        c.is_whitespace()
+                            || (SNAPSHOT_PATH_DELIMITERS.contains(*c)
+                                && !(*c == ':'
+                                    && *index == 1
+                                    && without_placeholder.as_bytes()[0].is_ascii_alphabetic()))
+                    })
+                {
+                    bail!(
+                        "File path `{path}` in test `{test_name}` contains unsupported character \
+                         {character:?}. Remove it to make the path unambiguous in diagnostic snapshots."
+                    );
+                }
+
                 EmbeddedFilePath::Explicit(path)
             }
             None => match lang {
@@ -1121,6 +1151,7 @@ mod tests {
 
     use insta::assert_snapshot;
     use serde::Deserialize;
+    use test_case::test_case;
 
     use crate::parser::EmbeddedFilePath;
 
@@ -1583,6 +1614,68 @@ mod tests {
             err.to_string(),
             "Merged snippets in test `One` are not allowed in the presence of other files."
         );
+    }
+
+    /// Rejects fixture paths with components that resemble hexadecimal, Unicode, or octal escapes.
+    #[test_case("src/x64", "x64")]
+    #[test_case("src/x64.py", "x64.py")]
+    #[test_case("src/u200b.pyi", "u200b.pyi")]
+    #[test_case("src/U000e0001.py", "U000e0001.py")]
+    #[test_case("src/N{LATIN SMALL LETTER A}", "N{LATIN SMALL LETTER A}")]
+    #[test_case("src/2028", "2028")]
+    #[test_case("src/x64/module.py", "x64")]
+    #[test_case("src/2028/module.py", "2028")]
+    #[test_case("src\\x64", "x64"; "backslash separator")]
+    fn rejects_escape_like_paths(path: &str, component: &str) {
+        let source = format!("# Example\n\n`{path}`:\n\n```text\ncontents\n```\n");
+        let error = parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "File path `{path}` in test `Example` has a component `{component}`. \
+                 On Windows, `\\{component}` can be mistaken for an escape sequence in a snapshot. \
+                 Rename the component."
+            )
+        );
+    }
+
+    /// Rejects fixture paths containing characters that delimit paths in diagnostic snapshots.
+    #[test_case("src/parent(dir)/file.py", '(')]
+    #[test_case("src/file,name.py", ','; "comma")]
+    fn rejects_ambiguous_path_characters(path: &str, character: char) {
+        let source = format!("# Example\n\n`{path}`:\n\n```text\ncontents\n```\n");
+        let error = parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "File path `{path}` in test `Example` contains unsupported character \
+                 {character:?}. Remove it to make the path unambiguous in diagnostic snapshots."
+            )
+        );
+    }
+
+    /// Accepts common paths, including extensionless files and single-letter components.
+    #[test_case("a/b.py")]
+    #[test_case("a/b/module.py")]
+    #[test_case("src/n/file.py")]
+    #[test_case("src/n")]
+    #[test_case("src/script")]
+    #[test_case("src/namespace.py")]
+    #[test_case("src/@extra/module.py")]
+    #[test_case("src/9876/module.py")]
+    #[test_case("src/file_x64.py")]
+    #[test_case("/.venv/<path-to-site-packages>/module.py")]
+    #[test_case("C:/src/module.py")]
+    fn accepts_common_paths(path: &str) {
+        let source = format!("# Example\n\n`{path}`:\n\n```text\ncontents\n```\n");
+        let suite = parse("file.md", &source).expect("Should parse");
+        let [test] = &suite.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+        assert_eq!(file.relative_path(), path);
     }
 
     #[test]
@@ -2091,6 +2184,7 @@ mod tests {
         assert_eq!(file.code, "x = 1");
     }
 
+    /// Rejects a file path containing a space.
     #[test]
     fn path_with_space() {
         let source = dedent(
@@ -2103,17 +2197,12 @@ mod tests {
             ",
         );
 
-        let mf = parse("file.md", &source).unwrap();
-
-        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
-            panic!("expected one test");
-        };
-        let [file] = test.files().collect::<Vec<_>>()[..] else {
-            panic!("expected one file");
-        };
-
-        assert_eq!(file.relative_path(), "foo bar.py");
-        assert_eq!(file.code, "x = 1");
+        let error = parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            error.to_string(),
+            "File path `foo bar.py` in test `file.md` contains unsupported character ' '. \
+             Remove it to make the path unambiguous in diagnostic snapshots."
+        );
     }
 
     #[test]

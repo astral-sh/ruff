@@ -1,8 +1,12 @@
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
+use std::path::{Component, PathBuf};
+use std::sync::LazyLock;
 
 use camino::Utf8Path;
 use colored::Colorize;
+use path_slash::{PathBufExt, PathExt};
+use regex::Regex;
 use similar::{ChangeTag, TextDiff};
 
 use ruff_db::Db;
@@ -10,6 +14,7 @@ use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::File;
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::source::line_index;
+use ruff_db::system::SystemPath;
 use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange};
@@ -335,7 +340,12 @@ pub fn render_diagnostic(db: &dyn Db, tool_name: &'static str, diagnostic: &Diag
 fn render_diagnostics(db: &dyn Db, tool_name: &'static str, diagnostics: &[Diagnostic]) -> String {
     let mut rendered = String::new();
     for diag in diagnostics {
-        writeln!(rendered, "{}", render_diagnostic(db, tool_name, diag)).unwrap();
+        writeln!(
+            rendered,
+            "{}",
+            diag.display(&db, &diagnostic_display_config(tool_name))
+        )
+        .unwrap();
     }
 
     rendered.trim_end_matches('\n').to_string()
@@ -348,22 +358,115 @@ fn is_update_inline_snapshots_enabled() -> bool {
     *is_enabled
 }
 
-fn apply_snapshot_filters(rendered: &str) -> std::borrow::Cow<'_, str> {
-    static INLINE_SNAPSHOT_PATH_FILTER: std::sync::LazyLock<regex::Regex> =
-        std::sync::LazyLock::new(|| regex::Regex::new(r#"\\(\w\w|\.|")"#).unwrap());
-    INLINE_SNAPSHOT_PATH_FILTER.replace_all(rendered, "/$1")
+const SNAPSHOT_PATH_DELIMITERS: &str = "'\"`<>|:()[],;{}";
+
+/// The database, tool name, and search roots used when rendering diagnostic snapshots.
+///
+/// Search roots help identify paths in snapshot text, including paths that do not exist.
+pub struct SnapshotContext<'a> {
+    db: &'a dyn Db,
+    tool_name: &'static str,
+    search_roots: &'a [&'a SystemPath],
+}
+
+impl<'a> SnapshotContext<'a> {
+    pub const fn new(
+        db: &'a dyn Db,
+        tool_name: &'static str,
+        search_roots: &'a [&'a SystemPath],
+    ) -> Self {
+        Self {
+            db,
+            tool_name,
+            search_roots,
+        }
+    }
+
+    /// Replaces backslashes in recognized paths with forward slashes in diagnostic snapshots.
+    fn normalize_paths<'s>(&self, rendered: &'s str) -> std::borrow::Cow<'s, str> {
+        // Find potential paths in diagnostic text as runs of characters containing a backslash,
+        // bounded by whitespace or mdtest path delimiters. A drive prefix such as `C:` is allowed
+        // at the start.
+        static PATH: LazyLock<Regex> = LazyLock::new(|| {
+            let delimiters = regex::escape(SNAPSHOT_PATH_DELIMITERS);
+            Regex::new(&format!(
+                r"(?:[A-Za-z]:)?[^\s{delimiters}]*\\[^\s{delimiters}]*"
+            ))
+            .unwrap()
+        });
+
+        PATH.replace_all(rendered, |captures: &regex::Captures<'_>| {
+            let matched = &captures[0];
+            // Trailing periods can be punctuation following a path in a diagnostic message. Exclude
+            // them from the filesystem lookup and restore them after normalizing the path.
+            let candidate = matched.trim_end_matches('.');
+
+            // A lone backslash can be a Python line continuation.
+            if candidate == "\\" {
+                return matched.to_string();
+            }
+
+            // Interpret backslashes as path separators on the host platform before querying the
+            // test filesystem. Leave the text unchanged if it cannot be represented as a system path.
+            let path = PathBuf::from_backslash(candidate);
+            let Some(system_path) = SystemPath::from_std_path(&path) else {
+                return matched.to_string();
+            };
+
+            // Diagnostic paths can be relative to the current directory or a search root.
+            let system = self.db.system();
+            let exists = system.path_exists(system_path)
+                || self
+                    .search_roots
+                    .iter()
+                    .any(|root| system.path_exists(&root.join(system_path)))
+                // `VendoredFileSystem::exists` panics for paths with a root or drive prefix.
+                || (path.components().all(|component| {
+                    matches!(
+                        component,
+                        Component::Normal(_) | Component::CurDir | Component::ParentDir
+                    )
+                }) && self.db.vendored().exists(system_path.as_str()));
+
+            // For a candidate that doesn't exist, joining it to the current directory lets us check
+            // whether it starts with a search root. If it does start with a search root, we only
+            // normalize it if its components don't resemble Python escapes, such as `\x64` in the
+            // source text.
+            let absolute = system.current_directory().join(system_path);
+            let under_root = self
+                .search_roots
+                .iter()
+                .any(|root| absolute.starts_with(root));
+
+            if exists || (under_root && !candidate.split('\\').skip(1).any(looks_like_escape)) {
+                // `path-slash` can leave backslashes in Windows UNC prefixes; replace those too.
+                let normalized = path.to_slash_lossy().replace('\\', "/");
+                format!("{normalized}{}", &matched[candidate.len()..])
+            } else {
+                matched.to_string()
+            }
+        })
+    }
+}
+
+/// Recognizes path components that start with text resembling a Python escape after a backslash.
+fn looks_like_escape(component: &str) -> bool {
+    static ESCAPE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"^(?:x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|N\{|[0-7]|[abfnrtv](?:$|["'`]))"#)
+            .unwrap()
+    });
+    ESCAPE.is_match(component)
 }
 
 pub fn validate_inline_snapshot(
-    db: &dyn Db,
-    tool_name: &'static str,
+    context: &SnapshotContext<'_>,
     test_file: &TestFile<'_>,
     inline_diagnostics: &[Diagnostic],
     markdown_edits: &mut Vec<MarkdownEdit>,
     snapshot_filter: impl Fn(&str) -> String,
 ) -> Result<(), matcher::FailuresByLine> {
     let update_snapshots = is_update_inline_snapshots_enabled();
-    let line_index = line_index(db, test_file.file);
+    let line_index = line_index(context.db, test_file.file);
     let mut failures = matcher::FailuresByLine::default();
     let mut inline_diagnostics = inline_diagnostics;
 
@@ -419,8 +522,8 @@ pub fn validate_inline_snapshot(
             continue;
         };
 
-        let rendered = render_diagnostics(db, tool_name, block_diagnostics);
-        let actual = snapshot_filter(&apply_snapshot_filters(&rendered));
+        let rendered = render_diagnostics(context.db, context.tool_name, block_diagnostics);
+        let actual = snapshot_filter(&context.normalize_paths(&rendered));
 
         let Some(snapshot_code_block) = code_block.inline_snapshot_block() else {
             if update_snapshots {
@@ -536,7 +639,12 @@ fn create_diagnostic_snapshot<'d, C>(
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot, "mdtest name: {}", test.uncontracted_name()).unwrap();
-    writeln!(snapshot, "mdtest path: {relative_fixture_path}").unwrap();
+    writeln!(
+        snapshot,
+        "mdtest path: {}",
+        relative_fixture_path.as_std_path().to_slash_lossy()
+    )
+    .unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot).unwrap();
 
@@ -576,7 +684,12 @@ fn create_diagnostic_snapshot<'d, C>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", render_diagnostic(db, tool_name, diagnostic)).unwrap();
+        write!(
+            snapshot,
+            "{}",
+            diagnostic.display(&db, &diagnostic_display_config(tool_name))
+        )
+        .unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot
@@ -703,8 +816,7 @@ pub fn check_panic<C>(test: &MarkdownTest<'_, '_, C>, panic_info: Option<PanicEr
 
 pub fn snapshot_diagnostics<C>(
     test: &MarkdownTest<'_, '_, C>,
-    db: &dyn Db,
-    tool_name: &'static str,
+    context: &SnapshotContext<'_>,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     diagnostics: &[Diagnostic],
@@ -718,8 +830,8 @@ pub fn snapshot_diagnostics<C>(
         );
 
         let snapshot = crate::create_diagnostic_snapshot(
-            db,
-            tool_name,
+            context.db,
+            context.tool_name,
             relative_fixture_path,
             test,
             diagnostics
@@ -732,21 +844,20 @@ pub fn snapshot_diagnostics<C>(
             {
                 snapshot_path => snapshot_path,
                 input_file => name.clone(),
-                filters => vec![(r"\\", "/")],
                 prepend_module_to_snapshot => false,
             },
-            { insta::assert_snapshot!(name, snapshot) }
+            { insta::assert_snapshot!(name, context.normalize_paths(&snapshot)) }
         );
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::apply_snapshot_filters;
     use ruff_db::Db;
     use ruff_db::files::Files;
-    use ruff_db::system::{DbWithTestSystem, System, TestSystem};
-    use ruff_db::vendored::VendoredFileSystem;
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, System, SystemPath, TestSystem};
+    use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
+    use zip::CompressionMethod;
 
     /// Database that can be used for testing.
     ///
@@ -795,10 +906,103 @@ pub(crate) mod tests {
     #[salsa::db]
     impl salsa::Database for TestDb {}
 
+    /// Checks that snapshot paths use forward slashes while escape sequences are preserved.
     #[test]
-    fn preserves_site_packages_paths_in_inline_snapshots() {
-        let rendered = " ::: .venv/lib/python3.10/site-packages/dependency.py:1:5";
+    fn snapshot_paths_preserve_escape_sequences() -> anyhow::Result<()> {
+        let mut db = TestDb::setup();
+        let mut vendored = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
+        vendored.add_directory("stdlib/")?;
+        vendored.add_directory("stdlib/asyncio/")?;
+        vendored.add_file("stdlib/builtins.pyi", "")?;
+        vendored.add_file("stdlib/asyncio/tasks.pyi", "")?;
+        db.vendored = vendored.finish()?;
+        db.write_files([
+            ("/src/nested/example.py", ""),
+            ("/src/a/file.py", ""),
+            ("/src/@extra/example.py", ""),
+            ("/src/other+test/module.py", ""),
+            ("/src/9876/file.py", ""),
+            ("/src/script", ""),
+            ("C:/src/nested/example.py", ""),
+            ("C:/tools/Python/module.py", ""),
+            ("C:/tools/a/file.py", ""),
+            ("C:/a/file.py", ""),
+            ("//server/share/module.py", ""),
+        ])?;
+        let search_roots = [SystemPath::new("/src")];
+        let snapshot = r#"error[example]: Type `C @ src\nested\example.py:1:1` contains `Literal["prefix\x1b\u200b\U000e0001"]`
+ --> C:\src\nested\example.py:1:9
+  |
+1 | value = "\x1b\u200b\n"
+2 | format_spec = f"{value:\b}"
+3 | format_spec = f"{x:\b}"
+4 | zero = b"\0"
+5 | name = "\N{LATIN SMALL LETTER A}"
+6 | data = b"\x00abc\xff"
+7 | more = b"\0abc\101hello\2024\x1b."
+8 | simple = "\n,\t."
+9 | dotted = "\n.foo"
+10 | dotted_text = "prefix\n.foo"
+11 | escaped_filename = "\x64.py"
+12 | text_after_escape = "\nfoo"
+13 | format_spec = f"{x!r:\b}"
+14 | raw = r"\n\q"
+15 | escaped_under_root = "src\x1b\u200b"
+16 | escaped_prefix = "src\n"
+17 | continuation = \
+  |         ^^^^^^^^^^^^^^
+help: Read C:\tools\Python\module.py
+help: Read \\server\share\module.py, \src, and C:\a
+help: See src\@extra\example.py, src\other+test\module.py, and src\9876
+help: See nested\example.py and src\script
+help: Inspect nested\example.py.
+help: Expected src\missing\module.py and src\new\module.py
+ ::: stdlib\builtins.pyi:1:1
+ ::: stdlib\asyncio\tasks.pyi:1:1
+help: Read stdlib\asyncio and stdlib\missing.pyi
+help: Missing \unknown\module.py, C:\unknown\module.py, and C:unknown\module.py
+info:   1. /src\a (first-party code)
+info:   2. C:\tools\a (extra search path)
+"#;
+        let expected = r#"error[example]: Type `C @ src/nested/example.py:1:1` contains `Literal["prefix\x1b\u200b\U000e0001"]`
+ --> C:/src/nested/example.py:1:9
+  |
+1 | value = "\x1b\u200b\n"
+2 | format_spec = f"{value:\b}"
+3 | format_spec = f"{x:\b}"
+4 | zero = b"\0"
+5 | name = "\N{LATIN SMALL LETTER A}"
+6 | data = b"\x00abc\xff"
+7 | more = b"\0abc\101hello\2024\x1b."
+8 | simple = "\n,\t."
+9 | dotted = "\n.foo"
+10 | dotted_text = "prefix\n.foo"
+11 | escaped_filename = "\x64.py"
+12 | text_after_escape = "\nfoo"
+13 | format_spec = f"{x!r:\b}"
+14 | raw = r"\n\q"
+15 | escaped_under_root = "src\x1b\u200b"
+16 | escaped_prefix = "src\n"
+17 | continuation = \
+  |         ^^^^^^^^^^^^^^
+help: Read C:/tools/Python/module.py
+help: Read //server/share/module.py, /src, and C:/a
+help: See src/@extra/example.py, src/other+test/module.py, and src/9876
+help: See nested/example.py and src/script
+help: Inspect nested/example.py.
+help: Expected src/missing/module.py and src/new/module.py
+ ::: stdlib/builtins.pyi:1:1
+ ::: stdlib/asyncio/tasks.pyi:1:1
+help: Read stdlib/asyncio and stdlib\missing.pyi
+help: Missing \unknown\module.py, C:\unknown\module.py, and C:unknown\module.py
+info:   1. /src/a (first-party code)
+info:   2. C:/tools/a (extra search path)
+"#;
 
-        assert_eq!(apply_snapshot_filters(rendered), rendered);
+        assert_eq!(
+            super::SnapshotContext::new(&db, "ty", &search_roots).normalize_paths(snapshot),
+            expected
+        );
+        Ok(())
     }
 }

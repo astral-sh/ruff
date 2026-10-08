@@ -62,6 +62,7 @@ fn run_test(
     let project_root = SystemPathBuf::from("/src");
     db.create_directory_all(&project_root)
         .expect("Creating the project root to succeed");
+    let search_roots = [project_root.as_path()];
 
     let test_files: Vec<_> = test
         .files()
@@ -98,6 +99,7 @@ fn run_test(
     .into_settings(project_root.as_std_path())
     .expect("Failed to construct settings");
 
+    let snapshot_context = mdtest::SnapshotContext::new(db, "ruff", &search_roots);
     let mut all_diagnostics = vec![];
 
     // Edits for updating changed inline snapshots.
@@ -169,8 +171,7 @@ fn run_test(
             )
             .and_then(|inline_diagnostics| {
                 mdtest::validate_inline_snapshot(
-                    db,
-                    "ruff",
+                    &snapshot_context,
                     test_file,
                     &inline_diagnostics,
                     &mut markdown_edits,
@@ -193,8 +194,7 @@ fn run_test(
     mdtest::check_panic(test, panic_info);
     mdtest::snapshot_diagnostics(
         test,
-        db,
-        "ruff",
+        &snapshot_context,
         relative_fixture_path,
         snapshot_path,
         &all_diagnostics,
