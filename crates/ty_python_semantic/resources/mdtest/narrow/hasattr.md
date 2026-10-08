@@ -1,7 +1,11 @@
 # Narrowing using `hasattr()`
 
-The builtin function `hasattr()` can be used to narrow nominal and structural types. This is
-accomplished using an intersection with a synthesized protocol:
+## Basic behavior
+
+The builtin function `hasattr()` can narrow nominal and structural types in its positive branch by
+intersecting the type with a synthesized protocol. A negative check does not narrow the type: we do
+not check definite initialization of instance attributes, so their absence does not rule out an
+instance of a class that declares them.
 
 ```py
 from typing import final
@@ -14,7 +18,7 @@ def _(obj: NonFinalClass):
         reveal_type(obj)  # revealed: NonFinalClass & <Protocol with members 'spam'>
         reveal_type(obj.spam)  # revealed: object
     else:
-        reveal_type(obj)  # revealed: NonFinalClass & ~<Protocol with members 'spam'>
+        reveal_type(obj)  # revealed: NonFinalClass
 
         # error: [unresolved-attribute]
         reveal_type(obj.spam)  # revealed: Unknown
@@ -51,12 +55,17 @@ change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, 
 class WithSpam:
     spam: int = 42
 
+    def method(self) -> None: ...
+
 def _(obj: WithSpam):
     if hasattr(obj, "spam"):
         reveal_type(obj)  # revealed: WithSpam
         reveal_type(obj.spam)  # revealed: int
     else:
-        reveal_type(obj)  # revealed: Never
+        reveal_type(obj)  # revealed: WithSpam
+
+    if not hasattr(obj, "method"):
+        reveal_type(obj)  # revealed: WithSpam
 ```
 
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
@@ -78,7 +87,7 @@ def _(obj: MaybeWithSpam):
         reveal_type(obj)  #  revealed: MaybeWithSpam & <Protocol with members 'spam'>
         reveal_type(obj.spam)  # revealed: int
     else:
-        reveal_type(obj)  # revealed: MaybeWithSpam & ~<Protocol with members 'spam'>
+        reveal_type(obj)  # revealed: MaybeWithSpam
 
         # TODO: Ideally, we would emit `[unresolved-attribute]` and reveal `Unknown` here:
         # error: [possibly-missing-attribute]
@@ -121,7 +130,7 @@ def protocol_dictionary(value: HasValue) -> None:
     if hasattr(value, "__dict__"):
         reveal_type(value)  # revealed: HasValue & <Protocol with members '__dict__'>
     else:
-        reveal_type(value)  # revealed: HasValue & ~<Protocol with members '__dict__'>
+        reveal_type(value)  # revealed: HasValue
 ```
 
 A final slotted class cannot gain an instance dictionary through a subclass, so the positive branch
@@ -135,4 +144,73 @@ class FinalSlotted:
 def no_dictionary(value: FinalSlotted) -> None:
     if hasattr(value, "__dict__"):
         reveal_type(value)  # revealed: Never
+```
+
+## Annotated instance attributes can be absent
+
+An annotation does not initialize an instance attribute.
+
+```py
+class Annotated:
+    value: int
+
+    def initialize(self) -> None:
+        if not hasattr(self, "value"):
+            reveal_type(self)  # revealed: Self@initialize
+            self.value = 1  # no diagnostic
+
+def check(value: Annotated) -> None:
+    reveal_type(hasattr(value, "value"))  # revealed: bool
+    if hasattr(value, "value"):
+        reveal_type(value.value)  # revealed: int
+    else:
+        reveal_type(value)  # revealed: Annotated
+        value.value = "invalid"  # error: [invalid-assignment]
+```
+
+## Instance initialization
+
+Assignments in `__init__` also do not make a negative `hasattr` check unreachable.
+
+```py
+class Initialized:
+    def __init__(self) -> None:
+        self.value = 1
+
+def check(value: Initialized) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Initialized
+```
+
+## Inherited uninitialized slots
+
+A slot provides storage for an instance attribute without initializing it, including in subclasses.
+
+```py
+class Base:
+    __slots__ = ("value",)
+    value: int
+
+class Slotted(Base): ...
+
+def check(value: Slotted) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Slotted
+```
+
+## Unions of instance and class attributes
+
+A negative `hasattr` check preserves union members, whether their attribute is declared on instances
+or initialized on the class.
+
+```py
+class InstanceAttribute:
+    value: int
+
+class ClassAttribute:
+    value: int = 1
+
+def check(value: InstanceAttribute | ClassAttribute) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: InstanceAttribute | ClassAttribute
 ```

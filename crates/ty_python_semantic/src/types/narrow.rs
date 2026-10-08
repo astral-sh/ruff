@@ -4595,6 +4595,13 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
+                    // Declared attributes are not necessarily initialized on every instance.
+                    // Until we distinguish runtime presence from declarations, a failed
+                    // `hasattr` check cannot safely exclude types that declare the attribute.
+                    if !is_positive {
+                        return None;
+                    }
+
                     let attr = inference
                         .expression_type(second_arg)
                         .as_string_literal()?
@@ -4614,11 +4621,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
-                        NarrowingConstraint::intersection(constraint.negate_if(
-                            db,
-                            &self.env,
-                            !is_positive,
-                        )),
+                        NarrowingConstraint::intersection(constraint),
                     )]));
                 }
 

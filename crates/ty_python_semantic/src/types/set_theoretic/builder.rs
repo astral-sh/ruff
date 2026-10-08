@@ -1696,9 +1696,16 @@ fn simplify_intersection_pair<'db>(
 /// recursive protocols.
 ///
 /// ```python
+/// from typing import Protocol, runtime_checkable
+///
+/// @runtime_checkable
+/// class HasX(Protocol):
+///     @property
+///     def x(self) -> object: ...
+///
 /// class C:
 ///     def __init__(self):
-///         if not hasattr(self, "x"):
+///         if not isinstance(self, HasX):
 ///             self.x = self.__str__
 /// ```
 ///
