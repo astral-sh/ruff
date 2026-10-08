@@ -8,8 +8,8 @@ use crate::{
     Db, ProgramEnvironment,
     place::{Place, TypeOrigin},
     types::{
-        ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType, KnownInstanceType,
-        MemberLookupPolicy, Type, TypeQualifiers,
+        ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
+        KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -27,6 +27,7 @@ struct AttributeContract<'db> {
     read: Type<'db>,
     write: Option<Type<'db>>,
     is_property: bool,
+    is_method: bool,
     qualifiers: TypeQualifiers,
 }
 
@@ -34,8 +35,8 @@ struct AttributeContract<'db> {
 ///
 /// Keep the owner's generic specialization, but bind `Self` and descriptor access to
 /// `receiver`. Looking up the name directly on the receiver would hide an overridden
-/// declaration before its contract could be compared. Methods and fields handled by
-/// dedicated override rules return `None`.
+/// declaration before its contract could be compared. Fields handled by dedicated
+/// override rules return `None`.
 ///
 /// ```python
 /// class Base:
@@ -53,9 +54,10 @@ fn attribute_contract<'db>(
     receiver: Type<'db>,
     name: &str,
 ) -> Option<AttributeContract<'db>> {
-    // `object.__class__` is specialized by member lookup, including for protocols
-    // that describe exact runtime classes. Its synthetic `Self` is not an override contract.
-    if owner.is_object(db) && name == "__class__" {
+    // `object.__class__` is specialized by member lookup, so its synthetic `Self` is
+    // not an override contract. Likewise, not every object is hashable or has a
+    // writable instance dictionary, despite the broad declarations in typeshed.
+    if owner.is_object(db) && matches!(name, "__class__" | "__hash__" | "__dict__") {
         return None;
     }
     let (literal, _) = owner.static_class_literal(db)?;
@@ -72,22 +74,25 @@ fn attribute_contract<'db>(
     let Place::Defined(class_place) = class_member.place else {
         return None;
     };
-    // Method contracts have their own override checks, including conditional definitions.
-    // A descriptor decorator, however, can turn a function into an attribute.
-    let is_method = |ty| {
-        matches!(ty, Type::FunctionLiteral(_))
-            || matches!(ty, Type::Callable(callable) if callable.is_method_like(db))
-    };
-    if match class_place.ty {
-        Type::Union(union) => union.elements(db).iter().copied().all(is_method),
-        ty => is_method(ty) || matches!(ty, Type::TypeAlias(_)),
-    } {
+    if matches!(class_place.ty, Type::TypeAlias(_)) {
         return None;
     }
+    let alternatives = class_place
+        .ty
+        .as_union()
+        .map_or(std::slice::from_ref(&class_place.ty), |union| {
+            union.elements(db)
+        });
+    // Only pairs of methods go to the method checker. A decorator can turn a
+    // function into a property, in which case its exposed value must be checked.
+    let is_method = alternatives.iter().all(|ty| {
+        matches!(ty, Type::FunctionLiteral(_))
+            || matches!(ty, Type::Callable(callable) if callable.is_method_like(db))
+    });
     let qualifiers = class_member.qualifiers | instance_member.qualifiers;
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
-    let is_property = class_place.ty.as_property_instance().is_some();
+    let is_property = alternatives.iter().any(Type::is_property_instance);
     let is_slot = matches!(class_place.ty, Type::SlotDescriptor(_));
     let is_descriptor = !is_class_var
         && (is_slot
@@ -119,10 +124,11 @@ fn attribute_contract<'db>(
         .bind_self_typevars(db, env, receiver);
         // Explicit `staticmethod(f)` and `classmethod(f)` assignments expose method
         // signatures, just like decorated definitions; the function's identity can change.
-        let read = if matches!(
-            class_place.ty,
-            Type::KnownInstance(KnownInstanceType::MethodWrapper(_))
-        ) {
+        let read = if is_method
+            || matches!(
+                class_place.ty,
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(_))
+            ) {
             read.try_upcast_to_callable(db, env)?.to_type(db, env)
         } else {
             read
@@ -138,7 +144,9 @@ fn attribute_contract<'db>(
         };
         (read, write)
     } else {
-        let place = if is_class_var || is_final {
+        // An annotated class-body default need not be in the instance dictionary.
+        // Its public class-member type still carries the declared annotation.
+        let place = if is_class_var || is_final || instance_member.place.is_undefined() {
             class_member.place
         } else {
             instance_member.place
@@ -163,6 +171,7 @@ fn attribute_contract<'db>(
             write
         },
         is_property,
+        is_method,
         qualifiers,
     })
 }
@@ -230,9 +239,14 @@ fn attribute_violation<'db>(
     source: &AttributeContract<'db>,
     target: &AttributeContract<'db>,
 ) -> Option<AttributeViolation<'db>> {
-    if target.qualifiers.contains(TypeQualifiers::FINAL)
-        || source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-            != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+    if source.is_method && target.is_method
+        || target.qualifiers.contains(TypeQualifiers::FINAL)
+        || !source.is_property
+            && !target.is_property
+            && !source.is_method
+            && !target.is_method
+            && source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+                != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     {
         return None;
     }
@@ -294,6 +308,7 @@ pub(super) fn check_override<'db>(
     context: &InferContext<'db, '_>,
     class: ClassType<'db>,
     superclass: ClassType<'db>,
+    inherited_owner: Option<ClassType<'db>>,
     name: &Name,
     definition: Definition<'db>,
     superclass_definition: Option<Definition<'db>>,
@@ -318,7 +333,42 @@ pub(super) fn check_override<'db>(
     ) else {
         return false;
     };
-    let rule = if source.is_property || target.is_property {
+    // Suppress only conflicts already present with the parent's own specialization of
+    // this ancestor. An unrelated base, or a newly incompatible specialization in the
+    // child, must still be checked.
+    if let Some(parent) = inherited_owner
+        && parent != superclass
+    {
+        let parent_receiver = Type::instance(db, env, parent);
+        if let Some(parent_source) = attribute_contract(db, env, parent, parent_receiver, name)
+            && parent
+                .iter_mro(db)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+                .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
+                .any(|ancestor| {
+                    attribute_contract(db, env, ancestor, parent_receiver, name).is_some_and(
+                        |parent_target| {
+                            attribute_violation(
+                                db,
+                                env,
+                                parent_receiver,
+                                Type::instance(db, env, ancestor),
+                                name,
+                                &parent_source,
+                                &parent_target,
+                            )
+                            .is_some()
+                        },
+                    )
+                })
+        {
+            return false;
+        }
+    }
+    let involves_property = source.is_property || target.is_property;
+    let rule = if involves_property {
         &INVALID_PROPERTY_TYPE_OVERRIDE
     } else if matches!(violation, AttributeViolation::Write { .. }) {
         &INVALID_MUTABLE_OVERRIDE
@@ -333,11 +383,19 @@ pub(super) fn check_override<'db>(
         builder.into_diagnostic(format_args!("Invalid override of attribute `{name}`"));
     match violation {
         AttributeViolation::Read { source, target } => {
-            diagnostic.set_primary_annotation_message(format_args!(
-                "Type `{}` is not assignable to inherited type `{}`",
-                source.display(db, env),
-                target.display(db, env),
-            ));
+            if involves_property {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Read type `{}` is not assignable to inherited read type `{}`",
+                    source.display(db, env),
+                    target.display(db, env),
+                ));
+            } else {
+                diagnostic.set_primary_annotation_message(format_args!(
+                    "Type `{}` is not assignable to inherited type `{}`",
+                    source.display(db, env),
+                    target.display(db, env),
+                ));
+            }
         }
         AttributeViolation::Write { target } => {
             diagnostic.set_primary_annotation_message(format_args!(

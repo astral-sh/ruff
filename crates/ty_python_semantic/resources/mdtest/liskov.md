@@ -757,7 +757,8 @@ class ClassDefaultSubclass(ClassDefaultBase):
 ### Method definitions
 
 Method definitions create descriptors in the class body. They are not instance variable
-declarations, so the class-variable vs. instance-variable override check does not apply to them:
+declarations, so the class-variable vs. instance-variable override check does not apply to them.
+They can still restrict the values a class variable accepts or expose an incompatible read type:
 
 ```py
 from collections.abc import Callable
@@ -770,18 +771,18 @@ class ClassVarBase:
     non_callable: ClassVar[int]
 
 class MethodSubclass(ClassVarBase):
-    def plain(self, x: int) -> int:
+    def plain(self, x: int) -> int:  # error: [invalid-mutable-override]
         return x
 
     @staticmethod
-    def static(x: int) -> int:
+    def static(x: int) -> int:  # error: [invalid-mutable-override]
         return x
 
     @classmethod
-    def class_(cls, x: int) -> int:
+    def class_(cls, x: int) -> int:  # error: [invalid-mutable-override]
         return x
 
-    def non_callable(self) -> int:
+    def non_callable(self) -> int:  # error: [invalid-attribute-override]
         return 1
 
 class PropertyBase:
@@ -789,7 +790,7 @@ class PropertyBase:
 
 class PropertySubclass(PropertyBase):
     @property
-    def attr(  # error: [invalid-attribute-override] "instance variable cannot override class variable `PropertyBase.attr`"
+    def attr(  # error: [invalid-property-type-override]
         self,
     ) -> int:
         return 1
@@ -2767,6 +2768,73 @@ error[invalid-attribute-override]: Invalid override of attribute `value`
   |     ^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
+## Annotated attributes with class defaults
+
+A class-body default does not erase an annotation's contract. Both the default and a later instance
+assignment must respect the declared type. Unannotated defaults still inherit their annotation.
+
+```py
+class Initialized:
+    value: int = 1
+
+class Uninitialized(Initialized):
+    value: str  # error: [invalid-attribute-override]
+
+class Declared:
+    value: int
+
+class WithDefault(Declared):
+    value: str = ""  # error: [invalid-attribute-override]
+
+class Compatible(Declared):
+    value: int = 2  # no diagnostic
+
+class InheritsAnnotation(Declared):
+    value = 1  # no diagnostic
+```
+
+## Inherited attribute conflicts
+
+An override is checked against each applicable ancestor, but a subclass does not introduce a
+conflict its parent already had. A conflict with an unrelated base still needs to be checked.
+
+```py
+class Base:
+    value: int
+
+class Parent(Base):
+    value: str  # error: [invalid-attribute-override]
+
+class Child(Parent):
+    value: str  # no diagnostic
+
+class Unrelated:
+    value: bytes
+
+class Multiple(Parent, Unrelated):
+    value: str  # error: [invalid-attribute-override]
+```
+
+Read-only properties follow the same rule, including when the child repeats a covariant narrowing
+that is still incompatible with the grandparent.
+
+```py
+class PropertyBase:
+    @property
+    def value(self) -> str:
+        return ""
+
+class PropertyParent(PropertyBase):
+    @property
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 1
+
+class PropertyChild(PropertyParent):
+    @property
+    def value(self) -> bool:  # no diagnostic
+        return True
+```
+
 ## Mutable attribute narrowing
 
 When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
@@ -2821,12 +2889,116 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
   --> src/mdtest_snippet.pyi:11:9
    |
 11 |     def value(self) -> str: ...  # snapshot: invalid-property-type-override
-   |         ^^^^^ Type `str` is not assignable to inherited type `int`
+   |         ^^^^^ Read type `str` is not assignable to inherited read type `int`
    |
   ::: src/mdtest_snippet.pyi:3:9
    |
  3 |     def value(self) -> int: ...
    |         ----- `Base.value` declared here
+```
+
+## Methods and attributes with the same name
+
+The value exposed by a method is a bound callable, not its return type. It must still preserve the
+contract of an inherited attribute or property. The same check applies when an attribute replaces a
+method.
+
+```py
+from typing import Callable
+
+class PropertyBase:
+    @property
+    def value(self) -> int:
+        return 1
+
+class MethodOverProperty(PropertyBase):
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 1
+
+class AttributeBase:
+    value: int
+
+class MethodOverAttribute(AttributeBase):
+    def value(self) -> int:  # error: [invalid-attribute-override]
+        return 1
+
+class MethodBase:
+    def value(self) -> int:
+        return 1
+
+class AttributeOverMethod(MethodBase):
+    value: int  # error: [invalid-attribute-override]
+
+class PropertyOverMethod(MethodBase):
+    @property
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 1
+
+class CallableAttributeOverMethod(MethodBase):
+    value: Callable[[], int]  # no diagnostic
+
+class CallablePropertyBase:
+    @property
+    def value(self) -> Callable[[], int]:
+        return lambda: 1
+
+class CompatibleMethod(CallablePropertyBase):
+    def value(self) -> int:  # no diagnostic
+        return 1
+```
+
+## Class variables replacing properties
+
+A property makes no `ClassVar` declaration. Changing the kind of storage is permitted, but the
+subclass must expose a compatible value when read through a superclass reference.
+
+```py
+from typing import ClassVar
+
+class Base:
+    @property
+    def value(self) -> int:
+        return 1
+
+class Incompatible(Base):
+    value: ClassVar[str]  # error: [invalid-property-type-override]
+
+class Compatible(Base):
+    value: ClassVar[int]  # no diagnostic
+
+class ClassBase:
+    value: ClassVar[int]
+
+class IncompatibleProperty(ClassBase):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
+```
+
+## Conditional property definitions
+
+The property override rule applies when an inherited property can have different definitions. Reads
+must remain assignable to the union of the possible result types.
+
+```py
+from random import random
+
+class Base:
+    if random() > 0.5:
+        @property
+        def value(self) -> int:
+            return 1
+
+    else:
+        @property
+        def value(self) -> str:
+            return ""
+
+class Child(Base):
+    value: bytes  # error: [invalid-property-type-override]
+
+class Compatible(Base):
+    value: int  # no diagnostic
 ```
 
 ## Property setters

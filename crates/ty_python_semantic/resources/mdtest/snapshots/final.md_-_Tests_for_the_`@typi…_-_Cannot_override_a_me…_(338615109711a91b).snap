@@ -336,7 +336,7 @@ error[invalid-property-type-override]: Invalid override of attribute `my_propert
   --> src/mdtest_snippet.pyi:76:9
    |
 76 |     def my_property1(self) -> str: ...
-   |         ^^^^^^^^^^^^ Type `str` is not assignable to inherited type `int`
+   |         ^^^^^^^^^^^^ Read type `str` is not assignable to inherited read type `int`
    |
   ::: src/mdtest_snippet.pyi:11:9
    |

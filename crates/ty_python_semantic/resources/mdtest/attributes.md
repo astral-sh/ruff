@@ -3101,8 +3101,7 @@ class Invalid(Base):
     values = ("wrong",)  # error: [invalid-assignment]
 
 class Redeclared(Base):
-    # TODO: Report a Liskov violation for the incompatible redeclaration.
-    value: str = "child"
+    value: str = "child"  # error: [invalid-mutable-override]
 
 reveal_type(Redeclared.value)  # revealed: str
 ```
@@ -3165,7 +3164,7 @@ class Right:
     value: bytes = b""
 
 class Child(Left, Right):
-    value = "child"
+    value = "child"  # error: [invalid-attribute-override]
 
 reveal_type(Child.value)  # revealed: int | str
 
@@ -3288,10 +3287,12 @@ class Left(Root):
     value = 1
 
 class Right(Root):
-    value: str = "right"
+    value: str = "right"  # error: [invalid-attribute-override]
 
 class Child(Left, Right):
-    value = "wrong"  # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    # error: [invalid-attribute-override]
+    value = "wrong"
 
 reveal_type(Child.value)  # revealed: int
 ```

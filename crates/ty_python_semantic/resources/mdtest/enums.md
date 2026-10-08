@@ -1756,7 +1756,7 @@ from enum import Enum, auto
 from ty_extensions._internal import enum_members
 from typing import Any, Literal, cast
 
-def external_generate_next_value(*args: Any) -> Any: ...
+def external_generate_next_value(*args: Any, **kwargs: Any) -> Any: ...
 
 class ReassignedGenerator(Enum):
     @staticmethod

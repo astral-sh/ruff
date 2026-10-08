@@ -653,9 +653,9 @@ fn check_class_declaration<'db>(
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
-    // Track the first superclass that defines this method so we can distinguish inherited
+    // Track the first superclass that defines this member so we can distinguish inherited
     // conflicts from violations introduced by the child.
-    let mut inherited_method_owner = None;
+    let mut inherited_member_owner = None;
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
@@ -750,7 +750,7 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            inherited_method_owner.get_or_insert(superclass);
+            inherited_member_owner.get_or_insert(superclass);
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
@@ -882,10 +882,14 @@ fn check_class_declaration<'db>(
             }
 
             if configuration.check_attribute_type_violations()
+                // Constructors may change their signature. Leave their special receiver
+                // binding and `@override` checks to the method checker below.
+                && !is_constructor_like_method(&member.name)
                 && attributes::check_override(
                     context,
                     class,
                     superclass,
+                    inherited_member_owner,
                     &member.name,
                     *first_reachable_definition,
                     superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id)),
@@ -932,7 +936,7 @@ fn check_class_declaration<'db>(
 
             // Do not repeat a violation that already exists in the parent's hierarchy.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some(method_owner) = inherited_method_owner
+            if let Some(method_owner) = inherited_member_owner
                 && method_owner != superclass
                 && is_inherited_method_violation(
                     db,
@@ -1400,14 +1404,16 @@ fn variable_kind<'db>(
     // class Sub(Base):
     //     def f(self) -> int: ...
     // ```
-    if matches!(
-        class_member.place,
-        Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(_),
-            ..
-        })
-    ) {
-        return None;
+    if let Place::Defined(DefinedPlace { ty, .. }) = class_member.place {
+        let alternatives = ty
+            .as_union()
+            .map_or(std::slice::from_ref(&ty), |union| union.elements(db));
+        if alternatives
+            .iter()
+            .all(|ty| matches!(ty, Type::FunctionLiteral(_) | Type::PropertyInstance(_)))
+        {
+            return None;
+        }
     }
 
     // Descriptor values are not normal instance variables: lookup calls `__get__`, so the value
