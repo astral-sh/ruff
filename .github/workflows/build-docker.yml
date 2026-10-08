@@ -166,11 +166,12 @@ jobs:
           IMAGE: ${{ env.RUFF_BASE_IMG }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
+          set -euo pipefail
           digest="$(
             docker buildx imagetools inspect \
               "${IMAGE}:${VERSION}" \
               --format '{{json .Manifest}}' \
-            | jq -r '.digest'
+            | jq -er '.digest'
           )"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
@@ -350,11 +351,12 @@ jobs:
           IMAGE: ${{ env.RUFF_BASE_IMG }}
           VERSION: ${{ steps.meta.outputs.version }}
         run: |
+          set -euo pipefail
           digest="$(
             docker buildx imagetools inspect \
               "${IMAGE}:${VERSION}" \
               --format '{{json .Manifest}}' \
-            | jq -r '.digest'
+            | jq -er '.digest'
           )"
           echo "digest=${digest}" >> "$GITHUB_OUTPUT"
 
