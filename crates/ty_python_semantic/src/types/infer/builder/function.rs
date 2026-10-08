@@ -32,7 +32,7 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
+            InferenceFlags, InferenceRegion, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -444,6 +444,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(decorator_inference.called_functions().iter().copied());
             self.legacy_aliases
                 .extend(decorator_inference.legacy_aliases().iter().copied());
+            self.record_reaching_definitions_for_region(InferenceRegion::FunctionDecorators(
+                definition,
+            ));
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
@@ -779,9 +782,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         if function_has_deferred_annotations(function) {
             self.extend_definition(definition, infer_deferred_types(db, definition));
+            self.record_reaching_definitions_for_region(InferenceRegion::Deferred(definition));
         }
         if parameters_have_defaults(&function.parameters) {
             self.extend_definition(definition, infer_function_default_types(db, definition));
+            self.record_reaching_definitions_for_region(InferenceRegion::FunctionDefaults(
+                definition,
+            ));
         }
     }
 

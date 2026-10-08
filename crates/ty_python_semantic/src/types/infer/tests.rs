@@ -7,11 +7,15 @@ use crate::lint::{LintSource, RuleSelection};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, PlaceAndQualifiers};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
+use insta::assert_snapshot;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
+use ruff_python_trivia::textwrap::dedent;
+use ruff_source_file::{LineIndex, LineRanges};
 use salsa::Database as _;
 use salsa::plumbing::AsId;
 use ty_python_core::definition::Definition;
@@ -89,6 +93,200 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
+}
+
+#[test]
+fn inference_records_reaching_definitions_across_regions() -> anyhow::Result<()> {
+    let source = dedent(
+        "
+        from __future__ import annotations
+
+        class First: ...
+        class Second: ...
+
+        def with_type(typ):
+            return lambda function: function
+
+        value = First
+
+        @with_type(value)
+        def function(argument: value = value()):
+            return [
+                value
+                for item in (value,)
+                for other in (value,)
+            ]
+        value = Second
+        ",
+    );
+
+    assert_snapshot!(render_reaching_definitions(source.trim(), "value")?, @"
+     1 | from __future__ import annotations
+     2 | 
+     3 | class First: ...
+     4 | class Second: ...
+     5 | 
+     6 | def with_type(typ):
+     7 |     return lambda function: function
+     8 | 
+     9 | value = First
+    10 | 
+    11 | @with_type(value)
+       |            ^^^^^ -> value = First (line 9)
+    12 | def function(argument: value = value()):
+       |                        ^^^^^ -> value = First (line 9), value = Second (line 18)
+       |                                ^^^^^ -> value = First (line 9)
+    13 |     return [
+    14 |         value
+       |         ^^^^^ -> value = First (line 9), value = Second (line 18)
+    15 |         for item in (value,)
+       |                      ^^^^^ -> value = First (line 9), value = Second (line 18)
+    16 |         for other in (value,)
+       |                       ^^^^^ -> value = First (line 9), value = Second (line 18)
+    17 |     ]
+    18 | value = Second
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn speculative_inference_preserves_reaching_definitions() -> anyhow::Result<()> {
+    let source = dedent(
+        "
+        value = 1
+        result: tuple[int] | tuple[str] = (value,)
+        ",
+    );
+
+    assert_snapshot!(render_reaching_definitions(source.trim(), "value")?, @"
+    1 | value = 1
+    2 | result: tuple[int] | tuple[str] = (value,)
+      |                                    ^^^^^ -> value = 1 (line 1)
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn class_scope_loads_resolve_local_and_enclosing_definitions() -> anyhow::Result<()> {
+    let source = dedent(
+        "
+        value = 1
+        class C:
+            if condition:
+                value = 2
+            result = value
+            value = 3
+            definite = value
+        ",
+    );
+
+    assert_snapshot!(render_reaching_definitions(source.trim(), "value")?, @"
+    1 | value = 1
+    2 | class C:
+    3 |     if condition:
+    4 |         value = 2
+    5 |     result = value
+      |              ^^^^^ -> value = 2 (line 4), value = 1 (line 1)
+    6 |     value = 3
+    7 |     definite = value
+      |                ^^^^^ -> value = 3 (line 6)
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn scope_declarations_produce_cross_scope_resolutions() -> anyhow::Result<()> {
+    let source = dedent(
+        "
+        value = 1
+        def with_global():
+            global value
+            return value
+        value = 2
+
+        def outer():
+            value = 3
+            def with_nonlocal():
+                nonlocal value
+                return value
+
+        def eager_outer():
+            value = 4
+            def intermediate():
+                nonlocal value
+                value = 5
+                class Eager:
+                    result = value
+        ",
+    );
+
+    assert_snapshot!(render_reaching_definitions(source.trim(), "value")?, @"
+     1 | value = 1
+     2 | def with_global():
+     3 |     global value
+     4 |     return value
+       |            ^^^^^ -> value = 1 (line 1), value = 2 (line 5)
+     5 | value = 2
+     6 | 
+     7 | def outer():
+     8 |     value = 3
+     9 |     def with_nonlocal():
+    10 |         nonlocal value
+    11 |         return value
+       |                ^^^^^ -> value = 3 (line 8)
+    12 | 
+    13 | def eager_outer():
+    14 |     value = 4
+    15 |     def intermediate():
+    16 |         nonlocal value
+    17 |         value = 5
+    18 |         class Eager:
+    19 |             result = value
+       |                      ^^^^^ -> value = 5 (line 17)
+    ");
+
+    let crosses_scope_declarations: Vec<_> =
+        reaching_definitions_for_name_loads(source.trim(), "value")
+            .into_iter()
+            .map(|(_, _, crosses_scope_declaration)| crosses_scope_declaration)
+            .collect();
+    assert_eq!(crosses_scope_declarations, [true, true, true]);
+
+    Ok(())
+}
+
+#[test]
+fn unimported_reveal_type_makes_resolution_incomplete() -> anyhow::Result<()> {
+    let source = dedent(
+        "
+        if condition:
+            reveal_type = 1
+        reveal_type
+        ",
+    );
+    let db = TestDbBuilder::new()
+        .with_file("/src/test.py", &source)
+        .build()?;
+    let file = program_file(&db, system_path_to_file(&db, "/src/test.py")?);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let [_, ast::Stmt::Expr(expression)] = module.suite().as_slice() else {
+        anyhow::bail!("expected a conditional followed by a name expression");
+    };
+    let ast::Expr::Name(name) = expression.value.as_ref() else {
+        anyhow::bail!("expected a name expression");
+    };
+
+    let resolutions = reaching_definitions_for_scope(&db, global_scope(&db, file));
+    let resolution = resolutions
+        .get(&ast::ExprRef::Name(name).into())
+        .ok_or_else(|| anyhow::anyhow!("expected a resolution for reveal_type"))?;
+
+    assert_eq!(resolution.definitions().len(), 1);
+    assert!(!resolution.is_complete());
+    Ok(())
 }
 
 #[test]
@@ -2067,4 +2265,103 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
     );
 
     Ok(())
+}
+
+struct NameLoads<'ast, 'name> {
+    name: &'name str,
+    names: Vec<&'ast ast::ExprName>,
+}
+
+impl<'ast> Visitor<'ast> for NameLoads<'ast, '_> {
+    fn visit_expr(&mut self, expression: &'ast ast::Expr) {
+        if let ast::Expr::Name(name) = expression
+            && name.ctx.is_load()
+            && name.id == self.name
+        {
+            self.names.push(name);
+        }
+        walk_expr(self, expression);
+    }
+}
+
+fn reaching_definitions_for_name_loads(
+    source: &str,
+    name: &str,
+) -> Vec<(TextRange, Vec<TextRange>, bool)> {
+    let db = TestDbBuilder::new()
+        .with_file("/src/test.py", source)
+        .build()
+        .unwrap();
+    let file = system_path_to_file(&db, "/src/test.py").unwrap();
+    let file = program_file(&db, file);
+    let module = parsed_module(&db, file.python_file(&db)).load(&db);
+    let index = semantic_index(&db, file);
+    let mut names = NameLoads {
+        name,
+        names: Vec::new(),
+    };
+    names.visit_body(module.suite());
+
+    let mut by_scope = FxHashMap::default();
+    names
+        .names
+        .into_iter()
+        .map(|name| {
+            let expression = ast::ExprRef::Name(name);
+            let scope = index
+                .expression_scope_id(&expression)
+                .to_scope_id(&db, file);
+            let resolutions = by_scope
+                .entry(scope)
+                .or_insert_with(|| reaching_definitions_for_scope(&db, scope));
+            let resolution = resolutions
+                .get(&expression.into())
+                .unwrap_or_else(|| panic!("no resolution for {name:?} in {source}"));
+            (
+                name.range(),
+                resolution
+                    .definitions()
+                    .iter()
+                    .map(|definition| definition.full_range(&db, &module).range())
+                    .collect(),
+                resolution.crosses_scope_declaration(),
+            )
+        })
+        .collect()
+}
+
+fn render_reaching_definitions(source: &str, name: &str) -> Result<String, std::fmt::Error> {
+    let line_index = LineIndex::from_source_text(source);
+    let mut resolutions = reaching_definitions_for_name_loads(source, name);
+    resolutions.sort_by_key(|(range, _, _)| range.start());
+
+    let mut output = String::new();
+    for (line_number, line) in source.lines().enumerate() {
+        writeln!(output, "{:>2} | {line}", line_number + 1)?;
+        for (range, definitions, _) in &resolutions {
+            if line_index.line_index(range.start()).get() != line_number + 1 {
+                continue;
+            }
+
+            let indent = " ".repeat(usize::from(
+                range.start() - source.line_start(range.start()),
+            ));
+            let marker = "^".repeat(usize::from(range.len()));
+            write!(output, "   | {indent}{marker} -> ")?;
+            for (index, definition) in definitions.iter().enumerate() {
+                if index > 0 {
+                    write!(output, ", ")?;
+                }
+                write!(
+                    output,
+                    "{} (line {})",
+                    &source[*definition],
+                    line_index.line_index(definition.start())
+                )?;
+            }
+            writeln!(output)?;
+        }
+    }
+
+    Ok(output)
 }

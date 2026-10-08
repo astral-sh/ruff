@@ -30,10 +30,12 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_unpack_types,
+    OtherDefinitionInferenceExtra, ReachingDefinitionsByExpression, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
+use crate::place::definitions::DefinitionResolution;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, class_body_implicit_symbol,
@@ -317,6 +319,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Definitions that can reach a name expression.
+    ///
+    /// These are not recorded by default, but can be recorded on demand by
+    /// calling [`TypeInferenceBuilder::reaching_definitions`].
+    reaching_definitions_by_expression: Option<ReachingDefinitionsByExpression<'db>>,
+
     /// The scope this region is part of.
     scope: ScopeId<'db>,
 
@@ -539,6 +547,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             collection_use_constraints: FxHashMap::default(),
             string_annotations: FxHashSet::default(),
             expected_types: FxHashMap::default(),
+            reaching_definitions_by_expression: None,
             bindings: VecMap::default(),
             declarations: VecMap::default(),
             typevar_binding_context: None,
@@ -548,6 +557,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             discards_dict_key_assignments: false,
             dataclass_field_specifiers: SmallVec::new(),
+        }
+    }
+
+    pub(super) fn reaching_definitions(mut self) -> ReachingDefinitionsByExpression<'db> {
+        self.enable_reaching_definitions_recording();
+
+        // This inference pass only returns reaching definitions, so allow the
+        // context's diagnostics to be dropped.
+        self.context.defuse();
+
+        self.infer_region();
+        self.reaching_definitions_by_expression.unwrap_or_default()
+    }
+
+    fn enable_reaching_definitions_recording(&mut self) {
+        self.reaching_definitions_by_expression = Some(FxHashMap::default());
+    }
+
+    fn is_recording_reaching_definitions(&self) -> bool {
+        self.reaching_definitions_by_expression.is_some()
+    }
+
+    /// Re-infers the region to record its reaching definitions
+    /// (if that recording is enabled on this builder instance).
+    fn record_reaching_definitions_for_region(&mut self, region: InferenceRegion<'db>) {
+        if !self.is_recording_reaching_definitions() {
+            return;
+        }
+
+        let builder = TypeInferenceBuilder::new(
+            self.db(),
+            self.program_environment(),
+            region,
+            self.file(),
+            self.program_file(),
+            self.index,
+            self.module(),
+        );
+
+        if let Some(current) = &mut self.reaching_definitions_by_expression {
+            current.extend(builder.reaching_definitions());
         }
     }
 
@@ -795,6 +845,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_expression_cache_entry(&mut self, inference: &FullExpressionCacheEntry<'db>) {
+        if let Some(collection) = &mut self.reaching_definitions_by_expression
+            && let Some(defs) = &inference.reaching_definitions_by_expression
+        {
+            collection.extend(defs.iter().map(|(key, value)| (*key, value.clone())));
+        }
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
@@ -1199,6 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.extend_function_deferred(*definition, function.node(self.module()));
             } else {
                 self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
+                self.record_reaching_definitions_for_region(InferenceRegion::Deferred(*definition));
             }
         }
 
@@ -2275,6 +2331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
         self.extend_definition(definition, result);
+        self.record_reaching_definitions_for_region(InferenceRegion::Definition(definition));
     }
 
     fn infer_type_alias_definition(
@@ -3032,6 +3089,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inference =
                     infer_expression_types(self.db(), shared_value, TypeContext::default());
                 self.extend_expression_without_bindings(inference);
+                self.record_reaching_definitions_for_region(InferenceRegion::Expression(
+                    shared_value,
+                    TypeContext::default(),
+                ));
 
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 self.context.extend(unpacked.context_result());
@@ -3040,6 +3101,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
+                    builder.record_reaching_definitions_for_region(InferenceRegion::Expression(
+                        shared_value,
+                        tcx,
+                    ));
                     inference.expression_type(value.as_ref())
                 });
             }
@@ -3575,6 +3640,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
+                    self.record_reaching_definitions_for_region(InferenceRegion::Expression(
+                        standalone_expression,
+                        tcx,
+                    ));
                     inference.expression_type(value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
@@ -6578,6 +6647,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_standalone_statement_impl(&mut self, standalone_statement: Statement<'db>) {
         let types = infer_statement_types(self.db(), standalone_statement);
         self.extend_statement(&types);
+        let region = match standalone_statement {
+            Statement::Expression(expression) => {
+                InferenceRegion::Expression(expression, TypeContext::default())
+            }
+            Statement::Definition(definition) => InferenceRegion::Definition(definition),
+            Statement::Other(statement) => InferenceRegion::Statement(statement),
+        };
+        self.record_reaching_definitions_for_region(region);
     }
 
     fn infer_optional_expression(
@@ -6732,6 +6809,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let types = infer_expression_types(self.db(), standalone_expression, tcx);
         self.extend_expression(types);
+        self.record_reaching_definitions_for_region(InferenceRegion::Expression(
+            standalone_expression,
+            tcx,
+        ));
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
@@ -8373,6 +8454,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.db(), scope, yield_tcx);
         self.extend_scope(inference);
+        self.record_reaching_definitions_for_region(InferenceRegion::Scope(scope, yield_tcx));
         let yield_type = self.comprehension_element_type(elt, inference);
 
         if evaluation_mode.is_async() {
@@ -8453,6 +8535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
+        self.record_reaching_definitions_for_region(InferenceRegion::Scope(scope, tcx));
 
         self.infer_comprehension_specialization(
             KnownClass::List,
@@ -8494,6 +8577,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
+        self.record_reaching_definitions_for_region(InferenceRegion::Scope(scope, tcx));
 
         self.infer_comprehension_specialization(
             KnownClass::Set,
@@ -8536,6 +8620,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
         let inference = infer_scope_types(self.db(), scope, tcx);
         self.extend_scope(inference);
+        self.record_reaching_definitions_for_region(InferenceRegion::Scope(scope, tcx));
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
@@ -8764,6 +8849,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //     we'd add types for random wrong expressions in the current scope
             if !(comprehension.is_first() && target.is_name_expr()) {
                 self.extend_expression_unchecked(result);
+                self.record_reaching_definitions_for_region(InferenceRegion::Expression(
+                    expression,
+                    TypeContext::default(),
+                ));
             }
 
             (iterable_type, element_type)
@@ -8811,6 +8900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
             self.extend_definition(definition, result);
+            self.record_reaching_definitions_for_region(InferenceRegion::Definition(definition));
             result.binding_type(definition)
         } else {
             // String annotations have no indexed definitions, and syntactically invalid targets
@@ -9055,6 +9145,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
+        self.record_reaching_definitions_for_region(InferenceRegion::Scope(scope, return_tcx));
 
         let return_ty = inference.expression_type(lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
@@ -10733,7 +10824,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// This also returns the [`ConstraintKey`]s used by expression-level narrowing.
     fn infer_place_load(
-        &self,
+        &mut self,
         place_expr: PlaceExpr,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
@@ -10745,15 +10836,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             PlaceLoadMode::AtExpression(expr_ref)
         };
-        let mut resolution =
+        let mut place_load =
             resolve_place_load(self.db(), self.index, self.scope(), place_expr, mode);
         let mut place = PlaceAndQualifiers::from(Place::Undefined);
         let mut failure = None;
         let mut checked_deprecated = false;
+        let mut resolution = (expr_ref.is_name_expr() && self.is_recording_reaching_definitions())
+            .then(DefinitionResolution::new);
 
-        while let Some(step) = resolution.next() {
+        while let Some(step) = place_load.next() {
             match step {
                 PlaceLoadResolutionStep::Source(source) => {
+                    if let Some(resolution) = resolution.as_mut() {
+                        resolution.add_source(self.db(), env, self.scope(), &source);
+                    }
                     if !checked_deprecated && source.is_post_lexical() {
                         // Deprecation diagnostics apply to the result of lexical name resolution,
                         // before it is combined with implicit module globals or builtins. Hence, we
@@ -10765,10 +10861,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         checked_deprecated = true;
                     }
-                    let narrowing_constraints = resolution.narrowing_constraints_for(&source);
+                    let narrowing_constraints = place_load.narrowing_constraints_for(&source);
                     place = place.or_fall_back_to(self.db(), env, || {
                         self.infer_place_load_source(
-                            resolution.place_expr(),
+                            place_load.place_expr(),
                             source,
                             narrowing_constraints,
                         )
@@ -10790,19 +10886,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        if let Some(resolution) = &mut resolution {
+            resolution.crosses_scope_declaration = place_load.crosses_scope_declaration();
+        }
+
         if !checked_deprecated && let Some(ty) = place.place.ignore_possibly_undefined() {
             self.check_deprecated(expr_ref, ty);
         }
 
         let place = if failure == Some(PlaceLoadFailure::NotFound) {
             place.or_fall_back_to(self.db(), env, || {
-                self.infer_unimported_reveal_type_fallback(expr_ref)
+                let fallback = self.infer_unimported_reveal_type_fallback(expr_ref);
+                if !fallback.is_undefined()
+                    && let Some(resolution) = &mut resolution
+                {
+                    // This fallback supplies `reveal_type` without an explicit import, so the
+                    // recorded definitions do not account for every possible binding.
+                    resolution.is_complete = false;
+                }
+                fallback
             })
         } else {
             place
         };
 
-        let constraint_keys = resolution.into_constraints();
+        if let Some(resolution) = resolution
+            && let Some(collection) = &mut self.reaching_definitions_by_expression
+        {
+            collection.insert(expr_ref.into(), resolution);
+        }
+
+        let constraint_keys = place_load.into_constraints();
 
         (place, constraint_keys)
     }
@@ -12099,6 +12213,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
+            reaching_definitions_by_expression,
             expected_types,
             scope,
             bindings,
@@ -12137,6 +12252,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         FullExpressionCacheEntry {
             legacy_aliases,
+            reaching_definitions_by_expression,
             expressions,
             comparison_truthiness,
             type_expression_flags,
@@ -12164,6 +12280,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             string_annotations,
+            reaching_definitions_by_expression: _,
             expected_types,
             scope,
             bindings,
@@ -12307,6 +12424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             scope: _,
             string_annotations: _,
+            reaching_definitions_by_expression: _,
             expected_types: _,
             return_types_and_ranges: _,
             collection_use_constraints: _,
@@ -12356,6 +12474,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             string_annotations,
+            reaching_definitions_by_expression: _,
             expected_types,
             scope,
             bindings,
@@ -12549,6 +12668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             legacy_aliases,
             context,
             string_annotations,
+            reaching_definitions_by_expression: _,
             expected_types,
             type_expression_flags,
             mut collection_use_constraints,
@@ -12643,6 +12763,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: _,
             comparison_truthiness: _,
             string_annotations: _,
+            reaching_definitions_by_expression: _,
             expected_types: _,
             scope: _,
             bindings: _,
@@ -12668,6 +12789,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Speculated builders are often discarded immediately.
         builder.context.defuse();
+        if self.is_recording_reaching_definitions() {
+            builder.enable_reaching_definitions_recording();
+        }
 
         // Ensure the speculative builder has the same inference context as the current one.
         builder.cycle_recovery = cycle_recovery;
@@ -12710,6 +12834,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             collection_use_constraints,
             string_annotations,
+            reaching_definitions_by_expression,
             expected_types,
             scope,
             bindings,
@@ -12748,6 +12873,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         self.extend_expression_types(expressions);
+        if let Some(collection) = &mut self.reaching_definitions_by_expression
+            && let Some(defs) = reaching_definitions_by_expression
+        {
+            collection.extend(defs);
+        }
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&context);
         self.extend_cycle_recovery(cycle_recovery);
@@ -12876,6 +13006,7 @@ enum ExpressionCacheEntry<'db> {
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
     legacy_aliases: FxIndexSet<Definition<'db>>,
+    reaching_definitions_by_expression: Option<ReachingDefinitionsByExpression<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
@@ -12900,7 +13031,10 @@ impl<'db> FullExpressionCacheEntry<'db> {
     }
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
-        self.expressions.len() == 1
+        self.reaching_definitions_by_expression
+            .as_ref()
+            .is_none_or(FxHashMap::is_empty)
+            && self.expressions.len() == 1
             && self.expressions.get(&expression) == Some(&ty)
             && !self.has_extra()
     }
