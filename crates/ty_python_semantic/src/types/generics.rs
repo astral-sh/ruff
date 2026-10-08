@@ -14,9 +14,9 @@ use crate::types::class_base::ClassBase;
 use crate::types::constraints::projection::{ProjectionError, SolutionBudget, SolutionProjection};
 use crate::types::constraints::resolution::{SolutionType, resolve_solution};
 use crate::types::constraints::{
-    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintSet,
-    ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution, SolutionPaths,
-    SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
+    CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence, ConstraintProvenance,
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, PathBoundSolution, Solution,
+    SolutionPaths, SolutionViolation, SolutionViolationKind, Solutions, TypeVarSolution,
 };
 use crate::types::cyclic::{ActiveRecursionDetector, CycleDetector, HasIdentity, TypeIdentity};
 use crate::types::infer::original_class_type;
@@ -1974,6 +1974,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             env,
                             self.constraints,
+                            self.provenance,
                             typevar,
                             ty.top_materialization(db, env),
                             ty.bottom_materialization(db, env),
@@ -1983,6 +1984,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             db,
                             env,
                             self.constraints,
+                            self.provenance,
                             typevar,
                             ty,
                         )
@@ -2762,12 +2764,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         self.infer_from_constraint_set(set)
     }
 
-    /// Adds the provided constraint set as a validity constraint to the generic call.
-    pub(crate) fn intersect_validity_constraints(&mut self, set: ConstraintSet<'db, 'c>) {
-        let set = set.with_validity_bounds(self.db, self.env);
-        self.record_constraint_set(set);
-    }
-
     /// Build a merged specialization, using a caller-provided hook to select the solution for
     /// each typevar. This compatibility API discards correlations and solving completeness.
     ///
@@ -3502,6 +3498,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3509,6 +3506,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3516,6 +3514,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
+                ConstraintProvenance::Evidence,
                 bound_typevar,
                 ty,
             ),
@@ -3618,7 +3617,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ///
     /// Generic unsatisfiability is retained in `pending` rather than reported as a misleading
     /// type-variable declaration error.
-    fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
+    pub(super) fn record_constraint_set(&mut self, when: ConstraintSet<'db, 'c>) {
         self.pending.intersect(self.db, self.constraints, when);
     }
 
@@ -4868,6 +4867,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
+                        ConstraintProvenance::Evidence,
                         typevar,
                         ty,
                     )
@@ -4995,6 +4995,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             t,
             int,
         ));
@@ -5050,6 +5051,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
+                ConstraintProvenance::Evidence,
                 t,
                 ty,
             ));
@@ -5082,7 +5084,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         });
 
         for (budget, expected_choices) in [
@@ -5141,7 +5150,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         let relation = [int, str].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         });
 
         // Both budgets allow solving the two present bindings, but storing the complete
@@ -5209,7 +5225,14 @@ mod tests {
         let int = KnownClass::Int.to_instance(db, &env);
         let str = KnownClass::Str.to_instance(db, &env);
         builder.record_constraint_set([str, int].into_iter().when_any(db, &constraints, |ty| {
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, t, ty)
+            ConstraintSet::constrain_typevar_equivalence_bound(
+                db,
+                &env,
+                &constraints,
+                ConstraintProvenance::Evidence,
+                t,
+                ty,
+            )
         }));
 
         let inference = builder
@@ -5357,6 +5380,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             t,
             int,
             int,
@@ -5528,6 +5552,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             int,
         );
@@ -5570,8 +5595,14 @@ mod tests {
 
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
         let ty = UnionType::from_two_elements(db, &env, str, Type::int_literal(0));
-        let relation =
-            ConstraintSet::constrain_typevar_equivalence_bound(db, &env, &constraints, typevar, ty);
+        let relation = ConstraintSet::constrain_typevar_equivalence_bound(
+            db,
+            &env,
+            &constraints,
+            ConstraintProvenance::Evidence,
+            typevar,
+            ty,
+        );
         builder.record_constraint_set(relation);
         builder.project_for_legacy_fallback(&ConstraintSetAnalysis::BudgetExceeded);
         builder.add_type_mapping(typevar, str, TypeVarVariance::Covariant);
@@ -5611,12 +5642,19 @@ mod tests {
         let context = GenericContext::from_typevar_instances(db, &env, [typevar]);
         let constraints = ConstraintSetBuilder::new();
         let mut builder = SpecializationBuilder::new(db, &env, &constraints, context);
-        let lower_only =
-            ConstraintSet::constrain_typevar_lower_bound(db, &env, &constraints, typevar, str);
+        let lower_only = ConstraintSet::constrain_typevar_lower_bound(
+            db,
+            &env,
+            &constraints,
+            ConstraintProvenance::Evidence,
+            typevar,
+            str,
+        );
         let rejected = ConstraintSet::constrain_typevar_equivalence_bound(
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             str,
         );
@@ -5624,6 +5662,7 @@ mod tests {
             db,
             &env,
             &constraints,
+            ConstraintProvenance::Evidence,
             typevar,
             int,
         );
