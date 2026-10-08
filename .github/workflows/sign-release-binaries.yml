@@ -350,10 +350,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install wheels/"$TARGET"/ruff-*.whl --force-reinstall --no-index --no-deps
+          python=(python)
+          # Intel wheels are verified on an ARM runner and need the Intel Python slice.
+          if [[ "$TARGET" == x86_64-apple-darwin ]]; then
+            python=(arch -x86_64 python)
+          fi
+          "${python[@]}" -m pip install wheels/"$TARGET"/ruff-*.whl --force-reinstall --no-index --no-deps
           ruff --version
           ruff --help
-          python -m ruff --help
+          "${python[@]}" -m ruff --help
 
   verify-windows:
     name: "verify signed ${{ matrix.platform.target }} artifacts"
