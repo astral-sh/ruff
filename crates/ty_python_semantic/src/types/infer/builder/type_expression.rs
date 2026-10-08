@@ -19,6 +19,7 @@ use crate::types::diagnostic::{
     report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
+use crate::types::infer::implicit_alias::is_non_alias_assignment;
 use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
     implicit_alias_definition, implicit_alias_parameters, infer_implicit_alias_type,
@@ -87,26 +88,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> ImplicitAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        // Forwarding an alias preserves its parameters. Interpreting a bare generic alias as
-        // an annotation here would instead apply its default specialization too early.
-        // Explicit alias validation and references without a unique source still need this
-        // path even though references to forwarding aliases are canonicalized during lookup.
-        let (ty, parameters) = if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
-            self.context.inference_flags |= InferenceFlags::IN_TYPE_EXPRESSION;
-            if self.in_stub() {
-                self.replace_deferred_state(DeferredExpressionState::Deferred);
-            }
-            let (value_ty, referenced) = self.infer_type_expression_reference(value);
-            self.implicit_alias_reference(referenced)
-                .unwrap_or_else(|| {
-                    (
-                        self.infer_name_or_attribute_type_expression(value_ty, referenced, value),
-                        parameters,
-                    )
-                })
-        } else {
-            (self.infer_type_expression(value), parameters)
-        };
+        // Implicit forwarding preserves the referenced alias's parameters. An explicit
+        // `TypeAlias` declaration instead applies defaults to a bare generic reference.
+        let (ty, parameters) =
+            if matches!(definition.kind(self.db()), DefinitionKind::Assignment(_))
+                && matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            {
+                self.context.inference_flags |= InferenceFlags::IN_TYPE_EXPRESSION;
+                if self.in_stub() {
+                    self.replace_deferred_state(DeferredExpressionState::Deferred);
+                }
+                let (value_ty, referenced) = self.infer_type_expression_reference(value);
+                self.implicit_alias_reference(referenced)
+                    .unwrap_or_else(|| {
+                        (
+                            self.infer_name_or_attribute_type_expression(
+                                value_ty, referenced, value,
+                            ),
+                            parameters,
+                        )
+                    })
+            } else {
+                (self.infer_type_expression(value), parameters)
+            };
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
             let target = match definition.kind(db) {
@@ -234,7 +238,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let db = self.db();
         let env = self.program_environment();
         if let Some((alias, parameters)) = self.implicit_alias_reference(definition) {
-            report_missing_type_arguments(&self.context, ty, annotation);
             let result = match parameters {
                 Some(parameters) => {
                     alias.apply_specialization(db, parameters.default_specialization(db, None))
@@ -249,16 +252,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
+        let result = ty.default_specialize(db, env).in_type_expression(
+            db,
+            self.scope(),
+            self.typevar_binding_context,
+            self.inference_flags(),
+        );
+        // Do not add alias diagnostics when value-to-type conversion is still incomplete.
+        if result
+            .as_ref()
+            .is_ok_and(|result| !matches!(result, Type::Dynamic(DynamicType::Todo(_))))
+            && self.reject_non_alias_reference(ty, definition, annotation)
+        {
+            return Type::unknown();
+        }
         report_missing_type_arguments(&self.context, ty, annotation);
-        let result_ty = ty
-            .default_specialize(db, env)
-            .in_type_expression(
-                db,
-                self.scope(),
-                self.typevar_binding_context,
-                self.inference_flags(),
-            )
-            .unwrap_or_else(|error| {
+        let result_ty =
+            result.unwrap_or_else(|error| {
                 if error.invalid_expressions.iter().any(|invalid| {
                     matches!(invalid, InvalidTypeExpression::InvalidBareTypeVarTuple(_))
                 }) {
@@ -270,6 +280,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 error.into_fallback_type(&self.context, annotation, self.inference_flags())
             });
         self.check_type_variable_scope(annotation, result_ty)
+    }
+
+    fn reject_non_alias_reference(
+        &mut self,
+        ty: Type<'db>,
+        definition: Option<Definition<'db>>,
+        reference: &ast::Expr,
+    ) -> bool {
+        // Unknown and provisional cycle types may come from incomplete inference or an error.
+        if !ty.is_unknown()
+            && !ty.is_divergent()
+            && definition
+                .is_some_and(|definition| is_non_alias_assignment(self.db(), definition, ty))
+        {
+            self.report_invalid_type_expression(
+                reference,
+                format_args!(
+                    "Variable is not allowed in {}s",
+                    self.type_expression_context()
+                ),
+            );
+            return true;
+        }
+        false
     }
 
     /// Infer the type of a type expression without storing the result.
@@ -1301,6 +1335,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 },
             );
+        }
+        if self.reject_non_alias_reference(value_ty, definition, &subscript.value) {
+            return Type::unknown();
         }
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {

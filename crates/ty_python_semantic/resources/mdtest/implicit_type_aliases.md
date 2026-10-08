@@ -27,6 +27,17 @@ def g(x: MyNone):
 g(None)
 ```
 
+## Any
+
+```py
+from typing import Any
+
+MyAny = Any
+
+def inspect(value: MyAny):
+    reveal_type(value)  # revealed: Any
+```
+
 ## Unions
 
 We also support unions in type aliases:
@@ -635,7 +646,7 @@ Assigning a generic alias to another name preserves its type parameters and thei
 of a generic class or special form also remains subscriptable:
 
 ```py
-from typing_extensions import Annotated, TypeAlias, TypeVar, Union
+from typing_extensions import Annotated, TypeVar, Union
 
 T = TypeVar("T", default=str)
 
@@ -644,7 +655,6 @@ Forwarded = Items
 ForwardedAgain = Forwarded
 List = list
 ForwardedList = List
-DeclaredList: TypeAlias = list  # error: [missing-type-argument]
 UnionAlias = Union
 ForwardedUnion = UnionAlias
 
@@ -653,14 +663,12 @@ def inspect(
     default: Forwarded,
     repeated: ForwardedAgain[bytes],
     class_alias: ForwardedList[int],
-    declared_class_alias: DeclaredList[int],
     special_form: ForwardedUnion[int, str],
 ):
     reveal_type(explicit)  # revealed: list[int]
     reveal_type(default)  # revealed: list[str]
     reveal_type(repeated)  # revealed: list[bytes]
     reveal_type(class_alias)  # revealed: list[int]
-    reveal_type(declared_class_alias)  # revealed: list[int]
     reveal_type(special_form)  # revealed: int | str
 ```
 
@@ -681,6 +689,60 @@ def inspect(
 ):
     reveal_type(type_var)  # revealed: Unknown
     reveal_type(identity)  # revealed: int
+```
+
+The parameters are preserved only when the right-hand side is a name or attribute. A reference
+nested inside another type expression uses the alias's default specialization:
+
+```py
+OptionalItems = Items | None
+AnnotatedItems = Annotated[Items, "metadata"]
+
+def inspect(optional: OptionalItems, annotated: AnnotatedItems):
+    reveal_type(optional)  # revealed: list[str] | None
+    reveal_type(annotated)  # revealed: list[str]
+
+def invalid(
+    optional: OptionalItems[int],  # error: [not-subscriptable]
+    annotated: AnnotatedItems[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Forwarding PEP 695 aliases
+
+Assigning a PEP 695 alias to another name preserves its type parameters and defaults, including when
+the right-hand side is a module attribute:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+`aliases.py`:
+
+```py
+type Modern[V = str] = list[V]
+```
+
+`main.py`:
+
+```py
+from aliases import Modern
+import aliases
+
+Forwarded = Modern
+ForwardedAttribute = aliases.Modern
+
+def inspect(
+    specialized: Forwarded[int],
+    default: Forwarded,
+    specialized_attribute: ForwardedAttribute[bytes],
+    default_attribute: ForwardedAttribute,
+):
+    reveal_type(specialized)  # revealed: list[int]
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(specialized_attribute)  # revealed: list[bytes]
+    reveal_type(default_attribute)  # revealed: list[str]
 ```
 
 ### Generic typed dictionaries in aliases
@@ -789,37 +851,6 @@ def _(
     reveal_type(forwarded)  # revealed: list[int]
     reveal_type(forwarded_attribute)  # revealed: list[int]
     reveal_type(forwarded_default)  # revealed: list[str]
-```
-
-### Forward references in stubs
-
-An alias in a stub can refer to a definition that appears later in the file. Forwarding a generic
-alias this way preserves its type parameters:
-
-`aliases.pyi`:
-
-```pyi
-from typing import TypeAlias, TypeVar
-
-T = TypeVar("T")
-
-Forwarded: TypeAlias = Items
-Items = list[T]
-Explicit: TypeAlias = Later
-
-class Later: ...
-
-def items() -> Forwarded[int]: ...
-def later() -> Explicit: ...
-```
-
-`main.py`:
-
-```py
-from aliases import items, later
-
-reveal_type(items())  # revealed: list[int]
-reveal_type(later())  # revealed: Later
 ```
 
 ### Imported tagged typed-dictionary aliases
@@ -2167,6 +2198,45 @@ def inspect(
     reveal_type(forwarded)  # revealed: Unknown
 ```
 
+An expression that evaluates to a class or `Any` does not automatically define a type alias. Calls,
+indexing into a list or dictionary, conditional expressions, and boolean operations remain ordinary
+values:
+
+```py
+Evaluated = eval("int")  # no diagnostic
+Called = (lambda: int)()  # no diagnostic
+CalledGeneric = (lambda: list)()  # no diagnostic
+Indexed = [int][0]  # no diagnostic
+Classes = [int]
+IndexedName = Classes[0]  # no diagnostic
+Mapping = {"type": int}
+IndexedMapping = Mapping["type"]  # no diagnostic
+Conditional = int if 1 < 3 else str  # no diagnostic
+Boolean = list or set  # no diagnostic
+ForwardedCalled = Called  # no diagnostic
+
+def inspect(
+    evaluated: Evaluated,  # error: [invalid-type-form]
+    called: Called,  # error: [invalid-type-form]
+    specialized: CalledGeneric[int],  # error: [invalid-type-form]
+    indexed: Indexed,  # error: [invalid-type-form]
+    indexed_name: IndexedName,  # error: [invalid-type-form]
+    indexed_mapping: IndexedMapping,  # error: [invalid-type-form]
+    conditional: Conditional,  # error: [invalid-type-form]
+    boolean: Boolean,  # error: [invalid-type-form]
+    forwarded: ForwardedCalled,  # error: [invalid-type-form]
+):
+    reveal_type(evaluated)  # revealed: Unknown
+    reveal_type(called)  # revealed: Unknown
+    reveal_type(specialized)  # revealed: Unknown
+    reveal_type(indexed)  # revealed: Unknown
+    reveal_type(indexed_name)  # revealed: Unknown
+    reveal_type(indexed_mapping)  # revealed: Unknown
+    reveal_type(conditional)  # revealed: Unknown
+    reveal_type(boolean)  # revealed: Unknown
+    reveal_type(forwarded)  # revealed: Unknown
+```
+
 ## Invalid expressions with nested scopes
 
 Lambdas and comprehensions are invalid type arguments, even when they refer to type variables:
@@ -2186,7 +2256,8 @@ def inspect(lambda_alias: LambdaAlias, comprehension_alias: ComprehensionAlias):
 ## Imported invalid implicit aliases
 
 Importing a value, accessing it through its module, or assigning it to another name does not make it
-a valid type alias. This also holds when the defining module is a dependency that is not checked:
+a valid type alias, even when the value is a class. This also holds when the defining module is a
+dependency that is not checked:
 
 ```toml
 [environment]
@@ -2198,15 +2269,19 @@ extra-paths = ["/dependencies"]
 ```py
 Number = 1 + 2
 Forwarded = Number
+ComputedClass = (lambda: int)()
+ForwardedClass = ComputedClass
 ```
 
 `main.py`:
 
 ```py
 import values
-from values import Number, Forwarded
+from values import Number, Forwarded, ComputedClass, ForwardedClass
 
 Local = Number  # no diagnostic
+LocalClass = ComputedClass  # no diagnostic
+AttributeClass = values.ComputedClass  # no diagnostic
 
 def inspect(
     imported: Number,  # error: [invalid-type-form]
@@ -2218,6 +2293,19 @@ def inspect(
     reveal_type(attribute)  # revealed: Unknown
     reveal_type(forwarded)  # revealed: Unknown
     reveal_type(local)  # revealed: Unknown
+
+def inspect_classes(
+    imported: ComputedClass,  # error: [invalid-type-form]
+    attribute: values.ComputedClass,  # error: [invalid-type-form]
+    forwarded: ForwardedClass,  # error: [invalid-type-form]
+    local: LocalClass,  # error: [invalid-type-form]
+    local_attribute: AttributeClass,  # error: [invalid-type-form]
+):
+    reveal_type(imported)  # revealed: Unknown
+    reveal_type(attribute)  # revealed: Unknown
+    reveal_type(forwarded)  # revealed: Unknown
+    reveal_type(local)  # revealed: Unknown
+    reveal_type(local_attribute)  # revealed: Unknown
 ```
 
 ## Recursive

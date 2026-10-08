@@ -2,8 +2,10 @@
 
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
+use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor as ast_visitor};
+use ruff_text_size::Ranged;
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::place::PlaceExpr;
 use ty_python_core::scope::FileScopeId;
@@ -37,23 +39,9 @@ pub(super) struct ImplicitAliasDefinition<'db> {
 #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn implicit_alias_definition<'db>(
     db: &'db dyn Db,
-    mut definition: Definition<'db>,
+    definition: Definition<'db>,
 ) -> Option<ImplicitAliasDefinition<'db>> {
-    if definition.kind(db).is_import() {
-        let table = place_table(db, definition.scope(db));
-        let symbol = table.symbol(definition.place(db).as_symbol()?);
-        let definitions = resolve_definition(
-            db,
-            &ProgramEnvironment::from_file(definition.program_file(db)),
-            definition,
-            Some(symbol.name().as_str()),
-            ImportAliasResolution::ResolveAliases,
-        );
-        let [resolved] = definitions.as_slice() else {
-            return None;
-        };
-        definition = resolved.definition()?;
-    }
+    let definition = resolve_imported_definition(db, definition)?;
 
     if !matches!(
         definition.kind(db),
@@ -91,29 +79,128 @@ pub(super) fn implicit_alias_definition<'db>(
         }
         _ => return None,
     };
-    // A forwarding alias shares its target's parameters and recursive identity. Resolve
-    // the source before inferring its value, which could re-enter a recursive alias.
-    // Explicit aliases are still validated separately when their defining file is checked.
-    if let Some(target) = forwarding_alias_definition(db, definition, value)
+    // An implicit forwarding alias shares its target's parameters and recursive identity.
+    // Resolve the source before inferring its value, which could re-enter a recursive alias.
+    // Explicit aliases instead interpret their right-hand side as a type expression,
+    // applying the default specialization to bare generic references.
+    if !is_explicit
+        && let Some(target) = forwarding_alias_definition(db, definition, value)
         && target != definition
         && let Some(alias) = implicit_alias_definition(db, target)
     {
         return Some(alias);
     }
-    // Class and special-form aliases preserve their constructor identity. `UnionAlias = Union`
-    // need not be valid as a bare annotation to allow `UnionAlias[int, str]`. Likewise, simply
-    // renaming a TypeVar does not make it generic; an explicit `TypeAlias` declaration does.
-    if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
-        match crate::types::definition_expression_type(db, definition, value) {
-            Type::ClassLiteral(_) | Type::SpecialForm(_) => return None,
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) if !is_explicit => return None,
-            _ => {}
-        }
+    // Assignments such as `List = list`, `UnionAlias = Union`, and `Renamed = T` preserve
+    // the original class, special form, or type variable. A bare reference to a PEP 695
+    // alias likewise preserves its type parameters.
+    if !is_explicit
+        && matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+        && matches!(
+            crate::types::definition_expression_type(db, definition, value),
+            Type::ClassLiteral(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::TypeVar(_) | KnownInstanceType::TypeAliasType(_)
+                )
+        )
+    {
+        return None;
     }
     Some(ImplicitAliasDefinition {
         definition,
         is_explicit,
     })
+}
+
+/// Whether a failed alias interpretation refers to an ordinary computed value.
+///
+/// A class-valued assignment is not necessarily a type declaration: `(lambda: int)()`
+/// produces the existing `int` class, whereas a recognized `NamedTuple` or `type` call
+/// creates a class whose definition is the assignment itself. Unknown source definitions
+/// remain eligible for the usual fallback, including unresolved and ambiguous imports.
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn is_non_alias_assignment<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    ty: Type<'db>,
+) -> bool {
+    let Some(definition) = resolve_imported_definition(db, definition) else {
+        return false;
+    };
+    let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+        return false;
+    };
+    let module = parsed_module(db, definition.python_file(db)).load(db);
+    let value = assignment.value(&module);
+    if matches!(value, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
+        return forwarding_alias_definition(db, definition, value)
+            .is_some_and(|target| target != definition && is_non_alias_assignment(db, target, ty));
+    }
+    if value.is_none_literal_expr() {
+        return false;
+    }
+    // These forms can describe an alias even when one of its type arguments is invalid.
+    // Type-expression inference diagnoses those arguments and preserves the outer type.
+    if let ast::Expr::Subscript(subscript) = value
+        && is_dotted_name(&subscript.value)
+    {
+        let base = crate::types::definition_expression_type(db, definition, &subscript.value);
+        if matches!(
+            base,
+            Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
+                | Type::SpecialForm(_)
+                | Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
+        ) && !forwarding_alias_definition(db, definition, &subscript.value)
+            .is_some_and(|target| is_non_alias_assignment(db, target, base))
+        {
+            return false;
+        }
+    }
+
+    let origin = match ty {
+        Type::Union(union) => {
+            return union.elements(db).iter().any(|element| {
+                !element.is_none(db)
+                    && !element.is_unknown()
+                    && !element.is_divergent()
+                    && is_non_alias_assignment(db, definition, *element)
+            });
+        }
+        // Shared and nested factory calls are anchored to their expression rather than
+        // a single assignment target, as in `A = B = TypedDict(...)`.
+        Type::ClassLiteral(class) if class.definition(db).is_none() => {
+            return class.program_file(db) != definition.program_file(db)
+                || !value.range().contains_range(class.header_range(db));
+        }
+        Type::KnownInstance(KnownInstanceType::Sentinel(sentinel)) => Some(sentinel.definition(db)),
+        _ => ty
+            .definition(db, &ProgramEnvironment::from_definition(definition))
+            .and_then(|origin| origin.definition()),
+    };
+    origin != Some(definition)
+}
+
+fn resolve_imported_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Definition<'db>> {
+    if !definition.kind(db).is_import() {
+        return Some(definition);
+    }
+    let table = place_table(db, definition.scope(db));
+    let symbol = table.symbol(definition.place(db).as_symbol()?);
+    let definitions = resolve_definition(
+        db,
+        &ProgramEnvironment::from_definition(definition),
+        definition,
+        Some(symbol.name().as_str()),
+        ImportAliasResolution::ResolveAliases,
+    );
+    let [resolved] = definitions.as_slice() else {
+        return None;
+    };
+    resolved.definition()
 }
 
 /// Find a unique source for a forwarding assignment without inferring a plain name's value.

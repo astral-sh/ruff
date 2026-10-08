@@ -1,9 +1,9 @@
 # PEP 613 type aliases
 
 PEP 613 type aliases are simple assignment statements, annotated with `typing.TypeAlias` to mark
-them as a type alias. At runtime, they behave the same as implicit type aliases. Our support for
-them is currently the same as for implicit type aliases, but we don't reproduce the full
-implicit-type-alias test suite here, just some particularly interesting cases.
+them as a type alias. At runtime, they behave the same as implicit type aliases. In type
+expressions, an explicit alias applies the default specialization to an unsubscripted generic on its
+right-hand side.
 
 ## Basic
 
@@ -129,9 +129,7 @@ def _(x: MyAlias):
 
 ## Generic aliases
 
-A more comprehensive set of tests can be found in
-[`implicit_type_aliases.md`](./implicit_type_aliases.md). If the implementations ever diverge, we
-may need to duplicate more tests here.
+See also the generic aliases in [`implicit_type_aliases.md`](./implicit_type_aliases.md).
 
 ### Basic
 
@@ -149,6 +147,168 @@ reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
     reveal_type(list_or_set_of_str)  # revealed: list[str] | set[str]
+```
+
+### Default specialization on the right-hand side
+
+An unsubscripted generic alias on the right-hand side is specialized with its defaults. Passing a
+type variable explicitly instead creates another generic alias:
+
+```py
+from typing_extensions import TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+Items: TypeAlias = list[T]
+DefaultItems: TypeAlias = Items
+GenericItems: TypeAlias = Items[T]
+QuotedItems: TypeAlias = "Items"
+
+def inspect(default: DefaultItems, generic: GenericItems[int], quoted: QuotedItems):
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(generic)  # revealed: list[int]
+    reveal_type(quoted)  # revealed: list[str]
+
+def invalid(value: DefaultItems[int]): ...  # error: [not-subscriptable]
+```
+
+A bare generic class in an explicit alias is also default-specialized. Assigning that alias to
+another name preserves the specialization:
+
+```py
+DeclaredList: TypeAlias = list  # error: [missing-type-argument]
+ForwardedDeclared = DeclaredList
+
+def inspect(declared: DeclaredList, forwarded: ForwardedDeclared):
+    reveal_type(declared)  # revealed: list[Unknown]
+    reveal_type(forwarded)  # revealed: list[Unknown]
+
+def invalid(
+    declared: DeclaredList[int],  # error: [not-subscriptable]
+    forwarded: ForwardedDeclared[int],  # error: [not-subscriptable]
+): ...
+```
+
+The alias still refers to the generic class object in value expressions:
+
+```py
+reveal_type(DeclaredList[int])  # revealed: <class 'list[int]'>
+reveal_type(DeclaredList([1]))  # revealed: list[int]
+```
+
+An explicit alias also default-specializes bare `Callable`. An implicit alias preserves the special
+form and can still supply its parameter and return types:
+
+```py
+from typing import Callable
+
+DeclaredCallable: TypeAlias = Callable  # error: [missing-type-argument]
+ImplicitCallable = Callable
+
+def inspect(declared: DeclaredCallable, implicit: ImplicitCallable[[int], str]):
+    reveal_type(declared)  # revealed: (...) -> Unknown
+    reveal_type(implicit)  # revealed: (int, /) -> str
+
+def invalid(value: DeclaredCallable[[int], str]): ...  # error: [not-subscriptable]
+```
+
+### Forwarding PEP 695 aliases
+
+An explicit alias applies defaults when its right-hand side is a PEP 695 alias. Assigning the
+explicit alias to another name preserves that specialization:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeAlias
+
+type Modern[V = str] = list[V]
+Default: TypeAlias = Modern
+Forwarded = Default
+
+def inspect(default: Default, forwarded: Forwarded):
+    reveal_type(default)  # revealed: list[str]
+    reveal_type(forwarded)  # revealed: list[str]
+
+def invalid(
+    default: Default[int],  # error: [not-subscriptable]
+    forwarded: Forwarded[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Imported generic aliases
+
+An explicit alias also applies defaults when the generic alias comes from another module, whether
+the original alias is implicit or explicit:
+
+`aliases.py`:
+
+```py
+from typing_extensions import TypeAlias, TypeVar
+
+T = TypeVar("T", default=str)
+Implicit = list[T]
+Explicit: TypeAlias = list[T]
+Default: TypeAlias = Implicit
+```
+
+`main.py`:
+
+```py
+from typing import TypeAlias
+from aliases import Default, Implicit
+import aliases
+
+DefaultImplicit: TypeAlias = Implicit
+DefaultExplicit: TypeAlias = aliases.Explicit
+ForwardedDefault = DefaultExplicit
+
+def inspect(implicit: DefaultImplicit, explicit: DefaultExplicit, forwarded: ForwardedDefault, imported: Default):
+    reveal_type(implicit)  # revealed: list[str]
+    reveal_type(explicit)  # revealed: list[str]
+    reveal_type(forwarded)  # revealed: list[str]
+    reveal_type(imported)  # revealed: list[str]
+
+def invalid(
+    implicit: DefaultImplicit[int],  # error: [not-subscriptable]
+    explicit: DefaultExplicit[int],  # error: [not-subscriptable]
+    forwarded: ForwardedDefault[int],  # error: [not-subscriptable]
+    imported: Default[int],  # error: [not-subscriptable]
+): ...
+```
+
+### Forward references in stubs
+
+An explicit alias in a stub can refer to an alias or class defined later in the file. An
+unsubscripted generic reference applies the default specialization, using `Unknown` for a type
+variable with no default:
+
+`aliases.pyi`:
+
+```pyi
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+Forwarded: TypeAlias = Items
+Items = list[T]
+Explicit: TypeAlias = Later
+
+class Later: ...
+
+def items() -> Forwarded: ...
+def invalid() -> Forwarded[int]: ...  # error: [not-subscriptable]
+def later() -> Explicit: ...
+```
+
+`main.py`:
+
+```py
+from aliases import items, later
+
+reveal_type(items())  # revealed: list[Unknown]
+reveal_type(later())  # revealed: Later
 ```
 
 ### Stringified generic alias
@@ -952,14 +1112,15 @@ C().takes(1)
 
 ## Forwarding generic recursive aliases
 
-A forwarded explicit alias preserves type arguments throughout the recursive type:
+A forwarded explicit alias preserves type arguments throughout the recursive type when its
+right-hand side passes a type variable explicitly:
 
 ```py
-from typing import TypeAlias, TypeVar
+from typing_extensions import TypeAlias, TypeVar
 
-T = TypeVar("T")
+T = TypeVar("T", default=str)
 Node: TypeAlias = tuple[T, "Forwarded[T] | None"]
-Forwarded: TypeAlias = Node
+Forwarded: TypeAlias = Node[T]
 
 def inspect(value: Forwarded[int]):
     reveal_type(value[0])  # revealed: int
@@ -969,6 +1130,21 @@ def inspect(value: Forwarded[int]):
 
 def invalid() -> Forwarded[int]:
     return (1, ("bad", None))  # error: [invalid-return-type]
+```
+
+An unsubscripted reference fixes the default throughout the recursive type:
+
+```py
+DefaultNode: TypeAlias = Node
+
+def inspect_default(value: DefaultNode):
+    reveal_type(value[0])  # revealed: str
+    tail = value[1]
+    if tail is not None:
+        reveal_type(tail[0])  # revealed: str
+
+def invalid_default() -> DefaultNode:
+    return ("root", (1, None))  # error: [invalid-return-type]
 ```
 
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow

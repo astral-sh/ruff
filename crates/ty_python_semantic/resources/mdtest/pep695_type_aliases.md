@@ -232,7 +232,10 @@ But narrowing of names used in the type alias is still respected:
 
 ```py
 def _(flag: bool):
-    t = int if flag else None
+    if flag:
+        t = int
+    else:
+        t = None
     if t is not None:
         type Alias = t | str
         def f(x: Alias):
@@ -248,10 +251,20 @@ reveal_type(ListOrSet.__type_params__)
 type Tuple1[T] = tuple[T]
 
 def _(cond: bool):
-    Generic = ListOrSet if cond else Tuple1
+    if cond:
+        Generic = ListOrSet
+    else:
+        Generic = Tuple1
 
     def _(x: Generic[int]):
         reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
+
+# A conditional expression does not define a type alias.
+def invalid(cond: bool):
+    Computed = ListOrSet if cond else Tuple1
+
+    def _(x: Computed[int]):  # error: [invalid-type-form]
+        reveal_type(x)  # revealed: Unknown
 
 try:
     class Foo[T]:
