@@ -3,9 +3,9 @@
 ## Basic behavior
 
 The builtin function `hasattr()` can narrow nominal and structural types in its positive branch by
-intersecting the type with a synthesized protocol. A negative check does not narrow the type: we do
-not check definite initialization of instance attributes, so their absence does not rule out an
-instance of a class that declares them.
+intersecting the type with a synthesized protocol. A negative check excludes types whose classes
+provide the attribute. We do not check definite initialization of instance attributes, so their
+absence does not rule out an instance of a class that only declares them.
 
 ```py
 from typing import final
@@ -47,25 +47,34 @@ def _(obj: FinalClass):
         reveal_type(obj.spam)  # revealed: Unknown
 ```
 
-When the corresponding attribute is already defined on the class, `hasattr` narrowing does not
-change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
-`WithSpam & <Protocol …>` simplifies to `WithSpam`:
+When the corresponding attribute is already defined on the class, positive `hasattr` narrowing does
+not change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
+`WithSpam & <Protocol …>` simplifies to `WithSpam`. The negative branch is unreachable, including
+for methods:
 
 ```py
 class WithSpam:
     spam: int = 42
 
     def method(self) -> None: ...
+    @classmethod
+    def class_method(cls) -> None: ...
+    @staticmethod
+    def static_method() -> None: ...
 
 def _(obj: WithSpam):
     if hasattr(obj, "spam"):
         reveal_type(obj)  # revealed: WithSpam
         reveal_type(obj.spam)  # revealed: int
     else:
-        reveal_type(obj)  # revealed: WithSpam
+        reveal_type(obj)  # revealed: Never
 
     if not hasattr(obj, "method"):
-        reveal_type(obj)  # revealed: WithSpam
+        reveal_type(obj)  # revealed: Never
+    if not hasattr(obj, "class_method"):
+        reveal_type(obj)  # revealed: Never
+    if not hasattr(obj, "static_method"):
+        reveal_type(obj)  # revealed: Never
 ```
 
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
@@ -185,9 +194,13 @@ def check(value: Initialized) -> None:
 ## Inherited uninitialized slots
 
 A slot provides storage for an instance attribute without initializing it, including in subclasses.
+It also hides a default inherited from a base class.
 
 ```py
-class Base:
+class Default:
+    value: int = 1
+
+class Base(Default):
     __slots__ = ("value",)
     value: int
 
@@ -200,8 +213,8 @@ def check(value: Slotted) -> None:
 
 ## Unions of instance and class attributes
 
-A negative `hasattr` check preserves union members, whether their attribute is declared on instances
-or initialized on the class.
+A negative `hasattr` check excludes union members whose classes provide the attribute, but preserves
+members that only declare an instance attribute.
 
 ```py
 class InstanceAttribute:
@@ -212,5 +225,162 @@ class ClassAttribute:
 
 def check(value: InstanceAttribute | ClassAttribute) -> None:
     if not hasattr(value, "value"):
-        reveal_type(value)  # revealed: InstanceAttribute | ClassAttribute
+        reveal_type(value)  # revealed: InstanceAttribute
+```
+
+## Inherited defaults behind annotations
+
+An annotation in a subclass does not hide a value inherited from its base class.
+
+```py
+class Base:
+    value: int = 1
+
+class Derived(Base):
+    value: int
+
+def check(value: Derived) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Never
+```
+
+## Declarations in protocols and stubs
+
+Methods declared in protocols and stubs also establish presence. A negative check for `keys`
+excludes the corresponding protocol from a union with an iterable. Annotation-only declarations in
+stubs do not establish presence, including `ClassVar` declarations.
+
+`methods.pyi`:
+
+```pyi
+from typing import ClassVar, Protocol
+
+class HasKeys(Protocol):
+    def keys(self) -> list[str]: ...
+
+class WithMethod:
+    value: int
+    class_value: ClassVar[int]
+
+    def method(self) -> None: ...
+```
+
+`main.py`:
+
+```py
+from collections.abc import Iterable
+from methods import HasKeys, WithMethod
+
+def check_keys(value: HasKeys | Iterable[str]) -> None:
+    if not hasattr(value, "keys"):
+        reveal_type(value)  # revealed: Iterable[str]
+
+def check_method(value: WithMethod) -> None:
+    if not hasattr(value, "method"):
+        reveal_type(value)  # revealed: Never
+
+def check_annotations(value: WithMethod) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: WithMethod
+    if not hasattr(value, "class_value"):
+        reveal_type(value)  # revealed: WithMethod
+```
+
+## Properties and custom descriptors
+
+A property getter or descriptor can raise `AttributeError`, so it does not make the negative branch
+unreachable.
+
+```py
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> int:
+        raise AttributeError
+
+def make_descriptor() -> object:
+    return Descriptor()
+
+class WithDescriptors:
+    descriptor = Descriptor()
+    opaque = make_descriptor()
+
+    @property
+    def property(self) -> int:
+        raise AttributeError
+
+def check(value: WithDescriptors) -> None:
+    if not hasattr(value, "descriptor"):
+        reveal_type(value)  # revealed: WithDescriptors
+    if not hasattr(value, "property"):
+        reveal_type(value)  # revealed: WithDescriptors
+    if not hasattr(value, "opaque"):
+        reveal_type(value)  # revealed: WithDescriptors
+```
+
+## Class attributes initialized in methods
+
+Assigning an attribute through `cls` does not establish that it is present before that method runs.
+
+```py
+class Initialized:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.value = 1
+
+def check(value: Initialized) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Initialized
+```
+
+## Dataclass field specifiers
+
+A field specifier can be removed from the class by the dataclass decorator. It does not establish
+presence, whether the field is left unset or initialized on instances by a factory.
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass
+class Uninitialized:
+    value: int = field(init=False)
+
+@dataclass
+class WithFactory:
+    value: list[int] = field(default_factory=list)
+
+def check_uninitialized(value: Uninitialized) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Uninitialized
+
+def check_factory(value: WithFactory) -> None:
+    if not hasattr(value, "value"):
+        reveal_type(value)  # revealed: WithFactory
+```
+
+## Conjunctions with instance checks
+
+A negative attribute check before an `isinstance` check does not exclude a class that only declares
+the attribute. Reversing the checks has the same result.
+
+```py
+class Annotated:
+    value: int
+
+def check(value: object) -> None:
+    if not hasattr(value, "value") and isinstance(value, Annotated):
+        reveal_type(value)  # revealed: Annotated
+    if isinstance(value, Annotated) and not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Annotated
+```
+
+A class with a bound default is excluded in either order.
+
+```py
+class WithDefault:
+    value: int = 1
+
+def check_default(value: object) -> None:
+    if not hasattr(value, "value") and isinstance(value, WithDefault):
+        reveal_type(value)  # revealed: Never
+    if isinstance(value, WithDefault) and not hasattr(value, "value"):
+        reveal_type(value)  # revealed: Never
 ```

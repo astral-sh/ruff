@@ -1,12 +1,148 @@
 use crate::Db;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
-    TypeOrigin, place_by_id, place_from_bindings, place_from_declarations,
+    ConsideredDefinitions, DefinedPlace, Definedness, Place, PlaceAndQualifiers,
+    RequiresExplicitReExport, TypeOrigin, place_by_id, place_from_bindings,
+    place_from_declarations,
 };
-use crate::types::{ProgramEnvironment, Type, class::MroLookup, infer::nearest_enclosing_class};
+use crate::types::{
+    ClassBase, ClassType, KnownInstanceType, MemberLookupKey, MemberLookupPolicy,
+    ProgramEnvironment, Type, TypeVarBoundOrConstraints,
+    class::{CodeGeneratorKind, MroLookup},
+    infer::nearest_enclosing_class,
+};
 use ty_python_core::{
-    place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
+    definition::{DefinitionKind, DefinitionState},
+    place_table,
+    scope::ScopeId,
+    semantic_index,
+    symbol::ScopedSymbolId,
+    use_def_map,
 };
+
+/// Whether class bindings or a protocol method contract establish an attribute's presence.
+///
+/// Instance annotations and assignments do not establish presence because we do not check
+/// definite initialization. Descriptors other than ordinary methods can raise `AttributeError`
+/// when accessed, even when the descriptor itself is bound on the class.
+pub(super) fn has_definitely_present_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+    name: &str,
+) -> bool {
+    has_definitely_present_attribute_impl(
+        db,
+        MemberLookupKey::new(db, env.program(db), ty, name, MemberLookupPolicy::default()),
+    )
+}
+
+#[salsa::tracked(returns(copy), cycle_result=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn has_definitely_present_attribute_impl<'db>(db: &'db dyn Db, key: MemberLookupKey<'db>) -> bool {
+    let env = ProgramEnvironment::from_program(key.program(db));
+    let name = key.name(db).as_str();
+    let has_attribute = |ty| has_definitely_present_attribute(db, &env, ty, name);
+
+    match key.ty(db) {
+        Type::NominalInstance(instance) => {
+            has_definitely_bound_class_attribute(db, &env, instance.class(db, &env), name)
+        }
+        Type::ProtocolInstance(protocol) => protocol
+            .interface(db)
+            .member_by_name(db, name)
+            .is_some_and(|member| member.is_method()),
+        Type::Union(union) => union.elements(db).iter().copied().all(has_attribute),
+        Type::Intersection(intersection) => intersection.iter_positive(db).any(has_attribute),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db, &env) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => has_attribute(bound),
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                constraints.elements(db).iter().copied().all(has_attribute)
+            }
+            None => false,
+        },
+        Type::NewTypeInstance(newtype) => has_attribute(newtype.concrete_base_type(db)),
+        Type::TypeAlias(alias) => has_attribute(alias.value_type(db)),
+        Type::Recursive(recursive) => recursive
+            .unfold(db, &env)
+            .map(has_attribute)
+            .unwrap_or(false),
+        Type::LiteralValue(literal) => has_attribute(literal.fallback_instance(db, &env)),
+        _ => false,
+    }
+}
+
+fn has_definitely_bound_class_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    name: &str,
+) -> bool {
+    for base in class.iter_mro(db) {
+        let class = match base {
+            ClassBase::Class(class) => class,
+            ClassBase::Generic | ClassBase::Protocol => continue,
+            _ => return false,
+        };
+        let Some((class, _)) = class.static_class_literal(db) else {
+            return false;
+        };
+        if class.has_own_slot_descriptor(db, name) {
+            return false;
+        }
+
+        let scope = class.body_scope(db);
+        let Some(symbol) = place_table(db, scope).symbol_id(name) else {
+            continue;
+        };
+        if let Some(
+            field_policy @ (CodeGeneratorKind::DataclassLike(_) | CodeGeneratorKind::Pydantic(_)),
+        ) = CodeGeneratorKind::from_class(db, class.into())
+            && class.own_fields(db, None, field_policy).contains_key(name)
+        {
+            // Field transformations can remove the class binding or initialize the value only
+            // on instances. The original field specifier is not evidence of runtime presence.
+            return false;
+        }
+        let use_def = use_def_map(db, scope);
+        let mut has_binding = false;
+        let mut has_bare_annotation = false;
+        for binding in use_def.end_of_scope_symbol_bindings(symbol) {
+            let DefinitionState::Defined(definition) = binding.binding else {
+                continue;
+            };
+            if matches!(definition.kind(db), DefinitionKind::AnnotatedAssignment(assignment) if !assignment.has_value())
+            {
+                // Stub annotations participate in binding inference, but do not describe an
+                // initialized class attribute. They can coexist with conditional bindings.
+                has_bare_annotation = true;
+            } else {
+                has_binding = true;
+            }
+        }
+        if !has_binding {
+            continue;
+        }
+        if has_bare_annotation {
+            return false;
+        }
+        let Place::Defined(binding) =
+            place_from_bindings(db, env, use_def.end_of_scope_symbol_bindings(symbol)).place
+        else {
+            continue;
+        };
+        return binding.definedness == Definedness::AlwaysDefined
+            // An `object` return annotation can hide a descriptor supplied by a factory.
+            && !binding.ty.resolve_type_alias(db).is_object()
+            && binding.ty.is_definitely_non_data_descriptor(db, env)
+            && (binding.ty.function_like_kind(db).is_some()
+                && !matches!(binding.ty, Type::KnownInstance(KnownInstanceType::MethodWrapper(_)))
+                || binding
+                    .ty
+                    .class_member_with_policy(db, env, "__get__", MemberLookupPolicy::REQUIRE_CONCRETE)
+                    .place
+                    .is_undefined());
+    }
+    false
+}
 
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.

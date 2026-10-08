@@ -365,8 +365,8 @@ class Base:
 ## Class attributes independently establish presence
 
 A class attribute is present before an initializer runs, including when it is inherited. Assigning
-to the same name inside a negative `isinstance` guard does not make that branch reachable. We
-conservatively check negative `hasattr` branches because they do not narrow the instance.
+to the same name inside a negative `hasattr` or `isinstance` guard does not make that branch
+reachable.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -381,8 +381,8 @@ class Base:
 
     def __init__(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__  # error: [invalid-assignment]
-            self.missing  # error: [unresolved-attribute]
+            self.x = self.__str__  # no diagnostic
+            self.missing  # no diagnostic
         if not isinstance(self, HasX):
             self.x = self.__str__
             self.missing
@@ -390,8 +390,8 @@ class Base:
 class Child(Base):
     def initialize(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__  # error: [invalid-assignment]
-            self.missing  # error: [unresolved-attribute]
+            self.x = self.__str__  # no diagnostic
+            self.missing  # no diagnostic
 ```
 
 ## Class attributes establish presence through aliased protocol members
@@ -444,6 +444,9 @@ class Base:
             self.unreachable = self.__str__
         if not hasattr(self, "deleted"):
             self.deleted = self.__str__
+
+reveal_type(Base().unreachable())  # revealed: str
+reveal_type(Base().deleted())  # revealed: str
 ```
 
 `child.py`:
