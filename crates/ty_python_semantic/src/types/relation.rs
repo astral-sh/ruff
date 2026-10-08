@@ -1,5 +1,6 @@
 use crate::ProgramEnvironment;
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
@@ -304,6 +305,36 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db, env, TypeVarSet::None)
     }
 
+    /// Checks whether this type guarantees the target's behavior when refining a generic return.
+    ///
+    /// Overloaded callables must provide their return guarantees in overload order, rather than
+    /// merely have one assignable signature. An unsupported overload comparison returns `None`,
+    /// so inference can keep its merged result instead of discarding an unproven alternative.
+    pub(super) fn is_subtype_for_return_refinement(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        target: Type<'db>,
+    ) -> Option<bool> {
+        let constraints = ConstraintSetBuilder::new();
+        let unsupported = Cell::new(false);
+        let result = TypeRelationChecker {
+            overload_refinement: Some(&unsupported),
+            ..TypeRelationChecker::subtyping(
+                env,
+                &constraints,
+                TypeVarSet::None,
+                &HasRelationToVisitor::default(&constraints),
+                &IsDisjointVisitor::default(&constraints),
+                &SignatureRelationVisitor::default(),
+                &ApplyTypeMappingVisitor::new(env),
+            )
+        }
+        .check_type_pair(db, self, target)
+        .is_always_satisfied(db, env, TypeVarSet::None);
+        (!unsupported.get()).then_some(result)
+    }
+
     pub(super) fn when_subtype_of<'c>(
         self,
         db: &'db dyn Db,
@@ -428,6 +459,7 @@ impl<'db> Type<'db> {
             inferable: TypeVarSet::None,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            overload_refinement: None,
             context_tree: Some(ErrorContextTree::new(relation)),
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
@@ -768,6 +800,7 @@ impl<'db> Type<'db> {
             inferable,
             relation,
             typevar_evaluation,
+            overload_refinement: None,
             context_tree: None,
             provenance,
             perform_expensive_checks: true,
@@ -906,6 +939,7 @@ impl<'db> Type<'db> {
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
             typevar_evaluation,
+            overload_refinement: None,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
             signature_relation_visitor: &signature_relation_visitor,
@@ -1024,20 +1058,22 @@ impl<'db> Type<'db> {
 }
 
 /// A [`CycleDetector`] that is used in `has_relation_to` methods.
+/// The final key component distinguishes ordinary relations from return-refinement proofs.
 pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     'db,
     TypeRelation,
-    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation),
+    (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation, bool),
     ConstraintSet<'db, 'c>,
     1,
 >;
 
-impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation) {
+impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvaluation, bool) {
     type Id = (
         TypeIdentity<'db>,
         TypeIdentity<'db>,
         TypeRelation,
         TypeVarEvaluation,
+        bool,
     );
 
     fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
@@ -1045,6 +1081,7 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             && self.1.may_share_type_identity(db, other.1)
             && self.2 == other.2
             && self.3 == other.3
+            && self.4 == other.4
     }
 
     fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
@@ -1053,6 +1090,7 @@ impl<'db> HasIdentity<'db> for (Type<'db>, Type<'db>, TypeRelation, TypeVarEvalu
             self.1.to_type_identity(db),
             self.2,
             self.3,
+            self.4,
         )
     }
 }
@@ -1083,6 +1121,8 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     pub(super) relation: TypeRelation,
     pub(super) typevar_evaluation: TypeVarEvaluation,
     pub(super) provenance: ConstraintProvenance,
+    /// Present only during return refinement; records an unsupported overload proof.
+    pub(super) overload_refinement: Option<&'a Cell<bool>>,
     context_tree: Option<ErrorContextTree<'db>>,
     perform_expensive_checks: bool,
 
@@ -1117,6 +1157,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            overload_refinement: None,
             context_tree: None,
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
@@ -1185,6 +1226,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Lazy,
+            overload_refinement: None,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
@@ -1209,6 +1251,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             inferable: TypeVarSet::None,
             relation: TypeRelation::Assignability,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            overload_refinement: None,
             context_tree: Some(ErrorContextTree::new(TypeRelation::Assignability)),
             provenance: ConstraintProvenance::Evidence,
             perform_expensive_checks: true,
@@ -1236,6 +1279,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let env = self.env;
         let checker = Self {
             provenance: self.provenance,
+            overload_refinement: self.overload_refinement,
             ..Self::subtyping(
                 env,
                 self.constraints,
@@ -1612,7 +1656,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         self.relation_visitor
             .try_visit(
                 db,
-                (source, target, self.relation, self.typevar_evaluation),
+                (
+                    source,
+                    target,
+                    self.relation,
+                    self.typevar_evaluation,
+                    self.overload_refinement.is_some(),
+                ),
                 // Cached constraints do not retain explanations. When collecting context,
                 // recompute unsatisfiable comparisons while preserving the active recursion
                 // guards. Satisfiable constraints remain reusable, including those that
@@ -3056,6 +3106,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            overload_refinement: self.overload_refinement,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
@@ -3103,6 +3154,7 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     provenance: ConstraintProvenance,
     perform_expensive_checks: bool,
     typevar_evaluation: TypeVarEvaluation,
+    overload_refinement: Option<&'a Cell<bool>>,
 
     // N.B. these fields are private to reduce the risk of
     // "double-visiting" a given pair of types. You should
@@ -3125,6 +3177,7 @@ impl<'c, 'db> EquivalenceChecker<'_, 'c, 'db> {
             env: self.env,
             relation: TypeRelation::Redundancy { pure: true },
             typevar_evaluation: self.typevar_evaluation,
+            overload_refinement: self.overload_refinement,
             constraints: self.constraints,
             context_tree: None,
             provenance: self.provenance,
@@ -3219,6 +3272,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             env: self.env,
             relation,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            // An incomplete refinement proof cannot establish disjointness.
+            overload_refinement: None,
             constraints: self.constraints,
             inferable: self.inferable,
             context_tree: None,
@@ -3264,6 +3319,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             provenance: self.provenance,
             perform_expensive_checks: self.perform_expensive_checks,
             typevar_evaluation: TypeVarEvaluation::Eager,
+            overload_refinement: None,
             relation_visitor: self.relation_visitor,
             disjointness_visitor: self.disjointness_visitor,
             signature_relation_visitor: self.signature_relation_visitor,
