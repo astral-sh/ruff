@@ -876,7 +876,11 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let default_signature_relations = SignatureRelationVisitor::default();
+        let signature_relation_visitor = materialization_visitor
+            .signature_relation_visitor
+            .as_ref()
+            .unwrap_or(&default_signature_relations);
         let checker = EquivalenceChecker {
             env: materialization_visitor.env,
             constraints,
@@ -885,7 +889,7 @@ impl<'db> Type<'db> {
             typevar_evaluation,
             relation_visitor: &relation_visitor,
             disjointness_visitor: &disjointness_visitor,
-            signature_relation_visitor: &signature_relation_visitor,
+            signature_relation_visitor,
             materialization_visitor,
         };
         checker.check_type_pair(db, self, other)
@@ -1332,7 +1336,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 {
                     self.check_type_pair(
                         db,
-                        intersection.with_expanded_typevars_and_newtypes(db, self.env),
+                        intersection.with_expanded_typevars_in_relation(
+                            db,
+                            self.env,
+                            self.signature_relation_visitor,
+                        ),
                         target,
                     )
                 }
@@ -1483,7 +1491,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if self.should_expand_intersection(db, intersection) {
                     self.check_type_pair(
                         db,
-                        intersection.with_expanded_typevars_and_newtypes(db, self.env),
+                        intersection.with_expanded_typevars_in_relation(
+                            db,
+                            self.env,
+                            self.signature_relation_visitor,
+                        ),
                         target,
                     )
                 } else {

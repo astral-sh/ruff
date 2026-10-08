@@ -3088,8 +3088,8 @@ def inherited(x: Nested[T]):
 ## Inherited recursive protocol members
 
 Methods inherited from a generic protocol may refer to the base protocol rather than the derived
-one. They are still recursive when inferring a specialization of the derived protocol.
-Regression test for <https://github.com/astral-sh/ty/issues/4694>.
+one. They are still recursive when inferring a specialization of the derived protocol. Regression
+test for <https://github.com/astral-sh/ty/issues/4694>.
 
 ```toml
 [environment]
@@ -3122,6 +3122,44 @@ def make() -> Derived[T]:
 
 result: Derived[int] = make()  # no diagnostic
 reveal_type(result)  # revealed: Derived[int]
+```
+
+## Recursive exclusions in protocol type arguments
+
+Each call excludes a further specialization of the protocol. The second exclusion remains meaningful
+even though checking it revisits the same method declaration. Regression test for
+<https://github.com/astral-sh/ty/issues/4691>.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-protocol]
+class A(Protocol[T]):
+    def cause_problems(self) -> A[T & ~A[T & Any]]: ...
+
+def foo(x: A[T]):
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[T@foo & ~A[T@foo & Any] & ~A[T@foo & Any & ~A[T@foo & Any]]]
+```
+
+Declaring the inferred variance also preserves the nested exclusions.
+
+```py
+T_co = TypeVar("T_co", covariant=True)
+
+class P(Protocol[T_co]):
+    def next(self) -> P[T_co & ~P[T_co & Any]]: ...
+
+def valid(x: P[T_co]):
+    reveal_type(x.next().next())  # revealed: P[T_co@valid & ~P[T_co@valid & Any] & ~P[T_co@valid & Any & ~P[T_co@valid & Any]]]
 ```
 
 ## Recursive protocol members introduced by type arguments

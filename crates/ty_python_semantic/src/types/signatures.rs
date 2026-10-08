@@ -11,8 +11,10 @@
 //! arguments must match _at least one_ overload.
 
 use crate::ProgramEnvironment;
+use std::cell::Cell;
 use std::fmt;
 use std::num::NonZeroU32;
+use std::rc::Rc;
 use std::slice::Iter;
 use std::sync::Arc;
 
@@ -738,6 +740,15 @@ pub(crate) struct SignatureRelationKey<'db> {
     target_definition: Definition<'db>,
     relation: TypeRelation,
     typevar_evaluation: TypeVarEvaluation,
+    phase: SignatureRelationPhase,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+enum SignatureRelationPhase {
+    /// Relating individual overloads after receiver binding and specialization.
+    Signature,
+    /// Preparing protocol methods, before the signatures of their overloads are available.
+    ProtocolMember,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -752,11 +763,67 @@ impl<'db> SignatureRelationKey<'db> {
             target_definition: target.definition?,
             relation,
             typevar_evaluation,
+            phase: SignatureRelationPhase::Signature,
         })
+    }
+
+    pub(super) fn protocol_member(
+        source_definition: Definition<'db>,
+        target_definition: Definition<'db>,
+        relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
+    ) -> Self {
+        Self {
+            source_definition,
+            target_definition,
+            relation,
+            typevar_evaluation,
+            phase: SignatureRelationPhase::ProtocolMember,
+        }
     }
 }
 
-pub(crate) type SignatureRelationVisitor<'db> = ActiveRecursionDetector<SignatureRelationKey<'db>>;
+/// The active signature obligations are shared with substitutions made while proving them.
+/// A substitution may simplify an intersection, and that simplification can ask about the
+/// very signature whose return type it is substituting.
+#[derive(Clone, Default)]
+pub(crate) struct SignatureRelationVisitor<'db>(Rc<SignatureRelationState<'db>>);
+
+#[derive(Default)]
+struct SignatureRelationState<'db> {
+    active: ActiveRecursionDetector<SignatureRelationKey<'db>>,
+    circular_proofs: Cell<u64>,
+}
+
+impl<'db> SignatureRelationVisitor<'db> {
+    pub(super) fn is_active(&self) -> bool {
+        !self.0.active.is_empty()
+    }
+
+    /// The result of a relation may close a recursive proof coinductively, but such a proof
+    /// cannot justify eliminating an element from the type being constructed.
+    pub(super) fn without_circular_proof<T>(&self, work: impl FnOnce() -> T) -> Option<T> {
+        let before = self.0.circular_proofs.get();
+        let result = work();
+        (before == self.0.circular_proofs.get()).then_some(result)
+    }
+
+    pub(super) fn visit<T>(
+        &self,
+        key: &SignatureRelationKey<'db>,
+        cycle: impl FnOnce() -> T,
+        work: impl FnOnce() -> T,
+    ) -> T {
+        self.0.active.visit(
+            key,
+            || {
+                self.0.circular_proofs.set(self.0.circular_proofs.get() + 1);
+                cycle()
+            },
+            work,
+        )
+    }
+}
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,

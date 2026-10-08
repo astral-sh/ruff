@@ -45,8 +45,15 @@ use std::ops::ControlFlow;
 
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
+use crate::types::ApplyTypeMappingVisitor;
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::enums::EnumComplement;
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::signatures::SignatureRelationVisitor;
+use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -1316,6 +1323,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // One disjunction does not multiply alternatives. Only subsequent distributions consume
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
+    signature_relations: Option<SignatureRelationVisitor<'db>>,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1325,7 +1333,16 @@ impl<'db> IntersectionBuilder<'db> {
             env: env.clone(),
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
+            signature_relations: None,
         }
+    }
+
+    pub(super) fn with_signature_relations(
+        mut self,
+        relations: Option<&SignatureRelationVisitor<'db>>,
+    ) -> Self {
+        self.signature_relations = relations.cloned();
+        self
     }
 
     /// Add DNF branches, dropping `Never` and duplicate branches so later distribution does not
@@ -1353,17 +1370,25 @@ impl<'db> IntersectionBuilder<'db> {
         for candidate in other.intersections {
             // Some branches only collapse during `build`, for example when a constrained
             // type variable has no remaining constraints. Those do not consume the budget.
-            let candidate_type = candidate.clone().build(db, env);
+            let candidate_type =
+                candidate
+                    .clone()
+                    .build(db, env, self.signature_relations.as_ref());
             if candidate_type.is_never()
                 || distributed.iter().any(|old| {
-                    candidate_type.is_redundant_with(db, env, old.clone().build(db, env))
+                    candidate_type.is_redundant_with(
+                        db,
+                        env,
+                        old.clone()
+                            .build(db, env, self.signature_relations.as_ref()),
+                    )
                 })
             {
                 continue;
             }
             distributed.retain(|old| {
                 !old.clone()
-                    .build(db, env)
+                    .build(db, env, self.signature_relations.as_ref())
                     .is_redundant_with(db, env, candidate_type)
             });
             L::check_terms(distributed.len() + 1)?;
@@ -1509,7 +1534,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
                 for inner in &mut self.intersections {
-                    inner.add_positive(db, &self.env, ty);
+                    inner.add_positive(db, &self.env, ty, self.signature_relations.as_ref());
                 }
             }
         }
@@ -1588,7 +1613,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             _ => {
                 for inner in &mut self.intersections {
-                    inner.add_negative(db, &self.env, ty);
+                    inner.add_negative(db, &self.env, ty, self.signature_relations.as_ref());
                 }
             }
         }
@@ -1613,7 +1638,7 @@ impl<'db> IntersectionBuilder<'db> {
             &self.env,
             self.intersections
                 .into_iter()
-                .map(|inner| inner.build(db, &self.env)),
+                .map(|inner| inner.build(db, &self.env, self.signature_relations.as_ref())),
         )
     }
 }
@@ -1715,44 +1740,116 @@ fn simplify_intersection_pair_impl<'db>(
     polarity: IntersectionPolarity,
 ) -> IntersectionSimplification {
     let env = ProgramEnvironment::from_program(types.program(db));
-    let first = types.first(db);
-    let second = types.second(db);
+    simplify_intersection_pair_in_proof(
+        db,
+        &env,
+        types.first(db),
+        types.second(db),
+        polarity,
+        &SignatureRelationVisitor::default(),
+    )
+}
 
-    match polarity {
-        IntersectionPolarity::Positive => {
-            // S & T = S if S <: T.
-            if first.is_redundant_with(db, &env, second) {
-                return IntersectionSimplification::SecondRedundant;
-            }
-            let first_redundant = second.is_redundant_with(db, &env, first);
-            if second.is_disjoint_from(db, &env, first) {
-                return IntersectionSimplification::Disjoint;
-            }
-            if first_redundant {
-                return IntersectionSimplification::FirstRedundant;
-            }
+/// An in-progress relation can specialize members under a signature obligation. That
+/// specialization is not a Salsa query: its proof state must neither be discarded nor cached.
+fn simplify_intersection_pair_with_relations<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+    polarity: IntersectionPolarity,
+    relations: Option<&SignatureRelationVisitor<'db>>,
+) -> IntersectionSimplification {
+    match relations.filter(|relations| relations.is_active()) {
+        Some(relations) => {
+            simplify_intersection_pair_in_proof(db, env, first, second, polarity, relations)
         }
-        IntersectionPolarity::Negative => {
-            // ~S & ~T = ~T if S <: T; the narrower exclusion is redundant.
-            let first_redundant = first.is_redundant_with(db, &env, second);
-            if second.is_subtype_of(db, &env, first) {
-                return IntersectionSimplification::SecondRedundant;
-            }
-            if first_redundant {
-                return IntersectionSimplification::FirstRedundant;
-            }
-        }
-        IntersectionPolarity::Mixed => {
-            // S & ~T = Never if S <: T, and S & ~T = S if S and T are disjoint.
-            if first.is_subtype_of(db, &env, second) {
-                return IntersectionSimplification::Disjoint;
-            }
-            if first.is_disjoint_from(db, &env, second) {
-                return IntersectionSimplification::SecondRedundant;
-            }
-        }
+        None => simplify_intersection_pair(db, env, first, second, polarity),
     }
-    IntersectionSimplification::Unchanged
+}
+
+fn simplify_intersection_pair_in_proof<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    first: Type<'db>,
+    second: Type<'db>,
+    polarity: IntersectionPolarity,
+    relations: &SignatureRelationVisitor<'db>,
+) -> IntersectionSimplification {
+    let constraints = ConstraintSetBuilder::new();
+    let relation_visitor = HasRelationToVisitor::default(&constraints);
+    let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+    let materialization_visitor =
+        ApplyTypeMappingVisitor::new(env).with_signature_relations(relations);
+    let mut checker = TypeRelationChecker::subtyping(
+        env,
+        &constraints,
+        TypeVarSet::None,
+        &relation_visitor,
+        &disjointness_visitor,
+        relations,
+        &materialization_visitor,
+    );
+    relations
+        .without_circular_proof(|| {
+            match polarity {
+                IntersectionPolarity::Positive => {
+                    checker.relation = TypeRelation::Redundancy { pure: false };
+                    if checker
+                        .check_type_pair(db, first, second)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    {
+                        return IntersectionSimplification::SecondRedundant;
+                    }
+                    let first_redundant = checker
+                        .check_type_pair(db, second, first)
+                        .is_always_satisfied(db, env, TypeVarSet::None);
+                    if checker
+                        .as_disjointness_checker()
+                        .check_type_pair(db, second, first)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    {
+                        return IntersectionSimplification::Disjoint;
+                    }
+                    if first_redundant {
+                        return IntersectionSimplification::FirstRedundant;
+                    }
+                }
+                IntersectionPolarity::Negative => {
+                    checker.relation = TypeRelation::Redundancy { pure: false };
+                    let first_redundant = checker
+                        .check_type_pair(db, first, second)
+                        .is_always_satisfied(db, env, TypeVarSet::None);
+                    checker.relation = TypeRelation::Subtyping;
+                    if checker
+                        .check_type_pair(db, second, first)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    {
+                        return IntersectionSimplification::SecondRedundant;
+                    }
+                    if first_redundant {
+                        return IntersectionSimplification::FirstRedundant;
+                    }
+                }
+                IntersectionPolarity::Mixed => {
+                    if checker
+                        .check_type_pair(db, first, second)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    {
+                        return IntersectionSimplification::Disjoint;
+                    }
+                    if checker
+                        .as_disjointness_checker()
+                        .check_type_pair(db, first, second)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                    {
+                        return IntersectionSimplification::SecondRedundant;
+                    }
+                }
+            }
+            IntersectionSimplification::Unchanged
+        })
+        .unwrap_or(IntersectionSimplification::Unchanged)
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
@@ -1833,6 +1930,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         mut new_positive: Type<'db>,
+        relations: Option<&SignatureRelationVisitor<'db>>,
     ) {
         // `Never & T` -> `Never`
         if self.positive.contains(&Type::Never) {
@@ -1905,39 +2003,39 @@ impl<'db> InnerIntersectionBuilder<'db> {
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
-                self.add_negative(db, env, Type::string_literal(db, ""));
+                self.add_negative(db, env, Type::string_literal(db, ""), relations);
             }
             // `LiteralString & AlwaysFalsy` -> `Literal[""]`
             Type::AlwaysFalsy if self.positive.swap_remove(&Type::literal_string()) => {
-                self.add_positive(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::string_literal(db, ""), relations);
             }
             // `AlwaysTruthy & LiteralString` -> `LiteralString & ~Literal[""]`
             Type::LiteralValue(literal)
                 if literal.is_literal_string()
                     && self.positive.swap_remove(&Type::AlwaysTruthy) =>
             {
-                self.add_positive(db, env, Type::literal_string());
-                self.add_negative(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::literal_string(), relations);
+                self.add_negative(db, env, Type::string_literal(db, ""), relations);
             }
             // `AlwaysFalsy & LiteralString` -> `Literal[""]`
             Type::LiteralValue(literal)
                 if literal.is_literal_string() && self.positive.swap_remove(&Type::AlwaysFalsy) =>
             {
-                self.add_positive(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::string_literal(db, ""), relations);
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & AlwaysFalsy` -> `Literal[""]`
             Type::LiteralValue(literal)
                 if literal.is_literal_string()
                     && self.negative.swap_remove(&Type::AlwaysTruthy) =>
             {
-                self.add_positive(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::string_literal(db, ""), relations);
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::LiteralValue(literal)
                 if literal.is_literal_string() && self.negative.swap_remove(&Type::AlwaysFalsy) =>
             {
-                self.add_positive(db, env, Type::literal_string());
-                self.add_negative(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::literal_string(), relations);
+                self.add_negative(db, env, Type::string_literal(db, ""), relations);
             }
 
             _ => {
@@ -2025,12 +2123,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         replacement = Some((index, merged));
                         break;
                     }
-                    match simplify_intersection_pair(
+                    match simplify_intersection_pair_with_relations(
                         db,
                         env,
                         *existing_positive,
                         new_positive,
                         IntersectionPolarity::Positive,
+                        relations,
                     ) {
                         IntersectionSimplification::Unchanged => {}
                         IntersectionSimplification::SecondRedundant => return,
@@ -2044,7 +2143,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
                 if let Some((index, value)) = replacement {
                     self.positive.swap_remove_index(index);
-                    self.add_positive(db, env, value);
+                    self.add_positive(db, env, value, relations);
                     return;
                 }
                 for index in to_remove.into_iter().rev() {
@@ -2053,12 +2152,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
-                    match simplify_intersection_pair(
+                    match simplify_intersection_pair_with_relations(
                         db,
                         env,
                         new_positive,
                         *existing_negative,
                         IntersectionPolarity::Mixed,
+                        relations,
                     ) {
                         IntersectionSimplification::Unchanged => {}
                         IntersectionSimplification::SecondRedundant => to_remove.push(index),
@@ -2085,6 +2185,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         new_negative: Type<'db>,
+        relations: Option<&SignatureRelationVisitor<'db>>,
     ) {
         // `Never & ~T` -> `Never`.
         if self.positive.contains(&Type::Never) {
@@ -2114,10 +2215,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
-                    self.add_negative(db, env, *pos);
+                    self.add_negative(db, env, *pos, relations);
                 }
                 for neg in inter.negative(db) {
-                    self.add_positive(db, env, *neg);
+                    self.add_positive(db, env, *neg, relations);
                 }
             }
             Type::Never => {
@@ -2132,31 +2233,31 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
-                self.add_positive(db, env, ty);
+                self.add_positive(db, env, ty, relations);
             }
             // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
             Type::AlwaysTruthy if contains_bool() => {
-                self.add_positive(db, env, Type::bool_literal(false));
+                self.add_positive(db, env, Type::bool_literal(false), relations);
             }
             // `bool & ~Literal[True]` -> `bool & Literal[False]`
             Type::LiteralValue(literal) if literal.as_bool() == Some(true) && contains_bool() => {
-                self.add_positive(db, env, Type::bool_literal(false));
+                self.add_positive(db, env, Type::bool_literal(false), relations);
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
-                self.add_positive(db, env, Type::string_literal(db, ""));
+                self.add_positive(db, env, Type::string_literal(db, ""), relations);
             }
             // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
             Type::AlwaysFalsy if contains_bool() => {
-                self.add_positive(db, env, Type::bool_literal(true));
+                self.add_positive(db, env, Type::bool_literal(true), relations);
             }
             // `bool & ~Literal[False]` -> `bool & Literal[True]`
             Type::LiteralValue(literal) if literal.as_bool() == Some(false) && contains_bool() => {
-                self.add_positive(db, env, Type::bool_literal(true));
+                self.add_positive(db, env, Type::bool_literal(true), relations);
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysFalsy if self.positive.contains(&Type::literal_string()) => {
-                self.add_negative(db, env, Type::string_literal(db, ""));
+                self.add_negative(db, env, Type::string_literal(db, ""), relations);
             }
             _ => {
                 let new_negative_enum = new_negative.as_enum_literal();
@@ -2175,12 +2276,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         continue;
                     }
 
-                    match simplify_intersection_pair(
+                    match simplify_intersection_pair_with_relations(
                         db,
                         env,
                         *existing_negative,
                         new_negative,
                         IntersectionPolarity::Negative,
+                        relations,
                     ) {
                         IntersectionSimplification::Unchanged => {}
                         IntersectionSimplification::SecondRedundant => return,
@@ -2219,12 +2321,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         }
                     }
 
-                    match simplify_intersection_pair(
+                    match simplify_intersection_pair_with_relations(
                         db,
                         env,
                         *existing_positive,
                         new_negative,
                         IntersectionPolarity::Mixed,
+                        relations,
                     ) {
                         IntersectionSimplification::Unchanged => {}
                         IntersectionSimplification::SecondRedundant => return,
@@ -2257,7 +2360,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
     ///
     /// - If the intersection contains negative entries for all of the constraints, the overall
     ///   intersection is `Never`.
-    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) {
+    fn simplify_constrained_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        relations: Option<&SignatureRelationVisitor<'db>>,
+    ) {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
 
         for ty in &self.positive {
@@ -2307,16 +2415,21 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         for remaining_constraint in to_add {
-            self.add_positive(db, env, remaining_constraint);
+            self.add_positive(db, env, remaining_constraint, relations);
         }
     }
 
-    fn build(mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+    fn build(
+        mut self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        relations: Option<&SignatureRelationVisitor<'db>>,
+    ) -> Type<'db> {
         if self.has_empty_enum_complement(db, env) {
             return Type::Never;
         }
 
-        self.simplify_constrained_typevars(db, env);
+        self.simplify_constrained_typevars(db, env, relations);
 
         // If any typevars are in `self.positive`, speculatively solve all bounded type variables
         // to their upper bound and all constrained type variables to the union of their constraints.
@@ -2327,8 +2440,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
             .iter()
             .any(|ty| matches!(ty, Type::TypeVar(_) | Type::NewTypeInstance(_)))
         {
-            let speculative =
-                expand_intersection_typevars_and_newtypes(db, env, &self.positive, &self.negative);
+            let speculative = expand_intersection_typevars_and_newtypes(
+                db,
+                env,
+                &self.positive,
+                &self.negative,
+                relations,
+            );
             if speculative.is_never() {
                 return Type::Never;
             }
@@ -2341,7 +2459,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .any(|positive| matches!(positive, Type::NewTypeInstance(_)))
             {
                 // Preserve the NewType while making its remaining enum member explicit.
-                self.add_positive(db, env, complement.remaining_literal_union(db, env));
+                self.add_positive(
+                    db,
+                    env,
+                    complement.remaining_literal_union(db, env),
+                    relations,
+                );
             }
         }
 

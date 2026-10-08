@@ -2228,8 +2228,8 @@ def inherited[T](x: Nested[T]):
 ## Inherited recursive protocol members
 
 Methods inherited from a generic protocol may refer to the base protocol rather than the derived
-one. They are still recursive when inferring a specialization of the derived protocol.
-Regression test for <https://github.com/astral-sh/ty/issues/4694>.
+one. They are still recursive when inferring a specialization of the derived protocol. Regression
+test for <https://github.com/astral-sh/ty/issues/4694>.
 
 ```toml
 [environment]
@@ -2258,6 +2258,29 @@ def make[T]() -> Derived[T]:
 
 result: Derived[int] = make()  # no diagnostic
 reveal_type(result)  # revealed: Derived[int]
+```
+
+## Recursive exclusions in protocol type arguments
+
+Each call excludes a further specialization of the protocol. The second exclusion remains meaningful
+even though checking it revisits the same method declaration. Regression test for
+<https://github.com/astral-sh/ty/issues/4691>.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol
+
+class A[T](Protocol):
+    def cause_problems(self) -> A[T & ~A[T & Any]]: ...
+
+def foo[T](x: A[T]):
+    reveal_type(x.cause_problems().cause_problems())  # revealed: A[T@foo & ~A[T@foo & Any] & ~A[T@foo & Any & ~A[T@foo & Any]]]
 ```
 
 ## Recursive protocol members introduced by type arguments

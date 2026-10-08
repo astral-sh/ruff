@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::signatures::SignatureRelationVisitor;
 use itertools::Either;
 use rustc_hash::FxHashSet;
 
@@ -1110,7 +1111,8 @@ impl<'db> IntersectionType<'db> {
             }
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            let mut builder = IntersectionBuilder::new(db, visitor.env)
+                .with_signature_relations(visitor.signature_relation_visitor.as_ref());
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,
@@ -1302,7 +1304,28 @@ impl<'db> IntersectionType<'db> {
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
     ) -> Type<'db> {
-        expand_intersection_typevars_and_newtypes(db, env, self.positive(db), self.negative(db))
+        expand_intersection_typevars_and_newtypes(
+            db,
+            env,
+            self.positive(db),
+            self.negative(db),
+            None,
+        )
+    }
+
+    pub(super) fn with_expanded_typevars_in_relation(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        relations: &SignatureRelationVisitor<'db>,
+    ) -> Type<'db> {
+        expand_intersection_typevars_and_newtypes(
+            db,
+            env,
+            self.positive(db),
+            self.negative(db),
+            Some(relations),
+        )
     }
 
     pub fn iter_positive(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
@@ -1377,8 +1400,9 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     env: &ProgramEnvironment<'db>,
     positive: &FxOrderSet<Type<'db>>,
     negative: &NegativeIntersectionElements<'db>,
+    relations: Option<&SignatureRelationVisitor<'db>>,
 ) -> Type<'db> {
-    let mut builder = IntersectionBuilder::new(db, env);
+    let mut builder = IntersectionBuilder::new(db, env).with_signature_relations(relations);
     for &element in positive {
         match element {
             Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {

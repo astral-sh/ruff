@@ -11,8 +11,11 @@ use crate::types::attribute_write::{
     DescriptorSetterDomain, ProtocolMemberWriteRequirement, descriptor_setter_domain,
     property_setter_value_type,
 };
+use crate::types::generics::ApplySpecialization;
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
+use crate::types::relation::{TypeRelation, TypeVarEvaluation};
+use crate::types::signatures::{SignatureRelationKey, SignatureRelationVisitor};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
@@ -533,8 +536,17 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.member_count(db)
     }
 
-    pub(super) fn has_only_methods(self, db: &'db dyn Db) -> bool {
-        self.members(db).all(|member| member.is_method(db))
+    pub(super) fn has_only_methods(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> bool {
+        self.members(db).all(|member| {
+            matches!(
+                member.data_for_relation(db, visitor).kind,
+                ProtocolMemberKind::Method(..)
+            )
+        })
     }
 
     /// Returns whether structural comparison can avoid recursive member expansion.
@@ -590,43 +602,64 @@ impl<'db> ProtocolInterfaceView<'db> {
     pub(super) fn differs_for_members_required_by(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         required: Self,
     ) -> bool {
+        let default_relations = SignatureRelationVisitor::default();
+        let relations = visitor
+            .signature_relation_visitor
+            .as_ref()
+            .unwrap_or(&default_relations);
         required.members(db).any(|required_member| {
-            let Some(materialized) = self.member_by_name(db, required_member.name()) else {
+            let Some(member) = self.member_by_name(db, required_member.name()) else {
                 return false;
             };
-            let original = ProtocolMember {
-                name: materialized.name,
-                data: materialized.data,
-                specialized_class: materialized.specialized_class,
-                materialization: None,
+            let compare = || {
+                let mapping =
+                    ApplyTypeMappingVisitor::new(visitor.env).with_signature_relations(relations);
+                let data = member.data_for_relation(db, &mapping);
+                let original = |mode| ProtocolMemberAccess {
+                    declaration: data,
+                    mode,
+                    materialization: None,
+                };
+                let materialized = |mode| ProtocolMemberAccess {
+                    materialization: member.materialization,
+                    ..original(mode)
+                };
+                if materialized(ProtocolMemberAccessMode::Instance).materialized_types(db, &mapping)
+                    != original(ProtocolMemberAccessMode::Instance).materialized_types(db, &mapping)
+                {
+                    return true;
+                }
+                // Ordinary instance method requirements are checked on the instance side.
+                if matches!(
+                    data.kind,
+                    ProtocolMemberKind::Method(_, ProtocolMethodKind::Instance)
+                ) {
+                    return false;
+                }
+                materialized(ProtocolMemberAccessMode::Class).materialized_types(db, &mapping)
+                    != original(ProtocolMemberAccessMode::Class).materialized_types(db, &mapping)
             };
-
-            if materialized
-                .access(db, ProtocolMemberAccessMode::Instance)
-                .materialized_types(db, env)
-                != original
-                    .access(db, ProtocolMemberAccessMode::Instance)
-                    .materialized_types(db, env)
+            if let (ProtocolMemberKind::Method(..), Some(definition)) =
+                (member.data.kind, member.data.definition)
             {
-                return true;
+                relations.visit(
+                    &SignatureRelationKey::protocol_member(
+                        definition,
+                        definition,
+                        TypeRelation::Redundancy { pure: true },
+                        TypeVarEvaluation::Eager,
+                    ),
+                    // If the comparison depends on this unfinished proof, unchanged
+                    // requirements have not been established and cannot justify a nominal check.
+                    || true,
+                    compare,
+                )
+            } else {
+                compare()
             }
-
-            // Class access to an ordinary instance method requires only that the method
-            // exists. Its unbound `self` is not part of structural compatibility and can
-            // recursively refer to this protocol, so do not materialize that signature.
-            if materialized.is_instance_method(db) {
-                return false;
-            }
-
-            materialized
-                .access(db, ProtocolMemberAccessMode::Class)
-                .materialized_types(db, env)
-                != original
-                    .access(db, ProtocolMemberAccessMode::Class)
-                    .materialized_types(db, env)
         })
     }
 
@@ -954,7 +987,7 @@ impl<'db> ProtocolInterface<'db> {
             .get(name)
             .and_then(|data| {
                 ProtocolMemberAccess {
-                    declaration: data,
+                    declaration: *data,
                     mode: ProtocolMemberAccessMode::Instance,
                     materialization: None,
                 }
@@ -1465,7 +1498,7 @@ impl<'db> ProtocolPropertyType<'db> {
 /// Describes instance or class-based access to a protocol member.
 #[derive(Debug, Copy, Clone)]
 struct ProtocolMemberAccess<'db> {
-    declaration: &'db ProtocolMemberData<'db>,
+    declaration: ProtocolMemberData<'db>,
     mode: ProtocolMemberAccessMode,
     materialization: Option<MaterializationKind>,
 }
@@ -1491,11 +1524,17 @@ impl<'db> ProtocolMemberAccess<'db> {
     fn materialize_type(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        self.materialization
-            .map_or(ty, |kind| ty.materialization(db, env, kind))
+        self.materialization.map_or(ty, |kind| {
+            ty.apply_type_mapping_impl(
+                db,
+                &TypeMapping::Materialize(kind),
+                TypeContext::default(),
+                &visitor.for_new_materialization_root(),
+            )
+        })
     }
 
     fn write(self) -> Option<ProtocolMemberWriteAccess<'db>> {
@@ -1550,13 +1589,14 @@ impl<'db> ProtocolMemberAccess<'db> {
     fn materialized_types(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> (Option<Type<'db>>, Option<Type<'db>>) {
         (
-            self.read().and_then(|read| read.result_type(db, env, None)),
+            self.read()
+                .and_then(|read| read.result_type_with_visitor(db, visitor, None)),
             self.write().and_then(|write| {
                 write
-                    .requirement(db, env, None)
+                    .requirement(db, visitor.env, None)
                     .and_then(|requirement| requirement.accepted_type())
             }),
         )
@@ -1615,6 +1655,16 @@ impl<'db> ProtocolMemberReadAccess<'db> {
         env: &ProgramEnvironment<'db>,
         self_type: Option<Type<'db>>,
     ) -> Option<Type<'db>> {
+        self.result_type_with_visitor(db, &ApplyTypeMappingVisitor::new(env), self_type)
+    }
+
+    fn result_type_with_visitor(
+        self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        self_type: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let env = visitor.env;
         let annotation = match self.access.declaration.kind {
             ProtocolMemberKind::Method(ty, kind) => {
                 // TODO: Passing `None` binds the method without a concrete receiver type.
@@ -1644,7 +1694,7 @@ impl<'db> ProtocolMemberReadAccess<'db> {
             ProtocolMemberKind::Attribute(annotation) => annotation,
         };
         let annotation = ProtocolAnnotation {
-            ty: self.access.materialize_type(db, env, annotation.ty),
+            ty: self.access.materialize_type(db, visitor, annotation.ty),
             ..annotation
         };
         Some(self_type.map_or(annotation.ty, |self_type| {
@@ -2072,6 +2122,19 @@ fn walk_protocol_member<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> ProtocolMember<'db> {
+    /// Specialization during a relation depends on its active signature obligations. Keep it
+    /// out of the member query cache, whose result must be independent of the caller's proof.
+    fn data_for_relation(
+        &self,
+        db: &'db dyn Db,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> ProtocolMemberData<'db> {
+        self.specialized_class
+            .and_then(|alias| {
+                protocol_member_with_visitor(db, ClassType::Generic(alias), self.name, visitor)
+            })
+            .unwrap_or(*self.data)
+    }
     /// Specialization can change an attribute into a method or property, so member classification
     /// and access must use the same resolved data.
     #[inline]
@@ -2479,7 +2542,7 @@ impl<'db> ProtocolMember<'db> {
 
     fn access(&self, db: &'db dyn Db, mode: ProtocolMemberAccessMode) -> ProtocolMemberAccess<'db> {
         ProtocolMemberAccess {
-            declaration: self.specialized_data(db),
+            declaration: *self.specialized_data(db),
             mode,
             materialization: self.materialization,
         }
@@ -3082,10 +3145,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         } else if source.read().is_none() {
             self.never()
         } else {
+            let mapping = self
+                .materialization_visitor
+                .for_new_materialization_root()
+                .with_signature_relations(self.signature_relation_visitor);
             let bind_read = |access: ProtocolMemberAccess<'db>| {
                 let ty = access
                     .read()
-                    .and_then(|read| read.result_type(db, env, None))?;
+                    .and_then(|read| read.result_type_with_visitor(db, &mapping, None))?;
                 if matches!(access.declaration.kind, ProtocolMemberKind::Method(..))
                     && let Type::Callable(callable) = ty
                 {
@@ -3097,9 +3164,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source_type,
                     )))
                 } else {
-                    access
-                        .read()
-                        .and_then(|read| read.result_type(db, env, Some(source_type)))
+                    access.read().and_then(|read| {
+                        read.result_type_with_visitor(db, &mapping, Some(source_type))
+                    })
                 }
             };
             let target_is_method =
@@ -3193,29 +3260,62 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let result = source_member.when_some_and(db, self.constraints, |source_member| {
-                    let source_data = source_member.specialized_data(db);
-                    let target_data = target_member.specialized_data(db);
-                    let check_access = |mode| {
-                        self.check_protocol_member_access_pair(
+                    let work = || {
+                        let source_visitor = ApplyTypeMappingVisitor::new(env)
+                            .with_signature_relations(self.signature_relation_visitor);
+                        let source_data = source_member.data_for_relation(db, &source_visitor);
+                        let target_visitor = ApplyTypeMappingVisitor::new(env)
+                            .with_signature_relations(self.signature_relation_visitor);
+                        let target_data = target_member.data_for_relation(db, &target_visitor);
+                        let check_access = |mode| {
+                            self.check_protocol_member_access_pair(
+                                db,
+                                source_type,
+                                ProtocolMemberAccess {
+                                    declaration: source_data,
+                                    mode,
+                                    materialization: source_member.materialization,
+                                },
+                                ProtocolMemberAccess {
+                                    declaration: target_data,
+                                    mode,
+                                    materialization: target_member.materialization,
+                                },
+                            )
+                        };
+                        check_access(ProtocolMemberAccessMode::Instance).and(
                             db,
-                            source_type,
-                            ProtocolMemberAccess {
-                                declaration: source_data,
-                                mode,
-                                materialization: source_member.materialization,
-                            },
-                            ProtocolMemberAccess {
-                                declaration: target_data,
-                                mode,
-                                materialization: target_member.materialization,
-                            },
+                            self.constraints,
+                            || check_access(ProtocolMemberAccessMode::Class),
                         )
                     };
-                    check_access(ProtocolMemberAccessMode::Instance).and(
-                        db,
-                        self.constraints,
-                        || check_access(ProtocolMemberAccessMode::Class),
-                    )
+                    // Method specialization precedes overload comparison. Guard the whole
+                    // method preparation separately so the first comparison still checks each
+                    // overload, including its finite parameter and return requirements.
+                    if let (
+                        ProtocolMemberKind::Method(..),
+                        ProtocolMemberKind::Method(..),
+                        Some(source_definition),
+                        Some(target_definition),
+                    ) = (
+                        source_member.data.kind,
+                        target_member.data.kind,
+                        source_member.data.definition,
+                        target_member.data.definition,
+                    ) {
+                        self.signature_relation_visitor.visit(
+                            &SignatureRelationKey::protocol_member(
+                                source_definition,
+                                target_definition,
+                                self.relation,
+                                self.typevar_evaluation,
+                            ),
+                            || self.always(),
+                            work,
+                        )
+                    } else {
+                        work()
+                    }
                 });
                 if let Some(context) = self.report_context()
                     && result.is_never_satisfied(db, env, self.inferable)
@@ -3654,20 +3754,43 @@ fn cached_protocol_member<'db>(
     name: Name,
 ) -> Option<ProtocolMemberData<'db>> {
     let env = ProgramEnvironment::from_file(class.class_literal(db).program_file(db));
+    protocol_member_with_visitor(db, class, &name, &ApplyTypeMappingVisitor::new(&env))
+}
+
+fn protocol_member_with_visitor<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    name: &Name,
+    visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+) -> Option<ProtocolMemberData<'db>> {
+    let env = visitor.env;
     let mut member = None;
     ProtocolClass(class).for_each_member_candidate(
         db,
-        &env,
-        Some(&name),
-        |_, candidate, specialization| {
+        env,
+        Some(name),
+        |_, mut candidate, specialization| {
             if member.is_none() {
-                let specialization =
-                    specialization.map(|specialization| specialization.with_typevar_bounds(db));
-                member = Some(
-                    candidate
-                        .apply_specialization(db, specialization)
-                        .into_member(db, &env, class),
-                );
+                if let Some(specialization) = specialization {
+                    let specialization = specialization.with_typevar_bounds(db);
+                    let apply_specialization = ApplySpecialization::specialization(specialization);
+                    let mapping = match specialization.materialization_kind(db) {
+                        None => TypeMapping::ApplySpecialization(apply_specialization),
+                        Some(materialization_kind) => {
+                            TypeMapping::ApplySpecializationWithMaterialization {
+                                specialization: apply_specialization,
+                                materialization_kind,
+                            }
+                        }
+                    };
+                    candidate.ty = candidate.ty.apply_type_mapping_impl(
+                        db,
+                        &mapping,
+                        TypeContext::default(),
+                        visitor,
+                    );
+                }
+                member = Some(candidate.into_member(db, env, class));
             }
         },
     );

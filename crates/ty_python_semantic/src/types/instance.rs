@@ -886,8 +886,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A no-op source materialization can be removed before comparing method-only
             // interfaces. For recursive properties and attributes, keep the wrapper: removing
             // it can make the cycle guard reject distinct specializations that stabilize.
+            let mapping = self
+                .materialization_visitor
+                .for_new_materialization_root()
+                .with_signature_relations(self.signature_relation_visitor);
             if source.materialization_kind(db).is_some()
-                && source.interface(db).has_only_methods(db)
+                && source.interface(db).has_only_methods(db, &mapping)
                 && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
                 return self.check_type_pair(
@@ -934,12 +938,24 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // Check that inexpensive case first: comparing every requirement of an unrelated
             // recursive protocol can expand its interface before structural member ordering gets
             // a chance to reject an incompatible finite member.
+            let requirements_visitor = self
+                .materialization_visitor
+                .for_new_materialization_root()
+                .with_signature_relations(self.signature_relation_visitor);
             let can_use_nominal_result_directly =
                 nominally_satisfied.is_never_satisfied(db, env, self.inferable)
                     || ((protocol.materialization_kind(db) == Some(MaterializationKind::Top)
-                        || !protocol.materialization_changes_requirements(db, env, protocol))
+                        || !protocol.materialization_changes_requirements(
+                            db,
+                            &requirements_visitor,
+                            protocol,
+                        ))
                         && !source_protocol.is_some_and(|source| {
-                            source.materialization_changes_requirements(db, env, protocol)
+                            source.materialization_changes_requirements(
+                                db,
+                                &requirements_visitor,
+                                protocol,
+                            )
                         }));
 
             if can_use_nominal_result_directly
@@ -1802,13 +1818,13 @@ impl<'db> ProtocolInstanceType<'db> {
     fn materialization_changes_requirements(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
         target: ProtocolInstanceType<'db>,
     ) -> bool {
         self.materialization_kind(db).is_some()
             && self
                 .interface(db)
-                .differs_for_members_required_by(db, env, target.interface(db))
+                .differs_for_members_required_by(db, visitor, target.interface(db))
     }
 
     /// Returns the materialization wrapper needed for displaying this protocol.
@@ -1836,7 +1852,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
         let interface = self.interface(db);
         interface
-            .differs_for_members_required_by(db, env, interface)
+            .differs_for_members_required_by(db, &ApplyTypeMappingVisitor::new(env), interface)
             .then_some(materialized.materialization_kind(db))
     }
 
