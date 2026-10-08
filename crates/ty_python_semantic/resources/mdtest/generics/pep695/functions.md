@@ -1598,6 +1598,164 @@ def _(x: Intersection[Source[A], Source[B]]) -> None:
     reveal_type(list_with_callback(x, accepts))  # revealed: list[A | B]
 ```
 
+## Ordered overloads in generic callbacks
+
+Overlapping overloads do not promise all of their return types simultaneously. A generic wrapper
+preserves the first applicable overload's return type, just like a direct call:
+
+```py
+from collections.abc import Callable
+from typing import Protocol, overload
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class Both(A, B): ...
+
+def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
+    return callback(value)
+
+@overload
+def convert(value: A) -> int: ...
+@overload
+def convert(value: B) -> str: ...
+def convert(value: A | B) -> int | str:
+    raise NotImplementedError
+
+def _(value: Both) -> None:
+    reveal_type(convert(value))  # revealed: int
+    reveal_type(invoke(convert, value))  # revealed: int
+```
+
+Reversing the overload order changes the result for an argument accepted by both overloads:
+
+```py
+@overload
+def reversed_convert(value: B) -> str: ...
+@overload
+def reversed_convert(value: A) -> int: ...
+def reversed_convert(value: A | B) -> int | str:
+    raise NotImplementedError
+
+def _(value: Both) -> None:
+    reveal_type(invoke(reversed_convert, value))  # revealed: str
+```
+
+When neither overload covers the whole argument type, the result includes both possible returns:
+
+```py
+def _(value: A | B) -> None:
+    reveal_type(invoke(convert, value))  # revealed: int | str
+```
+
+The same ordering applies when a protocol method supplies the callable constraint:
+
+```py
+class Converter[InputT, OutputT](Protocol):
+    def convert(self, value: InputT, /) -> OutputT: ...
+
+class OverloadedConverter:
+    @overload
+    def convert(self, value: A) -> int: ...
+    @overload
+    def convert(self, value: B) -> str: ...
+    def convert(self, value: A | B) -> int | str:
+        raise NotImplementedError
+
+def invoke_method[T, R](converter: Converter[T, R], value: T) -> R:
+    return converter.convert(value)
+
+def _(converter: OverloadedConverter, value: Both) -> None:
+    reveal_type(invoke_method(converter, value))  # revealed: int
+```
+
+Overlapping overloads with the same return type and disjoint overloads retain their precision:
+
+```py
+@overload
+def same_return(value: A) -> bytes: ...
+@overload
+def same_return(value: B) -> bytes: ...
+def same_return(value: A | B) -> bytes:
+    return b""
+
+@overload
+def disjoint(value: int) -> int: ...
+@overload
+def disjoint(value: str) -> str: ...
+def disjoint(value: int | str) -> int | str:
+    return value
+
+def _(value: Both) -> None:
+    reveal_type(invoke(same_return, value))  # revealed: bytes
+    reveal_type(invoke(disjoint, 1))  # revealed: int
+    reveal_type(invoke(disjoint, "x"))  # revealed: str
+```
+
+In contrast, an explicit intersection of callable types does promise both results for the same
+input. Its return types can still be intersected:
+
+```py
+def _(callback: Intersection[Callable[[object], A], Callable[[object], B]]) -> None:
+    reveal_type(invoke(callback, object()))  # revealed: A & B
+```
+
+An optional extra parameter does not change which overload handles the call:
+
+```py
+@overload
+def with_default(value: A, extra: int = 0) -> int: ...
+@overload
+def with_default(value: B, extra: int = 0) -> str: ...
+def with_default(value: A | B, extra: int = 0) -> int | str:
+    raise NotImplementedError
+
+def _(value: Both) -> None:
+    # TODO: revealed: int
+    reveal_type(invoke(with_default, value))  # revealed: int | str
+```
+
+`operator.mul` infers its return type through a protocol method. Multiplying a `Fraction` by an
+integer selects its `Fraction`-returning overload, not its later `float`-returning overload:
+
+```py
+from fractions import Fraction
+from operator import mul
+
+def left(value: Fraction) -> Fraction:
+    reveal_type(mul(value, 2))  # revealed: Fraction
+    return mul(value, 2)  # no diagnostic
+
+def right(value: Fraction) -> Fraction:
+    reveal_type(mul(2, value))  # revealed: Fraction
+    return mul(2, value)  # no diagnostic
+```
+
+## Generic receivers in overloaded callbacks
+
+A gradual receiver can satisfy different bounded `self` annotations using different type-variable
+bindings. These alternatives do not establish that the first overload applies for every receiver
+specialization, so inference retains their union:
+
+```py
+from typing import Any, Callable, overload
+
+class Callback[T]:
+    @overload
+    def __call__[U: int](self: "Callback[U]") -> int: ...
+    @overload
+    def __call__[U: str](self: "Callback[U]") -> str: ...
+    def __call__(self) -> int | str:
+        raise NotImplementedError
+
+def invoke[R](callback: Callable[[], R]) -> R:
+    return callback()
+
+def _(concrete: Callback[str], gradual: Callback[Any]) -> None:
+    reveal_type(invoke(concrete))  # revealed: str
+    reveal_type(invoke(gradual))  # revealed: int | str
+```
+
 ## Intersection arguments with variadic parameters
 
 Homogeneous unpacked tuple annotations on starred parameters can be validated for each
@@ -2269,11 +2427,12 @@ def _(callback: Intersection[Callable[[], AView], Callable[[], BView]]) -> None:
 
 ### Inferred protocol return alternatives
 
-A fresh empty list can have either element type, but cannot safely expose both mutable views at
-once. Even without type parameters, protocol returns can contain incompatible invariant members:
+Even without type parameters, protocol returns can contain incompatible invariant members. Inference
+retains the union when the callback signatures expose different mutable list types:
 
 ```py
-from typing import Callable, Protocol, overload
+from typing import Callable, Protocol
+from ty_extensions import Intersection
 
 class A: ...
 class B: ...
@@ -2285,24 +2444,11 @@ class IntList(Protocol):
 class StrList(Protocol):
     value: list[str]
 
-class Box[T]:
-    value: list[T]
-
-    def __init__(self) -> None:
-        self.value = []
-
-@overload
-def empty(value: A) -> IntList: ...
-@overload
-def empty(value: B) -> StrList: ...
-def empty(value: A | B) -> IntList | StrList:
-    return Box()
-
 def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
     return callback(value)
 
-def _() -> None:
-    reveal_type(invoke(empty, Both()))  # revealed: IntList | StrList
+def _(callback: Intersection[Callable[[A], IntList], Callable[[B], StrList]]) -> None:
+    reveal_type(invoke(callback, Both()))  # revealed: IntList | StrList
 ```
 
 Making the property read-only does not make its list immutable. These returns also remain a union:
@@ -2316,29 +2462,29 @@ class StrListView(Protocol):
     @property
     def value(self) -> list[str]: ...
 
-@overload
-def readonly_empty(value: A) -> IntListView: ...
-@overload
-def readonly_empty(value: B) -> StrListView: ...
-def readonly_empty(value: A | B) -> IntListView | StrListView:
-    return Box()
-
-def _() -> None:
-    reveal_type(invoke(readonly_empty, Both()))  # revealed: IntListView | StrListView
+def _(callback: Intersection[Callable[[A], IntListView], Callable[[B], StrListView]]) -> None:
+    reveal_type(invoke(callback, Both()))  # revealed: IntListView | StrListView
 ```
 
-An unchanged protocol component still allows the other tuple component to be refined:
+An unchanged protocol component still allows the other tuple component to be refined. These
+overloads have disjoint input types, so both provide independently valid specializations of
+`infer_result`:
 
 ```py
+from typing import overload
+
+def infer_result[T, R](callback: Callable[[T], R]) -> R:
+    raise NotImplementedError
+
 @overload
-def with_fixed(value: A) -> tuple[A, IntList]: ...
+def with_fixed(value: int) -> tuple[A, IntList]: ...
 @overload
-def with_fixed(value: B) -> tuple[B, IntList]: ...
-def with_fixed(value: A | B) -> tuple[A | B, IntList]:
-    return value, Box[int]()
+def with_fixed(value: str) -> tuple[B, IntList]: ...
+def with_fixed(value: int | str) -> tuple[A | B, IntList]:
+    raise NotImplementedError
 
 def _() -> None:
-    reveal_type(invoke(with_fixed, Both()))  # revealed: tuple[A, IntList] & tuple[B, IntList]
+    reveal_type(infer_result(with_fixed))  # revealed: tuple[A, IntList] & tuple[B, IntList]
 ```
 
 Specializations of the same generic protocol can also be compared without inspecting its members.
@@ -2352,14 +2498,14 @@ class View[T](Protocol):
     def value(self) -> T: ...
 
 @overload
-def view(value: A) -> View[A]: ...
+def view(value: int) -> View[A]: ...
 @overload
-def view(value: B) -> View[B]: ...
-def view(value: A | B) -> View[A] | View[B]:
+def view(value: str) -> View[B]: ...
+def view(value: int | str) -> View[A] | View[B]:
     raise NotImplementedError
 
 def _() -> None:
-    reveal_type(invoke(view, Both()))  # revealed: View[A] & View[B]
+    reveal_type(infer_result(view))  # revealed: View[A] & View[B]
 ```
 
 ### Inferred stateful callable return alternatives
@@ -2369,7 +2515,8 @@ its first argument. It can be specialized for either `A` or `B`, but giving the 
 signatures would allow an `A` to be stored and later returned as a `B`:
 
 ```py
-from typing import Callable, overload
+from typing import Callable
+from ty_extensions import Intersection
 
 class A: ...
 class B: ...
@@ -2382,18 +2529,23 @@ def cell[T](values: list[T]) -> Callable[[T], T]:
 
     return first
 
-@overload
-def factory(value: A) -> Callable[[A], A]: ...
-@overload
-def factory(value: B) -> Callable[[B], B]: ...
-def factory(value: A | B) -> Callable[[A], A] | Callable[[B], B]:
-    return cell([])
+def _(value: A) -> None:
+    first: Callable[[A], A] = cell([])
+    first(value)  # no diagnostic
+    reveal_type(first(Both()))  # revealed: A
+```
 
-def invoke[T, R](callback: Callable[[T], R], value: T) -> R:
+Inference also retains separate callable return alternatives instead of exposing both signatures
+through the same potentially stateful result:
+
+```py
+def invoke[R](callback: Callable[[object], R], value: object) -> R:
     return callback(value)
 
-def _() -> None:
-    result = invoke(factory, Both())
+def _(
+    factory: Intersection[Callable[[object], Callable[[A], A]], Callable[[object], Callable[[B], B]]],
+) -> None:
+    result = invoke(factory, object())
     reveal_type(result)  # revealed: ((A, /) -> A) | ((B, /) -> B)
     # error: [invalid-argument-type]
     result(A())
@@ -2403,44 +2555,34 @@ def _() -> None:
 An immutable tuple wrapper does not make the captured state safe to share between specializations:
 
 ```py
-@overload
-def wrapped(value: A) -> tuple[Callable[[A], A]]: ...
-@overload
-def wrapped(value: B) -> tuple[Callable[[B], B]]: ...
-def wrapped(value: A | B) -> tuple[Callable[[A], A]] | tuple[Callable[[B], B]]:
-    return (cell([]),)
-
-def _() -> None:
-    reveal_type(invoke(wrapped, Both()))  # revealed: tuple[(A, /) -> A] | tuple[(B, /) -> B]
+def _(
+    wrapped: Intersection[
+        Callable[[object], tuple[Callable[[A], A]]],
+        Callable[[object], tuple[Callable[[B], B]]],
+    ],
+) -> None:
+    reveal_type(invoke(wrapped, object()))  # revealed: tuple[(A, /) -> A] | tuple[(B, /) -> B]
 ```
 
 When the callable component has the same type in every alternative, the other tuple component can
 still be refined:
 
 ```py
-@overload
-def with_fixed(value: A) -> tuple[A, Callable[[int], int]]: ...
-@overload
-def with_fixed(value: B) -> tuple[B, Callable[[int], int]]: ...
-def with_fixed(value: A | B) -> tuple[A | B, Callable[[int], int]]:
-    return value, cell([])
-
-def _() -> None:
-    reveal_type(invoke(with_fixed, Both()))  # revealed: tuple[A, (int, /) -> int] & tuple[B, (int, /) -> int]
+def _(
+    with_fixed: Intersection[
+        Callable[[object], tuple[A, Callable[[int], int]]],
+        Callable[[object], tuple[B, Callable[[int], int]]],
+    ],
+) -> None:
+    reveal_type(invoke(with_fixed, object()))  # revealed: tuple[A, (int, /) -> int] & tuple[B, (int, /) -> int]
 ```
 
 Separate input and output type variables do not make a stateful callable safe to specialize
 independently for each call. The closure below can return a value produced by an earlier call, so
-its return type includes both `A` and `B` even when its latest argument is a `B`:
+its return type includes both `A` and `B` even when its latest argument is a `B`. The callback
+explicitly accepts `A | B` as well as each narrower input, so the merged specialization is valid:
 
 ```py
-@overload
-def identity(value: A) -> A: ...
-@overload
-def identity(value: B) -> B: ...
-def identity(value: A | B) -> A | B:
-    return value
-
 def remember_first[T, U](convert: Callable[[T], U]) -> Callable[[T], U]:
     values: list[U] = []
 
@@ -2450,21 +2592,25 @@ def remember_first[T, U](convert: Callable[[T], U]) -> Callable[[T], U]:
 
     return first
 
-def _() -> None:
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
     result = remember_first(identity)
     reveal_type(result)  # revealed: (A | B, /) -> A | B
-    result(A())
+    result(A())  # no diagnostic
     reveal_type(result(B()))  # revealed: A | B
 ```
 
 In contrast, a deferred call exposes only its output type. Capturing an argument accepted by both
-overloads lets the returned callable produce a value satisfying both return types:
+narrower callable contracts lets the returned callable produce a value satisfying both return types:
 
 ```py
 def defer[T, U](convert: Callable[[T], U], value: T) -> Callable[[], U]:
     return lambda: convert(value)
 
-def _() -> None:
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
     result = defer(identity, Both())
     reveal_type(result())  # revealed: A & B
 ```
@@ -2484,9 +2630,11 @@ def writer_and_reader[T, U](convert: Callable[[T], U]) -> tuple[Callable[[T], No
 
     return write, read
 
-def _() -> None:
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
     write, read = writer_and_reader(identity)
-    write(A())
+    write(A())  # no diagnostic
     reveal_type(read())  # revealed: A | B
 ```
 
@@ -2513,9 +2661,11 @@ def nominal_views[T, U](convert: Callable[[T], U]) -> tuple[Producer[U], Consume
     write, read = writer_and_reader(convert)
     return Producer(read), Consumer(write)
 
-def _() -> None:
+def _(
+    identity: Intersection[Callable[[A], A], Callable[[B], B], Callable[[A | B], A | B]],
+) -> None:
     producer, consumer = nominal_views(identity)
-    consumer.put(A())
+    consumer.put(A())  # no diagnostic
     reveal_type(producer.get())  # revealed: A | B
 ```
 

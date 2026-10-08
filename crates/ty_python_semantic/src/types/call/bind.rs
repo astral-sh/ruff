@@ -6306,15 +6306,12 @@ impl<'db> CallInference<'_, 'db> {
 
         // Apply defaults separately in each alternative, preserving dependencies such as
         // `U = list[T]` before validating arguments or projecting the return type.
-        let mut specializations = alternatives
-            .iter()
-            .map(|types| {
-                generic_context.specialize_recursive(
-                    db,
-                    types.iter().map(|binding| binding.and_then(resolved_type)),
-                )
-            })
-            .collect::<Vec<_>>();
+        let specializations = alternatives.iter().map(|types| {
+            generic_context.specialize_recursive(
+                db,
+                types.iter().map(|binding| binding.and_then(resolved_type)),
+            )
+        });
 
         let relations: Vec<_> = self
             .argument_relations()
@@ -6326,34 +6323,41 @@ impl<'db> CallInference<'_, 'db> {
             })
             .collect();
 
-        specializations.retain(|&specialization| {
-            // TODO: Remove revalidation once constraint generation and solution selection
-            // guarantee the original argument relations. Inference currently drops `None`
-            // from `list[int] | None` against `list[T]`, and can infer `T = str` from
-            // `tuple[str, str]` against `tuple[T, int]` without recording the second element's
-            // incompatibility. Recursive protocol inference can also omit some requirements.
-            // A solution of those partial constraints is not necessarily a valid call.
-            relations
-                .iter()
-                .all(|(relation, contributes_to_inference)| {
-                    let actual = relation
-                        .argument_type
-                        .apply_specialization(db, specialization);
-                    let formal = relation
-                        .declared_type
-                        .apply_specialization(db, specialization);
-                    if *contributes_to_inference {
-                        // Gradual assignability alone can accept different materializations in
-                        // each alternative: `Any` matching both `int` and `str` does not prove
-                        // that the argument has type `int & str`.
-                        actual.is_subtype_of(db, env, formal)
-                    } else {
-                        actual.is_assignable_to(db, env, formal)
-                    }
-                })
-        });
+        let mut validated = Vec::with_capacity(specializations.len());
+        for specialization in specializations {
+            // Recheck the original relations, including requirements that recursive protocol
+            // inference may omit. Even complete ordinary assignability constraints would not
+            // establish the overload-order guarantees needed to intersect return types.
+            let mut accepts_arguments = true;
+            for (relation, contributes_to_inference) in &relations {
+                let actual = relation
+                    .argument_type
+                    .apply_specialization(db, specialization);
+                let formal = relation
+                    .declared_type
+                    .apply_specialization(db, specialization);
+                let accepts = if *contributes_to_inference {
+                    // Gradual assignability alone can accept different materializations in
+                    // each alternative: `Any` matching both `int` and `str` does not prove
+                    // that the argument has type `int & str`.
+                    // An overloaded callback can satisfy ordinary subtyping via a later
+                    // signature whose return is shadowed by an earlier overload. Refinement
+                    // needs an ordered return guarantee, including through protocol members.
+                    actual.is_subtype_for_return_refinement(db, env, formal)?
+                } else {
+                    actual.is_assignable_to(db, env, formal)
+                };
+                if !accepts {
+                    accepts_arguments = false;
+                    break;
+                }
+            }
+            if accepts_arguments {
+                validated.push(specialization);
+            }
+        }
 
-        (!specializations.is_empty()).then_some(specializations)
+        (!validated.is_empty()).then_some(validated)
     }
 
     /// Projects the return type from specializations that each validate the whole call.
@@ -6685,9 +6689,9 @@ impl<'db> CallInference<'_, 'db> {
         InferredCall {
             inferable_typevars: self.inferable_typevars,
             inference: Some(inference),
-            refined_return_ty: self
-                .validated_specializations(inference)
-                .and_then(|specializations| self.specialized_return_type(inference, &specializations)),
+            refined_return_ty: self.validated_specializations(inference).and_then(
+                |specializations| self.specialized_return_type(inference, &specializations),
+            ),
             errors: specialization_errors,
             constraint_set_errors,
         }
