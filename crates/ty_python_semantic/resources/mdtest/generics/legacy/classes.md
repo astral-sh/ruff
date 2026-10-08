@@ -3085,6 +3085,45 @@ def inherited(x: Nested[T]):
     reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
 ```
 
+## Inherited recursive protocol members
+
+Methods inherited from a generic protocol may refer to the base protocol rather than the derived
+one. They are still recursive when inferring a specialization of the derived protocol.
+Regression test for <https://github.com/astral-sh/ty/issues/4694>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class Box(Generic[V]):
+    value: V
+
+class Stream(Protocol[T]):
+    @overload
+    def select(self, value: U) -> U: ...
+    @overload
+    def select(self, value: object) -> T: ...
+    def map(self) -> Box[T]: ...
+    def flatten(self: Stream[Stream[U]]) -> Stream[U]: ...
+    def window(self) -> Stream[Stream[T]]: ...
+
+class Derived(Stream[T], Protocol[T]): ...
+
+def make() -> Derived[T]:
+    raise NotImplementedError
+
+result: Derived[int] = make()  # no diagnostic
+reveal_type(result)  # revealed: Derived[int]
+```
+
 ## Recursive protocol members introduced by type arguments
 
 A property declared as `T` can become recursive after specialization. Finite overloaded requirements

@@ -1385,7 +1385,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 }
 
 /// Returns the finite members of a protocol interface, omitting members that refer back to its
-/// class-backed origin. Type aliases are expanded, but lazy protocol attributes are not visited.
+/// class-backed origin or a protocol base. Type aliases are expanded, but lazy protocol attributes
+/// are not visited.
 ///
 /// For example, `value` is retained while `child` is omitted:
 ///
@@ -1435,7 +1436,13 @@ fn non_recursive_protocol_interface<'db>(
                 .as_protocol_instance()
                 .and_then(|protocol| protocol.nominal_origin_instance(db))
                 .is_some_and(|instance| {
-                    instance.class_literal(db, self.program_environment()) == self.origin
+                    let referenced = instance.class_literal(db, self.program_environment());
+                    // Inherited recursive members still refer to their declaring protocol,
+                    // rather than the derived protocol whose interface we are filtering.
+                    self.origin
+                        .iter_mro(db)
+                        .filter_map(ClassBase::into_class)
+                        .any(|class| class.class_literal(db) == referenced)
                 })
             {
                 self.found.set(true);
