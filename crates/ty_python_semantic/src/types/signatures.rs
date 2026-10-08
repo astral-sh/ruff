@@ -1733,7 +1733,7 @@ impl<'db> Signature<'db> {
                         .evaluate(db)
                         .is_covariant())
                 && bounds
-                    .inference_lower(db, env)
+                    .inference_lower()
                     .is_some_and(|lower| !lower.is_never())
                 && let Some(solution) =
                     CandidateSolutions::default_solve(db, env, &constraints, bounds).as_type()
@@ -2410,7 +2410,7 @@ impl<'db> Signature<'db> {
                 db,
                 env,
                 constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 self_bound_typevar,
                 upper,
             );

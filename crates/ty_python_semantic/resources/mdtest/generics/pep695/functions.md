@@ -3598,6 +3598,29 @@ def check(box: Box[int | str], value: int):
     reveal_type(provide(box, value))  # revealed: Box[str]
 ```
 
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never
+
+def concat[T, U](left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider[T, U, V = Never](left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
+```
+
 ## Inferring nested generic function calls
 
 We can infer type assignments in nested calls to multiple generic functions. If they use the same

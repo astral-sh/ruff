@@ -909,7 +909,7 @@ impl<'db> AtomicConstraint<'db> {
             return None;
         }
 
-        if replacement_source.provenance == ConstraintProvenance::Validity
+        if replacement_source.provenance == ConstraintProvenance::VALIDITY
             && let Type::Callable(callable) = needle_bound
             && callable.kind(db) == CallableTypeKind::ParamSpecValue
         {
@@ -1439,7 +1439,9 @@ impl<'db> ConcreteLowerBound<'db> {
 
         // `⊤ ≤ T` implies `T = ⊤`
         if self.bound == self.typevar.domain(db).top(db) {
-            let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
+            // The implied upper bound comes from the type variable's domain, not inference evidence.
+            let provenance = self.provenance | ConstraintProvenance::VALIDITY;
+            let derived = ConcreteEquivalenceBound::new(provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
         }
     }
@@ -1673,7 +1675,9 @@ impl<'db> ConcreteUpperBound<'db> {
 
         // `T ≤ ⊥` implies `T = ⊥`
         if self.bound == self.typevar.domain(db).bottom(db) {
-            let derived = ConcreteEquivalenceBound::new(self.provenance, self.typevar, self.bound);
+            // The implied lower bound comes from the type variable's domain, not inference evidence.
+            let provenance = self.provenance | ConstraintProvenance::VALIDITY;
+            let derived = ConcreteEquivalenceBound::new(provenance, self.typevar, self.bound);
             map.add_single_implication(self.into(), derived.into());
         }
 
@@ -2272,29 +2276,29 @@ mod tests {
             CallableSignature::single(paramspec_signature(db, int, None)),
         ));
         let lower = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             p,
             captured,
         ));
 
         for provenance in [
-            ConstraintProvenance::Validity,
-            ConstraintProvenance::Evidence,
-            ConstraintProvenance::Mixed,
+            ConstraintProvenance::VALIDITY,
+            ConstraintProvenance::INFERRED,
+            ConstraintProvenance::INFERRED | ConstraintProvenance::VALIDITY,
         ] {
             for replacement in [
                 AtomicConstraint::from(ConcreteUpperBound::new(provenance, t, int)),
                 AtomicConstraint::from(ConcreteEquivalenceBound::new(provenance, t, int)),
             ] {
                 let sequents = SequentMap::for_constraint_pair(db, &env, lower, replacement);
-                if provenance == ConstraintProvenance::Validity {
+                if provenance == ConstraintProvenance::VALIDITY {
                     assert!(
                         sequents.is_none_or(|sequents| sequents.all_sequents().next().is_none()),
                         "{replacement:?}: {sequents:#?}",
                     );
                 } else {
                     let expected = AtomicConstraint::from(ConcreteLowerBound::new(
-                        ConstraintProvenance::derived(ConstraintProvenance::Evidence, provenance),
+                        ConstraintProvenance::derived(ConstraintProvenance::INFERRED, provenance),
                         p,
                         specialized,
                     ));
@@ -2342,17 +2346,17 @@ mod tests {
                 ),
             ));
             let lower = AtomicConstraint::from(ConcreteLowerBound::new(
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 p,
                 captured,
             ));
             let upper = AtomicConstraint::from(ConcreteUpperBound::new(
-                ConstraintProvenance::Validity,
+                ConstraintProvenance::VALIDITY,
                 t,
                 int,
             ));
             let expected = AtomicConstraint::from(ConcreteLowerBound::new(
-                ConstraintProvenance::Mixed,
+                ConstraintProvenance::INFERRED | ConstraintProvenance::VALIDITY,
                 p,
                 expected_bound,
             ));
@@ -2400,17 +2404,17 @@ mod tests {
             ),
         ));
         let lower = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             p,
             captured,
         ));
         let replacement = AtomicConstraint::from(ConcreteEquivalenceBound::new(
-            ConstraintProvenance::Validity,
+            ConstraintProvenance::VALIDITY,
             q,
             overloads,
         ));
         let expected = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Mixed,
+            ConstraintProvenance::INFERRED | ConstraintProvenance::VALIDITY,
             p,
             captured.substitute_one_typevar(db, &env, q, overloads),
         ));
@@ -2430,12 +2434,12 @@ mod tests {
         let env = db.program_environment();
         let t = create_typevar(db, "T");
         let left = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             Type::int_literal(0),
         ));
         let right = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             Type::int_literal(1),
         ));
@@ -2459,12 +2463,12 @@ mod tests {
         let type_of_u = SubclassOfType::from(db, &env, u);
         let bool_class = KnownClass::Bool.to_class_literal(db, &env);
         let left = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             type_of_u,
         ));
         let right = AtomicConstraint::from(ConcreteLowerBound::new(
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             bool_class,
         ));

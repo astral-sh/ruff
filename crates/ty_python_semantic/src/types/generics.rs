@@ -3437,8 +3437,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     Some(mapped_ty) => {
                         // The legacy map has already merged its solutions and discarded their
                         // directional bounds. Treat the resulting mapping as an exact equality.
-                        let candidate =
-                            CandidateTypeVarSolution::from_equivalence(*variable, mapped_ty);
+                        let candidate = CandidateTypeVarSolution::from_equivalence(
+                            *variable,
+                            mapped_ty,
+                            self.inferable,
+                        );
                         choose(*variable, Some(&candidate)).unwrap_or(mapped_ty)
                     }
                     None => choose(*variable, None)?,
@@ -3575,7 +3578,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3583,7 +3586,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -3591,7 +3594,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 self.db,
                 self.env,
                 self.constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 bound_typevar,
                 ty,
             ),
@@ -5148,7 +5151,7 @@ mod tests {
                         db,
                         &env,
                         constraints,
-                        ConstraintProvenance::Evidence,
+                        ConstraintProvenance::INFERRED,
                         typevar,
                         ty,
                     )
@@ -5226,9 +5229,7 @@ mod tests {
 
                 let inference = builder
                     .build_inference_with(|typevar, bounds| {
-                        let lower = bounds
-                            .as_ref()
-                            .and_then(|bounds| bounds.inference_lower(db, &env));
+                        let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                         (typevar == t && lower == Some(str))
                             .then_some(PathBoundSolution::BudgetExceeded { fallback })
                     })
@@ -5276,7 +5277,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
         ));
@@ -5332,7 +5333,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             ));
@@ -5369,7 +5370,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5435,7 +5436,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5510,7 +5511,7 @@ mod tests {
                 db,
                 &env,
                 &constraints,
-                ConstraintProvenance::Evidence,
+                ConstraintProvenance::INFERRED,
                 t,
                 ty,
             )
@@ -5518,9 +5519,7 @@ mod tests {
 
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = bounds
-                    .as_ref()
-                    .and_then(|bounds| bounds.inference_lower(db, &env));
+                let lower = bounds.as_ref().and_then(|bounds| bounds.inference_lower());
                 (typevar == t && lower == Some(str))
                     .then_some(PathBoundSolution::Solved(Type::TypeVar(u)))
             })
@@ -5567,7 +5566,7 @@ mod tests {
         // individual path still contains the cycle after merging with object.
         let inference = builder
             .build_inference_with(|typevar, bounds| {
-                let lower = bounds?.inference_lower(db, &env);
+                let lower = bounds?.inference_lower();
                 let ty = match (typevar, lower) {
                     (typevar, Some(lower)) if typevar == t && lower == int => list_of_u,
                     (typevar, Some(lower)) if typevar == u && lower == str => Type::TypeVar(t),
@@ -5661,7 +5660,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             int,
             int,
@@ -5833,7 +5832,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
@@ -5880,7 +5879,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             ty,
         );
@@ -5927,7 +5926,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5935,7 +5934,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             str,
         );
@@ -5943,7 +5942,7 @@ mod tests {
             db,
             &env,
             &constraints,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             typevar,
             int,
         );
