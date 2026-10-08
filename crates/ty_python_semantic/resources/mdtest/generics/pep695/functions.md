@@ -2409,8 +2409,7 @@ def first_recursive[T: Recursive](values: list[T], sink: Callable[[T], None]) ->
     return values[0]
 
 def _(values: list[Recursive], sink: Callable[[object], None]) -> None:
-    # revealed: None | int | set[int] | Sequence[Recursive] | Mapping[str, Recursive]
-    reveal_type(first_recursive(values, sink))
+    reveal_type(first_recursive(values, sink))  # revealed: Recursive
 ```
 
 ## Inferring from multiple intersection arguments

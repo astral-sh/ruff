@@ -3281,20 +3281,10 @@ impl<'db> Type<'db> {
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
-                .map(|unfolded| unfolded.negate(db, env))
-                .unwrap_or_else(|| {
-                    Type::Intersection(IntersectionType::new(
-                        db,
-                        FxOrderSet::default(),
-                        NegativeIntersectionElements::Single(*self),
-                    ))
-                }),
-
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
-            Type::AlwaysTruthy
+            Type::Recursive(_)
+            | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::KnownBoundMethod(_)
             | Type::KnownInstance(_)
@@ -3472,7 +3462,8 @@ impl<'db> Type<'db> {
     /// union, which is otherwise left unexpanded so diagnostics can name it, but filtering is a
     /// set operation and has to see the members rather than the name.
     ///
-    /// Otherwise, returns the type unchanged.
+    /// If every element is retained, preserves the original type, including its alias identity.
+    /// Otherwise, returns the filtered union.
     fn filter_union(
         self,
         db: &'db dyn Db,
@@ -3487,12 +3478,18 @@ impl<'db> Type<'db> {
                 Type::Union(expanded) => expanded,
                 // Expanding collapsed the union to a single type, leaving nothing to filter
                 // between, so apply the predicate to it directly.
-                expanded => return if f(&expanded) { expanded } else { Type::Never },
+                expanded => return if f(&expanded) { self } else { Type::Never },
             }
         } else {
             union
         };
-        union.filter(db, f)
+        let mut unchanged = true;
+        let filtered = union.filter(db, |element| {
+            let keep = f(element);
+            unchanged &= keep;
+            keep
+        });
+        if unchanged { self } else { filtered }
     }
 
     /// If the type is a union, removes union elements that are disjoint from `target`.

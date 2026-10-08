@@ -2872,15 +2872,15 @@ def modern_first_list[W](value: list[Tree[W]]) -> W:
     raise NotImplementedError
 
 # TODO: should be `int`
-reveal_type(first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(first_list([1]))  # revealed: Tree[int]
 # TODO: should be `int`
-reveal_type(modern_first_list([1]))  # revealed: int | tuple[Tree[int]]
+reveal_type(modern_first_list([1]))  # revealed: Tree[int]
 
 # TODO: should be `int`
-# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+# revealed: Tree[tuple[tuple[int]] | tuple[int] | int] | tuple[int] | tuple[tuple[int]] | int
 reveal_type(first_list([((1,),)]))
 # TODO: should be `int`
-# revealed: tuple[Tree[tuple[tuple[int]] | tuple[int] | int]] | int
+# revealed: Tree[tuple[tuple[int]] | tuple[int] | int] | tuple[int] | tuple[tuple[int]] | int
 reveal_type(modern_first_list([((1,),)]))
 ```
 
@@ -2962,7 +2962,7 @@ def inspect(container: Container):
             reveal_type(tree[0][0])  # revealed: int | Growing[list[list[int]]]
 
     values = [legacy(1), modern(1)]
-    reveal_type(values)  # revealed: list[int | list[Growing[list[int]]]]
+    reveal_type(values)  # revealed: list[Growing[int]]
     tree = values[0]
     if isinstance(tree, list):
         reveal_type(tree[0])  # revealed: Growing[list[int]]
@@ -3090,6 +3090,54 @@ def check(value: Node[int], gradual: Node[Any]):
     valid: list[int] = value[1]()[1]()[0]  # no diagnostic
     invalid: list[str] = value[1]()[1]()[0]  # error: [invalid-assignment]
     gradual_value: list[Any] = gradual[1]()[1]()[0]  # no diagnostic
+```
+
+### Nested complements in recursive union arguments
+
+A recursive union preserves both its leaf and list alternatives when its type argument contains a
+complemented recursive application. The list alternative accepts strings here, but excludes
+integers.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from, is_subtype_of
+
+T = TypeVar("T")
+Node = list["Node[~Node[Node[T]]]"] | T
+
+def accepts(value: Node[int]) -> None: ...
+
+accepts(1)  # no diagnostic
+accepts([])  # no diagnostic
+accepts(["ok"])  # no diagnostic
+accepts("bad")  # error: [invalid-argument-type]
+accepts([1])  # error: [invalid-argument-type]
+
+static_assert(is_subtype_of(int, Node[int]))
+static_assert(not is_disjoint_from(Node[int], int))
+static_assert(not is_disjoint_from(Node[int], list[Any]))
+```
+
+Narrowing to the list alternative retains the recursive element type, so indexing does not lose it
+to `Unknown`.
+
+```py
+def inspect(value: Node[int]):
+    if isinstance(value, list):
+        reveal_type(value)  # revealed: list[Node[~Node[Node[int]]]]
+        child: Node[~Node[Node[int]]] = value[0]  # no diagnostic
+        excluded: int = value[0]  # error: [invalid-assignment]
+    else:
+        reveal_type(value)  # revealed: int
 ```
 
 ### Projection through a recursive alias argument
@@ -3334,4 +3382,81 @@ def inspect(
     reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+```
+
+### Materialization within a recursive alias
+
+A recursive reference can retain a materialization without evaluating another copy of its body. The
+first element remains available after following the reference, including when its type argument
+contains a complemented recursive application.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+RecursiveTop = tuple[T, Top["RecursiveTop[T & ~RecursiveTop[T & Any]]"]]
+
+def takes_int(value: int) -> None: ...
+def takes_str(value: str) -> None: ...
+def inspect(value: RecursiveTop[int]):
+    takes_int(value[0])  # no diagnostic
+    takes_int(value[1][0])  # no diagnostic
+    takes_str(value[1][0])  # error: [invalid-argument-type]
+```
+
+### Materialization and substitution order
+
+Materializing a recursive reference preserves its type parameters. Specializing the enclosing alias
+can later replace those parameters with gradual types. In contrast, materializing the already
+specialized alias also materializes its substituted arguments.
+
+```py
+from typing import Any, TypeVar
+from ty_extensions import Bottom, Top
+
+T = TypeVar("T")
+Upper = tuple[T, Any, Top["Upper[T]"]]
+Lower = tuple[T, Any, Bottom["Lower[T]"]]
+
+def inspect_upper(value: Upper[Any], materialized: Top[Upper[Any]]):
+    reveal_type(value[2][0])  # revealed: Any
+    reveal_type(value[2][1])  # revealed: object
+    reveal_type(materialized[0])  # revealed: object
+    reveal_type(materialized[1])  # revealed: object
+    integer: int = value[2][0]  # no diagnostic
+    integer = value[2][1]  # error: [invalid-assignment]
+
+def inspect_lower(value: Lower[Any], materialized: Bottom[Lower[Any]]):
+    reveal_type(value[2][0])  # revealed: Any
+    reveal_type(value[2][1])  # revealed: Never
+    reveal_type(materialized[0])  # revealed: Never
+    reveal_type(materialized[1])  # revealed: Never
+
+def inspect_static(upper: Upper[int], lower: Lower[int]):
+    reveal_type(upper[2][0])  # revealed: int
+    reveal_type(lower[2][0])  # revealed: int
+```
+
+### Materialization preserves captured type variables
+
+A recursive alias defined within a generic function retains the function's type parameter when a
+recursive reference is materialized. Materialization still replaces gradual types in that reference.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Top
+
+def outer[U](value: U):
+    Captured = tuple[U, Any, Top["Captured"]]
+
+    def inspect(value: Captured):
+        reveal_type(value[0])  # revealed: U@outer
+        reveal_type(value[2][0])  # revealed: U@outer
+        reveal_type(value[2][1])  # revealed: object
 ```

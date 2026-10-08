@@ -48,6 +48,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use super::UnionType;
 use super::call::CallArguments;
 use super::constraints::{ConstraintSetBuilder, Solutions};
+use super::cyclic::PairVisitor;
 use super::equality::{
     ComparisonSoundnessPolicy, equality_exclusion_constraint, equality_truthiness,
     evaluate_type_equality, evaluate_type_inequality,
@@ -825,9 +826,14 @@ impl<'db> Conjunctions<'db> {
         self.conjuncts
             .into_iter()
             .fold(Type::object(), |accumulated, conjunct| match conjunct {
-                NarrowingOperation::Intersection(ty) => {
-                    IntersectionType::from_two_elements(db, env, accumulated, ty)
-                }
+                NarrowingOperation::Intersection(ty) => intersect_narrowing_types(
+                    db,
+                    env,
+                    accumulated,
+                    ty,
+                    false,
+                    &PairVisitor::new(None),
+                ),
                 NarrowingOperation::GenericFiltering(ty) => {
                     filter_generic_narrowing_constraint(db, env, accumulated, ty)
                 }
@@ -846,15 +852,61 @@ fn filter_generic_narrowing_constraint<'db>(
     subject: Type<'db>,
     target: Type<'db>,
 ) -> Type<'db> {
+    intersect_narrowing_types(db, env, subject, target, true, &PairVisitor::new(None))
+}
+
+fn intersect_narrowing_types<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    subject: Type<'db>,
+    target: Type<'db>,
+    specialize_generics: bool,
+    visitor: &PairVisitor<'db, NarrowingOperation<'db>, Option<Type<'db>>>,
+) -> Type<'db> {
     match (subject, target) {
+        // Narrowing observes the alias's outer alternatives. Keep recursive applications
+        // inside those alternatives intact so their specialized element types survive.
+        (Type::TypeAlias(alias), target) => visitor
+            .visit(db, (subject, target), || {
+                Some(intersect_narrowing_types(
+                    db,
+                    env,
+                    alias.value_type(db),
+                    target,
+                    specialize_generics,
+                    visitor,
+                ))
+            })
+            .unwrap_or_else(|| IntersectionType::from_two_elements(db, env, subject, target)),
+        (Type::Recursive(recursive), target) => visitor
+            .visit(db, (subject, target), || {
+                recursive
+                    .unfold(db, env)
+                    .map(|body| {
+                        Some(intersect_narrowing_types(
+                            db,
+                            env,
+                            body,
+                            target,
+                            specialize_generics,
+                            visitor,
+                        ))
+                    })
+                    .unwrap_or(None)
+            })
+            .unwrap_or_else(|| IntersectionType::from_two_elements(db, env, subject, target)),
         (Type::Union(union), target) => union.map(db, env, |element| {
-            filter_generic_narrowing_constraint(db, env, *element, target)
+            intersect_narrowing_types(db, env, *element, target, specialize_generics, visitor)
         }),
         (subject, Type::Union(union)) => union.map(db, env, |element| {
-            filter_generic_narrowing_constraint(db, env, subject, *element)
+            intersect_narrowing_types(db, env, subject, *element, specialize_generics, visitor)
         }),
-        (subject, target @ (Type::ProtocolInstance(_) | Type::Callable(_)))
-            if subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
+        (subject, target) if !specialize_generics => {
+            IntersectionType::from_two_elements(db, env, subject, target)
+        }
+        (subject, target)
+            if matches!(target, Type::ProtocolInstance(_) | Type::Callable(_))
+                && subject.is_subtype_of(db, env, target.top_materialization(db, env)) =>
         {
             subject
         }

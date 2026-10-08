@@ -2153,10 +2153,10 @@ def collection_literal_first(values: list[str], flag: bool) -> None:
     reveal_type([] if flag else values)  # revealed: list[str]
 
 def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
-    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+    reveal_type(values or {"foo": 0})  # revealed: dict[Key, int]
 
 def non_empty_set_fallback(values: set[Key] | None) -> None:
-    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+    reveal_type(values or {"foo"})  # revealed: set[Key]
 
 class TextContent: ...
 class TagContent: ...

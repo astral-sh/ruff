@@ -3454,23 +3454,23 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
 
-            (Type::Recursive(left_recursive), _) => left_recursive
-                .unfold(db, env)
-                .map(|left_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left_unfolded, right)
-                    })
+            (Type::Recursive(left_recursive), _) => {
+                self.with_recursion_guard(db, left, right, || {
+                    left_recursive
+                        .unfold(db, env)
+                        .map(|left_unfolded| self.check_type_pair(db, left_unfolded, right))
+                        .unwrap_or(self.never())
                 })
-                .unwrap_or(self.never()),
+            }
 
-            (_, Type::Recursive(right_recursive)) => right_recursive
-                .unfold(db, env)
-                .map(|right_unfolded| {
-                    self.with_recursion_guard(db, left, right, || {
-                        self.check_type_pair(db, left, right_unfolded)
-                    })
+            (_, Type::Recursive(right_recursive)) => {
+                self.with_recursion_guard(db, left, right, || {
+                    right_recursive
+                        .unfold(db, env)
+                        .map(|right_unfolded| self.check_type_pair(db, left, right_unfolded))
+                        .unwrap_or(self.never())
                 })
-                .unwrap_or(self.never()),
+            }
 
             (Type::TypeAlias(alias), _) => nontrivial_check(self, || {
                 let left_alias_ty = alias.value_type(db);

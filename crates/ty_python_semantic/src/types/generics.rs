@@ -413,7 +413,7 @@ impl<'db> GenericContext<'db> {
     ///
     /// For functions, this retains type variables that are moved to a returned callable in the
     /// externally visible signature. Other scope kinds have identical lexical and public contexts.
-    fn lexical_of_node(
+    pub(super) fn lexical_of_node(
         db: &'db dyn Db,
         node: &NodeWithScopeKind,
         index: &SemanticIndex<'db>,
@@ -2201,8 +2201,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             self.constraints,
             |(bound_typevar, left_type, right_type)| match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => {
-                    let left_type = left_type.resolve_type_alias(db);
-                    let right_type = right_type.resolve_type_alias(db);
+                    // Preserve recursive applications until the relation checker registers
+                    // their obligations. Unfolding here loses the constructor and its arguments.
+                    let left_type = *left_type;
+                    let right_type = *right_type;
 
                     // `Bottom[L] <: Top[R]` asks whether the materialization ranges for `L`
                     // and `R` have any common materialization, so this is symmetric despite

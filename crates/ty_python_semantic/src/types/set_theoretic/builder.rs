@@ -21,6 +21,8 @@
 //! Relation-based intersection simplifications require a non-circular proof. During inference
 //! cycles and structural substitution, an intersection can retain redundant or contradictory
 //! elements instead. Structural substitution restores DNF without inspecting type definitions.
+//! Recursive constructor applications remain atomic in both modes. Relations can unfold them after
+//! recording the constructor and its arguments; expanding them here would discard that identity.
 //!
 //! The implication of these invariants is that a [`UnionBuilder`] does not necessarily build a
 //! [`Type::Union`]. For example, if only one type is added to the [`UnionBuilder`], `build()` will
@@ -1450,10 +1452,11 @@ impl<'db> IntersectionBuilder<'db> {
         ControlFlow::Continue(())
     }
 
-    pub(super) fn bounded_from_elements<I, T>(
+    pub(in crate::types) fn bounded_from_elements<I, T>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         elements: I,
+        normalization: TypeNormalization,
     ) -> Option<Type<'db>>
     where
         I: IntoIterator<Item = T>,
@@ -1473,9 +1476,9 @@ impl<'db> IntersectionBuilder<'db> {
         // input order. With at most one disjunction, retain the original intersection element order.
         // Classification follows aliases and negations without expanding into DNF; the builder
         // performs that expansion under its budget and recursion guard.
-        let is_disjunctive = |ty: &Type<'db>| Self::is_disjunctive(db, env, *ty);
+        let is_disjunctive = |ty: &Type<'db>| Self::is_disjunctive(db, env, *ty, normalization);
         let multiple_disjunctions = elements.clone().filter(is_disjunctive).nth(1).is_some();
-        let mut builder = Self::new(db, env);
+        let mut builder = Self::new(db, env).normalization(normalization);
         for element in elements
             .clone()
             .filter(|ty| !multiple_disjunctions || !is_disjunctive(ty))
@@ -1489,12 +1492,17 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     /// Whether expanding a factor can introduce alternatives, including through De Morgan's law.
-    fn is_disjunctive(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) -> bool {
+    fn is_disjunctive(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        normalization: TypeNormalization,
+    ) -> bool {
         let mut pending = SmallVec::<[_; 4]>::from_slice(&[(ty, false)]);
         let mut seen_aliases = FxHashSet::default();
         while let Some((ty, negated)) = pending.pop() {
             match ty {
-                Type::TypeAlias(_) | Type::Recursive(_) => {
+                Type::TypeAlias(_) if normalization == TypeNormalization::Semantic => {
                     if seen_aliases.insert((ty, negated)) {
                         pending.push((ty.resolve_type_alias(db), negated));
                     }
@@ -1540,9 +1548,7 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> ControlFlow<L::Break> {
         let db = self.db;
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_)
-                if self.normalization == TypeNormalization::Semantic =>
-            {
+            Type::TypeAlias(_) if self.normalization == TypeNormalization::Semantic => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1619,9 +1625,7 @@ impl<'db> IntersectionBuilder<'db> {
         let db = self.db;
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
-            Type::TypeAlias(_) | Type::Recursive(_)
-                if self.normalization == TypeNormalization::Semantic =>
-            {
+            Type::TypeAlias(_) if self.normalization == TypeNormalization::Semantic => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {

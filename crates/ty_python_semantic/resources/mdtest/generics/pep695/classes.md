@@ -2738,5 +2738,35 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Materialized recursive aliases capture class parameters
+
+Materializing an alias in a class declaration preserves the class's type parameter. Specializing a
+method later replaces that parameter without changing the materialization of the alias's other
+components.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Top
+
+class Outer[U]:
+    Captured = tuple[U, Any, Top["Captured"]]
+
+    def materialized(self, value: Top[Captured]) -> Top[Captured]:
+        return value
+
+def inspect(gradual: Outer[Any], static: Outer[int], value: Any):
+    reveal_type(gradual.materialized(value)[0])  # revealed: Any
+    reveal_type(gradual.materialized(value)[1])  # revealed: object
+    reveal_type(static.materialized(value)[0])  # revealed: int
+    reveal_type(static.materialized(value)[1])  # revealed: object
+    integer: int = static.materialized(value)[0]  # no diagnostic
+    text: str = static.materialized(value)[0]  # error: [invalid-assignment]
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

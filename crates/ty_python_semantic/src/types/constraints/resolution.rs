@@ -432,8 +432,8 @@ mod tests {
             V = TypeVar("V")
 
             class C[U]:
-                Growing = tuple[int, "C.Growing[tuple[V, U]] | None"]
-                type ExplicitGrowing[V] = tuple[int, C.ExplicitGrowing[tuple[V, U]] | None]
+                Growing = tuple[U, "C.Growing[tuple[V, U]] | None"]
+                type ExplicitGrowing[V] = tuple[U, C.ExplicitGrowing[tuple[V, U]] | None]
 
             def source(
                 explicit_growing: C.ExplicitGrowing[int],
@@ -472,13 +472,31 @@ mod tests {
                 [SolutionType::Unresolved(alias)],
                 "{parameter:?}: missing captured dependency"
             );
-            // Specializing an alias's arguments cannot replace a variable captured in its body.
-            assert_eq!(
-                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)])
-                    .as_ref(),
-                [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
-                "{parameter:?}: retained captured dependency"
-            );
+            let resolved =
+                resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
+            if matches!(alias, Type::TypeAlias(_)) {
+                // Declared aliases currently specialize only their explicit arguments.
+                assert_eq!(
+                    resolved.as_ref(),
+                    [SolutionType::Unresolved(alias), SolutionType::Resolved(int)]
+                );
+            } else {
+                let [
+                    SolutionType::Resolved(Type::Recursive(mapped)),
+                    SolutionType::Resolved(resolved_u),
+                ] = resolved.as_ref()
+                else {
+                    anyhow::bail!(
+                        "{parameter:?}: expected the captured dependency to resolve, got {resolved:?}"
+                    );
+                };
+                assert_eq!(*resolved_u, int);
+                let unfolded = mapped.unfold(db, &env).into_type();
+                let Some(tuple) = unfolded.exact_tuple_instance_spec(db) else {
+                    anyhow::bail!("expected an unfolded tuple, got {unfolded:?}");
+                };
+                assert_eq!(tuple.fixed_elements().next(), Some(&int));
+            }
         }
         Ok(())
     }

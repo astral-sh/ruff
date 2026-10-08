@@ -1030,7 +1030,7 @@ impl<'db> IntersectionType<'db> {
         I::IntoIter: Clone,
         Type<'db>: From<T>,
     {
-        IntersectionBuilder::bounded_from_elements(db, env, elements)
+        IntersectionBuilder::bounded_from_elements(db, env, elements, TypeNormalization::Semantic)
     }
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
