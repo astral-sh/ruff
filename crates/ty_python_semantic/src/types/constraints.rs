@@ -1326,10 +1326,6 @@ impl<'db> ConstraintSetStorage<'db> {
                 self.env
             }
 
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
             fn notify_skipped_lazy_type_attributes(&self) {
                 self.support.borrow_mut().mark_incomplete();
             }
@@ -2037,10 +2033,6 @@ fn max_constructor_and_typevar_depth<'db>(
         impl<'db> TypeVisitor<'db> for TypeDepthVisitor<'_, 'db> {
             fn program_environment(&self) -> &ProgramEnvironment<'db> {
                 self.env
-            }
-
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {

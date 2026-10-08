@@ -187,14 +187,6 @@ pub struct PEP695TypeAliasType<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PEP695TypeAliasType<'_> {}
 
-fn walk_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: PEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, TypeAliasType::PEP695(type_alias).value_type(db));
-}
-
 #[salsa::tracked]
 impl<'db> PEP695TypeAliasType<'db> {
     fn definition(self, db: &'db dyn Db) -> Definition<'db> {
@@ -300,14 +292,6 @@ pub struct ManualPEP695TypeAliasType<'db> {
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for ManualPEP695TypeAliasType<'_> {}
-
-fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: ManualPEP695TypeAliasType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, TypeAliasType::ManualPEP695(type_alias).value_type(db));
-}
 
 #[salsa::tracked]
 impl<'db> ManualPEP695TypeAliasType<'db> {
@@ -474,25 +458,6 @@ pub(super) fn walk_type_alias_with_recursion_guard<'db, V: visitor::TypeVisitor<
         },
         || visitor.visit_type(db, alias.value_type(db)),
     );
-}
-
-pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    type_alias: TypeAliasType<'db>,
-    visitor: &V,
-) {
-    if !visitor.should_visit_lazy_type_attributes() {
-        visitor.notify_skipped_lazy_type_attributes();
-        return;
-    }
-    match type_alias {
-        TypeAliasType::PEP695(type_alias) => {
-            walk_pep_695_type_alias(db, type_alias, visitor);
-        }
-        TypeAliasType::ManualPEP695(type_alias) => {
-            walk_manual_pep_695_type_alias(db, type_alias, visitor);
-        }
-    }
 }
 
 #[salsa::tracked]

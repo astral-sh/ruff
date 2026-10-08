@@ -1144,7 +1144,7 @@ impl<'db> UnionBuilder<'db> {
                 if !self.unpack_aliases
                     && [ty, element_type]
                         .into_iter()
-                        .any(|ty| any_over_type(db, &self.env, ty, false, Type::is_alias_like))
+                        .any(|ty| any_over_type(db, &self.env, ty, Type::is_alias_like))
                 {
                     continue;
                 }

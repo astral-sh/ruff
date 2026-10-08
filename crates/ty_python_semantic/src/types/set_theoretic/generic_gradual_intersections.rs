@@ -1,6 +1,5 @@
 use crate::types::generics::specialization_variance;
 use crate::types::tuple::TupleSpec;
-use crate::types::visitor::contains_growing_type;
 use crate::types::{
     ClassBase, ClassType, IntersectionType, KnownClass, MaterializationKind, Type, TypeVarVariance,
     UnionType,
@@ -105,7 +104,7 @@ fn base_top_intersection<'db>(
     // Inspect lazy attributes only after establishing that the classes are related. Expanding a
     // recursive generic alias or member can re-enter intersection simplification with ever-growing
     // type arguments. Exact recursive specializations can still be checked.
-    if contains_growing_type(db, env, base) {
+    if base.contains_growing_type(db, env) {
         return Some(GenericIntersection::Recursive);
     }
     if base_specialization.materialization_kind(db).is_some()
