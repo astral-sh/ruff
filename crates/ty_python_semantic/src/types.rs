@@ -507,6 +507,42 @@ struct ApplyMaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
+/// Recursion state retained when constraint solving starts another type relation.
+///
+/// Constraint arenas and transformation caches remain local to each operation. Signature
+/// obligations and materialization equivalence, however, belong to the enclosing proof.
+#[derive(Clone)]
+pub(crate) struct ConstraintRelationContext<'db> {
+    signature_relations: SignatureRelationVisitor<'db>,
+    materialization_equivalence: MaterializationEquivalenceVisitor<'db>,
+    materialize_typevar_bounds_and_defaults: bool,
+}
+
+impl std::fmt::Debug for ConstraintRelationContext<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ConstraintRelationContext")
+            .field("active_signatures", &self.signature_relations.is_active())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'db> ConstraintRelationContext<'db> {
+    fn mapping_visitor<'env>(
+        &self,
+        env: &'env ProgramEnvironment<'db>,
+    ) -> ApplyTypeMappingVisitor<'env, 'db> {
+        ApplyTypeMappingVisitor {
+            signature_relation_visitor: Some(self.signature_relations.clone()),
+            materialization_equivalence: OnceCell::from(Rc::clone(
+                &self.materialization_equivalence,
+            )),
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            ..ApplyTypeMappingVisitor::new(env)
+        }
+    }
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Some recursive transformations visit the same type under more than one mapping mode within a
@@ -554,6 +590,17 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
     fn with_signature_relations(mut self, visitor: &SignatureRelationVisitor<'db>) -> Self {
         self.signature_relation_visitor = Some(visitor.clone());
         self
+    }
+
+    fn constraint_relation_context(
+        &self,
+        signatures: &SignatureRelationVisitor<'db>,
+    ) -> ConstraintRelationContext<'db> {
+        ConstraintRelationContext {
+            signature_relations: signatures.clone(),
+            materialization_equivalence: Rc::clone(self.materialization_equivalence()),
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+        }
     }
 
     fn project_meta_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {

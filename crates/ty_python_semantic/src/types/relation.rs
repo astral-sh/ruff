@@ -19,10 +19,11 @@ use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MaterializationKind, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
-    SubclassOfInner, SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType,
+    ConstraintRelationContext, CycleDetector, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, MaterializationKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -31,6 +32,83 @@ use crate::{
         typevar::TypeVarSet,
     },
 };
+
+impl<'db> ConstraintRelationContext<'db> {
+    /// Starts an eager normalization proof without reusing results obtained under an earlier
+    /// recursive assumption. A circular relation can close a proof, but cannot erase a type.
+    pub(super) fn prove_for_simplification(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        relation: TypeRelation,
+        work: impl FnOnce(&TypeRelationChecker<'_, '_, 'db>) -> bool,
+    ) -> bool {
+        let mapping = ApplyTypeMappingVisitor {
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            ..ApplyTypeMappingVisitor::new(env).with_signature_relations(&self.signature_relations)
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(
+            mapping.constraint_relation_context(&self.signature_relations),
+        );
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
+        let mut checker = TypeRelationChecker::subtyping(
+            env,
+            &constraints,
+            TypeVarSet::None,
+            &relation_visitor,
+            &disjointness_visitor,
+            &self.signature_relations,
+            &mapping,
+        );
+        checker.relation = relation;
+        self.signature_relations
+            .without_circular_proof(|| work(&checker))
+            .unwrap_or(false)
+    }
+
+    /// Compares sequent bounds in a fresh arena while retaining their enclosing signature proof.
+    pub(super) fn check_relation<'c>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+        relation: TypeRelation,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let mapping = self.mapping_visitor(env);
+        let mut checker = TypeRelationChecker::constraint_set_assignability(
+            env,
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &self.signature_relations,
+            &mapping,
+        );
+        checker.relation = relation;
+        checker.check_type_pair(db, source, target)
+    }
+
+    /// Retains the same proof when sequent bounds require gradual equivalence.
+    pub(super) fn check_equivalence<'c>(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        source.when_equivalent_to_with_materialization_visitor(
+            db,
+            target,
+            constraints,
+            &self.mapping_visitor(env),
+            TypeVarEvaluation::Lazy,
+        )
+    }
+}
 
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]

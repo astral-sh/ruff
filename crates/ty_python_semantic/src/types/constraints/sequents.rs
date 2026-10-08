@@ -1,5 +1,6 @@
 //! The [`SequentMap`] and related functionality
 
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::fmt::{Debug, Display};
 
@@ -16,10 +17,16 @@ use crate::types::constraints::{
     ALWAYS_FALSE, ConstraintId, ConstraintSetBuilder, ConstraintSetStorage, Node,
     OwnedConstraintSet,
 };
+use crate::types::generics::ApplySpecialization;
+use crate::types::relation::TypeRelation;
+use crate::types::set_theoretic::{IntersectionBuilder, UnionBuilder};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
-use crate::types::{BoundTypeVarInstance, IntersectionType, Type, TypeVarVariance, UnionType};
+use crate::types::{
+    BoundTypeVarInstance, ConstraintRelationContext, IntersectionType, MaterializationKind, Type,
+    TypeContext, TypeMapping, TypeVarVariance, UnionType,
+};
 use crate::{Db, Program, ProgramEnvironment};
 
 /// A constraint can occur in many cached pairs and their derived sequents. Intern it once instead
@@ -62,6 +69,7 @@ pub(super) struct SequentMap<'db> {
 
 struct SequentMapBuilder<'db> {
     db: &'db dyn Db,
+    relation_context: Option<ConstraintRelationContext<'db>>,
     sequents: Vec<SequentGroup<'db>>,
     /// Pending sequents that have not yet been added to [`sequents`][Self::sequents]. This is only
     /// used during construction, and will be empty in a finalized sequent map.
@@ -248,8 +256,138 @@ impl<'db> SequentMapBuilder<'db> {
     fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
+            relation_context: None,
             sequents: Vec::new(),
             pending: Vec::new(),
+        }
+    }
+
+    fn when_assignable(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        let Some(context) = &self.relation_context else {
+            return source.when_constraint_set_assignable_to_owned(self.db, env, target);
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        Cow::Owned(constraints.into_owned(|constraints| {
+            context.check_relation(
+                self.db,
+                env,
+                constraints,
+                source,
+                target,
+                TypeRelation::Assignability,
+            )
+        }))
+    }
+
+    fn when_equivalent(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
+        let Some(context) = &self.relation_context else {
+            return source.when_constraint_set_equivalent_to_owned(self.db, env, target);
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        Cow::Owned(constraints.into_owned(|constraints| {
+            context.check_equivalence(self.db, env, constraints, source, target)
+        }))
+    }
+
+    fn is_subtype(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let Some(context) = &self.relation_context else {
+            return source.is_constraint_set_subtype_of(self.db, env, target);
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        context
+            .check_relation(
+                self.db,
+                env,
+                &constraints,
+                source,
+                target,
+                TypeRelation::Subtyping,
+            )
+            .is_always_satisfied(self.db, env, TypeVarSet::None)
+    }
+
+    fn is_assignable(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let Some(context) = &self.relation_context else {
+            return source.is_constraint_set_assignable_to(self.db, env, target);
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        context
+            .check_relation(
+                self.db,
+                env,
+                &constraints,
+                source,
+                target,
+                TypeRelation::Assignability,
+            )
+            .is_always_satisfied(self.db, env, TypeVarSet::None)
+    }
+
+    fn is_equivalent(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let Some(context) = &self.relation_context else {
+            return source.is_constraint_set_equivalent_to(self.db, env, target);
+        };
+        let constraints = ConstraintSetBuilder::new_with_relation_context(context.clone());
+        context
+            .check_equivalence(self.db, env, &constraints, source, target)
+            .is_always_satisfied(self.db, env, TypeVarSet::None)
+    }
+
+    fn materialize(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        kind: MaterializationKind,
+    ) -> Type<'db> {
+        match &self.relation_context {
+            Some(context) => ty.materialize(self.db, kind, &context.mapping_visitor(env)),
+            None => ty.materialization(self.db, env, kind),
+        }
+    }
+
+    fn substitute(
+        &self,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+        variable: BoundTypeVarInstance<'db>,
+        replacement: Type<'db>,
+    ) -> Type<'db> {
+        match &self.relation_context {
+            Some(context) => ty.apply_type_mapping_impl(
+                self.db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::Single(
+                    variable,
+                    replacement,
+                )),
+                TypeContext::default(),
+                &context.mapping_visitor(env),
+            ),
+            None => ty.substitute_one_typevar(self.db, env, variable, replacement),
         }
     }
 
@@ -362,6 +500,24 @@ impl<'db> SequentMapBuilder<'db> {
 }
 
 impl<'db> SequentMap<'db> {
+    /// Derives sequents locally when their relations participate in an unfinished signature proof.
+    /// Such results must not be stored in the context-independent Salsa query cache.
+    pub(super) fn for_constraint_pair_with_context(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        left: Constraint<'db>,
+        right: Constraint<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
+    ) -> Option<Cow<'db, Self>> {
+        let Some(context) = context else {
+            return Self::for_constraint_pair(db, env, left, right).map(Cow::Borrowed);
+        };
+        let mut map = SequentMapBuilder::new(db);
+        map.relation_context = Some(context.clone());
+        left.add_sequents_with(db, env, &mut map, right);
+        Some(Cow::Owned(map.finish()))
+    }
+
     /// Returns a sequent map containing the sequents that we can infer from a single constraint in
     /// isolation. This method is cached so that we only perform this work once per
     /// constraint.
@@ -663,9 +819,7 @@ impl<'db> Constraint<'db> {
             return;
         }
 
-        let when = lower
-            .bound()
-            .when_constraint_set_assignable_to_owned(db, env, upper.bound());
+        let when = map.when_assignable(env, lower.bound(), upper.bound());
         let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
         Self::add_constraint_set_implication(
             map,
@@ -688,10 +842,7 @@ impl<'db> Constraint<'db> {
         if lower.bound().is_static_sequent_eligible(db, env)
             && upper.bound().is_static_sequent_eligible(db, env)
         {
-            let when =
-                lower
-                    .bound()
-                    .when_constraint_set_equivalent_to_owned(db, env, upper.bound());
+            let when = map.when_equivalent(env, lower.bound(), upper.bound());
             let provenance = ConstraintProvenance::derived(lower.provenance(), upper.provenance());
             Self::add_constraint_set_implication(
                 map,
@@ -797,7 +948,7 @@ impl<'db> Constraint<'db> {
     /// `needle_typevar` can produce the same cycle across the two constraints. Repeatedly
     /// following either pattern does not reach a fixed point, so we skip both.
     fn substitute_if_not_recursive(
-        db: &'db dyn Db,
+        map: &SequentMapBuilder<'db>,
         env: &ProgramEnvironment<'db>,
         needle_typevar: BoundTypeVarInstance<'db>,
         needle_bound: Type<'db>,
@@ -805,6 +956,7 @@ impl<'db> Constraint<'db> {
         replacement_bound: Type<'db>,
         replacement_is: ReplacementIs,
     ) -> Option<Type<'db>> {
+        let db = map.db;
         // Substituting a gradual type is not always safe.
         //
         // If we are substituting because a lower or upper bound, that means we are applying
@@ -850,7 +1002,7 @@ impl<'db> Constraint<'db> {
             return None;
         }
 
-        Some(needle_bound.substitute_one_typevar(db, env, replacement_typevar, replacement_bound))
+        Some(map.substitute(env, needle_bound, replacement_typevar, replacement_bound))
     }
 
     fn add_covariant_lower_tightened_sequent(
@@ -872,7 +1024,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -910,7 +1062,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -948,7 +1100,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -981,7 +1133,7 @@ impl<'db> Constraint<'db> {
             .evaluate(db)
             == TypeVarVariance::Contravariant
             && let Some(replacement) = Constraint::substitute_if_not_recursive(
-                db,
+                map,
                 env,
                 lower.typevar(),
                 lower.bound(),
@@ -1007,7 +1159,7 @@ impl<'db> Constraint<'db> {
             .evaluate(db)
             == TypeVarVariance::Contravariant
             && let Some(replacement) = Constraint::substitute_if_not_recursive(
-                db,
+                map,
                 env,
                 upper.typevar(),
                 upper.bound(),
@@ -1045,7 +1197,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1080,7 +1232,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1115,7 +1267,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1150,7 +1302,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1185,7 +1337,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1220,7 +1372,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1255,7 +1407,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1290,7 +1442,7 @@ impl<'db> Constraint<'db> {
             return;
         }
         let Some(replacement) = Constraint::substitute_if_not_recursive(
-            db,
+            map,
             env,
             left.typevar(),
             left.bound(),
@@ -1307,30 +1459,45 @@ impl<'db> Constraint<'db> {
 }
 
 fn possibly_reversed_intersection<'db>(
-    db: &'db dyn Db,
+    map: &SequentMapBuilder<'db>,
     env: &ProgramEnvironment<'db>,
     reversed: bool,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Type<'db> {
-    if reversed {
-        IntersectionType::from_two_elements(db, env, right, left)
+    let (left, right) = if reversed {
+        (right, left)
     } else {
-        IntersectionType::from_two_elements(db, env, left, right)
+        (left, right)
+    };
+    match &map.relation_context {
+        Some(context) => IntersectionBuilder::new(map.db, env)
+            .with_relation_context(context)
+            .positive_elements([left, right])
+            .build(),
+        None => IntersectionType::from_two_elements(map.db, env, left, right),
     }
 }
 
 fn possibly_reversed_union<'db>(
-    db: &'db dyn Db,
+    map: &SequentMapBuilder<'db>,
     env: &ProgramEnvironment<'db>,
     reversed: bool,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Type<'db> {
-    if reversed {
-        UnionType::from_two_elements(db, env, right, left)
+    let (left, right) = if reversed {
+        (right, left)
     } else {
-        UnionType::from_two_elements(db, env, left, right)
+        (left, right)
+    };
+    match &map.relation_context {
+        Some(context) => UnionBuilder::new(map.db, env)
+            .with_relation_context(context)
+            .add(left)
+            .add(right)
+            .build(),
+        None => UnionType::from_two_elements(map.db, env, left, right),
     }
 }
 
@@ -1376,22 +1543,22 @@ impl<'db> ConcreteLowerBound<'db> {
 
         // We use subtyping here, as a gradual range `Any <= T` permits materializations not implied
         // by `int <= T`, despite `Any` and `int` being mutually assignable.
-        let lower = self.bound.bottom_materialization(db, env);
-        let other_lower = other.bound.bottom_materialization(db, env);
+        let lower = map.materialize(env, self.bound, MaterializationKind::Bottom);
+        let other_lower = map.materialize(env, other.bound, MaterializationKind::Bottom);
 
         // (β ≤ α) ⇒ ((α ≤ T) ⇒ (β ≤ T))
-        if other_lower.is_constraint_set_subtype_of(db, env, lower) {
+        if map.is_subtype(env, other_lower, lower) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (α ≤ β) ⇒ ((β ≤ T) ⇒ (α ≤ T))
-        if lower.is_constraint_set_subtype_of(db, env, other_lower) {
+        if map.is_subtype(env, lower, other_lower) {
             map.add_single_implication(other.into(), self.into());
         }
 
         // `(α ≤ T) ∧ (β ≤ T)` is equivalent to `(α | β) ≤ T`. We do not create lower bounds that
         // are unions, so only add sequents when the union simplifies away.
-        let combined = possibly_reversed_union(db, env, reversed, self.bound, other.bound);
+        let combined = possibly_reversed_union(map, env, reversed, self.bound, other.bound);
         if !combined.is_union() {
             let provenance = ConstraintProvenance::simplified(
                 self.provenance,
@@ -1428,9 +1595,7 @@ impl<'db> ConcreteLowerBound<'db> {
                 && other.bound != self.typevar.domain(db).top(db)
                 && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
-                && other
-                    .bound
-                    .is_constraint_set_equivalent_to(db, env, self.bound)
+                && map.is_equivalent(env, other.bound, self.bound)
             {
                 let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
                 let derived = TypeVarRangeBound::new(db, provenance, other.typevar, self.typevar);
@@ -1453,11 +1618,9 @@ impl<'db> ConcreteLowerBound<'db> {
         // because callable types with different return types can represent the same parameter list.
         // (We don't need to add the projection implication `(T = α) ⇒ (α ≤ T)`, since anything we
         // can derive from `α ≤ T` we can also derive from `T = α`.)
-        let lower = self.bound.bottom_materialization(db, env);
-        let upper = other.bound.top_materialization(db, env);
-        if lower == upper
-            || (self.typevar.is_paramspec(db)
-                && lower.is_constraint_set_equivalent_to(db, env, upper))
+        let lower = map.materialize(env, self.bound, MaterializationKind::Bottom);
+        let upper = map.materialize(env, other.bound, MaterializationKind::Top);
+        if lower == upper || (self.typevar.is_paramspec(db) && map.is_equivalent(env, lower, upper))
         {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let simplified = ConcreteEquivalenceBound::new(provenance, self.typevar, lower);
@@ -1487,9 +1650,7 @@ impl<'db> ConcreteLowerBound<'db> {
             if self.typevar.domain(db) == other.typevar.domain(db)
                 && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
-                && self
-                    .bound
-                    .is_constraint_set_equivalent_to(db, env, other.bound)
+                && map.is_equivalent(env, self.bound, other.bound)
             {
                 let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
                 let derived = TypeVarRangeBound::new(db, provenance, other.typevar, self.typevar);
@@ -1499,10 +1660,7 @@ impl<'db> ConcreteLowerBound<'db> {
         }
 
         // (α ≤ β) ⇒ ((T = β) ⇒ (α ≤ T))
-        if self
-            .bound
-            .is_constraint_set_assignable_to(db, env, other.bound)
-        {
+        if map.is_assignable(env, self.bound, other.bound) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1606,16 +1764,16 @@ impl<'db> ConcreteUpperBound<'db> {
 
         // We use subtyping here, as a gradual range `T <= Any` permits materializations not implied
         // by `T <= int`, despite `Any` and `int` being mutually assignable.
-        let upper = self.bound.top_materialization(db, env);
-        let other_upper = other.bound.top_materialization(db, env);
+        let upper = map.materialize(env, self.bound, MaterializationKind::Top);
+        let other_upper = map.materialize(env, other.bound, MaterializationKind::Top);
 
         // (α ≤ β) ⇒ ((T ≤ α) ⇒ (T ≤ β))
-        if upper.is_constraint_set_subtype_of(db, env, other_upper) {
+        if map.is_subtype(env, upper, other_upper) {
             map.add_single_implication(self.into(), other.into());
         }
 
         // (β ≤ α) ⇒ ((T ≤ β) ⇒ (T ≤ α))
-        if other_upper.is_constraint_set_subtype_of(db, env, upper) {
+        if map.is_subtype(env, other_upper, upper) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1629,7 +1787,7 @@ impl<'db> ConcreteUpperBound<'db> {
 
         // `(T ≤ α) ∧ (T ≤ β)` is equivalent to `T ≤ (α & β)`. We do not create upper bounds that
         // are intersections, so only add sequents when the intersection simplifies away.
-        let combined = possibly_reversed_intersection(db, env, reversed, self.bound, other.bound);
+        let combined = possibly_reversed_intersection(map, env, reversed, self.bound, other.bound);
         if !combined.is_nontrivial_intersection(db) {
             let provenance = ConstraintProvenance::simplified(
                 self.provenance,
@@ -1666,9 +1824,7 @@ impl<'db> ConcreteUpperBound<'db> {
             if self.typevar.domain(db) == other.typevar.domain(db)
                 && self.bound.is_static_sequent_eligible(db, env)
                 && other.bound.is_static_sequent_eligible(db, env)
-                && self
-                    .bound
-                    .is_constraint_set_equivalent_to(db, env, other.bound)
+                && map.is_equivalent(env, self.bound, other.bound)
             {
                 let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
                 let derived = TypeVarRangeBound::new(db, provenance, self.typevar, other.typevar);
@@ -1678,10 +1834,7 @@ impl<'db> ConcreteUpperBound<'db> {
         }
 
         // (β ≤ α) ⇒ ((T = β) ⇒ (T ≤ α))
-        if other
-            .bound
-            .is_constraint_set_assignable_to(db, env, self.bound)
-        {
+        if map.is_assignable(env, other.bound, self.bound) {
             map.add_single_implication(other.into(), self.into());
         }
 
@@ -1777,10 +1930,7 @@ impl<'db> ConcreteEquivalenceBound<'db> {
         if self.bound == other.bound {
             return;
         }
-        if self
-            .bound
-            .is_constraint_set_equivalent_to(db, env, other.bound)
-        {
+        if map.is_equivalent(env, self.bound, other.bound) {
             let provenance = ConstraintProvenance::derived(self.provenance, other.provenance);
             let derived = ConcreteEquivalenceBound::new(provenance, other.typevar, other.bound);
             map.add_single_implication(self.into(), derived.into());

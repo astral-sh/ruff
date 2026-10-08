@@ -45,7 +45,6 @@ use std::ops::ControlFlow;
 
 use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
-use crate::types::ApplyTypeMappingVisitor;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::enums::EnumComplement;
 use crate::types::relation::{
@@ -55,6 +54,7 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::typevar::TypeVarSet;
 use crate::types::visitor::any_over_type;
+use crate::types::{ApplyTypeMappingVisitor, ConstraintRelationContext};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements,
@@ -63,6 +63,49 @@ use crate::types::{
 use crate::{Db, FxIndexSet, FxOrderMap, FxOrderSet, ProgramEnvironment};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+
+fn union_element_is_redundant<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: Type<'db>,
+    target: Type<'db>,
+    context: Option<&ConstraintRelationContext<'db>>,
+) -> bool {
+    context.map_or_else(
+        || source.is_redundant_with(db, env, target),
+        |context| {
+            context.prove_for_simplification(
+                env,
+                TypeRelation::Redundancy { pure: false },
+                |checker| {
+                    checker
+                        .check_type_pair(db, source, target)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                },
+            )
+        },
+    )
+}
+
+fn negation_is_subtype_for_union<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    source: Type<'db>,
+    target: Type<'db>,
+    negated: &mut Option<Type<'db>>,
+    context: Option<&ConstraintRelationContext<'db>>,
+) -> bool {
+    let Some(context) = context else {
+        return source.negation_is_subtype_of_cached(db, env, target, negated);
+    };
+    context.prove_for_simplification(env, TypeRelation::Subtyping, |checker| {
+        let mut builder = IntersectionBuilder::new(db, env).with_relation_context(context);
+        builder.add_negative_in_place(source);
+        checker
+            .check_type_pair(db, builder.build(), target)
+            .is_always_satisfied(db, env, TypeVarSet::None)
+    })
+}
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -77,6 +120,7 @@ fn split_truthiness_guarded_intersection<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     ty: Type<'db>,
+    context: Option<&ConstraintRelationContext<'db>>,
 ) -> Option<(Type<'db>, Type<'db>)> {
     let Type::Intersection(intersection) = ty else {
         return None;
@@ -94,6 +138,9 @@ fn split_truthiness_guarded_intersection<'db>(
     };
 
     let mut core = IntersectionBuilder::new(db, env);
+    if let Some(context) = context {
+        core = core.with_relation_context(context);
+    }
     for positive in intersection.positive(db) {
         core.add_positive_in_place(*positive);
     }
@@ -127,24 +174,58 @@ fn merge_truthiness_guarded_pair<'db>(
     env: &ProgramEnvironment<'db>,
     left: Type<'db>,
     right: Type<'db>,
+    context: Option<&ConstraintRelationContext<'db>>,
 ) -> Option<Type<'db>> {
-    let (left_core, left_guard) = split_truthiness_guarded_intersection(db, env, left)?;
-    let (right_core, right_guard) = split_truthiness_guarded_intersection(db, env, right)?;
-    if left_guard == right_guard {
-        return None;
-    }
+    let work = || {
+        let (left_core, left_guard) =
+            split_truthiness_guarded_intersection(db, env, left, context)?;
+        let (right_core, right_guard) =
+            split_truthiness_guarded_intersection(db, env, right, context)?;
+        if left_guard == right_guard {
+            return None;
+        }
 
-    if left_core.is_equivalent_to(db, env, right_core) {
-        return Some(left_core);
-    }
+        let equivalent = context.map_or_else(
+            || left_core.is_equivalent_to(db, env, right_core),
+            |context| {
+                context.prove_for_simplification(env, TypeRelation::Subtyping, |checker| {
+                    checker
+                        .as_equivalence_checker()
+                        .check_type_pair(db, left_core, right_core)
+                        .is_always_satisfied(db, env, TypeVarSet::None)
+                })
+            },
+        );
+        if equivalent {
+            return Some(left_core);
+        }
 
-    let candidate = UnionType::from_elements(db, env, [left_core, right_core]);
-    let left_reconstructed = IntersectionType::from_two_elements(db, env, candidate, left_guard);
-    let right_reconstructed = IntersectionType::from_two_elements(db, env, candidate, right_guard);
-    if left_reconstructed == left && right_reconstructed == right {
-        Some(candidate)
-    } else {
-        None
+        let mut union = UnionBuilder::new(db, env);
+        if let Some(context) = context {
+            union = union.with_relation_context(context);
+        }
+        let candidate = union.add(left_core).add(right_core).build();
+        let reconstruct = |guard| match context {
+            Some(context) => IntersectionBuilder::new(db, env)
+                .with_relation_context(context)
+                .positive_elements([candidate, guard])
+                .build(),
+            None => IntersectionType::from_two_elements(db, env, candidate, guard),
+        };
+        let left_reconstructed = reconstruct(left_guard);
+        let right_reconstructed = reconstruct(right_guard);
+        if left_reconstructed == left && right_reconstructed == right {
+            Some(candidate)
+        } else {
+            None
+        }
+    };
+    match context {
+        Some(context) => context
+            .signature_relations
+            .without_circular_proof(work)
+            .flatten(),
+        None => work(),
     }
 }
 
@@ -159,53 +240,78 @@ fn merge_disjoint_exclusions<'db>(
     env: &ProgramEnvironment<'db>,
     left: Type<'db>,
     right: Type<'db>,
+    context: Option<&ConstraintRelationContext<'db>>,
 ) -> Option<Type<'db>> {
-    let (Type::Intersection(left), Type::Intersection(right)) = (left, right) else {
-        return None;
-    };
-    let left_positive = left.positive(db);
-    let left_negative = left.negative(db);
-    let right_negative = right.negative(db);
+    let work = || {
+        let (Type::Intersection(left), Type::Intersection(right)) = (left, right) else {
+            return None;
+        };
+        let left_positive = left.positive(db);
+        let left_negative = left.negative(db);
+        let right_negative = right.negative(db);
 
-    if !left_positive.set_eq(right.positive(db)) {
-        return None;
-    }
+        if !left_positive.set_eq(right.positive(db)) {
+            return None;
+        }
 
-    let (common_negative, left_only): (SmallVec<[_; 2]>, SmallVec<[_; 2]>) = left_negative
-        .iter()
-        .copied()
-        .partition(|ty| right_negative.contains(ty));
+        let (common_negative, left_only): (SmallVec<[_; 2]>, SmallVec<[_; 2]>) = left_negative
+            .iter()
+            .copied()
+            .partition(|ty| right_negative.contains(ty));
 
-    // Leave trivially redundant operands to the usual union simplification, which preserves
-    // their order. This only checks exact containment, not redundancy through subtyping.
-    if left_only.is_empty() || common_negative.len() == right_negative.len() {
-        return None;
-    }
+        // Leave trivially redundant operands to the usual union simplification, which preserves
+        // their order. This only checks exact containment, not redundancy through subtyping.
+        if left_only.is_empty() || common_negative.len() == right_negative.len() {
+            return None;
+        }
 
-    for right_exclusion in right_negative
-        .iter()
-        .filter(|ty| !left_negative.contains(ty))
-    {
-        for left_exclusion in &left_only {
-            if simplify_intersection_pair(
-                db,
-                env,
-                *left_exclusion,
-                *right_exclusion,
-                IntersectionPolarity::Positive,
-            ) != IntersectionSimplification::Disjoint
-            {
-                return None;
+        for right_exclusion in right_negative
+            .iter()
+            .filter(|ty| !left_negative.contains(ty))
+        {
+            for left_exclusion in &left_only {
+                let disjoint = context.map_or_else(
+                    || {
+                        simplify_intersection_pair(
+                            db,
+                            env,
+                            *left_exclusion,
+                            *right_exclusion,
+                            IntersectionPolarity::Positive,
+                        ) == IntersectionSimplification::Disjoint
+                    },
+                    |context| {
+                        context.prove_for_simplification(env, TypeRelation::Subtyping, |checker| {
+                            checker
+                                .as_disjointness_checker()
+                                .check_type_pair(db, *left_exclusion, *right_exclusion)
+                                .is_always_satisfied(db, env, TypeVarSet::None)
+                        })
+                    },
+                );
+                if !disjoint {
+                    return None;
+                }
             }
         }
-    }
 
-    let mut common =
-        IntersectionBuilder::new(db, env).positive_elements(left_positive.iter().copied());
-    for negative in common_negative {
-        common.add_negative_in_place(negative);
+        let mut common = IntersectionBuilder::new(db, env);
+        if let Some(context) = context {
+            common = common.with_relation_context(context);
+        }
+        common = common.positive_elements(left_positive.iter().copied());
+        for negative in common_negative {
+            common.add_negative_in_place(negative);
+        }
+        Some(common.build())
+    };
+    match context {
+        Some(context) => context
+            .signature_relations
+            .without_circular_proof(work)
+            .flatten(),
+        None => work(),
     }
-    Some(common.build())
 }
 
 /// Return `true` if union simplification should preserve this pair because one element is
@@ -411,6 +517,7 @@ impl<'db> UnionElement<'db> {
         env: &ProgramEnvironment<'db>,
         other_type: Type<'db>,
         cycle_recovery: bool,
+        context: Option<&ConstraintRelationContext<'db>>,
     ) -> ReduceResult<'db> {
         if let UnionElement::Type(existing) = self {
             return ReduceResult::Type(*existing);
@@ -464,22 +571,24 @@ impl<'db> UnionElement<'db> {
         // both `ignore` and `collapse` are `false`. If either is `true`,
         // we skip the expensive redundancy check and return `true`.
         let mut should_retain_type = |ty| {
-            if ignore || other_type.is_redundant_with(db, env, ty) {
+            if ignore || union_element_is_redundant(db, env, other_type, ty, context) {
                 ignore = true;
                 return true;
             }
             if collapse
-                || other_type.negation_is_subtype_of_cached(
+                || negation_is_subtype_for_union(
                     db,
                     env,
+                    other_type,
                     ty,
                     &mut other_type_negated_cache,
+                    context,
                 )
             {
                 collapse = true;
                 return true;
             }
-            !ty.is_redundant_with(db, env, other_type)
+            !union_element_is_redundant(db, env, ty, other_type, context)
         };
 
         let should_keep = match self {
@@ -491,8 +600,13 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
+                    !union_element_is_redundant(
+                        db,
+                        env,
+                        LiteralValueType::new(*literal, *promotable).into(),
+                        other_type,
+                        context,
+                    )
                 }
             }
             UnionElement::StringLiterals(literals) => {
@@ -503,8 +617,13 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
+                    !union_element_is_redundant(
+                        db,
+                        env,
+                        LiteralValueType::new(*literal, *promotable).into(),
+                        other_type,
+                        context,
+                    )
                 }
             }
             UnionElement::BytesLiterals(literals) => {
@@ -515,8 +634,13 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
+                    !union_element_is_redundant(
+                        db,
+                        env,
+                        LiteralValueType::new(*literal, *promotable).into(),
+                        other_type,
+                        context,
+                    )
                 }
             }
             UnionElement::EnumLiterals {
@@ -533,8 +657,13 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(*literal, *promotable))
-                        .is_redundant_with(db, env, other_type)
+                    !union_element_is_redundant(
+                        db,
+                        env,
+                        LiteralValueType::new(*literal, *promotable).into(),
+                        other_type,
+                        context,
+                    )
                 }
             }
             UnionElement::Type(_) => unreachable!("ordinary types are handled before reduction"),
@@ -581,6 +710,7 @@ pub(crate) struct UnionBuilder<'db> {
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
+    relation_context: Option<ConstraintRelationContext<'db>>,
 }
 
 /// Accumulates types into a union.
@@ -655,7 +785,17 @@ impl<'db> UnionBuilder<'db> {
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
+            relation_context: None,
         }
+    }
+
+    /// Retains the enclosing proof while simplifying bounds accumulated by constraint solving.
+    pub(crate) fn with_relation_context(
+        mut self,
+        context: &ConstraintRelationContext<'db>,
+    ) -> Self {
+        self.relation_context = Some(context.clone());
+        self
     }
 
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
@@ -737,7 +877,6 @@ impl<'db> UnionBuilder<'db> {
         };
 
         let mut ty_negated_cache = None;
-        let mut ty_negated = || *ty_negated_cache.get_or_insert_with(|| ty.negate(db, &self.env));
 
         match ty {
             Type::Union(union) => {
@@ -805,14 +944,33 @@ impl<'db> UnionBuilder<'db> {
                                 UnionElement::Type(existing) if !cycle_recovery => {
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         return;
                                     }
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        *existing,
+                                        ty,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                    if negation_is_subtype_for_union(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        &mut ty_negated_cache,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -858,16 +1016,35 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[b""] & Any`,
                                     // and `ty` could be `Literal[b""]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        *existing,
+                                        ty,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                    if negation_is_subtype_for_union(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        &mut ty_negated_cache,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -915,16 +1092,35 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[1] & Any`,
                                     // and `ty` could be `Literal[1]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        *existing,
+                                        ty,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                    if negation_is_subtype_for_union(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        &mut ty_negated_cache,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -992,16 +1188,35 @@ impl<'db> UnionBuilder<'db> {
                                     return;
                                 }
                                 UnionElement::Type(existing) if !cycle_recovery => {
-                                    if ty.is_redundant_with(db, &self.env, *existing) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         return;
                                     }
                                     // e.g. `existing` could be `Literal[Foo.X] & Any`,
                                     // and `ty` could be `Literal[Foo.X]`
-                                    if existing.is_redundant_with(db, &self.env, ty) {
+                                    if union_element_is_redundant(
+                                        db,
+                                        &self.env,
+                                        *existing,
+                                        ty,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         to_remove = Some(index);
                                         continue;
                                     }
-                                    if ty_negated().is_subtype_of(db, &self.env, *existing) {
+                                    if negation_is_subtype_for_union(
+                                        db,
+                                        &self.env,
+                                        ty,
+                                        *existing,
+                                        &mut ty_negated_cache,
+                                        self.relation_context.as_ref(),
+                                    ) {
                                         // The type that includes both this new element, and its negation
                                         // (or a supertype of its negation), must be simply `object`.
                                         self.collapse_to_object();
@@ -1070,7 +1285,13 @@ impl<'db> UnionBuilder<'db> {
         let mut to_remove = SmallVec::<[usize; 2]>::new();
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(db, &self.env, ty, self.cycle_recovery) {
+            let element_type = match element.try_reduce(
+                db,
+                &self.env,
+                ty,
+                self.cycle_recovery,
+                self.relation_context.as_ref(),
+            ) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
                         to_remove.push(i);
@@ -1119,8 +1340,13 @@ impl<'db> UnionBuilder<'db> {
 
             // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
             if !self.cycle_recovery
-                && let Some(merged_type) =
-                    merge_truthiness_guarded_pair(db, &self.env, ty, element_type)
+                && let Some(merged_type) = merge_truthiness_guarded_pair(
+                    db,
+                    &self.env,
+                    ty,
+                    element_type,
+                    self.relation_context.as_ref(),
+                )
             {
                 to_remove.push(i);
                 ty = merged_type;
@@ -1155,7 +1381,13 @@ impl<'db> UnionBuilder<'db> {
                 {
                     continue;
                 }
-                if let Some(merged) = merge_disjoint_exclusions(db, &self.env, ty, element_type) {
+                if let Some(merged) = merge_disjoint_exclusions(
+                    db,
+                    &self.env,
+                    ty,
+                    element_type,
+                    self.relation_context.as_ref(),
+                ) {
                     to_remove.push(i);
                     for index in to_remove.into_iter().rev() {
                         self.elements.swap_remove(index);
@@ -1164,16 +1396,35 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(merged, seen_aliases);
                     return;
                 }
-                if ty.is_redundant_with(db, &self.env, element_type) {
+                if union_element_is_redundant(
+                    db,
+                    &self.env,
+                    ty,
+                    element_type,
+                    self.relation_context.as_ref(),
+                ) {
                     return;
                 }
 
-                if element_type.is_redundant_with(db, &self.env, ty) {
+                if union_element_is_redundant(
+                    db,
+                    &self.env,
+                    element_type,
+                    ty,
+                    self.relation_context.as_ref(),
+                ) {
                     to_remove.push(i);
                     continue;
                 }
 
-                if ty.negation_is_subtype_of_cached(db, &self.env, element_type, &mut ty_negated) {
+                if negation_is_subtype_for_union(
+                    db,
+                    &self.env,
+                    ty,
+                    element_type,
+                    &mut ty_negated,
+                    self.relation_context.as_ref(),
+                ) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of
@@ -1253,10 +1504,13 @@ impl<'db> UnionBuilder<'db> {
         }
 
         if normalize_enum_complement_unions(db, &self.env, &mut types) {
-            let builder = UnionBuilder::new(db, &self.env)
+            let mut builder = UnionBuilder::new(db, &self.env)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
                 .or_recursively_defined(recursively_defined);
+            if let Some(context) = &self.relation_context {
+                builder = builder.with_relation_context(context);
+            }
             return types
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
@@ -1324,6 +1578,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // the bounded constructor's budget, after impossible and redundant branches are removed.
     has_disjunction: bool,
     signature_relations: Option<SignatureRelationVisitor<'db>>,
+    relation_context: Option<ConstraintRelationContext<'db>>,
 }
 
 impl<'db> IntersectionBuilder<'db> {
@@ -1334,14 +1589,24 @@ impl<'db> IntersectionBuilder<'db> {
             intersections: vec![InnerIntersectionBuilder::default()],
             has_disjunction: false,
             signature_relations: None,
+            relation_context: None,
         }
     }
 
-    pub(super) fn with_signature_relations(
+    pub(crate) fn with_signature_relations(
         mut self,
         relations: Option<&SignatureRelationVisitor<'db>>,
     ) -> Self {
         self.signature_relations = relations.cloned();
+        self
+    }
+
+    pub(crate) fn with_relation_context(
+        mut self,
+        context: &ConstraintRelationContext<'db>,
+    ) -> Self {
+        self.signature_relations = Some(context.signature_relations.clone());
+        self.relation_context = Some(context.clone());
         self
     }
 
@@ -1376,20 +1641,27 @@ impl<'db> IntersectionBuilder<'db> {
                     .build(db, env, self.signature_relations.as_ref());
             if candidate_type.is_never()
                 || distributed.iter().any(|old| {
-                    candidate_type.is_redundant_with(
+                    union_element_is_redundant(
                         db,
                         env,
+                        candidate_type,
                         old.clone()
                             .build(db, env, self.signature_relations.as_ref()),
+                        self.relation_context.as_ref(),
                     )
                 })
             {
                 continue;
             }
             distributed.retain(|old| {
-                !old.clone()
-                    .build(db, env, self.signature_relations.as_ref())
-                    .is_redundant_with(db, env, candidate_type)
+                !union_element_is_redundant(
+                    db,
+                    env,
+                    old.clone()
+                        .build(db, env, self.signature_relations.as_ref()),
+                    candidate_type,
+                    self.relation_context.as_ref(),
+                )
             });
             L::check_terms(distributed.len() + 1)?;
             distributed.insert(candidate);
@@ -1633,13 +1905,23 @@ impl<'db> IntersectionBuilder<'db> {
 
     pub(crate) fn build(self) -> Type<'db> {
         let db = self.db;
-        UnionType::from_elements(
-            db,
-            &self.env,
-            self.intersections
-                .into_iter()
-                .map(|inner| inner.build(db, &self.env, self.signature_relations.as_ref())),
-        )
+        let mut elements = self
+            .intersections
+            .into_iter()
+            .map(|inner| inner.build(db, &self.env, self.signature_relations.as_ref()));
+        let Some(first) = elements.next() else {
+            return Type::Never;
+        };
+        let Some(second) = elements.next() else {
+            return first;
+        };
+        let mut builder = UnionBuilder::new(db, &self.env);
+        if let Some(context) = &self.relation_context {
+            builder = builder.with_relation_context(context);
+        }
+        elements
+            .fold(builder.add(first).add(second), UnionBuilder::add)
+            .build()
     }
 }
 

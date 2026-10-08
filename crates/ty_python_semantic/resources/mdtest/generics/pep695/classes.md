@@ -2397,6 +2397,33 @@ def incompatible[S: Finite[str]](x: S) -> Finite[int]:
     return x  # error: [invalid-return-type]
 ```
 
+## Constrained type variables in nested protocol receivers
+
+A method's receiver can require a nested protocol whose type argument is constrained. Each listed
+constraint permits a call, while an unrelated type or an unconstrained outer type parameter does
+not.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class A[T](Protocol):
+    value: T
+    def f[U: (int, str)](self: A[A[U]]) -> None: ...
+
+def valid_int(x: A[A[int]]) -> None:
+    x.f()  # no diagnostic
+
+def valid_str(x: A[A[str]]) -> None:
+    x.f()  # no diagnostic
+
+def invalid_float(x: A[A[float]]) -> None:
+    x.f()  # error: [invalid-argument-type]
+
+def invalid_generic[T](x: A[T]) -> None:
+    x.f()  # error: [invalid-argument-type]
+```
+
 ## Materializing a bound receiver requirement
 
 A bound method has already captured its receiver. Materializing its callable type preserves the

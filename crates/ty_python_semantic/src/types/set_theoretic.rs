@@ -11,8 +11,8 @@ use crate::place::{
 use crate::types::class::KnownClass;
 use crate::types::enums::EnumComplement;
 use crate::types::{
-    ApplyTypeMappingVisitor, InstanceProjection, PromotionKind, PromotionMode, Type, TypeContext,
-    TypeMapping, TypePair, TypeQualifiers,
+    ApplyTypeMappingVisitor, ConstraintRelationContext, InstanceProjection, PromotionKind,
+    PromotionMode, Type, TypeContext, TypeMapping, TypePair, TypeQualifiers,
 };
 use crate::types::{TypeVarBoundOrConstraints, visitor};
 use crate::{Db, FxOrderSet, Program};
@@ -294,7 +294,12 @@ impl<'db> UnionType<'db> {
                 self.recursively_defined(db),
             ))
         } else {
-            self.map_leave_aliases(db, visitor.env, |element| {
+            let context = visitor
+                .signature_relation_visitor
+                .as_ref()
+                .filter(|signatures| signatures.is_active())
+                .map(|signatures| visitor.constraint_relation_context(signatures));
+            self.map_leave_aliases_with_context(db, visitor.env, context.as_ref(), |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             })
         }
@@ -319,6 +324,16 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_leave_aliases_with_context(db, env, None, transform_fn)
+    }
+
+    fn map_leave_aliases_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: Option<&ConstraintRelationContext<'db>>,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         let elements = self.elements(db);
@@ -327,6 +342,9 @@ impl<'db> UnionType<'db> {
             let new_ty = transform_fn(ty);
             if &new_ty != ty {
                 let mut builder = UnionBuilder::new(db, env).unpack_aliases(false);
+                if let Some(context) = context {
+                    builder = builder.with_relation_context(context);
+                }
                 for prev in &elements[..i] {
                     builder.add_in_place(*prev);
                 }

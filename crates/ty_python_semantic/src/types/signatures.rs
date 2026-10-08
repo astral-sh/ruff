@@ -2965,7 +2965,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, env, self.constraints, signature_inferable)
+        if signature_inferable == TypeVarSet::None {
+            return when;
+        }
+        when.reduce_inferable_with_context(
+            db,
+            env,
+            signature_inferable,
+            self.materialization_visitor
+                .constraint_relation_context(self.signature_relation_visitor),
+        )
     }
 
     /// Runs a signature obligation with the same recursion context for relations and mappings.

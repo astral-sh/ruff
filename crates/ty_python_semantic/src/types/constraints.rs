@@ -113,8 +113,8 @@ use crate::types::visitor::{
     walk_non_atomic_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarInstance, DynamicType, IntersectionType, Type, TypePair, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionType,
+    BoundTypeVarInstance, ConstraintRelationContext, DynamicType, IntersectionType, Type, TypePair,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet, ProgramEnvironment};
 
@@ -718,9 +718,36 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
         let mut storage = builder.storage.borrow_mut();
+        self.reduce_inferable_in_storage(db, env, &mut storage, to_remove)
+    }
+
+    /// Projects method-local variables while retaining the signature proof that produced them.
+    /// Sequent discovery can compare recursive protocol bounds during this projection.
+    pub(super) fn reduce_inferable_with_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        to_remove: TypeVarSet<'db>,
+        context: ConstraintRelationContext<'db>,
+    ) -> Self {
+        if to_remove == TypeVarSet::None {
+            return self;
+        }
+        let mut storage = self.builder.storage.borrow_mut();
+        let scope = ConstraintRelationScope::new(&mut storage, context);
+        self.reduce_inferable_in_storage(db, env, scope.storage, to_remove)
+    }
+
+    fn reduce_inferable_in_storage(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        storage: &mut ConstraintSetStorage<'db>,
+        to_remove: TypeVarSet<'db>,
+    ) -> Self {
         let (node, derived_source_order) =
             self.node
-                .exists(db, env, &mut storage, to_remove, self.source_order);
+                .exists(db, env, storage, to_remove, self.source_order);
         // The eliminated typevars must also leave the source-order history. Otherwise recursive
         // relations can re-import each other's quantified constraints after their live graphs have
         // stabilized. Keep the original order of the remaining entries and append derived facts.
@@ -735,7 +762,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
                 storage.ordered_source_order(source_order, Some(constraint_source_order))
             });
         let source_order = storage.ordered_source_order(source_order, derived_source_order);
-        Self::from_node(builder, node, source_order)
+        Self::from_node(self.builder, node, source_order)
     }
 
     /// Universally abstracts constraints involving the given type variables from this TDD.
@@ -832,8 +859,34 @@ pub(crate) struct ConstraintSetBuilder<'db> {
 
 type ExistsCacheKey<'db> = (NodeId, TypeVarSet<'db>, Option<SourceOrderId>);
 
+/// Restores a solver's previous proof context even when a nested relation unwinds.
+struct ConstraintRelationScope<'a, 'db> {
+    storage: &'a mut ConstraintSetStorage<'db>,
+    previous: Option<ConstraintRelationContext<'db>>,
+}
+
+impl<'a, 'db> ConstraintRelationScope<'a, 'db> {
+    fn new(
+        storage: &'a mut ConstraintSetStorage<'db>,
+        context: ConstraintRelationContext<'db>,
+    ) -> Self {
+        let previous = storage.relation_context.replace(context);
+        Self { storage, previous }
+    }
+}
+
+impl Drop for ConstraintRelationScope<'_, '_> {
+    fn drop(&mut self) {
+        self.storage.relation_context = self.previous.take();
+    }
+}
+
 #[derive(Debug, Default)]
 struct ConstraintSetStorage<'db> {
+    /// An enclosing signature proof used by semantic sequent derivation. Context-dependent
+    /// projections and satisfiability results must not enter this arena's semantic caches.
+    relation_context: Option<ConstraintRelationContext<'db>>,
+
     /// Compacted owned storage overlaid onto this builder. This is used by
     /// [`OwnedConstraintSet::query`] to create a [`ConstraintSetBuilder`] that is initially a
     /// read-only view of the owned constraint set's storage.
@@ -983,6 +1036,16 @@ impl<'db> ConstraintSetStorage<'db> {
 impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates an independent constraint arena for a nested relation in the same proof.
+    pub(super) fn new_with_relation_context(context: ConstraintRelationContext<'db>) -> Self {
+        Self {
+            storage: RefCell::new(ConstraintSetStorage {
+                relation_context: Some(context),
+                ..ConstraintSetStorage::default()
+            }),
+        }
     }
 
     /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
@@ -2357,7 +2420,9 @@ impl NodeId {
             Node::AlwaysFalse => true,
             Node::Interior(interior) => {
                 let key = (self, inferable);
-                if let Some(result) = storage.never_satisfied_cache.get(&key) {
+                if storage.relation_context.is_none()
+                    && let Some(result) = storage.never_satisfied_cache.get(&key)
+                {
                     return *result;
                 }
 
@@ -2370,7 +2435,9 @@ impl NodeId {
                     let mut path = interior.path_assignments(db, env, storage, source_order);
                     walker.is_never_satisfied(db, env, storage, &mut path, Polarity::Positive, self)
                 };
-                storage.never_satisfied_cache.insert(key, result);
+                if storage.relation_context.is_none() {
+                    storage.never_satisfied_cache.insert(key, result);
+                }
                 result
             }
         }
@@ -2602,13 +2669,17 @@ impl NodeId {
         };
 
         let key = (self, bound_typevars, source_order);
-        if let Some(result) = storage.exists_cache.get(&key) {
+        if storage.relation_context.is_none()
+            && let Some(result) = storage.exists_cache.get(&key)
+        {
             return *result;
         }
 
         let result = interior.exists_inner(db, env, storage, bound_typevars, source_order);
 
-        storage.exists_cache.insert(key, result);
+        if storage.relation_context.is_none() {
+            storage.exists_cache.insert(key, result);
+        }
         result
     }
 
@@ -4014,7 +4085,7 @@ impl InteriorNode {
             // bound that mentions one of them. Removed constraints are still added to `path`, so
             // the sequent map can propagate any derived constraints that do not mention the
             // quantified typevars.
-            &mut |storage: &ConstraintSetStorage<'_>, constraint| {
+            &mut |storage: &ConstraintSetStorage<'db>, constraint| {
                 storage.constraint_mentions_typevars(db, constraint, bound_typevars)
             },
         );
@@ -4031,7 +4102,7 @@ impl InteriorNode {
         should_remove: F,
     ) -> ControlFlow<L::Break, (NodeId, Option<SourceOrderId>)>
     where
-        F: FnMut(&ConstraintSetStorage<'_>, ConstraintId) -> bool,
+        F: FnMut(&ConstraintSetStorage<'db>, ConstraintId) -> bool,
         L: SolutionLimits,
     {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -4045,9 +4116,9 @@ impl InteriorNode {
             limits: &'a mut L,
         }
 
-        impl<F, L> PathVisitor for AbstractVisitor<'_, F, L>
+        impl<'db, F, L> PathVisitor<'db> for AbstractVisitor<'_, F, L>
         where
-            F: FnMut(&ConstraintSetStorage<'_>, ConstraintId) -> bool,
+            F: FnMut(&ConstraintSetStorage<'db>, ConstraintId) -> bool,
             L: SolutionLimits,
         {
             type Result = (NodeId, Option<SourceOrderId>);
@@ -4058,7 +4129,7 @@ impl InteriorNode {
                 self.limits.visit_node()
             }
 
-            fn visit_satisfied<'db>(
+            fn visit_satisfied(
                 &mut self,
                 _db: &'db dyn Db,
                 _storage: &mut ConstraintSetStorage<'db>,
@@ -4067,7 +4138,7 @@ impl InteriorNode {
                 ControlFlow::Continue((ALWAYS_TRUE, None))
             }
 
-            fn visit_unsatisfied<'db>(
+            fn visit_unsatisfied(
                 &mut self,
                 _db: &'db dyn Db,
                 _storage: &mut ConstraintSetStorage<'db>,
@@ -4076,7 +4147,7 @@ impl InteriorNode {
                 ControlFlow::Continue((ALWAYS_FALSE, None))
             }
 
-            fn visit_impossible<'db>(
+            fn visit_impossible(
                 &mut self,
                 _db: &'db dyn Db,
                 _storage: &mut ConstraintSetStorage<'db>,
@@ -4085,7 +4156,7 @@ impl InteriorNode {
                 ControlFlow::Continue((ALWAYS_FALSE, None))
             }
 
-            fn enter_interior<'db>(
+            fn enter_interior(
                 &mut self,
                 _db: &'db dyn Db,
                 storage: &mut ConstraintSetStorage<'db>,
@@ -4100,7 +4171,7 @@ impl InteriorNode {
                 ControlFlow::Continue((disposition, interior.constraint))
             }
 
-            fn visit_edge<'db>(
+            fn visit_edge(
                 &mut self,
                 _db: &'db dyn Db,
                 storage: &mut ConstraintSetStorage<'db>,
@@ -4137,7 +4208,7 @@ impl InteriorNode {
                 }
             }
 
-            fn leave_interior<'db>(
+            fn leave_interior(
                 &mut self,
                 _db: &'db dyn Db,
                 storage: &mut ConstraintSetStorage<'db>,
@@ -4456,7 +4527,7 @@ impl ConstraintAssignment {
 ///
 /// Throughout this process, if any of your methods return [`ControlFlow::Break`], we will abort
 /// the path walk and immediately return that value.
-trait PathVisitor {
+trait PathVisitor<'db> {
     type Result;
     type Interior;
     type Break;
@@ -4470,7 +4541,7 @@ trait PathVisitor {
     /// Called when we reach the end of a satisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
-    fn visit_satisfied<'db>(
+    fn visit_satisfied(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4480,7 +4551,7 @@ trait PathVisitor {
     /// Called when we reach the end of an unsatisfied path. `path` will contain all of the
     /// assignments on this path. The `Result` value that you return will be propagated back up as
     /// we "unwind" this path.
-    fn visit_unsatisfied<'db>(
+    fn visit_unsatisfied(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4491,7 +4562,7 @@ trait PathVisitor {
     /// contradict each other, or because an edge is structurally absent (such as the uncertain
     /// edge when visiting a negated BDD). The `Result` value that you return will be propagated
     /// back up as we "unwind" this path.
-    fn visit_impossible<'db>(
+    fn visit_impossible(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4502,7 +4573,7 @@ trait PathVisitor {
     /// [`Interior`][Self::Interior] value that will be passed to the
     /// [`visit_edge`][Self::visit_edge] and [`leave_interior`][Self::leave_interior] methods
     /// when we call them for this node.
-    fn enter_interior<'db>(
+    fn enter_interior(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4512,7 +4583,7 @@ trait PathVisitor {
     /// Called once for each edge in the BDD. You are given the [`Result`][Self::Result] value
     /// of the subtree that the edge points to, as well as the origin and derived assignments that
     /// are added by the edge.
-    fn visit_edge<'db>(
+    fn visit_edge(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4524,7 +4595,7 @@ trait PathVisitor {
 
     /// Called on the way back up as we leave each interior node in the BDD. Combines the
     /// [`Result`][Self::Result] values for each of the interior node's subtrees.
-    fn leave_interior<'db>(
+    fn leave_interior(
         &mut self,
         db: &'db dyn Db,
         storage: &mut ConstraintSetStorage<'db>,
@@ -4640,6 +4711,9 @@ mod tests {
 
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
+    use crate::types::ApplyTypeMappingVisitor;
+    use crate::types::relation::{TypeRelation, TypeVarEvaluation};
+    use crate::types::signatures::{SignatureRelationKey, SignatureRelationVisitor};
     use crate::types::typevar::{
         TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     };
@@ -4954,6 +5028,90 @@ mod tests {
             }
             assert_eq!(upper.as_single_bound(db, &env), None);
         }
+    }
+
+    #[test]
+    fn receiver_projection_is_scoped_to_signature_proof() -> anyhow::Result<()> {
+        for guarded_first in [true, false] {
+            // Each ordering starts with cold Salsa caches. Within an ordering, both projections
+            // use the same graph and builder, so their semantic caches are shared.
+            let mut db = setup_db();
+            db.write_dedented(
+                "/src/receiver_projection.py",
+                r#"
+    from typing import Protocol
+
+    class Source(Protocol):
+        def f(self) -> "Source | int": ...
+
+    class Target(Protocol):
+        def f(self) -> "Target | str": ...
+    "#,
+            )?;
+            let db = &db;
+            let env = db.program_environment();
+            let file = system_path_to_file(db, "/src/receiver_projection.py")?;
+            let file = ProgramFile::new(db, file, env.program(db));
+            let protocol = |name| {
+                let class = global_symbol(db, file, name).place.expect_type();
+                let instance = class
+                    .to_instance_approximation(db, &env)
+                    .ok_or_else(|| anyhow::anyhow!("expected protocol {name}"))?;
+                let method = class
+                    .member(db, &env, "f")
+                    .place
+                    .expect_type()
+                    .as_function_literal()
+                    .ok_or_else(|| anyhow::anyhow!("expected method {name}.f"))?;
+                Ok::<_, anyhow::Error>((instance, method.last_definition(db)))
+            };
+            let (source, source_definition) = protocol("Source")?;
+            let (target, target_definition) = protocol("Target")?;
+            let variable = create_typevar(db, "X");
+            let builder = ConstraintSetBuilder::new();
+            let relation = create_constraint_set_with_bounds(
+                db,
+                &env,
+                &builder,
+                variable,
+                Some(source),
+                Some(target),
+            );
+            let to_remove = TypeVarSet::from_typevars(db, [variable]);
+            let signatures = SignatureRelationVisitor::default();
+            let mapping = ApplyTypeMappingVisitor::new(&env);
+            let context = mapping.constraint_relation_context(&signatures);
+            let key = SignatureRelationKey::protocol_member(
+                source_definition,
+                target_definition,
+                TypeRelation::Assignability,
+                TypeVarEvaluation::Lazy,
+            );
+
+            // Under the active protocol-member assumption, Source <= X <= Target can close
+            // coinductively. Outside that proof, the incompatible int/str alternatives reject it.
+            // Neither result may replace the other through builder-local or Salsa caches.
+            for guarded in [guarded_first, !guarded_first, guarded_first] {
+                if guarded {
+                    assert!(signatures.visit(
+                        &key,
+                        || false,
+                        || {
+                            relation
+                                .reduce_inferable_with_context(db, &env, to_remove, context.clone())
+                                .is_trivially_always_satisfied()
+                        },
+                    ));
+                } else {
+                    assert!(
+                        relation
+                            .reduce_inferable(db, &env, &builder, to_remove)
+                            .is_trivially_never_satisfied()
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 
     #[test]
