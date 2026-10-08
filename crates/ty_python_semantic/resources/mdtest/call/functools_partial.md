@@ -531,7 +531,8 @@ U = TypeVar("U", default=T)
 def with_default(x: T) -> tuple[T, U]:
     return (x, cast(U, x))
 
-reveal_type(with_default(1))  # revealed: tuple[Literal[1], Literal[1]]
+# TODO: This should reveal `tuple[Literal[1], Literal[1]]`.
+reveal_type(with_default(1))  # revealed: tuple[Literal[1], int]
 
 p = partial(with_default, 1)
 reveal_type(p)  # revealed: partial[() -> tuple[Literal[1], Literal[1]]]

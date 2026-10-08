@@ -125,7 +125,7 @@ impl<'db> ConstraintSet<'db, '_> {
             env,
             inferable,
             SolutionBudget::default(),
-            |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
+            |_variance, path_bound| path_bound.solve(db, env, builder, inferable),
         )
     }
 

@@ -59,7 +59,7 @@ use crate::types::callable::CallableTypeKind;
 use crate::types::class::{
     ClassLiteral, CodeGeneratorKind, FrozenDataclassDispatch, MethodDecorator,
 };
-use crate::types::constraints::{CandidateSolutions, ConstraintSetBuilder, Solutions};
+use crate::types::constraints::{ConstraintSetBuilder, Solutions};
 use crate::types::context::InferContext;
 use crate::types::dedicated::pydantic;
 use crate::types::diagnostic::{
@@ -6567,6 +6567,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         fallback_tcx: TypeContext<'db>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
+        if tcx == fallback_tcx {
+            return infer_expression(self, tcx);
+        }
+
         // Cache nested expressions so retries do not lead to exponential inference work.
         let teardown_expression_cache = self.setup_expression_cache();
         let mut speculative_builder = self.speculate();
@@ -6891,7 +6895,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Callable(target_callable),
                 inferable,
             );
-        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints, inferable)
+        else {
             return Some(ty);
         };
 
@@ -7783,7 +7788,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .entry(identity)
                         .and_modify(|current| *current = current.join(variance))
                         .or_insert(variance);
-                    CandidateSolutions::preliminary_solve(db, env, &constraints, path_bound)
+                    path_bound.preliminary_solve(db, env, &constraints)
                 });
 
                 match solutions {
@@ -8135,7 +8140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .origin(self.db())
             .apply_specialization(db, |_| {
                 builder.build_merged_with(|current_typevar, bounds| {
-                    let lower = bounds?.inference_lower(db, env)?;
+                    let lower = bounds?.inference_lower()?;
 
                     let lower = lower.promote_collection_element_type(
                         db,
@@ -8198,7 +8203,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let path_bounds =
             generator_ty.assignable_solutions_with_inferable(db, env, annotation, inferable);
         let constraints = ConstraintSetBuilder::new();
-        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints) else {
+        let Solutions::Constrained(solutions) = path_bounds.solve(db, env, &constraints, inferable)
+        else {
             return TypeContext::default();
         };
 
@@ -8846,7 +8852,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(db, env)
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !matches!(
+                            annotated_type,
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        )
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter
@@ -8864,7 +8875,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(db, env)
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !matches!(
+                            annotated_type,
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        )
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter
@@ -9741,8 +9757,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &bindings,
         );
 
-        let cast_value = if call_expression_tcx.annotation.is_some()
-            && let Type::FunctionLiteral(function) = callable_type
+        let cast_value = if let Type::FunctionLiteral(function) = callable_type
             && function.is_known(db, KnownFunction::Cast)
         {
             arguments.find_argument_value("val", 1)
@@ -9762,7 +9777,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Redundant casts inside the value are also an intended result of propagation.
                     return builder.infer_with_type_context_fallback(
                         call_expression_tcx,
-                        tcx,
+                        // The value parameter of `cast` is declared as `Any`. If provided as
+                        // type context to a nested generic call, it can incorrectly make the
+                        // cast appear redundant.
+                        TypeContext::default(),
                         |builder, tcx| builder.infer_expression(value, tcx),
                     );
                 }

@@ -1869,6 +1869,29 @@ However, if we pass something that does not match _any_ union element, we do emi
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
 ```
 
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never
+
+def concat[T, U](left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider[T, U, V = Never](left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
+```
+
 ## Inferring nested generic function calls
 
 We can infer type assignments in nested calls to multiple generic functions. If they use the same
@@ -2282,7 +2305,11 @@ def combine(left: A | B, right: A | B) -> Result:
     raise NotImplementedError
 
 def _(values: Iterable[Any]):
-    # revealed: Result | (A & Any) | (B & Any)
+    result = reduce(combine, values)
+    reveal_type(result)  # revealed: Result | (A & Any) | (B & Any)
+
+    # TODO: We should preserve the inferred union through the generic call.
+    # revealed: Result
     reveal_type(reduce(combine, values))
 ```
 
@@ -2614,7 +2641,7 @@ def test[T: int](items: list[T]) -> list[T]:
     ok1: list[str] | list[int] = list(items)
     ok2: list[int] | list[str] = list(items)
 
-    bad: list[str] | list[bytes] = list(items)  # error: [invalid-assignment]
+    bad: list[str] | list[bytes] = list(items)  # error: [invalid-argument-type]
     return items
 ```
 

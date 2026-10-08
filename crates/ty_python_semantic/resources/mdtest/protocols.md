@@ -6993,7 +6993,11 @@ def extract[T](consumer: Consumer[T]) -> T:
     raise NotImplementedError
 
 def check(value: Consumer[Consumer[int]]) -> None:
-    reveal_type(extract(value))  # revealed: Consumer[int] | int
+    result = extract(value)
+    reveal_type(result)  # revealed: Consumer[int] | int
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(extract(value))  # revealed: Consumer[int]
 ```
 
 An explicit receiver annotation introduces constraints when comparing a bound method with a

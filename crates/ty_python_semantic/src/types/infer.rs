@@ -855,8 +855,8 @@ impl<'db> TypeContext<'db> {
         }
     }
 
-    pub(crate) fn is_declared(self) -> bool {
-        matches!(self.kind, TypeContextKind::Declared)
+    pub(crate) fn is_validity(self) -> bool {
+        matches!(self.kind, TypeContextKind::Validity)
     }
 
     /// If the type annotation is a specialized instance of the given `KnownClass`, returns the
