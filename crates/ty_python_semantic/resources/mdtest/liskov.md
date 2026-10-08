@@ -2793,6 +2793,40 @@ class InheritsAnnotation(Declared):
     value = 1  # no diagnostic
 ```
 
+## Inherited annotations and instance assignments
+
+An instance assignment does not narrow an inherited annotation. Overrides in later subclasses use
+the declared type, just like ordinary attribute reads and writes.
+
+```toml
+[rules]
+invalid-mutable-override = "error"
+```
+
+```py
+class Base:
+    value: str | None
+
+class Middle(Base):
+    value = "middle"
+
+    def reset(self):
+        self.value = "middle"
+
+class Child(Middle):
+    value = "child"  # no diagnostic
+
+def clear(obj: Middle):
+    reveal_type(obj.value)  # revealed: str | None
+    obj.value = None  # no diagnostic
+
+class Incompatible(Middle):
+    value: int = 1  # error: [invalid-attribute-override]
+
+class Narrower(Middle):
+    value: str = "narrower"  # error: [invalid-mutable-override]
+```
+
 ## Inherited attribute conflicts
 
 An override is checked against each applicable ancestor, but a subclass does not introduce a

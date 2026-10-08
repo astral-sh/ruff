@@ -149,7 +149,9 @@ fn attribute_contract<'db>(
         let place = if is_class_var || is_final || instance_member.place.is_undefined() {
             class_member.place
         } else {
-            instance_member.place
+            // An inferred instance assignment must not narrow an inherited annotation.
+            // Resolve through the owner's MRO, as ordinary attribute lookup does.
+            owner.instance_member(db, env, name).place
         };
         let read = place
             .ignore_possibly_undefined()?
