@@ -42,11 +42,11 @@ impl RuntimeSemantics {
         self.min(other)
     }
 
-    pub fn is_required(self) -> bool {
+    pub(crate) fn is_required(self) -> bool {
         matches!(self, RuntimeSemantics::Required)
     }
 
-    pub fn is_default(self) -> bool {
+    pub(crate) fn is_default(self) -> bool {
         matches!(self, RuntimeSemantics::Default)
     }
 }
