@@ -2,416 +2,696 @@
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
 ---
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:63:25
+  --> B006_B008.py:66:25
    |
-63 | def this_is_wrong(value=[1, 2, 3]):
+66 | def this_is_wrong(value=[1, 2, 3]):
    |                         ^^^^^^^^^
-64 |     ...
+67 |     ...
    |
 help: Replace with `None`; initialize within function
    |
-62 |
+65 |
    - def this_is_wrong(value=[1, 2, 3]):
-63 + def this_is_wrong(value=None):
-64 |     ...
+66 + def this_is_wrong(value=None):
+67 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:67:30
+  --> B006_B008.py:70:30
    |
-67 | def this_is_also_wrong(value={}):
+70 | def this_is_also_wrong(value={}):
    |                              ^^
-68 |     ...
+71 |     ...
    |
 help: Replace with `None`; initialize within function
    |
-66 |
+69 |
    - def this_is_also_wrong(value={}):
-67 + def this_is_also_wrong(value=None):
-68 |     ...
+70 + def this_is_also_wrong(value=None):
+71 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:73:52
+  --> B006_B008.py:76:52
    |
-71 | class Foo:
-72 |     @staticmethod
-73 |     def this_is_also_wrong_and_more_indented(value={}):
+74 | class Foo:
+75 |     @staticmethod
+76 |     def this_is_also_wrong_and_more_indented(value={}):
    |                                                    ^^
-74 |         pass
+77 |         pass
    |
 help: Replace with `None`; initialize within function
    |
-72 |     @staticmethod
+75 |     @staticmethod
    -     def this_is_also_wrong_and_more_indented(value={}):
-73 +     def this_is_also_wrong_and_more_indented(value=None):
-74 |         pass
+76 +     def this_is_also_wrong_and_more_indented(value=None):
+77 |         pass
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:77:31
+  --> B006_B008.py:80:31
    |
-77 |   def multiline_arg_wrong(value={
+80 |   def multiline_arg_wrong(value={
    |  _______________________________^
-78 | |
-79 | | }):
+81 | |
+82 | | }):
    | |_^
-80 |       ...
+83 |       ...
    |
 help: Replace with `None`; initialize within function
    |
-76 |
+79 |
    - def multiline_arg_wrong(value={
    -
    - }):
-77 + def multiline_arg_wrong(value=None):
-78 |     ...
+80 + def multiline_arg_wrong(value=None):
+81 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
-  --> B006_B008.py:82:36
+  --> B006_B008.py:85:36
    |
-80 |     ...
-81 |
-82 | def single_line_func_wrong(value = {}): ...
+83 |     ...
+84 |
+85 | def single_line_func_wrong(value = {}): ...
    |                                    ^^
 help: Replace with `None`; initialize within function
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:85:20
+  --> B006_B008.py:88:20
    |
-85 | def and_this(value=set()):
+88 | def and_this(value=set()):
    |                    ^^^^^
-86 |     ...
+89 |     ...
    |
 help: Replace with `None`; initialize within function
    |
-84 |
+87 |
    - def and_this(value=set()):
-85 + def and_this(value=None):
-86 |     ...
+88 + def and_this(value=None):
+89 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:89:20
+  --> B006_B008.py:92:20
    |
-89 | def this_too(value=collections.OrderedDict()):
+92 | def this_too(value=collections.OrderedDict()):
    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^
-90 |     ...
+93 |     ...
    |
 help: Replace with `None`; initialize within function
    |
-88 |
+91 |
    - def this_too(value=collections.OrderedDict()):
-89 + def this_too(value=None):
-90 |     ...
+92 + def this_too(value=None):
+93 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:93:32
+  --> B006_B008.py:96:32
    |
-93 | async def async_this_too(value=collections.defaultdict()):
+96 | async def async_this_too(value=collections.defaultdict()):
    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^
-94 |     ...
+97 |     ...
    |
 help: Replace with `None`; initialize within function
    |
-92 |
+95 |
    - async def async_this_too(value=collections.defaultdict()):
-93 + async def async_this_too(value=None):
-94 |     ...
+96 + async def async_this_too(value=None):
+97 |     ...
    |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-  --> B006_B008.py:97:26
-   |
-97 | def dont_forget_me(value=collections.deque()):
-   |                          ^^^^^^^^^^^^^^^^^^^
-98 |     ...
-   |
-help: Replace with `None`; initialize within function
-   |
-96 |
-   - def dont_forget_me(value=collections.deque()):
-97 + def dont_forget_me(value=None):
-98 |     ...
-   |
-note: This is an unsafe fix and may change runtime behavior
-
-B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:102:46
+   --> B006_B008.py:100:26
     |
-101 | # B006 still flags mutable comprehension defaults.
-102 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
+100 | def dont_forget_me(value=collections.deque()):
+    |                          ^^^^^^^^^^^^^^^^^^^
+101 |     ...
+    |
+help: Replace with `None`; initialize within function
+    |
+99  |
+    - def dont_forget_me(value=collections.deque()):
+100 + def dont_forget_me(value=None):
+101 |     ...
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:105:46
+    |
+104 | # B006 still flags mutable comprehension defaults.
+105 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
     |                                              ^^^^^^^^^^^^^^^^^^^^^^^^
-103 |     pass
+106 |     pass
     |
 help: Replace with `None`; initialize within function
     |
-101 | # B006 still flags mutable comprehension defaults.
+104 | # B006 still flags mutable comprehension defaults.
     - def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
-102 + def list_comprehension_also_not_okay(default=None):
-103 |     pass
+105 + def list_comprehension_also_not_okay(default=None):
+106 |     pass
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:106:46
+   --> B006_B008.py:109:46
     |
-106 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
+109 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
     |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-107 |     pass
+110 |     pass
     |
 help: Replace with `None`; initialize within function
     |
-105 |
+108 |
     - def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
-106 + def dict_comprehension_also_not_okay(default=None):
-107 |     pass
+109 + def dict_comprehension_also_not_okay(default=None):
+110 |     pass
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:110:45
+   --> B006_B008.py:113:45
     |
-110 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
+113 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
     |                                             ^^^^^^^^^^^^^^^^^^^^^^^^
-111 |     pass
+114 |     pass
     |
 help: Replace with `None`; initialize within function
     |
-109 |
+112 |
     - def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
-110 + def set_comprehension_also_not_okay(default=None):
-111 |     pass
+113 + def set_comprehension_also_not_okay(default=None):
+114 |     pass
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:114:33
+   --> B006_B008.py:117:33
     |
-114 | def kwonlyargs_mutable(*, value=[]):
+117 | def kwonlyargs_mutable(*, value=[]):
     |                                 ^^
-115 |     ...
+118 |     ...
     |
 help: Replace with `None`; initialize within function
     |
-113 |
+116 |
     - def kwonlyargs_mutable(*, value=[]):
-114 + def kwonlyargs_mutable(*, value=None):
-115 |     ...
+117 + def kwonlyargs_mutable(*, value=None):
+118 |     ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:242:20
+   --> B006_B008.py:245:20
     |
-240 | # B006 and B008
-241 | # We should handle arbitrary nesting of these B008.
-242 | def nested_combo(a=[float(3), dt.datetime.now()]):
+243 | # B006 and B008
+244 | # We should handle arbitrary nesting of these B008.
+245 | def nested_combo(a=[float(3), dt.datetime.now()]):
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-243 |     pass
+246 |     pass
     |
 help: Replace with `None`; initialize within function
     |
-241 | # We should handle arbitrary nesting of these B008.
+244 | # We should handle arbitrary nesting of these B008.
     - def nested_combo(a=[float(3), dt.datetime.now()]):
-242 + def nested_combo(a=None):
-243 |     pass
+245 + def nested_combo(a=None):
+246 |     pass
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:279:27
+   --> B006_B008.py:282:27
     |
-278 | def mutable_annotations(
-279 |     a: list[int] | None = [],
+281 | def mutable_annotations(
+282 |     a: list[int] | None = [],
     |                           ^^
-280 |     b: Optional[Dict[int, int]] = {},
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+283 |     b: Optional[Dict[int, int]] = {},
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 help: Replace with `None`; initialize within function
     |
-278 | def mutable_annotations(
+281 | def mutable_annotations(
     -     a: list[int] | None = [],
-279 +     a: list[int] | None = None,
-280 |     b: Optional[Dict[int, int]] = {},
+282 +     a: list[int] | None = None,
+283 |     b: Optional[Dict[int, int]] = {},
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:280:35
+   --> B006_B008.py:283:35
     |
-278 | def mutable_annotations(
-279 |     a: list[int] | None = [],
-280 |     b: Optional[Dict[int, int]] = {},
+281 | def mutable_annotations(
+282 |     a: list[int] | None = [],
+283 |     b: Optional[Dict[int, int]] = {},
     |                                   ^^
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+285 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 help: Replace with `None`; initialize within function
     |
-279 |     a: list[int] | None = [],
+282 |     a: list[int] | None = [],
     -     b: Optional[Dict[int, int]] = {},
-280 +     b: Optional[Dict[int, int]] = None,
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+283 +     b: Optional[Dict[int, int]] = None,
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:281:62
+   --> B006_B008.py:284:62
     |
-279 |     a: list[int] | None = [],
-280 |     b: Optional[Dict[int, int]] = {},
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+282 |     a: list[int] | None = [],
+283 |     b: Optional[Dict[int, int]] = {},
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |                                                              ^^^^^
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-283 | ):
+285 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+286 | ):
     |
 help: Replace with `None`; initialize within function
     |
-280 |     b: Optional[Dict[int, int]] = {},
+283 |     b: Optional[Dict[int, int]] = {},
     -     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-281 +     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+284 +     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
+285 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:282:80
+   --> B006_B008.py:285:80
     |
-280 |     b: Optional[Dict[int, int]] = {},
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-282 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+283 |     b: Optional[Dict[int, int]] = {},
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+285 |     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     |                                                                                ^^^^^
-283 | ):
-284 |     pass
+286 | ):
+287 |     pass
     |
 help: Replace with `None`; initialize within function
     |
-281 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+284 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
     -     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
-282 +     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
-283 | ):
+285 +     d: typing_extensions.Annotated[Union[Set[str], abc.Sized], "annotation"] = None,
+286 | ):
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:287:52
+   --> B006_B008.py:290:52
     |
-287 | def single_line_func_wrong(value: dict[str, str] = {}):
+290 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^
-288 |     """Docstring"""
+291 |     """Docstring"""
     |
 help: Replace with `None`; initialize within function
     |
-286 |
+289 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
-287 + def single_line_func_wrong(value: dict[str, str] = None):
-288 |     """Docstring"""
+290 + def single_line_func_wrong(value: dict[str, str] = None):
+291 |     """Docstring"""
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:291:52
+   --> B006_B008.py:294:52
     |
-291 | def single_line_func_wrong(value: dict[str, str] = {}):
+294 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^
-292 |     """Docstring"""
-293 |     ...
+295 |     """Docstring"""
+296 |     ...
     |
 help: Replace with `None`; initialize within function
     |
-290 |
+293 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
-291 + def single_line_func_wrong(value: dict[str, str] = None):
-292 |     """Docstring"""
+294 + def single_line_func_wrong(value: dict[str, str] = None):
+295 |     """Docstring"""
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:296:52
+   --> B006_B008.py:299:52
     |
-296 | def single_line_func_wrong(value: dict[str, str] = {}):
+299 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^
-297 |     """Docstring"""; ...
+300 |     """Docstring"""; ...
     |
 help: Replace with `None`; initialize within function
     |
-295 |
+298 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
-296 + def single_line_func_wrong(value: dict[str, str] = None):
-297 |     """Docstring"""; ...
+299 + def single_line_func_wrong(value: dict[str, str] = None):
+300 |     """Docstring"""; ...
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:300:52
+   --> B006_B008.py:303:52
     |
-300 | def single_line_func_wrong(value: dict[str, str] = {}):
+303 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^
-301 |     """Docstring"""; \
-302 |         ...
+304 |     """Docstring"""; \
+305 |         ...
     |
 help: Replace with `None`; initialize within function
     |
-299 |
+302 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
-300 + def single_line_func_wrong(value: dict[str, str] = None):
-301 |     """Docstring"""; \
+303 + def single_line_func_wrong(value: dict[str, str] = None):
+304 |     """Docstring"""; \
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:305:52
+   --> B006_B008.py:308:52
     |
-305 |   def single_line_func_wrong(value: dict[str, str] = {
+308 |   def single_line_func_wrong(value: dict[str, str] = {
     |  ____________________________________________________^
-306 | |     # This is a comment
-307 | | }):
+309 | |     # This is a comment
+310 | | }):
     | |_^
-308 |       """Docstring"""
+311 |       """Docstring"""
     |
 help: Replace with `None`; initialize within function
     |
-304 |
+307 |
     - def single_line_func_wrong(value: dict[str, str] = {
     -     # This is a comment
     - }):
-305 + def single_line_func_wrong(value: dict[str, str] = None):
-306 |     """Docstring"""
+308 + def single_line_func_wrong(value: dict[str, str] = None):
+309 |     """Docstring"""
     |
 note: This is an unsafe fix and may change runtime behavior
 
 B006 Do not use mutable data structures for argument defaults
-   --> B006_B008.py:311:52
+   --> B006_B008.py:314:52
     |
-311 | def single_line_func_wrong(value: dict[str, str] = {}) \
+314 | def single_line_func_wrong(value: dict[str, str] = {}) \
     |                                                    ^^
-312 |     : \
-313 |     """Docstring"""
+315 |     : \
+316 |     """Docstring"""
     |
 help: Replace with `None`; initialize within function
 
 B006 [*] Do not use mutable data structures for argument defaults
-   --> B006_B008.py:316:52
+   --> B006_B008.py:319:52
     |
-316 | def single_line_func_wrong(value: dict[str, str] = {}):
+319 | def single_line_func_wrong(value: dict[str, str] = {}):
     |                                                    ^^
-317 |     """Docstring without newline"""
+320 |     """Docstring without newline"""
     |
 help: Replace with `None`; initialize within function
     |
-315 |
+318 |
     - def single_line_func_wrong(value: dict[str, str] = {}):
-316 + def single_line_func_wrong(value: dict[str, str] = None):
-317 |     """Docstring without newline"""
+319 + def single_line_func_wrong(value: dict[str, str] = None):
+320 |     """Docstring without newline"""
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:324:7
+    |
+323 | def weakref_module(
+324 |     a=weakref.WeakKeyDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+325 |     b=weakref.WeakValueDictionary(),
+326 |     c=weakref.WeakSet(),
+    |
+help: Replace with `None`; initialize within function
+    |
+323 | def weakref_module(
+    -     a=weakref.WeakKeyDictionary(),
+324 +     a=None,
+325 |     b=weakref.WeakValueDictionary(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:325:7
+    |
+323 | def weakref_module(
+324 |     a=weakref.WeakKeyDictionary(),
+325 |     b=weakref.WeakValueDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+326 |     c=weakref.WeakSet(),
+327 | ):
+    |
+help: Replace with `None`; initialize within function
+    |
+324 |     a=weakref.WeakKeyDictionary(),
+    -     b=weakref.WeakValueDictionary(),
+325 +     b=None,
+326 |     c=weakref.WeakSet(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:326:7
+    |
+324 |     a=weakref.WeakKeyDictionary(),
+325 |     b=weakref.WeakValueDictionary(),
+326 |     c=weakref.WeakSet(),
+    |       ^^^^^^^^^^^^^^^^^
+327 | ):
+328 |     pass
+    |
+help: Replace with `None`; initialize within function
+    |
+325 |     b=weakref.WeakValueDictionary(),
+    -     c=weakref.WeakSet(),
+326 +     c=None,
+327 | ):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:332:7
+    |
+331 | def weakref_from_import(
+332 |     a=WeakKeyDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^
+333 |     b=WeakValueDictionary(),
+334 |     c=WeakSet(),
+    |
+help: Replace with `None`; initialize within function
+    |
+331 | def weakref_from_import(
+    -     a=WeakKeyDictionary(),
+332 +     a=None,
+333 |     b=WeakValueDictionary(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:333:7
+    |
+331 | def weakref_from_import(
+332 |     a=WeakKeyDictionary(),
+333 |     b=WeakValueDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^^^
+334 |     c=WeakSet(),
+335 | ):
+    |
+help: Replace with `None`; initialize within function
+    |
+332 |     a=WeakKeyDictionary(),
+    -     b=WeakValueDictionary(),
+333 +     b=None,
+334 |     c=WeakSet(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:334:7
+    |
+332 |     a=WeakKeyDictionary(),
+333 |     b=WeakValueDictionary(),
+334 |     c=WeakSet(),
+    |       ^^^^^^^^^
+335 | ):
+336 |     pass
+    |
+help: Replace with `None`; initialize within function
+    |
+333 |     b=WeakValueDictionary(),
+    -     c=WeakSet(),
+334 +     c=None,
+335 | ):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:340:7
+    |
+339 | def weakref_aliased(
+340 |     a=wr.WeakKeyDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^^^^
+341 |     b=wr.WeakValueDictionary(),
+342 |     c=wr.WeakSet(),
+    |
+help: Replace with `None`; initialize within function
+    |
+339 | def weakref_aliased(
+    -     a=wr.WeakKeyDictionary(),
+340 +     a=None,
+341 |     b=wr.WeakValueDictionary(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:341:7
+    |
+339 | def weakref_aliased(
+340 |     a=wr.WeakKeyDictionary(),
+341 |     b=wr.WeakValueDictionary(),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^
+342 |     c=wr.WeakSet(),
+343 | ):
+    |
+help: Replace with `None`; initialize within function
+    |
+340 |     a=wr.WeakKeyDictionary(),
+    -     b=wr.WeakValueDictionary(),
+341 +     b=None,
+342 |     c=wr.WeakSet(),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:342:7
+    |
+340 |     a=wr.WeakKeyDictionary(),
+341 |     b=wr.WeakValueDictionary(),
+342 |     c=wr.WeakSet(),
+    |       ^^^^^^^^^^^^
+343 | ):
+344 |     pass
+    |
+help: Replace with `None`; initialize within function
+    |
+341 |     b=wr.WeakValueDictionary(),
+    -     c=wr.WeakSet(),
+342 +     c=None,
+343 | ):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:348:8
+    |
+347 | def weakref_parenthesized(
+348 |     a=(weakref.WeakKeyDictionary()),
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+349 |     b=(WeakValueDictionary()),
+350 |     c=(wr.WeakSet()),
+    |
+help: Replace with `None`; initialize within function
+    |
+347 | def weakref_parenthesized(
+    -     a=(weakref.WeakKeyDictionary()),
+348 +     a=None,
+349 |     b=(WeakValueDictionary()),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:349:8
+    |
+347 | def weakref_parenthesized(
+348 |     a=(weakref.WeakKeyDictionary()),
+349 |     b=(WeakValueDictionary()),
+    |        ^^^^^^^^^^^^^^^^^^^^^
+350 |     c=(wr.WeakSet()),
+351 | ):
+    |
+help: Replace with `None`; initialize within function
+    |
+348 |     a=(weakref.WeakKeyDictionary()),
+    -     b=(WeakValueDictionary()),
+349 +     b=None,
+350 |     c=(wr.WeakSet()),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:350:8
+    |
+348 |     a=(weakref.WeakKeyDictionary()),
+349 |     b=(WeakValueDictionary()),
+350 |     c=(wr.WeakSet()),
+    |        ^^^^^^^^^^^^
+351 | ):
+352 |     pass
+    |
+help: Replace with `None`; initialize within function
+    |
+349 |     b=(WeakValueDictionary()),
+    -     c=(wr.WeakSet()),
+350 +     c=None,
+351 | ):
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:356:7
+    |
+355 | def weakref_subscripted(
+356 |     a=weakref.WeakKeyDictionary[int, str](),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+357 |     b=WeakValueDictionary[str, int](),
+358 |     c=wr.WeakSet[int](),
+    |
+help: Replace with `None`; initialize within function
+    |
+355 | def weakref_subscripted(
+    -     a=weakref.WeakKeyDictionary[int, str](),
+356 +     a=None,
+357 |     b=WeakValueDictionary[str, int](),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:357:7
+    |
+355 | def weakref_subscripted(
+356 |     a=weakref.WeakKeyDictionary[int, str](),
+357 |     b=WeakValueDictionary[str, int](),
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+358 |     c=wr.WeakSet[int](),
+359 | ):
+    |
+help: Replace with `None`; initialize within function
+    |
+356 |     a=weakref.WeakKeyDictionary[int, str](),
+    -     b=WeakValueDictionary[str, int](),
+357 +     b=None,
+358 |     c=wr.WeakSet[int](),
+    |
+note: This is an unsafe fix and may change runtime behavior
+
+B006 [*] Do not use mutable data structures for argument defaults
+   --> B006_B008.py:358:7
+    |
+356 |     a=weakref.WeakKeyDictionary[int, str](),
+357 |     b=WeakValueDictionary[str, int](),
+358 |     c=wr.WeakSet[int](),
+    |       ^^^^^^^^^^^^^^^^^
+359 | ):
+360 |     pass
+    |
+help: Replace with `None`; initialize within function
+    |
+357 |     b=WeakValueDictionary[str, int](),
+    -     c=wr.WeakSet[int](),
+358 +     c=None,
+359 | ):
     |
 note: This is an unsafe fix and may change runtime behavior

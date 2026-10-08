@@ -311,6 +311,18 @@ pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
     )
 }
 
+/// Returns `true` if a call path represents a weakref container type from the Python standard
+/// library that returns a mutable value (e.g., `weakref.WeakKeyDictionary`).
+pub fn is_weakref_mutable_return_type(qualified_name: &[&str]) -> bool {
+    matches!(
+        qualified_name,
+        [
+            "weakref",
+            "WeakKeyDictionary" | "WeakValueDictionary" | "WeakSet"
+        ]
+    )
+}
+
 /// Returns `true` if a call path represents a function from the Python standard library that
 /// returns a immutable value (e.g., `bool`).
 pub fn is_immutable_return_type(qualified_name: &[&str]) -> bool {
@@ -379,5 +391,26 @@ pub fn simple_magic_return_type(method: &str) -> Option<&'static str> {
         "__init__" | "__del__" | "__setattr__" | "__delattr__" | "__setitem__" | "__delitem__"
         | "__set__" => Some("None"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_weakref_mutable_return_type() {
+        assert!(is_weakref_mutable_return_type(&[
+            "weakref",
+            "WeakKeyDictionary"
+        ]));
+        assert!(is_weakref_mutable_return_type(&[
+            "weakref",
+            "WeakValueDictionary"
+        ]));
+        assert!(is_weakref_mutable_return_type(&["weakref", "WeakSet"]));
+        assert!(!is_weakref_mutable_return_type(&["weakref", "ref"]));
+        assert!(!is_weakref_mutable_return_type(&["dict"]));
+        assert!(!is_weakref_mutable_return_type(&["collections", "deque"]));
     }
 }

@@ -9,8 +9,11 @@ import random
 import re
 import time
 import types
+import weakref
 from operator import attrgetter, itemgetter, methodcaller
 from types import MappingProxyType
+from weakref import WeakKeyDictionary, WeakSet, WeakValueDictionary
+import weakref as wr
 
 
 # B006
@@ -315,3 +318,43 @@ def single_line_func_wrong(value: dict[str, str] = {}) \
 
 def single_line_func_wrong(value: dict[str, str] = {}):
     """Docstring without newline"""
+
+
+def weakref_module(
+    a=weakref.WeakKeyDictionary(),
+    b=weakref.WeakValueDictionary(),
+    c=weakref.WeakSet(),
+):
+    pass
+
+
+def weakref_from_import(
+    a=WeakKeyDictionary(),
+    b=WeakValueDictionary(),
+    c=WeakSet(),
+):
+    pass
+
+
+def weakref_aliased(
+    a=wr.WeakKeyDictionary(),
+    b=wr.WeakValueDictionary(),
+    c=wr.WeakSet(),
+):
+    pass
+
+
+def weakref_parenthesized(
+    a=(weakref.WeakKeyDictionary()),
+    b=(WeakValueDictionary()),
+    c=(wr.WeakSet()),
+):
+    pass
+
+
+def weakref_subscripted(
+    a=weakref.WeakKeyDictionary[int, str](),
+    b=WeakValueDictionary[str, int](),
+    c=wr.WeakSet[int](),
+):
+    pass
