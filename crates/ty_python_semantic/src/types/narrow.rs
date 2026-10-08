@@ -451,6 +451,9 @@ struct PatternSuccessAnalyzer<'db, 'pattern> {
     ///
     /// For `int()` and an incoming subject type of `int | str`, the matched subject type is `int`.
     matched_subjects: FxHashMap<PatternCacheKey<'pattern, 'db>, Type<'db>>,
+    /// Tuple alternatives often reuse the same element union. Expand and normalize each such
+    /// union once while analyzing the pattern.
+    sequence_element_types: FxHashMap<Type<'db>, Type<'db>>,
 }
 
 /// Infer the types of all names bound when `pattern` succeeds.
@@ -2154,6 +2157,7 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
             scope,
             successful_patterns: FxHashMap::default(),
             matched_subjects: FxHashMap::default(),
+            sequence_element_types: FxHashMap::default(),
         }
     }
 
@@ -2546,10 +2550,10 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         original_subject_ty: Type<'db>,
         subject_ty: Type<'db>,
     ) -> Option<Vec<ClassPatternArgument<'db>>> {
+        if kind.is_empty() {
+            return Some(Vec::new());
+        }
         let db = self.db;
-        let subject_is_final = subject_ty
-            .nominal_class(db, &self.env)
-            .is_some_and(|class| class.is_final(db));
         let use_generic_filtering = self.use_generic_filtering();
         // Strict narrowing already includes the pattern's constraints in the subject type.
         // Its full member type must not be replaced by one specialization from an intersection.
@@ -2579,10 +2583,6 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                 })
         };
         let member_type = |name: &Name| {
-            let original_member_ty = original_subject_ty
-                .member(db, &self.env, name.as_str())
-                .place
-                .ignore_possibly_undefined();
             let place = subject_ty.member(db, &self.env, name.as_str()).place;
             let mut member_ty = place.ignore_possibly_undefined();
 
@@ -2637,7 +2637,10 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                     // through the related subject type. Prefer the subject's member type when it
                     // exists, but retain a member declared only by the pattern class.
                     member_ty = Some(
-                        original_member_ty
+                        original_subject_ty
+                            .member(db, &self.env, name.as_str())
+                            .place
+                            .ignore_possibly_undefined()
                             .or(unknown_pattern_member_ty)
                             .unwrap_or_else(Type::unknown),
                     );
@@ -2651,7 +2654,12 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                     ));
                 }
             }
-            member_ty.or_else(|| (!subject_is_final).then_some(Type::unknown()))
+            member_ty.or_else(|| {
+                (!subject_ty
+                    .nominal_class(db, &self.env)
+                    .is_some_and(|class| class.is_final(db)))
+                .then_some(Type::unknown())
+            })
         };
 
         context
@@ -3135,11 +3143,20 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                     narrowed_subject_ty,
                     &matched_element_types,
                 );
-                let binding_subject_ty = analyzer.successful_sequence_binding_type(
-                    kind,
-                    subject_ty,
-                    &binding_element_types,
-                );
+                // Exact-length patterns refine exact tuples identically for matching and binding
+                // when their child types agree. Other sequences need separate binding treatment.
+                let binding_subject_ty = if kind.split_around_star().is_none()
+                    && subject_ty.exact_tuple_instance_spec(db).is_some()
+                    && matched_element_types == binding_element_types
+                {
+                    matched_subject_ty
+                } else {
+                    analyzer.successful_sequence_binding_type(
+                        kind,
+                        subject_ty,
+                        &binding_element_types,
+                    )
+                };
                 Some(PatternSuccessResult {
                     matched_subject_ty,
                     binding_subject_ty,
@@ -3240,29 +3257,34 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
     /// Return `None` when any part cannot match, so callers can discard the whole union member
     /// before combining capture types.
     fn sequence_pattern_arm(
-        &self,
+        &mut self,
         subject_ty: Type<'db>,
         target_len: TupleLength,
         sequence_ty: Type<'db>,
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
         let db = self.db;
-        let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
-        if narrowed_subject_ty.is_never() {
-            return None;
-        }
-
-        let tuple = subject_ty
-            .try_iterate(db, &self.env)
-            .unwrap_or_else(|error| {
-                let fallback_element_ty = error.fallback_element_type(db, &self.env);
-                Cow::Owned(TupleSpec::homogeneous(
-                    if fallback_element_ty.is_unknown() {
-                        Type::object()
-                    } else {
-                        fallback_element_ty
-                    },
-                ))
-            });
+        let (narrowed_subject_ty, tuple) =
+            if let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) {
+                (subject_ty, tuple)
+            } else {
+                let narrowed_subject_ty = self.intersect_types(subject_ty, sequence_ty);
+                if narrowed_subject_ty.is_never() {
+                    return None;
+                }
+                let tuple = subject_ty
+                    .try_iterate(db, &self.env)
+                    .unwrap_or_else(|error| {
+                        let fallback_element_ty = error.fallback_element_type(db, &self.env);
+                        Cow::Owned(TupleSpec::homogeneous(
+                            if fallback_element_ty.is_unknown() {
+                                Type::object()
+                            } else {
+                                fallback_element_ty
+                            },
+                        ))
+                    });
+                (narrowed_subject_ty, tuple)
+            };
         let unpacked = tuple
             .unpack(
                 target_len,
@@ -3281,10 +3303,12 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                     collected_list_type(db, &self.env, elements.into_iter().map(|ty| (ty, None)))
                 }
                 TupleElement::Fixed(ty) | TupleElement::Prefix(ty) | TupleElement::Suffix(ty) => {
-                    UnionBuilder::new(db, &self.env)
-                        .add(ty)
-                        .try_build()
-                        .unwrap_or_else(Type::unknown)
+                    *self.sequence_element_types.entry(ty).or_insert_with(|| {
+                        UnionBuilder::new(db, &self.env)
+                            .add(ty)
+                            .try_build()
+                            .unwrap_or_else(Type::unknown)
+                    })
                 }
             })
             .collect();
@@ -3335,18 +3359,21 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
             .into_iter()
             .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
         let mut matched_subject_types = UnionBuilder::new(db, &self.env);
-        let mut binding_subject_types = UnionBuilder::new(db, &self.env);
+        let mut binding_subject_types = Vec::new();
+        let mut binding_subjects_match = true;
         let mut bindings = BTreeMap::new();
 
         for (original_subject_ty, arms) in &grouped_arms {
             let mut matched_types = UnionBuilder::new(db, &self.env);
-            let mut binding_types = UnionBuilder::new(db, &self.env);
+            let mut binding_types = Vec::new();
+            let mut binding_types_match = true;
             let mut arm_bindings = BTreeMap::new();
 
             for (_, filtering_subject_ty) in arms {
                 if let Some(arm) = analyze_arm(self, original_subject_ty, filtering_subject_ty) {
                     matched_types.add_in_place(arm.matched_subject_ty);
-                    binding_types.add_in_place(arm.binding_subject_ty);
+                    binding_types.push(arm.binding_subject_ty);
+                    binding_types_match &= arm.matched_subject_ty == arm.binding_subject_ty;
                     Self::merge_bindings(&mut arm_bindings, arm.bindings);
                 }
             }
@@ -3363,22 +3390,35 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
             }
             Self::merge_bindings(&mut bindings, arm_bindings);
 
-            matched_subject_types.add_in_place(self.preserve_original_subject_type(
+            // Most patterns produce identical matched and binding types. Normalize and restore
+            // that union once, retaining the separate path for mutable or stateful subjects.
+            let matched_subject_type = self.preserve_original_subject_type(
                 original_subject_ty,
                 matched_types.build(),
                 preservation,
-            ));
-            binding_subject_types.add_in_place(self.preserve_original_subject_type(
-                original_subject_ty,
-                binding_types.build(),
-                preservation,
-            ));
+            );
+            let binding_subject_type = if binding_types_match {
+                matched_subject_type
+            } else {
+                self.preserve_original_subject_type(
+                    original_subject_ty,
+                    UnionType::from_elements(db, &self.env, binding_types),
+                    preservation,
+                )
+            };
+            matched_subject_types.add_in_place(matched_subject_type);
+            binding_subject_types.push(binding_subject_type);
+            binding_subjects_match &= matched_subject_type == binding_subject_type;
         }
 
         let matched_subject_ty = matched_subject_types.build();
         PatternSuccessResult {
             matched_subject_ty,
-            binding_subject_ty: binding_subject_types.build(),
+            binding_subject_ty: if binding_subjects_match {
+                matched_subject_ty
+            } else {
+                UnionType::from_elements(db, &self.env, binding_subject_types)
+            },
             bindings,
         }
     }
@@ -3390,13 +3430,14 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
         preservation: OriginalSubjectPreservation,
     ) -> Type<'db> {
         let db = self.db;
+        let has_typevar = original_subject_ty.has_typevar(db, &self.env);
+        if matches!(preservation, OriginalSubjectPreservation::TypeVariablesOnly) && !has_typevar {
+            return filtered_ty;
+        }
         let filtering_ty = self.pattern_filtering_type(original_subject_ty);
-        if filtered_ty.is_equivalent_to(db, &self.env, filtering_ty)
-            && (matches!(preservation, OriginalSubjectPreservation::EquivalentTypes)
-                || original_subject_ty.has_typevar(db, &self.env))
-        {
+        if filtered_ty.is_equivalent_to(db, &self.env, filtering_ty) {
             original_subject_ty
-        } else if original_subject_ty.has_typevar(db, &self.env) {
+        } else if has_typevar {
             self.intersect_types(original_subject_ty, filtered_ty)
         } else {
             filtered_ty
@@ -3457,11 +3498,7 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
     }
 
     fn intersect_types(&self, left: Type<'db>, right: Type<'db>) -> Type<'db> {
-        let db = self.db;
-        IntersectionBuilder::new(db, &self.env)
-            .add_positive(left)
-            .add_positive(right)
-            .build()
+        IntersectionType::from_two_elements(self.db, &self.env, left, right)
     }
 
     fn places(&self) -> &'db PlaceTable {
