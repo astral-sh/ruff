@@ -322,6 +322,31 @@ def value[T](factory: type[Box[T]]) -> T:
 reveal_type(value(Box))  # revealed: int
 ```
 
+## Aliases of unsubscripted generic classes
+
+A plain assignment preserves the generic class object. An explicit type alias instead uses the
+class's default specialization, including when that alias is assigned to another name:
+
+```py
+from typing import TypeAlias
+
+class Box[T = str]: ...
+
+BoxAlias = Box
+DefaultBox: TypeAlias = Box
+ForwardedDefault = DefaultBox
+
+def inspect(generic: BoxAlias[int], default: DefaultBox, forwarded: ForwardedDefault):
+    reveal_type(generic)  # revealed: Box[int]
+    reveal_type(default)  # revealed: Box[str]
+    reveal_type(forwarded)  # revealed: Box[str]
+
+def invalid(
+    default: DefaultBox[int],  # error: [not-subscriptable]
+    forwarded: ForwardedDefault[int],  # error: [not-subscriptable]
+): ...
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
