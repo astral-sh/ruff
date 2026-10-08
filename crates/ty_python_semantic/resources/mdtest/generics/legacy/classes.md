@@ -3154,7 +3154,20 @@ class Concrete(Chain[T]): ...
 
 def check(value: Concrete[T]) -> None:
     matching: Chain[T] = value  # no diagnostic
-    incompatible: Chain[int] = value  # error: [invalid-assignment]
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:22:32
+   |
+22 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
 ```
 
 ## Aliased `Self` in explicit receivers
