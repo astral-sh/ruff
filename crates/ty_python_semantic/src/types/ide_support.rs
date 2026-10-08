@@ -1105,6 +1105,21 @@ fn displayed_parameters_for_signature<'db>(
     }
 }
 
+fn typed_call_arguments<'a, 'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &'a ast::ExprCall,
+) -> CallArguments<'a, 'db> {
+    let db = model.db();
+    CallArguments::from_arguments_typed(
+        db,
+        model
+            .scope(call_expr.into())
+            .map(|scope| scope.to_scope_id(db, model.program_file())),
+        &call_expr.arguments,
+        |expression| expression.inferred_type(model),
+    )
+}
+
 /// Extract signature details from a function call expression.
 /// This function analyzes the callable being invoked and returns zero or more
 /// `CallSignatureDetails` objects, each representing one possible signature
@@ -1126,10 +1141,7 @@ pub fn call_signature_details<'db>(
     {
         // Use from_arguments_typed so that check_types can infer TypeVar
         // specializations from the actual argument types at this call site.
-        let call_arguments =
-            CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
-                expression.inferred_type(model)
-            });
+        let call_arguments = typed_call_arguments(model, call_expr);
         let mut bindings =
             callable_type
                 .bindings(db, env)
@@ -1173,9 +1185,7 @@ fn resolve_single_overload<'db>(
     let env = &model.program_environment();
     let bindings = callable_type.bindings(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
-        expression.inferred_type(model)
-    });
+    let args = typed_call_arguments(model, call_expr);
 
     let constraints = ConstraintSetBuilder::new();
     let mut resolved: Vec<_> = bindings
@@ -1217,9 +1227,7 @@ fn full_type_bindings_for_call<'db>(
 ) -> crate::types::call::Bindings<'db> {
     let db = model.db();
     let env = &model.program_environment();
-    let call_arguments = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
-        expression.inferred_type(model)
-    });
+    let call_arguments = typed_call_arguments(model, call_expr);
     let constraints = ConstraintSetBuilder::new();
 
     func_type
@@ -1557,9 +1565,7 @@ pub fn resolved_call_signature<'db>(
     let env = &model.program_environment();
     let callable_type = func_type.try_upcast_to_callable(db, env)?.to_type(db, env);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
-        expression.inferred_type(model)
-    });
+    let args = typed_call_arguments(model, call_expr);
 
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
     let constraints = ConstraintSetBuilder::new();
