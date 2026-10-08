@@ -8685,6 +8685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
         let (body_ty, orelse_ty) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
+            && !is_nonempty_collection_literal_with_empty_peer(body, orelse)
         {
             // Infer the peer branch first so the body can use its type as context.
             let orelse_ty = self.infer_expression(orelse, tcx);
@@ -12792,6 +12793,23 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
+}
+
+// An empty literal cannot provide element types for the other branch. Infer the
+// nonempty branch first so the empty branch can use those types as context.
+fn is_nonempty_collection_literal_with_empty_peer(
+    expression: &ast::Expr,
+    peer: &ast::Expr,
+) -> bool {
+    match (expression, peer) {
+        (ast::Expr::List(expression), ast::Expr::List(peer)) => {
+            !expression.elts.is_empty() && peer.elts.is_empty()
+        }
+        (ast::Expr::Dict(expression), ast::Expr::Dict(peer)) => {
+            !expression.items.is_empty() && peer.items.is_empty()
+        }
+        _ => false,
+    }
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.
