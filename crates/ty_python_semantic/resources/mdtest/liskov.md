@@ -2796,7 +2796,8 @@ class InheritsAnnotation(Declared):
 ## Inherited annotations and instance assignments
 
 An instance assignment does not narrow an inherited annotation. Overrides in later subclasses use
-the declared type, just like ordinary attribute reads and writes.
+the declared type, just like ordinary attribute reads and writes, whether or not the base provides a
+class default.
 
 ```toml
 [rules]
@@ -2806,19 +2807,25 @@ invalid-mutable-override = "error"
 ```py
 class Base:
     value: str | None
+    defaulted: str | None = None
 
 class Middle(Base):
     value = "middle"
+    defaulted = "middle"
 
     def reset(self):
         self.value = "middle"
+        self.defaulted = "middle"
 
 class Child(Middle):
     value = "child"  # no diagnostic
+    defaulted = "child"  # no diagnostic
 
 def clear(obj: Middle):
     reveal_type(obj.value)  # revealed: str | None
+    reveal_type(obj.defaulted)  # revealed: str | None
     obj.value = None  # no diagnostic
+    obj.defaulted = None  # no diagnostic
 
 class Incompatible(Middle):
     value: int = 1  # error: [invalid-attribute-override]
@@ -3222,6 +3229,26 @@ def read(base: Base, slot: Slotted, generated: Generated) -> None:
     reveal_type(base.value)  # revealed: int | Descriptor
     reveal_type(slot.value)  # revealed: Descriptor
     reveal_type(generated.value)  # revealed: Descriptor
+```
+
+## Declarations without instance storage
+
+An annotation constrains subclass attributes even when slots do not provide storage for it.
+Attribute and property overrides must still preserve the declared read type.
+
+```py
+class Base:
+    __slots__ = ()
+    value: int
+
+class AttributeChild(Base):
+    __slots__ = ()
+    value: str  # error: [invalid-attribute-override]
+
+class PropertyChild(Base):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
 ```
 
 ## Descriptor setters cannot narrow accepted writes

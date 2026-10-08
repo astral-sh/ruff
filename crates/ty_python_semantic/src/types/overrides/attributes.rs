@@ -144,18 +144,10 @@ fn attribute_contract<'db>(
         };
         (read, write)
     } else {
-        // An annotated class-body default need not be in the instance dictionary.
-        // Its public class-member type still carries the declared annotation.
-        let place = if is_class_var || is_final || instance_member.place.is_undefined() {
-            class_member.place
-        } else {
-            // An inferred instance assignment must not narrow an inherited annotation.
-            // Resolve through the owner's MRO, as ordinary attribute lookup does.
-            owner.instance_member(db, env, name).place
-        };
-        let read = place
-            .ignore_possibly_undefined()?
-            .bind_self_typevars(db, env, receiver);
+        // Inferred non-descriptors were excluded above, so the class member carries
+        // the declared contract, including inherited annotations. Instance assignments
+        // do not narrow that contract, even when a class-body default is present.
+        let read = class_place.ty.bind_self_typevars(db, env, receiver);
         (
             read,
             Some(
