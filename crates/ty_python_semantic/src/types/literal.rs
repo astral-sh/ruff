@@ -192,7 +192,7 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    pub(crate) fn as_enum(self) -> Option<EnumLiteralType<'db>> {
+    pub(crate) const fn as_enum(self) -> Option<EnumLiteralType<'db>> {
         if let LiteralValueTypeKind::Enum(v) = self.kind() {
             Some(v)
         } else {

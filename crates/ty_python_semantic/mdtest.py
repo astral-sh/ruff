@@ -20,6 +20,7 @@
 # redundant-condition-strict = "warn"
 # disjoint-cast = "warn"
 # missing-direct-dependency = "warn"
+# non-exhaustive-match = "warn"
 #
 # [tool.uv]
 # exclude-newer = "P7D"

@@ -84,6 +84,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DYNAMIC_FUNCTION_DECORATOR_RETURN);
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
+    registry.register_lint(&NON_EXHAUSTIVE_MATCH);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&EMPTY_BODY);
     registry.register_lint(&EXPERIMENTAL_SYNTAX);
@@ -1405,6 +1406,15 @@ declare_lint! {
         summary: "detects conditions that are always truthy or always falsey",
         status: LintStatus::stable("0.0.79"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/non-exhaustive-match.md")]
+    pub(crate) static NON_EXHAUSTIVE_MATCH = {
+        summary: "detects match statements that do not cover all possible values",
+        status: LintStatus::stable("0.0.85"),
+        default_level: Level::Ignore,
     }
 }
 
