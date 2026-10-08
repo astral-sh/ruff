@@ -1955,11 +1955,17 @@ fn benchmark_literal_or_pattern_reachability(criterion: &mut Criterion) {
 ///
 /// Each case matches a pair of class patterns and captures their attributes. Preserving correlations
 /// across the cases can produce many tuple alternatives with wide element unions.
+/// Generic variants also require relating specializations when narrowing the captured attributes.
 fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
-    for (name, num_cases) in [
-        ("ty_micro[tuple_class_pattern_captures_8]", 8),
-        ("ty_micro[tuple_class_pattern_captures]", 16),
+    for (name, num_cases, generic) in [
+        ("ty_micro[tuple_class_pattern_captures_8]", 8, false),
+        ("ty_micro[tuple_class_pattern_captures]", 16, false),
+        ("ty_micro[generic_tuple_class_pattern_captures_8]", 8, true),
+        ("ty_micro[generic_tuple_class_pattern_captures]", 16, true),
     ] {
+        let type_parameters = if generic { "[T]" } else { "" };
+        let type_arguments = if generic { "[int]" } else { "" };
+        let value_type = if generic { "T" } else { "int" };
         let mut code = String::new();
 
         for prefix in ["A", "B"] {
@@ -1967,8 +1973,8 @@ fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
                 writeln!(
                     &mut code,
                     "
-            class {prefix}{index}:
-                value: int | None = None
+            class {prefix}{index}{type_parameters}:
+                value: {value_type} | None = None
             "
                 )
                 .ok();
@@ -1977,7 +1983,7 @@ fn benchmark_tuple_class_pattern_captures(criterion: &mut Criterion) {
 
         let union = |prefix: &str| {
             (0..num_cases)
-                .map(|index| format!("{prefix}{index}"))
+                .map(|index| format!("{prefix}{index}{type_arguments}"))
                 .join(" | ")
         };
 
