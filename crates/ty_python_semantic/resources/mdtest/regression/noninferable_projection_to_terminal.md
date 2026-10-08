@@ -137,6 +137,10 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
+        # TODO(#26680): The return context causes inference to prefer `T` for
+        # `Socket.__aenter__`'s `Self`, and the bound check rejects `T` even though the
+        # receiver is `T & Socket`.
+        # error: [invalid-argument-type]
         # error: [invalid-return-type] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
         return await self.response.__aenter__()
 ```
