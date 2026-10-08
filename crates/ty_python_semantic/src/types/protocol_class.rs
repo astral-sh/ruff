@@ -536,17 +536,15 @@ impl<'db> ProtocolInterfaceView<'db> {
         self.interface.member_count(db)
     }
 
-    pub(super) fn has_only_methods(
-        self,
-        db: &'db dyn Db,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> bool {
-        self.members(db).all(|member| {
-            matches!(
-                member.data_for_relation(db, visitor).kind,
-                ProtocolMemberKind::Method(..)
-            )
-        })
+    /// Proves that every member is a method without specializing its signature.
+    ///
+    /// Specialization preserves declared methods. Other declarations may become methods,
+    /// but callers of this predicate only need a sufficient condition for an optimization.
+    pub(super) fn has_only_declared_methods(self, db: &'db dyn Db) -> bool {
+        self.interface
+            .inner(db)
+            .values()
+            .all(|member| matches!(member.kind, ProtocolMemberKind::Method(..)))
     }
 
     /// Returns whether structural comparison can avoid recursive member expansion.

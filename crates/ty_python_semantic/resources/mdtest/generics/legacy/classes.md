@@ -3162,6 +3162,31 @@ def valid(x: P[T_co]):
     reveal_type(x.next().next())  # revealed: P[T_co@valid & ~P[T_co@valid & Any] & ~P[T_co@valid & Any & ~P[T_co@valid & Any]]]
 ```
 
+## Nested recursive exclusions
+
+Repeated calls preserve recursive exclusions even when a protocol type argument contains another
+specialization of the same protocol. Classifying the protocol's methods does not expand their
+signatures.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class A(Protocol[T_co]):
+    def f(self) -> A[T_co & ~A[A[T_co & Any]]]: ...
+
+def foo(x: A[int]):
+    reveal_type(x.f().f())  # revealed: A[int & ~A[A[int & Any]] & ~A[A[int & Any & ~A[A[int & Any]]]]]
+```
+
 ## Recursive protocol members introduced by type arguments
 
 A property declared as `T` can become recursive after specialization. Finite overloaded requirements

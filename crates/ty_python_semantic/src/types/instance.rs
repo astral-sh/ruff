@@ -886,12 +886,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // A no-op source materialization can be removed before comparing method-only
             // interfaces. For recursive properties and attributes, keep the wrapper: removing
             // it can make the cycle guard reject distinct specializations that stabilize.
-            let mapping = self
-                .materialization_visitor
-                .for_new_materialization_root()
-                .with_signature_relations(self.signature_relation_visitor);
             if source.materialization_kind(db).is_some()
-                && source.interface(db).has_only_methods(db, &mapping)
+                && source.interface(db).has_only_declared_methods(db)
                 && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
                 return self.check_type_pair(
