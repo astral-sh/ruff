@@ -3187,6 +3187,34 @@ def foo(x: A[int]):
     reveal_type(x.f().f())  # revealed: A[int & ~A[A[int & Any]] & ~A[A[int & Any & ~A[A[int & Any]]]]]
 ```
 
+## Nested recursive exclusions with gradual type arguments
+
+Repeated calls preserve nested exclusions that contain gradual type arguments. The resulting
+protocol still checks arguments to its other methods.
+
+```toml
+[environment]
+python-version = "3.14"
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class A(Protocol[T]):
+    def f(self) -> A[T & ~A[A[T | Any]]]: ...
+    def g(self, value: T) -> None: ...
+
+def check(x: A[int]):
+    result = x.f().f()
+    reveal_type(result)  # revealed: A[int & ~A[A[int | Any]] & ~A[A[(int & ~A[A[int | Any]]) | Any]]]
+    result.g(1)  # no diagnostic
+    result.g("bad")  # error: [invalid-argument-type]
+```
+
 ## Recursive exclusions for constrained type variables
 
 A recursive protocol exclusion preserves the constrained type variable, so the result remains

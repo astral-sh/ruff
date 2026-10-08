@@ -717,16 +717,10 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
     {
         return false;
     }
-    let interface = ProtocolInterfaceView::new(class.interface(db), None);
-    let Some(template) = origin.identity_specialization(db).into_protocol_class(db) else {
-        return false;
-    };
-    let template_view = ProtocolInterfaceView::new(template.interface(db), None);
     let class_context = origin.generic_context(db);
-    if interface.member_count(db) != template_view.member_count(db) {
-        return false;
-    }
-
+    // Check the proof's prerequisites before specializing either interface. Specializing a
+    // recursive protocol can re-enter type relations with growing arguments, even when those
+    // arguments already rule out this proof.
     if class_context.is_some_and(|context| {
         context.variables(db).any(|variable| {
             variable.is_paramspec(db)
@@ -758,6 +752,14 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                 .iter()
                 .any(|ty| !specialization_argument_is_static(db, env, *ty, None)))
     {
+        return false;
+    }
+    let interface = ProtocolInterfaceView::new(class.interface(db), None);
+    let Some(template) = origin.identity_specialization(db).into_protocol_class(db) else {
+        return false;
+    };
+    let template_view = ProtocolInterfaceView::new(template.interface(db), None);
+    if interface.member_count(db) != template_view.member_count(db) {
         return false;
     }
     let visitor = ParameterVisitor {
