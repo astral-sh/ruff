@@ -703,6 +703,17 @@ impl<'db> SolutionWalker<'db> {
         let Some(bound) = bound_typevar.typevar(db).upper_bound(db, env) else {
             return ControlFlow::Continue(true);
         };
+        // TODO: ParamSpecs can capture generic callables whose type variables need to be solved
+        // together with the forwarded arguments and return type. Until then, this check can reject
+        // valid calls by treating those variables as fixed. Preserve the existing behavior whenever
+        // a ParamSpec is inferable. See https://github.com/astral-sh/ty/issues/4508.
+        if self
+            .inferable
+            .iter(db)
+            .any(|typevar| typevar.is_paramspec(db))
+        {
+            return ControlFlow::Continue(true);
+        }
         let mut lower_bounds = SmallVec::<[(usize, Type<'db>); 4]>::new();
         let mut has_lower_inference = false;
         let mut has_symbolic_lower = false;

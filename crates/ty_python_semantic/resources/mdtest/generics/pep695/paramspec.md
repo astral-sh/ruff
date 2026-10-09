@@ -901,10 +901,25 @@ result should therefore be `Factory[Unknown]`, which is assignable to `Factory[o
 satisfies `R`'s bound.
 
 ```py
-# TODO: Accept the constructor by specializing its return type.
 # TODO: revealed: Factory[Unknown]
-# error: [invalid-argument-type]
-reveal_type(construct(Factory))  # revealed: Unknown
+reveal_type(construct(Factory))  # revealed: Factory[object]
+```
+
+### Class method with a generic callable receiver
+
+A class method's receiver can be a generic callable whose parameters are captured by a `ParamSpec`.
+
+```py
+from typing import Callable
+
+class Protocol: ...
+
+class Factory[P: Protocol]:
+    @classmethod
+    def for_protocol[**Params, R: "Factory[Protocol]"](cls: Callable[Params, R], protocol: Callable[[], P]) -> "Factory[P]":
+        raise NotImplementedError
+
+Factory.for_protocol(Protocol)  # no diagnostic
 ```
 
 ### Captured and fixed variables in a return type
@@ -923,7 +938,15 @@ def unrestricted[S](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:
         return value, fixed
 
-    forward(make, 1)  # error: [invalid-argument-type]
+    # TODO: Reject this call because `S` is not bounded by `str`.
+    forward(make, 1)  # no diagnostic
+
+def non_generic[S](fixed: S) -> None:
+    def make(value: int) -> tuple[int, S]:
+        return value, fixed
+
+    # TODO: Reject this call because `S` is not bounded by `str`.
+    forward(make, 1)  # no diagnostic
 
 def bounded[S: str](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:
@@ -947,11 +970,9 @@ def outer[S: str](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:
         return value, fixed
 
-    # TODO: Ty rejects this valid call because it checks the unspecialized `T` against `str`.
-    # error: [invalid-argument-type] "Argument type `tuple[T@make, S@outer]` does not satisfy upper bound"
-    forward(make, "text")
-    # error: [invalid-argument-type] "Argument type `tuple[T@make, S@outer]` does not satisfy upper bound"
-    forward(make, 1)
+    forward(make, "text")  # no diagnostic
+    # TODO: Reject this call because `T` cannot satisfy both the argument and the return bound.
+    forward(make, 1)  # no diagnostic
 ```
 
 ### `ParamSpec` in prepended positional parameters
