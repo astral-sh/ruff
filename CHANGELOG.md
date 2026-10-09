@@ -1,5 +1,44 @@
 # Changelog
 
+## 0.16.11
+
+Released on 2026-10-09.
+
+### Preview features
+
+- \[`flake8-bugbear`\] Report the method name and a more precise range (`B005`) ([#27050](https://github.com/astral-sh/ruff/pull/27050))
+- \[`refurb`\] Mark fix unsafe and move to `suspicious` (`FURB152`) ([#28405](https://github.com/astral-sh/ruff/pull/28405))
+- \[`ruff`\] Allow docstrings in strict mode (`RUF067`) ([#28679](https://github.com/astral-sh/ruff/pull/28679))
+
+### Bug fixes
+
+- \[`flake8-builtins`\] Expand checks in class scopes (`A001`) ([#29076](https://github.com/astral-sh/ruff/pull/29076))
+- \[`flake8-self`\] Allow private access on `object.__new__(cls)` instances (`SLF001`) ([#29001](https://github.com/astral-sh/ruff/pull/29001))
+- \[`flake8-tidy-imports`\] Skip `lazy-import-mismatch` in stubs (`TID254`) ([#29095](https://github.com/astral-sh/ruff/pull/29095))
+- \[`flake8-type-checking`\] Add the notion of runtime-ambiguous references ([#26508](https://github.com/astral-sh/ruff/pull/26508))
+- \[`flake8-type-checking`\] Never flag annotations in function scopes ([#29183](https://github.com/astral-sh/ruff/pull/29183))
+- \[`pyflakes`\] Mark the fix as unsafe when it creates a docstring (`F541`) ([#28258](https://github.com/astral-sh/ruff/pull/28258))
+- \[`pylint`\] Preserve trailing comments in `useless-return` fix (`PLR1711`) ([#29180](https://github.com/astral-sh/ruff/pull/29180))
+- \[`ruff`\] Avoid false positive when `pytest.raises` is used in a `with` statement (`RUF061`) ([#28186](https://github.com/astral-sh/ruff/pull/28186))
+
+### Rule changes
+
+- \[`pyupgrade`\] Suggest `typing.TypeForm` on Python 3.15 (`UP035`) ([#29084](https://github.com/astral-sh/ruff/pull/29084))
+
+### Contributors
+
+- [@dor-sr](https://github.com/dor-sr)
+- [@yxshee](https://github.com/yxshee)
+- [@DeviousCardi](https://github.com/DeviousCardi)
+- [@nekomario28](https://github.com/nekomario28)
+- [@DebadityaHait](https://github.com/DebadityaHait)
+- [@saberoueslati](https://github.com/saberoueslati)
+- [@hugehoo](https://github.com/hugehoo)
+- [@baltasarblanco](https://github.com/baltasarblanco)
+- [@Viicos](https://github.com/Viicos)
+- [@lognd](https://github.com/lognd)
+- [@Daverball](https://github.com/Daverball)
+
 ## 0.16.10
 
 Released on 2026-10-01.
