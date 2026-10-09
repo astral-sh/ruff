@@ -17,7 +17,11 @@ This rule is disabled by default. Enable it with `--warn unused-dependency` or s
 
 It requires uv dependency metadata, including module ownership. Enable uv workspace integration with
 `TY_UV=1`, or script integration with `TY_UV=scripts`. Project checks use an existing, synchronized
-environment; ty synchronizes PEP 723 script environments automatically.
+environment; ty synchronizes PEP 723 script environments automatically. For example:
+
+```console {data-mdtest="ignore"}
+TY_UV=1 ty check --warn unused-dependency
+```
 
 The rule checks `project.dependencies`, `project.optional-dependencies`, and PEP 723 script
 dependencies. Dependency groups, conditional requirements, and distributions with no known
@@ -33,6 +37,9 @@ the script's own environment and declarations.
 Imports in nested scopes, stub files, and `TYPE_CHECKING` blocks count as use. Literal calls to
 `importlib.import_module` and `__import__` also count. If a recognized dynamic import has an unknown
 module name, the rule does not report unused dependencies for that project or script.
+
+For scripts, a `# ty: ignore[unused-dependency]` comment on the declaration line suppresses the
+diagnostic. Project diagnostics respect rule overrides for the `pyproject.toml` file.
 
 Some dependencies are used without imports, for example through command-line tools or plugin
 discovery. Their absence from the import inventory does not prove they can be removed. Review these

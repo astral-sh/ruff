@@ -22,7 +22,7 @@ declare_lint! {
     #[doc = include_str!("../resources/lint_docs/unused-dependency.md")]
     pub static UNUSED_DEPENDENCY = {
         summary: "detects declared dependencies that are not imported",
-        status: LintStatus::stable("0.0.76"),
+        status: LintStatus::stable("0.0.86"),
         default_level: Level::Ignore,
     }
 }
