@@ -3121,7 +3121,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if positive.iter().any(|element_ty| {
                     self.validate_attribute_deletion(target, *element_ty, attribute, false)
                 }) {
-                    true
+                    !self.validate_final_attribute_deletion(
+                        target,
+                        object_ty,
+                        attribute,
+                        emit_diagnostics,
+                    )
                 } else {
                     if emit_diagnostics && let Some(element_ty) = positive.first() {
                         self.validate_attribute_deletion(target, *element_ty, attribute, true);
