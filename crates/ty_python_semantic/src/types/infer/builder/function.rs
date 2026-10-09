@@ -31,7 +31,8 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            FunctionDecoratorInference, InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
+            FunctionDecoratorInference, InferenceFlags, InferenceRegion, TypeExpressionFlags,
+            TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -798,6 +799,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .extend(inference.called_functions().iter().copied());
         self.implicit_aliases
             .extend(inference.implicit_aliases().iter().copied());
+        self.extend_reaching_definitions(InferenceRegion::FunctionDecorators(definition));
         inference
     }
 

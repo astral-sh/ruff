@@ -12,6 +12,7 @@ pub use db::Db;
 pub(crate) use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use diagnostic::inferred_python_version_source_annotation;
 pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
+pub use place::definitions::DefinitionResolution;
 use ruff_db::PythonFile;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
@@ -19,7 +20,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::source::{SourceTextError, source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
-    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind, SemanticModel,
+    Completion, ExpectedStringLiteralCompletion, HasDefinition, HasType, NameKind,
+    ReachingDefinitions, SemanticModel,
 };
 use std::hash::BuildHasherDefault;
 pub use suppression::suppress_single;
