@@ -187,14 +187,15 @@ impl DependencyMetadata {
         used: &mut BTreeSet<CharStr>,
     ) {
         for module in imports.modules.iter().copied() {
-            self.record_module_owners(db, module, used);
-            if let Some(runtime) = resolve_real_shadowable_module(
+            // Stubs describe types, but their runtime module can be shadowed by local code.
+            // Only fall back to the typed module when no runtime implementation is available.
+            let runtime = resolve_real_shadowable_module(
                 db,
                 ImportingFile::File(file.file(db), file.resolver_environment(db)),
                 module.name(db),
-            ) {
-                self.record_module_owners(db, runtime, used);
-            }
+            )
+            .unwrap_or(module);
+            self.record_module_owners(db, runtime, used);
         }
 
         // Import resolution can fail for native extensions or unavailable stubs. The package
@@ -205,8 +206,10 @@ impl DependencyMetadata {
     }
 
     fn record_module_owners(&self, db: &dyn Db, module: Module<'_>, used: &mut BTreeSet<CharStr>) {
-        if let Some(owner) = self.owner(db, module) {
-            used.insert(CharStr::from(owner));
+        if let Some(owner) = self.owner(db, module)
+            && let Some((id, _)) = self.distributions.get_key_value(owner)
+        {
+            used.insert(id.clone());
             return;
         }
 

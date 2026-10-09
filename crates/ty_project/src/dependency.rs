@@ -8,7 +8,7 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
-use ty_module_resolver::{ImportingFile, resolve_real_module};
+use ty_module_resolver::{ImportingFile, resolve_real_shadowable_module};
 use ty_python_core::ProgramFile;
 use ty_python_semantic::dependency::{
     DependencyMetadata, DependencyProject, DependencyProjectKind, UNUSED_DEPENDENCY,
@@ -219,7 +219,7 @@ fn used_dependencies<'db>(
         let local_modules = imports.modules.iter().flat_map(|module| {
             [
                 Some(*module),
-                resolve_real_module(
+                resolve_real_shadowable_module(
                     db,
                     ImportingFile::File(file.file(db), file.resolver_environment(db)),
                     module.name(db),

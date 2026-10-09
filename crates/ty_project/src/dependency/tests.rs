@@ -184,6 +184,30 @@ fn local_module_shadowing_does_not_use_installed_distribution() -> anyhow::Resul
 }
 
 #[test]
+fn bundled_backport_shadowing_does_not_use_installed_distribution() -> anyhow::Result<()> {
+    let mut db = database("warn", &["typing_extensions"])?;
+    db.write_file(
+        "/project/pyproject.toml",
+        "[project]\ndependencies = ['typing-extensions']\n",
+    )?;
+    db.write_file("/project/main.py", "import typing_extensions\n")?;
+    db.write_file("/project/typing_extensions.py", "")?;
+    let metadata = metadata(&[(
+        "/project",
+        DependencyProjectKind::Project,
+        &["typing-extensions"],
+    )])?;
+    assert_eq!(
+        declarations(&db, &project_diagnostics(&db, &metadata))?,
+        [(
+            "/project/pyproject.toml".into(),
+            "'typing-extensions'".into()
+        )]
+    );
+    Ok(())
+}
+
+#[test]
 fn stub_only_dependencies_without_module_ownership_are_skipped() -> anyhow::Result<()> {
     let mut db = database("warn", &["shared_lib"])?;
     db.write_file("/site-packages/shared_lib-stubs/__init__.pyi", "")?;
@@ -398,5 +422,22 @@ fn script_reachable_helpers_cycles_and_edits() -> anyhow::Result<()> {
         )?,
         [("/project/script.py".into(), "'used-lib'".into())]
     );
+    Ok(())
+}
+
+#[test]
+fn script_follows_runtime_module_shadowing_bundled_backport() -> anyhow::Result<()> {
+    let mut db = database("warn", &["used_lib"])?;
+    db.write_file(
+        "/project/script.py",
+        "# /// script\n# dependencies = ['used-lib']\n# ///\nimport typing_extensions\n",
+    )?;
+    db.write_file("/project/typing_extensions.py", "import used_lib\n")?;
+    let metadata = metadata(&[(
+        "/project/script.py",
+        DependencyProjectKind::Script,
+        &["used-lib"],
+    )])?;
+    assert!(script_diagnostics(&db, script(&db, "/project/script.py")?, &metadata).is_empty());
     Ok(())
 }
