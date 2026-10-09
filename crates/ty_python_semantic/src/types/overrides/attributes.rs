@@ -15,6 +15,7 @@ use crate::{
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
+        dedicated::pydantic,
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
@@ -72,6 +73,9 @@ struct AttributeContract<'db> {
     kind: AttributeKind,
     is_frozen_field: bool,
     qualifiers: TypeQualifiers,
+    // Methods, properties, and defaults whose inherited declaration is unknown
+    // do not establish a class-vs-instance storage contract.
+    variable_kind: Option<super::VariableKind>,
 }
 
 /// Resolve an owner's declaration as seen through the receiver being checked.
@@ -97,13 +101,21 @@ fn attribute_contract<'db>(
     receiver: Type<'db>,
     name: &str,
 ) -> Option<AttributeContract<'db>> {
-    // `object.__class__` is specialized by member lookup, so its synthetic `Self` is
-    // not an override contract. Likewise, not every object is hashable or has a
-    // writable instance dictionary, despite the broad declarations in typeshed.
-    if owner.is_object(db) && matches!(name, "__class__" | "__hash__" | "__dict__") {
+    // Object metadata depends on the receiver's class and instance layout. Not every
+    // object supports hashing, dictionary storage, or weak references.
+    if owner.is_object(db)
+        && matches!(
+            name,
+            "__class__" | "__hash__" | "__dict__" | "__weakref__" | "__doc__"
+        )
+    {
         return None;
     }
     let (literal, _) = owner.static_class_literal(db)?;
+    // Slots describe this class's contribution to instance layout.
+    if name == "__slots__" {
+        return None;
+    }
     // NamedTuple fields have a dedicated override rule, including synthesized properties.
     if CodeGeneratorKind::NamedTuple.matches(db, literal.into())
         && literal
@@ -184,7 +196,12 @@ fn attribute_contract<'db>(
         (Place::Defined(place), _) | (_, Place::Defined(place)) => place,
         (Place::Undefined, Place::Undefined) => return None,
     };
-    if matches!(own_place.ty, Type::TypeAlias(_)) {
+    // An alias used in an annotation is an attribute type, so it still participates
+    // in override checking. Only the alias object itself is exempt.
+    if matches!(
+        own_place.ty,
+        Type::KnownInstance(KnownInstanceType::TypeAliasType(_))
+    ) {
         return None;
     }
     let alternatives = own_place
@@ -274,6 +291,7 @@ fn attribute_contract<'db>(
         kind,
         is_frozen_field,
         qualifiers,
+        variable_kind: super::variable_kind(db, env, owner, name, class_member, instance_member),
     })
 }
 
@@ -323,12 +341,18 @@ enum AttributeViolation<'db> {
         target: Type<'db>,
     },
     ReadOnly,
+    Storage {
+        source: super::VariableKind,
+        target: super::VariableKind,
+    },
 }
 
 impl AttributeViolation<'_> {
-    /// Property violations have a dedicated rule, including incompatible writes.
+    /// Storage conflicts use the attribute rule; other property violations have a
+    /// dedicated rule, including incompatible writes.
     const fn rule(&self, involves_property: bool) -> &'static LintMetadata {
         match self {
+            Self::Storage { .. } => &INVALID_ATTRIBUTE_OVERRIDE,
             _ if involves_property => &INVALID_PROPERTY_TYPE_OVERRIDE,
             Self::Write { .. } => &INVALID_MUTABLE_OVERRIDE,
             Self::Read { .. } | Self::ReadOnly => &INVALID_ATTRIBUTE_OVERRIDE,
@@ -353,12 +377,17 @@ fn attribute_violation<'db>(
 ) -> Option<AttributeViolation<'db>> {
     if source.kind == AttributeKind::Method && target.kind == AttributeKind::Method
         || target.qualifiers.contains(TypeQualifiers::FINAL)
-        || source.kind == AttributeKind::Value
-            && target.kind == AttributeKind::Value
-            && source.qualifiers.contains(TypeQualifiers::CLASS_VAR)
-                != target.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     {
         return None;
+    }
+    if let (Some(source_kind), Some(target_kind)) = (source.variable_kind, target.variable_kind)
+        && !source_kind.can_override(target_kind)
+        && (target_kind == super::VariableKind::Class || target.write.is_some())
+    {
+        return Some(AttributeViolation::Storage {
+            source: source_kind,
+            target: target_kind,
+        });
     }
     if !target.has_type_contract {
         return None;
@@ -398,23 +427,20 @@ fn attribute_violation<'db>(
     } else {
         target_receiver
     };
-    if !source
+    let accepts_write = source
         .write
         .is_some_and(|source_write| write.is_assignable_to(db, env, source_write))
-        || !receiver.is_attribute_writable_with(db, env, name, write)
-    {
-        // Do not require a write that the superclass itself cannot perform, for example
-        // when a descriptor or custom `__setattr__` rejects the declared value type.
-        if !target_receiver.is_attribute_writable_with(db, env, name, write) {
-            return None;
-        }
-        return Some(if source.write.is_none() {
-            AttributeViolation::ReadOnly
-        } else {
-            AttributeViolation::Write { target: write }
-        });
+        && receiver.is_attribute_writable_with(db, env, name, write);
+    // Do not require a write that the superclass itself cannot perform, for example
+    // when a descriptor or custom `__setattr__` rejects the declared value type.
+    if accepts_write || !target_receiver.is_attribute_writable_with(db, env, name, write) {
+        return None;
     }
-    None
+    Some(if source.write.is_none() {
+        AttributeViolation::ReadOnly
+    } else {
+        AttributeViolation::Write { target: write }
+    })
 }
 
 /// Report an incompatible explicit override, if its diagnostic rule is enabled.
@@ -521,6 +547,13 @@ pub(super) fn check_override<'db>(
         }
         AttributeViolation::ReadOnly => diagnostic
             .set_primary_annotation_message("Read-only attribute overrides a writable attribute"),
+        AttributeViolation::Storage { source, target } => diagnostic
+            .set_primary_annotation_message(format_args!(
+                "{} cannot override {} `{}.{name}`",
+                source.description(),
+                target.description(),
+                superclass.name(db),
+            )),
     }
     if let Some(base_definition) = superclass_definition
         && base_definition.file(db) == context.file()
@@ -724,6 +757,9 @@ pub(super) fn check_inherited_conflict<'db>(
         ) else {
             continue;
         };
+        if pydantic::merges_inherited_attribute(db, env, class, name, [owner, target_owner]) {
+            continue;
+        }
         if already_inherited(db, env, class_type, target_owner, name, &source) {
             continue;
         }
@@ -751,6 +787,13 @@ pub(super) fn check_inherited_conflict<'db>(
             )),
             AttributeViolation::ReadOnly => {
                 diagnostic.info("Inherited read-only attribute replaces a writable attribute");
+            }
+            AttributeViolation::Storage { source, target } => {
+                diagnostic.info(format_args!(
+                    "{} cannot replace {}",
+                    source.description(),
+                    target.description(),
+                ));
             }
         }
         for owner in [owner, target_owner] {

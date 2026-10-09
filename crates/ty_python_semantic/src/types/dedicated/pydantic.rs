@@ -674,6 +674,47 @@ fn model_config<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> ModelCo
     config
 }
 
+/// Whether Pydantic can merge the values supplied by this pair of attribute owners.
+///
+/// A model can combine `model_config` from a regular mixin with the model's
+/// `ClassVar`, provided both owners supply a class-level mapping. Check each
+/// conflicting pair: a valid mixin does not hide invalid config from another base.
+///
+/// ```python
+/// from pydantic import BaseModel, ConfigDict
+///
+/// class ConfigMixin:
+///     model_config = ConfigDict(extra="allow")
+///
+/// class InvalidMixin:
+///     model_config = 1
+///
+/// class Valid(BaseModel, ConfigMixin): ...  # Both values can be merged.
+/// class Invalid(BaseModel, ConfigMixin, InvalidMixin): ...  # The third cannot.
+/// ```
+pub(in crate::types) fn merges_inherited_attribute<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: StaticClassLiteral<'db>,
+    name: &str,
+    owners: [ClassType<'db>; 2],
+) -> bool {
+    if name != "model_config" || !is_model(db, class) {
+        return false;
+    }
+    let config_mapping = KnownClass::Mapping.to_specialized_instance(
+        db,
+        env,
+        &[KnownClass::Str.to_instance(db, env), Type::object()],
+    );
+    owners.into_iter().all(|owner| {
+        owner
+            .own_class_member(db, env, None, name)
+            .ignore_possibly_undefined()
+            .is_some_and(|ty| ty.is_assignable_to(db, env, config_mapping))
+    })
+}
+
 fn inherited_model_config(db: &dyn Db, class: StaticClassLiteral<'_>) -> Option<ModelConfig> {
     for base in class.iter_mro(db, None).filter_map(ClassBase::into_class) {
         let Some((base, _)) = base.static_class_literal(db) else {

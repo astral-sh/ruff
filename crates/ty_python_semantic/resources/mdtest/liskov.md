@@ -676,15 +676,14 @@ info: This violates the Liskov Substitution Principle
 
 ## `ClassVar` and instance variables
 
-A pure class variable cannot override an inherited instance variable, and an instance variable
-cannot override an inherited pure class variable.
+A `ClassVar` cannot replace an attribute that permits writes through instances. Conversely, subclass
+declarations preserve a base class's explicit `ClassVar` qualifier.
 
 ### Direct overrides
 
-An annotation without `ClassVar` declares an instance variable, even if the declaration also has a
-class-level default value. An explicit `ClassVar` declaration is a pure class variable. Overriding
-one with the other changes the places where the attribute is valid, so it violates Liskov
-substitution:
+A class-body annotation without `ClassVar` declares a regular attribute, even when it has a
+class-level default. An explicit `ClassVar` declaration restricts writes to the class object.
+Changing between these two kinds is an invalid override:
 
 ```py
 from typing import ClassVar
@@ -710,10 +709,43 @@ class ValidSubclass(Base):
     class_attr: ClassVar[int] = 1
 ```
 
+The same rule applies when the annotation has a default value.
+
+```py
+class WithDefault(Base):
+    class_attr: int = 1  # error: [invalid-attribute-override]
+```
+
+Changing the qualifier takes precedence over read and write type incompatibilities.
+
+```py
+class Incompatible(Base):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable `Base.class_attr`"
+    class_attr: str
+
+class Narrow(Base):
+    class_attr: bool  # error: [invalid-attribute-override]
+```
+
+### Annotations in methods
+
+An annotation on `self.value` declares an instance attribute. It cannot replace a class variable,
+which permits writes on the class itself.
+
+```py
+from typing import ClassVar
+
+class Base:
+    value: ClassVar[int]
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: int = 1  # error: [invalid-attribute-override]
+```
+
 ### Regular class-body assignments
 
-An unannotated class-body assignment is an instance variable with a class-level default. This means
-it can replace another inherited instance-variable default. If it overrides an inherited `ClassVar`,
+An unannotated class-body assignment can replace an inherited default. If it overrides a `ClassVar`,
 it inherits that declaration and remains a class variable. However, an explicit `ClassVar` cannot
 override an inherited unannotated class-body assignment, because code using the base class can still
 write that attribute through an instance:
@@ -796,11 +828,76 @@ class PropertySubclass(PropertyBase):
         return 1
 ```
 
+### Defaults whose inherited declaration is unknown
+
+A dynamic base can hide the annotation governing an unannotated class-body default. In that case we
+cannot conclude that the default changes a later base's `ClassVar` into an instance variable. This
+applies both to a default on the class being checked and to one inherited through a mixin.
+
+```py
+from typing import Any, ClassVar
+
+class LayoutWidget:
+    keyctx: ClassVar[str] = ""
+
+class Commands(Any, LayoutWidget):
+    keyctx = "commands"  # no diagnostic
+
+class ContextMixin(Any):
+    keyctx = "commands"
+
+class Merged(ContextMixin, LayoutWidget): ...  # no diagnostic
+```
+
+An unresolved base produces the same uncertainty as `Any`:
+
+```py
+# error: [unresolved-import]
+from missing_widgets import Pile
+
+class Logs(Pile, LayoutWidget):
+    keyctx = "logs"  # no diagnostic
+```
+
+An explicit annotation or a receiver assignment still establishes its own storage contract, even if
+another base is unknown. A known inherited annotation also remains authoritative when it occurs
+before the dynamic base.
+
+```py
+class Explicit(Any, LayoutWidget):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable"
+    keyctx: str = "commands"
+
+class Receiver(Any, LayoutWidget):
+    def __init__(self) -> None:
+        # error: [invalid-attribute-override] "instance variable cannot override class variable"
+        self.keyctx: str = "commands"
+
+class Regular:
+    keyctx: str = ""
+
+class KnownFirst(Regular, Any, LayoutWidget):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable"
+    keyctx = "commands"
+
+class InferredRegular:
+    keyctx = "commands"
+
+# A known default without an annotation masks later declarations. It is not an unknown base.
+class KnownDefaultFirst(InferredRegular, Any, LayoutWidget):
+    # error: [invalid-attribute-override] "instance variable cannot override class variable"
+    keyctx = "commands"
+
+class ExplicitMixin(Any):
+    keyctx: str = "commands"
+
+class StillConflicting(ExplicitMixin, LayoutWidget): ...  # error: [invalid-attribute-override]
+```
+
 ### Repeated inherited conflicts
 
-If a parent class already made an invalid change from class variable to instance variable, a child
-that keeps the parent's kind should not receive a duplicate diagnostic. The same applies in the
-other direction:
+When a parent already changed between an instance attribute and a `ClassVar`, a subclass keeping the
+parent's declaration does not receive the same error again.
 
 ```py
 from typing import ClassVar
@@ -813,7 +910,7 @@ class ParentInstance(GrandparentClassVar):
     attr: int
 
 class ChildInstance(ParentInstance):
-    attr: int
+    attr: int  # no diagnostic
 
 class GrandparentInstance:
     attr: int
@@ -823,7 +920,7 @@ class ParentClassVar(GrandparentInstance):
     attr: ClassVar[int]
 
 class ChildClassVar(ParentClassVar):
-    attr: ClassVar[int]
+    attr: ClassVar[int]  # no diagnostic
 ```
 
 ### Descriptors
@@ -855,9 +952,8 @@ class DescriptorAnnotationOverride(DescriptorAnnotationBase):
 
 ### Multiple inheritance
 
-The subclass must satisfy every base class. It is not enough for the first base in the MRO to agree
-with the subclass: an unrelated base that declares the same member as a pure class variable still
-makes an instance-variable override invalid.
+The subclass must satisfy both bases. An explicit regular attribute cannot replace a `ClassVar` from
+another base, even when it agrees with the first base.
 
 ```py
 from typing import ClassVar
@@ -871,6 +967,85 @@ class InstanceBase:
 class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
     # error: [invalid-attribute-override] "instance variable cannot override class variable `ClassVarBase.attr`"
     attr: int
+```
+
+Without an explicit annotation, the first base supplies the attribute. Either order creates a
+conflict with the other base.
+
+```py
+class ClassFirst(ClassVarBase, InstanceBase): ...  # error: [invalid-attribute-override]
+class InstanceFirst(InstanceBase, ClassVarBase): ...  # error: [invalid-attribute-override]
+```
+
+Ordinary classes do not merge an attribute named `model_config`. The same inherited storage check
+applies to that name.
+
+```py
+class Settings:
+    model_config: ClassVar[dict[str, bool]] = {}
+
+class SettingsMixin:
+    model_config = {"enabled": True}
+
+class Ordinary(Settings, SettingsMixin): ...  # error: [invalid-attribute-override]
+```
+
+### Aliases in attribute annotations
+
+An annotation using a named alias describes an attribute, not an alias declaration. The same storage
+checks apply to it as to the expanded type, including when the attribute is supplied by another
+base.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar
+
+type OptionSpec = dict[str, int]
+
+class Directive:
+    option_spec: dict[str, int] = {}
+
+class IfConfig(Directive):
+    # error: [invalid-attribute-override] "class variable cannot override instance variable `Directive.option_spec`"
+    option_spec: ClassVar[OptionSpec] = {}
+
+class SuppliesOptions:
+    option_spec: ClassVar[OptionSpec] = {}
+
+class Inherited(SuppliesOptions, Directive): ...  # error: [invalid-attribute-override]
+```
+
+Reading and writing the annotated attribute must also satisfy the inherited type.
+
+```py
+type Text = str
+type Integer = int
+
+class Value:
+    data: int
+
+class WrongValue(Value):
+    data: Text  # error: [invalid-attribute-override]
+
+class TextValue:
+    data: Text
+
+class WrongInteger(TextValue):
+    data: Integer  # error: [invalid-attribute-override]
+```
+
+An actual alias declared in a class body does not introduce a variable-storage contract.
+
+```py
+class Aliases:
+    type Data = int
+
+class NewAliases(Aliases):
+    type Data = str  # no diagnostic
 ```
 
 ### Dataclasses
@@ -894,6 +1069,41 @@ class DC7(DC6):
 
     # error: [invalid-attribute-override] "instance variable cannot override class variable `DC6.y`"
     y: int
+```
+
+### Class variables replacing frozen fields
+
+A frozen field is already read-only on instances. Replacing it with a `ClassVar` removes no
+permitted write, whether the replacement is declared in the subclass or supplied by another base.
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+@dataclass(frozen=True)
+class Frozen:
+    value: int
+
+class Direct(Frozen):
+    value: ClassVar[int] = 1  # no diagnostic
+
+class SuppliesValue:
+    value: ClassVar[int] = 1
+
+class Inherited(SuppliesValue, Frozen): ...  # no diagnostic
+```
+
+The readable type must still be compatible in both forms.
+
+```py
+class Incompatible(Frozen):
+    # error: [invalid-attribute-override] "Type `str` is not assignable to inherited type `int`"
+    value: ClassVar[str] = ""
+
+class SuppliesString:
+    value: ClassVar[str] = ""
+
+class InheritedIncompatible(SuppliesString, Frozen): ...  # error: [invalid-attribute-override]
 ```
 
 ### Protocol implementations
@@ -3812,4 +4022,106 @@ class Generated(Base): ...
 
 class Mixin: ...
 class Child(Generated, Mixin): ...  # no diagnostic
+```
+
+## Repeated dataclass field assignments
+
+An instance field cannot replace a class variable. Assigning a default separately from the field
+annotation does not introduce another override: the conflict belongs to the declaration.
+
+```py
+from typing import ClassVar
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class Base(metaclass=ModelMeta):
+    value: ClassVar[object]
+
+class Child(Base):
+    value: object  # error: [invalid-attribute-override]
+    value = None  # no diagnostic
+```
+
+## Conditional attribute definitions
+
+Override checks use the definitions that are reachable for the configured Python version and
+platform.
+
+```toml
+[environment]
+python-version = "3.13"
+python-platform = "linux"
+```
+
+### Platform-specific defaults
+
+On Linux, `UnixCompiler` does not assign to `exe_extension`. The subclass's assignment therefore
+keeps the `ClassVar` declaration inherited from `BaseCompiler`.
+
+```py
+import sys
+from typing import ClassVar
+
+class BaseCompiler:
+    exe_extension: ClassVar[str | None] = None
+
+class UnixCompiler(BaseCompiler):
+    if sys.platform == "cygwin":
+        exe_extension = ".exe"
+
+class Compiler(UnixCompiler):
+    exe_extension = ".exe"  # no diagnostic
+```
+
+### Version-specific methods and attributes
+
+Before Python 3.14, the subclass declares `index` as `None`. That is incompatible with the inherited
+method. The method in the inactive branch does not change the result.
+
+```pyi
+import sys
+
+class Sequence:
+    def index(self) -> int: ...
+
+class memoryview(Sequence):
+    if sys.version_info >= (3, 14):
+        def index(self) -> int: ...
+
+    else:
+        index: None  # error: [invalid-attribute-override]
+```
+
+The opposite case keeps a compatible method and ignores the annotation in the inactive branch.
+
+```pyi
+class Compatible(Sequence):
+    if sys.version_info < (3, 14):
+        def index(self) -> int: ...  # no diagnostic
+
+    else:
+        index: None
+```
+
+### Version-specific instance annotations
+
+The active branch declares an instance attribute. A subclass cannot replace it with a `ClassVar`,
+even though another version of the base class defines a method with that name.
+
+```py
+import sys
+from typing import ClassVar
+
+class Base:
+    if sys.version_info >= (3, 14):
+        def value(self) -> int:
+            return 0
+
+    else:
+        value: int
+
+class Child(Base):
+    value: ClassVar[int] = 0  # error: [invalid-attribute-override]
 ```

@@ -8,6 +8,17 @@ use ty_python_core::{
     place_table, scope::ScopeId, semantic_index, symbol::ScopedSymbolId, use_def_map,
 };
 
+/// The declaration governing an unannotated default in a class body.
+///
+/// An unknown base can hide an annotation, which is different from a known absence
+/// of an inherited annotation. Only the latter establishes a new regular attribute.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum ClassBodyDeclaration<'db> {
+    Declared(PlaceAndQualifiers<'db>),
+    Undeclared,
+    Unknown,
+}
+
 /// The return type of certain member-lookup operations. Contains information
 /// about the type, type qualifiers, boundness/declaredness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize, Default, salsa::SalsaValue)]
@@ -69,7 +80,8 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 
             if let Place::Defined(ref mut place) = place_and_quals.place
                 && place.origin == TypeOrigin::Inferred
-                && let Some(inherited) = inherited_class_body_declaration(db, scope, symbol_id)
+                && let ClassBodyDeclaration::Declared(inherited) =
+                    inherited_class_body_declaration(db, scope, symbol_id)
                 && let Place::Defined(declared) = inherited.place
             {
                 // The annotation determines the public type, but the value is still supplied
@@ -131,13 +143,15 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
 /// A subclass assignment such as `items = []` retains an inherited `items: list[int]`
 /// declaration. Both initializer inference and public member lookup use that declaration,
 /// while an explicit annotation or a new method definition supplies its own public type.
-#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| ClassBodyDeclaration::Undeclared, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn inherited_class_body_declaration<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
-) -> Option<PlaceAndQualifiers<'db>> {
-    scope.node(db).as_class()?;
+) -> ClassBodyDeclaration<'db> {
+    if scope.node(db).as_class().is_none() {
+        return ClassBodyDeclaration::Undeclared;
+    }
     let table = place_table(db, scope);
     let name = table.symbol(symbol).name();
     let use_def = use_def_map(db, scope);
@@ -146,10 +160,14 @@ pub(super) fn inherited_class_body_declaration<'db>(
         .ignore_conflicting_declarations()
         .is_undefined()
     {
-        return None;
+        return ClassBodyDeclaration::Undeclared;
     }
 
-    let class = nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)?;
+    let Some(class) =
+        nearest_enclosing_class(db, semantic_index(db, scope.program_file(db)), scope)
+    else {
+        return ClassBodyDeclaration::Undeclared;
+    };
     MroLookup::new(
         db,
         &env,
