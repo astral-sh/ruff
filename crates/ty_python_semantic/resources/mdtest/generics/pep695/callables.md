@@ -1418,3 +1418,164 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Generic callables inside recursive return aliases
+
+Each callback returned by the factory is generic, including callbacks in child nodes.
+
+```py
+from typing import Callable
+
+type Callbacks[T] = tuple[Callable[[T], T], list[Callbacks[T]]]
+
+def factory[T]() -> Callbacks[T]:
+    raise NotImplementedError
+
+callbacks = factory()
+reveal_type(callbacks[0](1))  # revealed: Literal[1]
+reveal_type(callbacks[1][0][0](1))  # revealed: Literal[1]
+reveal_type(callbacks[1][0][1][0][0]("value"))  # revealed: Literal["value"]
+```
+
+## Literal promotion in recursive callables
+
+Putting a callable in a list widens its inferred literal return types, including in recursively
+returned callables. Its parameter types keep their literal types. Repeating the collection preserves
+this distinction even when the parameter becomes a larger tuple at each recursive step.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Transform[T] = Callable[[T], tuple[T, Transform[tuple[T]]]]
+
+def collect(value: Transform[TypeOf[1]], repetitions: int):
+    transform = [value][0]
+    transform(2)  # error: [invalid-argument-type]
+    transform(1)[1]((2,))  # error: [invalid-argument-type]
+    for _ in range(repetitions):
+        transform = [transform][0]
+    reveal_type(transform(1)[0])  # revealed: int
+    reveal_type(transform(1)[1]((1,))[1](((1,),))[0])  # revealed: tuple[tuple[int]]
+```
+
+## Generic callables with growing recursive arguments
+
+A factory's type variable can belong to each returned callable even when successive callbacks accept
+increasingly nested tuples. Calling one callback does not specialize the others.
+
+```py
+from typing import Callable
+
+type Callbacks[T, U] = tuple[Callable[[T], T], list[Callbacks[tuple[T, U], U]]]
+
+def factory[T, U]() -> tuple[Callbacks[T, U], Callable[[U], U]]:
+    raise NotImplementedError
+
+callbacks, other = factory()
+reveal_type(callbacks[0](1))  # revealed: Literal[1]
+reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
+nested = callbacks[1][0][1][0][0](((2, "value"), "value"))
+reveal_type(nested)  # revealed: tuple[tuple[Literal[2], Literal["value"]], Literal["value"]]
+reveal_type(other(True))  # revealed: Literal[True]
+```
+
+## Specializing a promoted recursive type
+
+Promotion widens the stream's inferred literals. A type argument supplied afterwards keeps its own
+literal types, even if that argument is another stream. Promoting an already specialized stream
+instead widens the literals inside its type argument as well.
+
+```py
+from typing import Any, Callable, cast
+from ty_extensions._internal import TypeOf
+
+type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
+type Promoted[T] = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
+
+def specialize(value: Promoted[Stream[int]]):
+    reveal_type(value[0])  # revealed: int
+    reveal_type(value[1][0])  # revealed: Literal[1]
+    reveal_type(value[2]()[2]()[1][0])  # revealed: Literal[1]
+
+def promote(value: Stream[TypeOf[2]]):
+    widened = [value][0]
+    reveal_type(widened[1])  # revealed: int
+    reveal_type(widened[2]()[2]()[2]()[1])  # revealed: int
+```
+
+## Promotion through shared generic aliases
+
+The same callback alias can appear in parameter and return positions of several recursively returned
+callables. Each occurrence uses the type argument and variance of its enclosing callable.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Leaf[T] = Callable[[], T]
+type Tree[T] = Callable[[tuple[Tree[int], Leaf[T]]], tuple[Leaf[T], Tree[tuple[T]]]]
+
+def collect(
+    tree: Tree[TypeOf[1]],
+    first: tuple[Tree[int], Leaf[TypeOf[1]]],
+    second: tuple[Tree[int], Leaf[tuple[TypeOf[1]]]],
+    third: tuple[Tree[int], Leaf[tuple[tuple[TypeOf[1]]]]],
+):
+    widened = [tree][0]
+    reveal_type(widened(first)[0]())  # revealed: int
+    reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
+```
+
+## Promoting a materialized recursive return type
+
+Reading a method from a top-materialized holder also materializes its returned callable. Collecting
+that callable widens inferred literals without restoring `Any`, including in recursive results.
+
+```py
+from typing import Any, Callable
+from typing_extensions import Never
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+type Growing[T] = Callable[[T], tuple[TypeOf[1], T, Growing[tuple[T]]]]
+
+class Holder[T]:
+    def get(self) -> Growing[T]:
+        raise NotImplementedError
+
+def inspect(holder: Top[Holder[Any]], bottom: Never):
+    before = holder.get()
+    reveal_type(before(bottom)[1])  # revealed: object
+    after = [before][0]
+    reveal_type(after(bottom)[0])  # revealed: int
+    reveal_type(after(bottom)[1])  # revealed: object
+    reveal_type(after(bottom)[2](bottom)[2](bottom)[0])  # revealed: int
+    reveal_type(after(bottom)[2](bottom)[1])  # revealed: tuple[object]
+```
+
+## Promoting materialized aliases with growing arguments
+
+Collecting a materialized stream widens its inferred literals while preserving the materialization
+of callback parameters and results. This also holds when the type argument grows at each step.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+type Stream[T] = tuple[TypeOf[1], None, Callable[[T], T], Callable[[], Stream[tuple[T]]]]
+
+def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int):
+    widened_top = [top][0]
+    widened_bottom = [bottom][0]
+    for _ in range(repetitions):
+        widened_top = [widened_top][0]
+        widened_bottom = [widened_bottom][0]
+    reveal_type(widened_top[0])  # revealed: int
+    reveal_type(widened_top[1])  # revealed: None | Unknown
+    reveal_type(widened_top[2])  # revealed: (Never, /) -> object
+    reveal_type(widened_top[3]()[2])  # revealed: (tuple[Never], /) -> tuple[object]
+    reveal_type(widened_bottom[2])  # revealed: (object, /) -> Never
+    reveal_type(widened_bottom[3]()[2])  # revealed: (tuple[object], /) -> tuple[Never]
+```

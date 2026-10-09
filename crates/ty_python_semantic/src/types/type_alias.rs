@@ -11,6 +11,7 @@ use crate::{
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
+        recursive::RecursiveTypeMapping,
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -640,7 +641,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    fn with_materialization_kind(
+    pub(super) fn with_materialization_kind(
         self,
         db: &'db dyn Db,
         materialization_kind: Option<MaterializationKind>,
@@ -700,11 +701,16 @@ impl<'db> TypeAliasType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
+        if !type_mapping.is_structural()
+            && !type_mapping.substitutes_variables()
+            && !matches!(type_mapping, TypeMapping::EagerExpansion)
+        {
+            return RecursiveTypeMapping::apply(db, ty, type_mapping, tcx, visitor);
+        }
         match type_mapping {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
-            TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
                 .value_type_with_recursion(db, visitor.recursion_context)
                 .expand_eagerly(db, visitor.env),
@@ -715,17 +721,8 @@ impl<'db> TypeAliasType<'db> {
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
             TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                if let Some(mut current_specialization) = specialization.as_specialization(db) =>
+                if let Some(current_specialization) = specialization.as_specialization(db) =>
             {
-                if let TypeMapping::ApplySpecializationWithMaterialization {
-                    materialization_kind,
-                    ..
-                } = type_mapping
-                {
-                    current_specialization = current_specialization
-                        .with_materialization_kind(db, Some(*materialization_kind));
-                }
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
@@ -753,10 +750,6 @@ impl<'db> TypeAliasType<'db> {
                     || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
                 {
                     ty
-                } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                    && self.is_recursive(db)
-                {
-                    Type::TypeAlias(self.with_materialization_kind(db, Some(*materialization_kind)))
                 } else {
                     mapped
                 }

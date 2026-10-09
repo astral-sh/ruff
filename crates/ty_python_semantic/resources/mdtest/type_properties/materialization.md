@@ -1396,6 +1396,32 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+## Materialization of recursively returned callables
+
+The top materialization widens every returned payload to `object`, including payloads produced by
+recursively returned callables. Implicit and PEP 695 aliases behave the same way.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable
+from ty_extensions import Top
+
+Stream = Callable[[], tuple[Any, "Stream"]]
+type NamedStream = Callable[[], tuple[Any, NamedStream]]
+
+def payloads(implicit: Top[Stream], explicit: Top[NamedStream]):
+    reveal_type(implicit()[0])  # revealed: object
+    reveal_type(implicit()[1]()[0])  # revealed: object
+    reveal_type(implicit()[1]()[1]()[0])  # revealed: object
+    reveal_type(explicit()[0])  # revealed: object
+    reveal_type(explicit()[1]()[0])  # revealed: object
+    reveal_type(explicit()[1]()[1]()[0])  # revealed: object
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive

@@ -1798,3 +1798,91 @@ def foo(x: A):
     reveal_type(x + 1)  # revealed: int
     reveal_type(1 + x)  # revealed: int
 ```
+
+### Promotion throughout a recursive stream
+
+Collecting a stream in a list widens its inferred literal values at every recursive depth.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Stream = tuple[TypeOf[1], Callable[[], Stream]]
+
+def collect(value: Stream):
+    stream = [value][0]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+```
+
+### Singleton promotion through recursive aliases
+
+Collecting trees with `None` labels permits other labels in the inferred collection type. The
+recursive alias follows the same widening as an ordinary tuple nested in a sequence.
+
+```py
+from typing import Sequence
+
+type Node = tuple[None, Sequence[Node]]
+
+def collect(node: Node):
+    trees = [node]
+    reveal_type(trees[0][0])  # revealed: None | Unknown
+    reveal_type(trees[0][1][0][1][0][0])  # revealed: None | Unknown
+```
+
+### Promotion and materialization across callable parameters
+
+A recursive callable's argument and result occupy opposite variance positions. Widening inferred
+literals and materializing `Any` both preserve that distinction at every recursive depth.
+
+```py
+from typing import Any, Callable, Never
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+type Recursive = Callable[[Recursive], tuple[TypeOf[1], Any, Recursive]]
+type Positive = Callable[[Negative], tuple[int, object, Positive]]
+type Negative = Callable[[Positive], tuple[TypeOf[1], Never, Negative]]
+
+def collect(value: Recursive):
+    widened = [value][0]
+    static_assert(is_equivalent_to(Top[TypeOf[widened]], Positive))
+```
+
+### Promoting a materialized recursive stream
+
+Collecting a materialized stream widens inferred literals without changing the materialization of
+its callback results, including results reached through further recursive steps.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+type Stream = tuple[TypeOf[1], Callable[[], Any], Callable[[], Stream]]
+
+def collect(top: Top[Stream], bottom: Bottom[Stream]):
+    reveal_type(top)  # revealed: tuple[Literal[1], () -> object, () -> Top[Stream]]
+    widened_top = [top][0]
+    widened_bottom = [bottom][0]
+    reveal_type(widened_top[2]()[2]()[0])  # revealed: int
+    reveal_type(widened_top[2]()[2]()[1]())  # revealed: object
+    reveal_type(widened_bottom[2]()[2]()[1]())  # revealed: Never
+```
+
+### Singleton promotion preserves unions inside recursive aliases
+
+Singleton promotion does not descend into a union. The child retains its original label type even
+though the outer tuple's label is widened.
+
+```py
+type Node = tuple[None, Node | int]
+
+def collect(value: Node):
+    widened = [value][0]
+    reveal_type(widened[0])  # revealed: None | Unknown
+    child = widened[1]
+    if isinstance(child, tuple):
+        reveal_type(child[0])  # revealed: None
+```

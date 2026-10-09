@@ -1,7 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -116,7 +116,7 @@ use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
-use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
+use crate::{Db, FxIndexMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
@@ -167,6 +167,7 @@ mod overrides;
 mod protocol_class;
 mod recursive;
 pub(crate) use recursive::RecursiveMapping;
+use recursive::RecursiveTypeMapping;
 pub use recursive::{RecursiveType, RecursiveVar, UnfoldResult};
 pub(crate) mod relation;
 mod relation_error;
@@ -514,6 +515,7 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    recursive_mapping: Option<&'env RecursiveTypeMapping<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -531,6 +533,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            recursive_mapping: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -9453,13 +9456,20 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
-        // and specialized generics). For all other types, return early.
+        if let Some(recursive_mapping) = visitor.recursive_mapping
+            && let Some(mapped) = recursive_mapping.map_type(db, self, type_mapping, tcx, visitor)
+        {
+            return mapped;
+        }
+
+        // Singleton promotion recurses into nominal type arguments and their aliases.
         if matches!(
             type_mapping,
             TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
-        ) && !matches!(self, Type::NominalInstance(_))
-        {
+        ) && !matches!(
+            self,
+            Type::NominalInstance(_) | Type::Recursive(_) | Type::TypeAlias(_)
+        ) {
             return self;
         }
 
@@ -11152,7 +11162,7 @@ pub enum TypeMapping<'a, 'db> {
     EagerExpansion,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
-    RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+    RescopeReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
@@ -11262,6 +11272,18 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
+    }
+
+    /// Whether the mapping substitutes variables without transforming surrounding constructors.
+    const fn substitutes_variables(&self) -> bool {
+        matches!(
+            self,
+            Self::ApplySpecialization(_)
+                | Self::BindLegacyTypevars(_)
+                | Self::FreshenBoundTypeVars { .. }
+                | Self::BindSelf(_)
+                | Self::ReplaceSelf { .. }
+        )
     }
 
     /// Whether this mapping rewrites type structure without semantic normalization.

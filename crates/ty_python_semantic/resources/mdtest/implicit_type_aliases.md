@@ -2914,11 +2914,17 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Tree]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
+
+trees = [legacy(1), modern(1)]
+for tree in trees:
+    while isinstance(tree, tuple):
+        tree = tree[0]
+    reveal_type(tree)  # revealed: int
 ```
 
 ### Growing aliases in generic signatures
@@ -3283,4 +3289,93 @@ def inspect(
     reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+```
+
+### Promotion throughout a recursive stream
+
+Collecting a stream in a list widens its inferred literal values at every recursive depth.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
+
+def collect(value: Stream):
+    stream = [value][0]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+```
+
+### Singleton promotion through recursive aliases
+
+Collecting trees with `None` labels permits other labels in the inferred collection type. The
+recursive alias follows the same widening as an ordinary tuple nested in a sequence.
+
+```py
+from typing import Sequence
+
+Node = tuple[None, Sequence["Node"]]
+
+def collect(node: Node):
+    trees = [node]
+    reveal_type(trees[0][0])  # revealed: None | Unknown
+    reveal_type(trees[0][1][0][1][0][0])  # revealed: None | Unknown
+```
+
+### Promotion and materialization across callable parameters
+
+A recursive callable's argument and result occupy opposite variance positions. Widening inferred
+literals and materializing `Any` both preserve that distinction at every recursive depth.
+
+```py
+from typing import Any, Callable
+from typing_extensions import Never
+from ty_extensions import Top, static_assert
+from ty_extensions._internal import TypeOf, is_equivalent_to
+
+Recursive = Callable[["Recursive"], tuple[TypeOf[1], Any, "Recursive"]]
+Positive = Callable[["Negative"], tuple[int, object, "Positive"]]
+Negative = Callable[[Positive], tuple[TypeOf[1], Never, "Negative"]]
+
+def collect(value: Recursive):
+    widened = [value][0]
+    static_assert(is_equivalent_to(Top[TypeOf[widened]], Positive))
+```
+
+### Promoting a materialized recursive stream
+
+Collecting a materialized stream widens inferred literals without changing the materialization of
+its callback results, including results reached through further recursive steps.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+Stream = tuple[TypeOf[1], Callable[[], Any], Callable[[], "Stream"]]
+
+def collect(top: Top[Stream], bottom: Bottom[Stream]):
+    reveal_type(top)  # revealed: Top[Stream]
+    widened_top = [top][0]
+    widened_bottom = [bottom][0]
+    reveal_type(widened_top[2]()[2]()[0])  # revealed: int
+    reveal_type(widened_top[2]()[2]()[1]())  # revealed: object
+    reveal_type(widened_bottom[2]()[2]()[1]())  # revealed: Never
+```
+
+### Singleton promotion preserves unions inside recursive aliases
+
+Singleton promotion does not descend into a union. The child retains its original label type even
+though the outer tuple's label is widened.
+
+```py
+Node = tuple[None, "Node | int"]
+
+def collect(value: Node):
+    widened = [value][0]
+    reveal_type(widened[0])  # revealed: None | Unknown
+    child = widened[1]
+    if isinstance(child, tuple):
+        reveal_type(child[0])  # revealed: None
 ```

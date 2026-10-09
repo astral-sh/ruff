@@ -7,12 +7,14 @@ use crate::{
     place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
-        SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
+        FunctionType, GenericContext, InternedType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        Signature, SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+        UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
+        generics::ApplySpecialization,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -979,7 +981,36 @@ impl<'db> CallableType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         if let TypeMapping::RescopeReturnCallables(replacements) = type_mapping {
-            return replacements.get(&self).copied().unwrap_or(self);
+            let variables = match visitor.recursive_mapping {
+                Some(context) => context.rescoped_variables(db, visitor.env, Type::Callable(self)),
+                None => Type::Callable(self).bound_typevars_in_annotation(db, visitor.env),
+            };
+            let mut renamed = replacements
+                .iter()
+                .filter_map(|(original, renamed)| variables.contains(original).then_some(*renamed))
+                .peekable();
+            let context = if renamed.peek().is_some() {
+                Some(GenericContext::from_typevar_instances(
+                    db,
+                    visitor.env,
+                    renamed,
+                ))
+            } else {
+                None
+            };
+            let signatures = self.signatures(db).apply_type_mapping_impl(
+                db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::ReturnCallables(
+                    replacements,
+                )),
+                tcx,
+                visitor,
+            );
+            let signatures = match context {
+                Some(context) => signatures.with_inherited_generic_context(db, context),
+                None => signatures,
+            };
+            return self.with_signatures(db, signatures);
         }
 
         self.with_signatures(

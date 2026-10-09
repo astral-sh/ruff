@@ -34,6 +34,22 @@ use ty_python_core::{
 };
 
 impl<'db> Type<'db> {
+    /// Create an opaque type for an internal substitution, identified by a Salsa allocation.
+    /// Distinct identities produce distinct types; reusing an identity is stable across queries.
+    /// The caller must substitute it away before exposing the result or inferring type variables.
+    pub(super) fn fresh(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        identity: salsa::Id,
+    ) -> Self {
+        Self::TypeVar(BoundTypeVarInstance::synthetic(
+            db,
+            env,
+            Name::new(format!("$fresh:{:x}", identity.as_bits())),
+            TypeVarVariance::Invariant,
+        ))
+    }
+
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))
     }
