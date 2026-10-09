@@ -601,6 +601,7 @@ impl<'db> KnownInstanceType<'db> {
                     ))
                 }
                 TypeMapping::ApplySpecialization(_)
+                | TypeMapping::CycleRecovery { .. }
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
                 | TypeMapping::FreshenBoundTypeVars { .. }

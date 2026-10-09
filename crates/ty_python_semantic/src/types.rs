@@ -2479,6 +2479,44 @@ impl<'db> Type<'db> {
         self.cycle_normalized_impl(db, env, previous, cycle)
     }
 
+    /// Widen a type computed as part of expression, binding, or declaration inference.
+    ///
+    /// This must not be used while recovering raw type-alias, member, or specialization queries.
+    /// Those operations have their own recursion models; observing their provisional result
+    /// during recovery can introduce new query cycles and invalidate Salsa's active cycle.
+    fn cycle_normalized_inference(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        previous: Self,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        // A concrete binding can displace the initial divergent marker while a query is
+        // still recursive. For example, a self-referencing decorator plus a later binding
+        // of the same name can yield `tuple[T]`, then `tuple[tuple[T]]`, and so on. Restore
+        // a marker only when the next result contains the whole previous result; replacing
+        // individual generic arguments would lose the correlation between alternatives.
+        // As with union widening below, leave the initial, tainted iterations alone.
+        let current = if cycle.iteration() > crate::TAINTED_CYCLES
+            && self != previous
+            && !previous.is_divergent()
+            && any_over_type(db, env, self, false, |part| part == previous)
+        {
+            self.apply_type_mapping(
+                db,
+                env,
+                &TypeMapping::CycleRecovery {
+                    previous,
+                    replacement: Type::divergent(cycle.id()),
+                },
+                TypeContext::default(),
+            )
+        } else {
+            self
+        };
+        current.cycle_normalized_impl(db, env, previous, cycle)
+    }
+
     fn cycle_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -9465,6 +9503,10 @@ impl<'db> Type<'db> {
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
             TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            TypeMapping::CycleRecovery {
+                previous,
+                replacement,
+            } if self == *previous => return *replacement,
             _ => {}
         }
 
@@ -9784,6 +9826,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::CycleRecovery { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9806,6 +9849,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::CycleRecovery { .. }
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -11143,6 +11187,11 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// A structural substitution constructed only by the recursive-type binder.
     ApplyRecursiveSubstitution(RecursiveMapping<'db>),
+    /// Restore the recursive marker when an iteration embeds the previous complete result.
+    CycleRecovery {
+        previous: Type<'db>,
+        replacement: Type<'db>,
+    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -11224,6 +11273,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::CycleRecovery { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -11270,6 +11320,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::CycleRecovery { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)

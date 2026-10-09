@@ -1396,6 +1396,32 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+## Materialized recursive aliases retain their outer structure
+
+Materializing a recursive alias can remove precision from its type arguments, but it does not remove
+the alias's tuple structure or the possibility of `None`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any
+from ty_extensions import Top
+
+type A[T] = tuple[T, Top[A[A[T] & Any]] | None]
+
+def shape(value: Top[A[Any]]) -> tuple[object, object] | None:
+    return value[1]  # no diagnostic
+
+def narrowed(value: Top[A[Any]]) -> tuple[object, object]:
+    if value[1] is not None:
+        wrong: str = value[1]  # error: [invalid-assignment]
+        return value[1]  # no diagnostic
+    return (None, None)
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive

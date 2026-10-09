@@ -502,6 +502,30 @@ finally:
     from unknown_module import member as result  # error: [unresolved-import]
 ```
 
+## Recursive decorator results in loop conditions
+
+A decorator can return a container that includes the decorated definition. The name can also have a
+later type-alias binding; this cannot make inferred tuple nesting grow without bound.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+@lambda fn: (make,)
+def make(): ...
+
+@lambda cls: make
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    valid: tuple[object] = Result  # no diagnostic
+    invalid: str = Result  # error: [invalid-assignment]
+
+type make = int
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.

@@ -271,7 +271,7 @@ impl ScopeKind {
         matches!(self, ScopeKind::Module)
     }
 
-    pub(crate) const fn is_annotation(self) -> bool {
+    pub const fn is_annotation(self) -> bool {
         matches!(self, ScopeKind::TypeParams | ScopeKind::TypeAlias)
     }
 
