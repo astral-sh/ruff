@@ -1418,12 +1418,11 @@ def construct(factory: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> 
     return factory(*args, **kwargs)
 ```
 
-`P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
-result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
-satisfies `R`'s bound.
+`P` captures an empty parameter list, so the forwarded call supplies no information for `T`.
 
 ```py
-# TODO: revealed: Factory[Unknown]
+# For a fully static specialization, the bound on `R` requires `T = object` because
+# `Factory` is invariant.
 reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
