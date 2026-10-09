@@ -1300,10 +1300,12 @@ pub(super) enum VariableKind {
 impl VariableKind {
     /// Whether the kinds themselves preserve the base's storage restrictions.
     ///
-    /// Regular and instance-only attributes can replace each other; neither may replace
-    /// a `ClassVar`. The caller must also check base writability: replacing a read-only
-    /// instance attribute removes no permitted write, even when this method returns
-    /// `false`.
+    /// Regular attributes can replace either kind. Instance-only attributes can also
+    /// replace regular attributes; nominal overrides deliberately permit that loss of
+    /// class access, including when an attribute is replaced by a descriptor.
+    ///
+    /// The caller must also check base writability: replacing a read-only instance
+    /// attribute removes no permitted write, even when this method returns `false`.
     ///
     /// ```python
     /// from dataclasses import dataclass
@@ -1319,8 +1321,7 @@ impl VariableKind {
     const fn can_override(self, base: Self) -> bool {
         !matches!(
             (self, base),
-            (Self::Class, Self::Instance | Self::Regular)
-                | (Self::Instance | Self::Regular, Self::Class)
+            (Self::Class, Self::Instance | Self::Regular) | (Self::Instance, Self::Class)
         )
     }
 
