@@ -9,6 +9,13 @@ use crate::settings::{LinterSettings, types::PreviewMode};
 
 // Rule-specific behavior
 
+// https://github.com/astral-sh/ruff/issues/29169
+pub(crate) const fn is_boolean_chained_comparison_reversed_enabled(
+    settings: &LinterSettings,
+) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/issues/25375
 pub(crate) const fn is_pytest_asyncio_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
