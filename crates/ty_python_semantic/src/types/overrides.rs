@@ -169,14 +169,7 @@ fn check_inherited_conflicts<'db>(
         class_type
             .own_instance_attribute_names(db)
             .iter()
-            .filter(|name| {
-                attribute_declarations(db, class.body_scope(db), name).any(
-                    |(mut declarations, _)| {
-                        declarations
-                            .any(|declaration| declaration.declaration.definition().is_some())
-                    },
-                )
-            })
+            .filter(|name| has_own_instance_declaration(db, class.body_scope(db), name))
             .filter(|name| {
                 matches!(class_type.own_instance_member(db, env, name).inner.place,
                     Place::Defined(place) if place.origin == TypeOrigin::Declared)
@@ -263,6 +256,21 @@ fn check_inherited_conflicts<'db>(
             }
         }
     }
+}
+
+/// Check for a receiver annotation without inferring the method that contains it.
+///
+/// Only call this for the class being checked: accessing another file's declarations
+/// directly would add a dependency on its AST. The caller still checks the resolved
+/// member's origin, since a syntactic declaration may be inactive.
+fn has_own_instance_declaration<'db>(
+    db: &'db dyn Db,
+    class_scope: ScopeId<'db>,
+    name: &str,
+) -> bool {
+    attribute_declarations(db, class_scope, name).any(|(mut declarations, _)| {
+        declarations.any(|declaration| declaration.declaration.definition().is_some())
+    })
 }
 
 /// Check a source-defined method against the later declarations in the resolved MRO.
