@@ -1,15 +1,13 @@
 use std::fmt::Write;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::{is_docstring_stmt, map_subscript};
+use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
-use ruff_python_semantic::analyze::typing::{
-    is_immutable_annotation, is_mutable_expr, is_weakref_mutable_func,
-};
+use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -18,7 +16,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::preview::{
     is_b006_check_guaranteed_mutable_expr_enabled,
-    is_b006_unsafe_fix_preserve_assignment_expr_enabled, is_b006_weakref_types_enabled,
+    is_b006_unsafe_fix_preserve_assignment_expr_enabled,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 
@@ -79,14 +77,8 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// and initializes it in the function body, which may not be what the user intended,
 /// as described above.
 ///
-/// ## Preview
-/// In [preview], this rule also detects mutable `weakref` containers:
-/// `weakref.WeakKeyDictionary`, `weakref.WeakValueDictionary`, and `weakref.WeakSet`.
-///
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.92", category = Category::Suspicious)]
 pub(crate) struct MutableArgumentDefault;
@@ -124,14 +116,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
             .map(|target| QualifiedName::from_dotted_name(target))
             .collect();
         let is_mut_expr = if is_b006_check_guaranteed_mutable_expr_enabled(checker.settings()) {
-            is_guaranteed_mutable_expr(
-                default,
-                checker.semantic(),
-                is_b006_weakref_types_enabled(checker.settings()),
-            )
-        } else if is_b006_weakref_types_enabled(checker.settings()) {
-            is_mutable_expr(default, checker.semantic())
-                || is_weakref_mutable_expr(default, checker.semantic())
+            is_guaranteed_mutable_expr(default, checker.semantic())
         } else {
             is_mutable_expr(default, checker.semantic())
         };
@@ -151,33 +136,14 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
 }
 
 /// Returns `true` if the expression is guaranteed to create a mutable object.
-fn is_guaranteed_mutable_expr(
-    expr: &Expr,
-    semantic: &SemanticModel,
-    weakref_types_enabled: bool,
-) -> bool {
+fn is_guaranteed_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     match expr {
         Expr::Generator(_) => true,
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
-            .iter()
-            .any(|e| is_guaranteed_mutable_expr(e, semantic, weakref_types_enabled)),
-        Expr::Named(ast::ExprNamed { value, .. }) => {
-            is_guaranteed_mutable_expr(value, semantic, weakref_types_enabled)
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().any(|e| is_guaranteed_mutable_expr(e, semantic))
         }
-        _ => {
-            is_mutable_expr(expr, semantic)
-                || (weakref_types_enabled && is_weakref_mutable_expr(expr, semantic))
-        }
-    }
-}
-
-/// Returns `true` if the expression creates a mutable weakref container.
-fn is_weakref_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::Call(ast::ExprCall { func, .. }) => {
-            is_weakref_mutable_func(map_subscript(func), semantic)
-        }
-        _ => false,
+        Expr::Named(ast::ExprNamed { value, .. }) => is_guaranteed_mutable_expr(value, semantic),
+        _ => is_mutable_expr(expr, semantic),
     }
 }
 

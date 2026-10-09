@@ -12,7 +12,6 @@ use ruff_python_stdlib::typing::{
     is_immutable_return_type, is_literal_member, is_mutable_return_type, is_pep_593_generic_member,
     is_pep_593_generic_type, is_standard_library_generic, is_standard_library_generic_member,
     is_standard_library_literal, is_typed_dict, is_typed_dict_member,
-    is_weakref_mutable_return_type,
 };
 use ruff_text_size::Ranged;
 use smallvec::{SmallVec, smallvec};
@@ -419,16 +418,6 @@ pub fn is_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
         .as_ref()
         .map(QualifiedName::segments)
         .is_some_and(is_mutable_return_type)
-}
-
-/// Return `true` if `func` is a function from the standard library `weakref` module that
-/// returns a mutable container value (e.g., `weakref.WeakKeyDictionary`).
-pub fn is_weakref_mutable_func(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .as_ref()
-        .map(QualifiedName::segments)
-        .is_some_and(is_weakref_mutable_return_type)
 }
 
 /// Return `true` if `expr` is an expression that resolves to a mutable value.

@@ -306,20 +306,12 @@ pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
         ["" | "builtins", "dict" | "list" | "set"]
             | [
                 "collections",
-                "Counter" | "OrderedDict" | "defaultdict" | "deque"
+                "ChainMap" | "Counter" | "OrderedDict" | "UserDict" | "defaultdict" | "deque"
             ]
-    )
-}
-
-/// Returns `true` if a call path represents a weakref container type from the Python standard
-/// library that returns a mutable value (e.g., `weakref.WeakKeyDictionary`).
-pub fn is_weakref_mutable_return_type(qualified_name: &[&str]) -> bool {
-    matches!(
-        qualified_name,
-        [
-            "weakref",
-            "WeakKeyDictionary" | "WeakValueDictionary" | "WeakSet"
-        ]
+            | [
+                "weakref",
+                "WeakKeyDictionary" | "WeakValueDictionary" | "WeakSet"
+            ]
     )
 }
 

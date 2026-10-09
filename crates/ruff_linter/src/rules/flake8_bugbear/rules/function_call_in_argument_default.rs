@@ -1,19 +1,16 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Parameters};
 use ruff_python_semantic::analyze::typing::{
     is_immutable_annotation, is_immutable_func, is_immutable_newtype_call, is_mutable_func,
-    is_weakref_mutable_func,
 };
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
-use crate::preview::is_b006_weakref_types_enabled;
 
 /// ## What it does
 /// Checks for function calls in default function arguments.
@@ -107,23 +104,20 @@ impl Visitor<'_> for ArgumentDefaultVisitor<'_, '_> {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
             Expr::Call(ast::ExprCall { func, .. }) => {
-                let is_ignored = is_mutable_func(func, self.checker.semantic())
-                    || is_immutable_func(
+                if !is_mutable_func(func, self.checker.semantic())
+                    && !is_immutable_func(
                         func,
                         self.checker.semantic(),
                         self.extend_immutable_calls,
                     )
-                    || func.as_name_expr().is_some_and(|name| {
+                    && !func.as_name_expr().is_some_and(|name| {
                         is_immutable_newtype_call(
                             name,
                             self.checker.semantic(),
                             self.extend_immutable_calls,
                         )
                     })
-                    || (is_b006_weakref_types_enabled(self.checker.settings())
-                        && is_weakref_mutable_func(map_subscript(func), self.checker.semantic()));
-
-                if !is_ignored {
+                {
                     self.checker.report_diagnostic(
                         FunctionCallInDefaultArgument {
                             name: UnqualifiedName::from_expr(func).map(|name| name.to_string()),
