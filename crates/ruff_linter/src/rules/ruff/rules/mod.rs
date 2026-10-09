@@ -57,6 +57,7 @@ pub(crate) use sort_dunder_all::*;
 pub(crate) use sort_dunder_slots::*;
 pub(crate) use starmap_zip::*;
 pub(crate) use static_key_dict_comprehension::*;
+pub(crate) use tarfile_ignore_zeros_true::*;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) use test_rules::*;
 pub(crate) use unmatched_suppression_comment::*;
@@ -141,6 +142,7 @@ mod sort_dunder_slots;
 mod starmap_zip;
 mod static_key_dict_comprehension;
 mod suppression_comment_visitor;
+mod tarfile_ignore_zeros_true;
 #[cfg(any(feature = "test-rules", test))]
 pub(crate) mod test_rules;
 mod unmatched_suppression_comment;
