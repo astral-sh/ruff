@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -304,6 +305,14 @@ impl FStringConversion {
 
                     let field = FieldName::parse(&field_name)?;
 
+                    for part in &field.parts {
+                        if let FieldNamePart::Attribute(name) = part
+                            && !is_identifier(name)
+                        {
+                            return Err(anyhow::anyhow!("non-identifier attribute"));
+                        }
+                    }
+
                     // Map from field type to specifier.
                     let specifier = match field.field_type {
                         FieldType::Auto => IndexOrKeyword::Index(summary.arg_auto()),
@@ -362,6 +371,18 @@ impl FStringConversion {
                                     "\"" => '\'',
                                     _ => unreachable!("invalid trailing quote"),
                                 };
+                                if index.contains(quote) {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains the f-string quote"
+                                    ));
+                                }
+                                // `str.format` takes the backslash literally, but inside the
+                                // quoted key it would start an escape sequence.
+                                if index.contains('\\') {
+                                    return Err(anyhow::anyhow!(
+                                        "string index contains a backslash"
+                                    ));
+                                }
                                 converted.push('[');
                                 converted.push(quote);
                                 converted.push_str(&index);
@@ -372,6 +393,9 @@ impl FStringConversion {
                     }
 
                     if let Some(conversion_spec) = conversion_spec {
+                        if !matches!(conversion_spec, 's' | 'r' | 'a') {
+                            return Err(anyhow::anyhow!("unknown conversion specifier"));
+                        }
                         converted.push('!');
                         converted.push(conversion_spec);
                     }
@@ -405,6 +429,11 @@ impl FStringConversion {
 /// UP032
 pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &FormatSummary) {
     if summary.has_nested_parts {
+        return;
+    }
+
+    // `"{} {1}".format(a, b)` raises `ValueError`, but the equivalent f-string would succeed.
+    if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         return;
     }
 
