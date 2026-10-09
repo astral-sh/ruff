@@ -1703,6 +1703,33 @@ class DictCallConfig(BaseModel):
 DictCallConfig(name="Alice", something_else=7)  # error: [unknown-argument]
 ```
 
+## Inherited model configuration contracts
+
+Only configuration available on a base class can be merged. A receiver-only attribute or an
+incompatible class value does not supply configuration, regardless of base order. A valid mixin does
+not hide a conflict from another base.
+
+```py
+from pydantic import BaseModel, ConfigDict
+
+class ConfigMixin:
+    model_config = ConfigDict(extra="allow")
+
+class ScalarMixin:
+    model_config = 1
+
+class InstanceMixin:
+    def set_config(self) -> None:
+        self.model_config: int = 1
+
+class Valid(BaseModel, ConfigMixin): ...  # no diagnostic
+class ScalarFirst(ScalarMixin, BaseModel): ...  # error: [invalid-attribute-override]
+class ScalarLast(BaseModel, ScalarMixin): ...  # error: [invalid-attribute-override]
+class InstanceFirst(InstanceMixin, BaseModel): ...  # error: [invalid-attribute-override]
+class InstanceLast(BaseModel, InstanceMixin): ...  # error: [invalid-attribute-override]
+class ValidAndInvalid(BaseModel, ConfigMixin, ScalarMixin): ...  # error: [invalid-attribute-override]
+```
+
 ## Mixins
 
 Annotated attributes on mixin-classes that do not inherit from `BaseModel` also become fields on the

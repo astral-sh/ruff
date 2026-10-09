@@ -36,7 +36,7 @@ use crate::types::function::DataclassTransformerParams;
 use crate::types::generics::{GenericContext, Specialization, walk_specialization};
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
-use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member::{ClassBodyDeclaration, Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
@@ -2932,7 +2932,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations, while dynamic bases
     /// prevent us from determining which declaration applies. Final declarations are handled by
     /// override diagnostics instead of supplying initializer context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<PlaceAndQualifiers<'db>> {
+    pub(super) fn class_body_declaration(self, name: &str) -> ClassBodyDeclaration<'db> {
         let db = self.db;
         for base in self.mro_iter {
             let base = match base {
@@ -2943,9 +2943,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 ClassBase::Any
                 | ClassBase::Dynamic(_)
                 | ClassBase::Divergent(_)
-                | ClassBase::TypedDict(_) => return None,
+                | ClassBase::TypedDict(_) => return ClassBodyDeclaration::Unknown,
             };
-            let (base, specialization) = base.static_class_literal(db)?;
+            let Some((base, specialization)) = base.static_class_literal(db) else {
+                return ClassBodyDeclaration::Undeclared;
+            };
             let scope = base.body_scope(db);
             let Some(symbol) = place_table(db, scope).symbol_id(name) else {
                 continue;
@@ -2967,16 +2969,21 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     continue;
                 }
                 inherited_class_body_declaration(db, scope, symbol)
+            } else if !declared.qualifiers.contains(TypeQualifiers::FINAL)
+                && declarations.contains_only_annotated_assignments(db)
+            {
+                ClassBodyDeclaration::Declared(declared)
             } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(declared)
+                ClassBodyDeclaration::Undeclared
             };
-            return declaration.map(|declaration| {
-                declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization))
-            });
+            return match declaration {
+                ClassBodyDeclaration::Declared(declaration) => ClassBodyDeclaration::Declared(
+                    declaration.map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                ),
+                other => other,
+            };
         }
-        None
+        ClassBodyDeclaration::Undeclared
     }
 
     /// Infer augmented-assignment results after finding the existing attribute they read.
