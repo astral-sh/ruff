@@ -506,7 +506,7 @@ fn attribute_violation<'db>(
     }
     let target_receiver = Type::instance(db, env, target_owner);
     if let (Some(source_kind), Some(target_kind)) = (source.variable_kind, target.variable_kind)
-        && !source_kind.can_override(target_kind)
+        && !source_kind.can_override(target_kind, target_receiver.is_protocol_instance())
         && (target_kind == super::VariableKind::Class
             || target.write.is_some_and(|write| !write.is_never())
                 && permits_instance_write(db, env, class, target_owner, name))
