@@ -3167,3 +3167,62 @@ class BoundedSetter(Base):
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
+
+## Inferred returns of generic functions and overrides
+
+An inferred return can retain the function's type parameter:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+def inferred_identity(value: T):
+    return value
+
+reveal_type(inferred_identity(1))  # revealed: Literal[1]
+```
+
+An unannotated override uses the specialized return annotation inherited from its generic base:
+
+```py
+class Base(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+
+class Derived(Base[int]):
+    def value(self):
+        return 1
+
+reveal_type(Derived().value())  # revealed: int
+```
+
+The inherited annotation is also specialized through an unannotated generic override:
+
+```py
+class GenericDerived(Base[T]):
+    def value(self):
+        return None
+
+class IntDerived(GenericDerived[int]):
+    def value(self):
+        return 1
+
+def _(derived: GenericDerived[int]):
+    reveal_type(derived.value())  # revealed: None | int
+
+reveal_type(IntDerived().value())  # revealed: int
+```
+
+An inferred method return also uses the specialization of its class:
+
+```py
+class Box(Generic[T]):
+    value: T
+
+    def get(self):
+        return self.value
+
+def _(box: Box[int]):
+    reveal_type(box.get())  # revealed: int | Unknown
+```

@@ -638,7 +638,9 @@ Normal branching and merging rules apply to the shadowing behavior described in 
 section:
 
 ```py
-def flag(): ...
+def flag() -> bool:
+    return True
+
 def foo():
     x = 2
 

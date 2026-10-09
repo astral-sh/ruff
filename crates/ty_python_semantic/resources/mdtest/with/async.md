@@ -697,17 +697,19 @@ async def main():
         pass
 ```
 
-## Unknown return type
+## Dynamic return type
 
-An unannotated return type might also be awaitable, so it must not produce an error.
+A dynamic return type might also be awaitable, so it must not produce an error.
 
 ```py
+from typing import Any
+
 class Manager:
-    def __aenter__(self): ...
-    def __aexit__(self, exc_type, exc, tb): ...
+    def __aenter__(self) -> Any: ...
+    def __aexit__(self, exc_type, exc, tb) -> Any: ...
 
 async def main():
-    async with Manager():
+    async with Manager():  # no diagnostic
         pass
 ```
 

@@ -211,7 +211,7 @@ def _(flag: bool):
 
     # error: [call-non-callable] "Object of type `Literal["This is a string literal"]` is not callable"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: None | Unknown
 ```
 
 ## Union of binding errors
@@ -228,7 +228,7 @@ def _(flag: bool):
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f2`: expected 0, got 1"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: None
 ```
 
 ## One not-callable, one wrong argument
@@ -246,7 +246,7 @@ def _(flag: bool):
     # error: [too-many-positional-arguments] "Too many positional arguments to function `f1`: expected 0, got 1"
     # error: [call-non-callable] "Object of type `C` is not callable"
     x = f(3)
-    reveal_type(x)  # revealed: Unknown
+    reveal_type(x)  # revealed: None | Unknown
 ```
 
 ## Union including a special-cased function
