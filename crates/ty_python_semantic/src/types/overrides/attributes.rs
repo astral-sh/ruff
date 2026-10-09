@@ -26,8 +26,42 @@ use crate::{
 /// A descriptor can accept a different type from the one it returns. Ordinary mutable
 /// attributes use the same type for both operations, making their types invariant.
 struct AttributeContract<'db> {
-    read: Type<'db>,
+    /// An unannotated assignment in this class is checked as an assignment, not
+    /// a new read-type declaration. Inherited values still have readable types.
+    read: Option<Type<'db>>,
     write: Option<Type<'db>>,
+    /// Whether this member establishes read/write type constraints for overrides.
+    ///
+    /// Declared types (including inherited annotations) and descriptors establish such
+    /// constraints. An inferred default does not: its value can still be checked against
+    /// a base's declared read type, but its narrow inferred type does not restrict later
+    /// writes. A descriptor's getter and setter provide the constraints instead of an
+    /// attribute annotation. A read-only descriptor can have this flag set while
+    /// `write` is `None`.
+    ///
+    /// ```python
+    /// class Declared:
+    ///     value: int = 0   # has_type_contract = true
+    ///
+    /// class Same(Declared):
+    ///     value = 1        # true: retains the inherited int annotation
+    ///
+    /// class Number:
+    ///     value = 1        # false: only an inferred default
+    ///
+    /// class Text:
+    ///     value = "text"   # false: only an inferred default
+    ///
+    /// class Compatible(Number, Declared): ...  # 1 is an int; later int writes are fine
+    /// class Incompatible(Text, Declared): ...  # error: "text" is not an int
+    /// ```
+    ///
+    /// In `Compatible`, `Number.value` has a `read` type but no type contract. When
+    /// checking it as an override, compare that read with `Declared.value`; do not treat
+    /// `Literal[1]` as the only permitted write. When a member without a type contract
+    /// is the target, it imposes no declared read/write type on the override. Storage
+    /// (for example, `ClassVar` versus instance storage) is checked independently.
+    has_type_contract: bool,
     is_property: bool,
     is_method: bool,
     is_frozen_field: bool,
@@ -134,12 +168,10 @@ fn attribute_contract<'db>(
                 .place
                 .ignore_possibly_undefined()
                 .is_some());
-    // Unannotated defaults with an inherited annotation already have a declared type.
-    // Other inferred bindings do not define an independent write contract: their raw
-    // types can retain literals that ordinary attribute access widens.
-    if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
-        return None;
-    }
+    // Defaults with inherited annotations already have a declared type. Other inferred
+    // bindings still determine storage, but their raw types can retain literals that
+    // ordinary attribute access widens.
+    let has_type_contract = own_place.origin == TypeOrigin::Declared || is_descriptor;
     let (read, write) = if is_descriptor {
         let read = Type::resolve_descriptor_access(
             db,
@@ -188,13 +220,18 @@ fn attribute_contract<'db>(
             ),
         )
     };
+    let check_read = has_type_contract
+        || receiver
+            .nominal_class(db, env)
+            .is_some_and(|receiver_class| receiver_class != owner);
     Some(AttributeContract {
-        read,
+        read: check_read.then_some(read),
         write: if is_final || !is_class_var && literal.is_frozen_dataclass(db) == Some(true) {
             None
         } else {
             write
         },
+        has_type_contract,
         is_property,
         is_method,
         is_frozen_field,
@@ -287,11 +324,20 @@ fn attribute_violation<'db>(
     {
         return None;
     }
-    if !source.read.is_assignable_to(db, env, target.read) {
+    if !target.has_type_contract {
+        return None;
+    }
+    let (source_read, target_read) = (source.read?, target.read?);
+    if !source_read.is_assignable_to(db, env, target_read) {
         return Some(AttributeViolation::Read {
-            source: source.read,
-            target: target.read,
+            source: source_read,
+            target: target_read,
         });
+    }
+    // Inferring a narrow default does not declare that subsequent writes must have
+    // that same narrow type. Only annotated attributes and descriptors constrain them.
+    if !source.has_type_contract {
+        return None;
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
@@ -564,6 +610,7 @@ fn already_inherited<'db>(
             };
             if inherited.read != source.read
                 || inherited.write != source.write
+                || inherited.has_type_contract != source.has_type_contract
                 || inherited.is_frozen_field != source.is_frozen_field
                 || inherited.qualifiers != source.qualifiers
             {
