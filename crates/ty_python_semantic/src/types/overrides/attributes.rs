@@ -123,6 +123,8 @@ fn attribute_contract<'db>(
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_property = alternatives.iter().any(Type::is_property_instance);
+    let is_frozen_field = literal.is_frozen_dataclass(db) == Some(true)
+        && literal.is_own_dataclass_instance_field(db, name);
     let is_slot = matches!(own_place.ty, Type::SlotDescriptor(_));
     let is_descriptor = !is_class_var
         && !class_member.place.is_undefined()
@@ -196,8 +198,7 @@ fn attribute_contract<'db>(
         },
         is_property,
         is_method,
-        is_frozen_field: literal.is_frozen_dataclass(db) == Some(true)
-            && literal.is_own_dataclass_instance_field(db, name),
+        is_frozen_field,
         qualifiers,
     })
 }
