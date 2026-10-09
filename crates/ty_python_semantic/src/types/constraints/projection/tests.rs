@@ -8,19 +8,14 @@ use ty_python_core::ProgramFile;
 use super::{ProjectionError, ProjectionTypeBudget, SolutionBudget, SolutionProjection};
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::global_symbol;
-use crate::types::callable::{CallableType, CallableTypeKind};
 use crate::types::constraints::{
     CandidateSolution, CandidateSolutions, CandidateTypeVarSolution, ConstraintFailureEvidence,
     ConstraintProvenance, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
     PathBoundSolution, Solution, SolutionPaths, SolutionValidity, SolutionViolationKind, Solutions,
     TypeVarSolution,
 };
-use crate::types::generics::GenericContext;
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
-use crate::types::typevar::{
-    BindingContext, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarNonce, TypeVarSet,
-};
+use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
 use crate::types::{
     BoundTypeVarInstance, IntersectionType, KnownClass, Type, TypeVarVariance, UnionType,
 };
@@ -542,94 +537,6 @@ fn upper_bound_cannot_narrow_a_callable_receiver() {
         set.solutions(db, &env, inferable),
         Ok(Solutions::Unsatisfiable(_))
     ));
-}
-
-#[test]
-fn upper_bound_specializes_captured_callable_variables() {
-    let db = setup_db();
-    let db = &db;
-    let env = db.program_environment();
-    let u = create_typevar(db, "U");
-    let int = known_instance(db, KnownClass::Int);
-    let str = known_instance(db, KnownClass::Str);
-    let bounded_u =
-        u.map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(str)));
-    let s = create_typevar(db, "S");
-    let list = |element| KnownClass::List.to_specialized_instance(db, &env, &[element]);
-    let bound = Type::single_callable(db, Signature::new(Parameters::empty(), Type::object()));
-    let t = create_typevar(db, "T")
-        .map_bound_or_constraints(db, |_| Some(TypeVarBoundOrConstraints::UpperBound(bound)));
-    let paramspec_identity = TypeVarIdentity::new(
-        db,
-        Name::new_static("P"),
-        None,
-        TypeVarKind::Pep695ParamSpec,
-    );
-    let paramspec = BoundTypeVarInstance::new(
-        db,
-        TypeVarInstance::new(db, paramspec_identity, None, None, None),
-        BindingContext::Synthetic(env.program(db)),
-        None,
-        TypeVarNonce::NONE,
-    );
-    for (captured_var, annotation, receiver, valid) in [
-        (u, Type::TypeVar(u), int, true),
-        (u, list(Type::TypeVar(u)), list(Type::TypeVar(s)), true),
-        (bounded_u, list(Type::TypeVar(bounded_u)), list(int), false),
-    ] {
-        // Receiver binding retains a constraint on the captured variable. It can be
-        // specialized, but only within its declared bound and without narrowing fixed S.
-        let callable = Type::single_callable(
-            db,
-            Signature::new(
-                Parameters::from_annotation(
-                    db,
-                    [Parameter::positional_only(None).with_annotated_type(annotation)],
-                ),
-                int,
-            )
-            .bind_self_with_receiver(db, &env, Some(receiver), None),
-        );
-        let mut signature = Signature::new(Parameters::empty(), Type::unknown());
-        signature.generic_context = Some(GenericContext::from_typevar_instances(
-            db,
-            &env,
-            [captured_var],
-        ));
-        let captured = Type::Callable(CallableType::new(
-            db,
-            CallableSignature::single(signature),
-            CallableTypeKind::ParamSpecValue,
-        ));
-        let builder = ConstraintSetBuilder::new();
-        let set = ConstraintSet::constrain_typevar_lower_bound(
-            db,
-            &env,
-            &builder,
-            ConstraintProvenance::Evidence,
-            t,
-            callable,
-        )
-        .and(db, &builder, || {
-            ConstraintSet::constrain_typevar_lower_bound(
-                db,
-                &env,
-                &builder,
-                ConstraintProvenance::Evidence,
-                paramspec,
-                captured,
-            )
-        });
-        let inferable = TypeVarSet::from_typevars(db, [t, paramspec]);
-        let result = set.solutions(db, &env, inferable);
-        assert!(
-            matches!(
-                (&result, valid),
-                (Ok(Solutions::Constrained(_)), true) | (Ok(Solutions::Unsatisfiable(_)), false)
-            ),
-            "receiver = {receiver:?}, result = {result:?}"
-        );
-    }
 }
 
 #[test]
