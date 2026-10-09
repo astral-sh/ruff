@@ -60,18 +60,18 @@ If a function has multiple return statements with different types, ty unions tho
 overall return type:
 
 ```py
-def returns_int_or_str(flag: bool):
+def returns_literal_1_or_a(flag: bool):
     if flag:
         return 1
     else:
         return "a"
 
 # TODO: should be `Literal[1, "a"]`
-reveal_type(returns_int_or_str(True))  # revealed: Unknown
+reveal_type(returns_literal_1_or_a(True))  # revealed: Unknown
 ```
 
-If the function has no return statements, or all return statements `return` without an expression,
-ty infers the return type as `None`:
+If control flow in a function can reach the end, or if all return statements `return` without an
+expression, ty infers the return type as `None`:
 
 ```py
 def implicit_none_1():
@@ -154,7 +154,7 @@ def can_only_return_int(flag: bool):
     else:
         return "a"
 
-# TODO: should be `int`
+# TODO: should be `Literal[1]`
 reveal_type(can_only_return_int(True))  # revealed: Unknown
 ```
 
@@ -248,8 +248,8 @@ reveal_type(always_raises())  # revealed: Unknown
 
 ### Functions that call other functions that do not return
 
-A function that calls a function like `sys.exit()` does never return, so its inferred return type
-should be `Never`.
+A function that calls a function like `sys.exit()` never returns, so its inferred return type should
+be `Never`.
 
 ```py
 import sys
@@ -330,7 +330,7 @@ just treat it as `Unknown`.
 reveal_type(Inner1)  # revealed: Unknown
 ```
 
-Unfortunatly, this means that we cannot infer precise types for attributes/methods on those types:
+Unfortunately, this means that we cannot infer precise types for attributes/methods on those types:
 
 ```py
 reveal_type(Inner1().attr)  # revealed: Unknown
@@ -369,7 +369,7 @@ reveal_type(callable1())  # revealed: Unknown
 ### Nested definitions and generics
 
 This case is a variant of the nested class problem, where an attribute depends on a function-scoped
-type variable. This is probably not too important in practise, so it's probably fine if our behavior
+type variable. This is probably not too important in practice, so it's probably fine if our behavior
 here is not perfect from the start.
 
 ```py
@@ -401,7 +401,7 @@ def yields_and_returns():
     return "return"
 
 # TODO: should ideally be `GeneratorType[Literal["yield"], Any, Literal["return"]]`
-# once we also support yield-type inference. With return type inference along, we
+# once we also support yield-type inference. With return type inference alone, we
 # should at least infer `GeneratorType[Any, Any, Literal["return"]]`.
 reveal_type(yields_and_returns())  # revealed: Unknown
 ```
@@ -488,7 +488,8 @@ it returns a `str`. To maintain the gradual guarantee, we would need to infer th
 `Base.method` as `Literal[1] | Unknown`. This might be fine in practice, but if users don't like
 seeing those unions with `Unknown`, we might also consider just inferring `int` as the return type
 of `Base.method`, accepting the fact that it will lead to some false positives. We should definitely
-promote to `int` though, or otherwise we would even get errors on an override that returns `2`.
+promote to `int` though (instead of `Literal[1]`), or otherwise we would even get errors on an
+override that returns `2`.
 
 So here is the example without return type annotations:
 
@@ -539,7 +540,7 @@ def _(task: Task, job: Job):
 
 ### Methods returning `self`
 
-A method that returns `self` should have its return type inferred as `Self`, so that sublasses get
+A method that returns `self` should have its return type inferred as `Self`, so that subclasses get
 the return type specialized accordingly:
 
 ```py
@@ -561,7 +562,7 @@ FluentSub().set_value(1).set_value(2)
 reveal_type(FluentSub().set_value(1))  # revealed: Unknown
 ```
 
-This also works the type of `self` has widened or narrowed:
+This also works when the type of `self` has been widened or narrowed:
 
 ```py
 class WidenedReceiver:
@@ -657,7 +658,7 @@ def fibonacci(n: int):
         return 1
     return fibonacci(n - 1) + fibonacci(n - 2)
 
-# TODO: Should ideally be `def f    ibonacci(n: int) -> int`
+# TODO: Should ideally be `def fibonacci(n: int) -> int`
 reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
 # TODO: Should ideally be `int`
 reveal_type(fibonacci(5))  # revealed: Unknown
@@ -665,7 +666,7 @@ reveal_type(fibonacci(5))  # revealed: Unknown
 
 ### Divergent
 
-A function that would never return normally should can still be analyzed:
+A function that would never return normally should still be analyzed without errors:
 
 ```py
 def divergent():
