@@ -2251,9 +2251,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Some(literal) => PredicateOrLiteral::Literal(literal),
             None => PredicateOrLiteral::Predicate(Predicate {
                 node: match (context, predicate_node) {
-                    (_, node) if node.is_name_expr() || node.is_literal_expr() => {
-                        PredicateNode::TypeTruthiness(expression)
-                    }
                     (
                         ExpressionContext::Condition,
                         ast::Expr::BoolOp(_)
@@ -2266,9 +2263,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     (ExpressionContext::Condition, ast::Expr::Compare(compare))
                         if compare.ops.len() > 1 =>
                     {
-                        PredicateNode::ChainedComparisonCondition(expression)
+                        PredicateNode::Condition(expression)
                     }
-                    _ => PredicateNode::Expression(expression),
+                    _ => PredicateNode::Expression {
+                        expression,
+                        truthiness_from_type: predicate_node.is_name_expr()
+                            || predicate_node.is_literal_expr(),
+                    },
                 },
                 is_positive: true,
             }),
@@ -2404,10 +2405,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = self.current_place_table();
 
                 match pred.node {
-                    PredicateNode::TypeTruthiness(expression)
-                    | PredicateNode::Expression(expression)
-                    | PredicateNode::Condition(expression)
-                    | PredicateNode::ChainedComparisonCondition(expression) => {
+                    PredicateNode::Expression { expression, .. }
+                    | PredicateNode::Condition(expression) => {
                         let expression_node = expression.node_ref(self.db).node(self.module);
                         let mut places = PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .expression(expression_node);

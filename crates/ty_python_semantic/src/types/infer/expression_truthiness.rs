@@ -80,6 +80,10 @@ where
             .is_some()
     }
 
+    /// Return `None` when the expression cannot finish evaluating, even if its inferred type is
+    /// inhabited, as in `bool(never)`. This lets required operands propagate non-completion with `?`.
+    /// A `Value` outcome has not tested the resulting object's truthiness; a `Condition` outcome
+    /// records that test and can be `Uninhabited` if the test itself cannot complete.
     fn evaluate(
         &self,
         expression: &ast::Expr,

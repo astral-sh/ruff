@@ -88,10 +88,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
 ) {
     let constraints = match predicate.node {
-        PredicateNode::TypeTruthiness(expression)
-        | PredicateNode::Expression(expression)
-        | PredicateNode::Condition(expression)
-        | PredicateNode::ChainedComparisonCondition(expression) => {
+        PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
             (constraints.get(place, true), constraints.get(place, false))
         }
@@ -156,7 +153,10 @@ fn all_narrowing_constraints_for_expression<'db>(
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
-    let predicate = PredicateNode::Expression(expression);
+    let predicate = PredicateNode::Expression {
+        expression,
+        truthiness_from_type: false,
+    };
     let mut positive = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true);
     let positive_constraints = positive.finish();
     let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
@@ -1731,10 +1731,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::TypeTruthiness(expression)
-            | PredicateNode::Expression(expression)
-            | PredicateNode::Condition(expression)
-            | PredicateNode::ChainedComparisonCondition(expression) => {
+            PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
             PredicateNode::Pattern(pattern) => {
@@ -3498,10 +3495,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
-            PredicateNode::TypeTruthiness(expression)
-            | PredicateNode::Expression(expression)
+            PredicateNode::Expression { expression, .. }
             | PredicateNode::Condition(expression)
-            | PredicateNode::ChainedComparisonCondition(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,

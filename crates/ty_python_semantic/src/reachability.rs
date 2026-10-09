@@ -595,10 +595,8 @@ const CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL: usize = 16;
 const NARROWING_EVALUATION_CHECKPOINT_INTERVAL: usize = 8;
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: &Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
-        PredicateNode::TypeTruthiness(expression)
-        | PredicateNode::Expression(expression)
+        PredicateNode::Expression { expression, .. }
         | PredicateNode::Condition(expression)
-        | PredicateNode::ChainedComparisonCondition(expression)
         | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
         PredicateNode::IsNonTerminalCall(call) => call.callable(db).scope(db),
         PredicateNode::Pattern(pattern) => pattern.scope(db),
@@ -817,7 +815,13 @@ fn is_reachability_checkpoint(
         && (checkpoint_position + 1).is_multiple_of(CONTROL_FLOW_REACHABILITY_CHECKPOINT_INTERVAL)
 }
 
-/// Walks a reachability decision diagram until it reaches a terminal or reusable checkpoint.
+/// Evaluate a reachability decision diagram, reusing checkpoints for previously evaluated suffixes.
+///
+/// An inhabited predicate selects its true, false, or ambiguous branch. An uninhabited predicate
+/// cannot select either boolean branch, so only paths that bypass it remain reachable. Such paths
+/// occur in both its true and false branches: evaluate both and take the conjunction of their
+/// reachability. A stack holds pending branches, and a set avoids evaluating shared suffixes twice.
+/// Stop as soon as any required branch is unreachable.
 ///
 /// `use_checkpoint` is false only when entering from a checkpoint query. In that case, the first
 /// node is evaluated directly to prevent the query from immediately calling itself again.
@@ -1993,7 +1997,10 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
     let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
 
     match predicate.node {
-        PredicateNode::TypeTruthiness(test_expr) => {
+        PredicateNode::Expression {
+            expression: test_expr,
+            truthiness_from_type: true,
+        } => {
             let inference = infer_expression_types(db, test_expr, TypeContext::default());
             let ty = inference.expression_type(test_expr.node_ref(db));
             if ty.is_equivalent_to(db, env, Type::Never) {
@@ -2002,11 +2009,11 @@ fn analyze_single(db: &dyn Db, env: &ProgramEnvironment<'_>, predicate: &Predica
                 ty.bool(db, env).negate_if(!predicate.is_positive)
             }
         }
-        PredicateNode::Expression(test_expr) => {
-            value_truthiness(db, test_expr).negate_if(!predicate.is_positive)
-        }
-        PredicateNode::Condition(test_expr)
-        | PredicateNode::ChainedComparisonCondition(test_expr) => {
+        PredicateNode::Expression {
+            expression: test_expr,
+            truthiness_from_type: false,
+        } => value_truthiness(db, test_expr).negate_if(!predicate.is_positive),
+        PredicateNode::Condition(test_expr) => {
             condition_truthiness(db, test_expr).negate_if(!predicate.is_positive)
         }
         PredicateNode::ContextManagerSuppresses {
@@ -2431,7 +2438,15 @@ class TargetB:
                 let predicate = use_def
                     .predicates()
                     .iter()
-                    .find(|predicate| matches!(predicate.node, PredicateNode::TypeTruthiness(_)))
+                    .find(|predicate| {
+                        matches!(
+                            predicate.node,
+                            PredicateNode::Expression {
+                                truthiness_from_type: true,
+                                ..
+                            }
+                        )
+                    })
                     .unwrap();
                 let predicates: Predicates = std::iter::repeat_n(*predicate, DEPTH).collect();
 

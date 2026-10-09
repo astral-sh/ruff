@@ -411,6 +411,8 @@ A membership test has type `bool`, but cannot finish evaluating an uninhabited o
 from typing_extensions import Never
 
 def membership(condition: Never, value: int):
+    reveal_type(condition in (False,))  # revealed: bool
+
     if condition in (False,):
         reveal_type(value)  # revealed: Never
     else:

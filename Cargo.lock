@@ -4888,6 +4888,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "static_assertions",
+ "test-case",
  "thin-vec",
  "tracing",
  "ty_combine",

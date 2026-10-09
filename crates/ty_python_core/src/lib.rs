@@ -1064,6 +1064,12 @@ impl Truthiness {
     }
 
     /// Combine the possible outcomes of alternative paths or types.
+    ///
+    /// For types with truthiness `left` and `right`, `left.union(right)` describes the truthiness
+    /// of their union: a value can come from either type. For example,
+    /// `AlwaysTrue.union(AlwaysFalse)` is `Ambiguous`, since both boolean outcomes are possible.
+    /// In contrast, [`Truthiness::or`] models Python's `or` operator, which can skip its second
+    /// operand: `AlwaysTrue.or(AlwaysFalse)` is `AlwaysTrue`.
     #[must_use]
     pub fn union(self, other: Self) -> Self {
         match (self, other) {
@@ -1074,6 +1080,11 @@ impl Truthiness {
     }
 
     /// Combine conditions using Python's short-circuit `and` semantics.
+    ///
+    /// Short-circuiting makes this operation non-commutative when an operand is `Uninhabited`.
+    /// If `stop()` returns `Never`, `flag and stop()` can complete only when `flag` is false:
+    /// `Ambiguous.and(Uninhabited)` is `AlwaysFalse`. Reversing the operands always evaluates
+    /// `stop()` first, so `Uninhabited.and(Ambiguous)` is `Uninhabited`.
     #[must_use]
     pub fn and(self, other: Self) -> Self {
         match self {
@@ -1096,6 +1107,11 @@ impl Truthiness {
     }
 
     /// Combine conditions using Python's short-circuit `or` semantics.
+    ///
+    /// Short-circuiting makes this operation non-commutative when an operand is `Uninhabited`.
+    /// If `stop()` returns `Never`, `flag or stop()` can complete only when `flag` is true:
+    /// `Ambiguous.or(Uninhabited)` is `AlwaysTrue`. Reversing the operands always evaluates
+    /// `stop()` first, so `Uninhabited.or(Ambiguous)` is `Uninhabited`.
     #[must_use]
     pub fn or(self, other: Self) -> Self {
         match self {
@@ -1197,6 +1213,7 @@ mod tests {
     };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
+    use test_case::test_case;
 
     use super::Truthiness::{AlwaysFalse, AlwaysTrue, Ambiguous, Uninhabited};
     use super::*;
@@ -1259,84 +1276,56 @@ mod tests {
             .collect()
     }
 
-    #[test]
-    fn truthiness_short_circuit() {
-        for (left, right, expected_and, expected_or, expected_union) in [
-            (AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue),
-            (AlwaysTrue, AlwaysFalse, AlwaysFalse, AlwaysTrue, Ambiguous),
-            (AlwaysTrue, Ambiguous, Ambiguous, AlwaysTrue, Ambiguous),
-            (AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue, AlwaysTrue),
-            (AlwaysFalse, AlwaysTrue, AlwaysFalse, AlwaysTrue, Ambiguous),
-            (
-                AlwaysFalse,
-                AlwaysFalse,
-                AlwaysFalse,
-                AlwaysFalse,
-                AlwaysFalse,
-            ),
-            (AlwaysFalse, Ambiguous, AlwaysFalse, Ambiguous, Ambiguous),
-            (
-                AlwaysFalse,
-                Uninhabited,
-                AlwaysFalse,
-                Uninhabited,
-                AlwaysFalse,
-            ),
-            (Ambiguous, AlwaysTrue, Ambiguous, AlwaysTrue, Ambiguous),
-            (Ambiguous, AlwaysFalse, AlwaysFalse, Ambiguous, Ambiguous),
-            (Ambiguous, Ambiguous, Ambiguous, Ambiguous, Ambiguous),
-            (Ambiguous, Uninhabited, AlwaysFalse, AlwaysTrue, Ambiguous),
-            (
-                Uninhabited,
-                AlwaysTrue,
-                Uninhabited,
-                Uninhabited,
-                AlwaysTrue,
-            ),
-            (
-                Uninhabited,
-                AlwaysFalse,
-                Uninhabited,
-                Uninhabited,
-                AlwaysFalse,
-            ),
-            (Uninhabited, Ambiguous, Uninhabited, Uninhabited, Ambiguous),
-            (
-                Uninhabited,
-                Uninhabited,
-                Uninhabited,
-                Uninhabited,
-                Uninhabited,
-            ),
-        ] {
-            assert_eq!(left.and(right), expected_and, "{left:?}.and({right:?})");
-            assert_eq!(left.or(right), expected_or, "{left:?}.or({right:?})");
-            assert_eq!(
-                left.union(right),
-                expected_union,
-                "{left:?}.union({right:?})"
-            );
+    #[test_case(AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue, AlwaysTrue; "true_true")]
+    #[test_case(AlwaysTrue, AlwaysFalse, AlwaysFalse, AlwaysTrue, Ambiguous; "true_false")]
+    #[test_case(AlwaysTrue, Ambiguous, Ambiguous, AlwaysTrue, Ambiguous; "true_ambiguous")]
+    #[test_case(AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue, AlwaysTrue; "true_uninhabited")]
+    #[test_case(AlwaysFalse, AlwaysTrue, AlwaysFalse, AlwaysTrue, Ambiguous; "false_true")]
+    #[test_case(AlwaysFalse, AlwaysFalse, AlwaysFalse, AlwaysFalse, AlwaysFalse; "false_false")]
+    #[test_case(AlwaysFalse, Ambiguous, AlwaysFalse, Ambiguous, Ambiguous; "false_ambiguous")]
+    #[test_case(AlwaysFalse, Uninhabited, AlwaysFalse, Uninhabited, AlwaysFalse; "false_uninhabited")]
+    #[test_case(Ambiguous, AlwaysTrue, Ambiguous, AlwaysTrue, Ambiguous; "ambiguous_true")]
+    #[test_case(Ambiguous, AlwaysFalse, AlwaysFalse, Ambiguous, Ambiguous; "ambiguous_false")]
+    #[test_case(Ambiguous, Ambiguous, Ambiguous, Ambiguous, Ambiguous; "ambiguous_ambiguous")]
+    #[test_case(Ambiguous, Uninhabited, AlwaysFalse, AlwaysTrue, Ambiguous; "ambiguous_uninhabited")]
+    #[test_case(Uninhabited, AlwaysTrue, Uninhabited, Uninhabited, AlwaysTrue; "uninhabited_true")]
+    #[test_case(Uninhabited, AlwaysFalse, Uninhabited, Uninhabited, AlwaysFalse; "uninhabited_false")]
+    #[test_case(Uninhabited, Ambiguous, Uninhabited, Uninhabited, Ambiguous; "uninhabited_ambiguous")]
+    #[test_case(Uninhabited, Uninhabited, Uninhabited, Uninhabited, Uninhabited; "uninhabited_uninhabited")]
+    fn truthiness_short_circuit(
+        left: Truthiness,
+        right: Truthiness,
+        expected_and: Truthiness,
+        expected_or: Truthiness,
+        expected_union: Truthiness,
+    ) {
+        assert_eq!(left.and(right), expected_and, "{left:?}.and({right:?})");
+        assert_eq!(left.or(right), expected_or, "{left:?}.or({right:?})");
+        assert_eq!(
+            left.union(right),
+            expected_union,
+            "{left:?}.union({right:?})"
+        );
 
-            let mut calls = 0;
-            let lazy_result = left.and_then(|| {
-                calls += 1;
-                right
-            });
-            assert_eq!(lazy_result, expected_and, "{left:?}.and_then(|| {right:?})");
-            assert_eq!(
-                calls,
-                usize::from(left.may_be_true()),
-                "{left:?}.and_then call count"
-            );
+        let mut calls = 0;
+        let lazy_result = left.and_then(|| {
+            calls += 1;
+            right
+        });
+        assert_eq!(lazy_result, expected_and, "{left:?}.and_then(|| {right:?})");
+        assert_eq!(
+            calls,
+            usize::from(left.may_be_true()),
+            "{left:?}.and_then call count"
+        );
 
-            let calls = Cell::new(0);
-            let lazy_result = left.or_else(|| {
-                calls.set(calls.get() + 1);
-                right
-            });
-            assert_eq!(lazy_result, expected_or, "{left:?}.or_else(|| {right:?})");
-            assert_eq!(calls.get(), usize::from(left.may_be_false()));
-        }
+        let calls = Cell::new(0);
+        let lazy_result = left.or_else(|| {
+            calls.set(calls.get() + 1);
+            right
+        });
+        assert_eq!(lazy_result, expected_or, "{left:?}.or_else(|| {right:?})");
+        assert_eq!(calls.get(), usize::from(left.may_be_false()));
     }
 
     #[test]

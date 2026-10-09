@@ -1509,7 +1509,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let places = self.index.place_table(self.scope().file_scope_id(db));
 
         let predicate = Predicate {
-            node: PredicateNode::Expression(self.index.expression(test)),
+            node: PredicateNode::Expression {
+                expression: self.index.expression(test),
+                truthiness_from_type: test.is_name_expr() || test.is_literal_expr(),
+            },
             is_positive: false,
         };
 
