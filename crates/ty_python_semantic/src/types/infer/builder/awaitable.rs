@@ -40,7 +40,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     pub(super) fn check_unused_awaitable(&self, expression: &ast::Expr) {
         let db = self.db();
-        let ty = self.expression_type(expression);
+        let ty = self.expression_value_type(expression);
         if ty.is_awaitable(db)
             && !self.is_known_function_call(expression)
             && let Some(builder) = self.context.report_lint(&UNUSED_AWAITABLE, expression)
@@ -64,7 +64,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return false;
         };
         matches!(
-            self.expression_type(&call.func),
+            self.expression_value_type(&call.func),
             Type::FunctionLiteral(f)
                 if matches!(
                     f.known(self.db()),

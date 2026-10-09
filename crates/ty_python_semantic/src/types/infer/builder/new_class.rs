@@ -68,7 +68,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.validate_new_class_call_arguments(call_expr, name_node, bases_arg, definition);
 
         let name_type = name_node
-            .map(|node| self.expression_type(node))
+            .map(|node| self.expression_value_type(node))
             .unwrap_or_else(Type::unknown);
 
         let name = if let Some(literal) = name_type.as_string_literal() {
@@ -94,7 +94,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // calls, infer and extract bases eagerly (they'll be stored in the anchor).
         let explicit_bases: Option<Box<[Type<'db>]>> = if definition.is_none() {
             if let Some(bases_arg) = bases_arg {
-                let bases_type = self.expression_type(bases_arg);
+                let bases_type = self.expression_value_type(bases_arg);
                 self.extract_explicit_bases(bases_arg, bases_type, DynamicClassKind::NewClass)
             } else {
                 Some(Box::from([]))
@@ -249,7 +249,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) {
         let db = self.db();
         let env = self.program_environment();
-        let callable_type = self.expression_type(call_expr.func.as_ref());
+        let callable_type = self.expression_value_type(call_expr.func.as_ref());
         let iterable_object =
             KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);
         let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);

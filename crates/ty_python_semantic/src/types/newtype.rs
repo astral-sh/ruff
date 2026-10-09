@@ -2,7 +2,7 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
+use crate::types::{ClassType, KnownUnion, Type, definition_type_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
@@ -80,7 +80,7 @@ impl<'db> NewType<'db> {
         let Some(second_arg) = call_expr.arguments.args.get(1) else {
             return object_fallback;
         };
-        match definition_expression_type(db, definition, second_arg) {
+        match definition_type_expression_type(db, definition, second_arg) {
             Type::NominalInstance(nominal_instance_type) => {
                 NewTypeBase::ClassType(nominal_instance_type.class(db, &env))
             }

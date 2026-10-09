@@ -392,7 +392,7 @@ pub(crate) fn inferred_declaration<'db>(
     inference.inferred_declaration(definition)
 }
 
-/// Infer the type of a (possibly deferred) sub-expression of a [`Definition`].
+/// Infer the value type of a (possibly deferred) sub-expression of a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
 ///
@@ -424,21 +424,50 @@ fn definition_expression_type_in_scope<'db>(
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if let Some(ty) = inference.try_expression_type(expression) {
+        if let Some(ty) = inference.try_expression_value_type(db, expression) {
             ty
         } else if let Some(ty) =
-            infer_deferred_types(db, definition).try_expression_type(expression)
+            infer_deferred_types(db, definition).try_expression_value_type(db, expression)
         {
             ty
         } else if matches!(definition.kind(db), DefinitionKind::Function(_)) {
-            infer_function_default_types(db, definition).expression_type(expression)
+            infer_function_default_types(db, definition).expression_value_type(db, expression)
         } else {
             Type::unknown()
         }
     } else {
         // The expression is evaluated in another scope, such as a type-parameter scope
         // or the scope containing a function's parameter annotations.
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_value_type(db, expression)
+    }
+}
+
+/// Infer the denoted type of a type expression within a [`Definition`].
+fn definition_type_expression_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    let file = definition.program_file(db);
+    let index = semantic_index(db, file);
+    let scope = index.expression_scope_id(expression).to_scope_id(db, file);
+    definition_type_expression_type_in_scope(db, definition, expression, scope)
+}
+
+/// Infer the denoted type using an explicit scope, including nodes parsed from string annotations.
+fn definition_type_expression_type_in_scope<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+    scope: ScopeId<'db>,
+) -> Type<'db> {
+    if scope == definition.scope(db) {
+        infer_definition_types(db, definition)
+            .try_type_expression_type(expression)
+            .or_else(|| infer_deferred_types(db, definition).try_type_expression_type(expression))
+            .unwrap_or_else(Type::unknown)
+    } else {
+        infer_complete_scope_types(db, scope).type_expression_type(expression)
     }
 }
 
@@ -458,14 +487,14 @@ fn definition_expression_annotation<'db>(
     if scope == definition.scope(db) {
         let inference = infer_deferred_types(db, definition);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.type_expression_type(expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )
     } else {
         let inference = infer_complete_scope_types(db, scope);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.type_expression_type(expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )

@@ -433,6 +433,15 @@ TypeForm(value=int)  # error: [invalid-type-form]
 TypeForm(*(int,))  # error: [invalid-type-form]
 ```
 
+Constructing a form of `Never` produces an inhabited type-form value:
+
+```py
+from typing_extensions import Never
+
+reveal_type(TypeForm(Never))  # revealed: TypeForm[Never]
+reveal_type(TypeForm("Never"))  # revealed: TypeForm[Never]
+```
+
 ## Generic specialization and aliases
 
 When `TypeForm` appears in a generic parameter or return annotation, the type argument can be

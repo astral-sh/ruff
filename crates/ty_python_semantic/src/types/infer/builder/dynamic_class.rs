@@ -109,7 +109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         extract_fixed_length_iterable_element_types(db, env, bases_node, |expr| {
-            self.expression_type(expr)
+            self.expression_value_type(expr)
         })
     }
 

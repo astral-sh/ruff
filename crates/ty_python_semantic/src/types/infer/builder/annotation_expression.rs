@@ -5,6 +5,7 @@ use ty_python_core::definition::Definition;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR};
+use crate::types::infer::InferredExpressionType;
 use crate::types::infer::builder::InferenceFlags;
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::nearest_enclosing_class;
@@ -24,13 +25,13 @@ struct AnnotationExpressionInference<'db> {
     /// The type and qualifiers that the annotation contributes to the declaration.
     annotation_ty: TypeAndQualifiers<'db>,
     /// The type exposed for the annotation expression itself, including to IDE features.
-    expression_ty: Type<'db>,
+    expression_ty: InferredExpressionType<'db>,
 }
 
 impl<'db> AnnotationExpressionInference<'db> {
     fn new(annotation_ty: TypeAndQualifiers<'db>) -> Self {
         Self {
-            expression_ty: annotation_ty.inner_type(),
+            expression_ty: InferredExpressionType::TypeExpression(annotation_ty.inner_type()),
             annotation_ty,
         }
     }
@@ -41,7 +42,7 @@ impl<'db> AnnotationExpressionInference<'db> {
     ) -> Self {
         Self {
             annotation_ty,
-            expression_ty,
+            expression_ty: InferredExpressionType::Value(expression_ty),
         }
     }
 }
@@ -343,7 +344,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 TypeAndQualifiers::declared(Type::unknown())
                             };
                             if slice.is_tuple_expr() {
-                                self.store_expression_type(slice, type_and_qualifiers.inner_type());
+                                self.store_type_expression_type(
+                                    slice,
+                                    type_and_qualifiers.inner_type(),
+                                );
                             }
                             type_and_qualifiers
                         }
@@ -373,7 +377,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             annotation_ty,
             expression_ty,
         } = inferred;
-        self.store_expression_type(annotation, expression_ty);
+        self.store_inferred_expression_type(annotation, expression_ty);
         self.store_qualifiers(annotation, annotation_ty.qualifiers());
 
         annotation_ty

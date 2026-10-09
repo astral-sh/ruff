@@ -222,7 +222,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     defaults_kw = Some(kw);
                     if let Some(element_types) =
                         extract_fixed_length_iterable_element_types(db, env, &kw.value, |expr| {
-                            self.expression_type(expr)
+                            self.expression_value_type(expr)
                         })
                     {
                         default_types = element_types.into_vec();
@@ -437,7 +437,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             } else {
                 extract_fixed_length_iterable_element_types(db, env, fields_arg, |expr| {
-                    self.expression_type(expr)
+                    self.expression_value_type(expr)
                 })
                 .and_then(|field_types| {
                     field_types
@@ -585,12 +585,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     match field_arg_kind {
                         SequenceKind::List => {
-                            self.store_expression_type(
+                            self.store_expression_value_type(
                                 fields_arg,
                                 KnownClass::List.to_instance(db, env),
                             );
                         }
-                        SequenceKind::Tuple => self.store_expression_type(
+                        SequenceKind::Tuple => self.store_expression_value_type(
                             fields_arg,
                             Type::homogeneous_tuple(db, env, Type::unknown()),
                         ),
@@ -616,12 +616,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 match field_arg_kind {
                     SequenceKind::List => {
-                        self.store_expression_type(
+                        self.store_expression_value_type(
                             fields_arg,
                             KnownClass::List.to_instance(db, env),
                         );
                     }
-                    SequenceKind::Tuple => self.store_expression_type(
+                    SequenceKind::Tuple => self.store_expression_value_type(
                         fields_arg,
                         Type::homogeneous_tuple(db, env, Type::unknown()),
                     ),
@@ -639,10 +639,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             let name_type = self.infer_expression(name_expr, TypeContext::default());
             let declared_type = self.infer_type_expression(declaration_expr);
+            let declaration_value_type = self.expression_value_type(declaration_expr);
 
             let element_type = match field_spec_kind {
                 SequenceKind::Tuple => {
-                    Type::heterogeneous_tuple(db, env, [name_type, declared_type])
+                    Type::heterogeneous_tuple(db, env, [name_type, declaration_value_type])
                 }
                 SequenceKind::List => KnownClass::List.to_specialized_instance(
                     db,
@@ -651,12 +652,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         db,
                         env,
                         name_type,
-                        declared_type,
+                        declaration_value_type,
                     )],
                 ),
             };
 
-            self.store_expression_type(element, element_type);
+            self.store_expression_value_type(element, element_type);
 
             let Some(name) = name_type.as_string_literal() else {
                 for element in &elements[(i + 1)..] {
@@ -664,12 +665,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 match field_arg_kind {
                     SequenceKind::List => {
-                        self.store_expression_type(
+                        self.store_expression_value_type(
                             fields_arg,
                             KnownClass::List.to_instance(db, env),
                         );
                     }
-                    SequenceKind::Tuple => self.store_expression_type(
+                    SequenceKind::Tuple => self.store_expression_value_type(
                         fields_arg,
                         Type::homogeneous_tuple(db, env, Type::unknown()),
                     ),
@@ -700,7 +701,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.check_invalid_namedtuple_field_names(&names, fields_arg, NamedTupleKind::Typing);
 
         let spec = NamedTupleSpec::known(db, fields.into_boxed_slice());
-        self.store_expression_type(
+        self.store_expression_value_type(
             fields_arg,
             Type::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)),
         );

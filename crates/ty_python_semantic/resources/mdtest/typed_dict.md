@@ -5161,6 +5161,28 @@ class TD12(TypedDict("TD12", {}, extra_items=InitVar[int])): ...  # error: [inva
 class TD13(TypedDict("TD13", {}, extra_items=Final[int])): ...  # error: [invalid-type-form]
 ```
 
+Extra items can themselves be type-form values. Their type retains the `TypeForm` wrapper for both
+named declarations and inline construction:
+
+```py
+from typing_extensions import TypeForm
+
+Forms = TypedDict("Forms", {}, extra_items=TypeForm[int])
+forms: Forms = {"item": int}
+reveal_type(forms["item"])  # revealed: TypeForm[int]
+
+inline_forms = TypedDict("InlineForms", {}, extra_items=TypeForm[int])(item=int)
+reveal_type(inline_forms["item"])  # revealed: TypeForm[int]
+```
+
+Inline construction also preserves the `ReadOnly` qualifier on extra items:
+
+```py
+read_only = TypedDict("ReadOnlyExtras", {}, extra_items="ReadOnly[int]")(item=1)
+reveal_type(read_only["item"])  # revealed: int
+read_only["item"] = 2  # error: [invalid-assignment] "key is marked read-only"
+```
+
 ## Function syntax inside string annotations
 
 A functional `TypedDict` can appear in `Annotated` metadata. Inferring `extra_items` in a stub must
@@ -8224,6 +8246,19 @@ The same restriction applies to functional TypedDicts:
 ```py
 # error: [invalid-argument-type]
 FunctionalE = TypedDict("FunctionalE", {"name": str}, closed=True, extra_items=int)
+```
+
+### Type-form extra items
+
+The type of extra items can itself be a `TypeForm`:
+
+```py
+from typing_extensions import TypeForm, TypedDict
+
+class Forms(TypedDict, extra_items=TypeForm[int]): ...
+
+forms: Forms = {"item": int}
+reveal_type(forms["item"])  # revealed: TypeForm[int]
 ```
 
 ### Forward references in `extra_items`

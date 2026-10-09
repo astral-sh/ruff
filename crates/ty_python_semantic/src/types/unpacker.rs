@@ -93,7 +93,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         );
         let value_expr = value.expression().node_ref(self.db()).node(self.module());
 
-        let value_type = value_inference.expression_type(value_expr);
+        let value_type = value_inference.expression_value_type(db, value_expr);
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -108,7 +108,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 if !mode.is_async()
                     && let ast::Expr::Dict(dict) = value_expr
                     && let Some((keys, _)) = dict_literal_key_value_types(db, env, dict, |expr| {
-                        value_inference.expression_type(expr)
+                        value_inference.expression_value_type(db, expr)
                     })
                 {
                     keys
@@ -214,7 +214,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 expression,
                 value.promote_literals,
                 &|expression, promote| {
-                    let ty = value_inference.expression_type(expression);
+                    let ty = value_inference.expression_value_type(db, expression);
                     UnpackElement {
                         ty: if promote { ty.promote(db, env) } else { ty },
                         expression: Some(expression),
@@ -225,7 +225,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     // The starred expression's inference has already reported iteration errors.
                     // For `a, *rest = [1, *items]`, retain the shape of `items`' iterator even
                     // though the enclosing list's type has erased positions and length.
-                    let ty = value_inference.expression_type(expression);
+                    let ty = value_inference.expression_value_type(db, expression);
                     let ty = if promote { ty.promote(db, env) } else { ty };
                     let mut tuple = ty.iterate(db, env);
                     if let Some(length) = known_length

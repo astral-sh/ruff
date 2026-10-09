@@ -118,7 +118,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .collect();
 
                 let tuple_ty = Type::heterogeneous_tuple(db, env, constraint_tys.clone());
-                self.store_expression_type(expr, tuple_ty);
+                self.store_type_expression_type(expr, tuple_ty);
                 // Mirror the `< 2` guard from `infer_typevar_definition` to avoid
                 // a cascading `invalid-type-variable-default` diagnostic for tuples
                 // that have already been flagged as invalid constraints.
@@ -610,7 +610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
-                self.store_expression_type(default_expr, ty);
+                self.store_type_expression_type(default_expr, ty);
                 return;
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
@@ -629,7 +629,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // N.B. We cannot represent a heterogeneous list of types in our type system, so we
                 // use a heterogeneous tuple type to represent the list of types instead.
                 let ty = Type::heterogeneous_tuple(db, self.program_environment(), types);
-                self.store_expression_type(default_expr, ty);
+                self.store_type_expression_type(default_expr, ty);
                 return;
             }
             ast::Expr::Name(_) => {

@@ -235,7 +235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         validate_paramspec_components(&self.context, self.index, &function.parameters, |expr| {
-            self.file_expression_type(expr)
+            self.file_type_expression_type(expr)
         });
         self.validate_unpacked_typed_dict_kwargs(&function.parameters);
 
@@ -243,7 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(returns) = function.returns.as_deref() {
             let has_empty_body = self.return_types_and_ranges.is_empty()
-                && function_body_kind(db, env, function, |expr| self.expression_type(expr))
+                && function_body_kind(db, env, function, |expr| self.expression_value_type(expr))
                     == FunctionBodyKind::Stub;
 
             let mut enclosing_class_context = None;
@@ -450,8 +450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
         if let Some(decorator_inference) = decorator_inference.as_ref() {
             self.context.extend(decorator_inference.diagnostics());
-            self.expressions
-                .extend(decorator_inference.expression_types());
+            self.extend_expression_types(decorator_inference.expression_types());
             self.bindings.extend(decorator_inference.bindings());
             self.called_functions
                 .extend(decorator_inference.called_functions().iter().copied());
@@ -469,7 +468,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let decorator_type = decorator_inference
                 .as_ref()
                 .and_then(|decorator_inference| {
-                    decorator_inference.expression_type(&decorator.expression)
+                    decorator_inference.expression_value_type(db, &decorator.expression)
                 })
                 .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
@@ -1009,7 +1008,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let annotated_type = self.file_expression_type(annotation);
+        let annotated_type = self.file_type_expression_type(annotation);
         let Some(unpacked_keys) = extract_unpacked_typed_dict_keys_from_kwargs_annotation(
             db,
             annotated_type,
@@ -1145,7 +1144,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
-            let declared_ty = self.file_expression_type(annotation);
+            let declared_ty = self.file_type_expression_type(annotation);
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.
@@ -1170,7 +1169,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(default_expr) = default_expr {
                 let default_expr = default_expr.as_ref();
-                let default_ty = self.file_expression_type(default_expr);
+                let default_ty = self.file_expression_value_type(default_expr);
 
                 // Avoid duplicate diagnostics: invalid TypedDict literals already emit specific errors.
                 let suppress_invalid_default =
@@ -1208,7 +1207,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         } else {
             let ty = if let Some(default_expr) = default_expr {
-                let default_ty = self.file_expression_type(default_expr);
+                let default_ty = self.file_expression_value_type(default_expr);
                 UnionType::from_two_elements(db, env, Type::unknown(), default_ty)
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
@@ -1236,7 +1235,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
+            let annotated_type = self.file_type_expression_type(annotation);
             let has_unpacked_annotation = self
                 .file_type_expression_flags(annotation)
                 .contains(TypeExpressionFlags::UNPACK);
@@ -1370,7 +1369,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let annotated_type = self.file_expression_type(annotation);
+            let annotated_type = self.file_type_expression_type(annotation);
             let ty = if let Type::TypeVar(typevar) = annotated_type
                 && typevar.is_paramspec(db)
             {
@@ -1462,7 +1461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
         } else if let Some(default_expr) = default {
-            let default_ty = self.file_expression_type(default_expr);
+            let default_ty = self.file_expression_value_type(default_expr);
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
@@ -1536,7 +1535,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.db(),
             self.index.enclosing_lambda_statement(lambda.into())?,
         );
-        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
+        let callable = enclosing_stmt
+            .expression_value_type(db, lambda)
+            .as_callable()?;
         let [signature] = callable.signatures(self.db()).overloads.as_slice() else {
             // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
             return None;
@@ -1866,7 +1867,7 @@ impl KnownFunction {
                             if let Some(decorator) =
                                 class.node(&module).decorator_list.iter().find(|decorator| {
                                     definition_types
-                                        .expression_type(&decorator.expression)
+                                        .expression_value_type(db, &decorator.expression)
                                         .as_function_literal()
                                         .is_some_and(|func| func.is_known(db, KnownFunction::Final))
                                 })

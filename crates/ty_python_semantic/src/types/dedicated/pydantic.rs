@@ -955,7 +955,8 @@ fn function_has_before_or_plain_field_validator<'db>(
         let Some(call) = decorator.expression.as_call_expr() else {
             return false;
         };
-        let Some(Type::FunctionLiteral(function)) = decorators.expression_type(call.func.as_ref())
+        let Some(Type::FunctionLiteral(function)) =
+            decorators.expression_value_type(db, call.func.as_ref())
         else {
             return false;
         };
@@ -967,7 +968,7 @@ fn function_has_before_or_plain_field_validator<'db>(
             return false;
         };
         if decorators
-            .expression_type(&mode.value)
+            .expression_value_type(db, &mode.value)
             .and_then(Type::as_string_literal)
             .is_none_or(|mode| !matches!(mode.value(db), "before" | "plain"))
         {
@@ -976,7 +977,7 @@ fn function_has_before_or_plain_field_validator<'db>(
 
         call.arguments.args.iter().any(|field| {
             decorators
-                .expression_type(field)
+                .expression_value_type(db, field)
                 .and_then(Type::as_string_literal)
                 .is_some_and(|field| {
                     let field = field.value(db);
