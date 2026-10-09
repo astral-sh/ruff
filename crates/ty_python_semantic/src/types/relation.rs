@@ -4,9 +4,9 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use itertools::Itertools;
+use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintProvenance, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -14,6 +14,7 @@ use crate::types::constraints::{
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::member_observation::lookup_member;
 use crate::types::projection::{
     CallableSelfBinding, ObservationEdge, ObservedType, ObservedTypeOrigin as RelationTypeOrigin,
     ObservedTypePair,
@@ -921,16 +922,20 @@ enum ProofObligation<'db> {
     },
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum RelationGoal {
     Relation(TypeRelation),
     Disjointness,
     Observation,
     CallBinding,
     CallableUpcast,
+    MemberLookup {
+        name: Name,
+        options: super::member_observation::MemberLookupOptions,
+    },
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 struct RelationObligation<'db> {
     source: Type<'db>,
     target: Type<'db>,
@@ -1076,7 +1081,7 @@ impl<'db> RelationSession<'db> {
         work: impl FnOnce() -> R,
     ) -> Result<R, RelationReentry> {
         let observed = observed.into();
-        let obligation = observed.obligation;
+        let obligation = &observed.obligation;
         // Computing a recursive constructor's identity can itself require type queries.
         let active: Vec<_> = self
             .active
@@ -1089,14 +1094,14 @@ impl<'db> RelationSession<'db> {
             .collect();
         if active
             .iter()
-            .any(|previous| previous.obligation == obligation)
+            .any(|previous| &previous.obligation == obligation)
         {
             self.assumption_epoch
                 .set(self.assumption_epoch.get().wrapping_add(1));
             return Err(RelationReentry::Exact);
         }
         if active.iter().any(|previous| {
-            let previous = previous.obligation;
+            let previous = &previous.obligation;
             previous.source == obligation.source
                 && previous.target == obligation.target
                 && previous.relation == obligation.relation
@@ -1109,7 +1114,7 @@ impl<'db> RelationSession<'db> {
             return Err(RelationReentry::Negative);
         }
         if active.iter().any(|previous_observed| {
-            let previous = previous_observed.obligation;
+            let previous = &previous_observed.obligation;
             (previous.source != obligation.source || previous.target != obligation.target)
                 && previous.relation == obligation.relation
                 && previous.evaluation == obligation.evaluation
@@ -1152,7 +1157,7 @@ impl<'db> RelationSession<'db> {
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> Result<ConstraintSet<'db, 'c>, RelationReentry> {
         let observed = observed.into();
-        let obligation = observed.obligation;
+        let obligation = &observed.obligation;
         let cached = self.completed.borrow().get(&observed).cloned();
         if let Some(cached) = cached {
             let result = builder.load(db, env, &cached);
@@ -2554,19 +2559,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 .is_known(db, wrapper.class(db)) =>
             {
                 self.with_recursion_guard(db, source, target, || {
-                    let Some(target_function) = target
-                        .member_lookup_with_policy(
-                            db,
-                            env,
-                            "__func__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place
-                        .ignore_possibly_undefined()
-                    else {
+                    let target = &self.operands().target;
+                    let Some(member) = lookup_member(
+                        db,
+                        env,
+                        target,
+                        target,
+                        "__func__",
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        &self.context(),
+                    ) else {
+                        return ConstraintSet::incomplete(self.constraints);
+                    };
+                    let Some(target_function) = member.value else {
                         return self.never();
                     };
-                    self.check_child_pair(db, wrapper.wrapped(db), target_function)
+                    self.check_observed_pair(
+                        db,
+                        self.operands()
+                            .source
+                            .unchanged_or_unresolved(wrapper.wrapped(db)),
+                        target_function,
+                    )
                 })
             }
 
@@ -3825,6 +3839,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             .unwrap_or_else(|_| ConstraintSet::incomplete(self.constraints))
     }
 
+    /// Inspect the source operand against the protocol carried by the target operand.
     fn any_protocol_members_absent_or_disjoint(
         &self,
         db: &'db dyn Db,
@@ -3839,11 +3854,19 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 if let Some(context) = self.report_context() {
                     context.take();
                 }
-                let attribute = other
-                    .member(db, env, member.name())
-                    .place
-                    .ignore_possibly_undefined();
-                let Some(attribute_type) = attribute else {
+                let receiver = self.operands().source.unchanged_or_unresolved(other);
+                let Some(attribute) = lookup_member(
+                    db,
+                    env,
+                    &receiver,
+                    &receiver,
+                    member.name(),
+                    MemberLookupPolicy::default(),
+                    &self.context(),
+                ) else {
+                    return ConstraintSet::incomplete(self.constraints);
+                };
+                let Some(attribute) = attribute.value else {
                     if let Some(context) = self.report_context() {
                         context.push(ErrorContext::ProtocolMemberNotDefined {
                             member_name: member.name().into(),
@@ -3860,7 +3883,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     }
                     return self.always();
                 };
+                let attribute_type = attribute.ty;
                 let result = self
+                    .with_operands(ObservedTypePair::new(
+                        attribute,
+                        self.operands().target.clone(),
+                    ))
                     .protocol_member_has_disjoint_type_from_ty(db, &member, attribute_type)
                     .or(db, self.constraints, || {
                         self.protocol_member_write_is_definitely_missing_from_ty(db, &member, other)
@@ -4568,7 +4596,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => {
                 nontrivial_check(self, || {
                     self.with_recursion_guard(db, left, right, || {
-                        self.any_protocol_members_absent_or_disjoint(
+                        let checker = if matches!(left, Type::ProtocolInstance(_)) {
+                            self.reversed()
+                        } else {
+                            self.clone()
+                        };
+                        checker.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
                             special_form.instance_fallback(db, env),
@@ -4581,7 +4614,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
                 nontrivial_check(self, || {
                     self.with_recursion_guard(db, left, right, || {
-                        self.any_protocol_members_absent_or_disjoint(
+                        let checker = if matches!(left, Type::ProtocolInstance(_)) {
+                            self.reversed()
+                        } else {
+                            self.clone()
+                        };
+                        checker.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
                             known_instance.instance_fallback(db, env),
@@ -4634,7 +4672,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 | Type::GenericAlias(..)),
             ) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(db, protocol, ty)
+                    let checker = if matches!(left, Type::ProtocolInstance(_)) {
+                        self.reversed()
+                    } else {
+                        self.clone()
+                    };
+                    checker.any_protocol_members_absent_or_disjoint(db, protocol, ty)
                 })
             }),
 
@@ -4647,7 +4690,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             {
                 nontrivial_check(self, || {
                     self.with_recursion_guard(db, left, right, || {
-                        self.any_protocol_members_absent_or_disjoint(
+                        let checker = if matches!(left, Type::ProtocolInstance(_)) {
+                            self.reversed()
+                        } else {
+                            self.clone()
+                        };
+                        checker.any_protocol_members_absent_or_disjoint(
                             db,
                             protocol,
                             Type::NominalInstance(nominal),
@@ -4659,6 +4707,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(protocol), other)
             | (other, Type::ProtocolInstance(protocol)) => nontrivial_check(self, || {
                 self.with_recursion_guard(db, left, right, || {
+                    let checker = if matches!(left, Type::ProtocolInstance(_)) {
+                        self.reversed()
+                    } else {
+                        self.clone()
+                    };
                     protocol
                         .interface(db)
                         .members(db)
@@ -4666,15 +4719,33 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                             if let Some(context) = self.report_context() {
                                 context.take();
                             }
-                            let result = match other.member(db, env, member.name()).place {
-                                Place::Defined(DefinedPlace {
-                                    ty: attribute_type, ..
-                                }) => self.protocol_member_has_disjoint_type_from_ty(
-                                    db,
-                                    &member,
-                                    attribute_type,
-                                ),
-                                Place::Undefined => self.never(),
+                            let receiver = checker.operands().source.unchanged_or_unresolved(other);
+                            let Some(attribute) = lookup_member(
+                                db,
+                                env,
+                                &receiver,
+                                &receiver,
+                                member.name(),
+                                MemberLookupPolicy::default(),
+                                &checker.context(),
+                            ) else {
+                                return ConstraintSet::incomplete(self.constraints);
+                            };
+                            let result = match attribute.value {
+                                Some(attribute) => {
+                                    let attribute_type = attribute.ty;
+                                    checker
+                                        .with_operands(ObservedTypePair::new(
+                                            attribute,
+                                            checker.operands().target.clone(),
+                                        ))
+                                        .protocol_member_has_disjoint_type_from_ty(
+                                            db,
+                                            &member,
+                                            attribute_type,
+                                        )
+                                }
+                                None => self.never(),
                             };
                             if let Some(context) = self.report_context()
                                 && result.is_always_satisfied(db, env, self.inferable)
@@ -5063,25 +5134,40 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
             ) if self.perform_expensive_checks && nominal.class(db, env).is_final(db) => {
                 nontrivial_check(self, || {
-                    Type::NominalInstance(nominal)
-                        .member_lookup_with_policy(
-                            db,
-                            env,
-                            "__call__",
-                            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        )
-                        .place
-                        .ignore_possibly_undefined()
-                        .when_none_or(db, self.constraints, |dunder_call| {
-                            self.when_relation_does_not_hold(db, || {
-                                self.as_relation_checker(TypeRelation::Assignability)
-                                    .check_child_pair(
-                                        db,
-                                        dunder_call,
-                                        Type::Callable(CallableType::unknown(db)),
-                                    )
-                            })
-                        })
+                    let checker = if matches!(left, Type::NominalInstance(_)) {
+                        self.clone()
+                    } else {
+                        self.reversed()
+                    };
+                    let receiver = &checker.operands().source;
+                    let Some(member) = lookup_member(
+                        db,
+                        env,
+                        receiver,
+                        receiver,
+                        "__call__",
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                        &checker.context(),
+                    ) else {
+                        return ConstraintSet::incomplete(self.constraints);
+                    };
+                    let Some(dunder_call) = member.value else {
+                        return self.always();
+                    };
+                    checker.when_relation_does_not_hold(db, || {
+                        checker
+                            .as_relation_checker(TypeRelation::Assignability)
+                            .check_observed_pair(
+                                db,
+                                dunder_call,
+                                checker
+                                    .operands()
+                                    .target
+                                    .unchanged_or_unresolved(Type::Callable(
+                                        CallableType::unknown(db),
+                                    )),
+                            )
+                    })
                 })
             }
 
@@ -5293,7 +5379,7 @@ inner: Node[int]
         let session = RelationSession::default();
         let key = obligation(Type::object(), Type::unknown());
         let first = ObservedRelationObligation {
-            obligation: key,
+            obligation: key.clone(),
             source_origin: Some(Rc::new(RelationTypeOrigin {
                 constructor: TypeIdentity::Other(Type::Never),
                 application: Type::object(),
@@ -5422,9 +5508,9 @@ inner: Node[int]
 
         // A requires B and a false condition. B initially succeeds only because A is active.
         let result = session
-            .visit_type_pair(db, &env, &builder, a, false, || {
+            .visit_type_pair(db, &env, &builder, a.clone(), false, || {
                 let b_result = session
-                    .visit_type_pair(db, &env, &builder, b, false, || {
+                    .visit_type_pair(db, &env, &builder, b.clone(), false, || {
                         b_evaluations.set(b_evaluations.get() + 1);
                         let recursive_a =
                             session.visit_type_pair(db, &env, &builder, a, false, || {
@@ -5468,7 +5554,7 @@ inner: Node[int]
             let builder = ConstraintSetBuilder::with_relation_session(Rc::clone(&session));
             let evaluations = Cell::new(0);
             let result = session
-                .visit_type_pair(db, &env, &builder, key, false, || {
+                .visit_type_pair(db, &env, &builder, key.clone(), false, || {
                     evaluations.set(evaluations.get() + 1);
                     let pending = ConstraintSet::incomplete(&builder);
                     if complete_result {
@@ -5483,7 +5569,7 @@ inner: Node[int]
             assert_eq!(result.is_complete(), complete_result);
 
             let result = session
-                .visit_type_pair(db, &env, &builder, key, false, || {
+                .visit_type_pair(db, &env, &builder, key.clone(), false, || {
                     evaluations.set(evaluations.get() + 1);
                     ConstraintSet::from_bool(&builder, false)
                 })

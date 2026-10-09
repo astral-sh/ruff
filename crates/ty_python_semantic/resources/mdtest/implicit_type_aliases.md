@@ -2914,11 +2914,21 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([legacy(1)])  # revealed: list[Tree[int]]
+reveal_type([modern(1)])  # revealed: list[Tree[int]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
+```
+
+Promotion retains the closed recursive alias. The compact result is equivalent to unfolding its body
+twice.
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to
+
+static_assert(is_equivalent_to(list[Tree[int]], list[int | tuple[int | tuple[Tree[int]]]]))
 ```
 
 ### Growing aliases in generic signatures

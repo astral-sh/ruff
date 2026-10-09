@@ -327,6 +327,214 @@ impl<'db> RecursiveOperation<'db> {
         }
     }
 
+    pub(super) fn is_substitution(&self) -> bool {
+        match self {
+            Self::Specialize(..)
+            | Self::BindLegacy(_)
+            | Self::Freshen(..)
+            | Self::BindSelf(..)
+            | Self::ReplaceSelf(_) => true,
+            Self::Materialize(..)
+            | Self::Promote(..)
+            | Self::ReplaceParameterDefaults
+            | Self::EagerExpansion
+            | Self::RescopeReturnCallables(_) => false,
+        }
+    }
+
+    /// Reapplying one of these operations to its completed output does not change it.
+    pub(super) fn is_idempotent(&self) -> bool {
+        matches!(
+            self,
+            Self::Materialize(..)
+                | Self::Promote(..)
+                | Self::ReplaceParameterDefaults
+                | Self::EagerExpansion
+        )
+    }
+
+    /// Prove that a body operation has no targets in the finite declaration graph.
+    /// Stored arguments and operation captures remain visible; declaration parameters do not
+    /// contribute their unrelated bounds or defaults. Unknown lazy structure prevents the proof.
+    pub(super) fn is_identity_on(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        root: Type<'db>,
+    ) -> bool {
+        struct Targets<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            pending: RefCell<Vec<Type<'db>>>,
+            complete: Cell<bool>,
+        }
+        impl<'db> TypeVisitor<'db> for Targets<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+            fn notify_skipped_lazy_type_attributes(&self) {
+                self.complete.set(false);
+            }
+            fn visit_type(&self, _db: &'db dyn Db, ty: Type<'db>) {
+                self.pending.borrow_mut().push(ty);
+            }
+            fn visit_bound_type_var_type(
+                &self,
+                _db: &'db dyn Db,
+                _variable: BoundTypeVarInstance<'db>,
+            ) {
+            }
+        }
+        if !matches!(
+            self,
+            Self::Promote(..) | Self::ReplaceParameterDefaults | Self::RescopeReturnCallables(_)
+        ) {
+            return false;
+        }
+        let targets = Targets {
+            env,
+            pending: RefCell::new(vec![root]),
+            complete: Cell::new(true),
+        };
+        let mut visited = FxHashSet::default();
+        let mut aliases = FxHashSet::default();
+        let mut recursive_bodies = FxHashSet::default();
+        while targets.complete.get() {
+            let Some(ty) = targets.pending.borrow_mut().pop() else {
+                break;
+            };
+            if !visited.insert(ty) {
+                continue;
+            }
+            match ty {
+                Type::TypeVar(_) => continue,
+                Type::TypeAlias(alias) => {
+                    alias.visit_stored_operands(db, &targets);
+                    if aliases.insert(alias.definition(db)) {
+                        targets.visit_type(db, alias.raw_value_type(db));
+                    }
+                    continue;
+                }
+                Type::Recursive(recursive) => {
+                    if let Some(arguments) = recursive.base_arguments(db) {
+                        super::generics::walk_specialization_types(db, arguments, &targets);
+                    }
+                    for operation in recursive.operations(db) {
+                        operation.visit_types(db, &targets);
+                    }
+                    if recursive_bodies.insert(recursive.cycle(db)) {
+                        match recursive.body(db) {
+                            RecursiveBody::Inferred(Type::RecursiveVar(_))
+                            | RecursiveBody::Protocol(_) => return false,
+                            RecursiveBody::Inferred(body) => targets.visit_type(db, body),
+                        }
+                    }
+                    continue;
+                }
+                Type::RecursiveVar(variable) => {
+                    if let Some(arguments) = variable.arguments(db) {
+                        super::generics::walk_specialization_types(db, arguments, &targets);
+                    }
+                    for operation in variable.operations(db) {
+                        operation.visit_types(db, &targets);
+                    }
+                    continue;
+                }
+                Type::Divergent(_) => return false,
+                // These values require declaration or domain observation to determine what the
+                // operation can change. Retain the operation when that structure is still lazy.
+                Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::BoundMethod(_)
+                | Type::ProtocolInstance(_)
+                | Type::Deferred(_) => {
+                    return false;
+                }
+                Type::LiteralValue(literal)
+                    if matches!(self, Self::Promote(_, super::PromotionKind::Regular))
+                        && literal.is_promotable() =>
+                {
+                    return false;
+                }
+                // Regular promotion can remove negative intersection terms without changing
+                // the types stored in them. Visiting only the children would miss that effect.
+                Type::Intersection(intersection)
+                    if matches!(self, Self::Promote(_, super::PromotionKind::Regular))
+                        && !intersection.negative(db).is_empty() =>
+                {
+                    return false;
+                }
+                Type::ClassLiteral(_)
+                    if matches!(
+                        self,
+                        Self::Promote(_, super::PromotionKind::ClassLiteralsOnly)
+                    ) =>
+                {
+                    return false;
+                }
+                Type::NominalInstance(instance) => {
+                    let changes = match self {
+                        Self::Promote(_, super::PromotionKind::Regular) => matches!(
+                            instance.known_class(db),
+                            Some(super::KnownClass::Float | super::KnownClass::Complex)
+                        ),
+                        Self::Promote(_, super::PromotionKind::SingletonsOnly) => {
+                            instance.is_singleton(db)
+                        }
+                        _ => false,
+                    };
+                    if changes {
+                        return false;
+                    }
+                    // The class declaration is not an operand of an instance transformation.
+                    if let Some(tuple) = instance.own_tuple_type() {
+                        super::tuple::walk_tuple_type(db, tuple, &targets);
+                    } else if let Some(alias) = instance.class(db, env).into_generic_alias() {
+                        super::generics::walk_specialization_types(
+                            db,
+                            alias.specialization(db),
+                            &targets,
+                        );
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+            if let visitor::TypeKind::NonAtomic(ty) = ty.into() {
+                visitor::walk_non_atomic_type(db, ty, &targets);
+            }
+        }
+        targets.complete.get()
+    }
+
+    /// Move an operation into arguments only when the body contributes no targets and each
+    /// parameter has one polarity. Invariant parameters can occur in both directions, so their
+    /// transformations must remain on the application and run after substitution.
+    pub(super) fn maps_arguments_only(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        body: Type<'db>,
+        parameters: Option<GenericContext<'db>>,
+    ) -> bool {
+        if matches!(body, Type::RecursiveVar(_) | Type::Divergent(_))
+            || !self.is_identity_on(db, env, body)
+        {
+            return false;
+        }
+        self.with_mapping(|mapping| mapping == mapping.flip())
+            || parameters.is_some_and(|parameters| {
+                parameters.variables(db).all(|parameter| {
+                    matches!(
+                        parameter.variance(db),
+                        super::TypeVarVariance::Covariant | super::TypeVarVariance::Contravariant
+                    )
+                })
+            })
+    }
+
     pub(super) fn substitution(mapping: &TypeMapping<'_, 'db>) -> Option<Self> {
         Some(match mapping {
             TypeMapping::ApplySpecialization(specialization) => {
@@ -1317,30 +1525,33 @@ impl<'db> RecursiveType<'db> {
                         .into_type()
                 })
             }
-            _ => visitor.visit(db, Type::Recursive(self), mapping, tcx, || {
-                // Map arguments before unfolding so recursive backedges retain their mapped
-                // arguments. Pending operations must run first: rewriting their input arguments
-                // would move this mapping across a captured materialization.
-                let recursive = if self.operations(db).is_empty() {
-                    let arguments = self.arguments(db).map(|arguments| {
-                        arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
-                    });
-                    self.with_arguments(db, arguments)
-                } else {
-                    self
+            _ => {
+                let Some(operation) = RecursiveOperation::capture(
+                    mapping,
+                    visitor.materialize_typevar_bounds_and_defaults,
+                ) else {
+                    return Type::Recursive(self);
                 };
-                recursive
-                    .unfold(db, visitor.env)
-                    .map(|unfolded| {
-                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        if mapped == unfolded {
-                            Type::Recursive(recursive)
-                        } else {
-                            mapped
-                        }
-                    })
-                    .into_type()
-            }),
+                if operation.is_identity_on(db, visitor.env, Type::Recursive(self))
+                    || (operation.is_idempotent() && self.operations(db).last() == Some(&operation))
+                {
+                    return Type::Recursive(self);
+                }
+                if self.operations(db).is_empty()
+                    && let Some(body) = self.observation_body(db)
+                    && operation.maps_arguments_only(db, visitor.env, body, self.parameters(db))
+                {
+                    return Type::Recursive(self.with_arguments(
+                        db,
+                        self.base_arguments(db).map(|arguments| {
+                            arguments.apply_type_mapping_impl(db, mapping, &[], visitor)
+                        }),
+                    ));
+                }
+                let mut operations = self.operations(db).to_vec();
+                operations.push(operation);
+                Type::Recursive(self.with_operations(db, operations.into_boxed_slice()))
+            }
         }
     }
 

@@ -5,7 +5,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::OnceCell;
 use std::iter;
 use std::time::Duration;
 
@@ -160,6 +159,7 @@ pub mod list_members;
 mod literal;
 mod match_pattern;
 mod member;
+mod member_observation;
 mod method;
 mod mro;
 pub(crate) mod narrow;
@@ -791,6 +791,203 @@ impl<'db> DescriptorGetCallContext<'db> {
                 &CallArguments::positional([descriptor_type, instance, owner]),
             )
             .err()
+    }
+}
+
+/// Which evaluated branch supplies the result of descriptor precedence.
+#[derive(Clone, Copy)]
+enum MemberSelection {
+    Meta,
+    Fallback,
+    Both,
+}
+
+/// Descriptor precedence consumes already evaluated candidates. Both ordinary and observed
+/// lookups use this selector, so observations follow the branch that supplied the value.
+struct DescriptorAccess<'db> {
+    member: PlaceAndQualifiers<'db>,
+    kind: AttributeKind,
+    error: Option<DescriptorGetCallContext<'db>>,
+    properties: Option<PropertyDeprecations<'db>>,
+    slot: bool,
+    policy: InstanceFallbackShadowsNonDataDescriptor,
+}
+
+impl<'db> DescriptorAccess<'db> {
+    fn select(
+        self,
+        db: &'db dyn Db,
+        fallback: MemberLookupResult<'db>,
+        combine: impl FnOnce(Type<'db>, Type<'db>) -> Type<'db>,
+    ) -> (MemberLookupResult<'db>, MemberSelection) {
+        let PlaceAndQualifiers {
+            place: meta_attr,
+            qualifiers: meta_attr_qualifiers,
+        } = self.member;
+        let meta_attr_kind = self.kind;
+        let meta_attr_error = self.error;
+        let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
+        let meta_properties = self.properties;
+        let fallback_error = fallback.err().map(|error| error.kind(db));
+        let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
+        let fallback_properties = fallback_member.deprecated_properties(db);
+        let fallback_member = fallback_member.member(db);
+
+        // A slot stores the same instance attribute described by the receiver's declarations.
+        // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
+        // declaration established by the receiver's class.
+        if matches!(meta_attr, Place::Defined(_))
+            && self.slot
+            && !fallback_member.place.is_undefined()
+        {
+            return (fallback, MemberSelection::Fallback);
+        }
+
+        let PlaceAndQualifiers {
+            place: fallback,
+            qualifiers: fallback_qualifiers,
+        } = fallback_member;
+
+        match (meta_attr, meta_attr_kind, fallback) {
+            // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
+            // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
+            (meta_attr @ Place::Defined(_), _, Place::Undefined) => (
+                member_lookup_result(
+                    db,
+                    meta_attr.with_qualifiers(meta_attr_qualifiers),
+                    meta_attr_error,
+                    meta_properties,
+                ),
+                MemberSelection::Meta,
+            ),
+
+            // `meta_attr` is the return type of a data descriptor and definitely bound, so we
+            // return it.
+            (
+                meta_attr @ Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }),
+                AttributeKind::DataDescriptor,
+                _,
+            ) => (
+                member_lookup_result(
+                    db,
+                    meta_attr.with_qualifiers(meta_attr_qualifiers),
+                    meta_attr_error,
+                    meta_properties,
+                ),
+                MemberSelection::Meta,
+            ),
+
+            // `meta_attr` is the return type of a data descriptor, but the attribute on the
+            // meta-type is possibly-unbound. This means that we "fall through" to the next
+            // stage of the descriptor protocol and union with the fallback type.
+            (
+                Place::Defined(DefinedPlace {
+                    ty: meta_attr_ty,
+                    origin: meta_origin,
+                    definedness: Definedness::PossiblyUndefined,
+                    provenance: meta_attr_provenance,
+                    ..
+                }),
+                AttributeKind::DataDescriptor,
+                Place::Defined(DefinedPlace {
+                    ty: fallback_ty,
+                    origin: fallback_origin,
+                    definedness: fallback_boundness,
+                    public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance,
+                }),
+            ) => (
+                member_lookup_result(
+                    db,
+                    Place::Defined(DefinedPlace {
+                        ty: combine(meta_attr_ty, fallback_ty),
+                        origin: meta_origin.merge(fallback_origin),
+                        definedness: fallback_boundness,
+                        public_type_policy: fallback_public_type_policy,
+                        provenance: fallback_provenance.or(meta_attr_provenance),
+                    })
+                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                    meta_attr_error.or(fallback_error),
+                    union_deprecated_properties(db, meta_properties, fallback_properties),
+                ),
+                MemberSelection::Both,
+            ),
+
+            // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
+            // now the highest priority. However, we only return the pure `fallback` type if the
+            // policy allows it. When invoked on class objects, the policy is set to `Yes`, which
+            // means that class-level attributes (the fallback) can shadow non-data descriptors
+            // on metaclasses. However, for instances, the policy is set to `No`, because we do
+            // allow instance-level attributes to shadow class-level non-data descriptors. This
+            // would require us to statically infer if an instance attribute is always set, which
+            // is something we currently don't attempt to do.
+            (
+                Place::Defined(_),
+                AttributeKind::NormalOrNonDataDescriptor,
+                fallback @ Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }),
+            ) if self.policy == InstanceFallbackShadowsNonDataDescriptor::Yes => (
+                member_lookup_result(
+                    db,
+                    fallback.with_qualifiers(fallback_qualifiers),
+                    fallback_error,
+                    fallback_properties,
+                ),
+                MemberSelection::Fallback,
+            ),
+
+            // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
+            // unbound or the policy argument is `No`. In both cases, the `fallback` type does
+            // not completely shadow the non-data descriptor, so we build a union of the two.
+            (
+                Place::Defined(DefinedPlace {
+                    ty: meta_attr_ty,
+                    origin: meta_origin,
+                    definedness: meta_attr_boundness,
+                    provenance: meta_attr_provenance,
+                    ..
+                }),
+                AttributeKind::NormalOrNonDataDescriptor,
+                Place::Defined(DefinedPlace {
+                    ty: fallback_ty,
+                    origin: fallback_origin,
+                    definedness: fallback_boundness,
+                    public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance,
+                }),
+            ) => (
+                member_lookup_result(
+                    db,
+                    Place::Defined(DefinedPlace {
+                        ty: combine(meta_attr_ty, fallback_ty),
+                        origin: meta_origin.merge(fallback_origin),
+                        definedness: meta_attr_boundness.max(fallback_boundness),
+                        public_type_policy: fallback_public_type_policy,
+                        provenance: fallback_provenance.or(meta_attr_provenance),
+                    })
+                    .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
+                    meta_attr_error.or(fallback_error),
+                    union_deprecated_properties(db, meta_properties, fallback_properties),
+                ),
+                MemberSelection::Both,
+            ),
+
+            // If the attribute is not found on the meta-type, we simply return the fallback.
+            (Place::Undefined, _, fallback) => (
+                member_lookup_result(
+                    db,
+                    fallback.with_qualifiers(fallback_qualifiers),
+                    fallback_error,
+                    fallback_properties,
+                ),
+                MemberSelection::Fallback,
+            ),
+        }
     }
 }
 
@@ -4452,18 +4649,9 @@ impl<'db> Type<'db> {
         // `object.__dict__` is a typeshed approximation: a concrete slotted instance without
         // dictionary storage does not inherit that attribute at runtime. Keep normal lookup for
         // `Self` and other type variables because their subclasses can introduce a dictionary.
-        let key = if key.name(db) == "__dict__"
-            && let Type::NominalInstance(instance) = receiver
-            && let Some((class, _)) = instance.class(db, env).static_class_literal(db)
-            && class.lacks_instance_storage(db, "__dict__")
-        {
-            MemberLookupKey::new(
-                db,
-                key.program(db),
-                ty,
-                key.name(db).as_str(),
-                key.policy(db) | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-            )
+        let policy = receiver.instance_class_member_policy(db, env, key.name(db), key.policy(db));
+        let key = if policy != key.policy(db) {
+            MemberLookupKey::new(db, key.program(db), ty, key.name(db).as_str(), policy)
         } else {
             key
         };
@@ -4480,6 +4668,75 @@ impl<'db> Type<'db> {
         }
 
         Self::class_member_with_policy_inner(db, key)
+    }
+
+    fn instance_class_member_policy(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> MemberLookupPolicy {
+        if name == "__dict__"
+            && let Type::NominalInstance(instance) = self
+            && let Some((class, _)) = instance.class(db, env).static_class_literal(db)
+            && class.lacks_instance_storage(db, "__dict__")
+        {
+            policy | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+        } else {
+            policy
+        }
+    }
+
+    /// Whether a declaration contributes a value to the class namespace, independently of
+    /// inferred instance storage. A `ClassVar` is a class contract even without an initializer.
+    fn has_own_class_namespace_value(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType<'db>,
+        name: &str,
+        member: PlaceAndQualifiers<'db>,
+    ) -> bool {
+        member.is_class_var()
+            || !class.static_class_literal(db).is_some_and(|(class, _)| {
+                let scope = class.body_scope(db);
+                place_table(db, scope)
+                    .symbol_id(name)
+                    .is_some_and(|symbol| {
+                        place_from_bindings(
+                            db,
+                            env,
+                            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
+                        )
+                        .place
+                        .is_undefined()
+                    })
+            })
+    }
+
+    /// Enum members keep their enum-literal type on both class and instance access.
+    fn resolved_enum_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &Name,
+    ) -> Option<Type<'db>> {
+        let class = match self {
+            Type::ClassLiteral(class) => class.into_enum_class(db),
+            Type::GenericAlias(_) => None,
+            Type::SubclassOf(subclass) => subclass
+                .subclass_of()
+                .into_class(db, env)
+                .and_then(|class| class.class_literal(db).into_enum_class(db)),
+            Type::LiteralValue(literal) => literal
+                .as_enum()
+                .map(|literal| literal.enum_class_literal(db)),
+            _ => self
+                .nominal_class(db, env)
+                .and_then(|class| class.class_literal(db).into_enum_class(db)),
+        }?;
+        let name = class.resolve_member(db, name)?;
+        Some(Type::enum_literal(EnumLiteralType::new(db, class, name)))
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -4620,25 +4877,12 @@ impl<'db> Type<'db> {
         );
         // A non-ClassVar declaration-only member describes instance storage but does not add a
         // value to the class namespace.
-        let own_class_member = if !own_class_member.is_class_var()
-            && class.static_class_literal(db).is_some_and(|(class, _)| {
-                let scope = class.body_scope(db);
-                place_table(db, scope)
-                    .symbol_id(name)
-                    .is_some_and(|symbol| {
-                        place_from_bindings(
-                            db,
-                            env,
-                            use_def_map(db, scope).end_of_scope_symbol_bindings(symbol),
-                        )
-                        .place
-                        .is_undefined()
-                    })
-            }) {
-            PlaceAndQualifiers::default()
-        } else {
-            own_class_member
-        };
+        let own_class_member =
+            if Self::has_own_class_namespace_value(db, env, class, name, own_class_member) {
+                own_class_member
+            } else {
+                PlaceAndQualifiers::default()
+            };
         let inherited_class_member = class.class_literal(db).class_member_from_mro(
             db,
             env,
@@ -5545,150 +5789,18 @@ impl<'db> Type<'db> {
             meta_attr_error,
         ) = Self::try_call_dunder_get_on_attribute(db, env, meta_attr_plain, Some(receiver), owner);
 
-        let meta_attr_error = meta_attr_error.map(MemberLookupErrorKind::DescriptorGet);
-        let meta_properties = meta_attr_ty.and_then(|ty| ty.property_deprecations(db));
-        let fallback_error = fallback.err().map(|error| error.kind(db));
-        let fallback_member = fallback.unwrap_or_else(|error| error.fallback_member(db));
-        let fallback_properties = fallback_member.deprecated_properties(db);
-        let fallback_member = fallback_member.member(db);
-
-        // A slot stores the same instance attribute described by the receiver's declarations.
-        // Unlike an arbitrary data descriptor, its inherited getter must not hide a more precise
-        // declaration established by the receiver's class.
-        if matches!(meta_attr, Place::Defined(_))
-            && matches!(meta_attr_ty, Some(Type::SlotDescriptor(_)))
-            && !fallback_member.place.is_undefined()
-        {
-            return fallback;
+        DescriptorAccess {
+            member: meta_attr.with_qualifiers(meta_attr_qualifiers),
+            kind: meta_attr_kind,
+            error: meta_attr_error,
+            properties: meta_attr_ty.and_then(|ty| ty.property_deprecations(db)),
+            slot: matches!(meta_attr_ty, Some(Type::SlotDescriptor(_))),
+            policy,
         }
-
-        let PlaceAndQualifiers {
-            place: fallback,
-            qualifiers: fallback_qualifiers,
-        } = fallback_member;
-
-        match (meta_attr, meta_attr_kind, fallback) {
-            // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
-            // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Defined(_), _, Place::Undefined) => member_lookup_result(
-                db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
-                meta_attr_error,
-                meta_properties,
-            ),
-
-            // `meta_attr` is the return type of a data descriptor and definitely bound, so we
-            // return it.
-            (
-                meta_attr @ Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-                AttributeKind::DataDescriptor,
-                _,
-            ) => member_lookup_result(
-                db,
-                meta_attr.with_qualifiers(meta_attr_qualifiers),
-                meta_attr_error,
-                meta_properties,
-            ),
-
-            // `meta_attr` is the return type of a data descriptor, but the attribute on the
-            // meta-type is possibly-unbound. This means that we "fall through" to the next
-            // stage of the descriptor protocol and union with the fallback type.
-            (
-                Place::Defined(DefinedPlace {
-                    ty: meta_attr_ty,
-                    origin: meta_origin,
-                    definedness: Definedness::PossiblyUndefined,
-                    provenance: meta_attr_provenance,
-                    ..
-                }),
-                AttributeKind::DataDescriptor,
-                Place::Defined(DefinedPlace {
-                    ty: fallback_ty,
-                    origin: fallback_origin,
-                    definedness: fallback_boundness,
-                    public_type_policy: fallback_public_type_policy,
-                    provenance: fallback_provenance,
-                }),
-            ) => member_lookup_result(
-                db,
-                Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
-                    origin: meta_origin.merge(fallback_origin),
-                    definedness: fallback_boundness,
-                    public_type_policy: fallback_public_type_policy,
-                    provenance: fallback_provenance.or(meta_attr_provenance),
-                })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                meta_attr_error.or(fallback_error),
-                union_deprecated_properties(db, meta_properties, fallback_properties),
-            ),
-
-            // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
-            // now the highest priority. However, we only return the pure `fallback` type if the
-            // policy allows it. When invoked on class objects, the policy is set to `Yes`, which
-            // means that class-level attributes (the fallback) can shadow non-data descriptors
-            // on metaclasses. However, for instances, the policy is set to `No`, because we do
-            // allow instance-level attributes to shadow class-level non-data descriptors. This
-            // would require us to statically infer if an instance attribute is always set, which
-            // is something we currently don't attempt to do.
-            (
-                Place::Defined(_),
-                AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ Place::Defined(DefinedPlace {
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }),
-            ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => member_lookup_result(
-                db,
-                fallback.with_qualifiers(fallback_qualifiers),
-                fallback_error,
-                fallback_properties,
-            ),
-
-            // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
-            // unbound or the policy argument is `No`. In both cases, the `fallback` type does
-            // not completely shadow the non-data descriptor, so we build a union of the two.
-            (
-                Place::Defined(DefinedPlace {
-                    ty: meta_attr_ty,
-                    origin: meta_origin,
-                    definedness: meta_attr_boundness,
-                    provenance: meta_attr_provenance,
-                    ..
-                }),
-                AttributeKind::NormalOrNonDataDescriptor,
-                Place::Defined(DefinedPlace {
-                    ty: fallback_ty,
-                    origin: fallback_origin,
-                    definedness: fallback_boundness,
-                    public_type_policy: fallback_public_type_policy,
-                    provenance: fallback_provenance,
-                }),
-            ) => member_lookup_result(
-                db,
-                Place::Defined(DefinedPlace {
-                    ty: UnionType::from_two_elements(db, env, meta_attr_ty, fallback_ty),
-                    origin: meta_origin.merge(fallback_origin),
-                    definedness: meta_attr_boundness.max(fallback_boundness),
-                    public_type_policy: fallback_public_type_policy,
-                    provenance: fallback_provenance.or(meta_attr_provenance),
-                })
-                .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
-                meta_attr_error.or(fallback_error),
-                union_deprecated_properties(db, meta_properties, fallback_properties),
-            ),
-
-            // If the attribute is not found on the meta-type, we simply return the fallback.
-            (Place::Undefined, _, fallback) => member_lookup_result(
-                db,
-                fallback.with_qualifiers(fallback_qualifiers),
-                fallback_error,
-                fallback_properties,
-            ),
-        }
+        .select(db, fallback, |left, right| {
+            UnionType::from_two_elements(db, env, left, right)
+        })
+        .0
     }
 
     /// Access an attribute of this type, potentially invoking the descriptor protocol.
@@ -5804,6 +5916,266 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Members synthesized entirely from a type's own representation. Both ordinary
+    /// lookup and lookup during a relation use these leaves; MRO and descriptor evaluation
+    /// remain with the lookup that owns their recursion context.
+    fn intrinsic_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+    ) -> Option<PlaceAndQualifiers<'db>> {
+        let member = match self {
+            _ if name == "__get__" && self.function_like_kind(db).is_some() => {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(db, self)),
+                ))
+                .into()
+            }
+            Type::FunctionLiteral(_) if name == "__call__" => Place::bound(Type::KnownBoundMethod(
+                KnownBoundMethodType::DunderCall(InternedType::new(db, self)),
+            ))
+            .into(),
+            Type::FunctionLiteral(function)
+                if matches!(name, "__func__" | "__wrapped__")
+                    && (function.is_staticmethod(db) || function.is_classmethod(db)) =>
+            {
+                Place::bound(self.underlying_function(db)).into()
+            }
+            Type::PropertyInstance(property) if name == "__get__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
+            )
+            .into(),
+            Type::PropertyInstance(property) if name == "__set__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
+            )
+            .into(),
+            Type::PropertyInstance(property) if name == "__delete__" => Place::bound(
+                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)),
+            )
+            .into(),
+
+            Type::LiteralValue(literal)
+                if name == "startswith"
+                    && let Some(string_literal) = literal.as_string() =>
+            {
+                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(
+                    string_literal,
+                )))
+                .into()
+            }
+
+            Type::ClassLiteral(class)
+                if name == "lower_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetLowerBound,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "upper_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetUpperBound,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "equality" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetEquality,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetRange,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "always" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetAlways,
+                ))
+                .into()
+            }
+            Type::ClassLiteral(class)
+                if name == "never" && class.is_known(db, KnownClass::ConstraintSet) =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetNever,
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "implies_subtype_of" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "satisfies" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetSatisfies(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) if name == "exists" => {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetExists(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked)) if name == "for_all" => {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetForAll(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "solutions_for" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetSolutionsFor(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "solutions" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetSolutions(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "is_always_satisfied" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "is_never_satisfied" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetIsNeverSatisfied(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "with_detailed_display" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
+                ))
+                .into()
+            }
+
+            Type::ClassLiteral(class)
+                if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
+            {
+                Place::bound(Type::WrapperDescriptor(
+                    WrapperDescriptorKind::FunctionTypeDunderGet,
+                ))
+                .into()
+            }
+            Type::Callable(callable)
+                if name == "__call__"
+                    && (callable.is_function_like(db) || callable.is_staticmethod_like(db)) =>
+            {
+                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
+                    InternedType::new(db, self),
+                )))
+                .into()
+            }
+            Type::Callable(_) | Type::DataclassTransformer(_) if name == "__call__" => {
+                Place::bound(self).into()
+            }
+
+            Type::Callable(callable)
+                if matches!(name, "__func__" | "__wrapped__")
+                    && (callable.is_staticmethod_like(db) || callable.is_classmethod_like(db)) =>
+            {
+                Place::bound(self.underlying_function(db)).into()
+            }
+            Type::NominalInstance(instance)
+                if matches!(name, "major" | "minor") && instance.is_sys_version_info() =>
+            {
+                let python_version = env.python_version(db);
+                let segment = if name == "major" {
+                    python_version.major
+                } else {
+                    python_version.minor
+                };
+                Place::bound(Type::int_literal(segment.into())).into()
+            }
+
+            Type::PropertyInstance(property) if name == "fget" => {
+                Place::bound(property.getter(db).unwrap_or(Type::none(db, env))).into()
+            }
+            Type::PropertyInstance(property) if name == "fset" => {
+                Place::bound(property.setter(db).unwrap_or(Type::none(db, env))).into()
+            }
+            Type::PropertyInstance(property) if name == "fdel" => {
+                Place::bound(property.deleter(db).unwrap_or(Type::none(db, env))).into()
+            }
+
+            Type::LiteralValue(literal)
+                if literal.is_int() && matches!(name, "real" | "numerator") =>
+            {
+                Place::bound(self).into()
+            }
+
+            Type::LiteralValue(literal)
+                if matches!(name, "real" | "numerator")
+                    && let Some(bool_value) = literal.as_bool() =>
+            {
+                Place::bound(Type::int_literal(i64::from(bool_value))).into()
+            }
+
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper))
+                if matches!(name, "__func__" | "__wrapped__") =>
+            {
+                Place::bound(wrapper.wrapped(db)).into()
+            }
+            Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper))
+                if name == "__call__" && wrapper.class(db) == KnownClass::Staticmethod =>
+            {
+                Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
+                    InternedType::new(db, self),
+                )))
+                .into()
+            }
+            Type::BoundMethod(bound_method) => match name {
+                "__call__" => Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::DunderCall(InternedType::new(db, self)),
+                ))
+                .into(),
+                "__get__" if env.python_version(db) >= ast::PythonVersion::PY313 => Place::bound(
+                    Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(bound_method)),
+                )
+                .into(),
+                "__self__" => Place::bound(bound_method.self_instance(db)).into(),
+                "__func__" => Place::bound(bound_method.func(db)).into(),
+                _ => return None,
+            },
+
+            _ => return None,
+        };
+        Some(member)
+    }
+
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
     pub(crate) fn member_lookup_with_policy(
@@ -5902,22 +6274,8 @@ impl<'db> Type<'db> {
 
                 // Enum members can be accessed through enum instances and other enum members,
                 // e.g. `answer.YES` or `Answer.YES.NO`.
-                if let Some(enum_class) = match this {
-                    Type::LiteralValue(literal) => literal
-                        .as_enum()
-                        .map(|enum_literal| enum_literal.enum_class_literal(db)),
-                    _ => this
-                        .nominal_class(db, env)
-                        .map(|class| class.class_literal(db))
-                        .and_then(|class| class.into_enum_class(db)),
-                } && let Some(resolved_name) = enum_class.resolve_member(db, name)
-                {
-                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                        db,
-                        enum_class,
-                        resolved_name,
-                    )))
-                    .into();
+                if let Some(member) = this.resolved_enum_member(db, env, name) {
+                    return Place::bound(member).into();
                 }
 
                 let fallback = this.instance_member(db, env, name_str);
@@ -5966,6 +6324,10 @@ impl<'db> Type<'db> {
             if let Some(fallback) = this.materialized_divergent_fallback() {
                 return fallback
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver);
+            }
+
+            if let Some(member) = this.intrinsic_member(db, env, name_str) {
+                return member.into();
             }
 
             match this {
@@ -6097,176 +6459,6 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
 
-                _ if name == "__get__" && this.function_like_kind(db).is_some() => {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::FunctionTypeDunderGet(InternedType::new(db, this)),
-                    ))
-                    .into()
-                }
-                Type::FunctionLiteral(_) if name == "__call__" => {
-                    Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
-                        InternedType::new(db, this),
-                    )))
-                    .into()
-                }
-                Type::FunctionLiteral(function)
-                    if matches!(name_str, "__func__" | "__wrapped__")
-                        && (function.is_staticmethod(db) || function.is_classmethod(db)) =>
-                {
-                    Place::bound(this.underlying_function(db)).into()
-                }
-                Type::PropertyInstance(property) if name == "__get__" => Place::bound(
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
-                )
-                .into(),
-                Type::PropertyInstance(property) if name == "__set__" => Place::bound(
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)),
-                )
-                .into(),
-                Type::PropertyInstance(property) if name == "__delete__" => Place::bound(
-                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(property)),
-                )
-                .into(),
-
-                Type::LiteralValue(literal)
-                    if name == "startswith"
-                        && let Some(string_literal) = literal.as_string() =>
-                {
-                    Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(
-                        string_literal,
-                    )))
-                    .into()
-                }
-
-                Type::ClassLiteral(class)
-                    if name == "lower_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetLowerBound,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "upper_bound" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetUpperBound,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "equality" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetEquality,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "range" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetRange,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "always" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetAlways,
-                    ))
-                    .into()
-                }
-                Type::ClassLiteral(class)
-                    if name == "never" && class.is_known(db, KnownClass::ConstraintSet) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetNever,
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "implies_subtype_of" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "satisfies" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetSatisfies(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "exists" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetExists(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "for_all" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetForAll(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "solutions_for" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetSolutionsFor(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "solutions" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetSolutions(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "is_always_satisfied" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetIsAlwaysSatisfied(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "is_never_satisfied" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetIsNeverSatisfied(tracked),
-                    ))
-                    .into()
-                }
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
-                    if name == "with_detailed_display" =>
-                {
-                    Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::ConstraintSetWithDetailedDisplay(tracked),
-                    ))
-                    .into()
-                }
-
-                Type::ClassLiteral(class)
-                    if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
-                {
-                    Place::bound(Type::WrapperDescriptor(
-                        WrapperDescriptorKind::FunctionTypeDunderGet,
-                    ))
-                    .into()
-                }
                 Type::ClassLiteral(_) | Type::GenericAlias(_)
                     if matches!(name_str, "__get__" | "__set__" | "__delete__")
                         && let Some(wrapper @ Type::WrapperDescriptor(_)) = this
@@ -6275,52 +6467,24 @@ impl<'db> Type<'db> {
                 {
                     Place::bound(wrapper).into()
                 }
-                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => match name_str {
-                    "__func__" | "__wrapped__" => Place::bound(wrapper.wrapped(db)).into(),
-                    "__call__" if wrapper.class(db) == KnownClass::Staticmethod => {
-                        Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
-                            InternedType::new(db, this),
-                        )))
-                        .into()
-                    }
-                    _ => wrapper
-                        .instance_fallback(db, env)
+
+                Type::KnownInstance(KnownInstanceType::MethodWrapper(wrapper)) => wrapper
+                    .instance_fallback(db, env)
+                    .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
+                Type::BoundMethod(bound_method) => {
+                    let result = KnownClass::MethodType
+                        .to_instance(db, env)
                         .member_lookup_with_policy_and_receiver(
                             db, env, name_str, policy, receiver,
-                        ),
-                },
-                Type::BoundMethod(bound_method) => match name_str {
-                    "__call__" => Place::bound(Type::KnownBoundMethod(
-                        KnownBoundMethodType::DunderCall(InternedType::new(db, this)),
-                    ))
-                    .into(),
-                    "__get__" if env.python_version(db) >= ast::PythonVersion::PY313 => {
-                        Place::bound(Type::KnownBoundMethod(
-                            KnownBoundMethodType::MethodTypeDunderGet(bound_method),
-                        ))
-                        .into()
-                    }
-                    "__self__" => Place::bound(bound_method.self_instance(db)).into(),
-                    "__func__" => Place::bound(bound_method.func(db)).into(),
-                    _ => {
-                        let result = KnownClass::MethodType
-                            .to_instance(db, env)
-                            .member_lookup_with_policy_and_receiver(
-                                db, env, name_str, policy, receiver,
-                            );
-                        member_lookup_or_fall_back_to(db, env, result, || {
-                            // If an attribute is not available on the bound method object,
-                            // it will be looked up on the underlying function object. This
-                            // changes the lookup object, so do not forward the bound-method
-                            // receiver.
-                            bound_method
-                                .func(db)
-                                .member_lookup_with_policy_and_receiver(
-                                    db, env, name_str, policy, None,
-                                )
-                        })
-                    }
-                },
+                        );
+                    member_lookup_or_fall_back_to(db, env, result, || {
+                        // Missing attributes on a method are looked up on the function object.
+                        // That changes the lookup object, so it also changes the receiver.
+                        bound_method
+                            .func(db)
+                            .member_lookup_with_policy_and_receiver(db, env, name_str, policy, None)
+                    })
+                }
                 Type::KnownBoundMethod(method) => method
                     .class()
                     .to_instance(db, env)
@@ -6332,67 +6496,12 @@ impl<'db> Type<'db> {
                     .to_instance(db, env)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
-                Type::Callable(callable)
-                    if name_str == "__call__"
-                        && (callable.is_function_like(db) || callable.is_staticmethod_like(db)) =>
-                {
-                    Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(
-                        InternedType::new(db, this),
-                    )))
-                    .into()
-                }
-                Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
-                    Place::bound(this).into()
-                }
-
-                Type::Callable(callable)
-                    if matches!(name_str, "__func__" | "__wrapped__")
-                        && (callable.is_staticmethod_like(db)
-                            || callable.is_classmethod_like(db)) =>
-                {
-                    Place::bound(this.underlying_function(db)).into()
-                }
                 Type::Callable(callable) if let Some(class) = callable.runtime_class(db) => class
                     .to_instance(db, env)
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
 
                 Type::Callable(_) | Type::DataclassTransformer(_) => Type::object()
                     .member_lookup_with_policy_and_receiver(db, env, name_str, policy, receiver),
-
-                Type::NominalInstance(instance)
-                    if matches!(name_str, "major" | "minor") && instance.is_sys_version_info() =>
-                {
-                    let python_version = env.python_version(db);
-                    let segment = if name == "major" {
-                        python_version.major
-                    } else {
-                        python_version.minor
-                    };
-                    Place::bound(Type::int_literal(segment.into())).into()
-                }
-
-                Type::PropertyInstance(property) if name == "fget" => {
-                    Place::bound(property.getter(db).unwrap_or(Type::none(db, env))).into()
-                }
-                Type::PropertyInstance(property) if name == "fset" => {
-                    Place::bound(property.setter(db).unwrap_or(Type::none(db, env))).into()
-                }
-                Type::PropertyInstance(property) if name == "fdel" => {
-                    Place::bound(property.deleter(db).unwrap_or(Type::none(db, env))).into()
-                }
-
-                Type::LiteralValue(literal)
-                    if literal.is_int() && matches!(name_str, "real" | "numerator") =>
-                {
-                    Place::bound(this).into()
-                }
-
-                Type::LiteralValue(literal)
-                    if matches!(name_str, "real" | "numerator")
-                        && let Some(bool_value) = literal.as_bool() =>
-                {
-                    Place::bound(Type::int_literal(i64::from(bool_value))).into()
-                }
 
                 Type::ModuleLiteral(module) => module.static_member(db, env, name_str),
 
@@ -6596,23 +6705,8 @@ impl<'db> Type<'db> {
                     let receiver = receiver
                         .filter(|receiver| receiver.to_instance_approximation(db, env).is_some())
                         .unwrap_or(this);
-                    let enum_class = match this {
-                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
-                        Type::SubclassOf(subclass_of) => subclass_of
-                            .subclass_of()
-                            .into_class(db, env)
-                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
-                        _ => None,
-                    };
-                    if let Some(enum_class) = enum_class
-                        && let Some(resolved_name) = enum_class.resolve_member(db, name)
-                    {
-                        return Place::bound(Type::enum_literal(EnumLiteralType::new(
-                            db,
-                            enum_class,
-                            resolved_name,
-                        )))
-                        .into();
+                    if let Some(member) = this.resolved_enum_member(db, env, name) {
+                        return Place::bound(member).into();
                     }
 
                     let class_attr_plain = this.class_object_member(db, env, name_str, policy);

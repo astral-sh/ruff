@@ -37,16 +37,36 @@ pub(super) enum ObservationEdge {
     GenericArgument(usize),
     SpecializationTuple,
     FunctionImplementationCallable(usize),
+    UnderlyingFunction,
+    PropertyGetter,
+    IntrinsicMember(Name),
+    EnumMember(Name),
     ClassView,
+    MetaType,
     ClassBase(usize),
     ClassMetaclassInstance,
+    /// The guaranteed `type` base of an otherwise gradual metaclass.
+    GradualMetaclassBase,
+    SubclassInstance,
+    TransposedSubclassVariable,
     CallableOverload(usize),
-    CallableParameter { overload: usize, parameter: usize },
-    CallableReturn { overload: usize },
+    CallableParameter {
+        overload: usize,
+        parameter: usize,
+    },
+    CallableReturn {
+        overload: usize,
+    },
     TypedDictField(Name),
     TypedDictExtraItems,
-    ProtocolMemberRead { name: Name, class_access: bool },
-    ProtocolMemberWrite { name: Name, class_access: bool },
+    ProtocolMemberRead {
+        name: Name,
+        class_access: bool,
+    },
+    ProtocolMemberWrite {
+        name: Name,
+        class_access: bool,
+    },
 }
 
 impl ObservationEdge {
@@ -84,6 +104,35 @@ pub(super) struct CallableSelfBinding<'db> {
     pub(super) self_type: Type<'db>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+enum CallableBindingMode {
+    /// Apply a previously captured receiver to retained constraints.
+    Apply,
+    /// Consume the first parameter and retain any receiver constraint.
+    Capture,
+}
+
+impl CallableBindingMode {
+    fn bind<'db>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        callable: CallableType<'db>,
+        binding: CallableSelfBinding<'db>,
+    ) -> CallableType<'db> {
+        match self {
+            Self::Apply => protocol_apply_self_with_receiver(
+                db,
+                env.program(db),
+                callable,
+                binding.receiver,
+                binding.self_type,
+            ),
+            Self::Capture => callable.bind_self(db, env, binding.receiver, binding.self_type),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum ObservedOperationKind<'db> {
     Mapping(RecursiveOperation<'db>),
@@ -91,6 +140,7 @@ enum ObservedOperationKind<'db> {
         callable: CallableType<'db>,
         binding: CallableSelfBinding<'db>,
         path_depth: usize,
+        mode: CallableBindingMode,
     },
 }
 
@@ -123,6 +173,7 @@ enum ObservationRecipeShape<'db> {
     Expression,
     Normalized(Arc<[ObservationRecipe<'db>]>),
     Merged(Arc<[ObservationRecipe<'db>]>),
+    Constructed(Arc<[(ObservationEdge, ObservationRecipe<'db>)]>),
     Unresolved(Arc<[Arc<ObservedTypeOrigin<'db>>]>),
 }
 
@@ -178,16 +229,22 @@ enum ObservedShape<'db> {
     Expression,
     Normalized(Rc<[ObservedType<'db>]>),
     Merged(Rc<[ObservedType<'db>]>),
+    /// A result assembled from separate observed inputs retains their exact stored positions.
+    Constructed(Rc<[(ObservationEdge, ObservedType<'db>)]>),
     /// A semantic helper has not exposed the edge producing its result. Keep that dependency
     /// unresolved rather than pretending its result is an independent proof root.
     Unresolved(Rc<[Rc<ObservedTypeOrigin<'db>>]>),
 }
+
+type ObservedFields<'db> = [(ObservationEdge, ObservedType<'db>)];
+type RecipeFields<'db> = [(ObservationEdge, ObservationRecipe<'db>)];
 
 /// Preserve graph sharing when removing session-local observation state from stored bounds.
 /// These keys identify allocations within this conversion, never types or proof identities.
 #[derive(Default)]
 struct RecipeBuilder<'db> {
     children: FxHashMap<*const [ObservedType<'db>], Arc<[ObservationRecipe<'db>]>>,
+    fields: FxHashMap<*const ObservedFields<'db>, Arc<RecipeFields<'db>>>,
     origins: FxHashMap<*const ObservedTypeOrigin<'db>, Arc<ObservedTypeOrigin<'db>>>,
 }
 
@@ -201,6 +258,20 @@ impl<'db> RecipeBuilder<'db> {
             }
             ObservedShape::Merged(children) => {
                 ObservationRecipeShape::Merged(self.children(children))
+            }
+            ObservedShape::Constructed(fields) => {
+                let key = Rc::as_ptr(fields);
+                let fields = if let Some(recipes) = self.fields.get(&key) {
+                    Arc::clone(recipes)
+                } else {
+                    let recipes: Arc<[_]> = fields
+                        .iter()
+                        .map(|(edge, field)| (edge.clone(), self.recipe(field)))
+                        .collect();
+                    self.fields.insert(key, Arc::clone(&recipes));
+                    recipes
+                };
+                ObservationRecipeShape::Constructed(fields)
             }
             ObservedShape::Unresolved(origins) => ObservationRecipeShape::Unresolved(
                 origins
@@ -238,6 +309,7 @@ impl<'db> RecipeBuilder<'db> {
 #[derive(Default)]
 struct ObservationBuilder<'db> {
     children: FxHashMap<*const [ObservationRecipe<'db>], Rc<[ObservedType<'db>]>>,
+    fields: FxHashMap<*const RecipeFields<'db>, Rc<ObservedFields<'db>>>,
     origins: FxHashMap<*const ObservedTypeOrigin<'db>, Rc<ObservedTypeOrigin<'db>>>,
 }
 
@@ -251,6 +323,20 @@ impl<'db> ObservationBuilder<'db> {
             }
             ObservationRecipeShape::Merged(children) => {
                 ObservedShape::Merged(self.children(children))
+            }
+            ObservationRecipeShape::Constructed(fields) => {
+                let key = Arc::as_ptr(fields);
+                let fields = if let Some(observed) = self.fields.get(&key) {
+                    Rc::clone(observed)
+                } else {
+                    let observed: Rc<[_]> = fields
+                        .iter()
+                        .map(|(edge, field)| (edge.clone(), self.observe(field)))
+                        .collect();
+                    self.fields.insert(key, Rc::clone(&observed));
+                    observed
+                };
+                ObservedShape::Constructed(fields)
             }
             ObservationRecipeShape::Unresolved(origins) => ObservedShape::Unresolved(
                 origins
@@ -285,6 +371,18 @@ impl<'db> ObservationBuilder<'db> {
 }
 
 impl<'db> ObservedType<'db> {
+    /// The caller has constructed `ty` from these fields. Only the provided edges have exact
+    /// occurrences; any other query on the result keeps the field dependencies unresolved.
+    pub(super) fn constructed(
+        ty: Type<'db>,
+        fields: impl IntoIterator<Item = (ObservationEdge, Self)>,
+    ) -> Self {
+        Self {
+            ty,
+            origin: None,
+            shape: ObservedShape::Constructed(fields.into_iter().collect()),
+        }
+    }
     /// Retain every contributing expression when a bound operation has no exact projection.
     pub(super) fn dependent_on(ty: Type<'db>, contributors: &[Self]) -> Self {
         let mut dependencies = Vec::new();
@@ -661,6 +759,10 @@ impl<'db> ObservedType<'db> {
                         .map_or_else(|| child.dependency_origins(), |origin| vec![origin])
                 })
                 .collect(),
+            ObservedShape::Constructed(fields) => fields
+                .iter()
+                .flat_map(|(_, field)| field.input_origins())
+                .collect(),
             _ => Vec::new(),
         }
     }
@@ -726,6 +828,13 @@ impl<'db> ObservedType<'db> {
             ObservedShape::Root => self.root_expression().child_at_impl(db, env, ty, edge),
             ObservedShape::Unresolved(_) => self.unchanged_or_unresolved(ty),
             ObservedShape::Normalized(_) => self.unchanged_or_unresolved(ty),
+            ObservedShape::Constructed(fields) => fields
+                .iter()
+                .find(|(position, _)| position == &edge)
+                .map_or_else(
+                    || self.unchanged_or_unresolved(ty),
+                    |(_, field)| field.unchanged_or_unresolved(ty),
+                ),
             ObservedShape::Merged(children) => {
                 let children = children
                     .iter()
@@ -737,7 +846,39 @@ impl<'db> ObservedType<'db> {
                 let Some(origin) = &self.origin else {
                     return self.unchanged_or_unresolved(ty);
                 };
-                if let Some(template) = observation_child(db, env, origin.node.template, &edge) {
+                // Capturing a positional receiver shifts the remaining parameter positions.
+                // Select that input position before recording the output edge.
+                let mut input_edge = edge.clone();
+                if let ObservationEdge::CallableParameter {
+                    overload,
+                    parameter,
+                } = edge
+                {
+                    for operation in &origin.operations {
+                        if let ObservedOperationKind::CallableBinding {
+                            callable,
+                            path_depth,
+                            mode: CallableBindingMode::Capture,
+                            ..
+                        } = &operation.operation
+                            && *path_depth == origin.node.path.len()
+                            && callable
+                                .signatures(db)
+                                .overloads
+                                .get(overload)
+                                .and_then(|signature| signature.parameters().get(0))
+                                .is_some_and(Parameter::is_positional)
+                        {
+                            input_edge = ObservationEdge::CallableParameter {
+                                overload,
+                                parameter: parameter + 1,
+                            };
+                        }
+                    }
+                }
+                if let Some(template) =
+                    observation_child(db, env, origin.node.template, &input_edge)
+                {
                     let mut path = origin.node.path.to_vec();
                     path.push(edge.clone());
                     let child_origin = ObservedTypeOrigin {
@@ -875,6 +1016,7 @@ impl<'db> ObservedType<'db> {
                     callable,
                     binding,
                     path_depth,
+                    mode,
                 } => {
                     let edge = origin.node.path.get(*path_depth);
                     let overload = match edge {
@@ -882,13 +1024,7 @@ impl<'db> ObservedType<'db> {
                             let Type::Callable(callable) = mapped else {
                                 return None;
                             };
-                            mapped = Type::Callable(protocol_apply_self_with_receiver(
-                                db,
-                                env.program(db),
-                                callable,
-                                binding.receiver,
-                                binding.self_type,
-                            ));
+                            mapped = Type::Callable(mode.bind(db, env, callable, *binding));
                             continue;
                         }
                         Some(
@@ -901,13 +1037,7 @@ impl<'db> ObservedType<'db> {
                                     let Type::Callable(callable) = mapped else {
                                         return None;
                                     };
-                                    mapped = Type::Callable(protocol_apply_self_with_receiver(
-                                        db,
-                                        env.program(db),
-                                        callable,
-                                        binding.receiver,
-                                        binding.self_type,
-                                    ));
+                                    mapped = Type::Callable(mode.bind(db, env, callable, *binding));
                                     continue;
                                 }
                                 Some(
@@ -952,6 +1082,22 @@ impl<'db> ObservedType<'db> {
         let ty =
             self.ty
                 .apply_type_mapping_impl(db, mapping, TypeContext::default(), &mapping_visitor);
+        if let ObservedShape::Constructed(fields) = &self.shape {
+            return Self::constructed(
+                ty,
+                fields.iter().map(|(edge, field)| {
+                    let field_mapping = if edge.is_contravariant() {
+                        mapping.flip()
+                    } else {
+                        mapping.clone()
+                    };
+                    (
+                        edge.clone(),
+                        field.apply_mapping(db, &field_mapping, &mapping_visitor),
+                    )
+                }),
+            );
+        }
         if let ObservedShape::Unresolved(origins) = &self.shape {
             return Self {
                 ty,
@@ -1044,19 +1190,34 @@ impl<'db> ObservedType<'db> {
         env: &ProgramEnvironment<'db>,
         binding: CallableSelfBinding<'db>,
     ) -> Self {
+        self.record_callable_binding(db, env, binding, CallableBindingMode::Apply)
+    }
+
+    pub(super) fn capture_callable_receiver(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: CallableSelfBinding<'db>,
+    ) -> Self {
+        self.record_callable_binding(db, env, binding, CallableBindingMode::Capture)
+    }
+
+    fn record_callable_binding(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        binding: CallableSelfBinding<'db>,
+        mode: CallableBindingMode,
+    ) -> Self {
         if matches!(self.shape, ObservedShape::Root) {
-            return self.root_expression().bind_callable_self(db, env, binding);
+            return self
+                .root_expression()
+                .record_callable_binding(db, env, binding, mode);
         }
         let Type::Callable(callable) = self.ty else {
             return self.unresolved();
         };
-        let ty = Type::Callable(protocol_apply_self_with_receiver(
-            db,
-            env.program(db),
-            callable,
-            binding.receiver,
-            binding.self_type,
-        ));
+        let ty = Type::Callable(mode.bind(db, env, callable, binding));
         let Some(origin) = &self.origin else {
             return self.unchanged_or_unresolved(ty);
         };
@@ -1066,6 +1227,7 @@ impl<'db> ObservedType<'db> {
                 callable,
                 binding,
                 path_depth: origin.node.path.len(),
+                mode,
             },
             contravariant: false,
         });
@@ -1463,6 +1625,25 @@ fn observation_child<'db>(
                 .for_inheritance(db, env)
                 .to_instance_approximation(db, env)
         }
+        (Type::SubclassOf(subclass), ObservationEdge::GradualMetaclassBase)
+            if subclass.is_dynamic() =>
+        {
+            Some(super::KnownClass::Type.to_instance(db, env))
+        }
+        (Type::SubclassOf(subclass), ObservationEdge::SubclassInstance) => {
+            Some(subclass.to_instance(db, env))
+        }
+        (Type::SubclassOf(subclass), ObservationEdge::TransposedSubclassVariable)
+            if subclass.into_type_var().is_some() =>
+        {
+            let SubclassOfInner::TypeVar(variable) =
+                subclass.subclass_of().with_transposed_type_var(db, env)
+            else {
+                return None;
+            };
+            Some(Type::TypeVar(variable))
+        }
+        (_, ObservationEdge::MetaType) => Some(template.to_meta_type(db, env)),
         (_, ObservationEdge::ClassBase(index)) => {
             let class = match template {
                 Type::ClassLiteral(class) => ClassType::NonGeneric(class),
@@ -1482,12 +1663,21 @@ fn observation_child<'db>(
                 Type::GenericAlias(alias) => ClassType::Generic(alias),
                 Type::SubclassOf(subclass) => match subclass.subclass_of() {
                     SubclassOfInner::Class(class) => class,
+                    SubclassOfInner::Protocol(protocol) => *protocol.class_origin(db)?,
                     _ => return None,
                 },
                 _ => template.nominal_class(db, env)?,
             };
             Some(class.into())
         }
+        (Type::PropertyInstance(property), ObservationEdge::PropertyGetter) => property.getter(db),
+        (ty, ObservationEdge::UnderlyingFunction) if ty.function_like_kind(db).is_some() => {
+            Some(ty.underlying_function(db))
+        }
+        (ty, ObservationEdge::IntrinsicMember(name)) => ty
+            .intrinsic_member(db, env, name)
+            .and_then(|member| member.place.ignore_possibly_undefined()),
+        (ty, ObservationEdge::EnumMember(name)) => ty.resolved_enum_member(db, env, name),
         (Type::Union(union), ObservationEdge::UnionElement(index)) => {
             union.elements(db).get(*index).copied()
         }
@@ -1566,6 +1756,26 @@ fn observation_child<'db>(
                 _ => None,
             }
         }
+        (
+            Type::SubclassOf(subclass),
+            ObservationEdge::ProtocolMemberRead {
+                name,
+                class_access: true,
+            },
+        ) if let SubclassOfInner::Protocol(protocol) = subclass.subclass_of() => protocol
+            .interface(db)
+            .meta_member(db, env, template, name)
+            .and_then(|member| member.place.ignore_possibly_undefined()),
+        (
+            Type::SubclassOf(subclass),
+            ObservationEdge::ProtocolMemberWrite {
+                name,
+                class_access: true,
+            },
+        ) if let SubclassOfInner::Protocol(protocol) = subclass.subclass_of() => protocol
+            .interface(db)
+            .meta_write_requirement(db, env, template, name)
+            .and_then(|(domain, _)| domain),
         (
             _,
             edge @ (ObservationEdge::ProtocolMemberRead { .. }

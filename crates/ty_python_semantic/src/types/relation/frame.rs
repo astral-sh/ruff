@@ -2,9 +2,12 @@
 
 use std::rc::Rc;
 
+use ruff_python_ast::name::Name;
+
 use super::{RelationSession, TypeRelation, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::ApplyTypeMappingVisitor;
 use crate::types::constraints::{ConstraintProvenance, ConstraintSetBuilder, OwnedConstraintSet};
+use crate::types::member_observation::MemberLookupOptions;
 use crate::types::projection::{ObservedType, ObservedTypePair};
 use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
@@ -102,6 +105,30 @@ impl<'db> RelationContext<'db> {
         self.observe_goal(db, operand, super::RelationGoal::CallableUpcast, work)
     }
 
+    /// Resolve a member within the proof that requested it. Both the lookup view and the
+    /// runtime receiver contribute to recurrence, as do the member name, lookup policy, and
+    /// whether the caller needs the value or only its presence.
+    pub(in crate::types) fn member_lookup<R>(
+        &self,
+        db: &'db dyn Db,
+        lookup: &ObservedType<'db>,
+        receiver: &ObservedType<'db>,
+        name: &str,
+        options: MemberLookupOptions,
+        work: impl FnOnce() -> Option<R>,
+    ) -> Option<R> {
+        self.observe_pair(
+            db,
+            lookup,
+            receiver,
+            super::RelationGoal::MemberLookup {
+                name: Name::new(name),
+                options,
+            },
+            work,
+        )
+    }
+
     fn observe_goal<R>(
         &self,
         db: &'db dyn Db,
@@ -109,11 +136,22 @@ impl<'db> RelationContext<'db> {
         goal: super::RelationGoal,
         work: impl FnOnce() -> Option<R>,
     ) -> Option<R> {
+        self.observe_pair(db, operand, operand, goal, work)
+    }
+
+    fn observe_pair<R>(
+        &self,
+        db: &'db dyn Db,
+        source: &ObservedType<'db>,
+        target: &ObservedType<'db>,
+        goal: super::RelationGoal,
+        work: impl FnOnce() -> Option<R>,
+    ) -> Option<R> {
         self.session.with_polarity(self.negative, || {
             let obligation = super::ObservedRelationObligation {
                 obligation: super::RelationObligation {
-                    source: operand.ty,
-                    target: operand.ty,
+                    source: source.ty,
+                    target: target.ty,
                     relation: goal,
                     evaluation: TypeVarEvaluation::Eager,
                     inferable: TypeVarSet::None,
@@ -121,10 +159,10 @@ impl<'db> RelationContext<'db> {
                     perform_expensive_checks: self.perform_expensive_checks,
                     negative: self.negative,
                 },
-                source_origin: operand.origin(),
-                target_origin: operand.origin(),
-                source_dependency: operand.dependency_origins(),
-                target_dependency: operand.dependency_origins(),
+                source_origin: source.origin(),
+                target_origin: target.origin(),
+                source_dependency: source.dependency_origins(),
+                target_dependency: target.dependency_origins(),
             };
             match self.session.visit(db, obligation, work) {
                 Ok(result) => result,
@@ -423,6 +461,111 @@ impl<'db> super::DisjointnessChecker<'_, '_, 'db> {
             provenance: self.provenance,
             negative: self.constraints.relation_session().is_negative(),
             perform_expensive_checks: self.perform_expensive_checks,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::Cell;
+
+    use super::{MemberLookupOptions, RelationContext};
+    use crate::db::tests::setup_db;
+    use crate::types::member_observation::MemberLookupDemand;
+    use crate::types::projection::ObservedType;
+    use crate::types::{KnownClass, MemberLookupPolicy, Type};
+
+    #[test]
+    fn member_lookup_can_resolve_distinct_nested_requests() {
+        let db = setup_db();
+        let env = db.program_environment();
+        let context = RelationContext::default();
+        let lookup = ObservedType::root(Type::object());
+        let receiver = ObservedType::root(KnownClass::Int.to_instance(&db, &env));
+        let other = ObservedType::root(KnownClass::Str.to_instance(&db, &env));
+        let policy = MemberLookupPolicy::empty();
+        let value = MemberLookupDemand::Value;
+        let options = MemberLookupOptions {
+            policy,
+            demand: value,
+        };
+        let before = context.session.incomplete_epoch();
+        let resolved = context.member_lookup(&db, &lookup, &receiver, "value", options, || {
+            // Descriptor resolution can change the member, policy, demand, runtime receiver, or
+            // lookup view without returning to the operation that requested it.
+            [
+                (&lookup, &receiver, "__get__", policy, value),
+                (
+                    &lookup,
+                    &receiver,
+                    "value",
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                    value,
+                ),
+                (&lookup, &other, "value", policy, value),
+                (&other, &receiver, "value", policy, value),
+                (
+                    &lookup,
+                    &receiver,
+                    "value",
+                    policy,
+                    MemberLookupDemand::Presence,
+                ),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(index, (lookup, receiver, name, policy, demand))| {
+                context.member_lookup(
+                    &db,
+                    lookup,
+                    receiver,
+                    name,
+                    MemberLookupOptions { policy, demand },
+                    || Some(index),
+                )
+            })
+            .collect::<Option<Vec<_>>>()
+        });
+        assert_eq!(resolved, Some(vec![0, 1, 2, 3, 4]));
+        assert_eq!(context.session.incomplete_epoch(), before);
+        assert!(!context.session.is_active());
+    }
+
+    #[test]
+    fn member_lookup_reentry_is_incomplete_under_either_polarity() {
+        let db = setup_db();
+        let operand = ObservedType::root(Type::object());
+        let options = MemberLookupOptions {
+            policy: MemberLookupPolicy::empty(),
+            demand: MemberLookupDemand::Value,
+        };
+        for outer_negative in [false, true] {
+            for inner_negative in [false, true] {
+                let outer = RelationContext {
+                    negative: outer_negative,
+                    ..RelationContext::default()
+                };
+                let inner = RelationContext {
+                    negative: inner_negative,
+                    ..outer.clone()
+                };
+                let repeated_work = Cell::new(false);
+                let before = outer.session.incomplete_epoch();
+                let resolved =
+                    outer.member_lookup(&db, &operand, &operand, "value", options, || {
+                        inner.member_lookup(&db, &operand, &operand, "value", options, || {
+                            repeated_work.set(true);
+                            Some(Type::object())
+                        })
+                    });
+                // Repeating an operation supplies neither its value nor a proof, even when
+                // the enclosing caller will negate the result of a later relation.
+                assert_eq!(resolved, None);
+                assert!(!repeated_work.get());
+                assert!(outer.session.incomplete_epoch() > before);
+                assert!(!outer.session.is_active());
+                assert!(!outer.session.is_negative());
+            }
         }
     }
 }

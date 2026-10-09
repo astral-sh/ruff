@@ -3802,6 +3802,79 @@ def as_chain(value: Implementation[int]) -> Chain[int]:
     return value  # no diagnostic
 ```
 
+## Class objects returned by recursive descriptors
+
+A descriptor can return a class object whose next member wraps the same type argument again. Both
+the initial instance and the resulting class objects satisfy the recursive protocol.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Node(Protocol):
+    @property
+    def next(self) -> "Node": ...
+
+class Next(Generic[T]):
+    def __get__(self, instance: object, owner: type | None = None) -> type["Implementation[list[T]]"]:
+        raise NotImplementedError
+
+class Implementation(Generic[T]):
+    next = Next[T]()
+
+def as_node(value: Implementation[int]) -> Node:
+    return value  # no diagnostic
+
+def class_as_node(value: type[Implementation[int]]) -> Node:
+    return value  # no diagnostic
+
+def inspect(value: Implementation[int]) -> None:
+    reveal_type(value.next)  # revealed: type[Implementation[list[int]]]
+    reveal_type(value.next.next)  # revealed: type[Implementation[list[list[int]]]]
+    valid: type[Implementation[list[int]]] = value.next  # no diagnostic
+    invalid: str = value.next  # error: [invalid-assignment]
+```
+
+## Recursive descriptor overloads change the next member
+
+The first getter returns another class object, but that class's getter returns an integer. The
+initial successful lookup does not establish the recursive protocol requirement.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T")
+
+class Node(Protocol):
+    @property
+    def next(self) -> "Node": ...
+
+class Next(Generic[T]):
+    @overload
+    def __get__(self: "Next[int]", instance: object, owner: type | None = None) -> type["Implementation[list[int]]"]: ...
+    @overload
+    def __get__(self: "Next[list[int]]", instance: object, owner: type | None = None) -> int: ...
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Implementation(Generic[T]):
+    next = Next[T]()
+
+def incompatible(value: Implementation[int]) -> Node:
+    return value  # error: [invalid-return-type]
+```
+
 ## Recursive payloads remain visible after specialization
 
 The initial integer payload agrees with the protocol. The next step requires a list payload, so a

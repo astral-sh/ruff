@@ -2,6 +2,7 @@ use super::*;
 use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::call::bind::CallableDescription;
+use crate::types::tuple::Tuple;
 use crate::types::type_alias::PEP695TypeAliasType;
 use crate::types::typevar::TypeVarSet;
 use crate::{Db, ProgramEnvironment};
@@ -1240,4 +1241,118 @@ fn transformation_frames_distinguish_substitutions_and_promotion_kinds() {
     );
     assert!(classes_only.is_function_literal());
     assert!(matches!(regular, Type::Callable(_)));
+}
+
+#[test]
+fn recursive_promotion_preserves_prefixes_and_transforms_successive_arguments() {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+from typing import Literal
+type Node[T] = tuple[T, Node[tuple[T]] | None]
+source: Node[Literal[1]]
+expected: Node[int]
+"#,
+    )
+    .unwrap();
+    let env = db.program_environment();
+    let file = ProgramFile::new(
+        &db,
+        system_path_to_file(&db, "/src/a.py").unwrap(),
+        env.program(&db),
+    );
+    let explicit_literal = global_symbol(&db, file, "source").place.expect_type();
+    let Type::TypeAlias(alias) = explicit_literal else {
+        panic!("expected an alias application");
+    };
+    let source = Type::TypeAlias(alias.apply_specialization(&db, |context| {
+        context.specialize(&db, [Type::int_literal(1)].as_slice())
+    }));
+    let expected = global_symbol(&db, file, "expected").place.expect_type();
+    let visitor = ApplyTypeMappingVisitor::new_for_type_construction(&env);
+    assert_eq!(explicit_literal.promote(&db, &env), explicit_literal);
+    let promoted = source.apply_type_mapping_impl(
+        &db,
+        &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
+        TypeContext::default(),
+        &visitor,
+    );
+    let body = promoted.resolve_type_alias(&db);
+    let tuple = body.exact_tuple_instance_spec(&db).unwrap();
+    let Tuple::Fixed(tuple) = tuple.as_ref() else {
+        panic!("expected a fixed outer tuple");
+    };
+    assert_eq!(
+        tuple.elements_slice()[0],
+        KnownClass::Int.to_instance(&db, &env)
+    );
+    let tail = tuple.elements_slice()[1];
+    let Type::Union(tail) = tail else {
+        panic!("expected the optional recursive tail");
+    };
+    let next = tail
+        .elements(&db)
+        .iter()
+        .copied()
+        .find(|ty| !ty.is_none(&db))
+        .unwrap();
+    let next = next
+        .resolve_type_alias(&db)
+        .exact_tuple_instance_spec(&db)
+        .unwrap();
+    let Tuple::Fixed(next) = next.as_ref() else {
+        panic!("expected another fixed tuple");
+    };
+    assert_eq!(
+        next.elements_slice()[0],
+        Type::heterogeneous_tuple(&db, &env, [KnownClass::Int.to_instance(&db, &env)])
+    );
+    assert!(promoted.is_equivalent_to(&db, &env, expected));
+    assert!(!promoted.is_equivalent_to(&db, &env, source));
+}
+
+#[test]
+fn alias_operations_keep_materialization_before_later_substitution() {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        "from typing import Any\ntype Ordered[T] = tuple[T, Any]",
+    )
+    .unwrap();
+    let env = db.program_environment();
+    let file = ProgramFile::new(
+        &db,
+        system_path_to_file(&db, "/src/a.py").unwrap(),
+        env.program(&db),
+    );
+    let Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) =
+        global_symbol(&db, file, "Ordered").place.expect_type()
+    else {
+        panic!("expected an alias");
+    };
+    let context = alias.generic_context(&db).unwrap();
+    let parameter = context.variables(&db).next().unwrap();
+    let expression = Type::TypeAlias(
+        alias.apply_specialization(&db, |context| context.identity_specialization(&db)),
+    );
+    let mapping =
+        TypeMapping::ApplySpecialization(ApplySpecialization::Single(parameter, Type::any()));
+    let visitor = ApplyTypeMappingVisitor::new_for_type_construction(&env);
+    let materialized_first = expression
+        .materialize(&db, MaterializationKind::Top, &visitor)
+        .apply_type_mapping_impl(&db, &mapping, TypeContext::default(), &visitor)
+        .resolve_type_alias(&db);
+    let substituted_first = expression
+        .apply_type_mapping_impl(&db, &mapping, TypeContext::default(), &visitor)
+        .materialize(&db, MaterializationKind::Top, &visitor)
+        .resolve_type_alias(&db);
+    assert_eq!(
+        materialized_first,
+        Type::heterogeneous_tuple(&db, &env, [Type::any(), Type::object()])
+    );
+    assert_eq!(
+        substituted_first,
+        Type::heterogeneous_tuple(&db, &env, [Type::object(), Type::object()])
+    );
 }

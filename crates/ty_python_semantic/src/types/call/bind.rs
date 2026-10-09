@@ -53,13 +53,16 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
+    ApplySpecialization, GenericContext, Specialization, SpecializationBuilder,
+    SpecializationError, TypeVarInference,
 };
 use crate::types::infer::original_class_type;
 use crate::types::known_instance::{
     FieldInstance, InternedConstraintSetSolution, MethodWrapper, MethodWrapperKind,
 };
-use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
+use crate::types::projection::{
+    CallableSelfBinding, ObservationEdge, ObservedType, ObservedTypePair,
+};
 use crate::types::relation::RelationContext;
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
@@ -74,12 +77,13 @@ use crate::types::visitor::{
     walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BindingContext, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral, CycleDetector,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, TypeContext, TypeIdentity,
-    TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder,
-    UnionType, WrapperDescriptorKind, enums, is_property_method, list_members,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, CycleDetector, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
+    GenericAlias, InternedConstraintSet, IntersectionBuilder, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
+    PropertyInstanceType, TypeContext, TypeIdentity, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    is_property_method, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -320,6 +324,23 @@ impl<'db> CallableItem<'db> {
         }
     }
 
+    fn observed_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
+    ) -> ObservedType<'db> {
+        let observed = self.callable().observed_return_type(db, env, context);
+        match self {
+            Self::Regular(_) => observed,
+            // Constructor selection can replace a declared return with an inferred instance or
+            // a downstream result. Preserve its call dependency when no exact projection exists.
+            Self::Constructor(binding) => {
+                observed.unchanged_or_unresolved(binding.return_type(db, env))
+            }
+        }
+    }
+
     fn check_types(
         &mut self,
         db: &'db dyn Db,
@@ -517,6 +538,34 @@ impl<'db> BindingsElement<'db> {
         } else {
             Type::unknown()
         }
+    }
+
+    fn observed_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
+    ) -> ObservedType<'db> {
+        let mut items = self.items.iter().filter(|item| item.is_callable());
+        let Some(first) = items.next() else {
+            let inputs: Vec<_> = self
+                .items
+                .iter()
+                .map(|item| item.observed_return_type(db, env, context))
+                .collect();
+            return ObservedType::dependent_on(Type::unknown(), &inputs);
+        };
+        let first = first.observed_return_type(db, env, context);
+        let Some(second) = items.next() else {
+            return first;
+        };
+        let mut result = IntersectionBuilder::new(db, env).with_observed_context(context.clone());
+        result.add_positive_observed_in_place(&first);
+        result.add_positive_observed_in_place(&second.observed_return_type(db, env, context));
+        for item in items {
+            result.add_positive_observed_in_place(&item.observed_return_type(db, env, context));
+        }
+        result.build_observed()
     }
 
     /// Check types for all bindings in this element.
@@ -1300,6 +1349,26 @@ impl<'db> Bindings<'db> {
         observed: &ObservedType<'db>,
     ) -> Self {
         for callable in self.iter_flat_mut() {
+            // Ordinary methods keep the receiver as an implicit call argument; synthesized
+            // or constrained methods may already have consumed it. Observe the same signature
+            // in either case, beginning with the function that supplied the method.
+            let (source, captured) = if let Type::BoundMethod(method) = observed.ty {
+                (
+                    observed
+                        .project(
+                            db,
+                            env,
+                            ObservationEdge::IntrinsicMember(Name::new_static("__func__")),
+                        )
+                        .unwrap_or_else(|| observed.unresolved()),
+                    callable.bound_type.is_none().then(|| CallableSelfBinding {
+                        receiver: method.signature_receiver(db),
+                        self_type: method.typing_self_type(db),
+                    }),
+                )
+            } else {
+                (observed.clone(), None)
+            };
             let ty = Type::Callable(CallableType::new(
                 db,
                 CallableSignature::from_overloads(
@@ -1310,11 +1379,21 @@ impl<'db> Bindings<'db> {
                 ),
                 CallableTypeKind::Regular,
             ));
-            let observed = observed.unchanged_or_unresolved(ty);
             for (index, binding) in callable.overloads.iter_mut().enumerate() {
-                binding.observed_callable = observed
-                    .callable_overload(db, env, index)
-                    .unwrap_or_else(|| observed.unresolved());
+                binding.observed_callable = source.callable_overload(db, env, index).map_or_else(
+                    || source.unchanged_or_unresolved(ty).unresolved(),
+                    |mut overload| {
+                        if let Some(captured) = captured {
+                            overload = overload.capture_callable_receiver(db, env, captured);
+                        }
+                        let ty = Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::single(binding.signature.clone()),
+                            CallableTypeKind::Regular,
+                        ));
+                        overload.unchanged_or_unresolved(ty)
+                    },
+                );
             }
         }
         self
@@ -1545,6 +1624,24 @@ impl<'db> Bindings<'db> {
                 .iter()
                 .map(|element| element.return_type(db, env)),
         )
+    }
+
+    /// Observe the results of the selected signatures in the caller's proof. Each result keeps
+    /// its return-expression origin and inferred substitution through union normalization.
+    pub(in crate::types) fn observed_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
+    ) -> ObservedType<'db> {
+        if let [element] = self.elements.as_slice() {
+            return element.observed_return_type(db, env, context);
+        }
+        let mut result = UnionBuilder::new(db, env).with_observed_context(context.clone());
+        for element in &self.elements {
+            result.add_observed_in_place(element.observed_return_type(db, env, context));
+        }
+        result.build_observed()
     }
 
     /// Returns the inferred type for the argument at the specified index.
@@ -2385,29 +2482,30 @@ impl<'db> Bindings<'db> {
                                         )
                                     };
 
-                                let generic_context_for_simple_type = |ty: Type<'db>| match ty {
-                                    Type::ClassLiteral(class) => {
-                                        class.generic_context(db).map(wrap_generic_context)
-                                    }
+                                let generic_context_for_simple_type =
+                                    |ty: Type<'db>| match ty.resolve_type_alias(db) {
+                                        Type::ClassLiteral(class) => {
+                                            class.generic_context(db).map(wrap_generic_context)
+                                        }
 
-                                    Type::FunctionLiteral(function) => {
-                                        signature_generic_context(function.signature(db))
-                                    }
+                                        Type::FunctionLiteral(function) => {
+                                            signature_generic_context(function.signature(db))
+                                        }
 
-                                    Type::BoundMethod(bound_method) => bound_method
-                                        .unbound_signatures(db)
-                                        .and_then(signature_generic_context),
+                                        Type::BoundMethod(bound_method) => bound_method
+                                            .unbound_signatures(db)
+                                            .and_then(signature_generic_context),
 
-                                    Type::Callable(callable) => {
-                                        signature_generic_context(callable.signatures(db))
-                                    }
+                                        Type::Callable(callable) => {
+                                            signature_generic_context(callable.signatures(db))
+                                        }
 
-                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                        alias,
-                                    )) => alias.generic_context(db).map(wrap_generic_context),
+                                        Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                            alias,
+                                        )) => alias.generic_context(db).map(wrap_generic_context),
 
-                                    _ => None,
-                                };
+                                        _ => None,
+                                    };
 
                                 let generic_context = match ty {
                                     Type::Union(union_type) => UnionType::try_from_elements(
@@ -4746,6 +4844,57 @@ impl<'db> CallableBinding<'db> {
             return overload.return_type();
         }
         Type::unknown()
+    }
+
+    fn observed_return_type(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
+    ) -> ObservedType<'db> {
+        if let Some(OverloadCallResult::ArgumentTypeExpansion(expanded)) =
+            &self.overload_call_result
+        {
+            let mut result = UnionBuilder::new(db, env).with_observed_context(context.clone());
+            for case in &expanded.cases {
+                let selected: Vec<_> = case
+                    .snapshot
+                    .matching_overloads
+                    .iter()
+                    .filter(|(index, _)| case.selected_overloads.contains(index))
+                    .filter_map(|(index, snapshot)| {
+                        let binding = self.overloads.get(*index)?;
+                        Some(binding.observe_return(
+                            db,
+                            env,
+                            snapshot.return_ty,
+                            snapshot.inference,
+                        ))
+                    })
+                    .collect();
+                let observed = match selected.as_slice() {
+                    [single] => single.unchanged_or_unresolved(case.return_type),
+                    selected => ObservedType::dependent_on(case.return_type, selected),
+                };
+                result.add_observed_in_place(observed);
+            }
+            return result.build_observed();
+        }
+        if self.overload_call_result.is_none() {
+            if let Some((_, binding)) = self.matching_overloads().next() {
+                return binding.observe_return(db, env, binding.return_ty, binding.inference);
+            }
+            if let [binding] = self.overloads.as_slice() {
+                return binding.observe_return(db, env, binding.return_ty, binding.inference);
+            }
+        }
+        let inputs: Vec<_> = self
+            .matching_overloads()
+            .map(|(_, binding)| {
+                binding.observe_return(db, env, binding.return_ty, binding.inference)
+            })
+            .collect();
+        ObservedType::dependent_on(self.return_type(), &inputs)
     }
 
     fn report_diagnostics(
@@ -8511,6 +8660,33 @@ impl<'db> Binding<'db> {
         self.return_ty
     }
 
+    /// Instantiate the selected return expression with the inference state from this call.
+    /// Expanded argument lists supply their own snapshots rather than the merged final state.
+    fn observe_return(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        return_ty: Type<'db>,
+        inference: Option<TypeVarInference<'db>>,
+    ) -> ObservedType<'db> {
+        let mut observed = self
+            .observed_callable
+            .project(db, env, ObservationEdge::CallableReturn { overload: 0 })
+            .unwrap_or_else(|| self.observed_callable.unresolved())
+            .unchanged_or_unresolved(self.signature.return_ty);
+        if let Some(inference) = inference {
+            let specialization = inference.merged_specialization(db);
+            observed = observed.apply_mapping(
+                db,
+                &TypeMapping::ApplySpecialization(ApplySpecialization::specialization(
+                    specialization,
+                )),
+                &ApplyTypeMappingVisitor::new_for_type_construction(env),
+            );
+        }
+        observed.unchanged_or_unresolved(return_ty)
+    }
+
     /// Returns the bound types for each parameter, in parameter source order, or `None` if no
     /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
@@ -10793,6 +10969,125 @@ expected: tuple[list[object], A | B, C | D | E]
             paths.iter().map(AsRef::as_ref).collect::<Vec<_>>(),
             [[Some(Resolved(Type::object())), None].as_slice()]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn inferred_return_keeps_equal_valued_expression_positions() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+def pair[T](value: T) -> tuple[T, int]:
+    raise NotImplementedError
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let callable = global_symbol(db, file, "pair").place.expect_type();
+        let int = KnownClass::Int.to_instance(db, &env);
+        let arguments = CallArguments::positional([int]);
+        let bindings = callable
+            .try_call(db, &env, &arguments)
+            .map_err(|error| anyhow::anyhow!("pair call failed: {error:?}"))?;
+        let observed = bindings.observed_return_type(db, &env, &RelationContext::default());
+        assert_eq!(observed.ty, bindings.return_type(db, &env));
+        let substituted = observed
+            .project(db, &env, ObservationEdge::TupleElement(0))
+            .ok_or_else(|| anyhow::anyhow!("missing substituted tuple element"))?;
+        let fixed = observed
+            .project(db, &env, ObservationEdge::TupleElement(1))
+            .ok_or_else(|| anyhow::anyhow!("missing fixed tuple element"))?;
+        assert_eq!((substituted.ty, fixed.ty), (int, int));
+        let substituted_origin = substituted
+            .origin()
+            .ok_or_else(|| anyhow::anyhow!("substitution lost the return expression"))?;
+        let fixed_origin = fixed
+            .origin()
+            .ok_or_else(|| anyhow::anyhow!("fixed element lost its return expression"))?;
+        // Inferring T = int must not turn the T occurrence into the equal literal annotation.
+        assert!(substituted_origin.node.template.is_type_var());
+        assert_eq!(fixed_origin.node.template, int);
+        assert_ne!(substituted_origin, fixed_origin);
+        Ok(())
+    }
+
+    #[test]
+    fn expanded_calls_keep_each_selected_return_specialization() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from typing import overload
+
+class Left[T]:
+    value: T
+
+class Right[T]:
+    value: T
+
+@overload
+def choose[T](value: list[T]) -> Left[T]: ...
+@overload
+def choose[T](value: set[T]) -> Right[T]: ...
+def choose(value: object) -> object:
+    raise NotImplementedError
+
+argument: list[int] | list[str] | set[bytes]
+left_int: Left[int]
+left_str: Left[str]
+right_bytes: Right[bytes]
+expected: Left[int] | Left[str] | Right[bytes]
+"#,
+        )?;
+        let db = &db;
+        let env = db.program_environment();
+        let file = system_path_to_file(db, "/src/a.py")?;
+        let file = ProgramFile::new(db, file, env.program(db));
+        let symbol = |name| global_symbol(db, file, name).place.expect_type();
+        let arguments = CallArguments::positional([symbol("argument")]);
+        let bindings = symbol("choose")
+            .try_call(db, &env, &arguments)
+            .map_err(|error| anyhow::anyhow!("expanded call failed: {error:?}"))?;
+        let Some(OverloadCallResult::ArgumentTypeExpansion(expanded)) = bindings
+            .single_element()
+            .and_then(|binding| binding.overload_call_result.as_ref())
+        else {
+            anyhow::bail!("fixture must expand the argument union");
+        };
+        assert_eq!(expanded.cases.len(), 3);
+        let observed = bindings.observed_return_type(db, &env, &RelationContext::default());
+        assert_eq!(observed.ty, bindings.return_type(db, &env));
+        assert!(observed.ty.is_equivalent_to(db, &env, symbol("expected")));
+        let children = observed.union_children(db, &env);
+        assert_eq!(children.len(), 3);
+        let origins = [
+            ("left_int", KnownClass::Int),
+            ("left_str", KnownClass::Str),
+            ("right_bytes", KnownClass::Bytes),
+        ]
+        .into_iter()
+        .map(|(name, argument)| -> anyhow::Result<_> {
+            let child = children
+                .iter()
+                .find(|child| child.ty == symbol(name))
+                .ok_or_else(|| anyhow::anyhow!("missing return alternative {name}"))?;
+            let parameter = child
+                .project(db, &env, ObservationEdge::GenericArgument(0))
+                .ok_or_else(|| anyhow::anyhow!("missing return argument for {name}"))?;
+            assert_eq!(parameter.ty, argument.to_instance(db, &env));
+            child
+                .origin()
+                .ok_or_else(|| anyhow::anyhow!("lost selected return origin for {name}"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+        // The first overload is selected twice. Its expression stays the same, but its
+        // substitutions must not be replaced by the final merged inference state.
+        assert_eq!(origins[0].node, origins[1].node);
+        assert_ne!(origins[0].operations, origins[1].operations);
+        assert_ne!(origins[0].node, origins[2].node);
         Ok(())
     }
 }

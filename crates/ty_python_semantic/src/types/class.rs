@@ -37,6 +37,7 @@ use crate::types::generics::{GenericContext, Specialization, walk_specialization
 use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::{Member, inherited_class_body_declaration};
+use crate::types::member_observation::{MemberStorage, MroMemberSource};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
 use crate::types::relation::{
@@ -3136,6 +3137,24 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         inherited_generic_context: Option<GenericContext<'db>>,
         is_self_object: bool,
     ) -> ClassMemberResult<'db> {
+        self.class_member_with_observer(
+            name,
+            policy,
+            inherited_generic_context,
+            is_self_object,
+            |_| {},
+        )
+    }
+
+    /// Report the declarations selected by the same MRO walk that computes the member value.
+    pub(super) fn class_member_with_observer(
+        self,
+        name: &str,
+        policy: MemberLookupPolicy,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        is_self_object: bool,
+        mut observe: impl FnMut(MroMemberSource<'db>),
+    ) -> ClassMemberResult<'db> {
         let db = self.db;
 
         let mut dynamic_type: Option<Type<'db>> = None;
@@ -3211,6 +3230,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         pending_augmented_bindings.clear();
                     }
 
+                    if !member.place.is_undefined() {
+                        observe(MroMemberSource {
+                            class,
+                            member,
+                            storage: MemberStorage::Class,
+                            replace: false,
+                        });
+                    }
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(db, &self.env, member)
                     });
@@ -3240,6 +3267,15 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
     fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+        self.instance_member_with_observer(name, |_| {})
+    }
+
+    /// Retain the inputs of inferred unions, replacing them when an annotation governs the value.
+    pub(super) fn instance_member_with_observer(
+        self,
+        name: &str,
+        mut observe: impl FnMut(MroMemberSource<'db>),
+    ) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db, &self.env);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -3297,6 +3333,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
 
                                 // We found a definitely-declared attribute. Discard possibly collected
                                 // inferred types from subclasses and return the declared type.
+                                observe(MroMemberSource {
+                                    class,
+                                    member,
+                                    storage: MemberStorage::Instance,
+                                    replace: true,
+                                });
                                 return InstanceMemberResult::Done(member);
                             }
 
@@ -3306,6 +3348,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
+                        observe(MroMemberSource {
+                            class,
+                            member,
+                            storage: MemberStorage::Instance,
+                            replace: false,
+                        });
                         union = union.add(ty);
                         provenance = provenance.or(member_provenance);
 
@@ -3348,6 +3396,12 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         }
 
                         if origin.is_declared() {
+                            observe(MroMemberSource {
+                                class,
+                                member: class_member.inner,
+                                storage: MemberStorage::Class,
+                                replace: union.is_empty(),
+                            });
                             if union.is_empty() {
                                 return InstanceMemberResult::Done(class_member.inner);
                             }
@@ -3416,7 +3470,11 @@ pub(super) struct CompletedMemberLookup<'db> {
 
 impl<'db> CompletedMemberLookup<'db> {
     /// Finalize the lookup result by handling dynamic type intersection.
-    fn finalize(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> PlaceAndQualifiers<'db> {
+    pub(super) fn finalize(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> PlaceAndQualifiers<'db> {
         match (
             PlaceAndQualifiers::from(self.lookup_result),
             self.dynamic_type,

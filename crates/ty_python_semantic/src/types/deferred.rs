@@ -337,32 +337,14 @@ impl<'db> DeferredType<'db> {
                     .collect::<Box<[_]>>(),
             ));
         }
-        let operation = match mapping {
-            TypeMapping::Materialize(kind) => RecursiveOperation::Materialize(
-                *kind,
-                visitor.materialize_typevar_bounds_and_defaults,
-            ),
-            TypeMapping::Promote(mode, kind) => RecursiveOperation::Promote(*mode, *kind),
-            TypeMapping::ReplaceParameterDefaults => RecursiveOperation::ReplaceParameterDefaults,
-            TypeMapping::EagerExpansion => RecursiveOperation::EagerExpansion,
-            TypeMapping::RescopeReturnCallables(callables) => {
-                RecursiveOperation::RescopeReturnCallables(
-                    callables
-                        .iter()
-                        .map(|(&source, &target)| (source, target))
-                        .collect(),
-                )
-            }
-            _ => {
-                let Some(operation) = RecursiveOperation::substitution(mapping) else {
-                    return Type::Deferred(self);
-                };
-                if !self.inputs_change(db, mapping, visitor) {
-                    return Type::Deferred(self);
-                }
-                operation
-            }
+        let Some(operation) =
+            RecursiveOperation::capture(mapping, visitor.materialize_typevar_bounds_and_defaults)
+        else {
+            return Type::Deferred(self);
         };
+        if operation.is_substitution() && !self.inputs_change(db, mapping, visitor) {
+            return Type::Deferred(self);
+        }
         if matches!(
             operation,
             RecursiveOperation::Materialize(..)

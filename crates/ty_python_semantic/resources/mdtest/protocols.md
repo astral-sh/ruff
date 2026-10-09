@@ -4786,6 +4786,39 @@ class IntParser:
 parser: Parser = IntParser
 ```
 
+## Class and instance descriptor precedence
+
+A data descriptor on the metaclass supplies the class object's member. Reading the same name through
+an instance uses the instance's class declaration instead.
+
+```py
+from typing import Protocol
+
+class Number(Protocol):
+    @property
+    def value(self) -> int: ...
+
+class Text(Protocol):
+    @property
+    def value(self) -> str: ...
+
+class Meta(type):
+    @property
+    def value(cls) -> int:
+        return 1
+
+class C(metaclass=Meta):
+    value: str = "text"
+
+def check(cls: type[C], instance: C):
+    reveal_type(cls.value)  # revealed: int
+    reveal_type(instance.value)  # revealed: str
+    number: Number = cls  # no diagnostic
+    text: Text = instance  # no diagnostic
+    wrong_number: Number = instance  # error: [invalid-assignment]
+    wrong_text: Text = cls  # error: [invalid-assignment]
+```
+
 ## Generic protocol inference from class attributes
 
 A class object can supply the type argument of a protocol through an ordinary attribute. Passing the

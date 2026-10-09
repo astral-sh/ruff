@@ -812,6 +812,23 @@ impl<'db> TypeAliasType<'db> {
         })
     }
 
+    /// Visit finite stored operands without replaying the operations they supply.
+    pub(super) fn visit_stored_operands(
+        self,
+        db: &'db dyn Db,
+        visitor: &impl visitor::TypeVisitor<'db>,
+    ) {
+        if let Some(arguments) = self.base_specialization(db).or_else(|| {
+            self.generic_context(db)
+                .map(|context| context.default_specialization(db, None))
+        }) {
+            super::generics::walk_specialization_types(db, arguments, visitor);
+        }
+        for operation in self.operations(db) {
+            operation.visit_types(db, visitor);
+        }
+    }
+
     /// Visit the application's finite arguments and captures without inspecting its body.
     pub(super) fn visit_application_types(
         self,
@@ -904,15 +921,41 @@ impl<'db> TypeAliasType<'db> {
                 self.value_type_with_recursion(db, visitor.recursion_context)
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
-            _ => visitor.visit(db, ty, type_mapping, tcx, || {
-                let body = self.value_type_with_recursion(db, visitor.recursion_context);
-                let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                if mapped == ty || mapped == body {
-                    ty
-                } else {
-                    mapped
+            _ => {
+                let Some(operation) = RecursiveOperation::capture(
+                    type_mapping,
+                    visitor.materialize_typevar_bounds_and_defaults,
+                ) else {
+                    return ty;
+                };
+                if operation.is_identity_on(db, visitor.env, ty)
+                    || (operation.is_idempotent() && self.operations(db).last() == Some(&operation))
+                {
+                    return ty;
                 }
-            }),
+                if self.operations(db).is_empty()
+                    && operation.maps_arguments_only(
+                        db,
+                        visitor.env,
+                        self.raw_value_type(db),
+                        self.generic_context(db),
+                    )
+                {
+                    let arguments = self.base_specialization(db).or_else(|| {
+                        self.generic_context(db)
+                            .map(|context| context.default_specialization(db, None))
+                    });
+                    return Type::TypeAlias(self.with_base_specialization(
+                        db,
+                        arguments.map(|arguments| {
+                            arguments.apply_type_mapping_impl(db, type_mapping, &[], visitor)
+                        }),
+                    ));
+                }
+                let mut operations = self.operations(db).to_vec();
+                operations.push(operation);
+                Type::TypeAlias(self.with_operations(db, operations.into_boxed_slice()))
+            }
         }
     }
 
