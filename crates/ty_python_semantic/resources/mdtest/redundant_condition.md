@@ -5877,6 +5877,8 @@ if next(sys.platform == "linux" for _ in range(1)):  # no diagnostic
 
 if (lambda: sys.platform)():  # no diagnostic
     pass
+if (lambda: (lambda: sys.platform)())():  # no diagnostic
+    pass
 if next(sys.version_info for _ in range(1)):  # no diagnostic
     pass
 ```

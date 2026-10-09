@@ -22,6 +22,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
+use crate::types::callable::LambdaSignature;
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
     IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
@@ -33,6 +34,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::{
     TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
+    infer_same_file_expression_type,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -5172,8 +5174,9 @@ impl<'db> Parameters<'db> {
 
         let index = semantic_index(db, definition.program_file(db));
         let default_type = |param: &ast::ParameterWithDefault| {
-            param.default().map(|_| {
-                ParameterDefault::Deferred(index.expect_single_definition(&param.parameter))
+            param.default().map(|_| ParameterDefault::Deferred {
+                parameter: index.expect_single_definition(&param.parameter),
+                lambda_input: None,
             })
         };
 
@@ -6127,21 +6130,27 @@ pub enum ParameterDefault<'db> {
     /// An already inferred default.
     Inferred(Type<'db>),
     /// A source parameter whose default is inferred on demand.
-    Deferred(Definition<'db>),
+    Deferred {
+        parameter: Definition<'db>,
+        lambda_input: Option<LambdaSignature<'db>>,
+    },
 }
 
 impl<'db> ParameterDefault<'db> {
     fn ty(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Inferred(ty) => ty,
-            Self::Deferred(parameter) => parameter_default_type(db, parameter),
+            Self::Deferred {
+                parameter,
+                lambda_input,
+            } => parameter_default_type(db, parameter, lambda_input),
         }
     }
 
     fn eager_type(self) -> Option<Type<'db>> {
         match self {
             Self::Inferred(ty) => Some(ty),
-            Self::Deferred(_) => None,
+            Self::Deferred { .. } => None,
         }
     }
 
@@ -6150,20 +6159,24 @@ impl<'db> ParameterDefault<'db> {
             Self::Inferred(ty) => Self::Inferred(f(ty)),
             // A source default is a runtime value, not part of the callable's type parameters.
             // Specializing or otherwise transforming the signature must not evaluate it.
-            Self::Deferred(_) => self,
+            Self::Deferred { .. } => self,
         }
     }
 }
 
 #[salsa::tracked(
     returns(copy),
-    cycle_initial=|_, id, _| Type::divergent(id),
-    cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>| {
+    cycle_initial=|_, id, _, _| Type::divergent(id),
+    cycle_fn=|db, cycle, previous: &Type<'db>, ty: Type<'db>, parameter: Definition<'db>, _| {
         ty.cycle_normalized(db, &ProgramEnvironment::from_definition(parameter), *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> Type<'db> {
+fn parameter_default_type<'db>(
+    db: &'db dyn Db,
+    parameter: Definition<'db>,
+    lambda_input: Option<LambdaSignature<'db>>,
+) -> Type<'db> {
     match parameter.kind(db) {
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
             let Some(function) = parameter.scope(db).node(db).as_function() else {
@@ -6190,12 +6203,13 @@ fn parameter_default_type<'db>(db: &'db dyn Db, parameter: Definition<'db>) -> T
             let Some(default) = node.node(&module).default() else {
                 return Type::unknown();
             };
-            let scope = semantic_index(db, file)
-                .expression_scope_id(default)
-                .to_scope_id(db, file);
-            infer_complete_scope_types(db, scope)
-                .expression_type(default)
-                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
+            let expression = semantic_index(db, file).expression(default);
+            infer_same_file_expression_type(
+                db,
+                expression,
+                TypeContext::default().with_lambda_input(lambda_input),
+            )
+            .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
         }
         _ => Type::unknown(),
     }

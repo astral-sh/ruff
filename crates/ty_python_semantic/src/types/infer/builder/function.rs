@@ -36,8 +36,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
+            function_known_decorator_flags, function_known_decorators, infer_complete_scope_types,
+            infer_deferred_types, infer_function_default_types, nearest_enclosing_function,
             original_class_type,
         },
         infer_definition_types,
@@ -457,6 +457,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(decorator_inference.called_functions().iter().copied());
             self.implicit_aliases
                 .extend(decorator_inference.implicit_aliases().iter().copied());
+            self.lambda_inputs
+                .extend(decorator_inference.lambda_inputs.iter().copied());
         }
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
@@ -1462,7 +1464,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
         } else if let Some(default_expr) = default {
-            let default_ty = self.file_expression_type(default_expr);
+            let default = self.index.expression(default_expr.as_ref());
+            let input = self
+                .lambda_input
+                .and_then(|input| input.enclosing(db, default.scope(db)));
+            let default_ty = crate::types::infer::infer_same_file_expression_type(
+                db,
+                default,
+                TypeContext::default().with_lambda_input(input),
+            );
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
@@ -1532,15 +1542,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let db = self.db();
-        let enclosing_stmt = infer_statement_types(
-            self.db(),
-            self.index.enclosing_lambda_statement(lambda.into())?,
-        );
-        let callable = enclosing_stmt.expression_type(lambda).as_callable()?;
-        let Some(parameters) = callable.single_parameters(self.db()) else {
-            // TODO: If there are multiple applicable overloads, we could attempt multi-inference.
-            return None;
-        };
+        let scope = self
+            .index
+            .try_node_scope(NodeWithScopeRef::Lambda(lambda))?
+            .to_scope_id(db, self.program_file());
+        let input = self
+            .lambda_input
+            .and_then(|input| input.enclosing(db, scope))
+            .filter(|input| input.scope(db) == scope)
+            .or_else(|| {
+                let parent = self
+                    .index
+                    .parent_scope_id(scope.file_scope_id(db))?
+                    .to_scope_id(db, self.program_file());
+                infer_complete_scope_types(db, parent).lambda_input(lambda)
+            })?;
+        let parameters = input.parameters(db);
 
         let parameter_type = parameters.as_slice()[index as usize].annotated_type();
         (!parameter_type.has_provisional_marker(db, self.program_environment()))

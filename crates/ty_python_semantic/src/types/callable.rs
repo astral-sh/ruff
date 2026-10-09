@@ -789,11 +789,13 @@ impl get_size2::GetSize for CallableType<'_> {}
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct LambdaSignature<'db> {
     #[returns(ref)]
-    parameters: Parameters<'db>,
+    pub(super) parameters: Parameters<'db>,
     #[returns(copy)]
-    scope: ScopeId<'db>,
+    pub(super) scope: ScopeId<'db>,
     #[returns(copy)]
     body: ExpressionNodeKey,
+    /// The expected return type and lexical lambda environment. The current lambda is added
+    /// only when its body is inferred, so these inputs refer only to enclosing lambdas.
     #[returns(copy)]
     return_context: TypeContext<'db>,
     /// A transformation of another source-backed lambda, independent of its inferred body.
@@ -805,6 +807,41 @@ impl get_size2::GetSize for LambdaSignature<'_> {}
 
 #[salsa::tracked]
 impl<'db> LambdaSignature<'db> {
+    /// Infer the body using the parameter types captured when this lambda was constructed.
+    pub(super) fn infer_body(
+        self,
+        db: &'db dyn Db,
+    ) -> &'db crate::types::infer::ScopeInference<'db> {
+        infer_scope_types(
+            db,
+            self.scope(db),
+            self.return_context(db).with_lambda_input(Some(self)),
+        )
+    }
+
+    /// Select the lexical lambda environment that contains `scope`.
+    /// Unrelated definitions must not inherit a caller's contextual parameter types.
+    pub(super) fn enclosing(self, db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Self> {
+        let file = scope.program_file(db);
+        if self.scope(db).program_file(db) != file {
+            return None;
+        }
+        let index = ty_python_core::semantic_index(db, file);
+        let mut input = Some(self);
+        while let Some(lambda) = input {
+            let lambda_scope = lambda.scope(db);
+            if lambda_scope.program_file(db) == file
+                && index
+                    .ancestor_scopes(scope.file_scope_id(db))
+                    .any(|(ancestor, _)| ancestor == lambda_scope.file_scope_id(db))
+            {
+                return Some(lambda);
+            }
+            input = lambda.return_context(db).lambda_input;
+        }
+        None
+    }
+
     /// Build the lambda's variance equation while keeping recursive lambda references symbolic.
     #[salsa::tracked(
         returns(copy),
@@ -833,8 +870,7 @@ fn infer_lambda_signature<'db>(
 ) -> CallableSignature<'db> {
     let return_ty = match lambda.mapping(db) {
         Some(mapping) => mapping.return_type(db),
-        None => infer_scope_types(db, lambda.scope(db), lambda.return_context(db))
-            .expression_type(lambda.body(db)),
+        None => lambda.infer_body(db).expression_type(lambda.body(db)),
     };
     CallableSignature::single(Signature::new(lambda.parameters(db).clone(), return_ty))
 }
@@ -850,23 +886,10 @@ impl<'db> CallableType<'db> {
     }
 
     /// Construct a lambda with a stable return-type reference and eagerly inferred parameters.
-    pub(super) fn lambda(
-        db: &'db dyn Db,
-        parameters: Parameters<'db>,
-        scope: ScopeId<'db>,
-        body: ExpressionNodeKey,
-        return_context: TypeContext<'db>,
-    ) -> Self {
+    pub(super) fn from_lambda(db: &'db dyn Db, input: LambdaSignature<'db>) -> Self {
         Self::new_internal(
             db,
-            SignatureSource::<CallableSignature<'db>>::Lambda(LambdaSignature::new(
-                db,
-                parameters,
-                scope,
-                body,
-                return_context,
-                None,
-            )),
+            SignatureSource::<CallableSignature<'db>>::Lambda(input),
             CallableTypeKind::FunctionLike,
             None,
         )
@@ -895,7 +918,6 @@ impl<'db> CallableType<'db> {
     }
 
     /// Inspect the parameters of a non-overloaded callable without inferring a lambda's body.
-    /// Lambda parameter inference calls this while that same body is being inferred.
     pub(crate) fn single_parameters(self, db: &'db dyn Db) -> Option<&'db Parameters<'db>> {
         match self.signature_source(db) {
             SignatureSource::Explicit(signatures) => {

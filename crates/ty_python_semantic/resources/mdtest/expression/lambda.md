@@ -273,3 +273,52 @@ node = Grow(1).node
 # error: [unresolved-attribute] "Object of type `() -> tuple[int, () -> tuple[list[int], () -> tuple[list[list[int]], () -> tuple[list[list[list[int]]], (...) -> ...]]]]` has no attribute `missing`"
 node.missing
 ```
+
+## Recursive references during collection inference
+
+A lambda can refer to a name that is rebound by unpacking a collection. Checking the lambda's body
+separately lets inference converge while retaining the errors in the collection and the warning for
+using the lambda as a condition.
+
+```py
+node = lambda: node
+
+# error: [not-iterable] "Object of type `(values) -> dict[Unknown, int]` is not iterable"
+# error: [not-iterable] "Object of type `int` is not iterable"
+for [node] in {
+    **{0: 0 for _ in [] if node},  # error: [redundant-condition] "Function object is always truthy"
+    (lambda values: {key: 0 for key in values}): 0,
+    **0,  # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
+}:
+    pass
+```
+
+## Recursive references during collection inference in async functions
+
+The same cycle converges in an asynchronous function, where the condition diagnostic also inspects
+return types to decide whether to suggest `await`.
+
+```py
+async def check():
+    node = lambda: node
+
+    # error: [not-iterable] "Object of type `(values) -> dict[Unknown, int]` is not iterable"
+    # error: [not-iterable] "Object of type `int` is not iterable"
+    for [node] in {
+        **{0: 0 for _ in [] if node},  # error: [redundant-condition] "Function object is always truthy"
+        (lambda values: {key: 0 for key in values}): 0,
+        **0,  # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
+    }:
+        pass
+```
+
+## Body diagnostics in invalid annotations
+
+An invalid annotation still reports errors inside its lambda body, even though the annotation's
+inferred type is `Unknown`.
+
+```py
+# error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: lambda: missing = 1
+```

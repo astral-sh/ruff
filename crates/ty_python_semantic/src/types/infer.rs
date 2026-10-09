@@ -54,6 +54,7 @@ use salsa::plumbing::AsId;
 use std::borrow::Cow;
 pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
+use crate::types::callable::LambdaSignature;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
@@ -68,10 +69,12 @@ use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
-use ty_python_core::scope::ScopeId;
+use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
+use ty_python_core::{
+    ExpressionNodeKey, ProgramFile, SemanticIndex, Statement, Truthiness, semantic_index,
+};
 
 mod builder;
 mod implicit_alias;
@@ -247,6 +250,43 @@ pub(crate) fn infer_definition_types<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
+    infer_definition_types_inner(db, definition, None)
+}
+
+pub(super) fn infer_definition_types_with_context<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    input: Option<LambdaSignature<'db>>,
+) -> &'db DefinitionInference<'db> {
+    match input.and_then(|input| input.enclosing(db, definition.scope(db))) {
+        Some(input) => infer_contextual_definition_types(db, definition, input),
+        None => infer_definition_types(db, definition),
+    }
+}
+
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|db, id, definition: Definition<'db>, _| {
+        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+    },
+    cycle_fn=|db: &'db dyn Db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition: Definition<'db>, _| {
+        inference.cycle_normalized(db, previous, cycle, definition)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn infer_contextual_definition_types<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    input: LambdaSignature<'db>,
+) -> DefinitionInference<'db> {
+    infer_definition_types_inner(db, definition, Some(input))
+}
+
+fn infer_definition_types_inner<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    input: Option<LambdaSignature<'db>>,
+) -> DefinitionInference<'db> {
     let program_file = definition.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -270,6 +310,7 @@ pub(crate) fn infer_definition_types<'db>(
         index,
         &module,
     )
+    .with_lambda_input(input)
     .finish_definition(definition)
 }
 
@@ -349,6 +390,7 @@ pub(crate) struct FunctionDecoratorInference<'db> {
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     implicit_aliases: Box<[Definition<'db>]>,
+    lambda_inputs: FrozenMap<ExpressionNodeKey, LambdaSignature<'db>>,
     known_decorators: FunctionDecorators,
     /// Whether any decorator is unrecognized, or decorator inference is incomplete.
     has_unknown_decorators: bool,
@@ -487,25 +529,28 @@ pub(crate) fn infer_complete_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
 ) -> &'db ScopeInference<'db> {
-    // Scopes that may require type context are inferred during the inference of
-    // their outer scope.
+    // Lambda bodies use the inputs recorded by their enclosing region. Comprehension types
+    // are already included in that region's inference result.
     if scope.accepts_type_context(db) {
         let program_file = scope.program_file(db);
         let index = semantic_index(db, program_file);
 
         if let Some(parent_scope) = index.parent_scope_id(scope.file_scope_id(db)) {
-            // Note that nested lambdas or comprehensions may require recursing until we reach
-            // an outer scope that is independent of any type context.
-            return infer_complete_scope_types(db, parent_scope.to_scope_id(db, program_file));
+            let parent = infer_complete_scope_types(db, parent_scope.to_scope_id(db, program_file));
+            if let NodeWithScopeKind::Lambda(lambda) = scope.node(db) {
+                return parent.lambda_input(lambda).map_or_else(
+                    || infer_scope_types(db, scope, TypeContext::declared(None)),
+                    |input| input.infer_body(db),
+                );
+            }
+            return parent;
         }
     }
 
     infer_scope_types_impl(db, InferScope::new(db, scope, TypeContext::default()))
 }
 
-/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
-/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
-/// scope.
+/// Infer the definitions and expressions in a scope, excluding nested lambda bodies.
 ///
 /// Note that you should generally use [`infer_complete_scope_types`] instead of this method,
 /// unless you have already obtained the necessary type context while inferring the parent scope.
@@ -622,6 +667,42 @@ fn expression_cycle_initial<'db>(
     let (expression, _) = input.into_inner(db);
     let cycle_recovery = Type::divergent(id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
+}
+
+/// Read an expression using the lambda inputs recorded by its enclosing inference region.
+/// Nested bodies retain their own contextual inputs; looking up an expression must not replace
+/// those inputs with the context selected by a separate inference of the enclosing statement.
+pub(super) fn expression_type_with_deferred_bodies<'db>(
+    db: &'db dyn Db,
+    file: ProgramFile<'db>,
+    expression: &ast::Expr,
+    mut lookup: impl FnMut(ExpressionNodeKey) -> (Option<Type<'db>>, Option<LambdaSignature<'db>>),
+) -> Type<'db> {
+    if let (Some(ty), _) = lookup(expression.into()) {
+        return ty;
+    }
+    let index = semantic_index(db, file);
+    let Some(scope) = index.try_expression_scope_id(expression) else {
+        return Type::unknown();
+    };
+    let lambdas: Vec<_> = index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, scope)| match scope.node() {
+            NodeWithScopeKind::Lambda(lambda) => Some(ExpressionNodeKey::from(lambda)),
+            _ => None,
+        })
+        .collect();
+    let mut body: Option<&ScopeInference<'db>> = None;
+    for lambda in lambdas.into_iter().rev() {
+        let input = match body {
+            Some(body) => body.lambda_input(lambda),
+            None => lookup(lambda).1,
+        };
+        if let Some(input) = input {
+            body = Some(input.infer_body(db));
+        }
+    }
+    body.map_or_else(Type::unknown, |body| body.expression_type(expression))
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -759,7 +840,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.annotation.is_some() || tcx.lambda_input.is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)
@@ -794,7 +875,7 @@ pub(super) struct ScopeWithContext<'db> {
 
 impl<'db> InferScope<'db> {
     fn new(db: &'db dyn Db, scope: ScopeId<'db>, tcx: TypeContext<'db>) -> InferScope<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.annotation.is_some() || tcx.lambda_input.is_some() {
             InferScope::WithContext(ScopeWithContext::new(db, scope, tcx))
         } else {
             InferScope::Bare(scope)
@@ -838,6 +919,9 @@ enum TypeContextKind {
 pub struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
     kind: TypeContextKind,
+    /// Contextual parameter types for the enclosing lambda body. Query keys retain these inputs
+    /// so speculative inference cannot recover parameters from a different candidate context.
+    pub(super) lambda_input: Option<LambdaSignature<'db>>,
 }
 
 impl<'db> TypeContext<'db> {
@@ -845,6 +929,7 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation,
             kind: TypeContextKind::Declared,
+            lambda_input: None,
         }
     }
 
@@ -852,6 +937,7 @@ impl<'db> TypeContext<'db> {
         Self {
             annotation: Some(annotation),
             kind: TypeContextKind::Validity,
+            lambda_input: None,
         }
     }
 
@@ -877,6 +963,13 @@ impl<'db> TypeContext<'db> {
 
     pub(crate) fn with_annotation(self, annotation: Option<Type<'db>>) -> Self {
         Self { annotation, ..self }
+    }
+
+    pub(super) fn with_lambda_input(self, lambda_input: Option<LambdaSignature<'db>>) -> Self {
+        Self {
+            lambda_input,
+            ..self
+        }
     }
 
     fn is_typealias(&self) -> bool {
@@ -922,16 +1015,37 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// involved in an unpacking operation. It returns a result-like object that can be used to get the
 /// type of the variables involved in this unpacking along with any violations that are detected
 /// during this unpacking.
+pub(super) fn infer_unpack_types<'db>(
+    db: &'db dyn Db,
+    unpack: Unpack<'db>,
+) -> &'db UnpackResult<'db> {
+    infer_unpack_types_with_context(db, unpack, None)
+}
+
+pub(super) fn infer_unpack_types_with_context<'db>(
+    db: &'db dyn Db,
+    unpack: Unpack<'db>,
+    input: Option<LambdaSignature<'db>>,
+) -> &'db UnpackResult<'db> {
+    let input =
+        input.and_then(|input| input.enclosing(db, unpack.value(db).expression().scope(db)));
+    infer_unpack_types_impl(db, unpack, input)
+}
+
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
-    cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>| {
+    cycle_initial=|_, id, _, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, unpack: Unpack<'db>, _| {
         let env = ProgramEnvironment::from_file(unpack.program_file(db));
         result.cycle_normalized(db, &env, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> UnpackResult<'db> {
+fn infer_unpack_types_impl<'db>(
+    db: &'db dyn Db,
+    unpack: Unpack<'db>,
+    input: Option<LambdaSignature<'db>>,
+) -> UnpackResult<'db> {
     let program_file = unpack.program_file(db);
     let python_file = program_file.python_file(db);
     let module = parsed_module(db, python_file).load(db);
@@ -944,7 +1058,11 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 
     let env = ProgramEnvironment::from_file(program_file);
     let mut unpacker = Unpacker::new(db, &env, unpack.target_scope(db), program_file, &module);
-    unpacker.unpack(unpack.target(db, &module), unpack.value(db));
+    unpacker.unpack(
+        unpack.target(db, &module),
+        unpack.value(db),
+        TypeContext::default().with_lambda_input(input),
+    );
     unpacker.finish()
 }
 
@@ -1065,6 +1183,7 @@ pub(crate) struct ScopeInference<'db> {
 struct ScopeInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
+    lambda_inputs: FrozenMap<ExpressionNodeKey, LambdaSignature<'db>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1089,6 +1208,14 @@ struct ScopeInferenceExtra<'db> {
 }
 
 impl<'db> ScopeInference<'db> {
+    fn lambda_input(&self, lambda: impl Into<ExpressionNodeKey>) -> Option<LambdaSignature<'db>> {
+        self.extra
+            .as_ref()?
+            .lambda_inputs
+            .get(&lambda.into())
+            .copied()
+    }
+
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
@@ -1478,6 +1605,7 @@ struct DeferredAndUndecorated<'db> {
 struct OtherDefinitionInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
+    lambda_inputs: FrozenMap<ExpressionNodeKey, LambdaSignature<'db>>,
 
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
@@ -1588,6 +1716,15 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    fn lambda_input(&self, lambda: impl Into<ExpressionNodeKey>) -> Option<LambdaSignature<'db>> {
+        match self.extra.as_deref()? {
+            DefinitionInferenceExtra::Other(extra) => {
+                extra.lambda_inputs.get(&lambda.into()).copied()
+            }
+            _ => None,
+        }
+    }
+
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1971,6 +2108,7 @@ pub(crate) struct ExpressionInference<'db> {
 struct ExpressionInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
+    lambda_inputs: FrozenMap<ExpressionNodeKey, LambdaSignature<'db>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -2027,6 +2165,14 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
+    fn lambda_input(&self, lambda: impl Into<ExpressionNodeKey>) -> Option<LambdaSignature<'db>> {
+        self.extra
+            .as_ref()?
+            .lambda_inputs
+            .get(&lambda.into())
+            .copied()
+    }
+
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
@@ -2221,6 +2367,7 @@ pub(crate) struct StatementInferenceInner<'db> {
 struct StatementInferenceInnerExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
+    lambda_inputs: FrozenMap<ExpressionNodeKey, LambdaSignature<'db>>,
 
     /// Condition truthiness retained for checks performed by the enclosing suite.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.

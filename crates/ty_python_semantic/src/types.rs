@@ -127,7 +127,7 @@ pub(crate) use literal::{
 pub use special_form::SpecialFormType;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
-use ty_python_core::scope::ScopeId;
+use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
 use ty_python_core::{ProgramFile, Truthiness, place_table, semantic_index, use_def_map};
 
 mod abstract_methods;
@@ -205,13 +205,15 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let mut implicit_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
-        // Scopes that may require type context are inferred during the inference of
-        // their outer scope.
-        if scope_id.accepts_type_context(db) {
+        // Comprehensions are inferred with their outer scopes. Lambda bodies are checked
+        // separately, using the inputs recorded by their enclosing inference regions.
+        if scope_id.accepts_type_context(db)
+            && !matches!(scope_id.node(db), NodeWithScopeKind::Lambda(_))
+        {
             continue;
         }
 
-        let result = infer_scope_types(db, scope_id, TypeContext::default());
+        let result = infer_complete_scope_types(db, scope_id);
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);

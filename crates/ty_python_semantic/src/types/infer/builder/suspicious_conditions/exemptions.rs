@@ -42,6 +42,7 @@ use crate::{
         infer::{
             TypeInferenceBuilder,
             builder::suspicious_conditions::{SuiteExitKind, suite_ends_with_exit},
+            expression_type_with_deferred_bodies,
         },
         infer_definition_types, infer_expression_types,
     },
@@ -271,7 +272,19 @@ impl RedundantConditionContext {
                     builder.db(),
                     builder.program_file(),
                     expression,
-                    |expr| builder.expression_type(expr),
+                    |expr| {
+                        expression_type_with_deferred_bodies(
+                            builder.db(),
+                            builder.program_file(),
+                            expr,
+                            |key| {
+                                (
+                                    builder.try_expression_type(key),
+                                    builder.lambda_inputs.get(&key).copied(),
+                                )
+                            },
+                        )
+                    },
                 )
             }),
         }
@@ -811,17 +824,24 @@ fn definition_contains_special_cased_condition<'db>(
 
     any_over_expr(source_expression, |expression| {
         is_special_cased_condition_expression(db, program_file, expression, |expr| {
-            if let Some(standalone) = standalone {
-                expression_inference
-                    .get_or_insert_with(|| {
+            expression_type_with_deferred_bodies(db, program_file, expr, |key| {
+                if let Some(standalone) = standalone {
+                    let inference = expression_inference.get_or_insert_with(|| {
                         infer_expression_types(db, standalone, TypeContext::default())
-                    })
-                    .expression_type(expr)
-            } else {
-                definition_inference
-                    .get_or_insert_with(|| infer_definition_types(db, definition))
-                    .expression_type(expr)
-            }
+                    });
+                    (
+                        inference.try_expression_type(key),
+                        inference.lambda_input(key),
+                    )
+                } else {
+                    let inference = definition_inference
+                        .get_or_insert_with(|| infer_definition_types(db, definition));
+                    (
+                        inference.try_expression_type(key),
+                        inference.lambda_input(key),
+                    )
+                }
+            })
         })
     })
 }
