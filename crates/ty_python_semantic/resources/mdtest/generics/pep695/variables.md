@@ -1342,6 +1342,80 @@ def _(n: Node[str]):
     reveal_type(n)  # revealed: Node[Unknown]
 ```
 
+### Bounds and constraints through aliases
+
+Specializing an alias with a type variable does not make a generic bound valid. After reporting the
+invalid bound, calls still infer their result from the argument.
+
+```py
+type R[T] = T | list[T]
+
+# error: [invalid-type-variable-bound]
+def bounded[U: R[U]](value: U) -> U:
+    return value
+
+def check(value: R[int]):
+    reveal_type(bounded(value))  # revealed: int | list[int]
+```
+
+The same restriction applies to constraints, even when the alias refers to an outer parameter
+instead of the constrained variable itself.
+
+```py
+# error: [invalid-type-variable-constraints]
+def constrained[S, U: (R[S], str)](value: S, other: U) -> U:
+    return other
+
+reveal_type(constrained(1, b"hello"))  # revealed: Literal[b"hello"]
+```
+
+Fully specialized recursive aliases remain usable as bounds and constraints.
+
+```py
+from typing import Any
+
+type Tree[T] = T | list[Tree[T]]
+
+def closed[U: Tree[Any]](value: U) -> U:  # no diagnostic
+    return value
+
+def closed_constraint[U: (list[Tree[Any]], str)](value: U) -> U:  # no diagnostic
+    return value
+
+def accepted(value: Tree[Any], seq: list[Tree[Any]]):
+    reveal_type(closed(value))  # revealed: Any | list[Tree[Any]]
+    reveal_type(closed_constraint(seq))  # revealed: list[Tree[Any]]
+```
+
+An alias that erases its argument has a non-generic bound. Its constraint still promotes an integer
+literal to `int`, and the bound still rejects a string.
+
+```py
+type Discard[T] = int
+
+def erased[U: Discard[U]](value: U) -> U:  # no diagnostic
+    return value
+
+def erased_constraint[U: (Discard[U], str)](value: U) -> U:  # no diagnostic
+    return value
+
+reveal_type(erased(1))  # revealed: Literal[1]
+reveal_type(erased_constraint(1))  # revealed: int
+erased("wrong")  # error: [invalid-argument-type]
+```
+
+Recursively forwarding an unused argument does not make it part of the bound.
+
+```py
+type IntegerTree[T] = int | list[IntegerTree[T]]
+
+def recursive_erased[U: IntegerTree[U]](value: U) -> U:  # no diagnostic
+    return value
+
+reveal_type(recursive_erased(1))  # revealed: Literal[1]
+recursive_erased("wrong")  # error: [invalid-argument-type]
+```
+
 ### Defaults
 
 Defaults can be generic, but can only refer to earlier typevars:

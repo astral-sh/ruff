@@ -106,7 +106,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .iter()
                     .map(|expr| {
                         let constraint = self.infer_type_expression(expr);
-                        if constraint.has_typevar_or_typevar_instance(db, env)
+                        if constraint.is_generic_typevar_bound(db, env)
                             && let Some(builder) = self
                                 .context
                                 .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
@@ -132,7 +132,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Some(expr) => {
                 let bound_ty = self.infer_type_expression(expr);
-                if bound_ty.has_typevar_or_typevar_instance(db, env)
+                if bound_ty.is_generic_typevar_bound(db, env)
                     && let Some(builder) =
                         self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
                 {

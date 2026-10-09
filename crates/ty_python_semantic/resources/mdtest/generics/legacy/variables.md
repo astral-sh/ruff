@@ -1118,6 +1118,95 @@ class Foo(Generic[S]):
     T = TypeVar("T", bound=S)
 ```
 
+### Bounds and constraints through aliases
+
+Specializing an alias with a type variable does not make a generic bound valid. After reporting the
+invalid bound, calls still infer their result from the argument.
+
+```py
+from typing import TypeAlias, TypeVar
+
+T = TypeVar("T")
+R: TypeAlias = T | list[T]
+
+# error: [invalid-type-variable-bound]
+U = TypeVar("U", bound="R[U]")
+
+def bounded(value: U) -> U:
+    return value
+
+def check(value: R[int]):
+    reveal_type(bounded(value))  # revealed: int | list[int]
+```
+
+The same restriction applies to constraints, even when the alias refers to a different type
+variable.
+
+```py
+S = TypeVar("S")
+# error: [invalid-type-variable-constraints]
+V = TypeVar("V", R[S], str)
+
+def constrained(value: S, other: V) -> V:
+    return other
+
+reveal_type(constrained(1, b"hello"))  # revealed: Literal[b"hello"]
+```
+
+Fully specialized recursive aliases remain usable as bounds and constraints.
+
+```py
+from typing import Any
+
+Tree: TypeAlias = T | list["Tree[T]"]
+Closed = TypeVar("Closed", bound=Tree[Any])  # no diagnostic
+Choice = TypeVar("Choice", list[Tree[Any]], str)  # no diagnostic
+
+def closed(value: Closed) -> Closed:
+    return value
+
+def closed_constraint(value: Choice) -> Choice:
+    return value
+
+def accepted(value: Tree[Any], seq: list[Tree[Any]]):
+    reveal_type(closed(value))  # revealed: Tree[Any]
+    reveal_type(closed_constraint(seq))  # revealed: list[Tree[Any]]
+```
+
+An explicitly parameterized alias can erase its argument. Its non-generic bound and constraint still
+reject incompatible values and promote integer literals.
+
+```py
+from typing_extensions import TypeAliasType
+
+Erased = TypeAliasType("Erased", int, type_params=(T,))
+ErasedBound = TypeVar("ErasedBound", bound="Erased[ErasedBound]")  # no diagnostic
+ErasedChoice = TypeVar("ErasedChoice", "Erased[ErasedChoice]", str)  # no diagnostic
+
+def erased(value: ErasedBound) -> ErasedBound:
+    return value
+
+def erased_constraint(value: ErasedChoice) -> ErasedChoice:
+    return value
+
+reveal_type(erased(1))  # revealed: Literal[1]
+reveal_type(erased_constraint(1))  # revealed: int
+erased("wrong")  # error: [invalid-argument-type]
+```
+
+Recursively forwarding an unused argument does not make it part of the bound.
+
+```py
+IntegerTree = TypeAliasType("IntegerTree", "int | list[IntegerTree[T]]", type_params=(T,))
+RecursiveErased = TypeVar("RecursiveErased", bound="IntegerTree[RecursiveErased]")  # no diagnostic
+
+def recursive_erased(value: RecursiveErased) -> RecursiveErased:
+    return value
+
+reveal_type(recursive_erased(1))  # revealed: Literal[1]
+recursive_erased("wrong")  # error: [invalid-argument-type]
+```
+
 ### Recursive bounds
 
 However, they are lazily evaluated and can cyclically refer to their own type:

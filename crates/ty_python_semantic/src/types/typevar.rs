@@ -121,6 +121,49 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// A type variable's bound or constraint must not itself be generic. A closed recursive
+    /// bound such as `Tree[Any]` needs no expansion. When alias arguments contain a type
+    /// variable, variance determines whether the alias actually depends on that variable.
+    /// `type Ignore[T] = int` erases `T`, including when an alias forwards it recursively.
+    pub(crate) fn is_generic_typevar_bound(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> bool {
+        any_over_type(db, env, self, false, |ty| match ty {
+            Type::TypeVar(_) | Type::KnownInstance(KnownInstanceType::TypeVar(_)) => true,
+            Type::TypeAlias(alias) => alias.specialization(db).is_some_and(|arguments| {
+                arguments
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(arguments.types(db))
+                    .any(|(parameter, argument)| {
+                        argument.is_generic_typevar_bound(db, env)
+                            && alias
+                                .variance_of(db, env, parameter.identity(db))
+                                .evaluate(db)
+                                != TypeVarVariance::Bivariant
+                    })
+            }),
+            Type::Recursive(recursive) => recursive.arguments(db).is_some_and(|arguments| {
+                let context = arguments.generic_context(db);
+                let generic =
+                    recursive.with_arguments(db, Some(context.identity_specialization(db)));
+                context
+                    .variables(db)
+                    .zip(arguments.types(db))
+                    .any(|(parameter, argument)| {
+                        argument.is_generic_typevar_bound(db, env)
+                            && generic
+                                .variance_of(db, env, parameter.identity(db))
+                                .evaluate(db)
+                                != TypeVarVariance::Bivariant
+                    })
+            }),
+            _ => false,
+        })
+    }
+
     pub(crate) fn has_unspecialized_type_var(
         self,
         db: &'db dyn Db,
@@ -615,7 +658,7 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_bound(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Option<Type<'db>> {
         let bound = self.lazy_bound_unchecked(db)?;
 
-        if bound.has_typevar_or_typevar_instance(db, env) {
+        if bound.is_generic_typevar_bound(db, env) {
             return None;
         }
 
@@ -680,7 +723,7 @@ impl<'db> TypeVarInstance<'db> {
         if constraints
             .elements(db)
             .iter()
-            .any(|ty| ty.has_typevar_or_typevar_instance(db, env))
+            .any(|ty| ty.is_generic_typevar_bound(db, env))
         {
             return None;
         }
