@@ -31,14 +31,13 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
+            FunctionDecoratorInference, InferenceFlags, TypeExpressionFlags, TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorator_flags, function_known_decorators, infer_deferred_types,
-            infer_function_default_types, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            function_known_decorator_flags, function_known_decorators, infer_statement_types,
+            nearest_enclosing_function, original_class_type,
         },
         infer_definition_types,
         list_members::all_members,
@@ -446,18 +445,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        let decorator_inference =
-            (!decorator_list.is_empty()).then(|| function_known_decorators(self.db(), definition));
-        if let Some(decorator_inference) = decorator_inference.as_ref() {
-            self.context.extend(decorator_inference.diagnostics());
-            self.expressions
-                .extend(decorator_inference.expression_types());
-            self.bindings.extend(decorator_inference.bindings());
-            self.called_functions
-                .extend(decorator_inference.called_functions().iter().copied());
-            self.implicit_aliases
-                .extend(decorator_inference.implicit_aliases().iter().copied());
-        }
+        let decorator_inference = (!decorator_list.is_empty())
+            .then(|| self.infer_and_extend_function_decorators(definition));
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut has_transforming_decorators = false;
@@ -789,13 +778,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
-        let db = self.db();
         if function_has_deferred_annotations(function) {
-            self.extend_definition(definition, infer_deferred_types(db, definition));
+            self.infer_and_extend_deferred_definition(definition);
         }
         if parameters_have_defaults(&function.parameters) {
-            self.extend_definition(definition, infer_function_default_types(db, definition));
+            self.infer_and_extend_function_defaults(definition);
         }
+    }
+
+    fn infer_and_extend_function_decorators(
+        &mut self,
+        definition: Definition<'db>,
+    ) -> &'db FunctionDecoratorInference<'db> {
+        let inference = function_known_decorators(self.db(), definition);
+        self.context.extend(inference.diagnostics());
+        self.expressions.extend(inference.expression_types());
+        self.bindings.extend(inference.bindings());
+        self.called_functions
+            .extend(inference.called_functions().iter().copied());
+        self.implicit_aliases
+            .extend(inference.implicit_aliases().iter().copied());
+        inference
     }
 
     pub(super) fn infer_function_annotations(
