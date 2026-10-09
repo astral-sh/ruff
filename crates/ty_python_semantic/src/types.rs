@@ -506,24 +506,27 @@ struct ApplyMaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<'db, ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool, 1>>;
 
-/// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
-///
-/// Some recursive transformations visit the same type under more than one mapping mode within a
-/// single call chain. Keep separate cycle caches for those modes so one transformation cannot
-/// reuse the result of another.
+/// The identity of one transformation, including its captured substitution and polarity.
+/// Normalization and type context can change the result even for the same input type.
+#[derive(Clone, PartialEq, Eq, Hash)]
+struct TypeTransformationKey<'db> {
+    program: Program<'db>,
+    operation: Option<recursive::RecursiveOperation<'db>>,
+    recursive: Option<recursive::RecursiveMapping<'db>>,
+    context: TypeContext<'db>,
+    normalization: TypeNormalization,
+    materialize_bounds: bool,
+}
+
+/// A mapping frame has local completed results and shares active traversal ancestry with
+/// nested frames. Switching normalization or substitution must not forget that ancestry.
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     normalization: TypeNormalization,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
-    default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    top_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
-    skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    transformations: TypeTransformer<'db, ApplyTypeMappingTag, TypeTransformationKey<'db>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -534,13 +537,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             normalization: TypeNormalization::Semantic,
             recursion_context: None,
             materialize_typevar_bounds_and_defaults: true,
-            default: OnceCell::default(),
-            top_materialization: OnceCell::default(),
-            bottom_materialization: OnceCell::default(),
-            top_specialization_materialization: OnceCell::default(),
-            bottom_specialization_materialization: OnceCell::default(),
-            promotion: OnceCell::default(),
-            skip_promotion: OnceCell::default(),
+            transformations: TypeTransformer::default(),
             materialization_equivalence: OnceCell::default(),
         }
     }
@@ -579,26 +576,24 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         db: &'db dyn Db,
         ty: Type<'db>,
         type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let type_transformer = match type_mapping {
-            TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
-            TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Top,
-                ..
-            } => &self.top_specialization_materialization,
-            TypeMapping::ApplySpecializationWithMaterialization {
-                materialization_kind: MaterializationKind::Bottom,
-                ..
-            } => &self.bottom_specialization_materialization,
-            TypeMapping::Promote(PromotionMode::On, _) => &self.promotion,
-            TypeMapping::Promote(PromotionMode::Off, _) => &self.skip_promotion,
-            _ => &self.default,
+        let key = TypeTransformationKey {
+            program: self.env.program(db),
+            operation: recursive::RecursiveOperation::capture(
+                type_mapping,
+                self.materialize_typevar_bounds_and_defaults,
+            ),
+            recursive: match type_mapping {
+                TypeMapping::ApplyRecursiveSubstitution(mapping) => Some(*mapping),
+                _ => None,
+            },
+            context: tcx,
+            normalization: self.normalization,
+            materialize_bounds: self.materialize_typevar_bounds_and_defaults,
         };
-        type_transformer
-            .get_or_init(Box::default)
-            .visit_type(db, ty, func)
+        self.transformations.visit_type_keyed(db, ty, key, func)
     }
 
     fn is_equivalent_to_materialization(
@@ -620,6 +615,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         debug_assert!(was_empty.is_ok());
 
         Self {
+            transformations: self.transformations.for_new_mapping(),
             materialization_equivalence,
             recursion_context: self.recursion_context,
             normalization: self.normalization,
@@ -9630,7 +9626,7 @@ impl<'db> Type<'db> {
                     }
                 }
 
-                return visitor.visit(db, self, type_mapping, || {
+                return visitor.visit(db, self, type_mapping, tcx, || {
                     let expanded_paramspecs = union_paramspecs
                         .iter()
                         .map(|(typevar, union)| {
@@ -9683,7 +9679,7 @@ impl<'db> Type<'db> {
                 reference.apply_type_mapping_impl(db, type_mapping, visitor)
             }
 
-            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, || {
+            Type::FunctionLiteral(function) => visitor.visit(db, self, type_mapping, tcx, || {
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
@@ -9739,7 +9735,7 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
-            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
+            Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, tcx, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 }))
@@ -9795,7 +9791,7 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            Type::Callable(callable) => visitor.visit(db, self, type_mapping, || {
+            Type::Callable(callable) => visitor.visit(db, self, type_mapping, tcx, || {
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }),
 
@@ -9830,11 +9826,11 @@ impl<'db> Type<'db> {
                 complement.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
-            Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, || {
+            Type::TypeIs(type_is) => visitor.visit(db, self, type_mapping, tcx, || {
                 type_is.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
 
-            Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, || {
+            Type::TypeGuard(type_guard) => visitor.visit(db, self, type_mapping, tcx, || {
                 type_guard.with_type(
                     db,
                     type_guard.return_type(db).apply_type_mapping_impl(
@@ -9846,7 +9842,7 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, || {
+            Type::TypeForm(typeform) => visitor.visit(db, self, type_mapping, tcx, || {
                 TypeFormType::from_type_expression(
                     db,
                     typeform.type_argument(db).apply_type_mapping_impl(
@@ -11098,7 +11094,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,

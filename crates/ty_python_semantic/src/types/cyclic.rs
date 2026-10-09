@@ -27,6 +27,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
+use std::rc::Rc;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -1027,22 +1028,18 @@ pub(super) enum CycleDetectorVisit<T, R> {
     Pending(T),
 }
 
-/// Guards recursive type transformations.
-pub(crate) struct TypeTransformer<'db, Tag> {
-    /// The active transformation stack and its recursive identities.
-    /// Completed visits are removed from the end of the stack.
-    seen: RefCell<SmallVec<[ActiveTypeTransformation<'db>; 3]>>,
-
-    /// Memoized transformations from earlier visits in the current recursive operation.
-    cache: RefCell<CycleDetectorCache<Type<'db>, Type<'db>>>,
-
+/// A traversal's active ancestors survive nested mappings; completed results belong to
+/// one mapping frame. The key distinguishes operations with different captured environments.
+pub(crate) struct TypeTransformer<'db, Tag, K = ()> {
+    seen: Rc<RefCell<SmallVec<[ActiveTypeTransformation<'db, K>; 3]>>>,
+    cache: RefCell<CycleDetectorCache<(Type<'db>, K), Type<'db>>>,
     _tag: PhantomData<fn() -> Tag>,
 }
 
-impl<Tag> Default for TypeTransformer<'_, Tag> {
+impl<Tag, K> Default for TypeTransformer<'_, Tag, K> {
     fn default() -> Self {
         Self {
-            seen: RefCell::default(),
+            seen: Rc::default(),
             cache: RefCell::default(),
             _tag: PhantomData,
         }
@@ -1050,60 +1047,68 @@ impl<Tag> Default for TypeTransformer<'_, Tag> {
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
-    #[inline]
     pub(crate) fn visit_type(
         &self,
         db: &'db dyn Db,
         ty: Type<'db>,
         compute: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        match self.begin_visit(db, ty) {
-            TypeTransformerVisit::Ready(result) => result,
-            TypeTransformerVisit::Pending(ty) => {
-                let result = compute();
-                self.finish_visit(ty, result)
-            }
+        self.visit_type_keyed(db, ty, (), compute)
+    }
+}
+
+impl<'db, Tag, K: Clone + Eq + Hash> TypeTransformer<'db, Tag, K> {
+    /// Start another mapping without losing the operations that are still active.
+    /// Completed results cannot cross this boundary: semantic callers may have different
+    /// provisional assumptions even when their stored inputs happen to be equal.
+    pub(crate) fn for_new_mapping(&self) -> Self {
+        Self {
+            seen: Rc::clone(&self.seen),
+            cache: RefCell::default(),
+            _tag: PhantomData,
         }
     }
 
-    fn begin_visit(&self, db: &'db dyn Db, ty: Type<'db>) -> TypeTransformerVisit<'db> {
-        if let Some(result) = self.cache.borrow().get(&ty) {
-            return TypeTransformerVisit::Ready(*result);
+    #[inline]
+    pub(crate) fn visit_type_keyed(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        key: K,
+        compute: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
+        if let Some(result) = self.cache.borrow().get(&(ty, key.clone())) {
+            return *result;
         }
-
         let identity = ty.to_type_identity(db);
-        let seen = self.seen.borrow();
-        if seen
+        if self
+            .seen
+            .borrow()
             .iter()
-            .any(|active| active.ty == ty || active.identity == identity)
+            .any(|active| active.key == key && (active.ty == ty || active.identity == identity))
         {
-            return TypeTransformerVisit::Ready(ty);
+            // The recursive edge retains its declaration-backed reference, including any
+            // operations already captured on the application.
+            return ty;
         }
-        drop(seen);
-
-        self.seen
-            .borrow_mut()
-            .push(ActiveTypeTransformation { ty, identity });
-        TypeTransformerVisit::Pending(ty)
-    }
-
-    fn finish_visit(&self, ty: Type<'db>, result: Type<'db>) -> Type<'db> {
+        self.seen.borrow_mut().push(ActiveTypeTransformation {
+            ty,
+            identity,
+            key: key.clone(),
+        });
+        let result = compute();
         let active = self.seen.borrow_mut().pop();
-        debug_assert_eq!(active.map(|active| active.ty), Some(ty));
-        self.cache.borrow_mut().insert_completed(ty, result);
+        debug_assert_eq!(active.as_ref().map(|active| active.ty), Some(ty));
+        debug_assert!(active.is_some_and(|active| active.key == key));
+        self.cache.borrow_mut().insert_completed((ty, key), result);
         result
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct ActiveTypeTransformation<'db> {
+struct ActiveTypeTransformation<'db, K> {
     ty: Type<'db>,
     identity: TypeIdentity<'db>,
-}
-
-enum TypeTransformerVisit<'db> {
-    Ready(Type<'db>),
-    Pending(Type<'db>),
+    key: K,
 }
 
 impl<'db, Tag, T, R: Default, const INLINE_CAPACITY: usize> Default

@@ -1190,3 +1190,54 @@ type H[T] = G[T]
         "Divergent",
     );
 }
+
+#[test]
+fn transformation_frames_distinguish_substitutions_and_promotion_kinds() {
+    let mut db = setup_db();
+    db.write_dedented("/src/a.py", "def identity[T](value: T) -> T: return value")
+        .unwrap();
+    let env = db.program_environment();
+    let file = ProgramFile::new(
+        &db,
+        system_path_to_file(&db, "/src/a.py").unwrap(),
+        env.program(&db),
+    );
+    let original = global_symbol(&db, file, "identity").place.expect_type();
+    let Type::FunctionLiteral(function) = original else {
+        panic!("expected a function");
+    };
+    let parameter = function.signature(&db).overloads[0]
+        .generic_context
+        .unwrap()
+        .variables(&db)
+        .next()
+        .unwrap();
+    let visitor = ApplyTypeMappingVisitor::new(&env);
+    for expected in [KnownClass::Int, KnownClass::Str] {
+        let expected = expected.to_instance(&db, &env);
+        let mapped = original.apply_type_mapping_impl(
+            &db,
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Single(parameter, expected)),
+            TypeContext::default(),
+            &visitor,
+        );
+        let Type::FunctionLiteral(mapped) = mapped else {
+            panic!("specialization preserves function identity");
+        };
+        assert_eq!(mapped.signature(&db).overloads[0].return_ty, expected);
+    }
+    let classes_only = original.apply_type_mapping_impl(
+        &db,
+        &TypeMapping::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly),
+        TypeContext::default(),
+        &visitor,
+    );
+    let regular = original.apply_type_mapping_impl(
+        &db,
+        &TypeMapping::Promote(PromotionMode::On, PromotionKind::Regular),
+        TypeContext::default(),
+        &visitor,
+    );
+    assert!(classes_only.is_function_literal());
+    assert!(matches!(regular, Type::Callable(_)));
+}

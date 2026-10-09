@@ -874,11 +874,11 @@ impl<'db> TypeAliasType<'db> {
             TypeMapping::EagerExpansion if self.operations(db).is_empty() => {
                 self.raw_value_type(db).expand_eagerly(db, visitor.env)
             }
-            TypeMapping::EagerExpansion => visitor.visit(db, ty, type_mapping, || {
+            TypeMapping::EagerExpansion => visitor.visit(db, ty, type_mapping, tcx, || {
                 self.value_type_with_recursion(db, visitor.recursion_context)
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
-            _ => visitor.visit(db, ty, type_mapping, || {
+            _ => visitor.visit(db, ty, type_mapping, tcx, || {
                 let body = self.value_type_with_recursion(db, visitor.recursion_context);
                 let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 if mapped == ty || mapped == body {

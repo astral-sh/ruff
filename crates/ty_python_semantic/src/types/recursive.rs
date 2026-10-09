@@ -285,9 +285,40 @@ pub enum RecursiveOperation<'db> {
         Option<BindingContext<'db>>,
     ),
     ReplaceSelf(Type<'db>),
+    Promote(super::PromotionMode, super::PromotionKind),
+    ReplaceParameterDefaults,
+    EagerExpansion,
+    RescopeReturnCallables(Box<[(super::CallableType<'db>, super::CallableType<'db>)]>),
 }
 
 impl<'db> RecursiveOperation<'db> {
+    /// Capture a closed operation without inspecting the declaration it will transform.
+    /// Binder substitution and normalization rewrite stored syntax directly.
+    pub(super) fn capture(
+        mapping: &TypeMapping<'_, 'db>,
+        materialize_bounds: bool,
+    ) -> Option<Self> {
+        match mapping {
+            TypeMapping::Normalize | TypeMapping::ApplyRecursiveSubstitution(_) => None,
+            TypeMapping::Materialize(kind) => Some(Self::Materialize(*kind, materialize_bounds)),
+            TypeMapping::Promote(mode, kind) => Some(Self::Promote(*mode, *kind)),
+            TypeMapping::ReplaceParameterDefaults => Some(Self::ReplaceParameterDefaults),
+            TypeMapping::EagerExpansion => Some(Self::EagerExpansion),
+            TypeMapping::RescopeReturnCallables(callables) => Some(Self::RescopeReturnCallables(
+                callables
+                    .iter()
+                    .map(|(&source, &target)| (source, target))
+                    .collect(),
+            )),
+            TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ApplySpecializationWithMaterialization { .. }
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::FreshenBoundTypeVars { .. }
+            | TypeMapping::BindSelf(_)
+            | TypeMapping::ReplaceSelf { .. } => Self::substitution(mapping),
+        }
+    }
+
     pub(super) fn substitution(mapping: &TypeMapping<'_, 'db>) -> Option<Self> {
         Some(match mapping {
             TypeMapping::ApplySpecialization(specialization) => {
@@ -313,10 +344,16 @@ impl<'db> RecursiveOperation<'db> {
         })
     }
 
-    fn visit_types(&self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
+    pub(super) fn visit_types(&self, db: &'db dyn Db, visitor: &impl TypeVisitor<'db>) {
         match self {
             Self::Specialize(specialization, _) => specialization.visit_types(db, visitor),
             Self::BindSelf(ty, ..) | Self::ReplaceSelf(ty) => visitor.visit_type(db, *ty),
+            Self::RescopeReturnCallables(callables) => {
+                for &(source, target) in callables {
+                    visitor.visit_type(db, Type::Callable(source));
+                    visitor.visit_type(db, Type::Callable(target));
+                }
+            }
             _ => {}
         }
     }
@@ -350,6 +387,13 @@ impl<'db> RecursiveOperation<'db> {
             Self::ReplaceSelf(new_upper_bound) => f(TypeMapping::ReplaceSelf {
                 new_upper_bound: *new_upper_bound,
             }),
+            Self::Promote(mode, kind) => f(TypeMapping::Promote(*mode, *kind)),
+            Self::ReplaceParameterDefaults => f(TypeMapping::ReplaceParameterDefaults),
+            Self::EagerExpansion => f(TypeMapping::EagerExpansion),
+            Self::RescopeReturnCallables(callables) => {
+                let callables = callables.iter().copied().collect();
+                f(TypeMapping::RescopeReturnCallables(&callables))
+            }
         }
     }
 
@@ -368,6 +412,27 @@ impl<'db> RecursiveOperation<'db> {
             }
             Self::BindSelf(ty, class, context) => Self::BindSelf(map(*ty), *class, *context),
             Self::ReplaceSelf(ty) => Self::ReplaceSelf(map(*ty)),
+            Self::RescopeReturnCallables(callables) => Self::RescopeReturnCallables(
+                callables
+                    .iter()
+                    .map(|&(source, target)| {
+                        (
+                            source.apply_type_mapping_impl(
+                                db,
+                                mapping,
+                                TypeContext::default(),
+                                visitor,
+                            ),
+                            target.apply_type_mapping_impl(
+                                db,
+                                mapping,
+                                TypeContext::default(),
+                                visitor,
+                            ),
+                        )
+                    })
+                    .collect(),
+            ),
             operation => operation.clone(),
         }
     }
@@ -429,10 +494,10 @@ impl<'db> RecursiveVar<'db> {
 }
 
 /// A structural substitution that only the recursive-type binder can construct.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub struct RecursiveMapping<'db>(RecursiveSubstitution<'db>);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum RecursiveSubstitution<'db> {
     /// Replace references to a binder with applications of its recursive constructor.
     /// In the module example, this replaces `F[list[T]]` with `Tree[list[T]]`.
@@ -960,7 +1025,7 @@ impl<'db> RecursiveType<'db> {
                 Type::Recursive(self.with_operations(db, operations.into_boxed_slice()))
             }
             TypeMapping::EagerExpansion => {
-                visitor.visit(db, Type::Recursive(self), mapping, || {
+                visitor.visit(db, Type::Recursive(self), mapping, tcx, || {
                     // Expand arguments only where the body exposes them. Expanding stored arguments
                     // first can feed a recursive alias's previous approximation into its own arguments.
                     self.unfold(db, visitor.env)
@@ -976,7 +1041,7 @@ impl<'db> RecursiveType<'db> {
                         .into_type()
                 })
             }
-            _ => visitor.visit(db, Type::Recursive(self), mapping, || {
+            _ => visitor.visit(db, Type::Recursive(self), mapping, tcx, || {
                 // Map arguments before unfolding so recursive backedges retain their mapped
                 // arguments. Pending operations must run first: rewriting their input arguments
                 // would move this mapping across a captured materialization.

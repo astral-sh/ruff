@@ -22,7 +22,7 @@ mod generic_gradual_intersections;
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
 /// Whether constructing a type can inspect the relationships between its elements.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
 pub(super) enum TypeNormalization {
     /// Simplify types using subtype and disjointness relations.
     #[default]

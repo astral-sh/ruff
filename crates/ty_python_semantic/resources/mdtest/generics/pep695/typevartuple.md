@@ -2196,6 +2196,27 @@ type Repeated = tuple[int, *Repeated]
 type EmptyCycle = tuple[*EmptyCycle]
 ```
 
+Mutually recursive unpacks have the same invalid shape. Passing these recovered types through a
+generic function preserves any known positions, including when recursive arguments keep growing.
+
+```py
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+type Left = tuple[*Right]
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+type Right = tuple[*Left]
+
+def identity[T](value: T) -> T:
+    return value
+
+def inspect_recovery(empty: EmptyCycle, repeated: Repeated, growing: Growing[int], mutual: Left) -> None:
+    identity(empty)  # no diagnostic
+    reveal_type(empty)  # revealed: tuple[Unknown, ...]
+    reveal_type(identity(repeated)[0])  # revealed: int
+    reveal_type(identity(growing)[0])  # revealed: int
+    reveal_type(identity(mutual)[0])  # revealed: Unknown
+    invalid: str = identity(growing)[0]  # error: [invalid-assignment]
+```
+
 Recursion within a single element does not change the number of elements in the outer tuple.
 Unpacking a finite alias preserves every position, including through repeated applications of the
 same alias constructor.
@@ -2212,6 +2233,8 @@ finite: Finite = (b"prefix", 1, "tail")  # no diagnostic
 
 def inspect(value: Finite) -> None:
     reveal_type(value)  # revealed: tuple[bytes, int, str]
+    reveal_type(identity(value))  # revealed: tuple[bytes, int, str]
+    invalid: tuple[bytes, str, int] = identity(value)  # error: [invalid-assignment]
 ```
 
 An unbounded tuple is already a finite description of a variable-length segment. Aliases preserve
