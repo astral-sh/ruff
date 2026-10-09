@@ -899,8 +899,8 @@ def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args
 `P` captures an empty parameter list, so the forwarded call supplies no information for `T`.
 
 ```py
-# For a fully static specialization, the bound on `R` requires `T = object` because
-# `Factory` is invariant.
+# `R` is bounded by `Factory[object]`, and since `Factory` is invariant, no other fully static
+# specialization of `Factory` can satisfy that bound.
 reveal_type(construct(Factory))  # revealed: Factory[object]
 ```
 
