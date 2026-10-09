@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/rules/perflint/mod.rs
+---
+PERF403 Use a dictionary comprehension instead of a for-loop
+  --> PERF403_py312.py:12:17
+   |
+10 |         for idx, name in enumerate(fruit):
+11 |             if super().filter(idx):
+12 |                 result[idx] = name  # PERF403
+   |                 ^^^^^^^^^^^^^^^^^^
+help: Replace for loop with dict comprehension
