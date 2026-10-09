@@ -10,13 +10,11 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
-        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-        TypeVarBoundOrConstraints, UnionBuilder,
+        IntersectionBuilder, KnownClass, MemberLookupPolicy, SpecialFormType, SubclassOfInner,
+        SubclassOfType, Type, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
-        member_lookup_result,
         relation::EquivalenceChecker,
         signatures::{Parameter, Parameters, Signature},
         typevar::{TypeVarConstraints, TypeVarInstance},
@@ -364,7 +362,7 @@ impl<'db> SuperOwnerKind<'db> {
         }
     }
 
-    fn descriptor_binding(
+    pub(super) fn descriptor_binding(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -942,31 +940,6 @@ impl<'db> BoundSuperType<'db> {
             }
             true
         }))
-    }
-
-    /// Tries to call `__get__` on the attribute.
-    /// The arguments passed to `__get__` depend on whether the owner is an instance or a class.
-    /// See the `CPython` implementation for reference:
-    /// <https://github.com/python/cpython/blob/3b3720f1a26ab34377542b48eb6a6565f78ff892/Objects/typeobject.c#L11690-L11693>
-    pub(super) fn try_call_dunder_get_on_attribute(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        attribute: PlaceAndQualifiers<'db>,
-    ) -> Option<MemberLookupResult<'db>> {
-        let (instance, owner) = self.owner(db).descriptor_binding(db, env)?;
-        let (member, _, descriptor_error) =
-            Type::try_call_dunder_get_on_attribute(db, env, attribute, instance, owner);
-        Some(member_lookup_result(
-            db,
-            member,
-            descriptor_error.map(MemberLookupErrorKind::DescriptorGet),
-            instance
-                .and_then(|_| attribute.place.ignore_possibly_undefined())
-                .and_then(|ty| ty.property_deprecations(db))
-                // `super` delegates reads to the owner's descriptors, but not writes or deletions.
-                .map(|properties| properties.getters_only(db)),
-        ))
     }
 
     /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the

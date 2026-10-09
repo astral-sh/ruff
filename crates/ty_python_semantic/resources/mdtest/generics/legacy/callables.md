@@ -954,6 +954,36 @@ def _(callback: H):
     reveal_type(apply(callback))  # revealed: str
 ```
 
+## Recursive callable members with growing arguments
+
+A possible `__call__` accepts the current type argument, but the next level can require a list
+instead. The first callable does not establish that every possible value accepts an integer.
+
+```py
+from typing import Callable, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Recursive(Generic[T]):
+    __call__: "Recursive[list[T]] | Callable[[T], T]"  # no diagnostic
+
+def check(callback: Recursive[int]):
+    only_current: Callable[[int], int] = callback  # error: [invalid-assignment]
+    unrelated: Callable[[str], str] = callback  # error: [invalid-assignment]
+```
+
+Finite nested wrappers still specialize each callable before comparison. An annotated `__call__` is
+bound as a method, so its callable includes the receiver parameter:
+
+```py
+class Wrapper(Generic[T]):
+    __call__: T
+
+def finite(callback: Wrapper[Wrapper[Callable[[object, int], str]]]):
+    good: Callable[[int], str] = callback  # no diagnostic
+    bad: Callable[[str], int] = callback  # error: [invalid-assignment]
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its

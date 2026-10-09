@@ -26,8 +26,8 @@ use crate::{
         DataclassParams, GenericAlias, GenericContext, KnownClass, KnownInstanceType,
         MaterializationKind, MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo,
         Parameter, Parameters, PropertyInstanceType, Signature, SpecialFormType, StaticMroError,
-        SubclassOfType, Type, TypeContext, TypeMapping, TypeVarVariance, TypingModule,
-        UnionBuilder, UnionType,
+        SubclassOfType, Type, TypeContext, TypeMapping, TypeNormalization, TypeVarVariance,
+        TypingModule, UnionBuilder, UnionType,
         attribute_write::DescriptorSetterDomain,
         bound_super::BoundSuperType,
         call::{CallError, CallErrorKind},
@@ -1433,28 +1433,6 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        fn into_function_like_callable<'d>(
-            db: &'d dyn Db,
-            env: &ProgramEnvironment<'d>,
-            ty: Type<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty)
-                    if callable_ty.is_regular(db)
-                        && callable_ty.signatures(db).has_parameters() =>
-                {
-                    Type::Callable(callable_ty.into_function_like(db))
-                }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_function_like_callable(db, env, *element)
-                }),
-                _ => ty,
-            }
-        }
-
         let inherited_generic_context = if policy.no_inherited_generic_context() {
             None
         } else {
@@ -1482,10 +1460,37 @@ impl<'db> StaticClassLiteral<'db> {
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
         if name.starts_with("__") && name.ends_with("__") {
-            member = member.map_type(|ty| into_function_like_callable(db, env, ty));
+            member = member.map_type(|ty| Self::into_function_like_callable(db, env, ty));
         }
 
         member
+    }
+
+    pub(in crate::types) fn into_function_like_callable<'d>(
+        db: &'d dyn Db,
+        env: &ProgramEnvironment<'d>,
+        ty: Type<'d>,
+    ) -> Type<'d> {
+        match ty {
+            Type::Callable(callable_ty)
+                if callable_ty.is_regular(db) && callable_ty.signatures(db).has_parameters() =>
+            {
+                Type::Callable(callable_ty.into_function_like(db))
+            }
+            Type::Union(union) => union.map_leave_aliases_with_normalization(
+                db,
+                env,
+                TypeNormalization::Structural,
+                |element| Self::into_function_like_callable(db, env, *element),
+            ),
+            Type::Intersection(intersection) => intersection.map_positive_with_normalization(
+                db,
+                env,
+                TypeNormalization::Structural,
+                |element| Self::into_function_like_callable(db, env, *element),
+            ),
+            _ => ty,
+        }
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
@@ -1514,12 +1519,18 @@ impl<'db> StaticClassLiteral<'db> {
                 {
                     Type::Callable(callable_ty.into_dunder_paramspec(db))
                 }
-                Type::Union(union) => union.map(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
-                Type::Intersection(intersection) => intersection.map_positive(db, env, |element| {
-                    into_dunder_paramspec_callable(db, env, *element)
-                }),
+                Type::Union(union) => union.map_leave_aliases_with_normalization(
+                    db,
+                    env,
+                    TypeNormalization::Structural,
+                    |element| into_dunder_paramspec_callable(db, env, *element),
+                ),
+                Type::Intersection(intersection) => intersection.map_positive_with_normalization(
+                    db,
+                    env,
+                    TypeNormalization::Structural,
+                    |element| into_dunder_paramspec_callable(db, env, *element),
+                ),
                 _ => ty,
             }
         }

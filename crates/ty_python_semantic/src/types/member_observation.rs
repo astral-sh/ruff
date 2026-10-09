@@ -220,6 +220,77 @@ pub(super) fn lookup_member_with_options<'db>(
     .lookup(input, receiver, name, options.policy)
 }
 
+/// Bind a descriptor selected by a declaration query within the requesting proof.
+pub(super) fn bind_descriptor<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    descriptor: &ObservedType<'db>,
+    instance: Option<&ObservedType<'db>>,
+    owner: &ObservedType<'db>,
+    context: &RelationContext<'db>,
+) -> Option<(
+    ObservedMember<'db>,
+    AttributeKind,
+    Option<DescriptorGetCallContext<'db>>,
+)> {
+    let member =
+        ObservedMember::from_value(db, Place::bound(descriptor.ty).into(), descriptor.clone());
+    MemberEvaluator {
+        db,
+        env,
+        context,
+        demand: MemberLookupDemand::Value,
+    }
+    .get_attribute(member, instance, owner)
+}
+
+pub(super) fn resolve_descriptor_access<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    receiver: Type<'db>,
+    attribute: PlaceAndQualifiers<'db>,
+    fallback: MemberLookupResult<'db>,
+    policy: InstanceFallbackShadowsNonDataDescriptor,
+) -> MemberLookupResult<'db> {
+    let context = RelationContext::default();
+    let evaluator = MemberEvaluator {
+        db,
+        env,
+        context: &context,
+        demand: MemberLookupDemand::Value,
+    };
+    let receiver = ObservedType::root(receiver);
+    let owner = receiver.unchanged_or_unresolved(receiver.ty.to_meta_type(db, env));
+    let member = ObservedMember::from_result(db, attribute.into(), &receiver);
+    let fallback = ObservedMember::from_result(db, fallback, &receiver);
+    evaluator
+        .resolve_descriptor(member, Some(&receiver), &owner, fallback, policy)
+        .map_or_else(
+            || Place::bound(Type::unknown()).into(),
+            |member| member.result,
+        )
+}
+
+/// Call an implicitly resolved method while retaining the proof which requested it.
+pub(super) fn call_dunder<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    input: &ObservedType<'db>,
+    receiver: &ObservedType<'db>,
+    name: &str,
+    arguments: &CallArguments<'_, 'db>,
+    policy: MemberLookupPolicy,
+    context: &RelationContext<'db>,
+) -> Option<Result<Bindings<'db>, CallDunderError<'db>>> {
+    MemberEvaluator {
+        db,
+        env,
+        context,
+        demand: MemberLookupDemand::Value,
+    }
+    .call_dunder(input, receiver, name, arguments, policy)
+}
+
 #[derive(Clone, Copy)]
 struct MemberEvaluator<'a, 'db> {
     db: &'db dyn Db,
@@ -254,8 +325,22 @@ impl<'db> MemberEvaluator<'_, 'db> {
     }
 
     fn class_view(&self, input: &ObservedType<'db>) -> Option<(ObservedType<'db>, ClassType<'db>)> {
-        let view = input.project(self.db, self.env, ObservationEdge::ClassView)?;
-        let class = view.ty.to_class_type(self.db)?;
+        let view = input
+            .project(self.db, self.env, ObservationEdge::ClassView)
+            .or_else(|| {
+                self.runtime_lookup_target(input)?.project(
+                    self.db,
+                    self.env,
+                    ObservationEdge::ClassView,
+                )
+            })?;
+        // Preserve a bare class so the declaration can select identity specialization for
+        // constructors; `Type::to_class_type` would already choose the default arguments.
+        let class = match view.ty {
+            Type::ClassLiteral(class) => ClassType::NonGeneric(class),
+            Type::GenericAlias(alias) => ClassType::Generic(alias),
+            _ => return None,
+        };
         Some((view, class))
     }
 
@@ -339,7 +424,57 @@ impl<'db> MemberEvaluator<'_, 'db> {
         policy: MemberLookupPolicy,
         storage: MemberStorage,
     ) -> ObservedMember<'db> {
-        self.mro_member_from(input, class, name, policy, storage, class.iter_mro(self.db))
+        if matches!(storage, MemberStorage::Class)
+            && class.class_literal(self.db).as_static().is_none()
+        {
+            // Runtime-created classes do not have a source generic declaration to observe. Their
+            // own constructor determines the shape of their namespace, including unknown fields.
+            return ObservedMember::from_result(
+                self.db,
+                class.class_member(self.db, self.env, name, policy).into(),
+                input,
+            );
+        }
+        if matches!(storage, MemberStorage::Class)
+            && let Some((literal, specialization)) = class.static_class_literal(self.db)
+            && literal.is_typed_dict(self.db)
+        {
+            let member = literal.typed_dict_member(self.db, self.env, specialization, name, policy);
+            return ObservedMember::from_result(self.db, member.into(), input);
+        }
+        let db = self.db;
+        // Bare generic constructors remain generic; ordinary attributes use default arguments.
+        // This is the same declaration context used by class construction and static lookup.
+        let (class, enclosing_specialization) = if matches!(storage, MemberStorage::Class)
+            && let Some((literal, None)) = class.static_class_literal(db)
+        {
+            if matches!(name, "__new__" | "__init__") {
+                (literal.identity_specialization(db), None)
+            } else {
+                let class = literal.default_specialization(db);
+                (
+                    class,
+                    class
+                        .static_class_literal(db)
+                        .and_then(|(_, specialization)| specialization),
+                )
+            }
+        } else {
+            (class, None)
+        };
+        let member = self.mro_member_from(input, class, name, policy, storage, class.iter_mro(db));
+        // Inherited Self bounds can still name the enclosing class parameters after the base
+        // declaration was specialized. Close them with the enclosing specialization, including
+        // default arguments for a bare class. Bare constructors remain independently inferable.
+        if let Some(specialization) = enclosing_specialization {
+            let mapping = super::ApplySpecialization::Specialization {
+                specialization,
+                specialize_self_domain: true,
+            };
+            member.map(db, &TypeMapping::ApplySpecialization(mapping), self.env)
+        } else {
+            member
+        }
     }
 
     fn mro_member_from(
@@ -371,13 +506,22 @@ impl<'db> MemberEvaluator<'_, 'db> {
                     name,
                     policy,
                     inherited,
-                    class.is_object(self.db),
+                    matches!(input.ty, Type::ClassLiteral(_)) && class.is_object(self.db),
                     &mut observe,
                 ) {
                     ClassMemberResult::Done(result) => result.finalize(self.db, self.env),
                     // TypedDict member declarations have a shared synthesized constructor.
                     ClassMemberResult::TypedDict(_) => {
-                        class.class_member(self.db, self.env, name, policy)
+                        let specialization = class
+                            .static_class_literal(self.db)
+                            .and_then(|(_, specialization)| specialization);
+                        class.class_literal(self.db).typed_dict_member(
+                            self.db,
+                            self.env,
+                            specialization,
+                            name,
+                            policy,
+                        )
                     }
                 }
             }
@@ -387,6 +531,20 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 InstanceMemberResult::Done(result) => result,
                 InstanceMemberResult::TypedDict => Place::Undefined.into(),
             },
+        };
+        let member = if matches!(storage, MemberStorage::Class)
+            && class.class_literal(self.db).as_static().is_some()
+            && name.starts_with("__")
+            && name.ends_with("__")
+        {
+            member.map_type(|ty| {
+                let ty = super::class::StaticClassLiteral::into_function_like_callable(
+                    self.db, self.env, ty,
+                );
+                super::property_wrapper_descriptor(self.db, self.env, name, ty)
+            })
+        } else {
+            member
         };
         let Some(ty) = member.place.ignore_possibly_undefined() else {
             return self.missing(input);
@@ -436,21 +594,65 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 }
             };
         }
-        if let Some(runtime) = self.runtime_lookup_target(descriptor) {
-            return self.descriptor_slot(&runtime, name, policy);
+        // Descriptor slots are class-level attributes of the descriptor's type. Projecting to
+        // the meta-type before looking up storage lets the shared walk handle unions and
+        // intersections of descriptor bounds as well as individual instance and class values.
+        let meta = descriptor.project(db, env, ObservationEdge::MetaType)?;
+        self.storage_member(&meta, name, policy, MemberStorage::Class)
+    }
+
+    /// Resolve raw storage on a type whose metaclass can itself be a union. All descriptors
+    /// remain unbound here; the requesting access supplies its original receiver afterwards.
+    fn storage_member(
+        &self,
+        input: &ObservedType<'db>,
+        name: &str,
+        policy: MemberLookupPolicy,
+        storage: MemberStorage,
+    ) -> Option<ObservedMember<'db>> {
+        let db = self.db;
+        let env = self.env;
+        if let Some(unfolded) = input.unfold(db, env) {
+            return self.storage_member(&unfolded, name, policy, storage);
         }
-        let (view, class) = self.class_view(descriptor)?;
-        let (view, class) = if matches!(
-            descriptor.ty,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-        ) {
-            let meta = view.project(db, env, ObservationEdge::ClassMetaclassInstance)?;
-            let (_, class) = self.class_view(&meta)?;
-            (meta, class)
-        } else {
-            (view, class)
+        if let Type::Union(union) = input.ty {
+            let mut members = Vec::new();
+            for index in 0..union.elements(db).len() {
+                let child = input.project(db, env, ObservationEdge::UnionElement(index))?;
+                members.push(self.storage_member(&child, name, policy, storage)?);
+            }
+            return self.combine_members(input, members, false);
+        }
+        if let Type::Intersection(intersection) = input.ty {
+            let mut members = Vec::new();
+            if intersection.positive(db).is_empty() {
+                let object = input.unchanged_or_unresolved(Type::object());
+                members.push(self.storage_member(&object, name, policy, storage)?);
+            } else {
+                for index in 0..intersection.positive(db).len() {
+                    let child =
+                        input.project(db, env, ObservationEdge::IntersectionPositive(index))?;
+                    members.push(self.storage_member(&child, name, policy, storage)?);
+                }
+            }
+            return self.combine_members(input, members, true);
+        }
+        if input.ty.is_dynamic() || input.ty.is_never() || input.ty.is_divergent() {
+            return Some(ObservedMember::from_value(
+                db,
+                Place::bound(input.ty).into(),
+                input.clone(),
+            ));
+        }
+        let Some((view, class)) = self.class_view(input) else {
+            return Some(self.missing(input));
         };
-        Some(self.mro_member(&view, class, name, policy, MemberStorage::Class))
+        match storage {
+            MemberStorage::Instance => Some(self.mro_member(input, class, name, policy, storage)),
+            MemberStorage::Class => {
+                self.instance_class_namespace(input, &view, class, name, policy)
+            }
+        }
     }
 
     fn instance_class_namespace(
@@ -467,10 +669,12 @@ impl<'db> MemberEvaluator<'_, 'db> {
         else {
             return Some(class_attr);
         };
-        let Some((_, metaclass)) = self.class_view(&meta) else {
+        // A namespace contribution needs a nominal metaclass declaration. A gradual
+        // metaclass does not by itself replace known class namespace attributes.
+        if meta.ty.is_dynamic() || meta.ty.is_divergent() || meta.ty.is_never() {
             return Some(class_attr);
-        };
-        let mut stored = self.mro_member(&meta, metaclass, name, policy, MemberStorage::Instance);
+        }
+        let mut stored = self.storage_member(&meta, name, policy, MemberStorage::Instance)?;
         if stored.place(db).place.is_undefined() {
             return Some(class_attr);
         }
@@ -503,10 +707,25 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 class.iter_mro(db).skip(1),
             ))
         })?;
-        Some(if implicit {
+        let member = if implicit {
             member.with_definedness(db, Definedness::AlwaysDefined)
         } else {
             member
+        };
+        let place =
+            Type::apply_dynamic_namespace_fallback(db, self.env, class, policy, member.place(db));
+        let result = member_lookup_result(
+            db,
+            place,
+            member.result.err().map(|error| error.kind(db)),
+            member
+                .result
+                .unwrap_or_else(|err| err.fallback_member(db))
+                .deprecated_properties(db),
+        );
+        Some(match member.value {
+            Some(value) => ObservedMember::from_value(db, result, value),
+            None => ObservedMember::from_result(db, result, input),
         })
     }
 
@@ -519,14 +738,38 @@ impl<'db> MemberEvaluator<'_, 'db> {
     ) -> Option<ObservedMember<'db>> {
         let db = self.db;
         let env = self.env;
-        let declaration_protocol = matches!(input.ty, Type::Recursive(recursive)
-            if recursive.materialization_kind(db).is_none() && input.ty.as_protocol_instance(db).is_some());
+        if let Some(fallback) = input.ty.materialized_divergent_fallback() {
+            let fallback = input.unchanged_or_unresolved(fallback);
+            return self.lookup(&fallback, &fallback, name, policy);
+        }
+        let declaration_protocol =
+            matches!(input.ty, Type::Recursive(_)) && input.ty.as_protocol_instance(db).is_some();
         if !declaration_protocol && let Some(unfolded) = input.unfold(db, env) {
+            let receiver = if input.same_occurrence(receiver) {
+                &unfolded
+            } else {
+                receiver
+            };
             return self.lookup(&unfolded, receiver, name, policy);
         }
         if matches!(input.ty, Type::Deferred(_)) {
             let resolved = input.unfold_in_context(db, env, self.context)?;
+            let receiver = if input.same_occurrence(receiver) {
+                &resolved
+            } else {
+                receiver
+            };
             return self.lookup(&resolved, receiver, name, policy);
+        }
+        // `__class__` is available even on a gradual value. Looking it up never requires
+        // descriptor binding, since it is the type that determines that binding.
+        if name == "__class__" {
+            let ty = input.ty.dunder_class(db, env);
+            return Some(ObservedMember::from_value(
+                db,
+                Place::bound(ty).into(),
+                input.unchanged_or_unresolved(ty),
+            ));
         }
         if input.ty.is_dynamic() || input.ty.is_never() || input.ty.is_divergent() {
             return Some(ObservedMember::from_value(
@@ -544,18 +787,34 @@ impl<'db> MemberEvaluator<'_, 'db> {
             let mut children = Vec::new();
             for (index, _) in union.elements(db).iter().enumerate() {
                 let child = input.project(db, env, ObservationEdge::UnionElement(index))?;
-                let receiver = IntersectionBuilder::bounded_from_observed_elements(
-                    db,
-                    env,
-                    [receiver.clone(), child.clone()],
-                    TypeNormalization::Semantic,
-                    Some(self.context.clone()),
-                )?;
+                // A union accessed on its own binds each alternative to itself. A receiver
+                // supplied by an enclosing intersection is instead narrowed to that alternative.
+                let receiver = if input.same_occurrence(receiver) {
+                    child.clone()
+                } else {
+                    IntersectionBuilder::bounded_from_observed_elements(
+                        db,
+                        env,
+                        [receiver.clone(), child.clone()],
+                        TypeNormalization::Semantic,
+                        Some(self.context.clone()),
+                    )?
+                };
                 children.push(self.lookup(&child, &receiver, name, policy)?);
             }
             return self.combine_members(input, children, false);
         }
         if let Type::Intersection(intersection) = input.ty {
+            if let Some(complement) = intersection.enum_complement(db, env) {
+                return Some(ObservedMember::from_result(
+                    db,
+                    super::enums::member_lookup_for_enum_complement(
+                        db, env, complement, name, policy,
+                    )
+                    .into(),
+                    input,
+                ));
+            }
             let mut children = Vec::new();
             if intersection.positive(db).is_empty() {
                 let child = input.unchanged_or_unresolved(Type::object());
@@ -568,6 +827,99 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 }
             }
             return self.combine_members(input, children, true);
+        }
+        if let Type::EnumComplement(complement) = input.ty {
+            return Some(ObservedMember::from_result(
+                db,
+                super::enums::member_lookup_for_enum_complement(db, env, complement, name, policy)
+                    .into(),
+                input,
+            ));
+        }
+        if let Type::BoundSuper(bound_super) = input.ty {
+            if policy.no_instance_fallback() {
+                let runtime = input.unchanged_or_unresolved(KnownClass::Super.to_instance(db, env));
+                return self.lookup(&runtime, receiver, name, policy);
+            }
+            let attribute = bound_super.find_name_in_mro_after_pivot(db, env, name, policy);
+            let member = ObservedMember::from_result(db, attribute.into(), input);
+            let Some((instance, owner)) = bound_super.owner(db).descriptor_binding(db, env) else {
+                return Some(member);
+            };
+            let instance = instance.map(|ty| input.unchanged_or_unresolved(ty));
+            let owner = input.unchanged_or_unresolved(owner);
+            let (mut result, _, error) = self.get_attribute(member, instance.as_ref(), &owner)?;
+            result.result = member_lookup_result(
+                db,
+                result.place(db),
+                error.map(MemberLookupErrorKind::DescriptorGet),
+                instance
+                    .and_then(|_| attribute.place.ignore_possibly_undefined())
+                    .and_then(|ty| ty.property_deprecations(db))
+                    .map(|properties| properties.getters_only(db)),
+            );
+            return Some(result);
+        }
+        if matches!(input.ty, Type::ClassLiteral(_) | Type::GenericAlias(_))
+            && matches!(name, "__get__" | "__set__" | "__delete__")
+            && let Some(wrapper @ Type::WrapperDescriptor(_)) = input
+                .ty
+                .find_name_in_mro_with_policy(db, env, name, policy)
+                .and_then(|member| member.place.ignore_possibly_undefined())
+        {
+            return Some(ObservedMember::from_value(
+                db,
+                Place::bound(wrapper).into(),
+                input.unchanged_or_unresolved(wrapper),
+            ));
+        }
+        // Numeric NewTypes use the same runtime union as the promoted builtin.
+        if let Type::NewTypeInstance(instance) = input.ty
+            && input.ty.as_union_like(db).is_some()
+        {
+            let base = input.unchanged_or_unresolved(instance.concrete_base_type(db));
+            return self.lookup(&base, &base, name, policy);
+        }
+        if let Type::KnownInstance(super::KnownInstanceType::FunctoolsPartial(partial)) = input.ty {
+            if name == "__call__" {
+                let ty =
+                    Type::KnownInstance(super::KnownInstanceType::FunctoolsPartialCall(partial));
+                return Some(ObservedMember::from_value(
+                    db,
+                    Place::bound(ty).into(),
+                    input.unchanged_or_unresolved(ty),
+                ));
+            }
+            let nominal = input.unchanged_or_unresolved(
+                partial.partial(db).into_functools_partial_instance(db, env),
+            );
+            let member = self.lookup(&nominal, receiver, name, policy)?;
+            if name == "func" {
+                let wrapped = partial.wrapped(db).inner(db);
+                let result = if member.place(db).place.is_undefined() {
+                    Place::bound(wrapped).into()
+                } else {
+                    map_member_lookup_type(db, member.result, |_| wrapped)
+                };
+                return Some(ObservedMember::from_value(
+                    db,
+                    result,
+                    input.unchanged_or_unresolved(wrapped),
+                ));
+            }
+            return Some(member);
+        }
+        if name == "__call__"
+            && matches!(
+                input.ty,
+                Type::KnownInstance(super::KnownInstanceType::FunctoolsPartialCall(_))
+            )
+        {
+            return Some(ObservedMember::from_value(
+                db,
+                Place::bound(input.ty).into(),
+                input.clone(),
+            ));
         }
         if let Type::TypedDict(super::typed_dict::TypedDictType::Synthesized(synthesized)) =
             input.ty
@@ -625,27 +977,50 @@ impl<'db> MemberEvaluator<'_, 'db> {
             }
         }
         if let Type::SubclassOf(subclass) = input.ty {
-            if subclass.into_type_var().is_some() {
+            if subclass.into_type_var().is_some() && self.class_view(input).is_none() {
                 let transposed =
                     input.project(db, env, ObservationEdge::TransposedSubclassVariable)?;
                 return self.lookup(&transposed, receiver, name, policy);
             }
             if subclass.is_dynamic() {
-                // Every metaclass inherits type's real members. Names absent from that base
-                // remain gradual unless the caller explicitly requires a concrete declaration.
                 let base = input.project(db, env, ObservationEdge::GradualMetaclassBase)?;
-                let known = self.lookup(&base, receiver, name, policy)?;
-                if policy.require_concrete() {
-                    return Some(known);
-                }
-                return self.or_fall_back_to(input, known, || {
-                    let value = input.project(db, env, ObservationEdge::SubclassInstance)?;
-                    Some(ObservedMember::from_value(
+                let (view, class) = self.class_view(&base)?;
+                let declaration =
+                    self.instance_class_namespace(&base, &view, class, name, policy)?;
+                let dynamic = input.project(db, env, ObservationEdge::SubclassInstance)?;
+                // The unknown portion of a gradual class can supply metaclass slots even to
+                // special-method lookup, which excludes instance storage but not class slots.
+                let fallback = if policy.require_concrete() {
+                    self.missing(input)
+                } else {
+                    ObservedMember::from_value(db, Place::bound(dynamic.ty).into(), dynamic.clone())
+                };
+                let owner = receiver.unchanged_or_unresolved(receiver.ty.to_meta_type(db, env));
+                let mut result = self.resolve_descriptor(
+                    declaration,
+                    Some(receiver),
+                    &owner,
+                    fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::Yes,
+                )?;
+                if let Some(value) = &result.value
+                    && !value.ty.is_dynamic()
+                    && !policy.no_instance_fallback()
+                {
+                    let combined = IntersectionBuilder::bounded_from_observed_elements(
                         db,
-                        Place::bound(value.ty).into(),
-                        value,
-                    ))
-                });
+                        env,
+                        [value.clone(), dynamic],
+                        TypeNormalization::Semantic,
+                        Some(self.context.clone()),
+                    )?;
+                    result = ObservedMember::from_value(
+                        db,
+                        map_member_lookup_type(db, result.result, |_| combined.ty),
+                        combined,
+                    );
+                }
+                return Some(result);
             }
         }
         if let Type::ModuleLiteral(module) = input.ty {
@@ -658,14 +1033,62 @@ impl<'db> MemberEvaluator<'_, 'db> {
         if let Type::BoundMethod(method) = input.ty {
             let runtime =
                 input.unchanged_or_unresolved(KnownClass::MethodType.to_instance(db, env));
-            let result = self.lookup(&runtime, receiver, name, policy)?;
+            let binding = if input.same_occurrence(receiver) {
+                &runtime
+            } else {
+                receiver
+            };
+            let result = self.lookup(&runtime, binding, name, policy)?;
             return self.or_fall_back_to(input, result, || {
                 let function = input.unchanged_or_unresolved(method.func(db));
                 self.lookup(&function, &function, name, policy)
             });
         }
-        if let Some(runtime) = self.runtime_lookup_target(input) {
-            return self.lookup(&runtime, receiver, name, policy);
+        if let Type::TypeVar(variable) = input.ty
+            && variable.is_paramspec(db)
+            && let Some(attr) = super::ParamSpecAttrKind::from_name(name)
+        {
+            let ty = Type::TypeVar(variable.with_paramspec_attr(db, attr));
+            return Some(ObservedMember::from_value(
+                db,
+                Place::declared(ty).into(),
+                input.unchanged_or_unresolved(ty),
+            ));
+        }
+        if let Some(protocol) = input.ty.as_protocol_instance(db)
+            && (protocol.class_origin(db).is_none()
+                || (protocol.materialized_origin(db).is_some()
+                    && protocol.interface(db).includes_member(db, name)))
+        {
+            // A directly materialized requirement is already an exposed signature. An unfolded
+            // class interface still carries the original receiver and its Self obligation.
+            let self_type = if matches!(protocol.inner, super::instance::Protocol::Materialized(_))
+            {
+                None
+            } else {
+                Some(receiver.ty)
+            };
+            let place = protocol.interface(db).instance_member_in_context(
+                db,
+                env,
+                input,
+                receiver,
+                self_type,
+                name,
+                policy,
+                self.context,
+            );
+            return Some(ObservedMember::from_result(db, place.into(), input));
+        }
+        if !matches!(input.ty, Type::SpecialForm(_) | Type::KnownInstance(_))
+            && let Some(runtime) = self.runtime_lookup_target(input)
+        {
+            let binding = if input.same_occurrence(receiver) {
+                &runtime
+            } else {
+                receiver
+            };
+            return self.lookup(&runtime, binding, name, policy);
         }
         let (class_view, class) = self.class_view(input)?;
         if policy.no_instance_fallback() {
@@ -674,8 +1097,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
             ) {
                 let meta = class_view.project(db, env, ObservationEdge::ClassMetaclassInstance)?;
-                let (_, class) = self.class_view(&meta)?;
-                self.mro_member(&meta, class, name, policy, MemberStorage::Class)
+                self.storage_member(&meta, name, policy, MemberStorage::Class)?
             } else {
                 // A metaclass can store values in its instances' class namespace. They remain
                 // visible to implicit method lookup even though instance storage is excluded.
@@ -693,6 +1115,54 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 InstanceFallbackShadowsNonDataDescriptor::No,
             )?;
             return Some(result.bind_self_typevars(db, env, receiver.ty));
+        }
+        if matches!(name, "name" | "_name_" | "value" | "_value_") {
+            if let Type::LiteralValue(literal) = input.ty
+                && let Some(enum_literal) = literal.as_enum()
+                && !super::enums::class_defines_property(db, env, enum_literal.enum_class(db), name)
+            {
+                let class = enum_literal.enum_class_literal(db);
+                let public = Type::ClassLiteral(class.class_literal(db)).is_subtype_of(
+                    db,
+                    env,
+                    KnownClass::Enum.to_subclass_of(db, env),
+                );
+                let ty = match name {
+                    "name" if public => class.name_type(db, enum_literal.name(db)),
+                    "_name_" => class.name_type(db, enum_literal.name(db)),
+                    "value" if public => class.value_type(db, enum_literal.name(db)),
+                    "_value_" => class.value_type(db, enum_literal.name(db)),
+                    _ => None,
+                };
+                return Some(ObservedMember::from_result(
+                    db,
+                    ty.map(Place::bound).unwrap_or_default().into(),
+                    input,
+                ));
+            }
+            if let Type::NominalInstance(instance) = input.ty
+                && let class = instance.class_literal(db, env)
+                && let Some(metadata) = super::enum_metadata(db, class)
+                && !super::enums::class_defines_property(db, env, class, name)
+            {
+                let public = Type::ClassLiteral(class).is_subtype_of(
+                    db,
+                    env,
+                    KnownClass::Enum.to_subclass_of(db, env),
+                );
+                let ty = match name {
+                    "name" if public => metadata.instance_name_type(db, env),
+                    "_name_" => metadata.instance_name_type(db, env),
+                    "value" if public => metadata.instance_value_type(db, env),
+                    "_value_" => metadata.instance_value_type(db, env),
+                    _ => None,
+                };
+                return Some(ObservedMember::from_result(
+                    db,
+                    ty.map(Place::bound).unwrap_or_default().into(),
+                    input,
+                ));
+            }
         }
         if let Some(value) = input.project(db, env, ObservationEdge::EnumMember(Name::new(name))) {
             return Some(ObservedMember::from_value(
@@ -731,7 +1201,14 @@ impl<'db> MemberEvaluator<'_, 'db> {
                     return self.fallback(input, receiver, name, policy, class_result);
                 }
             }
-            let fallback = self.mro_member(input, class, name, policy, MemberStorage::Instance);
+            let fallback = if matches!(
+                receiver.ty,
+                Type::SpecialForm(_) | Type::KnownInstance(_) | Type::TypedDict(_)
+            ) {
+                self.missing(input)
+            } else {
+                self.mro_member(input, class, name, policy, MemberStorage::Instance)
+            };
             let result = self.resolve_descriptor(
                 member,
                 Some(receiver),
@@ -922,11 +1399,10 @@ impl<'db> MemberEvaluator<'_, 'db> {
             _ => None,
         };
         let meta = class_view.project(db, env, ObservationEdge::ClassMetaclassInstance)?;
-        let (_, metaclass) = self.class_view(&meta)?;
         let namespace = if own_definedness == Some(Definedness::AlwaysDefined) {
             namespace
         } else {
-            let stored = self.mro_member(&meta, metaclass, name, policy, MemberStorage::Instance);
+            let stored = self.storage_member(&meta, name, policy, MemberStorage::Instance)?;
             if own_definedness.is_some() {
                 self.or_fall_back_to(input, namespace, || Some(stored))?
             } else {
@@ -935,8 +1411,16 @@ impl<'db> MemberEvaluator<'_, 'db> {
         };
         let instance = receiver.ty.to_instance_approximation(db, env)?;
         let namespace = namespace.bind_self_typevars(db, env, instance);
-        let (fallback, _, _) = self.get_attribute(namespace, None, receiver)?;
-        let member = self.mro_member(&meta, metaclass, name, policy, MemberStorage::Class);
+        let (mut fallback, _, error) = self.get_attribute(namespace, None, receiver)?;
+        if let Some(error) = error {
+            fallback.result = member_lookup_result(
+                db,
+                fallback.place(db),
+                Some(MemberLookupErrorKind::DescriptorGet(error)),
+                None,
+            );
+        }
+        let member = self.storage_member(&meta, name, policy, MemberStorage::Class)?;
         let owner = receiver.unchanged_or_unresolved(receiver.ty.to_meta_type(db, env));
         let result = self.resolve_descriptor(
             member,
@@ -1013,15 +1497,26 @@ impl<'db> MemberEvaluator<'_, 'db> {
         let db = self.db;
         let env = self.env;
         let Some(descriptor) = &member.value else {
-            return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+            return Some((member, AttributeKind::Normal, None));
         };
         if let Some(unfolded) = descriptor.unfold_in_context(db, env, self.context) {
             let result = map_member_lookup_type(db, member.result, |_| unfolded.ty);
-            return self.get_attribute(
+            let (resolved, kind, error) = self.get_attribute(
                 ObservedMember::from_value(db, result, unfolded),
                 instance,
                 owner,
-            );
+            )?;
+            // Unfolding tells us whether an attribute is a descriptor. If it is not, reading
+            // it returns the declaration's value, including an alias or protocol application.
+            return Some((
+                if kind == AttributeKind::Normal {
+                    member
+                } else {
+                    resolved
+                },
+                kind,
+                error,
+            ));
         }
         // These values already carry their descriptor outcome, even when no nominal runtime
         // class is available. Ordinary descriptor invocation treats them as data descriptors.
@@ -1034,6 +1529,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
         if let Type::Union(union) = descriptor.ty {
             let mut members = Vec::new();
             let mut all_data = true;
+            let mut any_descriptor = false;
             let mut error = None;
             for index in 0..union.elements(db).len() {
                 let child = descriptor.project(db, env, ObservationEdge::UnionElement(index))?;
@@ -1045,12 +1541,15 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 )?;
                 members.push(result);
                 all_data &= kind.is_data();
+                any_descriptor |= kind != AttributeKind::Normal;
                 error = error.or(child_error);
             }
             let kind = if all_data {
                 AttributeKind::DataDescriptor
+            } else if any_descriptor {
+                AttributeKind::NonDataDescriptor
             } else {
-                AttributeKind::NormalOrNonDataDescriptor
+                AttributeKind::Normal
             };
             return Some((
                 self.combine_members(descriptor, members, false)?,
@@ -1060,25 +1559,31 @@ impl<'db> MemberEvaluator<'_, 'db> {
         }
         if let Type::Intersection(intersection) = descriptor.ty {
             if intersection.positive(db).is_empty() {
-                return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+                return Some((member, AttributeKind::Normal, None));
             }
             let mut members = Vec::new();
             let mut error = None;
+            let mut any_descriptor = false;
             for index in 0..intersection.positive(db).len() {
                 let child =
                     descriptor.project(db, env, ObservationEdge::IntersectionPositive(index))?;
                 let result = map_member_lookup_type(db, member.result, |_| child.ty);
-                let (result, _, child_error) = self.get_attribute(
+                let (result, kind, child_error) = self.get_attribute(
                     ObservedMember::from_value(db, result, child),
                     instance,
                     owner,
                 )?;
                 members.push(result);
+                any_descriptor |= kind != AttributeKind::Normal;
                 error = error.or(child_error);
             }
             return Some((
                 self.combine_members(descriptor, members, true)?,
-                AttributeKind::NormalOrNonDataDescriptor,
+                if any_descriptor {
+                    AttributeKind::NonDataDescriptor
+                } else {
+                    AttributeKind::Normal
+                },
                 error,
             ));
         }
@@ -1095,20 +1600,30 @@ impl<'db> MemberEvaluator<'_, 'db> {
             ));
         }
         if matches!(descriptor.ty, Type::BoundMethod(_)) {
-            return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+            return Some((member, AttributeKind::Normal, None));
         }
         if let Type::PropertyInstance(property) = descriptor.ty {
             let Some(instance) = instance else {
                 return Some((member, AttributeKind::DataDescriptor, None));
             };
+            if let Some(ty) = instance.ty.known_property_getter_result(db, env, property) {
+                let value = instance.unchanged_or_unresolved(ty);
+                return Some((
+                    ObservedMember::from_value(
+                        db,
+                        map_member_lookup_type(db, member.result, |_| ty),
+                        value,
+                    ),
+                    AttributeKind::DataDescriptor,
+                    None,
+                ));
+            }
             let Some(getter) = descriptor.project(db, env, ObservationEdge::PropertyGetter) else {
-                let value = descriptor.unchanged_or_unresolved(Type::unknown());
+                let value = descriptor.unchanged_or_unresolved(Type::Never);
                 let context = DescriptorGetCallContext::new(
                     db,
                     descriptor.ty,
-                    Type::KnownBoundMethod(super::KnownBoundMethodType::PropertyDunderGet(
-                        property,
-                    )),
+                    Type::WrapperDescriptor(super::WrapperDescriptorKind::PropertyDunderGet),
                     Some(instance.ty),
                     owner.ty,
                 );
@@ -1130,9 +1645,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
                     Some(DescriptorGetCallContext::new(
                         db,
                         descriptor.ty,
-                        Type::KnownBoundMethod(super::KnownBoundMethodType::PropertyDunderGet(
-                            property,
-                        )),
+                        Type::WrapperDescriptor(super::WrapperDescriptorKind::PropertyDunderGet),
                         Some(instance.ty),
                         owner.ty,
                     )),
@@ -1149,17 +1662,26 @@ impl<'db> MemberEvaluator<'_, 'db> {
                 error,
             ));
         }
-        if let Some(bound) =
-            descriptor
-                .ty
-                .function_like_dunder_get(db, env, instance.map(|v| v.ty), Some(owner.ty))
-        {
+        // Metadata properties need the original runtime value (for example, T.__name__).
+        // Ordinary functions on these synthetic values bind to their nominal runtime class.
+        let runtime_instance = instance.and_then(|instance| {
+            matches!(instance.ty, Type::SpecialForm(_) | Type::KnownInstance(_))
+                .then(|| self.runtime_lookup_target(instance))
+                .flatten()
+        });
+        let function_instance = runtime_instance.as_ref().or(instance);
+        if let Some(bound) = descriptor.ty.function_like_dunder_get(
+            db,
+            env,
+            function_instance.map(|v| v.ty),
+            Some(owner.ty),
+        ) {
             let function = descriptor.project(db, env, ObservationEdge::UnderlyingFunction)?;
             let value = if let Type::BoundMethod(method) = bound {
                 let receiver = if descriptor.ty.is_classmethod(db) {
                     owner
                 } else {
-                    instance?
+                    function_instance?
                 };
                 ObservedType::constructed(
                     bound,
@@ -1183,7 +1705,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
                     map_member_lookup_type(db, member.result, |_| bound),
                     value,
                 ),
-                AttributeKind::NormalOrNonDataDescriptor,
+                AttributeKind::NonDataDescriptor,
                 None,
             ));
         }
@@ -1206,7 +1728,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
             .place
             .is_undefined()
         {
-            return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+            return Some((member, AttributeKind::Normal, None));
         }
         let get = self.descriptor_slot(
             descriptor,
@@ -1215,10 +1737,10 @@ impl<'db> MemberEvaluator<'_, 'db> {
         )?;
         let getter_definitely_defined = get.place(db).place.is_definitely_bound();
         let Some(getter) = get.value else {
-            return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+            return Some((member, AttributeKind::Normal, None));
         };
         if getter.ty.is_divergent() {
-            return Some((member, AttributeKind::NormalOrNonDataDescriptor, None));
+            return Some((member, AttributeKind::Normal, None));
         }
         let kind = if !self
             .descriptor_slot(descriptor, "__set__", MemberLookupPolicy::REQUIRE_CONCRETE)?
@@ -1237,7 +1759,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
         {
             AttributeKind::DataDescriptor
         } else {
-            AttributeKind::NormalOrNonDataDescriptor
+            AttributeKind::NonDataDescriptor
         };
         let instance_ty = instance.map_or_else(|| Type::none(db, env), |v| v.ty);
         let arguments = CallArguments::positional([descriptor.ty, instance_ty, owner.ty]);
@@ -1448,249 +1970,5 @@ impl<'db> MemberEvaluator<'_, 'db> {
             }));
         }
         Some(Ok(bindings))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::DbWithWritableSystem;
-    use ty_python_core::ProgramFile;
-
-    use super::{ObservedMember, lookup_member};
-    use crate::db::tests::{TestDb, setup_db};
-    use crate::place::{Definedness, Place, global_symbol};
-    use crate::types::projection::ObservedType;
-    use crate::types::relation::RelationContext;
-    use crate::types::{KnownClass, MemberLookupPolicy, Type, TypeQualifiers};
-
-    fn assert_lookup_parity<'db>(
-        db: &'db TestDb,
-        receiver: Type<'db>,
-        name: &str,
-    ) -> anyhow::Result<ObservedMember<'db>> {
-        let env = db.program_environment();
-        let policy = MemberLookupPolicy::default();
-        let legacy = receiver.member_lookup_with_policy_and_receiver(db, &env, name, policy, None);
-        let input = ObservedType::root(receiver);
-        let observed = lookup_member(
-            db,
-            &env,
-            &input,
-            &input,
-            name,
-            policy,
-            &RelationContext::default(),
-        )
-        .ok_or_else(|| anyhow::anyhow!("finite member {name} did not complete"))?;
-        // Compare the full result: the member's place includes definedness, declaration origin,
-        // provenance, and qualifiers; an error includes its recovery member and call context.
-        let place = receiver.member_lookup_with_policy(db, &env, name, policy);
-        assert_eq!(observed.result, legacy, "lookup of {name}");
-        assert_eq!(observed.place(db), place, "public lookup of {name}");
-        assert_eq!(
-            observed.value.as_ref().map(|value| value.ty),
-            place.place.ignore_possibly_undefined()
-        );
-        Ok(observed)
-    }
-
-    #[test]
-    fn finite_lookup_preserves_member_precedence_and_metadata() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from typing import ClassVar, Final, overload
-
-class Meta(type):
-    @property
-    def value(cls) -> int:
-        return 1
-
-class Descriptor:
-    @overload
-    def __get__(self, instance: None, owner: type) -> str: ...
-    @overload
-    def __get__(self, instance: object, owner: type) -> bytes: ...
-    def __get__(self, instance: object, owner: type) -> str | bytes:
-        raise NotImplementedError
-
-class Subject(metaclass=Meta):
-    value: str = "text"
-    shared: ClassVar[int] = 1
-    constant: Final[int] = 1
-    descriptor = Descriptor()
-
-    @property
-    def property_value(self) -> bytes:
-        return b"value"
-
-class Other:
-    value: bytes
-
-class Broad:
-    value: object
-
-class Missing: ...
-
-class Fallback:
-    def __getattr__(self, name: str) -> bytes:
-        raise NotImplementedError
-
-instance: Subject
-class_object: type[Subject]
-combined: Subject | Other
-possibly_missing: Subject | Missing
-intersection: Subject & Broad
-fallback: Fallback
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        let symbol = |name| global_symbol(db, file, name).place.expect_type();
-        for (receiver, member) in [
-            ("instance", "value"),
-            ("Subject", "value"),
-            ("class_object", "value"),
-            ("instance", "property_value"),
-            ("Subject", "property_value"),
-            ("instance", "descriptor"),
-            ("Subject", "descriptor"),
-            ("combined", "value"),
-            ("possibly_missing", "value"),
-            ("intersection", "value"),
-            ("fallback", "unknown"),
-            ("Missing", "unknown"),
-        ] {
-            assert_lookup_parity(db, symbol(receiver), member)?;
-        }
-        let instance = assert_lookup_parity(db, symbol("instance"), "value")?;
-        let class = assert_lookup_parity(db, symbol("class_object"), "value")?;
-        assert_eq!(
-            instance.value.map(|value| value.ty),
-            Some(KnownClass::Str.to_instance(db, &env))
-        );
-        assert_eq!(
-            class.value.map(|value| value.ty),
-            Some(KnownClass::Int.to_instance(db, &env))
-        );
-        let possibly_missing = assert_lookup_parity(db, symbol("possibly_missing"), "value")?;
-        assert!(
-            matches!(possibly_missing.place(db).place, Place::Defined(place) if place.definedness == Definedness::PossiblyUndefined)
-        );
-        for (member, qualifier) in [
-            ("shared", TypeQualifiers::CLASS_VAR),
-            ("constant", TypeQualifiers::FINAL),
-        ] {
-            let observed = assert_lookup_parity(db, symbol("instance"), member)?;
-            assert!(observed.place(db).qualifiers.contains(qualifier));
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn callable_annotation_is_a_member_without_runtime_descriptor_binding() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from collections.abc import Callable
-from typing import ClassVar
-
-class Subject:
-    callback: ClassVar[Callable[[int], str]]
-
-instance: Subject
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        for receiver in ["Subject", "instance"] {
-            let receiver = global_symbol(db, file, receiver).place.expect_type();
-            let observed = assert_lookup_parity(db, receiver, "callback")?;
-            assert!(
-                matches!(observed.value.map(|value| value.ty), Some(Type::Callable(callable)) if callable.is_regular(db))
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn bottom_protocol_class_members_keep_materialized_values() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-from typing import Any, ClassVar, Never, Protocol
-from ty_extensions import Bottom
-
-class P(Protocol):
-    value: ClassVar[Any]
-
-class Subject:
-    missing: ClassVar[Never]
-    empty: ClassVar[None]
-
-bottom: type[Bottom[P]]
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        for (receiver, name) in [
-            ("Subject", "empty"),
-            ("Subject", "missing"),
-            ("bottom", "value"),
-        ] {
-            let receiver = global_symbol(db, file, receiver).place.expect_type();
-            assert_lookup_parity(db, receiver, name)?;
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn failed_implicit_calls_preserve_error_and_recovery_value() -> anyhow::Result<()> {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            r#"
-class Descriptor:
-    def __get__(self, instance: int, owner: type) -> bytes:
-        raise NotImplementedError
-
-class Subject:
-    value = Descriptor()
-
-class Fallback:
-    def __getattr__(self, name: int) -> str:
-        raise NotImplementedError
-
-subject: Subject
-fallback: Fallback
-"#,
-        )?;
-        let db = &db;
-        let env = db.program_environment();
-        let file = system_path_to_file(db, "/src/a.py")?;
-        let file = ProgramFile::new(db, file, env.program(db));
-        for (receiver, member, expected) in [
-            ("subject", "value", KnownClass::Bytes),
-            ("fallback", "missing", KnownClass::Str),
-        ] {
-            let receiver = global_symbol(db, file, receiver).place.expect_type();
-            let observed = assert_lookup_parity(db, receiver, member)?;
-            assert!(observed.result.is_err());
-            assert_eq!(
-                observed.value.map(|value| value.ty),
-                Some(expected.to_instance(db, &env))
-            );
-        }
-        Ok(())
     }
 }

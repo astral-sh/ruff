@@ -16,6 +16,8 @@ use crate::{
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
+        projection::ObservedType,
+        relation::RelationContext,
     },
 };
 
@@ -194,7 +196,13 @@ fn descriptor_write_domain<'db>(
             IntersectionType::bounded_from_elements(db, env, domains).unwrap_or_else(Type::unknown),
         );
     }
-    match descriptor_setter_domain(db, env, descriptor, receiver) {
+    match descriptor_setter_domain(
+        db,
+        env,
+        &ObservedType::root(descriptor),
+        &ObservedType::root(receiver),
+        &RelationContext::default(),
+    ) {
         DescriptorSetterDomain::Known(ty) => Some(ty),
         DescriptorSetterDomain::Deferred => Some(Type::unknown()),
         DescriptorSetterDomain::Missing

@@ -1490,8 +1490,8 @@ class Outer:
 ## Metaclass reflection in a metaclass base
 
 This stress test creates an inheritance cycle through metaclass reflection. In the stub, `Meta`
-inherits from `Outer.type`, which refers back to `Meta` through `Inner.__class__`. Inference
-terminates and reports the cycle.
+inherits from `Outer.type`, which refers back to `Meta` through `Inner.__class__`. Inference reports
+the cycle in `Meta` and preserves the explicit metaclass of `Inner`.
 
 `mod.pyi`:
 
@@ -1501,7 +1501,7 @@ class Outer:
     class Inner(object, metaclass=Meta): ...
     type = Inner.__class__
 
-reveal_type(Outer.Inner.__class__)  # revealed: type[Unknown]
+reveal_type(Outer.Inner.__class__)  # revealed: <class 'Meta'>
 ```
 
 ## PEP 695 generic

@@ -3982,6 +3982,32 @@ def incompatible(value: Implementation[int]) -> Chain[int]:
     return value  # error: [invalid-return-type]
 ```
 
+## Descriptors with recursively specialized protocol owners
+
+The declared descriptor can require a different specialization of its owning protocol. Checking both
+accessors retains that owner relation even before an attribute is read or written.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance: Owner[list[T]], owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: Owner[list[T]], value: int) -> None: ...
+
+class Owner(Protocol[T]):
+    child: Descriptor[T]  # no diagnostic
+```
+
 ## Recursive parameter domains preserve enclosing bounds
 
 A cycle in an inner type parameter's bound does not erase an enclosing finite bound.

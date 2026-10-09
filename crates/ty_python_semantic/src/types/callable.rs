@@ -1,4 +1,5 @@
 use crate::ProgramEnvironment;
+use crate::types::member_observation::lookup_member;
 use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
 use crate::types::relation::RelationContext;
 use rustc_hash::FxHashSet;
@@ -7,7 +8,6 @@ use std::rc::Rc;
 
 use crate::{
     Db, FxOrderSet,
-    place::Place,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
@@ -308,32 +308,37 @@ impl<'db> Type<'db> {
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
-                let call_symbol = self
-                    .member_lookup_with_policy_and_receiver(
+                context.relation.upcast_callable(db, &context.observed, || {
+                    let receiver = receiver.map_or_else(
+                        || context.observed.clone(),
+                        |receiver| context.observed.unchanged_or_unresolved(receiver),
+                    );
+                    let member = lookup_member(
                         db,
                         env,
+                        &context.observed,
+                        &receiver,
                         "__call__",
                         MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                        receiver,
-                    )
-                    .unwrap_or_else(|error| error.fallback_member(db))
-                    .member(db)
-                    .place;
-
-                if let Place::Defined(place) = call_symbol
-                    && place.is_definitely_defined()
-                {
-                    place
+                        &context.relation,
+                    )?;
+                    if !member.place(db).place.is_definitely_bound() {
+                        return None;
+                    }
+                    let callable = member.value?;
+                    let next = CallableUpcastContext {
+                        observed: callable.clone(),
+                        ..context.clone()
+                    };
+                    callable
                         .ty
                         .try_upcast_to_callable_with_policy_and_context(
-                            db, env, policy, context, None,
+                            db, env, policy, &next, None,
                         )
                         // The callable instance itself doesn't inherit the descriptor behavior of
                         // its `__call__` method.
                         .map(|callables| callables.map(|callable| callable.into_regular(db)))
-                } else {
-                    None
-                }
+                })
             }
             Type::ClassLiteral(class_literal) => {
                 let class = class_literal.identity_specialization(db);

@@ -19,6 +19,8 @@ use crate::types::diagnostic::{
     report_bad_dunder_set_call, report_invalid_attribute_assignment,
     report_possibly_missing_attribute,
 };
+use crate::types::projection::ObservedType;
+use crate::types::relation::RelationContext;
 use crate::types::{
     CallDunderError, DisplaySettings, MemberLookupPolicy, PropertyDeprecations, Type, TypeContext,
     TypeQualifiers,
@@ -781,8 +783,9 @@ impl<'db> AssignmentAttributeWriteEvaluator<'_, 'db, '_, '_> {
             && let DescriptorSetterDomain::Known(write_ty) = descriptor_setter_domain(
                 self.builder.db(),
                 self.builder.program_environment(),
-                *descriptor_ty,
-                receiver_ty,
+                &ObservedType::root(*descriptor_ty),
+                &ObservedType::root(receiver_ty),
+                &RelationContext::default(),
             )
         {
             TypeContext::declared(Some(write_ty))

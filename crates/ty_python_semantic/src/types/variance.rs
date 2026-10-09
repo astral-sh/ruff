@@ -3,6 +3,8 @@ use crate::{
     types::{
         BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance, StaticClassLiteral, Type,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
+        projection::ObservedType,
+        relation::RelationContext,
     },
 };
 
@@ -52,7 +54,13 @@ impl<'db> MemberVariance<'db> {
         }
         Self {
             read_ty: Self::bind(db, env, ty, receiver),
-            write_domain: descriptor_setter_domain(db, env, ty, receiver),
+            write_domain: descriptor_setter_domain(
+                db,
+                env,
+                &ObservedType::root(ty),
+                &ObservedType::root(receiver),
+                &RelationContext::default(),
+            ),
         }
     }
 

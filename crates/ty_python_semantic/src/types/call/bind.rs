@@ -1877,57 +1877,12 @@ impl<'db> Bindings<'db> {
                             ] if instance.is_none(db) => {
                                 overload.set_return_type(*property);
                             }
-                            [
-                                Some(Type::PropertyInstance(property)),
-                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                    type_alias,
-                                ))),
-                                ..,
-                            ] if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .as_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                            {
-                                overload
-                                    .set_return_type(Type::string_literal(db, type_alias.name(db)));
-                            }
-                            [
-                                Some(Type::PropertyInstance(property)),
-                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
-                                ..,
-                            ] => match property.getter(db).and_then(Type::as_function_literal) {
-                                Some(getter) if getter.name(db) == "__name__" => {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
-                                }
-                                Some(getter) if getter.name(db) == "__bound__" => {
-                                    overload.set_return_type(
-                                        typevar
-                                            .upper_bound(db, env)
-                                            .unwrap_or_else(|| Type::none(db, env)),
-                                    );
-                                }
-                                Some(getter) if getter.name(db) == "__constraints__" => {
-                                    overload.set_return_type(Type::heterogeneous_tuple(
-                                        db,
-                                        env,
-                                        typevar.constraints(db, env).into_iter().flatten(),
-                                    ));
-                                }
-                                Some(getter) if getter.name(db) == "__default__" => {
-                                    overload.set_return_type(
-                                        typevar.default_type(db, env).unwrap_or_else(|| {
-                                            KnownClass::NoDefaultType.to_instance(db, env)
-                                        }),
-                                    );
-                                }
-                                _ => {}
-                            },
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
-                                if let Some(getter) = property.getter(db) {
+                                if let Some(known) =
+                                    instance.known_property_getter_result(db, env, *property)
+                                {
+                                    overload.set_return_type(known);
+                                } else if let Some(getter) = property.getter(db) {
                                     overload.check_property_getter(db, env, getter, *instance, 1);
                                 } else {
                                     overload

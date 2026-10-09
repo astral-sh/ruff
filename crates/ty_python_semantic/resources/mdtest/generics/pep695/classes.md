@@ -3342,6 +3342,25 @@ def incompatible(value: Implementation[int]) -> Chain[int]:
     return value  # error: [invalid-return-type]
 ```
 
+## Descriptors with recursively specialized protocol owners
+
+The declared descriptor can require a different specialization of its owning protocol. Checking both
+accessors retains that owner relation even before an attribute is read or written.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Descriptor[T]:
+    def __get__(self, instance: Owner[list[T]], owner: type | None = None) -> int:
+        raise NotImplementedError
+
+    def __set__(self, instance: Owner[list[T]], value: int) -> None: ...
+
+class Owner[T](Protocol):
+    child: Descriptor[T]  # no diagnostic
+```
+
 ## Recursive parameter domains preserve enclosing bounds
 
 A cycle in an inner type parameter's bound does not erase an enclosing finite bound.

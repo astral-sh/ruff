@@ -15,6 +15,7 @@ use super::visitor::{TypeKind, TypeVisitor, walk_non_atomic_type};
 use super::{
     ApplyTypeMappingVisitor, BindingContext, CallableType, ClassBase, ClassLiteral, ClassType,
     Parameter, SelfBinding, StaticClassLiteral, SubclassOfInner, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints,
 };
 use crate::{Db, ProgramEnvironment};
 
@@ -216,14 +217,14 @@ impl<'db> BoundSourceRecipe<'db> {
 
 /// An explicit operand of a recursive proof. Child expressions are selected by an edge in
 /// its declaration body; their identity is never inferred from an equal resulting type.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct ObservedType<'db> {
     pub(super) ty: Type<'db>,
     origin: Option<Rc<ObservedTypeOrigin<'db>>>,
     shape: ObservedShape<'db>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 enum ObservedShape<'db> {
     Root,
     Expression,
@@ -412,6 +413,12 @@ impl<'db> ObservedType<'db> {
 
     pub(super) fn recipe(&self) -> ObservationRecipe<'db> {
         RecipeBuilder::default().recipe(self)
+    }
+
+    /// Whether two operands name the same observed expression, including its substitutions.
+    /// Equal resulting types with different declaration paths are different occurrences.
+    pub(super) fn same_occurrence(&self, other: &Self) -> bool {
+        self == other
     }
 
     pub(super) fn root(ty: Type<'db>) -> Self {
@@ -1620,10 +1627,9 @@ fn observation_child<'db>(
                 Type::GenericAlias(alias) => ClassType::Generic(alias),
                 _ => return None,
             };
-            class
-                .inferred_metaclass(db)
-                .for_inheritance(db, env)
-                .to_instance_approximation(db, env)
+            // This is a storage lookup, not the public instance type of a metaclass.
+            // A missing metaclass has arbitrary storage, even though its instances are classes.
+            class.metaclass(db).to_instance_approximation(db, env)
         }
         (Type::SubclassOf(subclass), ObservationEdge::GradualMetaclassBase)
             if subclass.is_dynamic() =>
@@ -1664,6 +1670,18 @@ fn observation_child<'db>(
                 Type::SubclassOf(subclass) => match subclass.subclass_of() {
                     SubclassOfInner::Class(class) => class,
                     SubclassOfInner::Protocol(protocol) => *protocol.class_origin(db)?,
+                    SubclassOfInner::TypeVar(variable) => {
+                        // Keep the class namespace of a nominal bound before converting it to
+                        // its meta-type: `type[object]` normalizes to an instance of `type`.
+                        // Looking up that instance would lose the distinction between
+                        // `object.__repr__` and `type.__repr__`.
+                        let TypeVarBoundOrConstraints::UpperBound(Type::NominalInstance(bound)) =
+                            variable.require_bound_or_constraints(db, env)
+                        else {
+                            return None;
+                        };
+                        bound.class(db, env)
+                    }
                     _ => return None,
                 },
                 _ => template.nominal_class(db, env)?,

@@ -348,7 +348,7 @@ impl<'db> UnionType<'db> {
         )
     }
 
-    fn map_leave_aliases_with_normalization(
+    pub(in crate::types) fn map_leave_aliases_with_normalization(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1170,9 +1170,20 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.map_positive_with_normalization(db, env, TypeNormalization::Semantic, transform_fn)
+    }
+
+    /// Map positive positions while keeping declaration shaping structural until observation.
+    pub(in crate::types) fn map_positive_with_normalization(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        normalization: TypeNormalization,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let mut builder = IntersectionBuilder::new(db, env);
+        let mut builder = IntersectionBuilder::new(db, env).normalization(normalization);
         for ty in self.positive(db) {
             builder.add_positive_in_place(transform_fn(ty));
         }
