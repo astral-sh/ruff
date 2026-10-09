@@ -61,3 +61,28 @@ _ = lambda *args: f(*args, y=x)
 # https://github.com/astral-sh/ruff/issues/18675
 _ = lambda x: (string := str)(x)
 _ = lambda x: ((x := 1) and str)(x)
+
+# https://github.com/astral-sh/ruff/issues/24704
+x = {"a": lambda y: f_after(y)}
+_ = lambda y: f_after(y)
+
+class Foo:
+    x = {"a": lambda y: f_after(y)}
+
+def outer():
+    x = lambda y: f_inner_after(y)
+
+    def f_inner_after(y):
+        pass
+
+def f_after(y):
+    pass
+
+_ = lambda y: obj_after.method(y)
+obj_after = None
+
+def f_before(y):
+    pass
+
+_ = lambda y: f_before(y)  # [unnecessary-lambda]
+

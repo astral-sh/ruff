@@ -218,6 +218,17 @@ pub(crate) fn unnecessary_lambda(checker: &Checker, lambda: &ExprLambda) {
             if checker.semantic().is_current_scope(binding.scope) {
                 return;
             }
+            // The lambda is necessary if it calls a function defined later in an enclosing scope.
+            // Inlining the call would result in a `NameError` or `UnboundLocalError`.
+            // Ex) `x = {"a": lambda y: f(y)}; def f(y): ...`
+            if binding.start() > lambda.start()
+                && checker
+                    .semantic()
+                    .current_scope_ids()
+                    .any(|id| id == binding.scope)
+            {
+                return;
+            }
         }
     }
 
