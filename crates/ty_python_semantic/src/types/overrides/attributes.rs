@@ -6,7 +6,8 @@ use ruff_python_stdlib::identifiers::is_mangled_private;
 use ty_python_core::{definition::Definition, place_table};
 
 use crate::{
-    Db, ProgramEnvironment, attribute_declarations,
+    Db, ProgramEnvironment,
+    lint::LintMetadata,
     place::{Place, TypeOrigin},
     types::{
         ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
@@ -249,6 +250,17 @@ enum AttributeViolation<'db> {
     ReadOnly,
 }
 
+impl AttributeViolation<'_> {
+    /// Property violations have a dedicated rule, including incompatible writes.
+    const fn rule(&self, involves_property: bool) -> &'static LintMetadata {
+        match self {
+            _ if involves_property => &INVALID_PROPERTY_TYPE_OVERRIDE,
+            Self::Write { .. } => &INVALID_MUTABLE_OVERRIDE,
+            Self::Read { .. } | Self::ReadOnly => &INVALID_ATTRIBUTE_OVERRIDE,
+        }
+    }
+}
+
 /// Find the first read or write that the overriding contract fails to preserve.
 ///
 /// Both contracts are bound to the subclass receiver. `target_receiver` is the base
@@ -395,13 +407,7 @@ pub(super) fn check_override<'db>(
         return false;
     }
     let involves_property = source.is_property || target.is_property;
-    let rule = if involves_property {
-        &INVALID_PROPERTY_TYPE_OVERRIDE
-    } else if matches!(violation, AttributeViolation::Write { .. }) {
-        &INVALID_MUTABLE_OVERRIDE
-    } else {
-        &INVALID_ATTRIBUTE_OVERRIDE
-    };
+    let rule = violation.rule(involves_property);
     let Some(builder) = context.report_lint(rule, definition.focus_range(db, context.module()))
     else {
         return false;
@@ -476,11 +482,7 @@ pub(super) fn check_instance_overrides<'db>(
         // Ordinary assignments introduce no override contract. Do not infer their method
         // bodies just to discard the inferred type; a lazy cache can depend on its own reads.
         if is_mangled_private(name)
-            || !attribute_declarations(db, literal.body_scope(db), name).any(
-                |(mut declarations, _)| {
-                    declarations.any(|declaration| declaration.declaration.definition().is_some())
-                },
-            )
+            || !super::has_own_instance_declaration(db, literal.body_scope(db), name)
             || !class.own_class_member(db, env, None, name).is_undefined()
         {
             continue;
@@ -641,13 +643,7 @@ pub(super) fn check_inherited_conflict<'db>(
         if already_inherited(db, env, class_type, target_owner, name, &source) {
             continue;
         }
-        let rule = if source.is_property || target.is_property {
-            &INVALID_PROPERTY_TYPE_OVERRIDE
-        } else if matches!(violation, AttributeViolation::Write { .. }) {
-            &INVALID_MUTABLE_OVERRIDE
-        } else {
-            &INVALID_ATTRIBUTE_OVERRIDE
-        };
+        let rule = violation.rule(source.is_property || target.is_property);
         let Some(builder) = context.report_lint(rule, class.header_range(db)) else {
             continue;
         };
