@@ -7149,11 +7149,8 @@ This rule is disabled by default. Enable it with `--warn unused-dependency` or s
 
 It requires uv dependency metadata, including module ownership. Enable uv workspace integration with
 `TY_UV=1`, or script integration with `TY_UV=scripts`. Project checks use an existing, synchronized
-environment; ty synchronizes PEP 723 script environments automatically. For example:
-
-```console {data-mdtest="ignore"}
-TY_UV=1 ty check --warn unused-dependency
-```
+environment; ty synchronizes PEP 723 script environments automatically. For example, run
+`TY_UV=1 ty check --warn unused-dependency`.
 
 The rule checks `project.dependencies`, `project.optional-dependencies`, and PEP 723 script
 dependencies. Dependency groups, conditional requirements, and distributions with no known
