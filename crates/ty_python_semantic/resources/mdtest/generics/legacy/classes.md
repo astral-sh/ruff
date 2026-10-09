@@ -160,6 +160,11 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
+# error: [invalid-generic-class] "`Generic` base class must include all type variables used in other base classes"
+class ExplicitInheritedGenericEmpty(MultipleTypevars[T, S], Generic[()]): ...
+
+reveal_type(generic_context(ExplicitInheritedGenericEmpty))  # revealed: None
+
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGeneric, S@ExplicitInheritedGeneric]
 reveal_type(generic_context(ExplicitInheritedGeneric))
 # revealed: ty_extensions._internal.GenericContext[T@ExplicitInheritedGenericPartiallySpecialized]
