@@ -3,7 +3,7 @@
 //!
 //! Strongly inspired by https://github.com/sfackler/rust-phf
 
-use rand::prelude::{Rng, SeedableRng, SliceRandom, StdRng};
+use rand::prelude::{RngExt, SeedableRng, SliceRandom, StdRng};
 use std::iter::repeat;
 
 static NOVAL: char = '\0';
@@ -156,7 +156,7 @@ pub fn create_phf(
         #[cfg(not(feature = "timing"))]
         println!("PHF #{}", i);
 
-        let seed = rng.gen();
+        let seed = rng.random();
         if let Some((disp, map)) = try_phf_table(data, lambda, seed, &mut rng) {
             #[cfg(feature = "timing")]
             println!(
