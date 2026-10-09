@@ -145,7 +145,8 @@ impl<'db> AliasCycleRecovery<'_, 'db> {
         }
         match ty {
             Type::TypeAlias(alias) => self.visitor.visit(db, ty, || {
-                let value = alias.apply_application(db, alias.raw_value_type(db), self.context);
+                let value =
+                    alias.apply_application(db, alias.raw_value_type(db), self.context, false);
                 self.recover(db, value)
             }),
             Type::Recursive(recursive) => self.visitor.visit(db, ty, || {
@@ -454,6 +455,7 @@ fn apply_type_alias_specialization<'db>(
     generic_context: Option<GenericContext<'db>>,
     specialization: Option<Specialization<'db>>,
     recursion_context: Option<&TypeRecursionContext<'db>>,
+    contravariant: bool,
 ) -> Type<'db> {
     let Some(generic_context) = generic_context else {
         return ty;
@@ -468,6 +470,12 @@ fn apply_type_alias_specialization<'db>(
             specialization: ApplySpecialization::TypeAlias(specialization),
             materialization_kind,
         },
+    };
+
+    let type_mapping = if contravariant {
+        type_mapping.flip()
+    } else {
+        type_mapping
     };
 
     ty.apply_type_mapping_impl(
@@ -557,6 +565,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Resolve this specialization while preserving the marker of an unguarded cycle.
     fn specialized_value_type(
         self,
         db: &'db dyn Db,
@@ -573,7 +582,7 @@ impl<'db> TypeAliasType<'db> {
             .recover(db, Type::TypeAlias(self))
             .unwrap_or(cycle);
         }
-        self.apply_application(db, self.raw_value_type(db), context)
+        self.apply_application(db, self.raw_value_type(db), context, false)
     }
 
     /// Instantiate a finite expression in this declaration's environment, then replay its
@@ -583,6 +592,7 @@ impl<'db> TypeAliasType<'db> {
         db: &'db dyn Db,
         body: Type<'db>,
         context: Option<&TypeRecursionContext<'db>>,
+        contravariant: bool,
     ) -> Type<'db> {
         let mut body = apply_type_alias_specialization(
             db,
@@ -590,10 +600,16 @@ impl<'db> TypeAliasType<'db> {
             self.generic_context(db),
             self.base_specialization(db),
             context,
+            contravariant,
         );
         let env = ProgramEnvironment::from_definition(self.definition(db));
         for operation in self.operations(db) {
             operation.with_mapping(|mapping| {
+                let mapping = if contravariant {
+                    mapping.flip()
+                } else {
+                    mapping
+                };
                 let mut visitor = ApplyTypeMappingVisitor::new_for_type_construction(&env)
                     .with_recursion_context(context);
                 if let RecursiveOperation::Materialize(_, map_bounds) = operation {
@@ -607,7 +623,17 @@ impl<'db> TypeAliasType<'db> {
 
     /// Instantiate a selected expression without forcing any other part of the declaration.
     pub(super) fn apply_to_node_structural(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
-        self.apply_application(db, node, None)
+        self.apply_application(db, node, None, false)
+    }
+
+    /// Instantiate a selected declaration node using the same environment as the full body.
+    pub(super) fn observe_body_node(
+        self,
+        db: &'db dyn Db,
+        node: Type<'db>,
+        contravariant: bool,
+    ) -> Type<'db> {
+        self.apply_application(db, node, None, contravariant)
     }
 
     /// Resolve this application without caching an observation that depends on active recursion.

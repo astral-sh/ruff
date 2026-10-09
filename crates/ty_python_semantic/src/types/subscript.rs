@@ -575,6 +575,18 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
+            (Type::Deferred(deferred), _) => Some(
+                deferred
+                    .try_resolve(db, env)
+                    .map(|value| value.subscript(db, env, slice_ty, expr_context))
+                    .unwrap_or(Ok(value_ty)),
+            ),
+            (_, Type::Deferred(deferred)) => Some(
+                deferred
+                    .try_resolve(db, env)
+                    .map(|slice| value_ty.subscript(db, env, slice, expr_context))
+                    .unwrap_or(Ok(value_ty)),
+            ),
             (Type::RecursiveVar(_), _) | (_, Type::RecursiveVar(_)) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

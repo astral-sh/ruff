@@ -21,6 +21,64 @@ use crate::types::{
 
 type Paths<'db> = FxHashSet<Solution<'db>>;
 
+#[test]
+fn unresolved_validity_preserves_inference_evidence() {
+    let db = setup_db();
+    let db = &db;
+    let env = db.program_environment();
+    let builder = ConstraintSetBuilder::new();
+    let t = create_typevar(db, "T");
+    let inferable = TypeVarSet::from_typevars(db, [t]);
+    let int = known_instance(db, KnownClass::Int);
+    let str = known_instance(db, KnownClass::Str);
+    let pending = ConstraintSet::incomplete(&builder);
+    let restricted = exact(db, &builder, t, int).and(db, &builder, || pending);
+
+    assert!(!restricted.is_complete());
+    assert!(!restricted.has_satisfying_specialization(db, &env, inferable));
+    assert_eq!(
+        restricted.solutions(db, &env, inferable),
+        Err(ProjectionError::IncompleteSolution)
+    );
+    assert_eq!(
+        restricted.inference_solutions_with(
+            db,
+            &env,
+            inferable,
+            SolutionBudget::default(),
+            |_, bounds| CandidateSolutions::default_solve(db, &env, &builder, bounds),
+        ),
+        Ok(Solutions::Constrained(SolutionPaths::Incomplete(vec![
+            solution([binding(t, int)])
+        ]))),
+    );
+    let alternatives = restricted.or(db, &builder, || exact(db, &builder, t, str));
+    assert!(alternatives.has_satisfying_specialization(db, &env, inferable));
+    assert!(!alternatives.has_no_valid_solutions(db, &env));
+}
+
+#[test]
+fn direct_solution_selection_retains_incomplete_proofs() {
+    let db = setup_db();
+    let db = &db;
+    let builder = ConstraintSetBuilder::new();
+    let t = create_typevar(db, "T");
+    let int = known_instance(db, KnownClass::Int);
+    let candidates = CandidateSolutions::Constrained(Box::new([CandidateSolution {
+        typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, int)]),
+        validity: SolutionValidity::Valid,
+    }]));
+    let solutions = candidates.solve_with(&builder, |_, _| {
+        let unresolved = ConstraintSet::incomplete(&builder);
+        assert!(!unresolved.is_complete());
+        PathBoundSolution::Solved(int)
+    });
+    assert_eq!(
+        solutions,
+        Solutions::Constrained(SolutionPaths::Incomplete(vec![solution([binding(t, int)])]))
+    );
+}
+
 fn create_typevar<'db>(db: &'db TestDb, name: &'static str) -> BoundTypeVarInstance<'db> {
     BoundTypeVarInstance::synthetic(
         db,
@@ -88,27 +146,28 @@ fn collect_paths<'db, 'c>(
 ) -> Result<SolutionProjection<Paths<'db>>, ProjectionError> {
     let env = db.program_environment();
     let inferable = TypeVarSet::from_typevars(db, typevars.iter().copied());
-    set.try_fold_solutions(
-        db,
-        &env,
-        inferable,
-        budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
-        Paths::default(),
-        |mut paths, path, budget| {
-            for binding in path {
-                budget.charge_type(db, binding.solution)?;
-            }
-            let mut path = path.to_vec();
-            path.sort_by_key(|binding| {
-                typevars
-                    .iter()
-                    .position(|typevar| *typevar == binding.bound_typevar)
-            });
-            paths.insert(solution(path));
-            Ok(paths)
-        },
-    )
+    let solutions = set.solutions_with(db, &env, inferable, budget, |_, bound| {
+        CandidateSolutions::default_solve(db, &env, builder, bound)
+    })?;
+    match solutions {
+        Solutions::Unsatisfiable(_) => Ok(SolutionProjection::Unsatisfiable),
+        Solutions::Unconstrained => Ok(SolutionProjection::Unconstrained),
+        Solutions::Constrained(SolutionPaths::Complete(paths)) => {
+            let paths = paths
+                .into_iter()
+                .map(|mut path| {
+                    path.solved_typevars.sort_by_key(|binding| {
+                        typevars
+                            .iter()
+                            .position(|typevar| *typevar == binding.bound_typevar)
+                    });
+                    path
+                })
+                .collect();
+            Ok(SolutionProjection::Constrained(paths))
+        }
+        Solutions::Constrained(_) => Err(ProjectionError::IncompleteSolution),
+    }
 }
 
 #[test]
@@ -127,8 +186,7 @@ fn path_limit_is_checked_before_solving() {
 
     for max_paths in [0, 3, 4] {
         let mut selected = 0;
-        let mut folded = 0;
-        let result = set.try_fold_solutions(
+        let result = set.solutions_with(
             db,
             &env,
             inferable,
@@ -140,19 +198,15 @@ fn path_limit_is_checked_before_solving() {
                 selected += 1;
                 CandidateSolutions::default_solve(db, &env, &builder, bound)
             },
-            0,
-            |count, _, _| {
-                folded += 1;
-                Ok(count + 1)
-            },
         );
 
         if max_paths < 4 {
             assert_eq!(result, Err(ProjectionError::PathBudgetExceeded));
             assert_eq!(selected, 0);
-            assert_eq!(folded, 0);
         } else {
-            assert_eq!(result, Ok(SolutionProjection::Constrained(4)));
+            assert!(
+                matches!(result, Ok(Solutions::Constrained(SolutionPaths::Complete(paths))) if paths.len() == 4)
+            );
             assert_eq!(selected, 8);
         }
     }
@@ -451,7 +505,7 @@ fn four_independent_binary_arguments_have_sixteen_solutions() {
 }
 
 #[test]
-fn incomplete_solution_discards_the_projection() {
+fn incomplete_solution_retains_available_paths() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
@@ -483,12 +537,6 @@ fn incomplete_solution_discards_the_projection() {
             Ok(Solutions::Constrained(SolutionPaths::BudgetExceeded(
                 alternatives.map(|ty| solution([binding(t, ty)])).into()
             )))
-        );
-        assert_eq!(
-            set.try_fold_solutions(db, &env, inferable, budget, choose, 0, |count, _, _| Ok(
-                count + 1
-            ),),
-            Err(ProjectionError::IncompleteSolution)
         );
     }
 }
@@ -550,26 +598,6 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                         solution([binding(t, int),])
                     ])))
                 );
-                assert_eq!(
-                    set.try_fold_solutions(
-                        db,
-                        &env,
-                        inferable,
-                        budget,
-                        choose,
-                        Vec::new(),
-                        |mut paths, path, budget| {
-                            for binding in path {
-                                budget.charge_type(db, binding.solution)?;
-                            }
-                            paths.push(solution(path.iter().copied()));
-                            Ok(paths)
-                        },
-                    ),
-                    Ok(SolutionProjection::Constrained(vec![solution([binding(
-                        t, int
-                    )])]))
-                );
             }
         }
     }
@@ -589,47 +617,29 @@ fn valid_unsolved_path_is_not_unconstrained() {
         ..SolutionBudget::default()
     };
 
-    for (selected, collected, projected) in [
+    for (selected, collected) in [
         (
             PathBoundSolution::Unsolved,
             Solutions::Constrained(SolutionPaths::Complete(vec![solution([])])),
-            Ok(SolutionProjection::Constrained(1)),
         ),
         (
             PathBoundSolution::BudgetExceeded { fallback: None },
             Solutions::Constrained(SolutionPaths::BudgetExceeded(vec![solution([])])),
-            Err(ProjectionError::IncompleteSolution),
         ),
         (
             PathBoundSolution::Unsatisfiable,
             Solutions::Unsatisfiable(SolutionPaths::Complete(vec![])),
-            Ok(SolutionProjection::Unsatisfiable),
         ),
     ] {
         assert_eq!(
             set.solutions_with(db, &env, inferable, budget, |_, _| selected),
             Ok(collected)
         );
-        assert_eq!(
-            set.try_fold_solutions(
-                db,
-                &env,
-                inferable,
-                budget,
-                |_, _| selected,
-                0,
-                |count, path, _| {
-                    assert!(path.is_empty());
-                    Ok(count + 1)
-                },
-            ),
-            projected
-        );
     }
 }
 
 #[test]
-fn type_budget_is_charged_before_constructing_a_union() {
+fn type_budget_is_charged_before_selecting_remaining_paths() {
     let db = setup_db();
     let db = &db;
     let env = db.program_environment();
@@ -656,27 +666,8 @@ fn type_budget_is_charged_before_constructing_a_union() {
         // paths are not solved.
         assert_eq!(selected, (max_type_terms + 1).min(3));
 
-        let mut constructed = 0;
-        let result = set.try_fold_solutions(
-            db,
-            &env,
-            inferable,
-            budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
-            Type::Never,
-            |accumulated, path, budget| {
-                assert_eq!(path.len(), 1);
-                let ty = path[0].solution;
-                budget.charge_type(db, ty)?;
-                constructed += 1;
-                Ok(UnionType::from_two_elements(db, &env, accumulated, ty))
-            },
-        );
-
-        assert_eq!(constructed, max_type_terms);
         if max_type_terms < 3 {
             assert_eq!(collected, Err(ProjectionError::TypeBudgetExceeded));
-            assert_eq!(result, Err(ProjectionError::TypeBudgetExceeded));
         } else {
             assert_eq!(
                 collected,
@@ -684,14 +675,6 @@ fn type_budget_is_charged_before_constructing_a_union() {
                     [int, str, bytes]
                         .map(|ty| solution([binding(t, ty)]))
                         .into()
-                )))
-            );
-            assert_eq!(
-                result,
-                Ok(SolutionProjection::Constrained(UnionType::from_elements(
-                    db,
-                    &env,
-                    [int, str, bytes],
                 )))
             );
         }
@@ -739,69 +722,6 @@ type Recursive = int | Recursive
             Err(ProjectionError::TypeBudgetExceeded)
         );
         assert_eq!(ProjectionTypeBudget::new(terms).charge_type(db, ty), Ok(()));
-    }
-    Ok(())
-}
-
-#[test]
-fn intersection_construction_failure_discards_the_projection() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    db.write_dedented(
-        "/src/a.py",
-        r#"
-class A: ...
-class B: ...
-class C: ...
-class D: ...
-class E: ...
-"#,
-    )?;
-    let db = &db;
-    let env = db.program_environment();
-    let file = system_path_to_file(db, "/src/a.py")?;
-    let file = ProgramFile::new(db, file, env.program(db));
-    let instance = |name| {
-        global_symbol(db, file, name)
-            .place
-            .expect_type()
-            .to_instance_approximation(db, &env)
-            .ok_or_else(|| anyhow::anyhow!("expected class {name}"))
-    };
-    let left = UnionType::from_elements(db, &env, [instance("A")?, instance("B")?]);
-    let right =
-        UnionType::from_elements(db, &env, [instance("C")?, instance("D")?, instance("E")?]);
-    let t = create_typevar(db, "T");
-    let builder = ConstraintSetBuilder::new();
-
-    // These classes can overlap, so distributing the intersection requires six DNF terms.
-    // Charging the input alone does not prevent that expansion; the fold also needs a bounded
-    // intersection constructor.
-    for alternatives in [[left, right], [right, left]] {
-        let paths = CandidateSolutions::Constrained(
-            alternatives
-                .map(|ty| CandidateSolution {
-                    typevars: Box::new([CandidateTypeVarSolution::from_equivalence(t, ty)])
-                        as Box<[_]>,
-                    validity: SolutionValidity::Valid,
-                })
-                .into(),
-        );
-
-        assert_eq!(
-            paths.try_fold_with(
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
-                Type::object(),
-                &mut ProjectionTypeBudget::new(7),
-                |accumulated, path, budget| {
-                    assert_eq!(path.len(), 1);
-                    let ty = path[0].solution;
-                    budget.charge_type(db, ty)?;
-                    IntersectionType::bounded_from_elements(db, &env, [accumulated, ty])
-                        .ok_or(ProjectionError::TypeBudgetExceeded)
-                },
-            ),
-            Err(ProjectionError::TypeBudgetExceeded)
-        );
     }
     Ok(())
 }

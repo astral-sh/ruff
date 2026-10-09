@@ -175,6 +175,11 @@ impl<'db> AllMembers<'db> {
 
     fn extend_with_type(&mut self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: Type<'db>) {
         match ty {
+            Type::Deferred(deferred) => {
+                if let Some(resolved) = deferred.try_resolve(db, env) {
+                    self.extend_with_type(db, env, resolved);
+                }
+            }
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

@@ -202,7 +202,12 @@ class ConstraintSet:
         Returns `None` if the constraint set is unsatisfiable.
         """
 
-    def __bool__(self) -> bool: ...
+    def __bool__(self) -> bool:
+        """Return whether this formula is proved to hold for every specialization.
+
+        Use `~` to negate the formula while preserving unresolved constraints.
+        """
+
     def __eq__(self, other: ConstraintSet) -> bool: ...
     def __ne__(self, other: ConstraintSet) -> bool: ...
     def __and__(self, other: ConstraintSet) -> ConstraintSet: ...

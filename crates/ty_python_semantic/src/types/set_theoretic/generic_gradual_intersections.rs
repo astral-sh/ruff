@@ -242,7 +242,7 @@ fn dynamic_generalization_intersection<'db>(
         {
             if general_tuple.fixed_elements().next().is_some()
                 || specific_tuple.fixed_elements().next().is_some()
-                || specific.has_dynamic(db, env)
+                || !specific.is_fully_static(db, env)
             {
                 return None;
             }
@@ -272,7 +272,7 @@ fn dynamic_generalization_intersection<'db>(
         {
             return None;
         }
-        if specific.has_dynamic(db, env) {
+        if !specific.is_fully_static(db, env) {
             return None;
         }
 
@@ -314,7 +314,7 @@ fn dynamic_generalization_intersection<'db>(
         return Some(specific);
     }
 
-    if specific.has_dynamic(db, env) {
+    if !specific.is_fully_static(db, env) {
         return None;
     }
 

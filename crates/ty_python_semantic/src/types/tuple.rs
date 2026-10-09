@@ -27,6 +27,7 @@ use crate::subscript::{
 };
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::projection::ObservationEdge;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
 use crate::types::set_theoretic::{RecursivelyDefined, TypeNormalization};
 use crate::types::visitor::any_over_type_expanding_aliases;
@@ -41,7 +42,8 @@ use ty_python_core::definition::Definition;
 pub(crate) mod promotion;
 mod shape;
 pub(super) use shape::{
-    TupleElementExpression, TupleShapeDiagnostic, TupleShapeError, alias_shape_diagnostic,
+    TupleElementExpression, TupleElementObservation, TupleShapeDiagnostic, TupleShapeError,
+    TupleShapePosition, alias_shape_diagnostic,
 };
 use shape::{TupleElements, TupleShapeObservation};
 
@@ -231,6 +233,42 @@ impl<'db> TupleType<'db> {
         match self.elements(db) {
             TupleElements::Resolved(_) => None,
             TupleElements::Expression(_) => self.observe_shape(db).diagnostic(),
+        }
+    }
+
+    /// Select a position and its source occurrence from the same shape observation.
+    pub(super) fn observe_element(
+        self,
+        db: &'db dyn Db,
+        position: TupleShapePosition,
+    ) -> Option<TupleElementObservation<'db>> {
+        self.observe_shape(db).element(position)
+    }
+
+    /// Select a stored element or unpack operand without expanding its shape.
+    pub(super) fn expression_part(self, db: &'db dyn Db, index: usize) -> Option<Type<'db>> {
+        match self.elements(db) {
+            TupleElements::Expression(elements) => elements.get(index).map(|element| element.ty()),
+            TupleElements::Resolved(Tuple::Fixed(tuple)) => {
+                tuple.elements_slice().get(index).copied()
+            }
+            TupleElements::Resolved(Tuple::Variable(tuple)) => {
+                match index.cmp(&tuple.prefix_elements().len()) {
+                    Ordering::Less => tuple.prefix_elements().get(index).copied(),
+                    Ordering::Equal => Some(match tuple.variable() {
+                        VariableSegment::TypeVarTuple(typevar) => Type::TypeVar(typevar),
+                        VariableSegment::Homogeneous(element) => Type::tuple(Self::homogeneous(
+                            db,
+                            &ProgramEnvironment::from_program(self.program(db)),
+                            element,
+                        )),
+                    }),
+                    Ordering::Greater => tuple
+                        .suffix_elements()
+                        .get(index - tuple.prefix_elements().len() - 1)
+                        .copied(),
+                }
+            }
         }
     }
 
@@ -517,16 +555,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                 }
 
-                let mut n = 1;
                 ConstraintSet::from_bool(self.constraints, equal_length).and(
                     db,
                     self.constraints,
                     || {
-                        (source_tuple.0.iter().zip(&target.0)).when_all(
+                        (source_tuple.0.iter().zip(&target.0)).enumerate().when_all(
                             db,
                             self.constraints,
-                            |(&source, &target)| {
-                                let constraint_set = self.check_type_pair(db, source, target);
+                            |(index, (&source, &target))| {
+                                let constraint_set = self.check_child_pair_at(
+                                    db,
+                                    source,
+                                    target,
+                                    ObservationEdge::TupleElement(index),
+                                    ObservationEdge::TupleElement(index),
+                                );
                                 if let Some(context) = self.report_context()
                                     && constraint_set.is_never_satisfied(
                                         db,
@@ -537,12 +580,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                     context.push(ErrorContext::TupleElementNotCompatible {
                                         source,
                                         target,
-                                        element_index: n,
+                                        element_index: index + 1,
                                         element_count: source_tuple.0.len(),
                                     });
                                 }
-
-                                n += 1;
 
                                 constraint_set
                             },
@@ -555,12 +596,18 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // This tuple must have enough elements to match up with the other tuple's prefix
                 // and suffix, and each of those elements must pairwise satisfy the relation.
                 let mut result = self.always();
-                let mut source_iter = source_tuple.0.iter();
-                for &target_ty in target.prefix_elements() {
-                    let Some(&source_ty) = source_iter.next() else {
+                let mut source_iter = source_tuple.0.iter().enumerate();
+                for (target_index, &target_ty) in target.prefix_elements().iter().enumerate() {
+                    let Some((source_index, &source_ty)) = source_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints = self.check_child_pair_at(
+                        db,
+                        source_ty,
+                        target_ty,
+                        ObservationEdge::TupleElement(source_index),
+                        ObservationEdge::TupleElement(target_index),
+                    );
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -568,11 +615,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         return result;
                     }
                 }
-                for target_ty in target.iter_suffix_elements().rev() {
-                    let Some(&source_ty) = source_iter.next_back() else {
+                for (target_index, target_ty) in target.iter_suffix_elements().rev().enumerate() {
+                    let Some((source_index, &source_ty)) = source_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints = self.check_child_pair_at(
+                        db,
+                        source_ty,
+                        target_ty,
+                        ObservationEdge::TupleElement(source_index),
+                        ObservationEdge::TupleSuffix(target_index),
+                    );
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -583,18 +636,29 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 match target.variable() {
                     VariableSegment::TypeVarTuple(typevartuple) => {
-                        let packed = Type::heterogeneous_tuple(db, self.env, source_iter.copied());
+                        let packed =
+                            Type::heterogeneous_tuple(db, self.env, source_iter.map(|(_, &ty)| ty));
                         result.and(db, self.constraints, || {
-                            self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                            self.check_child_pair(db, packed, Type::TypeVar(typevartuple))
                         })
                     }
                     VariableSegment::Homogeneous(target_ty) => {
                         // In addition, any remaining elements in this tuple must satisfy the
                         // variable-length portion of the other tuple.
                         result.and(db, self.constraints, || {
-                            source_iter.when_all(db, self.constraints, |&source_ty| {
-                                self.check_type_pair(db, source_ty, target_ty)
-                            })
+                            source_iter.when_all(
+                                db,
+                                self.constraints,
+                                |(source_index, &source_ty)| {
+                                    self.check_child_pair_at(
+                                        db,
+                                        source_ty,
+                                        target_ty,
+                                        ObservationEdge::TupleElement(source_index),
+                                        ObservationEdge::TupleVariable,
+                                    )
+                                },
+                            )
                         })
                     }
                 }
@@ -635,12 +699,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
                 let mut result = self.always();
-                let mut target_iter = target.iter_all_elements();
-                for source_ty in source.prenormalized_prefix_elements(db, self, None) {
-                    let Some(target_ty) = target_iter.next() else {
+                let mut target_iter = target.all_elements().iter().copied().enumerate();
+                let element_checker = self.with_source_operands();
+                for (source_edge, source_ty) in
+                    source.prenormalized_prefix_elements(db, &element_checker, None)
+                {
+                    let Some((target_index, target_ty)) = target_iter.next() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints = self.check_child_pair_at(
+                        db,
+                        source_ty,
+                        target_ty,
+                        source_edge,
+                        ObservationEdge::TupleElement(target_index),
+                    );
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -649,13 +722,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
                 let suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, self, None)
+                    .prenormalized_suffix_elements(db, &element_checker, None)
                     .collect();
-                for &source_ty in suffix.iter().rev() {
-                    let Some(target_ty) = target_iter.next_back() else {
+                for (source_edge, source_ty) in suffix.iter().rev().cloned() {
+                    let Some((target_index, target_ty)) = target_iter.next_back() else {
                         return self.never();
                     };
-                    let element_constraints = self.check_type_pair(db, source_ty, target_ty);
+                    let element_constraints = self.check_child_pair_at(
+                        db,
+                        source_ty,
+                        target_ty,
+                        source_edge,
+                        ObservationEdge::TupleElement(target_index),
+                    );
                     if result
                         .intersect(db, self.constraints, element_constraints)
                         .is_trivially_never_satisfied()
@@ -666,8 +745,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // The gradual segment supplies the remaining elements.
                 result.and(db, self.constraints, || {
-                    target_iter.when_all(db, self.constraints, |target_ty| {
-                        self.check_type_pair(db, source_element, target_ty)
+                    target_iter.when_all(db, self.constraints, |(target_index, target_ty)| {
+                        self.check_child_pair_at(
+                            db,
+                            source_element,
+                            target_ty,
+                            ObservationEdge::TupleVariable,
+                            ObservationEdge::TupleElement(target_index),
+                        )
                     })
                 })
             }
@@ -695,8 +780,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .zip(target.suffix_elements()),
                         )
-                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
-                            self.check_type_pair(db, source_ty, target_ty)
+                        .enumerate()
+                        .when_all(db, self.constraints, |(index, (&source_ty, &target_ty))| {
+                            let edge = if index < source.prefix_len() {
+                                ObservationEdge::TupleElement(index)
+                            } else {
+                                ObservationEdge::TupleSuffix(
+                                    source.suffix_len() - (index - source.prefix_len()) - 1,
+                                )
+                            };
+                            self.check_child_pair_at(db, source_ty, target_ty, edge.clone(), edge)
                         });
                 }
 
@@ -727,8 +820,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                 .iter()
                                 .zip(target_suffix),
                         )
-                        .when_all(db, self.constraints, |(&source_ty, &target_ty)| {
-                            self.check_type_pair(db, source_ty, target_ty)
+                        .enumerate()
+                        .when_all(db, self.constraints, |(index, (&source_ty, &target_ty))| {
+                            let edge = if index < target_prefix.len() {
+                                ObservationEdge::TupleElement(index)
+                            } else {
+                                ObservationEdge::TupleSuffix(
+                                    target_suffix.len() - (index - target_prefix.len()) - 1,
+                                )
+                            };
+                            self.check_child_pair_at(db, source_ty, target_ty, edge.clone(), edge)
                         });
 
                     let packed = Type::tuple(TupleType::new(
@@ -741,7 +842,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         ),
                     ));
                     return boundary_constraints.and(db, self.constraints, || {
-                        self.check_type_pair(db, packed, Type::TypeVar(typevartuple))
+                        self.check_child_pair(db, packed, Type::TypeVar(typevartuple))
                     });
                 }
 
@@ -821,27 +922,51 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     VariableSegment::Homogeneous(Type::Dynamic(_)) => Some(source_variable),
                     _ => None,
                 };
+                let source_element_checker = if source_prenormalize_variable.is_some() {
+                    self.clone()
+                } else {
+                    self.with_source_operands()
+                };
+                let target_element_checker = if target_prenormalize_variable.is_some() {
+                    self.reversed()
+                } else {
+                    self.with_target_operands()
+                };
 
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.
                 // Any remaining parts must satisfy the relation with the other tuple's
                 // variable-length part.
                 let mut result = self.always();
                 let pairwise = source
-                    .prenormalized_prefix_elements(db, self, source_prenormalize_variable)
+                    .prenormalized_prefix_elements(
+                        db,
+                        &source_element_checker,
+                        source_prenormalize_variable,
+                    )
                     .zip_longest(target.prenormalized_prefix_elements(
                         db,
-                        self,
+                        &target_element_checker,
                         target_prenormalize_variable,
                     ));
                 for pair in pairwise {
                     let pair_constraints = match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self.check_type_pair(db, self_ty, other_ty)
+                        EitherOrBoth::Both((source_edge, source_ty), (target_edge, target_ty)) => {
+                            self.check_child_pair_at(
+                                db,
+                                source_ty,
+                                target_ty,
+                                source_edge,
+                                target_edge,
+                            )
                         }
-                        EitherOrBoth::Left(self_ty) => {
-                            self.check_type_pair(db, self_ty, target_variable)
-                        }
-                        EitherOrBoth::Right(other_ty) => {
+                        EitherOrBoth::Left((source_edge, source_ty)) => self.check_child_pair_at(
+                            db,
+                            source_ty,
+                            target_variable,
+                            source_edge,
+                            ObservationEdge::TupleVariable,
+                        ),
+                        EitherOrBoth::Right((target_edge, target_ty)) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
@@ -851,7 +976,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             {
                                 return self.never();
                             }
-                            self.check_type_pair(db, source_variable, other_ty)
+                            self.check_child_pair_at(
+                                db,
+                                source_variable,
+                                target_ty,
+                                ObservationEdge::TupleVariable,
+                                target_edge,
+                            )
                         }
                     };
                     if result
@@ -863,24 +994,43 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 let source_suffix: Vec<_> = source
-                    .prenormalized_suffix_elements(db, self, source_prenormalize_variable)
+                    .prenormalized_suffix_elements(
+                        db,
+                        &source_element_checker,
+                        source_prenormalize_variable,
+                    )
                     .collect();
                 let target_suffix: Vec<_> = target
-                    .prenormalized_suffix_elements(db, self, target_prenormalize_variable)
+                    .prenormalized_suffix_elements(
+                        db,
+                        &target_element_checker,
+                        target_prenormalize_variable,
+                    )
                     .collect();
                 let pairwise = source_suffix
                     .iter()
                     .rev()
-                    .zip_longest(target_suffix.iter().rev());
+                    .cloned()
+                    .zip_longest(target_suffix.iter().rev().cloned());
                 for pair in pairwise {
                     let pair_constraints = match pair {
-                        EitherOrBoth::Both(&source_ty, &target_ty) => {
-                            self.check_type_pair(db, source_ty, target_ty)
+                        EitherOrBoth::Both((source_edge, source_ty), (target_edge, target_ty)) => {
+                            self.check_child_pair_at(
+                                db,
+                                source_ty,
+                                target_ty,
+                                source_edge,
+                                target_edge,
+                            )
                         }
-                        EitherOrBoth::Left(&source_ty) => {
-                            self.check_type_pair(db, source_ty, target_variable)
-                        }
-                        EitherOrBoth::Right(&target_ty) => {
+                        EitherOrBoth::Left((source_edge, source_ty)) => self.check_child_pair_at(
+                            db,
+                            source_ty,
+                            target_variable,
+                            source_edge,
+                            ObservationEdge::TupleVariable,
+                        ),
+                        EitherOrBoth::Right((target_edge, target_ty)) => {
                             // The rhs has a required element that the lhs is not guaranteed to
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
@@ -890,7 +1040,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             {
                                 return self.never();
                             }
-                            self.check_type_pair(db, source_variable, target_ty)
+                            self.check_child_pair_at(
+                                db,
+                                source_variable,
+                                target_ty,
+                                ObservationEdge::TupleVariable,
+                                target_edge,
+                            )
                         }
                     };
                     if result
@@ -903,7 +1059,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 // And lastly, the variable-length portions must satisfy the relation.
                 result.and(db, self.constraints, || {
-                    self.check_type_pair(db, source_variable, target_variable)
+                    self.check_child_pair_at(
+                        db,
+                        source_variable,
+                        target_variable,
+                        ObservationEdge::TupleVariable,
+                        ObservationEdge::TupleVariable,
+                    )
                 })
             }
         }
@@ -921,25 +1083,49 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
     ) -> ConstraintSet<'db, 'c> {
         source
             .iter_prefix_elements()
-            .zip_longest(target.iter_prefix_elements())
+            .enumerate()
+            .map(|(index, ty)| (ObservationEdge::TupleElement(index), ty))
+            .zip_longest(
+                target
+                    .iter_prefix_elements()
+                    .enumerate()
+                    .map(|(index, ty)| (ObservationEdge::TupleElement(index), ty)),
+            )
             .chain(
                 source
                     .iter_suffix_elements()
                     .rev()
-                    .zip_longest(target.iter_suffix_elements().rev()),
+                    .enumerate()
+                    .map(|(index, ty)| (ObservationEdge::TupleSuffix(index), ty))
+                    .zip_longest(
+                        target
+                            .iter_suffix_elements()
+                            .rev()
+                            .enumerate()
+                            .map(|(index, ty)| (ObservationEdge::TupleSuffix(index), ty)),
+                    ),
             )
             .when_all(db, self.constraints, |pair| {
-                if let EitherOrBoth::Right(target) = pair
+                if let EitherOrBoth::Right((ref target_edge, target)) = pair
                     && matches!(source.variable(), VariableSegment::TypeVarTuple(_))
                 {
                     // The synthesized protocol stands for an arbitrary pack element. Diagnostics
                     // should describe the original tuple types, not this internal placeholder.
                     return self.without_context_collection(|| {
-                        self.check_type_pair(db, source_variable, target)
+                        self.check_child_pair_at(
+                            db,
+                            source_variable,
+                            target,
+                            ObservationEdge::TupleVariable,
+                            target_edge.clone(),
+                        )
                     });
                 }
-                let (source, target) = pair.or(source_variable, target_variable);
-                self.check_type_pair(db, source, target)
+                let ((source_edge, source), (target_edge, target)) = pair.or(
+                    (ObservationEdge::TupleVariable, source_variable),
+                    (ObservationEdge::TupleVariable, target_variable),
+                );
+                self.check_child_pair_at(db, source, target, source_edge, target_edge)
             })
     }
 }
@@ -976,9 +1162,19 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         }
 
         // If any of the required elements are pairwise disjoint, the tuples are disjoint as well.
-        let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool| {
+        let any_disjoint = |a: &[Type<'db>], b: &[Type<'db>], rev: bool, reverse_operands: bool| {
+            let checker = if reverse_operands {
+                self.reversed()
+            } else {
+                self.clone()
+            };
             let check_element = |(index, (&left, &right))| {
-                let result = self.check_type_pair(db, left, right);
+                let edge = if rev {
+                    ObservationEdge::TupleSuffix(index)
+                } else {
+                    ObservationEdge::TupleElement(index)
+                };
+                let result = checker.check_child_pair_at(db, left, right, edge.clone(), edge);
                 if let Some(context) = self.report_context()
                     && result.is_always_satisfied(db, self.env, self.inferable)
                 {
@@ -1004,28 +1200,45 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 
         match (left, right) {
             (Tuple::Fixed(left), Tuple::Fixed(right)) => {
-                any_disjoint(left.all_elements(), right.all_elements(), false)
+                any_disjoint(left.all_elements(), right.all_elements(), false, false)
             }
 
             // Note that we don't compare the variable-length portions; two pure homogeneous tuples
             // `tuple[A, ...]` and `tuple[B, ...]` can never be disjoint even if A and B are
             // disjoint, because `tuple[()]` would be assignable to both.
-            (Tuple::Variable(left), Tuple::Variable(right)) => {
-                any_disjoint(left.prefix_elements(), right.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(left.suffix_elements(), right.suffix_elements(), true),
-                )
-            }
+            (Tuple::Variable(left), Tuple::Variable(right)) => any_disjoint(
+                left.prefix_elements(),
+                right.prefix_elements(),
+                false,
+                false,
+            )
+            .or(db, self.constraints, || {
+                any_disjoint(left.suffix_elements(), right.suffix_elements(), true, false)
+            }),
 
-            (Tuple::Fixed(fixed), Tuple::Variable(variable))
-            | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => {
-                any_disjoint(fixed.all_elements(), variable.prefix_elements(), false).or(
-                    db,
-                    self.constraints,
-                    || any_disjoint(fixed.all_elements(), variable.suffix_elements(), true),
+            (Tuple::Fixed(fixed), Tuple::Variable(variable)) => any_disjoint(
+                fixed.all_elements(),
+                variable.prefix_elements(),
+                false,
+                false,
+            )
+            .or(db, self.constraints, || {
+                any_disjoint(
+                    fixed.all_elements(),
+                    variable.suffix_elements(),
+                    true,
+                    false,
                 )
-            }
+            }),
+            (Tuple::Variable(variable), Tuple::Fixed(fixed)) => any_disjoint(
+                fixed.all_elements(),
+                variable.prefix_elements(),
+                false,
+                true,
+            )
+            .or(db, self.constraints, || {
+                any_disjoint(fixed.all_elements(), variable.suffix_elements(), true, true)
+            }),
         }
     }
 }
@@ -2274,16 +2487,34 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         db: &'db dyn Db,
         checker: &'a TypeRelationChecker<'_, '_, 'db>,
         variable: Option<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a {
+    ) -> impl Iterator<Item = (ObservationEdge, Type<'db>)> + 'a {
         // Nested element comparisons must retain the outer recursive comparison's guards.
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
         self.iter_prefix_elements()
-            .chain(self.iter_suffix_elements().take_while(move |element| {
-                checker
-                    .as_equivalence_checker()
-                    .check_type_pair(db, *element, variable)
-                    .is_always_satisfied(db, checker.env, TypeVarSet::None)
-            }))
+            .enumerate()
+            .map(|(index, ty)| (ObservationEdge::TupleElement(index), ty))
+            .chain(
+                self.iter_suffix_elements()
+                    .enumerate()
+                    .map(|(index, ty)| {
+                        (
+                            ObservationEdge::TupleSuffix(self.suffix_len() - index - 1),
+                            ty,
+                        )
+                    })
+                    .take_while(move |(edge, element)| {
+                        checker
+                            .as_equivalence_checker()
+                            .check_child_pair_at(
+                                db,
+                                *element,
+                                variable,
+                                edge.clone(),
+                                ObservationEdge::TupleVariable,
+                            )
+                            .is_always_satisfied(db, checker.env, TypeVarSet::None)
+                    }),
+            )
     }
 
     /// Returns the suffix of the prenormalization of this tuple.
@@ -2310,14 +2541,28 @@ impl<'db> VariableLengthTuple<Type<'db>, VariableSegment<'db>> {
         db: &'db dyn Db,
         checker: &'a TypeRelationChecker<'_, '_, 'db>,
         variable: Option<Type<'db>>,
-    ) -> impl Iterator<Item = Type<'db>> + 'a {
+    ) -> impl Iterator<Item = (ObservationEdge, Type<'db>)> + 'a {
         let variable = variable.unwrap_or_else(|| self.variable().element_type(db));
-        self.iter_suffix_elements().skip_while(move |element| {
-            checker
-                .as_equivalence_checker()
-                .check_type_pair(db, *element, variable)
-                .is_always_satisfied(db, checker.env, TypeVarSet::None)
-        })
+        self.iter_suffix_elements()
+            .enumerate()
+            .map(|(index, ty)| {
+                (
+                    ObservationEdge::TupleSuffix(self.suffix_len() - index - 1),
+                    ty,
+                )
+            })
+            .skip_while(move |(edge, element)| {
+                checker
+                    .as_equivalence_checker()
+                    .check_child_pair_at(
+                        db,
+                        *element,
+                        variable,
+                        edge.clone(),
+                        ObservationEdge::TupleVariable,
+                    )
+                    .is_always_satisfied(db, checker.env, TypeVarSet::None)
+            })
     }
 
     fn recursive_type_normalized_impl(

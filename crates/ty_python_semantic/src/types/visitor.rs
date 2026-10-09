@@ -8,11 +8,11 @@ use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
 
 use crate::types::{
-    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-    GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-    PropertyInstanceType, ProtocolInstanceType, RecursiveType, SlotDescriptorType,
-    StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
-    TypeIsType, TypedDictType, UnionType,
+    BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, DeferredType,
+    EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
+    NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveType,
+    SlotDescriptorType, StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType,
+    TypeGuardType, TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
     callable::walk_callable_type,
     class::walk_generic_alias,
@@ -157,11 +157,16 @@ pub(crate) trait TypeVisitor<'db> {
             self.notify_skipped_lazy_type_attributes();
         }
     }
+
+    fn visit_deferred_type(&self, db: &'db dyn Db, deferred: DeferredType<'db>) {
+        deferred.visit_types(db, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub(super) enum NonAtomicType<'db> {
+    Deferred(DeferredType<'db>),
     Union(UnionType<'db>),
     Intersection(IntersectionType<'db>),
     EnumComplement(EnumComplementType<'db>),
@@ -262,6 +267,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
             Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
+            Type::Deferred(deferred) => TypeKind::NonAtomic(NonAtomicType::Deferred(deferred)),
             Type::NewTypeInstance(newtype) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
@@ -275,6 +281,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
     visitor: &V,
 ) {
     match non_atomic_type {
+        NonAtomicType::Deferred(deferred) => visitor.visit_deferred_type(db, deferred),
         NonAtomicType::FunctionLiteral(function) => {
             visitor.visit_function_type(db, function);
         }
@@ -591,6 +598,14 @@ pub(super) fn dynamic_content_impl<'db>(
             // Only the types the class was actually specialized with are relevant to whether
             // the `GenericAlias` contains a dynamic type.
             walk_specialization_types(db, alias.specialization(db), self);
+        }
+
+        fn visit_deferred_type(&self, db: &'db dyn Db, deferred: DeferredType<'db>) {
+            // Stored arguments describe the input of a deferred operation. A completed
+            // materialization denotes a static value even when that input contained Any.
+            if !deferred.is_materialized_for(db, false) {
+                deferred.visit_types(db, self);
+            }
         }
 
         fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {

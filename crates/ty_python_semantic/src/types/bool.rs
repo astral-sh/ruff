@@ -244,6 +244,10 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            Type::Deferred(deferred) => deferred
+                .try_resolve(db, env)
+                .map(|resolved| resolved.try_bool_impl(db, env, allow_short_circuit, visitor))
+                .unwrap_or(Ok(Truthiness::Ambiguous))?,
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -279,6 +283,8 @@ impl<'db> Type<'db> {
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
                 let tracked_set = constraints.load(db, env, tracked_set.constraints(db));
+                // Boolean conversion asks whether the formula is proved universally true.
+                // Logical operations on the formula itself, including `~`, retain uncertainty.
                 Truthiness::from(tracked_set.is_always_satisfied(db, env, TypeVarSet::None))
             }
 

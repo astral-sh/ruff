@@ -6872,9 +6872,7 @@ class C[T](Protocol):
 
 def takes_c(c: C[set[int]]) -> None: ...
 def f(c: C[int]) -> None:
-    # The key thing is that we don't stack overflow while checking this.
-    # The cycle detection assumes compatibility when it detects potential
-    # infinite recursion between protocol specializations.
+    # Comparing the growing specializations terminates without proving compatibility.
     takes_c(c)  # error: [invalid-argument-type]
 
 class Left[T](Protocol):

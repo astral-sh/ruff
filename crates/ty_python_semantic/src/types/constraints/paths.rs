@@ -304,7 +304,7 @@ impl PathAssignments {
         visitor: &mut V,
     ) -> ControlFlow<V::Break, V::Result>
     where
-        V: PathVisitor,
+        V: PathVisitor<'db>,
     {
         visitor.visit_node()?;
         match node.node() {
@@ -573,12 +573,14 @@ impl PathAssignments {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         map: &SequentMap<'db>,
+        sources: &super::observation::BoundSources<'db>,
     ) -> Range<usize> {
         fn intern_sequents<'db>(
             db: &'db dyn Db,
             env: &ProgramEnvironment<'db>,
             storage: &mut ConstraintSetStorage<'db>,
             sequents: &[Sequent<InternedSequentConstraint<'db>>],
+            sources: &super::observation::BoundSources<'db>,
             dest: &mut Vec<Sequent<ConstraintId, u16>>,
             antecedents: &mut FxHashMap<ConstraintAssignment, Vec<usize>>,
         ) {
@@ -593,13 +595,28 @@ impl PathAssignments {
 
                 let sequent = match sequent {
                     Sequent::SingleTautology { ante } => {
-                        let ante = storage.intern_constraint(db, env, ante.constraint(db));
+                        let ante = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante.constraint(db),
+                            sources.clone(),
+                        );
                         add_antecedent(ante.when_false());
                         Sequent::SingleTautology { ante }
                     }
                     Sequent::PairImpossibility { ante1, ante2 } => {
-                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
-                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
+                        let ante1 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante1.constraint(db),
+                            sources.clone(),
+                        );
+                        let ante2 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante2.constraint(db),
+                            sources.clone(),
+                        );
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         Sequent::PairImpossibility { ante1, ante2 }
@@ -609,9 +626,24 @@ impl PathAssignments {
                         ante2,
                         ante3,
                     } => {
-                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
-                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
-                        let ante3 = storage.intern_constraint(db, env, ante3.constraint(db));
+                        let ante1 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante1.constraint(db),
+                            sources.clone(),
+                        );
+                        let ante2 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante2.constraint(db),
+                            sources.clone(),
+                        );
+                        let ante3 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante3.constraint(db),
+                            sources.clone(),
+                        );
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         add_antecedent(ante3.when_true());
@@ -628,9 +660,24 @@ impl PathAssignments {
                         is_substitution,
                         ..
                     } => {
-                        let ante1 = storage.intern_constraint(db, env, ante1.constraint(db));
-                        let ante2 = storage.intern_constraint(db, env, ante2.constraint(db));
-                        let post = storage.intern_constraint(db, env, post.constraint(db));
+                        let ante1 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante1.constraint(db),
+                            sources.clone(),
+                        );
+                        let ante2 = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante2.constraint(db),
+                            sources.clone(),
+                        );
+                        let post = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            post.constraint(db),
+                            sources.clone(),
+                        );
                         add_antecedent(ante1.when_true());
                         add_antecedent(ante2.when_true());
                         let (ante1_depth, _) =
@@ -648,8 +695,18 @@ impl PathAssignments {
                         }
                     }
                     Sequent::SingleImplication { ante, post, .. } => {
-                        let ante = storage.intern_constraint(db, env, ante.constraint(db));
-                        let post = storage.intern_constraint(db, env, post.constraint(db));
+                        let ante = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            ante.constraint(db),
+                            sources.clone(),
+                        );
+                        let post = storage.intern_observed_constraint(
+                            db,
+                            env,
+                            post.constraint(db),
+                            sources.clone(),
+                        );
                         add_antecedent(ante.when_true());
                         let (ante_depth, _) = storage.cached_constraint_bound_depth(db, env, ante);
                         let fuel_cost = storage.sequent_fuel_cost(db, env, post, ante_depth);
@@ -674,6 +731,7 @@ impl PathAssignments {
                         env,
                         storage,
                         sequents,
+                        sources,
                         &mut self.sequents,
                         &mut self.sequent_antecedents,
                     );
@@ -695,6 +753,7 @@ impl PathAssignments {
                         env,
                         storage,
                         first,
+                        sources,
                         &mut self.sequents,
                         &mut self.sequent_antecedents,
                     );
@@ -703,6 +762,7 @@ impl PathAssignments {
                         env,
                         storage,
                         second,
+                        sources,
                         &mut self.sequents,
                         &mut self.sequent_antecedents,
                     );
@@ -734,7 +794,11 @@ impl PathAssignments {
 
         let constraint_data = storage.constraint_data(constraint);
         if let Some(map) = SequentMap::for_constraint(db, env, constraint_data) {
-            let added = self.add_sequents(db, env, storage, map);
+            if map.incomplete {
+                storage.relation_session.mark_incomplete();
+            }
+            let sources = storage.constraint_sources(constraint).clone();
+            let added = self.add_sequents(db, env, storage, map, &sources);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
             // each constraint. Since we are salsa-caching sequent derivation, we don't have easy
@@ -794,11 +858,23 @@ impl PathAssignments {
                 continue;
             }
 
-            let Some(map) = SequentMap::for_constraint_pair(db, env, a_data, b_data) else {
+            let mut sources = storage.constraint_sources(a).clone();
+            sources.merge(storage.constraint_sources(b));
+            let Some(map) = SequentMap::for_constraint_pair_in_context(
+                db,
+                env,
+                &storage.relation_context,
+                sources.clone(),
+                a_data,
+                b_data,
+            ) else {
                 continue;
             };
             self.elaborated_pairs.insert((a, b));
-            let added = self.add_sequents(db, env, storage, map);
+            if map.incomplete {
+                storage.relation_session.mark_incomplete();
+            }
+            let added = self.add_sequents(db, env, storage, &map, &sources);
 
             // `projection_source_order` depends on knowing the order that sequents were discovered for
             // each constraint. Since we are salsa-caching sequent derivation, we don't have easy

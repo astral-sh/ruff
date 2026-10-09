@@ -22,16 +22,15 @@ use crate::types::constraints::{
 use crate::types::cyclic::{ActiveRecursionDetector, TypeIdentity};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{walk_specialization, walk_specialization_types};
+use crate::types::projection::ObservedTypePair;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_instance_member,
     walk_protocol_interface,
 };
 use crate::types::recursive::RecursiveType;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
-    TypeRelationChecker, TypeVarEvaluation,
+    DisjointnessChecker, RelationContext, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarSet};
 use crate::types::visitor::{
@@ -717,6 +716,7 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
                         .class_context
                         .is_some_and(|context| context.contains(db, variable.identity(db))) => {}
                 Type::Never
+                | Type::Deferred(_)
                 | Type::Callable(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -818,6 +818,8 @@ fn protocol_materialization_is_noop_with_type_parameters<'db>(
 
 /// Check only closed, directly inspectable types. Recursive substitutions may additionally use
 /// the protocol's own parameters, whose bounds and defaults are checked separately.
+/// Deferred expressions are inspected through their stored arguments, domains, and operation
+/// captures; proving those inputs static does not require interpreting the expression.
 fn specialization_argument_is_static<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -826,6 +828,7 @@ fn specialization_argument_is_static<'db>(
 ) -> bool {
     !any_over_type(db, env, ty, false, |nested| match nested {
         Type::Never
+        | Type::Deferred(_)
         | Type::ClassLiteral(_)
         | Type::NominalInstance(_)
         | Type::Union(_)
@@ -927,7 +930,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 && source.interface(db).has_only_methods(db)
                 && protocol_materialization_is_noop(db, self.env.program(db), source_origin)
             {
-                return self.check_type_pair(
+                return self.check_child_pair(
                     db,
                     Type::ProtocolInstance(ProtocolInstanceType::from_class(source_origin)),
                     Type::ProtocolInstance(protocol),
@@ -947,7 +950,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .unwrap_or(ty);
 
             let nominally_satisfied =
-                self.check_type_pair(db, type_to_test, Type::NominalInstance(nominal_instance));
+                self.check_child_pair(db, type_to_test, Type::NominalInstance(nominal_instance));
 
             // `Generator` parameters must be compared nominally. The class specialization
             // already materializes each parameter according to its variance, while structural
@@ -1062,45 +1065,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             });
         }
         result.or(db, self.constraints, || structurally_satisfied)
-    }
-
-    /// Try a nominal proof when a materialized recursive protocol changes specialization.
-    ///
-    /// A recursive child can stabilize at a specialization that relates nominally even when its
-    /// parent only relates structurally. Keep the child's constraints without retrying the
-    /// structural comparison that reached the recursion guard.
-    pub(super) fn try_check_nominal_protocol_cycle(
-        &self,
-        db: &'db dyn Db,
-        source: Type<'db>,
-        target: Type<'db>,
-    ) -> Option<ConstraintSet<'db, 'c>> {
-        let source = source.as_protocol_instance(db)?;
-        let target = target.as_protocol_instance(db)?;
-        if source.materialization_kind(db).is_none() && target.materialization_kind(db).is_none() {
-            return None;
-        }
-        let source_origin = source.class_origin(db)?;
-        let target_origin = target.class_origin(db)?;
-        if source_origin.class_literal(db) != target_origin.class_literal(db) {
-            return None;
-        }
-
-        // Nominal arguments alone do not describe materialized requirements such as a fixed
-        // `Any` member. Only use the nominal proof when the pending wrappers are harmless.
-        for protocol in [source, target] {
-            if let Some(origin) = protocol.materialized_origin(db)
-                && !protocol_materialization_is_noop(db, self.env.program(db), origin)
-            {
-                return None;
-            }
-        }
-
-        Some(self.check_type_pair(
-            db,
-            Type::NominalInstance(source.nominal_origin_instance(db)?),
-            Type::NominalInstance(target.nominal_origin_instance(db)?),
-        ))
     }
 
     /// Avoid recursive requirements that cannot add solutions beyond explicit inheritance.
@@ -1395,7 +1359,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         );
 
         let constructed_ty = meta_ty.instance_type_for_meta_protocol(db, env);
-        self.check_type_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
+        self.check_child_pair(db, constructed_ty, Type::ProtocolInstance(protocol))
             .and(db, self.constraints, || {
                 self.check_meta_protocol_members(db, constructed_ty, meta_ty, protocol)
             })
@@ -1510,36 +1474,28 @@ fn non_recursive_protocol_interface<'db>(
 /// The target view retains its materialization, so readable and writable members are still
 /// materialized in their respective variance positions. The complete target protocol must be
 /// checked separately after generic inference.
-#[salsa::tracked(
-    returns(ref),
-    cycle_initial = |_, _, _, _| OwnedConstraintSet::always(),
-    heap_size = ruff_memory_usage::heap_size,
-)]
 fn non_recursive_protocol_constraints<'db>(
     db: &'db dyn Db,
     source: ProtocolInstanceType<'db>,
-    target: ProtocolInterfaceView<'db>,
+    target_interface: ProtocolInterfaceView<'db>,
+    context: &RelationContext<'db>,
+    observations: ObservedTypePair<'db>,
 ) -> OwnedConstraintSet<'db> {
-    let env = ProgramEnvironment::from_program(target.base().program(db));
-    let constraints = ConstraintSetBuilder::new();
+    let env = ProgramEnvironment::from_program(target_interface.base().program(db));
+    let constraints = ConstraintSetBuilder::with_relation_context(context.clone());
     constraints.into_owned(|constraints| {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
         let checker = TypeRelationChecker::constraint_set_assignability(
             &env,
             constraints,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
             &materialization_visitor,
+            observations,
         );
         checker.check_protocol_interface_pair(
             db,
             Type::ProtocolInstance(source),
             source.interface(db),
-            target,
+            target_interface,
         )
     })
 }
@@ -1858,7 +1814,7 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Whether nominal metadata omits an ordered transformation of the members.
-    fn requires_operation_replay(self, db: &'db dyn Db) -> bool {
+    pub(super) fn requires_operation_replay(self, db: &'db dyn Db) -> bool {
         matches!(self.inner, Protocol::FromInterface(protocol)
             if protocol.operations(db).is_some_and(|operations| operations.requires_replay(db))
                 || protocol.recursive_origin(db).is_some_and(|origin| origin.requires_operation_replay(db)))
@@ -2008,18 +1964,13 @@ impl<'db> ProtocolInstanceType<'db> {
 
             let env = ProgramEnvironment::from_program(interface.base().program(db));
             let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::new(&env);
             let checker = TypeRelationChecker::subtyping(
                 &env,
                 &constraints,
                 TypeVarSet::None,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
                 &materialization_visitor,
+                ObservedTypePair::roots(Type::object(), Type::ProtocolInstance(protocol)),
             );
             checker
                 .check_type_satisfies_protocol(db, Type::object(), protocol)
@@ -2257,7 +2208,9 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         target: Self,
-    ) -> Option<&'db OwnedConstraintSet<'db>> {
+        context: &RelationContext<'db>,
+        observations: ObservedTypePair<'db>,
+    ) -> Option<OwnedConstraintSet<'db>> {
         let origin = target.class_origin(db)?;
         let interface = target.interface(db);
         let non_recursive = non_recursive_protocol_interface(
@@ -2266,12 +2219,18 @@ impl<'db> ProtocolInstanceType<'db> {
             origin,
             Type::ProtocolInstance(target),
         );
-        let target = interface.with_base(non_recursive);
-        if target.member_count(db) == 0 {
+        let target_interface = interface.with_base(non_recursive);
+        if target_interface.member_count(db) == 0 {
             return None;
         }
 
-        Some(non_recursive_protocol_constraints(db, self, target))
+        Some(non_recursive_protocol_constraints(
+            db,
+            self,
+            target_interface,
+            context,
+            observations,
+        ))
     }
 }
 

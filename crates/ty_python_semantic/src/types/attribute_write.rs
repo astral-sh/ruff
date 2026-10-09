@@ -292,6 +292,10 @@ pub(super) fn attribute_write_requirement<'db>(
     attribute: &str,
 ) -> AttributeWriteRequirement<'db> {
     match object_ty {
+        Type::Deferred(deferred) => deferred
+            .try_resolve(db, env)
+            .map(|resolved| attribute_write_requirement(db, env, resolved, attribute))
+            .unwrap_or(AttributeWriteRequirement::CannotAssign),
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
         }
@@ -961,6 +965,7 @@ pub(super) fn assignment_attribute_members<'db>(
             }
             Type::Union(..)
             | Type::Intersection(..)
+            | Type::Deferred(_)
             | Type::TypeAlias(..)
             | Type::Recursive(_)
             | Type::Dynamic(..)

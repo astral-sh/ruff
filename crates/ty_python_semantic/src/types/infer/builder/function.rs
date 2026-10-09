@@ -2369,6 +2369,14 @@ fn is_instance_truthiness<'db>(
     };
 
     match ty {
+        Type::Deferred(deferred) => {
+            let resolved = deferred.resolve(db, env);
+            if resolved == ty {
+                Truthiness::Ambiguous
+            } else {
+                is_instance_truthiness(db, env, resolved, class)
+            }
+        }
         Type::Recursive(recursive) => recursive
             .unfold(db, env)
             .map(|unfolded| is_instance_truthiness(db, env, unfolded, class))

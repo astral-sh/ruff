@@ -3361,6 +3361,11 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
                     visitor,
                 )
             })?,
+            Type::Deferred(deferred) => visitor.visit(db, ty, || {
+                deferred
+                    .try_resolve(db, &deferred.environment(db))
+                    .and_then(|resolved| imp(db, resolved, visitor))
+            })?,
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

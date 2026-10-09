@@ -648,6 +648,16 @@ impl<'db> BoundSuperType<'db> {
             .map(Type::ProtocolInstance)
             .unwrap_or(owner_type);
         let owner = match owner_for_lookup {
+            Type::Deferred(deferred) => {
+                return deferred
+                    .try_resolve(db, env)
+                    .map(delegate_to)
+                    .unwrap_or(Err(BoundSuperError::AbstractOwnerType {
+                        owner_type,
+                        pivot_class: pivot_class_type,
+                        typevar_context: None,
+                    }));
+            }
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

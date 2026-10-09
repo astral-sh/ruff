@@ -9,7 +9,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use ty_python_core::definition::Definition;
 
-use super::{Tuple, TupleSpec, TupleSpecBuilder, TupleType, VariableLengthTuple, VariableSegment};
+use super::{
+    Tuple, TupleBuilder, TupleSpec, TupleSpecBuilder, TupleType, VariableLengthTuple,
+    VariableSegment,
+};
 use crate::types::instance::NominalInstanceType;
 use crate::types::set_theoretic::TypeNormalization;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
@@ -71,6 +74,27 @@ pub(in crate::types) enum TupleShapeError {
     MultipleVariadic,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(in crate::types) enum TupleShapePosition {
+    Element(usize),
+    Suffix(usize),
+    Variable,
+}
+
+/// A source occurrence contributing an observed tuple position. Unpack positions are relative
+/// to that operand, so changing its length never renumbers the surrounding expression parts.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(in crate::types) struct TupleShapePath {
+    pub(in crate::types) part: Option<usize>,
+    pub(in crate::types) position: Option<TupleShapePosition>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(in crate::types) struct TupleElementObservation<'db> {
+    pub(in crate::types) ty: Type<'db>,
+    pub(in crate::types) source: TupleShapePath,
+}
+
 /// Annotation locations refer to the stored parts of the tuple whose shape was observed.
 #[derive(Clone)]
 pub(in crate::types) struct TupleShapeDiagnostic {
@@ -83,6 +107,72 @@ pub(super) struct TupleShapeObservation<'db> {
     pub(super) tuple: TupleSpec<'db>,
     pub(super) error: Option<TupleShapeError>,
     multiple_variadic_parts: Box<[(usize, usize)]>,
+    origins: Tuple<Option<TupleShapePath>>,
+}
+
+impl<'db> TupleShapeObservation<'db> {
+    pub(super) fn element(
+        &self,
+        position: TupleShapePosition,
+    ) -> Option<TupleElementObservation<'db>> {
+        let ty = match (&self.tuple, position) {
+            (Tuple::Fixed(tuple), TupleShapePosition::Element(index)) => {
+                *tuple.elements_slice().get(index)?
+            }
+            (Tuple::Fixed(tuple), TupleShapePosition::Suffix(index)) => {
+                *tuple.elements_slice().iter().rev().nth(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Element(index)) => {
+                *tuple.prefix_elements().get(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Suffix(index)) => {
+                *tuple.suffix_elements().iter().rev().nth(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Variable) => {
+                tuple.variable().tuple_class_type()
+            }
+            _ => return None,
+        };
+        let source = match (&self.origins, position) {
+            (Tuple::Fixed(tuple), TupleShapePosition::Element(index)) => {
+                *tuple.elements_slice().get(index)?
+            }
+            (Tuple::Fixed(tuple), TupleShapePosition::Suffix(index)) => {
+                *tuple.elements_slice().iter().rev().nth(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Element(index)) => {
+                *tuple.prefix_elements().get(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Suffix(index)) => {
+                *tuple.suffix_elements().iter().rev().nth(index)?
+            }
+            (Tuple::Variable(tuple), TupleShapePosition::Variable) => tuple.variable(),
+            _ => return None,
+        }?;
+        Some(TupleElementObservation { ty, source })
+    }
+}
+
+fn source_paths(tuple: &TupleSpec<'_>, part: Option<usize>) -> Tuple<Option<TupleShapePath>> {
+    let path = |position| {
+        Some(TupleShapePath {
+            part,
+            position: Some(position),
+        })
+    };
+    match tuple {
+        Tuple::Fixed(tuple) => Tuple::heterogeneous(
+            (0..tuple.elements_slice().len()).map(|index| path(TupleShapePosition::Element(index))),
+        ),
+        Tuple::Variable(tuple) => VariableLengthTuple::mixed(
+            (0..tuple.prefix_elements().len())
+                .map(|index| path(TupleShapePosition::Element(index))),
+            path(TupleShapePosition::Variable),
+            (0..tuple.suffix_elements().len())
+                .rev()
+                .map(|index| path(TupleShapePosition::Suffix(index))),
+        ),
+    }
 }
 
 impl TupleShapeObservation<'_> {
@@ -199,13 +289,9 @@ impl<'db> ShapeObserver<'db> {
             }
             Type::Recursive(recursive) => {
                 let definition = recursive.definition(db);
-                let Some(body) = recursive.shape_body(db) else {
-                    return ShapeDependencies {
-                        error: Some(TupleShapeError::NotTuple),
-                        ..ShapeDependencies::default()
-                    };
-                };
-                let body = self.declaration(db, definition, |_| body);
+                let body = self.declaration(db, definition, |db| {
+                    recursive.observation_body(db).unwrap_or(Type::object())
+                });
                 result.error = body.error;
                 for parameter in body.parameters {
                     let mapped = recursive.apply_to_node_structural(db, Type::TypeVar(parameter));
@@ -290,7 +376,9 @@ impl<'db> ShapeObserver<'db> {
                 self.unpack(db, body)
             }
             Type::Recursive(recursive) => {
-                let body = recursive.shape_body(db).ok_or(TupleShapeError::NotTuple)?;
+                let body = recursive
+                    .observation_body(db)
+                    .ok_or(TupleShapeError::NotTuple)?;
                 self.unpack(db, recursive.apply_to_node_structural(db, body))
             }
             Type::NominalInstance(instance) if let Some(tuple) = instance.own_tuple_type() => {
@@ -310,13 +398,16 @@ impl<'db> ShapeObserver<'db> {
     fn tuple(&mut self, db: &'db dyn Db, tuple: TupleType<'db>) -> TupleShapeObservation<'db> {
         let TupleElements::Expression(elements) = tuple.elements(db) else {
             let tuple = tuple.tuple(db).clone();
+            let origins = source_paths(&tuple, None);
             return TupleShapeObservation {
                 tuple,
                 error: None,
                 multiple_variadic_parts: Box::new([]),
+                origins,
             };
         };
         let mut builder = TupleSpecBuilder::with_capacity(elements.len());
+        let mut origins = TupleBuilder::with_capacity(elements.len());
         let mut error = None;
         let mut first_variadic = None;
         let mut multiple_variadic_parts = Vec::new();
@@ -324,21 +415,56 @@ impl<'db> ShapeObserver<'db> {
             match element {
                 TupleElementExpression::Element(ty) => {
                     builder.push(*ty);
+                    origins.push(Some(TupleShapePath {
+                        part: Some(part),
+                        position: None,
+                    }));
                 }
                 TupleElementExpression::Unpack(ty)
                 | TupleElementExpression::UnpackSpecialization(ty)
                 | TupleElementExpression::UnpackRecovery(ty) => {
-                    let unpacked = self.unpack(db, *ty).unwrap_or_else(|invalid| {
-                        if invalid == TupleShapeError::NotTuple
-                            && matches!(element, TupleElementExpression::UnpackSpecialization(_))
-                        {
-                            return TupleType::homogeneous(db, &self.env, *ty).tuple(db).clone();
+                    let (unpacked, unpacked_origins) = match self.unpack(db, *ty) {
+                        Ok(unpacked) => {
+                            let origins =
+                                if matches!(element, TupleElementExpression::UnpackRecovery(_)) {
+                                    VariableLengthTuple::mixed([], None, [])
+                                } else {
+                                    source_paths(&unpacked, Some(part))
+                                };
+                            (unpacked, origins)
                         }
-                        error = error.or(Some(invalid));
-                        // Invalid sequences retain a gradual recovery segment, separately from
-                        // the error that prevents treating their shape as a successful result.
-                        TupleSpec::homogeneous(Type::unknown())
-                    });
+                        Err(TupleShapeError::NotTuple)
+                            if matches!(
+                                element,
+                                TupleElementExpression::UnpackSpecialization(_)
+                            ) =>
+                        {
+                            let unpacked =
+                                TupleType::homogeneous(db, &self.env, *ty).tuple(db).clone();
+                            let origins = if *ty == Type::Never {
+                                Tuple::Fixed(super::FixedLengthTuple::empty())
+                            } else {
+                                VariableLengthTuple::mixed(
+                                    [],
+                                    Some(TupleShapePath {
+                                        part: Some(part),
+                                        position: None,
+                                    }),
+                                    [],
+                                )
+                            };
+                            (unpacked, origins)
+                        }
+                        Err(invalid) => {
+                            error = error.or(Some(invalid));
+                            // Recovery has no source position within an invalid sequence. Following
+                            // that fictitious position would re-enter the same recursive unpack.
+                            (
+                                TupleSpec::homogeneous(Type::unknown()),
+                                VariableLengthTuple::mixed([], None, []),
+                            )
+                        }
+                    };
                     if unpacked.is_variadic()
                         && matches!(
                             element,
@@ -366,6 +492,10 @@ impl<'db> ShapeObserver<'db> {
                         }
                         *left = VariableSegment::Homogeneous(union.build());
                     });
+                    origins = origins.concat_with(&unpacked_origins, |_, variable, _, _| {
+                        // A recovery segment merged from multiple packs has no single source.
+                        *variable = None;
+                    });
                 }
             }
         }
@@ -373,6 +503,71 @@ impl<'db> ShapeObserver<'db> {
             tuple: builder.build(),
             error,
             multiple_variadic_parts: multiple_variadic_parts.into_boxed_slice(),
+            origins: origins.build(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TupleElementExpression, TupleShapePath, TupleShapePosition};
+    use crate::db::tests::setup_db;
+    use crate::types::Type;
+    use crate::types::tuple::TupleType;
+
+    #[test]
+    fn changing_pack_length_preserves_equal_element_occurrences() {
+        let db = setup_db();
+        let env = db.program_environment();
+        for length in [1, 2] {
+            let pack = Type::tuple(TupleType::heterogeneous(
+                &db,
+                &env,
+                std::iter::repeat_n(Type::object(), length),
+            ));
+            let tuple = TupleType::from_element_expressions(
+                &db,
+                &env,
+                vec![
+                    TupleElementExpression::Element(Type::object()),
+                    TupleElementExpression::Unpack(pack),
+                    TupleElementExpression::Element(Type::object()),
+                ],
+            );
+            let head = tuple
+                .observe_element(&db, TupleShapePosition::Element(0))
+                .unwrap();
+            let tail = tuple
+                .observe_element(&db, TupleShapePosition::Element(length + 1))
+                .unwrap();
+            assert_eq!(head.ty, tail.ty);
+            assert_eq!(
+                head.source,
+                TupleShapePath {
+                    part: Some(0),
+                    position: None
+                }
+            );
+            assert_eq!(
+                tail.source,
+                TupleShapePath {
+                    part: Some(2),
+                    position: None
+                }
+            );
+            for index in 0..length {
+                let element = tuple
+                    .observe_element(&db, TupleShapePosition::Element(index + 1))
+                    .unwrap();
+                assert_eq!(element.ty, head.ty);
+                assert_eq!(
+                    element.source,
+                    TupleShapePath {
+                        part: Some(1),
+                        position: Some(TupleShapePosition::Element(index)),
+                    }
+                );
+            }
         }
     }
 }

@@ -43,7 +43,7 @@ use crate::types::{
 use crate::{Db, ProgramEnvironment};
 
 /// The type identity used for recursive checks/transformations.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum TypeIdentity<'db> {
     FunctionLiteral(FunctionLiteral<'db>),
     NewTypeInstance(Definition<'db>),
@@ -1637,6 +1637,51 @@ class RecursivePropertySetter[T](Protocol):
             global_instance_type(&db, &env, "RecursivePropertySetter").recursive_identity(&db),
             Some(TypeIdentity::GrowingProtocol(_))
         );
+    }
+
+    #[test]
+    fn classifies_recursive_method_parameter_scopes() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            r#"
+from __future__ import annotations
+
+from typing import Protocol
+
+class Plain[T](Protocol):
+    def read(self) -> T: ...
+
+class Local[T](Protocol):
+    @staticmethod
+    def identity[U](value: U) -> U: ...
+
+class Stable[T](Protocol):
+    def consume(self, value: Stable[T]) -> None: ...
+
+class Growing[T](Protocol):
+    def child(self) -> Growing[list[T]]: ...
+
+class Receiver[T](Protocol):
+    value: T
+    def child[U](self: Receiver[U]) -> Receiver[list[U]]: ...
+"#,
+        )
+        .unwrap();
+        let env = db.program_environment();
+
+        for name in ["Plain", "Local", "Stable"] {
+            assert_eq!(
+                global_instance_type(&db, &env, name).recursive_identity(&db),
+                None
+            );
+        }
+        for name in ["Growing", "Receiver"] {
+            assert_matches!(
+                global_instance_type(&db, &env, name).recursive_identity(&db),
+                Some(TypeIdentity::GrowingProtocol(_))
+            );
+        }
     }
 
     #[test]

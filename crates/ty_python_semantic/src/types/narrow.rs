@@ -587,6 +587,7 @@ impl<'db> ClassInfoConstraint<'_, 'db> {
         };
 
         match classinfo {
+            Type::Deferred(deferred) => self.generate(db, deferred.try_resolve(db, env)?),
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -878,7 +879,7 @@ fn intersect_narrowing_types<'db>(
                 ))
             })
             .unwrap_or_else(|| IntersectionType::from_two_elements(db, env, subject, target)),
-        (Type::Recursive(recursive), target) => visitor
+        (Type::Recursive(recursive), target) if recursive.is_alias(db) => visitor
             .visit(db, (subject, target), || {
                 recursive
                     .unfold(db, env)
@@ -5533,6 +5534,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::Deferred(deferred) => deferred
+            .try_resolve(db, &deferred.environment(db))
+            .is_some_and(|resolved| is_or_contains_typeddict(db, resolved)),
         Type::RecursiveVar(_) => {
             unreachable!("semantic operation on an unbound recursive variable")
         }

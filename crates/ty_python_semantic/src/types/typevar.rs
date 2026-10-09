@@ -16,10 +16,10 @@ use crate::{
     },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
-        InstanceProjection, IntersectionType, KnownClass, KnownInstanceType, MaterializationKind,
-        Parameter, Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping,
-        TypeVarVariance, UnionBuilder, UnionType, any_over_type,
-        any_over_type_including_alias_arguments, binding_type,
+        InstanceProjection, KnownClass, KnownInstanceType, MaterializationKind, Parameter,
+        Parameters, Specialization, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarVariance,
+        UnionBuilder, UnionType, any_over_type, any_over_type_including_alias_arguments,
+        binding_type,
         cyclic::TypeIdentity,
         definition_expression_type,
         tuple::Tuple,
@@ -250,6 +250,28 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typevar: TypeVarInstance<'db>,
     visitor: &V,
 ) {
+    walk_type_var_domain(db, typevar, visitor);
+    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
+        typevar.default_type(db, visitor.program_environment())
+    } else {
+        match typevar._default(db) {
+            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
+            Some(TypeVarDefaultEvaluation::Lazy) => {
+                visitor.notify_skipped_lazy_type_attributes();
+                None
+            }
+            _ => None,
+        }
+    } {
+        visitor.visit_type(db, default_type);
+    }
+}
+
+pub(super) fn walk_type_var_domain<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typevar: TypeVarInstance<'db>,
+    visitor: &V,
+) {
     if let Some(bound_or_constraints) = if visitor.should_visit_lazy_type_attributes() {
         typevar.bound_or_constraints(db, visitor.program_environment())
     } else {
@@ -268,20 +290,6 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
     } {
         walk_type_var_bounds(db, bound_or_constraints, visitor);
-    }
-    if let Some(default_type) = if visitor.should_visit_lazy_type_attributes() {
-        typevar.default_type(db, visitor.program_environment())
-    } else {
-        match typevar._default(db) {
-            Some(TypeVarDefaultEvaluation::Eager(default_type)) => Some(default_type),
-            Some(TypeVarDefaultEvaluation::Lazy) => {
-                visitor.notify_skipped_lazy_type_attributes();
-                None
-            }
-            _ => None,
-        }
-    } {
-        visitor.visit_type(db, default_type);
     }
 }
 
@@ -356,6 +364,11 @@ impl<'db> TypeVarInstance<'db> {
         } else {
             None
         }
+    }
+
+    /// Whether a bound or constraints are declared, without evaluating their lazy annotations.
+    pub(super) fn has_declared_domain(self, db: &'db dyn Db) -> bool {
+        self._bound_or_constraints(db).is_some()
     }
 
     /// Returns whether this type variable has constraints without evaluating a lazy bound.
@@ -1409,25 +1422,13 @@ impl<'db> BoundTypeVarInstance<'db> {
                     if mapped == Type::TypeVar(self) {
                         mapped
                     } else {
-                        let env = visitor.env;
-                        // Materialization uses a different mapping mode. Reuse of the outer
-                        // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_mapping();
-                        let materialized =
-                            mapped.materialize(db, *materialization_kind, &materialization_visitor);
-
-                        if *materialization_kind == MaterializationKind::Top
-                            && !materialization_visitor.is_equivalent_to_materialization(
-                                db,
-                                mapped,
-                                materialized,
-                            )
-                            && let Some(upper_bound) = self.top_materialized_upper_bound(db)
-                        {
-                            IntersectionType::from_two_elements(db, env, materialized, upper_bound)
-                        } else {
-                            materialized
-                        }
+                        super::DeferredType::materialized_argument(
+                            db,
+                            mapped,
+                            self,
+                            *materialization_kind,
+                            &visitor.for_new_mapping(),
+                        )
                     }
                 })
                 .unwrap_or_else(|| possibly_apply_to_self(specialization)),
@@ -1488,43 +1489,6 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
         }
-    }
-
-    /// Returns the static upper bound used when materializing a gradual type argument.
-    ///
-    /// Constraints are unioned only when materializing an exposed member, where their union is a
-    /// valid conservative upper bound. A bound may recursively refer to its own generic class,
-    /// either directly or through other bounds. Such a bound has no finite static top
-    /// materialization, so recover from its cycle without applying an upper bound.
-    pub(super) fn top_materialized_upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        #[salsa::tracked(
-            returns(copy),
-            cycle_result=|_, _, _| None,
-            heap_size=ruff_memory_usage::heap_size
-        )]
-        fn top_materialized_upper_bound_inner<'db>(
-            db: &'db dyn Db,
-            bound_typevar: BoundTypeVarInstance<'db>,
-        ) -> Option<Type<'db>> {
-            let env =
-                ProgramEnvironment::from_program(bound_typevar.binding_context(db).program(db));
-
-            bound_typevar
-                .typevar(db)
-                .bound_or_constraints(db, &env)
-                .map(|bound_or_constraints| {
-                    // This query observes a usable upper bound rather than constructing a
-                    // deferred application. Complete the outer alias projection while the
-                    // query's cycle handling is active, so aliases cannot conceal recursive
-                    // bounds that require the same materialization again.
-                    bound_or_constraints
-                        .as_type(db, &env)
-                        .top_materialization(db, &env)
-                        .resolve_type_alias(db)
-                })
-        }
-
-        top_materialized_upper_bound_inner(db, self)
     }
 }
 

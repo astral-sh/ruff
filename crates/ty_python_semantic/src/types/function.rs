@@ -1229,7 +1229,10 @@ impl<'db> FunctionType<'db> {
         Some(signature)
     }
 
-    fn updated_implementation_callables(self, db: &'db dyn Db) -> Option<&'db [CallableType<'db>]> {
+    pub(super) fn updated_implementation_callables(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<&'db [CallableType<'db>]> {
         self.updated_signatures(db)
             .as_deref()
             .and_then(|updated| updated.implementation_callables.as_deref())

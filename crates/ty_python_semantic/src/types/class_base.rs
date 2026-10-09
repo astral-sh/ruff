@@ -149,6 +149,9 @@ impl<'db> ClassBase<'db> {
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         match ty {
+            Type::Deferred(deferred) => {
+                Self::try_from_type(db, env, deferred.try_resolve(db, env)?, subclass)
+            }
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

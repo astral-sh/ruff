@@ -9200,6 +9200,80 @@ def update(value: Recursive) -> None:
     value.update({"child": value})
 ```
 
+### Recursive complements in extra items
+
+A read-only extra-item type can exclude another recursive `TypedDict` without making the two
+dictionary types disjoint. Here, an empty dictionary belongs to `Extras` but not to `Required`, so a
+dictionary whose `child` is empty can satisfy both types. A mutable target still requires an
+invariant field type: writing an arbitrary `Extras` through it could violate the complement.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+from ty_extensions import static_assert
+from ty_extensions._internal import is_assignable_to, is_disjoint_from
+
+class Extras(TypedDict, extra_items=ReadOnly["~Required"]): ...
+
+class Required(TypedDict):
+    child: ReadOnly[Extras]
+
+class MutableRequired(TypedDict):
+    child: Extras
+
+class Shared(TypedDict, closed=True):
+    child: Extras & ~Required
+
+type WithoutRequired = ~Required
+
+static_assert(not is_disjoint_from(Extras, Required))
+static_assert(not is_disjoint_from(Required, Extras))
+static_assert(not is_assignable_to(Extras, WithoutRequired))
+
+def check(shared: Shared):
+    extras: Extras = shared  # no diagnostic
+    required: Required = shared  # no diagnostic
+    mutable: MutableRequired = shared  # error: [invalid-assignment]
+    invalid: int = shared["child"]  # error: [invalid-assignment]
+```
+
+### Mutable fields with recursive complements
+
+A mutable target can replace its field with any value of the declared type. The narrower
+intersection in `Shared` therefore prevents assigning it to `Required`, even though every value read
+from its `child` field is an `Extras`.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+class Extras(TypedDict, extra_items=ReadOnly["~Required"]): ...
+
+class Required(TypedDict):
+    child: Extras
+
+class Shared(TypedDict, closed=True):
+    child: Extras & ~Required
+
+def check(shared: Shared):
+    required: Required = shared  # error: [invalid-assignment]
+    child: Extras = shared["child"]  # no diagnostic
+```
+
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

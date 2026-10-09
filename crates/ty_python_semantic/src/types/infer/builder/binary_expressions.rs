@@ -489,6 +489,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::Deferred(deferred), rhs, _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    let resolved = deferred.resolve(db, env);
+                    if resolved == left_ty {
+                        None
+                    } else {
+                        self.infer_binary_expression_type_impl(
+                            node, resolved, rhs, op, visitor, state,
+                        )
+                    }
+                })
+            }
+            (lhs, Type::Deferred(deferred), _) => {
+                visitor.visit(db, (left_ty, op, right_ty), || {
+                    let resolved = deferred.resolve(db, env);
+                    if resolved == right_ty {
+                        None
+                    } else {
+                        self.infer_binary_expression_type_impl(
+                            node, lhs, resolved, op, visitor, state,
+                        )
+                    }
+                })
+            }
             (Type::RecursiveVar(_), _, _) | (_, Type::RecursiveVar(_), _) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }

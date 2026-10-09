@@ -15,7 +15,10 @@ use crate::types::constraints::{
     ConstraintSetStorage, Node, NodeId, SolutionLimits, SolutionValidity, SolutionViolation,
     SolutionViolationKind, UnboundedSolutionLimits,
 };
+use crate::types::projection::{ObservationEdge, ObservedType};
+use crate::types::relation::{RelationContext, TypeVarEvaluation};
 use crate::types::typevar::{TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarSet};
+use crate::types::{ApplyTypeMappingVisitor, MaterializationKind, TypeMapping};
 use crate::types::{BoundTypeVarIdentity, BoundTypeVarInstance, Type, any_over_type};
 use crate::{Db, FxIndexMap, FxIndexSet, ProgramEnvironment};
 
@@ -667,11 +670,12 @@ impl<'db> SolutionWalker<'db> {
     ) -> Option<CandidateTypeVarSolution<'db>> {
         let mut evidence = CandidateTypeVarSolver::default();
         for constraint in constraints {
+            let sources = storage.constraint_sources(constraint).clone();
             let constraint = storage.constraint_data(constraint);
             if constraint.provides_bound_for(db, bound_typevar)
                 && constraint.provenance() == ConstraintProvenance::Evidence
             {
-                evidence.add_constraint(db, bound_typevar, constraint);
+                evidence.add_constraint(db, bound_typevar, constraint, &sources);
             }
         }
         evidence.finish(db, env, storage, bound_typevar)
@@ -683,15 +687,22 @@ impl<'db> SolutionWalker<'db> {
         env: &ProgramEnvironment<'db>,
         storage: &mut ConstraintSetStorage<'db>,
         evidence: &CandidateTypeVarSolution<'db>,
-        constrained_ty: Type<'db>,
+        declared: &DeclaredConstraint<'db>,
     ) -> bool {
-        let constraint_lower = constrained_ty.bottom_materialization(db, env);
-        let constraint_upper = constrained_ty.top_materialization(db, env);
+        let constraint_lower = declared.materialize(db, env, MaterializationKind::Bottom);
+        let constraint_upper = declared.materialize(db, env, MaterializationKind::Top);
         let (when_lower, when_lower_source_order) = match evidence.evidence_lower {
             Some(lower) => storage.load(
                 db,
                 env,
-                &lower.when_assignable_to_owned(db, env, constraint_upper, self.inferable),
+                &storage.relation_context.when_assignable(
+                    db,
+                    env,
+                    evidence.sources.observe(lower),
+                    constraint_upper,
+                    self.inferable,
+                    TypeVarEvaluation::Eager,
+                ),
             ),
             None => (ALWAYS_TRUE, None),
         };
@@ -701,7 +712,14 @@ impl<'db> SolutionWalker<'db> {
                 let (when_upper, when_upper_source_order) = storage.load(
                     db,
                     env,
-                    &constraint_lower.when_assignable_to_owned(db, env, upper, self.inferable),
+                    &storage.relation_context.when_assignable(
+                        db,
+                        env,
+                        constraint_lower.clone(),
+                        evidence.sources.observe(upper),
+                        self.inferable,
+                        TypeVarEvaluation::Eager,
+                    ),
                 );
                 let when = when.and(storage, when_upper);
                 let when_source_order =
@@ -729,11 +747,13 @@ impl<'db> SolutionWalker<'db> {
     ) -> ControlFlow<L::Break, Option<ConstraintFailureEvidence<'db>>> {
         if let Some(lower) = evidence.inference_lower(db, env)
             && constrained.declared_constraints.iter().all(|declared| {
-                let when = lower.when_assignable_to_owned(
+                let when = storage.relation_context.when_assignable(
                     db,
                     env,
-                    declared.constrained_ty.top_materialization(db, env),
+                    evidence.sources.observe(lower),
+                    declared.materialize(db, env, MaterializationKind::Top),
                     self.inferable,
+                    TypeVarEvaluation::Eager,
                 );
                 let (when, source_order) = storage.load(db, env, &when);
                 when.is_never_satisfied(db, env, storage, self.inferable, source_order)
@@ -798,10 +818,14 @@ impl<'db> SolutionWalker<'db> {
                         let mut when = ALWAYS_TRUE;
                         let mut source_order = None;
                         for upper in bounds {
-                            let relation = declared
-                                .constrained_ty
-                                .bottom_materialization(db, env)
-                                .when_assignable_to_owned(db, env, *upper, self.inferable);
+                            let relation = storage.relation_context.when_assignable(
+                                db,
+                                env,
+                                declared.materialize(db, env, MaterializationKind::Bottom),
+                                evidence.sources.observe(*upper),
+                                self.inferable,
+                                TypeVarEvaluation::Eager,
+                            );
                             let (next, next_order) = storage.load(db, env, &relation);
                             when = when.and(storage, next);
                             source_order = storage.ordered_source_order(source_order, next_order);
@@ -974,6 +998,7 @@ impl<'db> SolutionWalker<'db> {
             return ControlFlow::Continue(());
         };
         let has_no_evidence = evidence.evidence_lower.is_none() && !evidence.upper.has_evidence();
+        let relation_context = storage.relation_context.clone();
         let is_preservable_typevar = |ty| {
             let Type::TypeVar(typevar) = ty else {
                 return false;
@@ -983,14 +1008,26 @@ impl<'db> SolutionWalker<'db> {
                     .typevar(db)
                     .constraints(db, env)
                     .is_some_and(|actual_constraints| {
-                        actual_constraints.iter().all(|actual| {
-                            constrained_typevar
-                                .declared_constraints
-                                .iter()
-                                .any(|declared| {
-                                    actual.is_equivalent_to(db, env, declared.constrained_ty)
-                                })
-                        })
+                        actual_constraints
+                            .iter()
+                            .enumerate()
+                            .all(|(index, actual)| {
+                                let parameter = ObservedType::root(Type::TypeVar(typevar));
+                                let observed = parameter
+                                    .project(db, env, ObservationEdge::TypeVarConstraint(index))
+                                    .unwrap_or_else(|| parameter.unchanged_or_unresolved(*actual));
+                                constrained_typevar
+                                    .declared_constraints
+                                    .iter()
+                                    .any(|declared| {
+                                        relation_context.is_equivalent_eager(
+                                            db,
+                                            env,
+                                            observed.clone(),
+                                            declared.observed.clone(),
+                                        )
+                                    })
+                            })
                     })
         };
         let contains_preservable_typevar =
@@ -998,7 +1035,7 @@ impl<'db> SolutionWalker<'db> {
         let has_bare_preservable_typevar_evidence =
             evidence.evidence_lower.is_some_and(is_preservable_typevar)
                 || evidence
-                    .as_single_upper_bound(db, env)
+                    .as_single_upper_bound(db, env, &storage.relation_context)
                     .is_some_and(is_preservable_typevar);
         let has_non_concrete_evidence = has_no_evidence
             || evidence.has_only_non_concrete_evidence == Some(true)
@@ -1009,7 +1046,7 @@ impl<'db> SolutionWalker<'db> {
                 .evidence_lower
                 .is_some_and(contains_preservable_typevar)
                 || evidence
-                    .as_single_upper_bound(db, env)
+                    .as_single_upper_bound(db, env, &storage.relation_context)
                     .is_some_and(contains_preservable_typevar);
 
             let mut potentially_satisfied_constraint_count = 0;
@@ -1079,7 +1116,7 @@ impl<'db> SolutionWalker<'db> {
                                                 env,
                                                 storage,
                                                 &evidence,
-                                                declared_constraint.constrained_ty,
+                                                declared_constraint,
                                             )
                                         {
                                             return ControlFlow::Continue(());
@@ -1155,12 +1192,17 @@ impl<'db> SolutionWalker<'db> {
         // A constraint preferred over every potentially valid alternative will also be preferred
         // over any subset of those alternatives. Try it first so that a successful branch can
         // discard the dominated alternatives before they multiply with later typevars.
-        let preferred =
-            constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
+        let preferred = constrained_typevar.preferred_constraint(
+            db,
+            env,
+            &storage.relation_context,
+            has_lower_bound_evidence,
+            |idx| {
                 constrained_typevar.declared_constraints[idx]
                     .constraints
                     .is_some()
-            });
+            },
+        );
         if let Some(preferred) = preferred
             && self.validate_single_declared_constraint(
                 db,
@@ -1223,10 +1265,13 @@ impl<'db> SolutionWalker<'db> {
 
         // At this point, we know that more than one constraint was satisfied. Check to see if any
         // one of them is preferred over all of the others. If so, we prefer that single solution.
-        let preferred =
-            constrained_typevar.preferred_constraint(db, env, has_lower_bound_evidence, |idx| {
-                constraint_satisfied[idx]
-            });
+        let preferred = constrained_typevar.preferred_constraint(
+            db,
+            env,
+            &storage.relation_context,
+            has_lower_bound_evidence,
+            |idx| constraint_satisfied[idx],
+        );
 
         // If there was a single preferred constraint, remove the solutions from the other
         // constraints. Otherwise keep them all, and let the caller decide how to handle the
@@ -1276,7 +1321,7 @@ impl<'db> SolutionWalker<'db> {
                                 env,
                                 storage,
                                 evidence,
-                                declared_constraint.constrained_ty,
+                                declared_constraint,
                             ) {
                                 return ControlFlow::Continue(());
                             }
@@ -1352,24 +1397,25 @@ impl<'db> SolutionWalker<'db> {
             FxIndexMap::default();
 
         for (constraint, _) in typevars {
+            let sources = storage.constraint_sources(constraint).clone();
             let constraint = storage.constraint_data(constraint);
             match constraint {
                 Constraint::ConcreteLower(lower) => {
                     if lower.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(lower.typevar).or_default();
-                        solver.add_constraint(db, lower.typevar, constraint);
+                        solver.add_constraint(db, lower.typevar, constraint, &sources);
                     }
                 }
                 Constraint::ConcreteUpper(upper) => {
                     if upper.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(upper.typevar).or_default();
-                        solver.add_constraint(db, upper.typevar, constraint);
+                        solver.add_constraint(db, upper.typevar, constraint, &sources);
                     }
                 }
                 Constraint::ConcreteEquivalence(equivalence) => {
                     if equivalence.typevar.is_inferable(db, self.inferable) {
                         let solver = mappings.entry(equivalence.typevar).or_default();
-                        solver.add_constraint(db, equivalence.typevar, constraint);
+                        solver.add_constraint(db, equivalence.typevar, constraint, &sources);
                     }
                 }
                 Constraint::TypeVarRange(bound) => {
@@ -1380,9 +1426,9 @@ impl<'db> SolutionWalker<'db> {
                         || bound.right.is_inferable(db, self.inferable)
                     {
                         let solver = mappings.entry(bound.left).or_default();
-                        solver.add_constraint(db, bound.left, constraint);
+                        solver.add_constraint(db, bound.left, constraint, &sources);
                         let solver = mappings.entry(bound.right).or_default();
-                        solver.add_constraint(db, bound.right, constraint);
+                        solver.add_constraint(db, bound.right, constraint, &sources);
                     }
                 }
                 Constraint::TypeVarEquivalence(bound) => {
@@ -1394,9 +1440,9 @@ impl<'db> SolutionWalker<'db> {
                         || right.is_inferable(db, self.inferable)
                     {
                         let solver = mappings.entry(left).or_default();
-                        solver.add_constraint(db, left, constraint);
+                        solver.add_constraint(db, left, constraint, &sources);
                         let solver = mappings.entry(right).or_default();
-                        solver.add_constraint(db, right, constraint);
+                        solver.add_constraint(db, right, constraint, &sources);
                     }
                 }
             }
@@ -1541,7 +1587,7 @@ impl<'db> SolutionWalker<'db> {
                                 env,
                                 storage,
                                 &evidence,
-                                declared_constraint.constrained_ty,
+                                declared_constraint,
                             ) {
                                 return ControlFlow::Continue(());
                             }
@@ -1638,6 +1684,22 @@ struct Constrained<'db> {
 struct DeclaredConstraint<'db> {
     constraints: ValidationConstraints,
     constrained_ty: Type<'db>,
+    observed: ObservedType<'db>,
+}
+
+impl<'db> DeclaredConstraint<'db> {
+    fn materialize(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        kind: MaterializationKind,
+    ) -> ObservedType<'db> {
+        self.observed.apply_mapping(
+            db,
+            &TypeMapping::Materialize(kind),
+            &ApplyTypeMappingVisitor::new_for_type_construction(env),
+        )
+    }
 }
 
 impl<'db> Validations<'db> {
@@ -1701,6 +1763,7 @@ impl<'db> Validations<'db> {
         }
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn intern_typevar_constraints(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -1709,11 +1772,19 @@ impl<'db> Validations<'db> {
         seen_typevars: &mut Support,
         support: &mut Support,
         constraints: impl Iterator<Item = Result<Constraint<'db>, UnsatisfiableBound>>,
+        observed: &ObservedType<'db>,
     ) -> ValidationConstraints {
         let constraints: ValidationConstraints = constraints
             .map(Result::ok)
             .map(|constraint| {
-                constraint.map(|constraint| storage.intern_constraint(db, env, constraint))
+                constraint.map(|constraint| {
+                    storage.intern_observed_constraint(
+                        db,
+                        env,
+                        constraint,
+                        super::observation::BoundSources::from_observed(observed),
+                    )
+                })
             })
             .collect();
 
@@ -1742,6 +1813,10 @@ impl<'db> Validations<'db> {
         bound: Type<'db>,
     ) {
         self.upper_bounds.entry(bound_typevar).or_insert_with(|| {
+            let parameter = ObservedType::root(Type::TypeVar(bound_typevar));
+            let observed = parameter
+                .project(db, env, ObservationEdge::TypeVarUpperBound)
+                .unwrap_or_else(|| parameter.unchanged_or_unresolved(bound));
             let constraints = Constraint::new_upper_bound(
                 db,
                 env,
@@ -1757,6 +1832,7 @@ impl<'db> Validations<'db> {
                 seen_typevars,
                 &mut self.support,
                 constraints,
+                &observed,
             );
             UpperBound { constraints }
         });
@@ -1777,7 +1853,12 @@ impl<'db> Validations<'db> {
             let validations = declared_constraints
                 .elements(db)
                 .iter()
-                .map(|&constrained_ty| {
+                .enumerate()
+                .map(|(index, &constrained_ty)| {
+                    let parameter = ObservedType::root(Type::TypeVar(bound_typevar));
+                    let observed = parameter
+                        .project(db, env, ObservationEdge::TypeVarConstraint(index))
+                        .unwrap_or_else(|| parameter.unchanged_or_unresolved(constrained_ty));
                     let constraints = Constraint::new_equivalence_bound(
                         db,
                         env,
@@ -1793,10 +1874,12 @@ impl<'db> Validations<'db> {
                         seen_typevars,
                         &mut self.support,
                         constraints,
+                        &observed,
                     );
                     DeclaredConstraint {
                         constraints,
                         constrained_ty,
+                        observed,
                     }
                 })
                 .collect();
@@ -1813,6 +1896,7 @@ impl<'db> Constrained<'db> {
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
         has_lower_bound_evidence: bool,
         is_eligible: impl Fn(usize) -> bool,
     ) -> Option<usize> {
@@ -1830,8 +1914,18 @@ impl<'db> Constrained<'db> {
                 }
 
                 let other = other_constraint.constrained_ty;
-                let candidate_assignable_to_other = candidate.is_assignable_to(db, env, other);
-                let other_assignable_to_candidate = other.is_assignable_to(db, env, candidate);
+                let candidate_assignable_to_other = context.is_assignable_eager(
+                    db,
+                    env,
+                    declared_constraint.observed.clone(),
+                    other_constraint.observed.clone(),
+                );
+                let other_assignable_to_candidate = context.is_assignable_eager(
+                    db,
+                    env,
+                    other_constraint.observed.clone(),
+                    declared_constraint.observed.clone(),
+                );
 
                 // Lower-bound evidence asks for the narrowest compatible declared constraint
                 // above the lower bound. With only upper-bound evidence, ask for the widest

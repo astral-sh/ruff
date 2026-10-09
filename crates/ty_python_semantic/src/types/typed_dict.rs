@@ -27,6 +27,7 @@ use super::{
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::projection::ObservationEdge;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::set_theoretic::TypeNormalization;
 use crate::types::variance::VarianceOrigin;
@@ -621,6 +622,28 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
+    /// Select a child expression from this application's structural schema.
+    ///
+    /// Field names and the extra-item policy identify declaration positions independently of
+    /// their specialized values. These projections substitute types without starting relations.
+    pub(super) fn observation_child(
+        self,
+        db: &'db dyn Db,
+        _env: &ProgramEnvironment<'db>,
+        edge: &ObservationEdge,
+    ) -> Option<Type<'db>> {
+        match edge {
+            ObservationEdge::TypedDictField(name) => {
+                self.items(db).get(name).map(|field| field.declared_ty)
+            }
+            ObservationEdge::TypedDictExtraItems => self
+                .openness(db)
+                .effective_extra_items()
+                .map(|items| items.declared_ty),
+            _ => None,
+        }
+    }
+
     pub(super) fn variance_of_items(
         self,
         db: &'db dyn Db,
@@ -769,9 +792,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             let mut result = self.always();
 
             for (source_item_name, source_item_field) in source_items {
-                let target_ty =
+                let (target_ty, target_edge) =
                     if let Some(target_item_field) = target_items.get(source_item_name.as_str()) {
-                        target_item_field.declared_ty
+                        (
+                            target_item_field.declared_ty,
+                            ObservationEdge::TypedDictField(source_item_name.clone()),
+                        )
                     } else {
                         match target_openness {
                             TypedDictOpenness::ImplicitlyOpen
@@ -784,14 +810,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Closed => {
                                 return self.never();
                             }
-                            TypedDictOpenness::Extra(extra_items) => extra_items.declared_ty,
+                            TypedDictOpenness::Extra(extra_items) => (
+                                extra_items.declared_ty,
+                                ObservationEdge::TypedDictExtraItems,
+                            ),
                         }
                     };
 
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(db, source_item_field.declared_ty, target_ty),
+                    self.check_child_pair_at(
+                        db,
+                        source_item_field.declared_ty,
+                        target_ty,
+                        ObservationEdge::TypedDictField(source_item_name.clone()),
+                        target_edge,
+                    ),
                 );
 
                 if result.is_trivially_never_satisfied() {
@@ -815,10 +850,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     result.intersect(
                         db,
                         self.constraints,
-                        self.check_type_pair(
+                        self.check_child_pair_at(
                             db,
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
+                            ObservationEdge::TypedDictExtraItems,
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
                         ),
                     );
                     if result.is_trivially_never_satisfied() {
@@ -833,10 +870,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(
                             db,
                             self.constraints,
-                            self.check_type_pair(
+                            self.check_child_pair_at(
                                 db,
                                 source_extra_items.declared_ty,
                                 target_extra_items.declared_ty,
+                                ObservationEdge::TypedDictExtraItems,
+                                ObservationEdge::TypedDictExtraItems,
                             ),
                         );
                     }
@@ -892,10 +931,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // self need to have the same assignability/subtyping/etc relation
                     // individually that we're looking for overall between the
                     // `TypedDict`s.
-                    self.check_type_pair(
+                    self.check_child_pair_at(
                         db,
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
+                        ObservationEdge::TypedDictField(target_item_name.clone()),
+                        ObservationEdge::TypedDictField(target_item_name.clone()),
                     )
                 } else {
                     if source_item_field.is_read_only() {
@@ -914,16 +955,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // invariants of self. For fully-static types, this is "equivalence".
                     // For gradual types, it depends on the relation, but mutual
                     // assignability is "consistency".
-                    self.check_type_pair(
+                    self.check_child_pair_at(
                         db,
                         source_item_field.declared_ty,
                         target_item_field.declared_ty,
+                        ObservationEdge::TypedDictField(target_item_name.clone()),
+                        ObservationEdge::TypedDictField(target_item_name.clone()),
                     )
                     .and(db, self.constraints, || {
-                        self.check_type_pair(
+                        self.reversed().check_child_pair_at(
                             db,
                             target_item_field.declared_ty,
                             source_item_field.declared_ty,
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
                         )
                     })
                 }
@@ -934,19 +979,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     // items. Missing mutable fields below require explicit mutable extra items and
                     // a relation in both directions.
                     if let Some(source_item_field) = source_items.get(target_item_name.as_str()) {
-                        self.check_type_pair(
+                        self.check_child_pair_at(
                             db,
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
                         )
                     } else {
                         match source_openness.effective_extra_items() {
                             // A closed source cannot contain this key, so the check succeeds.
                             None => self.always(),
-                            Some(source_extra_items) => self.check_type_pair(
+                            Some(source_extra_items) => self.check_child_pair_at(
                                 db,
                                 source_extra_items.declared_ty,
                                 target_item_field.declared_ty,
+                                ObservationEdge::TypedDictExtraItems,
+                                ObservationEdge::TypedDictField(target_item_name.clone()),
                             ),
                         }
                     }
@@ -980,16 +1029,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                         // As above, for mutable fields in the target, the relation needs
                         // to apply both ways.
-                        self.check_type_pair(
+                        self.check_child_pair_at(
                             db,
                             source_item_field.declared_ty,
                             target_item_field.declared_ty,
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
                         )
                         .and(db, self.constraints, || {
-                            self.check_type_pair(
+                            self.reversed().check_child_pair_at(
                                 db,
                                 target_item_field.declared_ty,
                                 source_item_field.declared_ty,
+                                ObservationEdge::TypedDictField(target_item_name.clone()),
+                                ObservationEdge::TypedDictField(target_item_name.clone()),
                             )
                         })
                     } else {
@@ -1000,16 +1053,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         if source_extra_items.is_read_only() {
                             return self.never();
                         }
-                        self.check_type_pair(
+                        self.check_child_pair_at(
                             db,
                             source_extra_items.declared_ty,
                             target_item_field.declared_ty,
+                            ObservationEdge::TypedDictExtraItems,
+                            ObservationEdge::TypedDictField(target_item_name.clone()),
                         )
                         .and(db, self.constraints, || {
-                            self.check_type_pair(
+                            self.reversed().check_child_pair_at(
                                 db,
                                 target_item_field.declared_ty,
                                 source_extra_items.declared_ty,
+                                ObservationEdge::TypedDictField(target_item_name.clone()),
+                                ObservationEdge::TypedDictExtraItems,
                             )
                         })
                     }
@@ -1055,16 +1112,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(
+                    self.check_child_pair_at(
                         db,
                         source_extra_items.declared_ty,
                         target_extra_items.declared_ty,
+                        ObservationEdge::TypedDictExtraItems,
+                        ObservationEdge::TypedDictExtraItems,
                     )
                     .and(db, self.constraints, || {
-                        self.check_type_pair(
+                        self.reversed().check_child_pair_at(
                             db,
                             target_extra_items.declared_ty,
                             source_extra_items.declared_ty,
+                            ObservationEdge::TypedDictExtraItems,
+                            ObservationEdge::TypedDictExtraItems,
                         )
                     }),
                 );
@@ -1076,16 +1137,20 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(
                             db,
                             self.constraints,
-                            self.check_type_pair(
+                            self.check_child_pair_at(
                                 db,
                                 source_item_field.declared_ty,
                                 target_extra_items.declared_ty,
+                                ObservationEdge::TypedDictField(source_item_name.clone()),
+                                ObservationEdge::TypedDictExtraItems,
                             )
                             .and(db, self.constraints, || {
-                                self.check_type_pair(
+                                self.reversed().check_child_pair_at(
                                     db,
                                     target_extra_items.declared_ty,
                                     source_item_field.declared_ty,
+                                    ObservationEdge::TypedDictExtraItems,
+                                    ObservationEdge::TypedDictField(source_item_name.clone()),
                                 )
                             }),
                         );
@@ -1102,10 +1167,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     result.intersect(
                         db,
                         self.constraints,
-                        self.check_type_pair(
+                        self.check_child_pair_at(
                             db,
                             source_extra_items.declared_ty,
                             target_extra_items.declared_ty,
+                            ObservationEdge::TypedDictExtraItems,
+                            ObservationEdge::TypedDictExtraItems,
                         ),
                     );
                 }
@@ -1114,10 +1181,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         result.intersect(
                             db,
                             self.constraints,
-                            self.check_type_pair(
+                            self.check_child_pair_at(
                                 db,
                                 source_item_field.declared_ty,
                                 target_extra_items.declared_ty,
+                                ObservationEdge::TypedDictField(source_item_name.clone()),
+                                ObservationEdge::TypedDictExtraItems,
                             ),
                         );
                     }
@@ -1233,16 +1302,20 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         self.as_relation_checker(TypeRelation::Assignability),
                         |relation_checker| {
                             relation_checker
-                                .check_type_pair(
+                                .check_child_pair_at(
                                     db,
                                     left_field.declared_ty,
                                     right_field.declared_ty,
+                                    ObservationEdge::TypedDictField(name.clone()),
+                                    ObservationEdge::TypedDictField(name.clone()),
                                 )
                                 .and(db, self.constraints, || {
-                                    relation_checker.check_type_pair(
+                                    relation_checker.reversed().check_child_pair_at(
                                         db,
                                         right_field.declared_ty,
                                         left_field.declared_ty,
+                                        ObservationEdge::TypedDictField(name.clone()),
+                                        ObservationEdge::TypedDictField(name.clone()),
                                     )
                                 })
                         },
@@ -1254,10 +1327,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         db,
                         self.as_relation_checker(TypeRelation::Assignability),
                         |checker| {
-                            checker.check_type_pair(
+                            checker.check_child_pair_at(
                                 db,
                                 left_field.declared_ty,
                                 right_field.declared_ty,
+                                ObservationEdge::TypedDictField(name.clone()),
+                                ObservationEdge::TypedDictField(name.clone()),
                             )
                         },
                     )
@@ -1268,17 +1343,25 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         db,
                         self.as_relation_checker(TypeRelation::Assignability),
                         |checker| {
-                            checker.check_type_pair(
+                            checker.reversed().check_child_pair_at(
                                 db,
                                 right_field.declared_ty,
                                 left_field.declared_ty,
+                                ObservationEdge::TypedDictField(name.clone()),
+                                ObservationEdge::TypedDictField(name.clone()),
                             )
                         },
                     )
                     .negate(db, self.constraints)
                 } else {
                     // Condition 4 above.
-                    self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                    self.check_child_pair_at(
+                        db,
+                        left_field.declared_ty,
+                        right_field.declared_ty,
+                        ObservationEdge::TypedDictField(name.clone()),
+                        ObservationEdge::TypedDictField(name.clone()),
+                    )
                 };
                 if let Some(context) = self.report_context()
                     && result.is_always_satisfied(db, self.env, self.inferable)
@@ -1296,92 +1379,146 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             left_items
                 .iter()
                 .filter(|(name, field)| field.is_required() && !right_items.contains_key(*name))
-                .map(|(_, field)| (field, right.openness(db)))
+                .map(|(name, field)| (name, field, right.openness(db), false))
                 .chain(
                     right_items
                         .iter()
                         .filter(|(name, field)| {
                             field.is_required() && !left_items.contains_key(*name)
                         })
-                        .map(|(_, field)| (field, left.openness(db))),
+                        .map(|(name, field)| (name, field, left.openness(db), true)),
                 )
-                .when_any(db, self.constraints, |(required_field, other_openness)| {
-                    let check_read_only_extra_items = |extra_items_ty| {
-                        if required_field.is_read_only() {
-                            self.check_type_pair(db, required_field.declared_ty, extra_items_ty)
+                .when_any(
+                    db,
+                    self.constraints,
+                    |(name, required_field, other_openness, reversed)| {
+                        let checker = if reversed {
+                            self.reversed()
                         } else {
-                            self.as_relation_checker(TypeRelation::Assignability)
-                                .check_type_pair(db, required_field.declared_ty, extra_items_ty)
-                                .negate(db, self.constraints)
-                        }
-                    };
+                            self.clone()
+                        };
+                        let check_read_only_extra_items = |extra_items_ty| {
+                            if required_field.is_read_only() {
+                                checker.check_child_pair_at(
+                                    db,
+                                    required_field.declared_ty,
+                                    extra_items_ty,
+                                    ObservationEdge::TypedDictField(name.clone()),
+                                    ObservationEdge::TypedDictExtraItems,
+                                )
+                            } else {
+                                self.when_relation_does_not_hold(db, || {
+                                    checker
+                                        .as_relation_checker(TypeRelation::Assignability)
+                                        .check_child_pair_at(
+                                            db,
+                                            required_field.declared_ty,
+                                            extra_items_ty,
+                                            ObservationEdge::TypedDictField(name.clone()),
+                                            ObservationEdge::TypedDictExtraItems,
+                                        )
+                                })
+                            }
+                        };
 
-                    match other_openness {
-                        TypedDictOpenness::Closed => self.always(),
-                        TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
-                            self.always()
+                        match other_openness {
+                            TypedDictOpenness::Closed => self.always(),
+                            TypedDictOpenness::Extra(extra_items)
+                                if !extra_items.is_read_only() =>
+                            {
+                                self.always()
+                            }
+                            TypedDictOpenness::ImplicitlyOpen => {
+                                check_read_only_extra_items(Type::object())
+                            }
+                            TypedDictOpenness::Extra(extra_items) => {
+                                check_read_only_extra_items(extra_items.declared_ty)
+                            }
                         }
-                        TypedDictOpenness::ImplicitlyOpen => {
-                            check_read_only_extra_items(Type::object())
-                        }
-                        TypedDictOpenness::Extra(extra_items) => {
-                            check_read_only_extra_items(extra_items.declared_ty)
-                        }
-                    }
-                })
+                    },
+                )
         });
 
         let unshared_fields_disjoint = required_fields_disjoint.or(db, self.constraints, || {
             left_items
                 .iter()
-                .map(|(name, field)| (name, field, right_items, right.openness(db)))
+                .map(|(name, field)| (name, field, right_items, right.openness(db), false))
                 .chain(
                     right_items
                         .iter()
-                        .map(|(name, field)| (name, field, left_items, left.openness(db))),
+                        .map(|(name, field)| (name, field, left_items, left.openness(db), true)),
                 )
-                .filter_map(|(name, field, other_items, other_openness)| {
+                .filter_map(|(name, field, other_items, other_openness, reversed)| {
                     if field.is_required() || other_items.contains_key(name) {
                         return None;
                     }
                     match other_openness {
-                        TypedDictOpenness::Closed if !field.is_read_only() => Some((field, None)),
+                        TypedDictOpenness::Closed if !field.is_read_only() => {
+                            Some((name, field, None, reversed))
+                        }
                         TypedDictOpenness::Extra(extra_items)
                             if !field.is_read_only() || !extra_items.is_read_only() =>
                         {
-                            Some((field, Some(extra_items)))
+                            Some((name, field, Some(extra_items), reversed))
                         }
                         TypedDictOpenness::ImplicitlyOpen
                         | TypedDictOpenness::Closed
                         | TypedDictOpenness::Extra(_) => None,
                     }
                 })
-                .when_any(db, self.constraints, |(field, extra_items)| {
-                    let Some(extra_items) = extra_items else {
-                        return self.always();
-                    };
-                    let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
-                    if field.is_read_only() {
-                        relation_checker
-                            .check_type_pair(db, extra_items.declared_ty, field.declared_ty)
-                            .negate(db, self.constraints)
-                    } else if extra_items.is_read_only() {
-                        relation_checker
-                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
-                            .negate(db, self.constraints)
-                    } else {
-                        relation_checker
-                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
-                            .and(db, self.constraints, || {
-                                relation_checker.check_type_pair(
+                .when_any(
+                    db,
+                    self.constraints,
+                    |(name, field, extra_items, reversed)| {
+                        let Some(extra_items) = extra_items else {
+                            return self.always();
+                        };
+                        let checker = if reversed {
+                            self.reversed()
+                        } else {
+                            self.clone()
+                        };
+                        let relation_checker =
+                            checker.as_relation_checker(TypeRelation::Assignability);
+                        self.when_relation_does_not_hold(db, || {
+                            if field.is_read_only() {
+                                relation_checker.reversed().check_child_pair_at(
                                     db,
                                     extra_items.declared_ty,
                                     field.declared_ty,
+                                    ObservationEdge::TypedDictExtraItems,
+                                    ObservationEdge::TypedDictField(name.clone()),
                                 )
-                            })
-                            .negate(db, self.constraints)
-                    }
-                })
+                            } else if extra_items.is_read_only() {
+                                relation_checker.check_child_pair_at(
+                                    db,
+                                    field.declared_ty,
+                                    extra_items.declared_ty,
+                                    ObservationEdge::TypedDictField(name.clone()),
+                                    ObservationEdge::TypedDictExtraItems,
+                                )
+                            } else {
+                                relation_checker
+                                    .check_child_pair_at(
+                                        db,
+                                        field.declared_ty,
+                                        extra_items.declared_ty,
+                                        ObservationEdge::TypedDictField(name.clone()),
+                                        ObservationEdge::TypedDictExtraItems,
+                                    )
+                                    .and(db, self.constraints, || {
+                                        relation_checker.reversed().check_child_pair_at(
+                                            db,
+                                            extra_items.declared_ty,
+                                            field.declared_ty,
+                                            ObservationEdge::TypedDictExtraItems,
+                                            ObservationEdge::TypedDictField(name.clone()),
+                                        )
+                                    })
+                            }
+                        })
+                    },
+                )
         });
 
         unshared_fields_disjoint.or(db, self.constraints, || {
@@ -1399,31 +1536,34 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 (TypedDictOpenness::Extra(left_extra), TypedDictOpenness::Extra(right_extra))
                     if !left_extra.is_read_only() && !right_extra.is_read_only() =>
                 {
-                    relation_checker
-                        .check_type_pair(db, left_extra.declared_ty, right_extra.declared_ty)
-                        .and(db, self.constraints, || {
-                            relation_checker.check_type_pair(
-                                db,
-                                right_extra.declared_ty,
-                                left_extra.declared_ty,
-                            )
-                        })
-                        .negate(db, self.constraints)
+                    self.when_relation_does_not_hold(db, || {
+                        relation_checker.check_child_pair_at(db, left_extra.declared_ty, right_extra.declared_ty, ObservationEdge::TypedDictExtraItems, ObservationEdge::TypedDictExtraItems)
+                            .and(db, self.constraints, || {
+                                relation_checker.reversed().check_child_pair_at(db, right_extra.declared_ty, left_extra.declared_ty, ObservationEdge::TypedDictExtraItems, ObservationEdge::TypedDictExtraItems)
+                            })
+                    })
                 }
                 (TypedDictOpenness::Extra(mutable_extra), other)
                 | (other, TypedDictOpenness::Extra(mutable_extra))
                     if !mutable_extra.is_read_only() =>
                 {
+                    let relation_checker = if matches!(left_openness, TypedDictOpenness::Extra(items) if !items.is_read_only()) {
+                        relation_checker
+                    } else {
+                        relation_checker.reversed()
+                    };
                     other.effective_extra_items().map_or_else(
                         || self.always(),
                         |other_extra| {
-                            relation_checker
-                                .check_type_pair(
+                            self.when_relation_does_not_hold(db, || {
+                                relation_checker.check_child_pair_at(
                                     db,
                                     mutable_extra.declared_ty,
                                     other_extra.declared_ty,
+                                    ObservationEdge::TypedDictExtraItems,
+                                    ObservationEdge::TypedDictExtraItems,
                                 )
-                                .negate(db, self.constraints)
+                            })
                         },
                     )
                 }
@@ -1954,6 +2094,9 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
     match ty {
+        Type::Deferred(deferred) => {
+            extract_unpacked_typed_dict_from_value_type(db, env, deferred.try_resolve(db, env)?)
+        }
         Type::Recursive(recursive) => {
             let unfolded = recursive.unfold(db, env).into_unfolded()?;
             extract_unpacked_typed_dict_from_value_type(db, env, unfolded)

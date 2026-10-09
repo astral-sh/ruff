@@ -33,11 +33,11 @@ use crate::types::type_alias::QualifiedTypeAliasName;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
-    PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    CallableType, DeferredType, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind,
+    PropertyInstanceClass, PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -156,6 +156,9 @@ pub struct DisplaySettings<'db> {
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
     /// Alias views can expose the same declaration under changed arguments.
     visited_type_aliases: Rc<FxHashSet<Definition<'db>>>,
+    /// Parameter-domain expressions already being rendered. Their applications can change
+    /// during observation, while their declaration remains the same recursive expression.
+    visited_deferred_types: Rc<FxHashSet<DeferredType<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -983,6 +986,7 @@ impl<'db> TypeAliasType<'db> {
             settings,
         }
     }
+
     /// Observe a completed transformation for display without changing its stored application.
     fn display_view(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let Some(input) = self.display_operation_input(db) else {
@@ -1275,6 +1279,27 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let db = self.db;
         match self.ty {
+            Type::Deferred(deferred) => {
+                let mut settings = self.settings.clone();
+                if !Rc::make_mut(&mut settings.visited_deferred_types)
+                    .insert(deferred.constructor(db))
+                {
+                    f.set_invalid_type_annotation();
+                    return f.with_type(self.ty).write_str("...");
+                }
+                if let Some(resolved) = deferred.try_resolve(db, self.env) {
+                    return resolved
+                        .display_with(db, self.env, settings)
+                        .fmt_detailed(f);
+                }
+                f.set_invalid_type_annotation();
+                f.write_str("<unresolved ")?;
+                deferred
+                    .argument(db)
+                    .display_with(db, self.env, settings)
+                    .fmt_detailed(f)?;
+                f.write_char('>')
+            }
             Type::Dynamic(dynamic) => {
                 if dynamic.is_todo() {
                     f.set_invalid_type_annotation();

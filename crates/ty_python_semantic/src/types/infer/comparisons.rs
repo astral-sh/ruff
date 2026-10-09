@@ -313,6 +313,14 @@ impl<'db> Type<'db> {
             visitor: &UpcastingVisitor<'db>,
         ) -> UpcastResult<'db> {
             match ty {
+                Type::Deferred(deferred) => visit_type(db, ty, visitor, || {
+                    let resolved = deferred.resolve(db, env);
+                    if resolved == ty {
+                        UpcastResult::unstable(ty)
+                    } else {
+                        upcast(db, env, resolved, visitor)
+                    }
+                }),
                 Type::Recursive(recursive) => visit_type(db, ty, visitor, || {
                     recursive
                         .unfold(db, env)

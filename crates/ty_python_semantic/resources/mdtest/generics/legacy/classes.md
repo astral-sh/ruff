@@ -781,6 +781,30 @@ def check(a: A[T], b: B[T]):
         child(1)  # error: [invalid-argument-type]
 ```
 
+## Mutable TypedDict fields with growing alias arguments
+
+Comparing recursively specialized mutable fields preserves their declared types. Reading a field
+retains the next alias application, including its list argument.
+
+```py
+from typing import Any, Generic, TypeVar, TypedDict
+from typing_extensions import TypeAliasType
+
+T = TypeVar("T")
+
+class Field(TypedDict, Generic[T]):
+    child: T
+
+Recursive = TypeAliasType("Recursive", "Field[Recursive[list[T]]]", type_params=(T,))
+
+def check(value: Recursive[int]):
+    same: Recursive[int] = value  # no diagnostic
+    gradual: Recursive[Any] = value  # error: [invalid-assignment]
+    reveal_type(value["child"])  # revealed: Field[Recursive[list[list[int]]]]
+    child: Recursive[list[int]] = value["child"]  # no diagnostic
+    invalid: int = value["child"]  # error: [invalid-assignment]
+```
+
 ## Declared fields and extra-item value types
 
 A known key retains its declared type. Reading an arbitrary key or iterating over values also
@@ -3754,6 +3778,183 @@ def inspect(gradual: Holder[Any], static: Holder[int], value: Any):
     gradual.materialized(value).dynamic = 1  # error: [invalid-assignment]
     gradual.materialized(value).child.value = 1  # no diagnostic
     gradual.materialized(value).child.dynamic = 1  # error: [invalid-assignment]
+```
+
+## Matching recursively specialized method returns
+
+An implementation and a protocol can both wrap their argument at every recursive step. Their methods
+remain compatible for each argument, even though no closed specialization repeats.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+T = TypeVar("T")
+
+class Chain(Protocol[T_co]):
+    def step(self) -> "Chain[list[T_co]]": ...
+
+class Implementation(Generic[T]):
+    def step(self) -> "Implementation[list[T]]":
+        raise NotImplementedError
+
+def as_chain(value: Implementation[int]) -> Chain[int]:
+    return value  # no diagnostic
+```
+
+## Recursive payloads remain visible after specialization
+
+The initial integer payload agrees with the protocol. The next step requires a list payload, so a
+fixed integer payload does not satisfy the recursive contract.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Chain(Protocol[T]):
+    @property
+    def value(self) -> T: ...
+    def step(self) -> "Chain[list[T]]": ...
+
+class FixedPayload(Generic[T]):
+    @property
+    def value(self) -> int:
+        return 0
+    def step(self) -> "FixedPayload[list[T]]":
+        raise NotImplementedError
+
+def incompatible(value: FixedPayload[int]) -> Chain[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Recursive methods apply different argument transformations
+
+Matching the initial payload does not make a set-producing recursive step compatible with a
+list-producing step.
+
+```py
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Chain(Protocol[T]):
+    @property
+    def value(self) -> T: ...
+    def step(self) -> "Chain[list[T]]": ...
+
+class SetChain(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+    def step(self) -> "SetChain[set[T]]":
+        raise NotImplementedError
+
+def incompatible(value: SetChain[int]) -> Chain[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Recursive methods select overloads from their receivers
+
+A receiver-specific overload can agree at the initial specialization and return an incompatible type
+after one recursive step.
+
+```py
+from typing import Any, Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T", covariant=True)
+
+class Chain(Protocol[T]):
+    def step(self) -> "Chain[list[T]]": ...
+
+class Selective(Generic[T]):
+    @overload
+    def step(self: "Selective[int]") -> "Selective[list[int]]": ...
+    @overload
+    def step(self: "Selective[list[int]]") -> int: ...
+    def step(self) -> Any:
+        raise NotImplementedError
+
+def incompatible(value: Selective[int]) -> Chain[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Recursive members use specialization-dependent descriptors
+
+Descriptor overloads can expose different callable types at successive specializations. The first
+callable alone does not establish compatibility with the recursive protocol.
+
+```py
+from typing import Any, Callable, Generic, Protocol, TypeVar, overload
+
+T = TypeVar("T", covariant=True)
+
+class Chain(Protocol[T]):
+    def step(self) -> "Chain[list[T]]": ...
+
+class Descriptor(Generic[T]):
+    @overload
+    def __get__(
+        self: "Descriptor[int]", instance: object, owner: type | None = None
+    ) -> Callable[[], "Implementation[list[int]]"]: ...
+    @overload
+    def __get__(self: "Descriptor[list[int]]", instance: object, owner: type | None = None) -> Callable[[], int]: ...
+    def __get__(self, instance: object, owner: type | None = None) -> Any:
+        raise NotImplementedError
+
+class Implementation(Generic[T]):
+    step: Descriptor[T] = Descriptor()
+
+def incompatible(value: Implementation[int]) -> Chain[int]:
+    return value  # error: [invalid-return-type]
+```
+
+## Recursive parameter domains preserve enclosing bounds
+
+A cycle in an inner type parameter's bound does not erase an enclosing finite bound.
+
+```py
+from typing import Any, Generic, TypeVar
+from ty_extensions import Top
+
+R = TypeVar("R", bound="Recursive[Any]", covariant=True)
+
+class Recursive(Generic[R]): ...
+
+T = TypeVar("T", bound=tuple[Recursive[Any], int], covariant=True)
+
+class Holder(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+def check(value: Top[Holder[Any]]) -> None:
+    reveal_type(value.get())  # revealed: tuple[Recursive[object], int]
+    valid: tuple[object, int] = value.get()  # no diagnostic
+    invalid: str = value.get()  # error: [invalid-assignment]
+```
+
+## Recursive aliases in parameter domains
+
+A recursive alias is a valid bound when its changing arguments do not require recursive parameter
+domains. Materialization preserves the alias's structure and materializes its exposed elements.
+
+```py
+from typing import Any, Generic, TypeVar
+from typing_extensions import TypeAliasType
+from ty_extensions import Top
+
+TreeItem = TypeVar("TreeItem")
+Tree = TypeAliasType("Tree", "tuple[TreeItem, Tree[list[TreeItem]] | None]", type_params=(TreeItem,))
+T = TypeVar("T", bound=Tree[Any], covariant=True)
+
+class Holder(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+def check(value: Top[Holder[Any]]) -> None:
+    reveal_type(value.get())  # revealed: tuple[object, Top[Tree[list[Any]]] | None]
+    valid: tuple[object, object] = value.get()  # no diagnostic
+    invalid: str = value.get()  # error: [invalid-assignment]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

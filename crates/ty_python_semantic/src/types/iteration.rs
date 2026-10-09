@@ -255,6 +255,9 @@ impl<'db> Type<'db> {
             const MAX_TUPLE_LENGTH: usize = 128;
 
             match ty {
+                Type::Deferred(deferred) => {
+                    non_async_special_case(db, env, deferred.try_resolve(db, env)?)
+                }
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }

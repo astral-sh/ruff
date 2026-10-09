@@ -38,12 +38,11 @@ use crate::types::infer::infer_definition_types;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::{Member, inherited_class_body_declaration};
 use crate::types::mro::{Mro, StaticMroError};
+use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, RelationContext, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{Tuple, TupleSpec};
 use crate::types::typevar::TypeVarSet;
 use crate::types::variance::VarianceOrigin;
@@ -1512,19 +1511,14 @@ impl<'db> ClassType<'db> {
         relation: TypeRelation,
     ) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::new(env);
         let checker = TypeRelationChecker::new(
             env,
             relation,
             &constraints,
             TypeVarSet::None,
-            &relation_visitor,
-            &disjointness_visitor,
-            &signature_relation_visitor,
             &materialization_visitor,
+            ObservedTypePair::roots(self.into(), target.into()),
         );
         checker
             .check_class_pair(db, self, target)
@@ -1646,33 +1640,15 @@ impl<'db> ClassType<'db> {
             .find_map(|base| base.as_disjoint_base(db))
     }
 
-    /// Return `true` if this class could exist in the MRO of `other`.
-    fn could_exist_in_mro_of(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> bool {
-        self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                .is_always_satisfied(db, env, TypeVarSet::None)
-        })
-    }
-
-    /// Like [`ClassType::could_exist_in_mro_of`], but reuses an active disjointness checker for
-    /// nested specialization checks so recursive class graphs keep the same cycle guard.
+    /// Check whether this class could occur in the other's MRO within the active proof.
     pub(super) fn could_exist_in_mro_of_with_disjointness_checker<'c>(
         self,
         db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
         other: Self,
         checker: &DisjointnessChecker<'_, 'c, 'db>,
     ) -> bool {
         self.could_exist_in_mro_of_impl(db, other, |this, other| {
-            checker
-                .check_specialization_pair(db, this, other)
-                .is_always_satisfied(db, env, checker.inferable)
+            class_specializations_are_disjoint(db, this, other, checker)
         })
     }
 
@@ -1680,7 +1656,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+        specializations_are_disjoint: impl Fn(GenericAlias<'db>, GenericAlias<'db>) -> bool,
     ) -> bool {
         other
             .iter_mro(db)
@@ -1691,10 +1667,7 @@ impl<'db> ClassType<'db> {
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
                     this_alias.origin(db) == other_alias.origin(db)
-                        && !specializations_are_disjoint(
-                            this_alias.specialization(db),
-                            other_alias.specialization(db),
-                        )
+                        && !specializations_are_disjoint(this_alias, other_alias)
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
@@ -1705,7 +1678,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+        specializations_are_disjoint: impl Fn(GenericAlias<'db>, GenericAlias<'db>) -> bool,
     ) -> bool {
         let other_generic_bases: Vec<_> = other
             .iter_mro(db)
@@ -1719,10 +1692,7 @@ impl<'db> ClassType<'db> {
             .any(|self_alias| {
                 other_generic_bases.iter().any(|other_alias| {
                     self_alias.origin(db) == other_alias.origin(db)
-                        && specializations_are_disjoint(
-                            self_alias.specialization(db),
-                            other_alias.specialization(db),
-                        )
+                        && specializations_are_disjoint(self_alias, *other_alias)
                 })
             })
     }
@@ -1739,21 +1709,15 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
-        self.could_coexist_in_mro_with_impl(
-            db,
+        let visitor = ApplyTypeMappingVisitor::new(env);
+        let checker = DisjointnessChecker::new(
             env,
-            other,
-            None,
-            |this, other| this.could_exist_in_mro_of(db, env, other, constraints),
-            |this, other| {
-                this.is_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, TypeVarSet::None)
-            },
-            |this, other| {
-                this.when_disjoint_from(db, env, other, constraints, TypeVarSet::None)
-                    .is_always_satisfied(db, env, TypeVarSet::None)
-            },
-        )
+            constraints,
+            TypeVarSet::None,
+            &visitor,
+            ObservedTypePair::roots(self.into(), other.into()),
+        );
+        self.could_coexist_in_mro_with_disjointness_checker(db, env, other, &checker)
     }
 
     pub(super) fn could_coexist_in_mro_with_disjointness_checker<'c>(
@@ -1770,17 +1734,38 @@ impl<'db> ClassType<'db> {
             env,
             other,
             checker.report_context(),
-            |this, other| {
-                this.could_exist_in_mro_of_with_disjointness_checker(db, env, other, checker)
+            |this, other, reversed| {
+                let checker = if reversed {
+                    checker.reversed()
+                } else {
+                    checker.clone()
+                };
+                this.could_exist_in_mro_of_with_disjointness_checker(db, other, &checker)
             },
-            |this, other| {
+            |this, other| class_specializations_are_disjoint(db, this, other, checker),
+            |_, _| {
+                let operands = checker.operands();
+                let Some(source) = operands
+                    .source
+                    .project(db, env, ObservationEdge::ClassView)
+                    .and_then(|class| {
+                        class.project(db, env, ObservationEdge::ClassMetaclassInstance)
+                    })
+                else {
+                    return false;
+                };
+                let Some(target) = operands
+                    .target
+                    .project(db, env, ObservationEdge::ClassView)
+                    .and_then(|class| {
+                        class.project(db, env, ObservationEdge::ClassMetaclassInstance)
+                    })
+                else {
+                    return false;
+                };
                 checker
-                    .check_specialization_pair(db, this, other)
-                    .is_always_satisfied(db, env, checker.inferable)
-            },
-            |this, other| {
-                checker
-                    .check_type_pair(db, this, other)
+                    .with_operands(ObservedTypePair::new(source.clone(), target.clone()))
+                    .check_type_pair(db, source.ty, target.ty)
                     .is_always_satisfied(db, env, checker.inferable)
             },
         )
@@ -1793,8 +1778,8 @@ impl<'db> ClassType<'db> {
         env: &ProgramEnvironment<'db>,
         other: Self,
         context: Option<&ErrorContextTree<'db>>,
-        could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
-        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+        could_exist_in_mro_of: impl Fn(Self, Self, bool) -> bool,
+        specializations_are_disjoint: impl Fn(GenericAlias<'db>, GenericAlias<'db>) -> bool,
         types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
     ) -> bool {
         if self == other {
@@ -1802,7 +1787,7 @@ impl<'db> ClassType<'db> {
         }
 
         if self.is_final(db) {
-            let compatible = could_exist_in_mro_of(other, self);
+            let compatible = could_exist_in_mro_of(other, self, true);
             if !compatible && let Some(context) = context {
                 context.push(ErrorContext::FinalClassDisjoint {
                     final_type: Type::instance(db, env, self),
@@ -1813,7 +1798,7 @@ impl<'db> ClassType<'db> {
         }
 
         if other.is_final(db) {
-            let compatible = could_exist_in_mro_of(self, other);
+            let compatible = could_exist_in_mro_of(self, other, false);
             if !compatible && let Some(context) = context {
                 context.push(ErrorContext::FinalClassDisjoint {
                     final_type: Type::instance(db, env, other),
@@ -2397,6 +2382,37 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         receiver: Type<'db>,
     ) -> CallableTypes<'db> {
+        self.into_callable_with_receiver_in_context(
+            db,
+            receiver,
+            &ObservedType::root(receiver),
+            &RelationContext::default(),
+        )
+    }
+
+    /// Observe a constructor within the caller's proof. The cached entrypoint above is reserved
+    /// for independent queries, whose result cannot depend on an enclosing recursive assumption.
+    pub(super) fn into_callable_with_receiver_in_context(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        observed: &ObservedType<'db>,
+        context: &RelationContext<'db>,
+    ) -> CallableTypes<'db> {
+        context
+            .upcast_callable(db, observed, || {
+                Some(self.into_callable_with_receiver_impl(db, receiver, observed, context))
+            })
+            .unwrap_or_else(|| CallableTypes::one(CallableType::bottom(db)))
+    }
+
+    fn into_callable_with_receiver_impl(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        observed: &ObservedType<'db>,
+        context: &RelationContext<'db>,
+    ) -> CallableTypes<'db> {
         let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
@@ -2441,7 +2457,15 @@ impl<'db> ClassType<'db> {
             // `Color("red")`, instead of the overloaded signature of `EnumMeta.__call__` which also accounts
             // for dynamic Enum creation.
             let is_actual_enum = enum_metadata(db, self.class_literal(db)).is_some();
-            if !is_actual_enum && let Some(callables) = ty.try_upcast_to_callable(db, env) {
+            if !is_actual_enum
+                && let Some(callables) = ty.try_upcast_to_callable_in_context(
+                    db,
+                    env,
+                    super::UpcastPolicy::Unsound,
+                    observed.unchanged_or_unresolved(ty),
+                    context.clone(),
+                )
+            {
                 return callables;
             }
         }
@@ -2453,17 +2477,53 @@ impl<'db> ClassType<'db> {
                     .resolve_dunder_new_callable(db, env, place_and_quals.place)
                     .ignore_possibly_undefined()
             })
-            .and_then(|ty| ty.try_upcast_to_callable(db, env));
+            .and_then(|ty| {
+                ty.try_upcast_to_callable_in_context(
+                    db,
+                    env,
+                    super::UpcastPolicy::Unsound,
+                    observed.unchanged_or_unresolved(ty),
+                    context.clone(),
+                )
+            });
 
         let dunder_new_callables = if let Some(callables) = dunder_new_callables {
-            let bound_callables =
-                callables.map(|callable| callable.bind_self(db, env, receiver, instance_type));
+            let bound_callables = callables.map(|callable| {
+                callable.bind_self_in_context(
+                    db,
+                    env,
+                    receiver,
+                    instance_type,
+                    &observed.unchanged_or_unresolved(Type::Callable(callable)),
+                    context,
+                )
+            });
 
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
-            let returns_non_subclass = bound_callables
-                .signatures(db)
-                .any(|signature| !signature.return_ty.is_assignable_to(db, env, instance_type));
+            let returns_non_subclass = bound_callables.iter().any(|callable| {
+                let callable_observed = observed.unchanged_or_unresolved(Type::Callable(*callable));
+                callable
+                    .signatures(db)
+                    .iter()
+                    .enumerate()
+                    .any(|(index, signature)| {
+                        let signature_observed = callable_observed
+                            .callable_overload(db, env, index)
+                            .unwrap_or_else(|| callable_observed.unresolved());
+                        !context.is_assignable_eager(
+                            db,
+                            env,
+                            signature_observed.child_at(
+                                db,
+                                env,
+                                signature.return_ty,
+                                ObservationEdge::CallableReturn { overload: 0 },
+                            ),
+                            observed.unchanged_or_unresolved(instance_type),
+                        )
+                    })
+            });
 
             if returns_non_subclass {
                 return bound_callables;
@@ -2634,6 +2694,35 @@ impl<'db> From<DynamicClassLiteral<'db>> for Type<'db> {
     fn from(class: DynamicClassLiteral<'db>) -> Type<'db> {
         Type::ClassLiteral(class.into())
     }
+}
+
+/// Compare inherited generic arguments through the base occurrences selected from each operand.
+fn class_specializations_are_disjoint<'db>(
+    db: &'db dyn Db,
+    left: GenericAlias<'db>,
+    right: GenericAlias<'db>,
+    checker: &DisjointnessChecker<'_, '_, 'db>,
+) -> bool {
+    let operands = checker.operands();
+    let Some(source) = operands
+        .source
+        .class_base(db, checker.env, left.origin(db).into())
+    else {
+        return false;
+    };
+    let Some(target) = operands
+        .target
+        .class_base(db, checker.env, right.origin(db).into())
+    else {
+        return false;
+    };
+    let (Type::GenericAlias(left), Type::GenericAlias(right)) = (source.ty, target.ty) else {
+        return false;
+    };
+    checker
+        .with_operands(ObservedTypePair::new(source, target))
+        .check_specialization_pair(db, left.specialization(db), right.specialization(db))
+        .is_always_satisfied(db, checker.env, checker.inferable)
 }
 
 impl<'db> From<ClassType<'db>> for Type<'db> {

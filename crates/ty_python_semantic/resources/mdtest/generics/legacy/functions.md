@@ -3168,6 +3168,64 @@ class BoundedSetter(Base):
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
 
+## Growing recursive aliases in generic calls
+
+Inferring a type argument preserves a recursive alias even when following one of its references
+would keep nesting that argument. The `None` alternative provides finite inhabitants of the alias.
+
+```py
+from typing import TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_disjoint_from
+
+T = TypeVar("T")
+U = TypeVar("U")
+Tree = tuple[T, "Tree[Tree[T]] | None"]
+
+def identity(value: U) -> U:
+    return value
+
+def inspect(value: Tree[int]):
+    result = identity(value)
+    reveal_type(result)  # revealed: Tree[int]
+    valid: Tree[int] = result  # no diagnostic
+    invalid: str = result  # error: [invalid-assignment]
+
+finite: Tree[int] = (1, None)  # no diagnostic
+nested: Tree[int] = (1, ((2, None), None))  # no diagnostic
+invalid: Tree[int] = ("wrong", None)  # error: [invalid-assignment]
+
+static_assert(not is_disjoint_from(Tree[int], Tree[int]))
+static_assert(not is_disjoint_from(Tree[int], tuple[int, None]))
+static_assert(not is_disjoint_from(tuple[int, None], Tree[int]))
+```
+
+A substituted argument can equal a type that already occurs in the alias body. Reordering those
+occurrences does not change generic inference.
+
+```py
+First = tuple[T | int, "First[First[T]] | None"]
+Last = tuple[int | T, "Last[Last[T]] | None"]
+
+def reordered(first: First[int], last: Last[int]):
+    reveal_type(identity(first))  # revealed: First[int]
+    reveal_type(identity(last))  # revealed: Last[int]
+```
+
+Comparing two applications also preserves the origins of recursive references inside their unions.
+The covariant assignment currently remains unresolved when both applications keep growing; the
+incompatible first element still rules out `Tree[str]` directly.
+
+```py
+from typing import Any
+
+def compare(value: Tree[int], gradual: Tree[Any]):
+    # TODO: Prove the covariance of this growing recursive application.
+    wider: Tree[object] = value  # error: [invalid-assignment]
+    incompatible: Tree[str] = value  # error: [invalid-assignment]
+    concrete: Tree[int] = gradual  # no diagnostic
+```
+
 ## Complements in growing recursive alias arguments
 
 Specializing a recursive alias preserves the complement in its next argument without expanding that

@@ -1,6 +1,9 @@
 use crate::ProgramEnvironment;
+use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
+use crate::types::relation::RelationContext;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
+use std::rc::Rc;
 
 use crate::{
     Db, FxOrderSet,
@@ -142,7 +145,7 @@ impl<'db> Type<'db> {
             UpcastPolicy::default(),
             &CallableUpcastContext {
                 recursive_definition,
-                ..CallableUpcastContext::default()
+                ..CallableUpcastContext::root(self)
             },
             None,
         )
@@ -158,7 +161,30 @@ impl<'db> Type<'db> {
             db,
             env,
             policy,
-            &CallableUpcastContext::default(),
+            &CallableUpcastContext::root(self),
+            None,
+        )
+    }
+
+    /// Continue callable observation without replacing an active proof or its operand.
+    pub(super) fn try_upcast_to_callable_in_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        policy: UpcastPolicy,
+        observed: ObservedType<'db>,
+        relation: RelationContext<'db>,
+    ) -> Option<CallableTypes<'db>> {
+        self.try_upcast_to_callable_with_policy_and_context(
+            db,
+            env,
+            policy,
+            &CallableUpcastContext {
+                recursive_definition: None,
+                active: Rc::default(),
+                observed,
+                relation,
+            },
             None,
         )
     }
@@ -171,10 +197,14 @@ impl<'db> Type<'db> {
         context: &CallableUpcastContext<'db>,
         receiver: Option<Type<'db>>,
     ) -> Option<CallableTypes<'db>> {
+        let context = CallableUpcastContext {
+            observed: context.observed.unchanged_or_unresolved(self),
+            ..context.clone()
+        };
         context.active.visit(
             &self,
             || None,
-            || self.try_upcast_to_callable_impl(db, env, policy, context, receiver),
+            || self.try_upcast_to_callable_impl(db, env, policy, &context, receiver),
         )
     }
 
@@ -207,10 +237,35 @@ impl<'db> Type<'db> {
                 Signature::dynamic(self),
             ))),
 
-            Type::Recursive(recursive) => recursive
-                .unfold(db, env)
-                .into_unfolded()?
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
+            Type::Recursive(_) | Type::TypeAlias(_) => {
+                context.relation.observe(db, &context.observed, || {
+                    let observed =
+                        context
+                            .observed
+                            .unfold_in_context(db, env, &context.relation)?;
+                    let next = CallableUpcastContext {
+                        observed: observed.clone(),
+                        ..context.clone()
+                    };
+                    observed.ty.try_upcast_to_callable_with_policy_and_context(
+                        db, env, policy, &next, receiver,
+                    )
+                })
+            }
+
+            Type::Deferred(_) => {
+                let observed = context
+                    .observed
+                    .unchanged_or_unresolved(self)
+                    .unfold_in_context(db, env, &context.relation)?;
+                let next = CallableUpcastContext {
+                    observed: observed.clone(),
+                    ..context.clone()
+                };
+                observed.ty.try_upcast_to_callable_with_policy_and_context(
+                    db, env, policy, &next, receiver,
+                )
+            }
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -230,14 +285,24 @@ impl<'db> Type<'db> {
             Type::BoundMethod(bound_method) => bound_method.callables(db).cloned(),
 
             Type::TypeVar(typevar) => match typevar.require_bound_or_constraints(db, env) {
-                TypeVarBoundOrConstraints::UpperBound(bound) => bound
-                    .try_upcast_to_callable_with_policy_and_context(
+                TypeVarBoundOrConstraints::UpperBound(bound) => {
+                    let next = CallableUpcastContext {
+                        observed: context.observed.child_at(
+                            db,
+                            env,
+                            bound,
+                            ObservationEdge::TypeVarUpperBound,
+                        ),
+                        ..context.clone()
+                    };
+                    bound.try_upcast_to_callable_with_policy_and_context(
                         db,
                         env,
                         policy,
-                        context,
+                        &next,
                         Some(receiver.unwrap_or(self)),
-                    ),
+                    )
+                }
                 // TODO: Preserve `Self` while validating the receiver against each constraint.
                 TypeVarBoundOrConstraints::Constraints(_) => None,
             },
@@ -271,10 +336,23 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(class_literal.identity_specialization(db).into_callable(db))
+                let class = class_literal.identity_specialization(db);
+                Some(class.into_callable_with_receiver_in_context(
+                    db,
+                    Type::from(class),
+                    &context.observed,
+                    &context.relation,
+                ))
             }
 
-            Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
+            Type::GenericAlias(alias) => Some(
+                ClassType::Generic(alias).into_callable_with_receiver_in_context(
+                    db,
+                    self,
+                    &context.observed,
+                    &context.relation,
+                ),
+            ),
 
             Type::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
@@ -289,15 +367,32 @@ impl<'db> Type<'db> {
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                SubclassOfInner::Class(class) => {
+                    Some(class.into_callable_with_receiver_in_context(
+                        db,
+                        Type::from(class),
+                        &context.observed,
+                        &context.relation,
+                    ))
+                }
                 SubclassOfInner::Protocol(protocol) => protocol.class_origin(db).map(|origin| {
                     if protocol.materialization_kind(db).is_some() {
                         // The origin supplies the constructor, but the actual receiver retains
                         // `Top[P]` or `Bottom[P]`. Infer with both so instance-returning overloads
                         // are materialized without replacing explicit non-instance returns.
-                        (*origin).into_callable_with_receiver(db, self)
+                        (*origin).into_callable_with_receiver_in_context(
+                            db,
+                            self,
+                            &context.observed,
+                            &context.relation,
+                        )
                     } else {
-                        (*origin).into_callable(db)
+                        (*origin).into_callable_with_receiver_in_context(
+                            db,
+                            Type::from(*origin),
+                            &context.observed,
+                            &context.relation,
+                        )
                     }
                 }),
                 SubclassOfInner::TypeVar(tvar) => {
@@ -348,12 +443,17 @@ impl<'db> Type<'db> {
                 ))),
             },
 
-            Type::Union(union) => {
+            Type::Union(_) => {
                 let mut callables = SmallVec::new();
-                for element in union.elements(db) {
-                    let element_callable = element.try_upcast_to_callable_with_policy_and_context(
-                        db, env, policy, context, receiver,
-                    )?;
+                for element in context.observed.union_children(db, env) {
+                    let next = CallableUpcastContext {
+                        observed: element.clone(),
+                        ..context.clone()
+                    };
+                    let element_callable =
+                        element.ty.try_upcast_to_callable_with_policy_and_context(
+                            db, env, policy, &next, receiver,
+                        )?;
                     callables.extend(element_callable.into_inner());
                 }
                 Some(CallableTypes::new(callables))
@@ -367,10 +467,6 @@ impl<'db> Type<'db> {
                     ),
                 _ => None,
             },
-
-            Type::TypeAlias(alias) => alias
-                .value_type(db)
-                .try_upcast_to_callable_with_policy_and_context(db, env, policy, context, receiver),
 
             Type::KnownBoundMethod(KnownBoundMethodType::DunderCall(callable)) => callable
                 .inner(db)
@@ -440,13 +536,23 @@ impl<'db> Type<'db> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
-    active: ActiveRecursionDetector<Type<'db>>,
+    active: Rc<ActiveRecursionDetector<Type<'db>>>,
+    observed: ObservedType<'db>,
+    relation: RelationContext<'db>,
 }
 
 impl<'db> CallableUpcastContext<'db> {
+    fn root(ty: Type<'db>) -> Self {
+        Self {
+            recursive_definition: None,
+            active: Rc::default(),
+            observed: ObservedType::root(ty),
+            relation: RelationContext::default(),
+        }
+    }
     fn is_recursive_reference(&self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
@@ -916,10 +1022,36 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
+        self.bind_self_in_context(
+            db,
+            env,
+            receiver_type,
+            typing_self_type,
+            &ObservedType::root(Type::Callable(self)),
+            &RelationContext::default(),
+        )
+    }
+
+    /// Bind an eager receiver while retaining the proof that requested its callable view.
+    pub(super) fn bind_self_in_context(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_type: Type<'db>,
+        typing_self_type: Type<'db>,
+        observed: &ObservedType<'db>,
+        context: &RelationContext<'db>,
+    ) -> CallableType<'db> {
         Self::new_internal(
             db,
-            self.signatures(db)
-                .bind_method_receiver(db, env, receiver_type, typing_self_type),
+            self.signatures(db).bind_method_receiver(
+                db,
+                env,
+                receiver_type,
+                typing_self_type,
+                context,
+                observed,
+            ),
             CallableTypeKind::Regular,
             self.deprecated(db),
         )
@@ -1132,7 +1264,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             return self.never();
         }
-        self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+        // Constructor and descriptor upcasts can expose a callable whose slots differ from
+        // the original operand. Keep its dependency while selecting those actual slots.
+        self.with_operands(ObservedTypePair::new(
+            self.operands()
+                .source
+                .unchanged_or_unresolved(Type::Callable(source)),
+            self.operands()
+                .target
+                .unchanged_or_unresolved(Type::Callable(target)),
+        ))
+        .check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
     }
 
     pub(super) fn check_callables_vs_callable(
