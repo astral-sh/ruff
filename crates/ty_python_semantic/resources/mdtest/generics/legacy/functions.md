@@ -2083,6 +2083,32 @@ def forward(value: Pair[U, object], hint: U):
     reveal_type(choose(hint=hint, value=value))  # revealed: U@forward
 ```
 
+## Widening when forwarding a generic union
+
+Forwarding a union to a helper with the same parameter type should preserve the caller's type
+variable. Currently, merging a precise specialization with a broader alternative widens the result,
+causing a false positive in this example reduced from Werkzeug.
+
+TODO: Apply solution-wise return inference from
+[#28303](https://github.com/astral-sh/ruff/pull/28303) so this call is accepted.
+
+```py
+from typing import Generic, TypeVar
+
+V = TypeVar("V")
+
+class Batch(Generic[V]): ...
+
+def first_value(mapping: V | Batch[V]) -> V:
+    raise NotImplementedError
+
+class MultiDict(Generic[V]):
+    def add(self, value: V): ...
+    def extend_values(self, mapping: V | Batch[V]):
+        # error: [invalid-argument-type] "Expected `V@MultiDict`, found `V@MultiDict | Batch[V@MultiDict]`"
+        self.add(first_value(mapping))
+```
+
 ## Unions nested in covariant type arguments
 
 Constraints on a nested union are solved together with constraints from other arguments. The call is
