@@ -29,19 +29,46 @@ use crate::{
 /// A descriptor can accept a different type from the one it returns. Ordinary mutable
 /// attributes use the same type for both operations, making their types invariant.
 struct AttributeContract<'db> {
-    read: Type<'db>,
+    /// An unannotated assignment in this class is checked as an assignment, not
+    /// a new read-type declaration. Inherited values still have readable types.
+    read: Option<Type<'db>>,
     write: Option<Type<'db>>,
+    /// Whether this member establishes read/write type constraints for overrides.
+    ///
+    /// Declared types (including inherited annotations) and descriptors establish such
+    /// constraints. An inferred default does not: its value can still be checked against
+    /// a base's declared read type, but its narrow inferred type does not restrict later
+    /// writes. A descriptor's getter and setter provide the constraints instead of an
+    /// attribute annotation. A read-only descriptor can have this flag set while
+    /// `write` is `None`.
+    ///
+    /// ```python
+    /// class Declared:
+    ///     value: int = 0   # has_type_contract = true
+    ///
+    /// class Same(Declared):
+    ///     value = 1        # true: retains the inherited int annotation
+    ///
+    /// class Number:
+    ///     value = 1        # false: only an inferred default
+    ///
+    /// class Text:
+    ///     value = "text"   # false: only an inferred default
+    ///
+    /// class Compatible(Number, Declared): ...  # 1 is an int; later int writes are fine
+    /// class Incompatible(Text, Declared): ...  # error: "text" is not an int
+    /// ```
+    ///
+    /// In `Compatible`, `Number.value` has a `read` type but no type contract. When
+    /// checking it as an override, compare that read with `Declared.value`; do not treat
+    /// `Literal[1]` as the only permitted write. When a member without a type contract
+    /// is the target, it imposes no declared read/write type on the override. Storage
+    /// (for example, `ClassVar` versus instance storage) is checked independently.
+    has_type_contract: bool,
     is_property: bool,
     is_method: bool,
     is_frozen_field: bool,
     qualifiers: TypeQualifiers,
-}
-
-/// An inferred default has no declared attribute contract, but its value can still
-/// provide a call signature that an overriding method needs to preserve.
-enum MemberContract<'db> {
-    Attribute(AttributeContract<'db>),
-    Inferred(Type<'db>),
 }
 
 /// Selects the declaration that supplies an attribute's override contract.
@@ -110,14 +137,14 @@ fn is_method_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// ```
 ///
 /// With `owner = Base` and a `Child` receiver, the read contract remains `int`.
-fn member_contract<'db>(
+fn attribute_contract<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
     owner: ClassType<'db>,
     receiver: Type<'db>,
     name: &str,
     kind: AttributeContractKind,
-) -> Option<MemberContract<'db>> {
+) -> Option<AttributeContract<'db>> {
     // `object.__class__` is specialized by member lookup, so its synthetic `Self` is
     // not an override contract. Likewise, not every object is hashable or has a
     // writable instance dictionary, despite the broad declarations in typeshed.
@@ -220,12 +247,10 @@ fn member_contract<'db>(
                 .place
                 .ignore_possibly_undefined()
                 .is_some());
-    // Unannotated defaults with an inherited annotation already have a declared type.
-    // Other inferred bindings do not define an independent write contract: their raw
-    // types can retain literals that ordinary attribute access widens.
-    if own_place.origin == TypeOrigin::Inferred && !is_descriptor {
-        return Some(MemberContract::Inferred(own_place.ty));
-    }
+    // Defaults with inherited annotations already have a declared type. Other inferred
+    // bindings still determine storage, but their raw types can retain literals that
+    // ordinary attribute access widens.
+    let has_type_contract = own_place.origin == TypeOrigin::Declared || is_descriptor;
     let (read, write) = if is_descriptor {
         let read = Type::resolve_descriptor_access(
             db,
@@ -274,18 +299,23 @@ fn member_contract<'db>(
             ),
         )
     };
-    Some(MemberContract::Attribute(AttributeContract {
-        read,
+    let check_read = has_type_contract
+        || receiver
+            .nominal_class(db, env)
+            .is_some_and(|receiver_class| receiver_class != owner);
+    Some(AttributeContract {
+        read: check_read.then_some(read),
         write: if is_final || !is_class_var && literal.is_frozen_dataclass(db) == Some(true) {
             None
         } else {
             write
         },
+        has_type_contract,
         is_property,
         is_method,
         is_frozen_field,
         qualifiers,
-    }))
+    })
 }
 
 /// Return the input type accepted by every possible descriptor or instance-storage path.
@@ -373,11 +403,20 @@ fn attribute_violation<'db>(
     {
         return None;
     }
-    if !source.read.is_assignable_to(db, env, target.read) {
+    if !target.has_type_contract {
+        return None;
+    }
+    let (source_read, target_read) = (source.read?, target.read?);
+    if !source_read.is_assignable_to(db, env, target_read) {
         return Some(AttributeViolation::Read {
-            source: source.read,
-            target: target.read,
+            source: source_read,
+            target: target_read,
         });
+    }
+    // Inferring a narrow default does not declare that subsequent writes must have
+    // that same narrow type. Only annotated attributes and descriptors constrain them.
+    if !source.has_type_contract {
+        return None;
     }
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
@@ -549,26 +588,21 @@ pub(super) fn check_override<'db>(
     } else {
         AttributeContractKind::Inherited
     };
-    let Some(MemberContract::Attribute(source)) =
-        member_contract(db, env, class, receiver, name, source_kind)
+    let Some(source) = attribute_contract(db, env, class, receiver, name, source_kind) else {
+        return OverrideCheck::Unavailable;
+    };
+    let Some(target) = attribute_contract(db, env, superclass, receiver, name, inherited_kind)
     else {
         return OverrideCheck::Unavailable;
     };
-    let target = match member_contract(db, env, superclass, receiver, name, inherited_kind) {
-        Some(MemberContract::Attribute(target)) => target,
-        Some(MemberContract::Inferred(target))
-            if source.is_method && target.try_upcast_to_callable(db, env).is_some() =>
-        {
-            return OverrideCheck::Callable;
-        }
-        Some(MemberContract::Inferred(_)) | None => return OverrideCheck::Unavailable,
-    };
-    // Final attributes are exempt from attribute compatibility checks, but finality
-    // and signature compatibility are independent: suppressing a finality diagnostic
-    // must not hide an incompatible method signature.
+    // Inferred callable defaults have no declared type contract, and final attributes
+    // are exempt from attribute compatibility checks. An overriding method must still
+    // preserve their call signature.
     if source.is_method
-        && target.qualifiers.contains(TypeQualifiers::FINAL)
-        && target.read.try_upcast_to_callable(db, env).is_some()
+        && (!target.has_type_contract || target.qualifiers.contains(TypeQualifiers::FINAL))
+        && target
+            .read
+            .is_some_and(|read| read.try_upcast_to_callable(db, env).is_some())
     {
         return OverrideCheck::Callable;
     }
@@ -590,8 +624,8 @@ pub(super) fn check_override<'db>(
         && parent != superclass
     {
         let parent_receiver = Type::instance(db, env, parent);
-        if let Some(MemberContract::Attribute(parent_source)) =
-            member_contract(db, env, parent, parent_receiver, name, inherited_kind)
+        if let Some(parent_source) =
+            attribute_contract(db, env, parent, parent_receiver, name, inherited_kind)
             && parent
                 .iter_mro(db)
                 .skip(1)
@@ -599,11 +633,8 @@ pub(super) fn check_override<'db>(
                 .chain(parent.iter_explicit_ancestors(db, env).skip(1))
                 .filter(|ancestor| ancestor.class_literal(db) == superclass.class_literal(db))
                 .any(|ancestor| {
-                    member_contract(db, env, ancestor, parent_receiver, name, inherited_kind)
+                    attribute_contract(db, env, ancestor, parent_receiver, name, inherited_kind)
                         .is_some_and(|parent_target| {
-                            let MemberContract::Attribute(parent_target) = parent_target else {
-                                return false;
-                            };
                             attribute_violation(
                                 db,
                                 env,
@@ -757,22 +788,20 @@ fn already_inherited<'db>(
             else {
                 return false;
             };
-            let Some(MemberContract::Attribute(inherited)) =
-                member_contract(db, env, owner, child_receiver, name, kind)
+            let Some(inherited) = attribute_contract(db, env, owner, child_receiver, name, kind)
             else {
                 return false;
             };
             if inherited.read != source.read
                 || inherited.write != source.write
+                || inherited.has_type_contract != source.has_type_contract
                 || inherited.is_frozen_field != source.is_frozen_field
                 || inherited.qualifiers != source.qualifiers
             {
                 return false;
             }
             let receiver = Type::instance(db, env, parent);
-            let Some(MemberContract::Attribute(inherited)) =
-                member_contract(db, env, owner, receiver, name, kind)
-            else {
+            let Some(inherited) = attribute_contract(db, env, owner, receiver, name, kind) else {
                 return false;
             };
             parent
@@ -782,8 +811,7 @@ fn already_inherited<'db>(
                 .chain(parent.iter_explicit_ancestors(db, env).skip(1))
                 .filter(|ancestor| ancestor.class_literal(db) == target_owner.class_literal(db))
                 .any(|ancestor| {
-                    let Some(MemberContract::Attribute(target)) =
-                        member_contract(db, env, ancestor, receiver, name, kind)
+                    let Some(target) = attribute_contract(db, env, ancestor, receiver, name, kind)
                     else {
                         return false;
                     };
@@ -827,15 +855,11 @@ pub(super) fn check_inherited_conflict<'db>(
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
     let kind = AttributeContractKind::Inherited;
-    let Some(MemberContract::Attribute(source)) =
-        member_contract(db, env, owner, receiver, name, kind)
-    else {
+    let Some(source) = attribute_contract(db, env, owner, receiver, name, kind) else {
         return;
     };
     for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
-        let Some(MemberContract::Attribute(target)) =
-            member_contract(db, env, target_owner, receiver, name, kind)
-        else {
+        let Some(target) = attribute_contract(db, env, target_owner, receiver, name, kind) else {
             continue;
         };
         let Some(violation) = attribute_violation(
