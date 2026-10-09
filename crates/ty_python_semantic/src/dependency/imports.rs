@@ -116,16 +116,17 @@ impl<'db> ImportCollector<'db> {
             for definition in definitions {
                 // Follow the same attribute-versus-submodule decision as import inference.
                 // A value re-exported from another distribution does not directly import it.
-                for ty in infer_definition_types(db, *definition).declaration_types() {
-                    if let Type::ModuleLiteral(literal) = ty.inner_type()
-                        && let child = literal.module(db)
-                        && let child_name = child.name(db)
-                        && child_name.parent().as_ref() == Some(parent.name(db))
-                        && child_name.components().next_back() == Some(alias.name.as_str())
-                    {
-                        self.modules.insert(child);
-                        found_child = true;
-                    }
+                if let Some(declaration) = infer_definition_types(db, *definition)
+                    .inferred_declaration(*definition)
+                    .declared()
+                    && let Type::ModuleLiteral(literal) = declaration.inner_type()
+                    && let child = literal.module(db)
+                    && let child_name = child.name(db)
+                    && child_name.parent().as_ref() == Some(parent.name(db))
+                    && child_name.components().next_back() == Some(alias.name.as_str())
+                {
+                    self.modules.insert(child);
+                    found_child = true;
                 }
             }
             if !found_child {

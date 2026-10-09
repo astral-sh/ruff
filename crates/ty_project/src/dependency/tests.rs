@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use anyhow::Context;
-use compact_str::CompactString;
+use char_str::CharStr;
 use ruff_db::Db as _;
 use ruff_db::diagnostic::{Diagnostic, Severity, UnifiedFile};
 use ruff_db::files::{File, system_path_to_file};
@@ -33,7 +33,7 @@ fn database_with_options(
 ) -> anyhow::Result<TestDb> {
     let root = SystemPathBuf::from("/project");
     let mut metadata = ProjectMetadata::new("app", root.clone());
-    metadata.apply_override_options(Options::from_toml_str(options, source)?);
+    metadata.set_override_options(Options::from_toml_str(options, source)?);
     let mut db = TestDb::new(metadata);
     for module in modules {
         db.write_file(format!("/site-packages/{module}.py"), "")?;
@@ -58,11 +58,11 @@ fn metadata(
     for (path, kind, dependencies) in projects {
         let mut ids = BTreeSet::new();
         for name in *dependencies {
-            let id = CompactString::from(format!("distribution:{name}"));
+            let id = CharStr::from(format!("distribution:{name}"));
             distributions.insert(
                 id.clone(),
                 DependencyDistribution {
-                    name: CompactString::new(name),
+                    name: CharStr::from(*name),
                     editable_path: None,
                 },
             );
@@ -200,7 +200,7 @@ fn stub_only_dependencies_without_module_ownership_are_skipped() -> anyhow::Resu
     metadata.module_owners.clear();
     metadata.module_owners.insert(
         ModuleName::new("shared_lib").context("valid module name")?,
-        vec![CompactString::new("distribution:shared-lib")].into_boxed_slice(),
+        vec![CharStr::from("distribution:shared-lib")].into_boxed_slice(),
     );
     assert!(project_diagnostics(&db, &metadata).is_empty());
 
@@ -237,7 +237,7 @@ fn namespace_import_credits_all_owners_but_child_import_is_specific() -> anyhow:
             ModuleName::new(module).context("valid module name")?,
             owners
                 .iter()
-                .map(|name| CompactString::from(format!("distribution:{name}")))
+                .map(|name| CharStr::from(format!("distribution:{name}")))
                 .collect(),
         );
     }
@@ -271,7 +271,7 @@ fn runtime_and_optional_declarations_exclude_groups_and_markers() -> anyhow::Res
     member.dependencies.remove("distribution:dev-tool");
     member
         .group_dependencies
-        .insert(CompactString::new("distribution:dev-tool"));
+        .insert(CharStr::from("distribution:dev-tool"));
     let diagnostics = project_diagnostics(&db, &metadata);
     assert_eq!(
         declarations(&db, &diagnostics)?,

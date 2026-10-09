@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use compact_str::CompactString;
+use char_str::CharStr;
 use pep508_rs::PackageName;
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, system_path_to_file};
@@ -32,7 +32,7 @@ use declarations::{DependencyDeclaration, declarations};
 /// diagnostics.
 pub(crate) fn project_dependency_diagnostics(db: &dyn Db) -> &[Diagnostic] {
     let project = db.project();
-    if project.metadata(db).uv_workspace().is_none() {
+    if project.metadata(db).uv_workspace_metadata().is_none() {
         return &[];
     }
     check_project_dependencies(db, project)
@@ -201,7 +201,7 @@ fn used_dependencies<'db>(
     metadata: &DependencyMetadata,
     files: impl IntoIterator<Item = ProgramFile<'db>>,
     member: Option<&DependencyProject>,
-) -> Option<BTreeSet<CompactString>> {
+) -> Option<BTreeSet<CharStr>> {
     let mut pending: Vec<_> = files.into_iter().collect();
     let mut visited = FxHashSet::default();
     let mut used = BTreeSet::new();
@@ -267,7 +267,7 @@ fn unused_declarations<'a>(
     metadata: &'a DependencyMetadata,
     project: &'a DependencyProject,
     declarations: &'a [DependencyDeclaration],
-    used: &'a BTreeSet<CompactString>,
+    used: &'a BTreeSet<CharStr>,
     file: File,
     severity: Severity,
 ) -> impl Iterator<Item = Diagnostic> + 'a {

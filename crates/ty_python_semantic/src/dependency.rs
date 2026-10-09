@@ -184,11 +184,11 @@ impl DependencyMetadata {
         db: &dyn Db,
         file: ProgramFile<'_>,
         imports: &ImportedModules<'_>,
-        used: &mut BTreeSet<CompactString>,
+        used: &mut BTreeSet<CharStr>,
     ) {
         for module in imports.modules.iter().copied() {
             self.record_module_owners(db, module, used);
-            if let Some(runtime) = resolve_real_module(
+            if let Some(runtime) = resolve_real_shadowable_module(
                 db,
                 ImportingFile::File(file.file(db), file.resolver_environment(db)),
                 module.name(db),
@@ -204,14 +204,9 @@ impl DependencyMetadata {
         }
     }
 
-    fn record_module_owners(
-        &self,
-        db: &dyn Db,
-        module: Module<'_>,
-        used: &mut BTreeSet<CompactString>,
-    ) {
+    fn record_module_owners(&self, db: &dyn Db, module: Module<'_>, used: &mut BTreeSet<CharStr>) {
         if let Some(owner) = self.owner(db, module) {
-            used.insert(owner.clone());
+            used.insert(CharStr::from(owner));
             return;
         }
 
@@ -225,7 +220,7 @@ impl DependencyMetadata {
         }
     }
 
-    fn record_named_module_owners(&self, name: &ModuleName, used: &mut BTreeSet<CompactString>) {
+    fn record_named_module_owners(&self, name: &ModuleName, used: &mut BTreeSet<CharStr>) {
         if let Some(owners) = name
             .ancestors()
             .find_map(|name| self.module_owners.get(&name))

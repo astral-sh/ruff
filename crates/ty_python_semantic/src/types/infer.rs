@@ -1869,12 +1869,6 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations(owner)
     }
 
-    pub(crate) fn declaration_types(
-        &self,
-    ) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.types.declaration_types()
-    }
-
     fn fallback_type(&self) -> Option<Type<'db>> {
         match self.extra.as_deref() {
             Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
