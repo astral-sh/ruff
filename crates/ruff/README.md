@@ -10,7 +10,7 @@ See the [documentation](https://docs.astral.sh/ruff/) or
 This crate is the entry point to the Ruff command-line interface. The Rust API exposed here is not
 considered public interface.
 
-This is version 0.16.10. The source can be found [here](https://github.com/astral-sh/ruff/blob/0.16.10/crates/ruff).
+This is version 0.17.0. The source can be found [here](https://github.com/astral-sh/ruff/blob/0.17.0/crates/ruff).
 
 The following Ruff workspace members are also available:
 
@@ -43,6 +43,8 @@ The following Ruff workspace members are also available:
 - [ruff_server](https://crates.io/crates/ruff_server)
 - [ruff_source_file](https://crates.io/crates/ruff_source_file)
 - [ruff_text_size](https://crates.io/crates/ruff_text_size)
+- [ruff_unicode_names2](https://crates.io/crates/ruff_unicode_names2)
+- [ruff_unicode_names2_generator](https://crates.io/crates/ruff_unicode_names2_generator)
 - [ruff_wasm](https://crates.io/crates/ruff_wasm)
 - [ruff_workspace](https://crates.io/crates/ruff_workspace)
 - [ty_combine](https://crates.io/crates/ty_combine)
