@@ -2981,6 +2981,49 @@ class InstanceOptions(InstanceFlow): ...
 class InstanceCombined(InstanceOptions, InstanceFirmware): ...  # no diagnostic
 ```
 
+An initializer in the class body establishes the same contract. Assignments in subclasses still use
+that annotation, even when the defining class never assigns the attribute on `self`.
+
+```py
+class DefaultFlow:
+    context: Context = {}
+
+class DefaultFirmware(DefaultFlow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class DefaultOptions(DefaultFlow): ...
+class DefaultCombined(DefaultOptions, DefaultFirmware): ...  # no diagnostic
+class DefaultIncompatible(DefaultFirmware, NeedsSource): ...  # error: [invalid-attribute-override]
+
+class BadFirmware(DefaultFlow):
+    def __init__(self) -> None:
+        self.context = {"source": 0}  # error: [invalid-assignment]
+```
+
+A base's unannotated default is different: it cannot hide an incompatible value assigned in a
+method. Nor can an inferred assignment take its type from an unrelated base added later.
+
+```py
+class Default:
+    count = 0
+
+class SetsText(Default):
+    def __init__(self) -> None:
+        self.count = "unknown"  # error: [invalid-assignment]
+
+class NeedsInt:
+    count: int
+
+class WrongDefault(SetsText, NeedsInt): ...  # error: [invalid-attribute-override]
+
+class Unrelated:
+    def __init__(self) -> None:
+        self.context = {}
+
+class NotAFlow(Unrelated, NeedsSource): ...  # error: [invalid-attribute-override]
+```
+
 ## Mutable attribute narrowing
 
 When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
@@ -3041,6 +3084,57 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
    |
  3 |     def value(self) -> int: ...
    |         ----- `Base.value` declared here
+```
+
+## Assignments to inherited properties
+
+Assigning to a writable property calls its setter. The assignment does not turn the property into an
+instance attribute, even when methods in both a base and a subclass assign to it. Further overrides
+preserve the property's getter and setter types.
+
+```py
+class Base:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int | str) -> None:
+        pass
+
+    def set_value(self, value: int) -> None:
+        self.value = value
+
+class Middle(Base):
+    def reset(self) -> None:
+        self.value = 0
+
+class Compatible(Middle):
+    @property
+    def value(self) -> int:  # no diagnostic
+        return super().value
+
+    @value.setter
+    def value(self, value: int | str) -> None:
+        pass
+
+class Incompatible(Middle):
+    @property
+    def value(self) -> str:
+        return ""
+
+    @value.setter
+    def value(self, value: int | str) -> None:  # error: [invalid-property-type-override]
+        pass
+
+class NarrowSetter(Middle):
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None:  # error: [invalid-property-type-override]
+        pass
 ```
 
 ## Methods and attributes with the same name
