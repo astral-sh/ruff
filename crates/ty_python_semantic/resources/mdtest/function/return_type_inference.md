@@ -2,7 +2,7 @@
 
 ```toml
 [environment]
-python-version = "3.12"  # I like using modern syntax
+python-version = "3.14"  # I like using modern syntax
 ```
 
 ## Basic
@@ -110,6 +110,18 @@ def returns_int_or_none_2(flag: bool):
 # TODO: should be `Literal[1] | None`
 reveal_type(returns_int_or_none_1(True))  # revealed: Unknown
 reveal_type(returns_int_or_none_2(True))  # revealed: Unknown
+```
+
+Return type inference takes narrowed types into account, so this function can only return `str`:
+
+```py
+def to_str(x: int | str):
+    if isinstance(x, int):
+        return str(x)
+    return x
+
+# TODO: should be `str`
+reveal_type(to_str(1))  # revealed: Unknown
 ```
 
 ## Functions with non-trivial control flow
@@ -369,9 +381,19 @@ def _(x: int):
 
 ## Asynchronous functions
 
-To do
+For async functions, the inferred return type will be wrapped in `CoroutineType`:
+
+```py
+async def async_func():
+    return 1
+
+# TODO: should be `def async_func() -> CoroutineType[Any, Any, Literal[1]]`
+reveal_type(async_func)  # revealed: def async_func() -> CoroutineType[Any, Any, Unknown]
+```
 
 ## Methods
+
+### Overrides
 
 Methods on classes need special treatment for return type inference, since they can be overridden on
 a subclass. To illustrate, consider the following example:
@@ -413,10 +435,78 @@ def _(base: BaseNA, derived: DerivedNA):
     reveal_type(derived.method())  # revealed: Unknown
 ```
 
-To do:
+### Methods that return `None` or `Never`
 
-- methods returning `None` or `Never` and whether or not they need extra-special treatment.
-- methods returning `self` or `cls`?
+If a method returns `None` (explicitly or implicitly), or always raises, it seems particularly
+important to widen the return type to `None | Unknown` and `Unknown`, respectively, since those
+might just be base class implementations which are meant to be specialized in subclasses.
+
+```py
+class Task:
+    def compute(self):
+        return None
+
+class IntTask(Task):
+    def compute(self):
+        return 1
+
+class Job:
+    def run(self):
+        raise NotImplementedError
+
+class IntJob(Job):
+    def run(self):
+        return 1
+
+def _(task: Task, job: Job):
+    # TODO: Should be `None | Unknown`
+    reveal_type(task.compute())  # revealed: Unknown
+    reveal_type(job.run())  # revealed: Unknown
+```
+
+### Methods returning `self`
+
+A method that returns `self` should have its return type inferred as `Self`, so that sublasses get
+the return type specialized accordingly:
+
+```py
+class Fluent:
+    def set_value(self, value: int):
+        self.value = value
+        return self
+
+Fluent().set_value(1).set_value(2)
+
+# TODO: Should be `Fluent`
+reveal_type(Fluent().set_value(1))  # revealed: Unknown
+
+class FluentSub(Fluent): ...
+
+FluentSub().set_value(1).set_value(2)
+
+# TODO: Should be `FluentSub`
+reveal_type(FluentSub().set_value(1))  # revealed: Unknown
+```
+
+This also works the type of `self` has widened or narrowed:
+
+```py
+class WidenedReceiver:
+    def method(self: object):
+        return self
+
+class NarrowedReceiver:
+    def method(self: NarrowedReceiverSub):
+        return self
+
+class NarrowedReceiverSub(NarrowedReceiver): ...
+
+# TODO: Should be `def method(self: object) -> object`
+reveal_type(WidenedReceiver.method)  # revealed: def method(self: object) -> Unknown
+
+# TODO: Should be `def method(self: NarrowedReceiverSub) -> NarrowedReceiverSub`
+reveal_type(NarrowedReceiver.method)  # revealed: def method(self: NarrowedReceiverSub) -> Unknown
+```
 
 ## Recursive functions
 
