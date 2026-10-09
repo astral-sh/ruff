@@ -107,10 +107,13 @@ fn attribute_contract<'db>(
         return None;
     }
     let class_member = owner.own_class_member(db, env, None, name).inner;
+    let instance_member = owner.own_instance_member(db, env, name).inner;
     let instance_member = if matches!(
         class_member.place.ignore_possibly_undefined(),
         Some(Type::SlotDescriptor(_))
-    ) {
+    ) || class_member.place.is_undefined()
+        && matches!(instance_member.place, Place::Defined(place) if place.origin == TypeOrigin::Inferred)
+    {
         // A slot provides storage without replacing an inherited annotation:
         //
         // ```python
@@ -128,10 +131,12 @@ fn attribute_contract<'db>(
         // ```
         //
         // For `owner = Slotted`, looking only at its own assignments would infer `Unknown`
-        // for `value`. Full instance lookup preserves the inherited `int` annotation.
+        // for `value`. The same applies to other unannotated instance assignments. Full lookup
+        // on the owner preserves annotations inherited by that owner. Looking on the receiver
+        // instead would pick up declarations from unrelated bases and hide real conflicts.
         owner.instance_member(db, env, name)
     } else {
-        owner.own_instance_member(db, env, name).inner
+        instance_member
     };
     let own_place = match (class_member.place, instance_member.place) {
         (Place::Defined(place), _) | (_, Place::Defined(place)) => place,

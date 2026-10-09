@@ -2929,6 +2929,58 @@ class Compatible(Number, Declared): ...  # no diagnostic
 class Incompatible(Text, Declared): ...  # error: [invalid-attribute-override]
 ```
 
+## Inferred instance assignments keep inherited declarations
+
+An unannotated instance assignment is checked against an annotation in its own base classes. It does
+not introduce a new type in a later subclass. In particular, a valid TypedDict initializer must not
+be rechecked as an ordinary `dict`.
+
+```py
+from typing import TypedDict
+
+class Context(TypedDict, total=False):
+    source: str
+
+class Flow:
+    context: Context
+
+class Firmware(Flow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class Options(Flow): ...
+class Combined(Options, Firmware): ...  # no diagnostic
+
+reveal_type(Combined().context)  # revealed: Context
+```
+
+The inherited declaration must still be compared with a different base's more restrictive contract.
+
+```py
+class RequiredContext(TypedDict):
+    source: str
+
+class NeedsSource:
+    context: RequiredContext
+
+class Incompatible(Firmware, NeedsSource): ...  # error: [invalid-attribute-override]
+```
+
+The same applies if the inherited annotation is on an instance rather than in the class body.
+
+```py
+class InstanceFlow:
+    def __init__(self) -> None:
+        self.context: Context = {}
+
+class InstanceFirmware(InstanceFlow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class InstanceOptions(InstanceFlow): ...
+class InstanceCombined(InstanceOptions, InstanceFirmware): ...  # no diagnostic
+```
+
 ## Mutable attribute narrowing
 
 When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
