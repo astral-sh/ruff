@@ -1086,6 +1086,9 @@ struct ScopeInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// The union of reachable returns and implicit fallthrough in a function body.
+    return_type: Option<Type<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -1093,6 +1096,7 @@ impl<'db> ScopeInference<'db> {
         Self {
             extra: Some(Box::new(ScopeInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
+                return_type: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenValueMap::default(),
@@ -1122,6 +1126,10 @@ impl<'db> ScopeInference<'db> {
         }
 
         if let Some(extra) = self.extra.as_deref_mut() {
+            if let Some(return_type) = &mut extra.return_type {
+                *return_type =
+                    return_type.cycle_normalized(db, env, previous_inference.return_type(), cycle);
+            }
             normalize_collection_use_constraints(
                 db,
                 env,
@@ -1131,6 +1139,13 @@ impl<'db> ScopeInference<'db> {
         }
 
         self
+    }
+
+    pub(super) fn return_type(&self) -> Type<'db> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.return_type)
+            .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn diagnostics(&self) -> Option<&TypeCheckDiagnostics> {

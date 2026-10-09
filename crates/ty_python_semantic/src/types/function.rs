@@ -64,21 +64,27 @@ use ty_module_resolver::{KnownModule, file_to_module};
 
 use crate::place::{DefinedPlace, Definedness, Place, place_from_bindings};
 use crate::types::callable::CallableTypeKind;
+use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
 use crate::types::cyclic::ActiveRecursionDetector;
 
 use crate::types::generics::{GenericContext, typing_self};
-use crate::types::infer::{infer_definition_types, nearest_enclosing_class, original_class_type};
+use crate::types::infer::{
+    infer_complete_scope_types, infer_definition_types, nearest_enclosing_class,
+    original_class_type,
+};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::relation::TypeRelationChecker;
-use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, ReturnCallableTypeVarScope, Signature,
+};
 use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, SubclassOfInner,
-    SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
+    CallableType, ClassType, FindLegacyTypeVarsVisitor, KnownClass, MemberLookupPolicy,
+    SubclassOfInner, SubclassOfType, Type, TypeContext, TypeMapping, UnionType, binding_type,
     definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
@@ -688,6 +694,7 @@ impl<'db> OverloadLiteral<'db> {
             //     or in its return type. If it does, then we really do need specialization
             //     inference at each call site to see which specific instance type should be
             //     used in those other parameters / return type.
+            //     An unannotated return can also acquire `Self` from the function body.
             //
             //   - The class cannot be generic. If it is, then we might need an actual `Self`
             //     typevar to help carry through constraints that relate the instance type to
@@ -696,7 +703,12 @@ impl<'db> OverloadLiteral<'db> {
             //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
             //     and so we need specialization inference to determine the "real" class that the
             //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
-            if method_has_explicit_self || class_is_generic || class_is_fallback {
+            if method_has_explicit_self
+                || class_is_generic
+                || class_is_fallback
+                || (function_stmt_node.returns.is_none()
+                    && !matches!(self.name(db).as_str(), "__new__" | "__init__"))
+            {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
                 let index = semantic_index(db, scope_id.program_file(db));
@@ -1620,6 +1632,162 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn signature(self, db: &'db dyn Db) -> &'db CallableSignature<'db> {
         self.updated_signature(db)
             .unwrap_or_else(|| self.literal_signature(db))
+    }
+
+    /// Use body inference when calling an unannotated function. Keeping this separate from
+    /// `signature` avoids making every reference to a function depend on its body.
+    pub(super) fn call_signature(self, db: &'db dyn Db) -> Cow<'db, CallableSignature<'db>> {
+        let signature = self.signature(db);
+        let [overload] = signature.overloads.as_slice() else {
+            return Cow::Borrowed(signature);
+        };
+        if !overload.return_ty.is_unknown()
+            || self.file(db).is_stub(db)
+            || self.has_explicit_return_annotation(db)
+            || !self.overloads_and_implementation(db).0.is_empty()
+            || matches!(self.name(db).as_str(), "__new__" | "__init__")
+        {
+            return Cow::Borrowed(signature);
+        }
+        let mut overload = overload.clone();
+        overload.return_ty = self.inferred_return_type(db);
+        Cow::Owned(CallableSignature::single(overload))
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, function: FunctionType<'db>| {
+            let env = ProgramEnvironment::from_scope(function.literal(db).last_definition.body_scope(db));
+            result.cycle_normalized(db, &env, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition.body_scope(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        let index = semantic_index(db, scope.program_file(db));
+        let module = parsed_module(db, self.python_file(db)).load(db);
+        let Some(function) = scope.node(db).as_function() else {
+            return Type::unknown();
+        };
+        if function.node(&module).is_async || scope.file_scope_id(db).is_generator_function(index) {
+            return Type::unknown();
+        }
+
+        let mut inferred = infer_complete_scope_types(db, scope)
+            .return_type()
+            .apply_type_mapping(
+                db,
+                &env,
+                &TypeMapping::ExportInferredReturn(scope),
+                TypeContext::default(),
+            );
+        let Some(class_definition) = index.class_definition_of_method(scope.file_scope_id(db))
+        else {
+            return inferred;
+        };
+        let class = original_class_type(db, class_definition);
+        if self.name(db) == "__call__"
+            && class.is_some_and(|class| {
+                class.iter_mro(db).any(|base| {
+                    base.into_class()
+                        .is_some_and(|base| base.class_literal(db).is_known(db, KnownClass::Type))
+                })
+            })
+        {
+            // Constructor binding supplies the instance return and checks __new__/__init__
+            // when a metaclass __call__ has no return annotation.
+            return Type::unknown();
+        }
+        if !self.has_known_decorator(db, FunctionDecorators::FINAL)
+            && !class.is_some_and(|class| class.is_final(db))
+        {
+            // A base annotation already describes the values that further overrides may return.
+            // Without that contract, leave room for subclasses by including Unknown.
+            inferred = UnionType::from_two_elements(
+                db,
+                &env,
+                inferred,
+                self.inherited_return_annotation(db)
+                    .unwrap_or_else(Type::unknown),
+            );
+        }
+        if let Some(class) = class
+            && let Some(receiver) = self
+                .signature(db)
+                .overloads
+                .first()
+                .and_then(|signature| signature.parameters().get(0))
+                .map(Parameter::annotated_type)
+        {
+            let receiver = if self.is_classmethod(db) {
+                receiver
+                    .to_instance_approximation(db, &env)
+                    .unwrap_or_else(Type::unknown)
+            } else {
+                receiver
+            };
+            if let Some(owner) = receiver.nominal_class(db, &env).and_then(|receiver| {
+                receiver
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .find(|base| base.class_literal(db) == class)
+            }) {
+                // Member lookup can specialize the signature before its body is inferred.
+                // Apply the same owner specialization to newly discovered return types.
+                inferred = inferred.apply_optional_specialization(
+                    db,
+                    owner.class_literal_and_specialization(db).1,
+                );
+            }
+        }
+        inferred
+    }
+
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| None,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn inherited_return_annotation(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let scope = self.literal(db).last_definition.body_scope(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        let index = semantic_index(db, scope.program_file(db));
+        let class = original_class_type(
+            db,
+            index.class_definition_of_method(scope.file_scope_id(db))?,
+        )?;
+        // Walk the original MRO so generic arguments remain specialized through every
+        // intermediate unannotated override.
+        for base_class in class.iter_mro(db).skip(1) {
+            let member = class.class_member_from_mro(
+                db,
+                &env,
+                self.name(db),
+                MemberLookupPolicy::default(),
+                std::iter::once(base_class),
+            );
+            let Some(member) = member.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            let base = member.as_function_literal()?;
+            if !base.has_explicit_return_annotation(db) {
+                continue;
+            }
+            let [signature] = base.signature(db).overloads.as_slice() else {
+                return None;
+            };
+            return Some(
+                signature.return_ty.apply_optional_specialization(
+                    db,
+                    signature
+                        .generic_context
+                        .map(|context| context.unknown_specialization(db, None)),
+                ),
+            );
+        }
+        None
     }
 
     /// This query isolates the function's AST dependency, so callers only invalidate when the

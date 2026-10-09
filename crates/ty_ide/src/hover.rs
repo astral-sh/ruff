@@ -1898,13 +1898,13 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @"
-        Unknown
+        Literal[42]
         ---------------------------------------------
         Foo documentation
 
         ---------------------------------------------
         ```python
-        Unknown
+        Literal[42]
         ```
         ---
         Foo documentation

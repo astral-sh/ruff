@@ -1453,7 +1453,8 @@ impl<'db> BoundTypeVarInstance<'db> {
                     ))
                 }
             }
-            TypeMapping::Promote(..)
+            TypeMapping::ExportInferredReturn(_)
+            | TypeMapping::Promote(..)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion
