@@ -30,8 +30,8 @@ use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
     FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_unpack_types,
+    InferredExpressionType, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_expression_types, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -49,6 +49,7 @@ use crate::place_load::{
 use crate::reachability::{
     ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
 };
+use crate::types::TypeFormType;
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
@@ -274,8 +275,10 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     index: &'db SemanticIndex<'db>,
     region: InferenceRegion<'db>,
 
-    /// The types of every expression in this region.
+    /// Value-expression types, with keys disjoint from `type_expressions`.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    /// The types denoted by expressions inferred in type-expression positions.
+    type_expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -513,6 +516,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
+            type_expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -598,7 +602,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expression_types());
         self.declarations.extend(inference.declarations(definition));
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -678,7 +682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expression_types());
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -728,21 +732,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// comparison may no longer need an override, so extending the sparse map alone is not enough.
     fn extend_expression_types(
         &mut self,
-        expressions: impl IntoIterator<Item = (ExpressionNodeKey, Type<'db>)>,
+        expressions: impl IntoIterator<Item = (ExpressionNodeKey, InferredExpressionType<'db>)>,
     ) {
-        if self.comparison_truthiness.is_empty() {
-            self.expressions.extend(expressions);
-        } else {
-            for (expression, ty) in expressions {
-                self.expressions.insert(expression, ty);
-                self.comparison_truthiness.remove(&expression);
-            }
+        for (expression, ty) in expressions {
+            self.replace_expression_type(expression, ty);
+            self.comparison_truthiness.remove(&expression);
         }
     }
 
     /// Merges expression results without claiming bindings owned by their enclosing statement.
     fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter().copied());
+        self.extend_expression_types(inference.expression_types());
 
         if let Some(extra) = &inference.extra {
             self.implicit_aliases
@@ -777,7 +777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
+        self.extend_expression_types(inference.expression_types());
         self.comparison_truthiness.extend(
             inference
                 .comparison_truthiness
@@ -823,7 +823,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.extend_expression_types(inference.expressions.iter());
+        self.extend_expression_types(inference.expression_types());
 
         if let Some(extra) = &inference.extra {
             self.implicit_aliases
@@ -1013,15 +1013,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     /// Get the already-inferred type of an expression node, or Unknown.
-    fn expression_type(&self, expr: &ast::Expr) -> Type<'db> {
-        self.try_expression_type(expr).unwrap_or_else(Type::unknown)
+    fn expression_value_type(&self, expr: &ast::Expr) -> Type<'db> {
+        self.try_expression_value_type(expr)
+            .unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
+    fn try_expression_value_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
         self.expressions
             .get(&expr.into())
             .copied()
+            .or_else(|| {
+                self.type_expressions
+                    .get(&expr.into())
+                    .map(|ty| TypeFormType::from_type_expression(self.db(), *ty))
+            })
             .or(self.fallback_type())
+    }
+
+    /// Get the denoted type of an already-inferred type expression, or Unknown.
+    fn type_expression_type(&self, expr: &ast::Expr) -> Type<'db> {
+        self.type_expressions
+            .get(&expr.into())
+            .copied()
+            .or(self.fallback_type())
+            .unwrap_or_else(Type::unknown)
     }
 
     /// Return an already-inferred type for `expr`, or infer it with `tcx` if needed.
@@ -1030,7 +1045,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// more specific type context, and re-inferring it would be redundant or would duplicate
     /// diagnostics.
     fn get_or_infer_expression(&mut self, expr: &ast::Expr, tcx: TypeContext<'db>) -> Type<'db> {
-        self.try_expression_type(expr)
+        self.try_expression_value_type(expr)
             .unwrap_or_else(|| self.infer_expression(expr, tcx))
     }
 
@@ -1077,14 +1092,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// Can cause query cycles if the expression is from a different scope and type inference is
     /// already in progress for that scope (further up the stack).
-    fn file_expression_type(&self, expression: &ast::Expr) -> Type<'db> {
+    fn file_expression_value_type(&self, expression: &ast::Expr) -> Type<'db> {
         let file_scope = self.index.expression_scope_id(expression);
         let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
         match self.region {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
-                self.expression_type(expression)
+                self.expression_value_type(expression)
             }
-            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope)
+                .expression_value_type(self.db(), expression),
+        }
+    }
+
+    /// Get the denoted type of a type expression from any scope in the same file.
+    fn file_type_expression_type(&self, expression: &ast::Expr) -> Type<'db> {
+        let file_scope = self.index.expression_scope_id(expression);
+        let expr_scope = file_scope.to_scope_id(self.db(), self.program_file());
+        match self.region {
+            InferenceRegion::Scope(scope, _) if scope == expr_scope => {
+                self.type_expression_type(expression)
+            }
+            _ => infer_complete_scope_types(self.db(), expr_scope).type_expression_type(expression),
         }
     }
 
@@ -1202,7 +1230,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         post_inference::function::check_function_definition(
                             &self.context,
                             definition,
-                            &|expr| self.file_expression_type(expr),
+                            &|expr| self.file_type_expression_type(expr),
                         );
                         post_inference::overloaded_function::check_overloaded_function(
                             &self.context,
@@ -1237,13 +1265,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ty,
                             class_node.node(self.module()),
                             self.index,
-                            &|expr| self.file_expression_type(expr),
+                            &|expr| self.file_expression_value_type(expr),
                         );
                     }
                     DefinitionKind::AnnotatedAssignment(assignment)
                         if assignment.value(self.module()).is_some()
                             && self
-                                .file_expression_type(assignment.annotation(self.module()))
+                                .file_type_expression_type(assignment.annotation(self.module()))
                                 .is_typealias_special_form() =>
                     {
                         self.implicit_aliases.insert(definition);
@@ -1663,7 +1691,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
         let db = self.db();
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
-            let value_type = self.try_expression_type(value).unwrap_or_else(|| {
+            let value_type = self.try_expression_value_type(value).unwrap_or_else(|| {
                 self.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             if let Place::Defined(DefinedPlace {
@@ -1993,7 +2021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 declaration,
                 target_ty,
                 value_ty,
-                |expression| self.expression_type(expression),
+                |expression| self.expression_value_type(expression),
             );
         }
 
@@ -2045,7 +2073,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Check both alias syntaxes, including union members that disappear during expansion.
     fn check_type_alias_cycle(&mut self, name: &str, value: &ast::Expr) {
         let db = self.db();
-        let value_ty = self.expression_type(value);
+        let value_ty = self.type_expression_type(value);
         let expanded = value_ty.expand_eagerly(db, self.program_environment());
         if (expanded.is_recursive_divergent() || value_ty.has_unguarded_alias_cycle(db))
             && let Some(builder) = self
@@ -2059,7 +2087,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if expanded.is_divergent() {
             // Preserve the dynamic recovery type for aliases that cannot be expanded at all.
             // Union cycles retain their non-recursive members for recovery.
-            self.expressions.insert(value.into(), expanded);
+            self.replace_expression_type(
+                value.into(),
+                InferredExpressionType::TypeExpression(expanded),
+            );
         }
     }
 
@@ -2142,10 +2173,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let definition_types = infer_definition_types(self.db(), definition);
 
-        function
-            .decorator_list
-            .iter()
-            .map(move |decorator| definition_types.expression_type(&decorator.expression))
+        function.decorator_list.iter().map(move |decorator| {
+            definition_types.expression_value_type(self.db(), &decorator.expression)
+        })
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -2184,7 +2214,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some((ast::Stmt::Expr(statement), body)) = suite.split_first()
             && statement.value.is_string_literal_expr()
         {
-            self.store_expression_type(&statement.value, Type::literal_string());
+            self.store_expression_value_type(&statement.value, Type::literal_string());
             self.infer_body(body);
         } else {
             self.infer_body(suite);
@@ -2287,7 +2317,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 PEP695TypeAliasType::new(self.db(), alias_name, rhs_scope, None, None),
             )));
 
-        self.store_expression_type(&type_alias.name, type_alias_ty);
+        self.store_expression_value_type(&type_alias.name, type_alias_ty);
 
         self.add_declaration_with_binding(
             type_alias.into(),
@@ -2431,7 +2461,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.store_expression_type(target, target_ty);
+        self.store_expression_value_type(target, target_ty);
         self.add_binding(target.into(), definition)
             .insert(self, target_ty);
     }
@@ -3019,7 +3049,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_target(target, value, &|builder, tcx| {
                     let inference = infer_expression_types(builder.db(), shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
-                    inference.expression_type(value.as_ref())
+                    inference.expression_value_type(builder.db(), value.as_ref())
                 });
             }
         }
@@ -3426,7 +3456,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
-                        builder.store_expression_type(target, assigned_ty);
+                        builder.store_expression_value_type(target, assigned_ty);
                         assigned_ty
                     };
 
@@ -3449,7 +3479,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     };
                     let infer_assigned_ty = &mut |builder: &mut Self, tcx| {
                         let assigned_ty = infer_assigned_ty(builder, tcx);
-                        builder.store_expression_type(target, assigned_ty);
+                        builder.store_expression_value_type(target, assigned_ty);
                         assigned_ty
                     };
 
@@ -3484,7 +3514,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let add = self.add_binding(target.into(), definition);
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
-        self.store_expression_type(target, target_ty);
+        self.store_expression_value_type(target, target_ty);
         add.insert(self, target_ty);
     }
 
@@ -3530,7 +3560,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.extend_expression_without_bindings(inference);
                         }
                     }
-                    inference.expression_type(value)
+                    inference.expression_value_type(self.db(), value)
                 } else if let ast::Expr::Call(call_expr) = value {
                     // If the RHS is not a standalone expression, this is a simple assignment
                     // (single target, no unpackings). That means it's a valid syntactic form
@@ -3638,7 +3668,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ty
                     };
 
-                    self.store_expression_type(value, ty);
+                    self.store_expression_value_type(value, ty);
                     ty
                 } else {
                     self.infer_expression(value, tcx)
@@ -3865,7 +3895,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
         let func_ty = self
-            .try_expression_type(func)
+            .try_expression_value_type(func)
             .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
         if func_ty == Type::SpecialForm(SpecialFormType::NamedTuple) {
             // Only the `fields` argument is deferred for `NamedTuple`;
@@ -4160,7 +4190,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut reported_default_order_error = false;
 
             for element in &tuple.elts {
-                let bound_typevar = match self.expression_type(element) {
+                let bound_typevar = match self.expression_value_type(element) {
                     Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => bind_typevar(
                         self.db(),
                         self.index,
@@ -4357,7 +4387,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else if let ast::Expr::Attribute(attr_expr) = annotation.as_ref()
                 && matches!(attr_expr.attr.as_str(), "args" | "kwargs")
             {
-                let value_ty = self.expression_type(&attr_expr.value);
+                let value_ty = self.expression_value_type(&attr_expr.value);
                 if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
                     && typevar.is_paramspec(self.db())
                 {
@@ -4442,7 +4472,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && annotated.qualifiers.contains(TypeQualifiers::FINAL)
                 && let ast::Expr::Attribute(attr_expr) = target.as_ref()
             {
-                let object_ty = self.expression_type(&attr_expr.value);
+                let object_ty = self.expression_value_type(&attr_expr.value);
                 self.invalid_assignment_to_final_attribute(
                     object_ty,
                     attr_expr,
@@ -4486,7 +4516,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 annotated.inner_type()
             };
-            self.expressions.insert((&**target).into(), target_ty);
+            self.replace_expression_type(
+                (&**target).into(),
+                InferredExpressionType::Value(target_ty),
+            );
         }
     }
 
@@ -4563,7 +4596,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Annotation-only definitions are bindings in stubs.
                 add.declared_ty.unwrap_or(Type::unknown())
             };
-            self.store_expression_type(target, target_ty);
+            self.store_expression_value_type(target, target_ty);
             add.insert(self, target_ty);
 
             return;
@@ -4594,7 +4627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // Also check the AST form for cases where P isn't bound (e.g., class body
             // annotations). In this case, the type might not resolve to a TypeVar.
-            let value_ty = self.expression_type(&attr_expr.value);
+            let value_ty = self.expression_value_type(&attr_expr.value);
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
                 && typevar.is_paramspec(self.db())
             {
@@ -4802,7 +4835,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // retained as the alias binding.
                 match inferred_ty {
                     Type::SpecialForm(SpecialFormType::TypingSelf) => {
-                        self.expressions.insert(value.into(), Type::unknown());
+                        self.replace_expression_type(
+                            value.into(),
+                            InferredExpressionType::Value(Type::unknown()),
+                        );
                         Type::unknown()
                     }
                     Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
@@ -4900,7 +4936,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
             }
 
-            self.store_expression_type(target, inferred_ty);
+            self.store_expression_value_type(target, inferred_ty);
         } else {
             if is_pep_613_type_alias {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, annotation) {
@@ -4920,7 +4956,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration(target.into(), definition, declared);
             }
 
-            self.store_expression_type(target, declared.inner_type());
+            self.store_expression_value_type(target, declared.inner_type());
         }
     }
 
@@ -4933,7 +4969,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let target = assignment.target.as_ref();
                 match target {
                     ast::Expr::Attribute(attribute) => {
-                        let object_ty = self.expression_type(&attribute.value);
+                        let object_ty = self.expression_value_type(&attribute.value);
                         self.validate_attribute_assignment(
                             attribute,
                             target,
@@ -4944,8 +4980,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                     ast::Expr::Subscript(subscript) => {
-                        let object_ty = self.expression_type(&subscript.value);
-                        let slice_ty = self.expression_type(&subscript.slice);
+                        let object_ty = self.expression_value_type(&subscript.value);
+                        let slice_ty = self.expression_value_type(&subscript.slice);
                         self.validate_subscript_assignment(
                             subscript,
                             target,
@@ -5138,7 +5174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_result = match &**target {
             ast::Expr::Name(name) => {
                 let previous_value = self.infer_name_load(name);
-                self.store_expression_type(target, previous_value);
+                self.store_expression_value_type(target, previous_value);
                 Ok(previous_value)
             }
             ast::Expr::Attribute(attr) => {
@@ -5147,13 +5183,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|ty| ty.inner_type())
                     .map_err(|ty| ty.inner_type());
                 let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
-                self.store_expression_type(target, previous_value);
+                self.store_expression_value_type(target, previous_value);
                 result
             }
             ast::Expr::Subscript(subscript) => {
                 let result = self.infer_subscript_load(subscript);
                 let previous_value = result.unwrap_or_else(|recovery_ty| recovery_ty);
-                self.store_expression_type(target, previous_value);
+                self.store_expression_value_type(target, previous_value);
                 result
             }
             _ => Ok(self.infer_expression(target, TypeContext::default())),
@@ -5183,7 +5219,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty = infer_definition_types(self.db(), assignment).expression_type(value);
+        let value_ty =
+            infer_definition_types(self.db(), assignment).expression_value_type(self.db(), value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -5236,7 +5273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
             if !*is_async
                 && let Some(element_type) = builder
-                    .precise_iterable_element_type(iter, |expr| builder.expression_type(expr))
+                    .precise_iterable_element_type(iter, |expr| builder.expression_value_type(expr))
             {
                 element_type
             } else {
@@ -5275,7 +5312,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if !for_stmt.is_async()
                     && let Some(element_type) = self
-                        .precise_iterable_element_type(iterable, |expr| self.expression_type(expr))
+                        .precise_iterable_element_type(iterable, |expr| {
+                            self.expression_value_type(expr)
+                        })
                 {
                     element_type
                 } else {
@@ -5295,7 +5334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.store_expression_type(target, loop_var_value_type);
+        self.store_expression_value_type(target, loop_var_value_type);
         self.add_binding(target.into(), definition)
             .insert(self, loop_var_value_type);
     }
@@ -6608,11 +6647,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let types = infer_expression_types(self.db(), standalone_expression, tcx);
         self.extend_expression(types);
 
-        // Instead of calling `self.expression_type(expr)` after extending here, we get
+        // Instead of calling `self.expression_value_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
         // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
         // using `expression_type` on `types`:
-        types.expression_type(expression)
+        types.expression_value_type(self.db(), expression)
     }
 
     /// Infer the type of an expression.
@@ -6631,12 +6670,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match cache_entry {
             Some(ExpressionCacheEntry::Small(ty)) => {
-                self.store_expression_type(expression, ty);
+                self.store_expression_value_type(expression, ty);
                 ty
             }
 
             Some(ExpressionCacheEntry::Full(inference)) => {
-                let ty = inference.expression_type(expression_key);
+                let ty = inference.expression_value_type(self.db(), expression_key);
                 self.extend_expression_cache_entry(&inference);
                 ty
             }
@@ -6648,7 +6687,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let inference = speculative_builder.into_expression_cache_entry();
 
                 let cached = if inference.is_single_expression(expression_key, ty) {
-                    self.store_expression_type(expression, ty);
+                    self.store_expression_value_type(expression, ty);
                     ExpressionCacheEntry::Small(ty)
                 } else {
                     self.extend_expression_cache_entry(&inference);
@@ -6674,7 +6713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let Some(target) = tcx.annotation
             && let Some(ty) = self.infer_type_form_contextual_expression(expression, target)
         {
-            self.store_expression_type(expression, ty);
+            self.store_expression_value_type(expression, ty);
             return ty;
         }
 
@@ -6763,7 +6802,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
         let ty = self.apply_type_context(expression, ty, tcx);
-        self.store_expression_type(expression, ty);
+        self.store_expression_value_type(expression, ty);
         ty
     }
 
@@ -6942,9 +6981,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     #[track_caller]
-    fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        let previous = self.expressions.insert(expression.into(), ty);
+    fn store_expression_value_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+        self.store_inferred_expression_type(expression, InferredExpressionType::Value(ty));
+    }
+
+    fn store_type_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+        self.store_inferred_expression_type(expression, InferredExpressionType::TypeExpression(ty));
+    }
+
+    #[track_caller]
+    fn store_inferred_expression_type(
+        &mut self,
+        expression: &ast::Expr,
+        ty: InferredExpressionType<'db>,
+    ) {
+        let previous = self.replace_expression_type(expression.into(), ty);
         assert_eq!(previous, None);
+    }
+
+    /// Keep the maps disjoint when inference replaces an expression's interpretation.
+    fn replace_expression_type(
+        &mut self,
+        expression: ExpressionNodeKey,
+        ty: InferredExpressionType<'db>,
+    ) -> Option<Type<'db>> {
+        let (destination, other, ty) = match ty {
+            InferredExpressionType::Value(ty) => {
+                (&mut self.expressions, &mut self.type_expressions, ty)
+            }
+            InferredExpressionType::TypeExpression(ty) => {
+                (&mut self.type_expressions, &mut self.expressions, ty)
+            }
+        };
+        destination
+            .insert(expression, ty)
+            .or(other.remove(&expression))
     }
 
     /// Whether this region's inference should record expected types for string-literal
@@ -7303,7 +7374,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // recovering literal positions. For `(*[(item := 1), item],)`, both list elements
         // must be inferred before the traversal reads their types.
         let inferred_type = |expression: &ast::Expr, promote| {
-            let ty = self.expression_type(expression);
+            let ty = self.expression_value_type(expression);
             if promote { ty.promote(db, env) } else { ty }
         };
         let spec = sequence_from_literal_elements(
@@ -7545,7 +7616,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             item_types
                 .get(&elt.node_index().load())
                 .copied()
-                .or_else(|| builder.try_expression_type(elt))
+                .or_else(|| builder.try_expression_value_type(elt))
                 .unwrap_or_else(|| builder.infer_expression(elt, tcx))
         };
 
@@ -7928,7 +7999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
                 if let Some(divergent) = statement_use_types
-                    .expression_type(use_expression)
+                    .expression_value_type(self.db(), use_expression)
                     .as_divergent()
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
@@ -8224,7 +8295,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let db = self.db();
         let env = self.program_environment();
-        let element_type = inference.expression_type(element);
+        let element_type = inference.expression_value_type(self.db(), element);
         if element.is_starred_expr() {
             element_type
                 .iterate(db, env)
@@ -8245,7 +8316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let mut infer_element_ty =
-            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
+            |builder: &mut Self, (_, elt, _)| inference.expression_value_type(builder.db(), elt);
 
         self.infer_collection_literal(
             collection_class,
@@ -8532,16 +8603,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let result =
                     infer_expression_types(builder.db(), builder.index.expression(iter), tcx);
                 (
-                    result.expression_type(iter),
-                    builder
-                        .precise_iterable_element_type(iter, |expr| result.expression_type(expr)),
+                    result.expression_value_type(builder.db(), iter),
+                    builder.precise_iterable_element_type(iter, |expr| {
+                        result.expression_value_type(builder.db(), expr)
+                    }),
                 )
             } else {
                 let iterable_type = builder.infer_maybe_standalone_expression(iter, tcx);
                 (
                     iterable_type,
-                    builder
-                        .precise_iterable_element_type(iter, |expr| builder.expression_type(expr)),
+                    builder.precise_iterable_element_type(iter, |expr| {
+                        builder.expression_value_type(expr)
+                    }),
                 )
             };
             if !*is_async && let Some(element_type) = element_type {
@@ -8576,11 +8649,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
             let result = infer_expression_types(self.db(), expression, TypeContext::default());
-            let iterable_type = result.expression_type(iterable);
+            let iterable_type = result.expression_value_type(self.db(), iterable);
             let element_type = if comprehension.is_async() {
                 None
             } else {
-                self.precise_iterable_element_type(iterable, |expr| result.expression_type(expr))
+                self.precise_iterable_element_type(iterable, |expr| {
+                    result.expression_value_type(self.db(), expr)
+                })
             };
 
             // Two things are different if it's the first comprehension:
@@ -8627,7 +8702,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.expressions.insert(target.into(), target_type);
+        self.replace_expression_type(target.into(), InferredExpressionType::Value(target_type));
         self.add_binding(target.into(), definition)
             .insert(self, target_type);
     }
@@ -8663,7 +8738,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let add = self.add_binding(named.target.as_ref().into(), definition);
 
         let ty = self.infer_expression(value, add.type_context());
-        self.store_expression_type(target, ty);
+        self.store_expression_value_type(target, ty);
         add.insert(self, ty)
     }
 
@@ -8710,7 +8785,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.comparison_truthiness
                     .get(&node.into())
                     .copied()
-                    .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
+                    .or_else(|| self.expression_value_type(node).bool_if_inhabited(db, env))
             })
             .unwrap_or(Truthiness::Ambiguous),
             Err(err) => {
@@ -8873,7 +8948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = infer_scope_types(self.db(), scope, return_tcx);
         self.extend_scope(inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = inference.expression_value_type(self.db(), lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -9003,18 +9078,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let ast::ArgOrKeyword::Arg(argument) = arg_or_keyword
                     && argument.is_starred_expr()
                 {
-                    self.store_expression_type(argument, ty);
+                    self.store_expression_value_type(argument, ty);
                 } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
                     return ty;
                 }
 
                 ty
             })
-            .with_known_unpacking(arguments, |expression| self.try_expression_type(expression));
+            .with_known_unpacking(arguments, |expression| {
+                self.try_expression_value_type(expression)
+            });
 
         for arg in &arguments.args {
             if let ast::Expr::Starred(ast::ExprStarred { value, .. }) = arg {
-                let iterable_type = self.expression_type(value);
+                let iterable_type = self.expression_value_type(value);
                 if let Err(err) = iterable_type.try_iterate(db, env) {
                     err.report_diagnostic(&self.context, iterable_type, value.as_ref().into());
                 }
@@ -9026,7 +9103,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .filter(|keyword| keyword.arg.is_none())
         {
-            let mapping_type = self.expression_type(&keyword.value);
+            let mapping_type = self.expression_value_type(&keyword.value);
 
             if mapping_type.as_paramspec_typevar(self.db()).is_some()
                 || mapping_type.unpack_keys_and_items(db, env).is_some()
@@ -9242,7 +9319,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && matches!(attribute.attr.as_str(), "keys" | "values" | "items")
             && let ast::Expr::Dict(dict) = attribute.value.as_ref()
             && let Some((keys, values)) =
-                dict_literal_key_value_types(db, env, dict, |expr| self.expression_type(expr))
+                dict_literal_key_value_types(db, env, dict, |expr| self.expression_value_type(expr))
         {
             let receiver = KnownClass::Dict.to_specialized_instance(db, env, &[keys, values]);
             callable_type = receiver
@@ -9367,7 +9444,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Special handling for `TypedDict` method calls
         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref() {
-            let value_type = self.expression_type(value);
+            let value_type = self.expression_value_type(value);
             let method_name = attr.id.as_str();
 
             if let Type::TypedDict(typed_dict_ty) = value_type
@@ -9566,7 +9643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Type::FunctionLiteral(function) if function.has_staticmethod_declaration(self.db()) => {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
-                    let value_type = self.expression_type(value);
+                    let value_type = self.expression_value_type(value);
                     if let Some(class) = value_type.to_class_type(db) {
                         if function.as_abstract_method(self.db(), class).is_some()
                             && function.has_trivial_body(self.db())
@@ -9795,7 +9872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             _ => false,
                         };
                         if is_reveal_type && let Some(first_arg) = arguments.args.first() {
-                            let revealed_ty = self.expression_type(first_arg);
+                            let revealed_ty = self.expression_value_type(first_arg);
                             report_revealed_type(&self.context, revealed_ty, first_arg);
                         }
                     }
@@ -9807,7 +9884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Record the constraints for the receiver of a bound method call, if the receiver is an
         // unannotated collection initializer.
         if let ast::Expr::Attribute(attribute @ ast::ExprAttribute { value, .. }) = func.as_ref() {
-            let value_type = self.expression_type(value);
+            let value_type = self.expression_value_type(value);
 
             if let Some(collection_def) = self.index.unannotated_collection_initializer(value)
                 && let Some((collection_literal, _)) = value_type.class_specialization(db, env)
@@ -11305,7 +11382,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let _ = self.infer_attribute_load(attribute);
                 self.validate_attribute_deletion(
                     attribute,
-                    self.expression_type(value),
+                    self.expression_value_type(value),
                     attr.as_str(),
                     true,
                 );
@@ -11797,7 +11874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             compare.iter(),
             |_| false,
             |builder, (left, op, right), _peer_ty| {
-                let left_ty = builder.expression_type(left);
+                let left_ty = builder.expression_value_type(left);
                 let right_ty = builder.infer_expression(right, TypeContext::default());
 
                 let range = TextRange::new(left.start(), right.end());
@@ -11807,7 +11884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     left_ty,
                     *op,
                     right,
-                    |element| builder.expression_type(element),
+                    |element| builder.expression_value_type(element),
                 );
 
                 let comparison = match literal_membership {
@@ -11902,6 +11979,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases,
             context,
             expressions,
+            type_expressions,
             comparison_truthiness,
             qualifiers: _,
             type_expression_flags,
@@ -11946,6 +12024,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         FullExpressionCacheEntry {
             implicit_aliases,
             expressions,
+            type_expressions,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -11967,6 +12046,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases,
             context,
             expressions,
+            type_expressions,
             comparison_truthiness,
             qualifiers,
             type_expression_flags,
@@ -12053,6 +12133,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         StatementInferenceInner {
             expressions: FrozenMap::from(expressions),
+            type_expressions: FrozenMap::from(type_expressions),
             #[cfg(debug_assertions)]
             scope,
             bindings: bindings.into_boxed_slice(),
@@ -12071,7 +12152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             has_unknown_decorators = false;
             for decorator in &function.node(self.module()).decorator_list {
-                let ty = self.expression_type(&decorator.expression);
+                let ty = self.expression_value_type(&decorator.expression);
                 let flags = FunctionDecorators::from_decorator_type(self.db(), ty);
                 known_decorators |= flags;
                 if flags.is_empty()
@@ -12087,6 +12168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases,
             context,
             expressions,
+            type_expressions,
             comparison_truthiness: _,
             bindings,
             called_functions,
@@ -12115,7 +12197,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         FunctionDecoratorInference {
             implicit_aliases: implicit_aliases.into_iter().collect(),
-            expression_types: FrozenMap::from(expressions),
+            expressions: FrozenMap::from(expressions),
+            type_expressions: FrozenMap::from(type_expressions),
             bindings: bindings.into_boxed_slice(),
             called_functions: called_functions
                 .into_iter()
@@ -12140,6 +12223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases,
             context,
             expressions,
+            type_expressions,
             comparison_truthiness,
             qualifiers,
             type_expression_flags,
@@ -12268,6 +12352,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         DefinitionInference {
             expressions: FrozenMap::from(expressions),
+            type_expressions: FrozenMap::from(type_expressions),
             #[cfg(debug_assertions)]
             scope,
             types: DefinitionTypes::from_parts(
@@ -12290,6 +12375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             expressions,
+            type_expressions,
             comparison_truthiness: _,
             scope,
             cycle_recovery,
@@ -12344,6 +12430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         ScopeInference {
             expressions: FrozenValueMap::from(expressions),
+            type_expressions: FrozenValueMap::from(type_expressions),
             extra,
         }
     }
@@ -12376,6 +12463,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: _,
             collection_use_constraints: _,
             expressions: _,
+            type_expressions: _,
             comparison_truthiness: _,
             string_annotations: _,
             expected_types: _,
@@ -12438,6 +12526,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases,
             context,
             expressions,
+            type_expressions,
             comparison_truthiness,
             type_expression_flags,
             collection_use_constraints,
@@ -12479,7 +12568,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.extend_expression_types(expressions);
+        self.extend_expression_types(
+            expressions
+                .into_iter()
+                .map(|(key, ty)| (key, InferredExpressionType::Value(ty)))
+                .chain(
+                    type_expressions
+                        .into_iter()
+                        .map(|(key, ty)| (key, InferredExpressionType::TypeExpression(ty))),
+                ),
+        );
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
@@ -12609,6 +12707,7 @@ enum ExpressionCacheEntry<'db> {
 struct FullExpressionCacheEntry<'db> {
     implicit_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    type_expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
     type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
     collection_use_constraints: CollectionUseConstraints<'db>,
@@ -12623,10 +12722,28 @@ struct FullExpressionCacheEntry<'db> {
 }
 
 impl<'db> FullExpressionCacheEntry<'db> {
-    fn expression_type(&self, expression: ExpressionNodeKey) -> Type<'db> {
+    fn expression_types(
+        &self,
+    ) -> impl Iterator<Item = (ExpressionNodeKey, InferredExpressionType<'db>)> + '_ {
+        self.expressions
+            .iter()
+            .map(|(key, ty)| (*key, InferredExpressionType::Value(*ty)))
+            .chain(
+                self.type_expressions
+                    .iter()
+                    .map(|(key, ty)| (*key, InferredExpressionType::TypeExpression(*ty))),
+            )
+    }
+
+    fn expression_value_type(&self, db: &'db dyn Db, expression: ExpressionNodeKey) -> Type<'db> {
         self.expressions
             .get(&expression)
             .copied()
+            .or_else(|| {
+                self.type_expressions
+                    .get(&expression)
+                    .map(|ty| TypeFormType::from_type_expression(db, *ty))
+            })
             .or(self.cycle_recovery)
             .unwrap_or_else(Type::unknown)
     }
@@ -12634,6 +12751,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.implicit_aliases.is_empty()
             && self.expressions.len() == 1
+            && self.type_expressions.is_empty()
             && self.expressions.get(&expression) == Some(&ty)
             && self.comparison_truthiness.is_empty()
             && self.type_expression_flags.is_empty()
@@ -12688,6 +12806,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
         ExpressionInference {
             expressions: FrozenMap::from(self.expressions),
+            type_expressions: FrozenMap::from(self.type_expressions),
             extra,
             #[cfg(debug_assertions)]
             scope: self.scope,
@@ -13247,7 +13366,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         }
         // In the following cases, the bound type may not be the same as the RHS value type.
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = self.node {
-            let value_ty = builder.try_expression_type(value).unwrap_or_else(|| {
+            let value_ty = builder.try_expression_value_type(value).unwrap_or_else(|| {
                 builder.infer_maybe_standalone_expression(value, TypeContext::default())
             });
             // Arbitrary data descriptors can transform the assigned value, but slot descriptors
@@ -13264,7 +13383,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
             }
         } else if let AnyNodeRef::ExprSubscript(ast::ExprSubscript { value, .. }) = self.node {
             let value_ty = builder
-                .try_expression_type(value)
+                .try_expression_value_type(value)
                 .unwrap_or_else(|| builder.infer_expression(value, TypeContext::default()));
 
             if !value_ty.is_typed_dict() && !Self::is_safe_mutable_class(db, env, value_ty) {

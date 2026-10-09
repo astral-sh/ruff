@@ -241,7 +241,7 @@ fn is_excluded_test_function<'db>(db: &'db dyn Db, definition: Definition<'db>) 
 
     let inference = function_known_decorators(db, definition);
     for decorator in decorators {
-        match inference.expression_type(&decorator.expression) {
+        match inference.expression_value_type(db, &decorator.expression) {
             Some(Type::ClassLiteral(class)) if class.is_known(db, KnownClass::Property) => {
                 return true;
             }

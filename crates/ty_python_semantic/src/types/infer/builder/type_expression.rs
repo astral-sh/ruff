@@ -99,7 +99,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         match definition.kind(db) {
             DefinitionKind::Assignment(_) if !value.is_string_literal_expr() => {}
             DefinitionKind::AnnotatedAssignment(assignment)
-                if crate::types::definition_expression_type(
+                if crate::types::definition_type_expression_type(
                     db,
                     definition,
                     assignment.annotation(&module),
@@ -203,7 +203,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             InferenceFlags::IN_TYPE_EXPRESSION,
             previously_in_type_expression,
         );
-        self.store_expression_type(expression, ty);
+        self.store_type_expression_type(expression, ty);
         ty
     }
 
@@ -1423,7 +1423,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                     }
                     let result = TupleType::homogeneous(db, env, element_ty);
-                    self.store_expression_type(&tuple.slice, Type::tuple(result));
+                    self.store_type_expression_type(&tuple.slice, Type::tuple(result));
                     return result;
                 }
 
@@ -1442,7 +1442,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 in a two-element `tuple` specialization",
                             );
                         }
-                        self.store_expression_type(element, Type::unknown());
+                        self.store_type_expression_type(element, Type::unknown());
                         element_types.push(Type::unknown());
                         continue;
                     }
@@ -1460,7 +1460,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         || matches!(
                             element,
                             ast::Expr::Subscript(ast::ExprSubscript { value, .. })
-                                if self.expression_type(value)
+                                if self.expression_value_type(value)
                                     == Type::SpecialForm(SpecialFormType::Unpack)
                         );
 
@@ -1523,7 +1523,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
                 // stored in the surrounding `infer_type_expression` call:
-                self.store_expression_type(&tuple.slice, Type::tuple(ty));
+                self.store_type_expression_type(&tuple.slice, Type::tuple(ty));
 
                 ty
             }
@@ -1539,7 +1539,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 in a two-element `tuple` specialization",
                         );
                     }
-                    self.store_expression_type(single_element, Type::unknown());
+                    self.store_type_expression_type(single_element, Type::unknown());
                     return TupleType::heterogeneous(db, env, [Type::unknown()]);
                 }
                 let previously_in_valid_unpack_context = self
@@ -1561,7 +1561,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     || matches!(
                         single_element,
                         ast::Expr::Subscript(ast::ExprSubscript { value, .. })
-                            if self.expression_type(value)
+                            if self.expression_value_type(value)
                                 == Type::SpecialForm(SpecialFormType::Unpack)
                     );
                 if single_element_is_unpack {
@@ -1655,7 +1655,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     .iter()
                                     .map(|element| self.infer_subclass_of_type_expression(element)),
                             );
-                            self.store_expression_type(parameters, ty);
+                            self.store_type_expression_type(parameters, ty);
                             ty
                         }
                         _ => self.infer_subclass_of_type_expression(parameters),
@@ -1735,7 +1735,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         todo_type!("unsupported nested subscript in type[X]")
                     }
                 };
-                self.store_expression_type(slice, parameters_ty);
+                self.store_type_expression_type(slice, parameters_ty);
                 parameters_ty
             }
             _ => {
@@ -2220,7 +2220,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .collect::<Vec<_>>(),
         );
         if arguments.is_tuple_expr() {
-            self.store_expression_type(arguments, ty);
+            self.store_type_expression_type(arguments, ty);
         }
         ty
     }
@@ -2266,7 +2266,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 && let [single_param] = &list.elts[..]
                 && single_param.is_ellipsis_literal_expr()
             {
-                builder.store_expression_type(single_param, Type::unknown());
+                builder.store_type_expression_type(single_param, Type::unknown());
                 if let Some(mut diagnostic) = builder.report_invalid_type_expression(
                     first_argument,
                     "`[...]` is not a valid parameter list for `Callable`",
@@ -2321,9 +2321,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // `Signature` / `Parameters` are not a `Type` variant, so we're storing
             // the outer callable type on these expressions instead.
-            builder.store_expression_type(arguments_slice, callable_type);
+            builder.store_type_expression_type(arguments_slice, callable_type);
             if let Some(first_argument) = first_argument {
-                builder.store_expression_type(first_argument, callable_type);
+                builder.store_type_expression_type(first_argument, callable_type);
             }
 
             callable_type
@@ -2408,7 +2408,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     Type::TypeVar(typevar) if typevar.is_typevartuple(db)
                                 ) || if let ast::Expr::Subscript(subscript) = argument {
                                     matches!(
-                                        self.expression_type(&subscript.slice),
+                                        self.type_expression_type(&subscript.slice),
                                         Type::TypeVar(typevar) if typevar.is_typevartuple(db)
                                     )
                                 } else {
@@ -2439,7 +2439,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     union_ty
                 };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, ty);
+                    self.store_type_expression_type(arguments_slice, ty);
                 }
                 ty
             }
@@ -2473,7 +2473,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, negated_type);
+                    self.store_type_expression_type(arguments_slice, negated_type);
                 }
                 negated_type
             }
@@ -2490,7 +2490,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .build();
 
                 if matches!(arguments_slice, ast::Expr::Tuple(_)) {
-                    self.store_expression_type(arguments_slice, ty);
+                    self.store_type_expression_type(arguments_slice, ty);
                 }
                 ty
             }
@@ -2572,7 +2572,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, type_of_type);
+                    self.store_type_expression_type(arguments_slice, type_of_type);
                 }
                 type_of_type
             }
@@ -2603,7 +2603,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 };
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, type_argument);
+                    self.store_type_expression_type(arguments_slice, type_argument);
                 }
                 TypeFormType::from_type_expression(db, type_argument)
             }
@@ -2630,7 +2630,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         1,
                     );
                     if arguments_slice.is_tuple_expr() {
-                        self.store_expression_type(arguments_slice, Type::unknown());
+                        self.store_type_expression_type(arguments_slice, Type::unknown());
                     }
                     return Type::unknown();
                 }
@@ -2664,13 +2664,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         ));
                     }
                     if arguments_slice.is_tuple_expr() {
-                        self.store_expression_type(arguments_slice, Type::unknown());
+                        self.store_type_expression_type(arguments_slice, Type::unknown());
                     }
                     return Type::unknown();
                 };
 
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, callable_type);
+                    self.store_type_expression_type(arguments_slice, callable_type);
                 }
                 callable_type
             }
@@ -2765,7 +2765,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     if argument.is_ellipsis_literal_expr() {
                         // The trailing `...` in `Concatenate[int, str, ...]` is valid;
                         // store without going through type-expression inference.
-                        self.store_expression_type(argument, Type::unknown());
+                        self.store_type_expression_type(argument, Type::unknown());
                     } else if i < arguments.len() - 1 {
                         let previously_allowed_paramspec = self
                             .context
@@ -2790,7 +2790,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, Type::unknown());
+                    self.store_type_expression_type(arguments_slice, Type::unknown());
                 }
 
                 Type::Dynamic(DynamicType::InvalidConcatenateUnknown)
@@ -2999,11 +2999,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     // This branch deals with annotations such as `Literal[Literal[1]]`.
                     // Here, we store the type for the inner `Literal[1]` expression:
-                    self.store_expression_type(parameters, ty);
+                    self.store_type_expression_type(parameters, ty);
                     ty
                 } else {
                     self.infer_expression(slice, TypeContext::default());
-                    self.store_expression_type(parameters, Type::unknown());
+                    self.store_type_expression_type(parameters, Type::unknown());
 
                     return Err(vec![parameters]);
                 }
@@ -3026,11 +3026,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     // This branch deals with annotations such as `Literal[1, 2]`. Here, we
                     // store the type for the inner `1, 2` tuple-expression:
-                    self.store_expression_type(parameters, union_type);
+                    self.store_type_expression_type(parameters, union_type);
 
                     union_type
                 } else {
-                    self.store_expression_type(parameters, Type::unknown());
+                    self.store_type_expression_type(parameters, Type::unknown());
 
                     return Err(errors);
                 }
@@ -3056,7 +3056,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ) =>
             {
                 let ty = self.infer_unary_expression(unary);
-                self.store_expression_type(parameters, ty);
+                self.store_expression_value_type(parameters, ty);
                 ty
             }
             // enum members and aliases to literal types
@@ -3284,7 +3284,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ));
                 }
                 if arguments_slice.is_tuple_expr() {
-                    self.store_expression_type(arguments_slice, Type::unknown());
+                    self.store_type_expression_type(arguments_slice, Type::unknown());
                 }
                 return Parameters::gradual_form();
             }
@@ -3313,7 +3313,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if arguments_slice.is_tuple_expr() {
             // TODO: What type to store for the argument slice in `Concatenate` because
             // `Parameters` is not a `Type` variant?
-            self.store_expression_type(arguments_slice, Type::unknown());
+            self.store_type_expression_type(arguments_slice, Type::unknown());
         }
 
         let result = parameters.unwrap_or_else(Parameters::unknown);

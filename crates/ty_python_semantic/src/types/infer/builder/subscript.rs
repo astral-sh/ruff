@@ -188,7 +188,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if let ast::Expr::Dict(dict) = subscript.value.as_ref()
             && let Some((_, values)) =
                 dict_literal_key_value_types(self.db(), self.program_environment(), dict, |expr| {
-                    self.expression_type(expr)
+                    self.expression_value_type(expr)
                 })
         {
             return Ok(values);
@@ -1200,7 +1200,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if store_inferred_type_arguments {
-            self.store_expression_type(
+            self.store_type_expression_type(
                 slice_node,
                 Type::heterogeneous_tuple(
                     db,
@@ -1476,18 +1476,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .contains(TypeExpressionFlags::INVALID_UNPACK)
             });
             let is_unpacked_typevartuple = |argument: &ast::Expr| {
-                let operand = match argument {
-                    ast::Expr::Starred(starred) => &*starred.value,
+                let argument_ty = match argument {
+                    ast::Expr::Starred(starred) => {
+                        if matches!(
+                            self.expression_value_type(&starred.value),
+                            Type::NominalInstance(instance)
+                                if matches!(
+                                    instance.known_class(db),
+                                    Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
+                                )
+                        ) {
+                            return true;
+                        }
+                        self.expression_value_type(argument)
+                    }
                     ast::Expr::Subscript(subscript)
-                        if self.expression_type(&subscript.value)
+                        if self.expression_value_type(&subscript.value)
                             == Type::SpecialForm(SpecialFormType::Unpack) =>
                     {
-                        &*subscript.slice
+                        self.type_expression_type(&subscript.slice)
                     }
                     _ => return false,
                 };
-                let argument_ty = self.expression_type(argument);
-                let operand_ty = self.expression_type(operand);
                 matches!(
                     argument_ty,
                     Type::TypeVar(typevar) if typevar.is_typevartuple(db)
@@ -1495,13 +1505,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     argument_ty.exact_tuple_instance_spec(db).as_deref(),
                     Some(Tuple::Variable(variable))
                         if variable.variable().typevartuple().is_some()
-                ) || matches!(
-                    operand_ty,
-                    Type::NominalInstance(instance)
-                        if matches!(
-                            instance.known_class(db),
-                            Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple)
-                        )
                 )
             };
             // A tuple type can preserve only one variable segment, so count unpacked

@@ -466,7 +466,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .as_ref()
                         .and_then(|name| typed_dict.item(db, name.id.as_str()))
                         .is_some_and(|field| {
-                            !self.expression_type(&keyword.value).is_assignable_to(
+                            !self.expression_value_type(&keyword.value).is_assignable_to(
                                 db,
                                 env,
                                 field.declared_ty,
@@ -479,7 +479,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     typed_dict,
                     arguments,
                     error_node,
-                    |expr, _| self.expression_type(expr),
+                    |expr, _| self.expression_value_type(expr),
                 );
                 return fallback_ty;
             }
@@ -545,7 +545,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return permits_field_inference(name.id.as_str());
                 }
 
-                self.try_expression_type(&keyword.value)
+                self.try_expression_value_type(&keyword.value)
                     .and_then(|ty| ty.resolve_type_alias(db).as_typed_dict())
                     .is_some_and(|unpacked| {
                         unpacked.items(db).iter().all(|(name, field)| {
@@ -602,7 +602,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             TypedDictConstructorForm::MixedLiteralAndKeywords(dict_expr) => {
                 self.infer_typed_dict_constructor_dict_literal_values(typed_dict, dict_expr);
-                self.store_expression_type(&arguments.args[0], Type::unknown());
+                self.store_expression_value_type(&arguments.args[0], Type::unknown());
             }
             TypedDictConstructorForm::KeywordOnly
             | TypedDictConstructorForm::VariadicPositional
@@ -618,7 +618,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             typed_dict,
             arguments,
             error_node,
-            |expr, _| self.expression_type(expr),
+            |expr, _| self.expression_value_type(expr),
         );
     }
 
@@ -689,7 +689,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// support inline schemas for `NamedTuple`s, so it makes sense to do the same for `TypedDict`s
     /// out of consistency.
     ///
-    /// This method uses `self.expression_type()` for all non-type expressions: it is assumed that
+    /// This method uses `self.expression_value_type()` for all non-type expressions: it is assumed that
     /// all non-type expressions have already been inferred by a call to `self.validate_fields_arg()`,
     /// which is called before this method in the inference process.
     fn infer_dangling_typeddict_spec(
@@ -714,7 +714,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return TypedDictSchema::default();
             };
 
-            let key_type = self.expression_type(key);
+            let key_type = self.expression_value_type(key);
             let Some(key_literal) = key_type.as_string_literal() else {
                 for ast::DictItem { key, value } in &dict_expr.items[i..] {
                     if key.is_some() {
