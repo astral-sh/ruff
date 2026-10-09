@@ -1,6 +1,6 @@
 [package]
 name = "ruff_unicode_names2_generator"
-version = "0.0.16"
+version = "0.0.17"
 description = "This is an internal component crate of Ruff"
 authors = { workspace = true }
 edition = "2018"

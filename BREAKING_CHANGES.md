@@ -1,5 +1,83 @@
 # Breaking Changes
 
+## 0.17.0
+
+- **Default to Python 3.11**
+
+    Ruff now defaults to Python 3.11 instead of 3.10 if no Python version is configured using
+    [`target-version`](https://docs.astral.sh/ruff/settings/#target-version) or
+    [`project.requires-python`](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version).
+
+- **Default to Python 3.15 for syntax errors**
+
+    Ruff now defaults to Python 3.15 instead of 3.14 when checking for syntax errors without a
+    configured Python version. This allows Python 3.15 syntax, including lazy imports, without an
+    explicit target version. The default for version-dependent lint rules is Python 3.11.
+
+- **Updated default rules**
+
+    Ruff no longer enables [`DTZ001`](https://docs.astral.sh/ruff/rules/call-datetime-without-tzinfo/),
+    [`DTZ005`](https://docs.astral.sh/ruff/rules/call-datetime-now-without-tzinfo/),
+    [`DTZ006`](https://docs.astral.sh/ruff/rules/call-datetime-fromtimestamp/),
+    [`DTZ007`](https://docs.astral.sh/ruff/rules/call-datetime-strptime-without-zone/),
+    [`DTZ011`](https://docs.astral.sh/ruff/rules/call-date-today/),
+    [`DTZ012`](https://docs.astral.sh/ruff/rules/call-date-fromtimestamp/), or
+    [`DTZ901`](https://docs.astral.sh/ruff/rules/datetime-min-max/)
+    by default. These rules restrict the use of timezone-naive dates and datetimes, which are
+    appropriate in many applications. The other `DTZ` rules remain in the default rule set.
+
+    [`F406`](https://docs.astral.sh/ruff/rules/undefined-local-with-nested-import-star-usage/),
+    which corresponds to a syntax error, is now enabled by default.
+
+- **`datetime` import convention**
+
+    [`unconventional-import-alias`](https://docs.astral.sh/ruff/rules/unconventional-import-alias/)
+    (`ICN001`) now expects the `datetime` module to be imported as `dt`.
+
+- **Unicode dummy variable names**
+
+    The default [`lint.dummy-variable-rgx`](https://docs.astral.sh/ruff/settings/#lint_dummy-variable-rgx)
+    now treats underscore-prefixed Unicode names, such as `_次` or `_é`, as dummy variables.
+
+- **Unicode 17**
+
+    Ruff now uses Unicode 17 data for identifier normalization and named character escapes.
+
+- **Unsafe fixes and manual suggestions in CLI output**
+
+    The default `full` output format now displays all suggested fix diffs, including unsafe fixes
+    and suggestions that require manual review. Enabling
+    [`unsafe-fixes`](https://docs.astral.sh/ruff/settings/#unsafe-fixes) in the configuration or
+    passing `--unsafe-fixes` alongside `--fix` are still required to _apply_ unsafe fixes.
+
+- **JUnit output**
+
+    The `junit` output format now uses `skipped` instead of `disabled` on `<testsuite>` elements and
+    adds a `skipped` attribute to the root `<testsuites>` element.
+
+- **Pragma comments and line length**
+
+    The formatter, [`unsorted-imports`](https://docs.astral.sh/ruff/rules/unsorted-imports/) (`I001`),
+    [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) (`E501`), and
+    [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) (`W505`) now
+    consistently ignore trailing pragma comments when computing line length. This resolved several
+    bugs involving interactions between these rules but may also cause existing imports to be
+    reformatted.
+
+- **conda-forge package**
+
+    The conda-forge build no longer depends on Python, now supports linux-riscv64, win-arm64, and
+    linux-ppc64le platforms, and now includes shell completions. However, no longer depending on
+    Python means that `python -m ruff` and `import ruff` will no longer work. Use `ruff` directly from
+    `PATH` instead. PyPI installations and those from the standalone installer are unaffected.
+
+- **Removal of `ruff-lsp` support**
+
+    Support for `ruff-lsp`, the legacy Python language server [deprecated in Ruff
+    v0.9.5](https://github.com/astral-sh/ruff/releases/tag/0.9.5), has been removed. The Ruff VS Code
+    extension now always uses the native language server; `ruff.nativeServer` is deprecated and
+    ignored. See the [migration guide](https://docs.astral.sh/ruff/editors/migration/).
+
 ## 0.16.0
 
 - **New default rules**
