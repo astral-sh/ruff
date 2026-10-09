@@ -3089,6 +3089,26 @@ class NewReceiverConflict(Bridge):
         self.value: bytes = b""  # error: [invalid-attribute-override]
 ```
 
+## Inferred attributes against declared read types
+
+An inferred default still has a readable value. When it comes from another base, that value must
+satisfy a declared read type. Its inferred literal type does not narrow the writes promised by the
+base.
+
+```py
+class Declared:
+    value: int = 0
+
+class Number:
+    value = 1
+
+class Text:
+    value = "text"
+
+class Compatible(Number, Declared): ...  # no diagnostic
+class Incompatible(Text, Declared): ...  # error: [invalid-attribute-override]
+```
+
 ## Mutable attribute narrowing
 
 The `invalid-mutable-override` rule rejects narrowing that prevents writes allowed by the
