@@ -83,3 +83,46 @@ pass;
 
 def foo():
     yield, x
+
+# https://github.com/astral-sh/ruff/issues/29215
+#: Okay
+values = {
+    'X':    None,
+    'XXXX': None,
+}
+
+#: Okay
+values = {
+    foo:    None,
+    bar:    True,
+    baz:    False,
+}
+
+#: Okay
+x =    None
+#: Okay
+x =	None
+#: Okay
+x =    True
+#: Okay
+x =	True
+#: Okay
+x =    False
+#: Okay
+x =	False
+#: Okay
+None   + 1
+#: Okay
+None	+ 1
+#: Okay
+True   + 1
+#: Okay
+True	+ 1
+#: Okay
+False   + 1
+#: Okay
+False	+ 1
+
+#: E271 E272
+None  and  True
+
