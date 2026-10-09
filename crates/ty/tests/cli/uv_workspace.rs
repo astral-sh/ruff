@@ -190,6 +190,91 @@ fn dependency_workspace_case() -> anyhow::Result<CliTest> {
     Ok(case)
 }
 
+/// A member's unused declaration is reported even if a sibling imports the same distribution.
+#[cfg(feature = "test-uv")]
+#[test]
+fn unused_dependencies_report_declarations() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_file("packages/member/member.py", "import indirect_module\n")?;
+    let mut command = uv_sync_command(&case, None)?;
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    command
+        .args(["--error", "unused-dependency"])
+        .env("TY_OUTPUT_FORMAT", "full");
+    assert_cmd_snapshot!(command, @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unused-dependency]: Dependency `direct-dependency` is declared but never imported
+     --> packages/member/pyproject.toml:6:17
+      |
+    6 | dependencies = ["direct-dependency"]
+      |                 ^^^^^^^^^^^^^^^^^^^
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    command.env("TY_OUTPUT_FORMAT", "concise");
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    packages/member/pyproject.toml:6:17: error[unused-dependency] Dependency `direct-dependency` is declared but never imported
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+/// A partial selection cannot establish whether the entire member uses a dependency.
+#[cfg(feature = "test-uv")]
+#[test]
+fn unused_dependencies_skip_partial_scans() -> anyhow::Result<()> {
+    let case = dependency_workspace_case()?;
+    case.write_file("packages/member/member.py", "pass\n")?;
+    case.write_file("packages/member/helper.py", "import direct_module\n")?;
+    let mut command = uv_sync_command(&case, None)?;
+    command.args(["packages/member/member.py", "--error", "unused-dependency"]);
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    let mut command = uv_sync_command(&case, None)?;
+    command.args([
+        "packages/member",
+        "--exclude",
+        "**/helper.py",
+        "--error",
+        "unused-dependency",
+    ]);
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
 /// Imports are checked against each member's direct dependencies, using uv's mapping from import
 /// names to distributions. A dependency declared by one member does not apply to its siblings.
 #[cfg(feature = "test-uv")]
