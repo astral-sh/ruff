@@ -227,8 +227,9 @@ reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
 reveal_type(bool(AmbiguousEnum2.NO))  # revealed: bool
 reveal_type(bool(AmbiguousEnum2.YES))  # revealed: bool
 
-reveal_type(bool(CustomLenEnum.NO))  # revealed: bool
-reveal_type(bool(CustomLenEnum.YES))  # revealed: bool
+# The final enum's inferred `__len__` always returns zero.
+reveal_type(bool(CustomLenEnum.NO))  # revealed: Literal[False]
+reveal_type(bool(CustomLenEnum.YES))  # revealed: Literal[False]
 ```
 
 ## TypedDict

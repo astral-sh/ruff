@@ -1031,7 +1031,8 @@ def lenient_issubclass[T: type | tuple[type, ...]](class_or_tuple: T) -> T:
         return check(class_or_tuple)
     return class_or_tuple
 
-def check(check_type: type): ...
+def check[T: type](check_type: T) -> T:
+    return check_type
 
 # In this scenario, we do not expand the intersection,
 # because it only has inferrable type variables in it.
