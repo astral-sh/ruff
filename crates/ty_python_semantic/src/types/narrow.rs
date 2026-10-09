@@ -88,9 +88,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     Option<NarrowingConstraint<'db>>,
 ) {
     let constraints = match predicate.node {
-        PredicateNode::Expression(expression)
-        | PredicateNode::Condition(expression)
-        | PredicateNode::ChainedComparisonCondition(expression) => {
+        PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
             (constraints.get(place, true), constraints.get(place, false))
         }
@@ -155,7 +153,10 @@ fn all_narrowing_constraints_for_expression<'db>(
     let python_file = program_file.python_file(db);
     let env = ProgramEnvironment::from_file(program_file);
     let module = parsed_module(db, python_file).load(db);
-    let predicate = PredicateNode::Expression(expression);
+    let predicate = PredicateNode::Expression {
+        expression,
+        truthiness_from_type: false,
+    };
     let mut positive = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, true);
     let positive_constraints = positive.finish();
     let mut negative = NarrowingConstraintsBuilder::new(db, &env, &module, predicate, false);
@@ -1730,9 +1731,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     fn finish(&mut self) -> Option<FrozenNarrowingConstraints<'db>> {
         let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::Expression(expression)
-            | PredicateNode::Condition(expression)
-            | PredicateNode::ChainedComparisonCondition(expression) => {
+            PredicateNode::Expression { expression, .. } | PredicateNode::Condition(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
             PredicateNode::Pattern(pattern) => {
@@ -1893,8 +1892,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     binding_type(db, definition),
                     definition.place(db),
                 );
-                // `Never` cannot produce either outcome, even though its truthiness is ambiguous.
-                ty.is_never() || ty.bool(db, &self.env) == Truthiness::from(!is_positive)
+                !ty.bool(db, &self.env).negate_if(!is_positive).may_be_true()
             })
     }
 
@@ -1959,6 +1957,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .bool(db, &self.env);
 
         match test_truthiness {
+            Truthiness::Uninhabited => None,
             Truthiness::AlwaysTrue => {
                 self.evaluate_expression_node_predicate(&expr_if.body, expression, is_positive)
             }
@@ -3496,9 +3495,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn scope(&self) -> ScopeId<'db> {
         let db = self.db;
         match self.predicate {
-            PredicateNode::Expression(expression)
+            PredicateNode::Expression { expression, .. }
             | PredicateNode::Condition(expression)
-            | PredicateNode::ChainedComparisonCondition(expression)
             | PredicateNode::ContextManagerSuppresses { expression, .. } => expression.scope(db),
             PredicateNode::Pattern(pattern) => pattern.scope(db),
             PredicateNode::FinallyNormalPathImpossible { scope, .. } => scope,
@@ -5460,9 +5458,9 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 .is_none_or(|attribute_type| {
                     let truthiness = attribute_type.bool(db, &self.env);
                     if is_positive {
-                        !truthiness.is_always_false()
+                        truthiness.may_be_true()
                     } else {
-                        !truthiness.is_always_true()
+                        truthiness.may_be_false()
                     }
                 })
         });

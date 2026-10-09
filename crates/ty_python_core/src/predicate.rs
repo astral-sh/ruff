@@ -161,15 +161,17 @@ impl<'ast> StatementCall<'ast> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, get_size2::GetSize, salsa::SalsaValue)]
 pub enum PredicateNode<'db> {
     /// The truthiness of an expression's resulting value.
-    Expression(Expression<'db>),
-    /// A boolean operation, `not`, or conditional expression evaluated directly as a condition.
+    Expression {
+        expression: Expression<'db>,
+        /// Names and literals need only their inferred type, avoiding a separate truthiness query.
+        truthiness_from_type: bool,
+    },
+    /// A boolean operation, `not`, conditional expression, or chained comparison evaluated
+    /// directly as a condition.
     ///
     /// In `if x and False`, the truthy branch is unreachable. But after `y = x and False`,
     /// `if y` may be truthy: it can call `x.__bool__` a second time and get a different result.
     Condition(Expression<'db>),
-    /// A chained comparison evaluated directly as a condition. Its inferred truthiness is
-    /// available without walking the expression again.
-    ChainedComparisonCondition(Expression<'db>),
     /// Whether a context manager's exit return type allows an exception to be suppressed.
     ///
     /// Resolved during type inference because the context manager's type is unavailable during

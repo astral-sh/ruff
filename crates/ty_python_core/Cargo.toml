@@ -44,6 +44,7 @@ ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_trivia = { workspace = true }
 
 anyhow = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 serde = ["dep:serde", "dep:ruff_macros"]
