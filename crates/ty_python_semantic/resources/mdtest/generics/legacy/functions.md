@@ -1887,17 +1887,17 @@ reveal_type(extract_both(SubP[int]()))  # revealed: tuple[int, Unknown]
 reveal_type(extract_both(SubQ[str]()))  # revealed: tuple[Unknown, str]
 ```
 
-When a type is a subclass of both `P` and `Q` with different specializations, we cannot infer a
-single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, we can still infer
-both types in a call to `extract_both`:
+When a type is a subclass of both `P` and `Q` with different specializations, both `T = int` and
+`T = str` satisfy `extract_t` independently. Its result must satisfy both return types, whose
+intersection is `Never`. Separate variables in `extract_both` retain both specializations:
 
 ```py
 class PandQ(P[int], Q[str]):
     pass
 
-# TODO: Ideally, we would return `Unknown` here.
-# error: [invalid-argument-type]
-reveal_type(extract_t(PandQ()))  # revealed: int | str
+# Isolate the non-returning call so the following examples remain reachable.
+def both_members():
+    reveal_type(extract_t(PandQ()))  # revealed: Never
 
 reveal_type(extract_both(PandQ()))  # revealed: tuple[int, str]
 ```
@@ -2246,6 +2246,28 @@ def choose(value: Pair[T, object] | Pair[object, T], hint: T) -> T:
 def forward(value: Pair[U, object], hint: U):
     reveal_type(choose(value, hint))  # revealed: U@forward
     reveal_type(choose(hint=hint, value=value))  # revealed: U@forward
+```
+
+## Preserving type variables when forwarding a generic union
+
+Forwarding a union to a helper with the same parameter type preserves the caller's type variable. A
+broader alternative specialization does not widen the return type: the result must satisfy every
+valid specialization. This example is reduced from Werkzeug.
+
+```py
+from typing import Generic, TypeVar
+
+V = TypeVar("V")
+
+class Batch(Generic[V]): ...
+
+def first_value(mapping: V | Batch[V]) -> V:
+    raise NotImplementedError
+
+class MultiDict(Generic[V]):
+    def add(self, value: V): ...
+    def extend_values(self, mapping: V | Batch[V]):
+        self.add(first_value(mapping))  # no diagnostic
 ```
 
 ## Unions nested in covariant type arguments
