@@ -28,10 +28,10 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
-    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceEnvironment,
-    InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types,
+    DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceContext,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference,
+    InferenceEnvironment, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -600,6 +600,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self
     }
 
+    fn expression_context(&self) -> ExpressionInferenceContext<'db> {
+        ExpressionInferenceContext {
+            environment: self.environment,
+            binding_context: self.typevar_binding_context,
+            flags: self.inference_flags(),
+        }
+    }
+
+    pub(super) fn with_expression_context(
+        mut self,
+        context: ExpressionInferenceContext<'db>,
+    ) -> Self {
+        self.environment = context.environment;
+        self.typevar_binding_context = context.binding_context;
+        self.context.inference_flags = context.flags;
+        self
+    }
+
     // Every nested inference query inherits this region's lexical bindings. Expected types can
     // change independently, including when speculative inference retries without an annotation.
     fn infer_expression_types(
@@ -607,7 +625,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> &'db ExpressionInference<'db> {
-        self.environment
+        self.expression_context()
             .infer_expression(self.db(), expression, tcx)
     }
 
@@ -3580,11 +3598,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             None => {
-                // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
-                // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
-                // order to bind `T` to `OptionalList`.
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
+                // A directly inferred RHS can define an implicit alias, such as
+                // `OptionalList = list[T] | None`, which binds `T` to `OptionalList`.
+                // A standalone RHS is shared by its assignment targets, so its context must
+                // not depend on which target requested inference.
+                let previous_typevar_binding_context = self.typevar_binding_context;
+                if !self.index.is_standalone_expression(value) {
+                    self.typevar_binding_context = Some(definition);
+                }
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
@@ -8840,7 +8861,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ParameterDefault::Inferred(default_ty),
             |parameter| ParameterDefault::Deferred {
                 parameter,
-                environment: self.environment,
+                context: self.expression_context(),
             },
         ))
     }

@@ -2618,6 +2618,18 @@ def test[T: int](items: list[T]) -> list[T]:
     return items
 ```
 
+## Type parameters in lambda defaults
+
+Function type parameters are not in scope in default values, including defaults of nested lambdas:
+
+```py
+from typing import cast
+
+# error: [unresolved-reference] "Name `T` used when not defined"
+def nested[T](value: T, callback=lambda outer=(lambda inner=cast(T, None): inner): outer) -> T:
+    return value
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py

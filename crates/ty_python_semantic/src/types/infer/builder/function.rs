@@ -43,7 +43,7 @@ use crate::{
         infer_definition_types,
         list_members::all_members,
         relation::TypeRelation,
-        signatures::{ReturnCallableTypeVarScope, function_signature_expression_type},
+        signatures::{Parameter, ReturnCallableTypeVarScope, function_signature_expression_type},
         tuple::{TupleSpec, TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
         typevar::TypeVarSet,
@@ -1463,11 +1463,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ty = if let Some(parameter_type) = self.annotated_lambda_parameter_type(index, lambda) {
             parameter_type
-        } else if let Some(default_expr) = default {
-            let default = self.index.expression(default_expr.as_ref());
+        } else if default.is_some() {
             let default_ty = self
-                .infer_expression_types(default, TypeContext::default())
-                .expression_type(default_expr.as_ref());
+                .lambda_parameter(index, lambda)
+                .and_then(|parameter| parameter.default_type_for_inference(db))
+                .unwrap_or_else(Type::unknown);
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
@@ -1532,10 +1532,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Returns the annotated type of the lambda parameter at the given index in the provided
     /// lambda expression, based on a `Callable` type annotation, if present.
     fn annotated_lambda_parameter_type(
-        &mut self,
+        &self,
         index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
+        let db = self.db();
+        let parameter_type = self.lambda_parameter(index, lambda)?.annotated_type();
+        (!parameter_type.has_provisional_marker(db, self.program_environment()))
+            .then_some(parameter_type)
+    }
+
+    /// Read the parameter's annotation and default from the inputs chosen for this lambda.
+    /// Defaults retain their enclosing expression's context, which can differ from the body's.
+    fn lambda_parameter(
+        &self,
+        index: u32,
+        lambda: &'ast ast::ExprLambda,
+    ) -> Option<&'db Parameter<'db>> {
         let db = self.db();
         let scope = self
             .index
@@ -1553,11 +1566,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .to_scope_id(db, self.program_file());
                 infer_complete_scope_types(db, parent).lambda_input(lambda)
             })?;
-        let parameters = input.parameters(db);
-
-        let parameter_type = parameters.as_slice()[index as usize].annotated_type();
-        (!parameter_type.has_provisional_marker(db, self.program_environment()))
-            .then_some(parameter_type)
+        input.parameters(db).as_slice().get(index as usize)
     }
 }
 

@@ -32,7 +32,8 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::infer::{
-    InferenceEnvironment, TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
+    ExpressionInferenceContext, TypeExpressionFlags, infer_deferred_types,
+    infer_function_default_types,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -5174,7 +5175,7 @@ impl<'db> Parameters<'db> {
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| ParameterDefault::Deferred {
                 parameter: index.expect_single_definition(&param.parameter),
-                environment: InferenceEnvironment::default(),
+                context: ExpressionInferenceContext::default(),
             })
         };
 
@@ -6099,6 +6100,16 @@ impl<'db> Parameter<'db> {
         self.default().map(|default| default.ty(db))
     }
 
+    /// Infer the default without stripping defaults from nested callable types.
+    pub(super) fn default_type_for_inference(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.default().map(|default| match default {
+            ParameterDefault::Inferred(ty) => ty,
+            ParameterDefault::Deferred { parameter, context } => {
+                raw_parameter_default_type(db, parameter, context)
+            }
+        })
+    }
+
     /// Returns a default type stored directly in the signature, without running inference.
     /// Deferred source defaults return `None`, even if their type is already cached. Use
     /// [`Self::default_type`] when the actual default type is needed.
@@ -6130,7 +6141,7 @@ pub enum ParameterDefault<'db> {
     /// A source parameter whose default is inferred on demand.
     Deferred {
         parameter: Definition<'db>,
-        environment: InferenceEnvironment<'db>,
+        context: ExpressionInferenceContext<'db>,
     },
 }
 
@@ -6138,10 +6149,7 @@ impl<'db> ParameterDefault<'db> {
     fn ty(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Inferred(ty) => ty,
-            Self::Deferred {
-                parameter,
-                environment,
-            } => parameter_default_type(db, parameter, environment),
+            Self::Deferred { parameter, context } => parameter_default_type(db, parameter, context),
         }
     }
 
@@ -6173,7 +6181,17 @@ impl<'db> ParameterDefault<'db> {
 fn parameter_default_type<'db>(
     db: &'db dyn Db,
     parameter: Definition<'db>,
-    environment: InferenceEnvironment<'db>,
+    context: ExpressionInferenceContext<'db>,
+) -> Type<'db> {
+    raw_parameter_default_type(db, parameter, context)
+        .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
+}
+
+/// Read a source default before normalizing nested defaults for signature display and comparison.
+fn raw_parameter_default_type<'db>(
+    db: &'db dyn Db,
+    parameter: Definition<'db>,
+    context: ExpressionInferenceContext<'db>,
 ) -> Type<'db> {
     match parameter.kind(db) {
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
@@ -6187,10 +6205,7 @@ fn parameter_default_type<'db>(
                 return Type::unknown();
             };
             // Use the function's default inference so the default retains its annotation context.
-            // Nested callable defaults still need the existing cycle-breaking normalization.
-            infer_function_default_types(db, function)
-                .expression_type(default)
-                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(function))
+            infer_function_default_types(db, function).expression_type(default)
         }
         DefinitionKind::LambdaParameter(LambdaParameterDefinitionNodeKind {
             parameter: ParameterDefinitionNodeKind::Parameter(node),
@@ -6202,10 +6217,9 @@ fn parameter_default_type<'db>(
                 return Type::unknown();
             };
             let expression = semantic_index(db, file).expression(default);
-            environment
+            context
                 .infer_expression(db, expression, TypeContext::default())
                 .expression_type(default)
-                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
         }
         _ => Type::unknown(),
     }

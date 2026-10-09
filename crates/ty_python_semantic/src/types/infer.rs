@@ -620,7 +620,7 @@ pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    let (expression, tcx, environment) = input.into_inner(db);
+    let (expression, tcx, context) = input.into_inner(db);
 
     let program_file = expression.program_file(db);
     let python_file = program_file.python_file(db);
@@ -646,7 +646,7 @@ pub(super) fn infer_expression_types_impl<'db>(
         index,
         &module,
     )
-    .with_environment(environment)
+    .with_expression_context(context)
     .finish_expression()
 }
 
@@ -724,7 +724,7 @@ pub(crate) fn infer_expression_type<'db>(
 ) -> Type<'db> {
     infer_expression_type_impl(
         db,
-        InferExpression::new(db, expression, tcx, InferenceEnvironment::default()),
+        InferExpression::new(db, expression, tcx, ExpressionInferenceContext::default()),
     )
 }
 
@@ -810,7 +810,7 @@ fn infer_statement_types_impl<'db>(
     .finish_statement()
 }
 
-/// An expression with its expected type and lexical inference environment.
+/// An expression with its expected type and inherited evaluation context.
 ///
 /// This is a Salsa supertype used as the input to `infer_expression_types` to avoid
 /// interning an `ExpressionWithContext` when neither input is needed.
@@ -827,7 +827,7 @@ pub(super) struct ExpressionWithContext<'db> {
     #[returns(copy)]
     tcx: TypeContext<'db>,
     #[returns(copy)]
-    environment: InferenceEnvironment<'db>,
+    context: ExpressionInferenceContext<'db>,
 }
 
 impl<'db> InferExpression<'db> {
@@ -835,16 +835,11 @@ impl<'db> InferExpression<'db> {
         db: &'db dyn Db,
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
-        environment: InferenceEnvironment<'db>,
+        mut context: ExpressionInferenceContext<'db>,
     ) -> InferExpression<'db> {
-        let environment = environment.for_scope(db, expression.scope(db));
-        if tcx.annotation.is_some() || !environment.is_empty() {
-            InferExpression::WithContext(ExpressionWithContext::new(
-                db,
-                expression,
-                tcx,
-                environment,
-            ))
+        context.environment = context.environment.for_scope(db, expression.scope(db));
+        if tcx.annotation.is_some() || context != ExpressionInferenceContext::default() {
+            InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx, context))
         } else {
             InferExpression::Bare(expression)
         }
@@ -853,19 +848,49 @@ impl<'db> InferExpression<'db> {
     fn into_inner(
         self,
         db: &'db dyn Db,
-    ) -> (Expression<'db>, TypeContext<'db>, InferenceEnvironment<'db>) {
+    ) -> (
+        Expression<'db>,
+        TypeContext<'db>,
+        ExpressionInferenceContext<'db>,
+    ) {
         match self {
             InferExpression::Bare(expression) => (
                 expression,
                 TypeContext::default(),
-                InferenceEnvironment::default(),
+                ExpressionInferenceContext::default(),
             ),
             InferExpression::WithContext(expression_with_context) => (
                 expression_with_context.expression(db),
                 expression_with_context.tcx(db),
-                expression_with_context.environment(db),
+                expression_with_context.context(db),
             ),
         }
+    }
+}
+
+/// State inherited when a subexpression is inferred in a separate query.
+///
+/// For example, a lambda default in a generic function can use that function's type variables
+/// and inherits its `no_type_check` suppression. These inputs must be part of the query key,
+/// just like the expected type and enclosing lambda bindings. Temporary suppression used to
+/// discard speculative diagnostics is not inherited: cached results must retain those diagnostics.
+#[derive(
+    Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue,
+)]
+pub struct ExpressionInferenceContext<'db> {
+    environment: InferenceEnvironment<'db>,
+    binding_context: Option<Definition<'db>>,
+    flags: InferenceFlags,
+}
+
+impl<'db> ExpressionInferenceContext<'db> {
+    pub(super) fn infer_expression(
+        self,
+        db: &'db dyn Db,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ExpressionInference<'db> {
+        infer_expression_types_impl(db, InferExpression::new(db, expression, tcx, self))
     }
 }
 
@@ -973,7 +998,11 @@ impl<'db> InferenceEnvironment<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> &'db ExpressionInference<'db> {
-        infer_expression_types_impl(db, InferExpression::new(db, expression, tcx, self))
+        ExpressionInferenceContext {
+            environment: self,
+            ..ExpressionInferenceContext::default()
+        }
+        .infer_expression(db, expression, tcx)
     }
 
     pub(super) fn infer_scope(
@@ -2632,7 +2661,7 @@ impl<'db> StatementInferenceInner<'db> {
 }
 
 bitflags::bitflags! {
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub(crate) struct InferenceFlags: u16 {
         /// Whether to allow `ParamSpec` in type expressions.
         ///
