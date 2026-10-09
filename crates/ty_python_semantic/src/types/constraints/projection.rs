@@ -4,11 +4,11 @@ use rustc_hash::FxHashSet;
 
 use super::{
     CandidateSolutions, CandidateTypeVarSolution, ConstraintSet, PathBoundSolution, SolutionPaths,
-    Solutions,
+    Solutions, TypeVarSolution,
 };
 use crate::types::typevar::TypeVarSet;
-use crate::types::{Type, TypeVarVariance};
-use crate::{Db, ProgramEnvironment};
+use crate::types::{BoundTypeVarIdentity, Type, TypeVarVariance};
+use crate::{Db, FxOrderMap, ProgramEnvironment};
 
 /// Limits for one projection, including preprocessing, path collection, and its result.
 #[derive(Clone, Copy, Debug)]
@@ -112,6 +112,68 @@ impl ProjectionTypeBudget {
 }
 
 impl<'db> ConstraintSet<'db, '_> {
+    /// Finds equalities that hold in every specialization still permitted by this proof.
+    ///
+    /// An unresolved relation can restrict a variable to one exact type without proving that a
+    /// valid specialization exists. Projecting its possible bound retains these necessary
+    /// equalities while leaving the original relation responsible for checking validity.
+    pub(in crate::types) fn necessary_bindings(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+    ) -> Result<Box<[TypeVarSolution<'db>]>, ProjectionError> {
+        let budget = SolutionBudget::default();
+        let candidates = CandidateSolutions::compute_bounded(
+            db,
+            env,
+            &mut self.builder.storage.borrow_mut(),
+            self.possible_node,
+            inferable,
+            self.source_order,
+            budget,
+        )?;
+        let candidates = match candidates {
+            CandidateSolutions::Constrained(candidates)
+            | CandidateSolutions::Incomplete(candidates) => candidates,
+            CandidateSolutions::Unsatisfiable | CandidateSolutions::Unconstrained => {
+                return Ok(Box::default());
+            }
+        };
+        // Candidate validation may remain unresolved. We retain every candidate here, including
+        // candidates marked invalid, and require a positive equality proof on every path. Thus
+        // validity cannot remove an alternative and manufacture an apparent consensus.
+        let mut common: Option<FxOrderMap<BoundTypeVarIdentity<'db>, TypeVarSolution<'db>>> = None;
+        let mut type_budget = ProjectionTypeBudget::new(budget.type_terms);
+        for candidate in &candidates {
+            let mut exact = FxOrderMap::default();
+            for bounds in &candidate.typevars {
+                if let Some(solution) = bounds.as_exact(db, env, self.builder) {
+                    type_budget.charge_type(db, solution)?;
+                    exact.insert(
+                        bounds.bound_typevar.identity(db),
+                        TypeVarSolution {
+                            bound_typevar: bounds.bound_typevar,
+                            solution,
+                        },
+                    );
+                }
+            }
+            match &mut common {
+                Some(common) => common.retain(|identity, binding| {
+                    exact
+                        .get(identity)
+                        .is_some_and(|other| other.solution == binding.solution)
+                }),
+                None => common = Some(exact),
+            }
+        }
+        Ok(common
+            .into_iter()
+            .flat_map(FxOrderMap::into_values)
+            .collect())
+    }
+
     /// Computes default solutions for each BDD path within the default projection budget.
     pub(crate) fn solutions(
         self,
@@ -127,6 +189,20 @@ impl<'db> ConstraintSet<'db, '_> {
             SolutionBudget::default(),
             |_variance, path_bound| CandidateSolutions::default_solve(db, env, builder, path_bound),
         )
+    }
+
+    fn bounded_path_bounds(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        budget: SolutionBudget,
+    ) -> Result<CandidateSolutions<'db>, ProjectionError> {
+        let candidates = self.inference_path_bounds(db, env, inferable, budget)?;
+        match candidates {
+            CandidateSolutions::Incomplete(_) => Err(ProjectionError::IncompleteSolution),
+            candidates => Ok(candidates),
+        }
     }
 
     fn inference_path_bounds(
@@ -214,6 +290,94 @@ impl<'db> ConstraintSet<'db, '_> {
         } else {
             Ok(result)
         }
+    }
+
+    /// Folds complete, correlated solutions without first allocating every solved path.
+    ///
+    /// Raw paths are collected within the traversal limits and sorted in the same source order
+    /// as [`Self::solutions_with`]. The storage borrow is released before invoking either
+    /// callback, so they can safely use the constraint builder. Each call to `fold` receives the
+    /// complete bindings for one retained path, including an empty slice for a valid path on
+    /// which no variable was solved.
+    ///
+    /// The accumulator is returned only if the entire projection succeeds. `fold` must charge
+    /// newly accumulated types to its supplied budget and use bounded constructors for operations
+    /// that can expand them. It should combine alternatives commutatively when their order is not
+    /// meaningful to its consumer. Existing limitations in solution extraction still apply; this
+    /// API does not make an order-sensitive selector or fold order-independent.
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn try_fold_solutions<T>(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        inferable: TypeVarSet<'db>,
+        budget: SolutionBudget,
+        choose: impl FnMut(TypeVarVariance, &CandidateTypeVarSolution<'db>) -> PathBoundSolution<'db>,
+        initial: T,
+        fold: impl FnMut(
+            T,
+            &[TypeVarSolution<'db>],
+            &mut ProjectionTypeBudget,
+        ) -> Result<T, ProjectionError>,
+    ) -> Result<SolutionProjection<T>, ProjectionError> {
+        let path_bounds = self.bounded_path_bounds(db, env, inferable, budget)?;
+
+        let incomplete_before = self.builder.relation_session.incomplete_epoch();
+        let result = path_bounds.try_fold_with(
+            choose,
+            initial,
+            &mut ProjectionTypeBudget::new(budget.type_terms),
+            fold,
+        )?;
+        if self.builder.relation_session.incomplete_epoch() != incomplete_before {
+            return Err(ProjectionError::IncompleteSolution);
+        }
+        Ok(result)
+    }
+}
+
+impl<'db> CandidateSolutions<'db> {
+    fn try_fold_with<T>(
+        &self,
+        mut choose: impl FnMut(
+            TypeVarVariance,
+            &CandidateTypeVarSolution<'db>,
+        ) -> PathBoundSolution<'db>,
+        mut accumulated: T,
+        budget: &mut ProjectionTypeBudget,
+        mut fold: impl FnMut(
+            T,
+            &[TypeVarSolution<'db>],
+            &mut ProjectionTypeBudget,
+        ) -> Result<T, ProjectionError>,
+    ) -> Result<SolutionProjection<T>, ProjectionError> {
+        let candidates = match self {
+            Self::Incomplete(_) => return Err(ProjectionError::IncompleteSolution),
+            Self::Unsatisfiable => return Ok(SolutionProjection::Unsatisfiable),
+            Self::Unconstrained => return Ok(SolutionProjection::Unconstrained),
+            Self::Constrained(candidates) => candidates,
+        };
+
+        let mut retained = false;
+        for candidate in candidates {
+            let Some((solution, incomplete)) = Self::solve_path_with(candidate, &mut choose) else {
+                continue;
+            };
+            if !solution.is_valid() {
+                continue;
+            }
+            if incomplete {
+                return Err(ProjectionError::IncompleteSolution);
+            }
+            accumulated = fold(accumulated, &solution.solved_typevars, budget)?;
+            retained = true;
+        }
+
+        Ok(if retained {
+            SolutionProjection::Constrained(accumulated)
+        } else {
+            SolutionProjection::Unsatisfiable
+        })
     }
 }
 

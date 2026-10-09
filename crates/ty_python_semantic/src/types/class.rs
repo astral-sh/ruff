@@ -41,7 +41,7 @@ use crate::types::member_observation::{MemberStorage, MroMemberSource};
 use crate::types::mro::{Mro, StaticMroError};
 use crate::types::projection::{ObservationEdge, ObservedType, ObservedTypePair};
 use crate::types::relation::{
-    DisjointnessChecker, RelationContext, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, RelationContext, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{Tuple, TupleSpec};
@@ -2415,6 +2415,7 @@ impl<'db> ClassType<'db> {
         context: &RelationContext<'db>,
     ) -> CallableTypes<'db> {
         let env = &ProgramEnvironment::from_file(self.class_literal(db).program_file(db));
+        let constraints = ConstraintSetBuilder::with_relation_context(context.clone());
         // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
         // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
         // then relying on the call binding machinery to Just Work™?
@@ -2489,16 +2490,8 @@ impl<'db> ClassType<'db> {
             });
 
         let dunder_new_callables = if let Some(callables) = dunder_new_callables {
-            let bound_callables = callables.map(|callable| {
-                callable.bind_self_in_context(
-                    db,
-                    env,
-                    receiver,
-                    instance_type,
-                    &observed.unchanged_or_unresolved(Type::Callable(callable)),
-                    context,
-                )
-            });
+            let bound_callables =
+                callables.map(|callable| callable.bind_self(db, env, receiver, instance_type));
 
             // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
             // then we should ignore the `__init__` and just return the `__new__` method.
@@ -2512,17 +2505,26 @@ impl<'db> ClassType<'db> {
                         let signature_observed = callable_observed
                             .callable_overload(db, env, index)
                             .unwrap_or_else(|| callable_observed.unresolved());
-                        !context.is_assignable_eager(
-                            db,
-                            env,
-                            signature_observed.child_at(
-                                db,
-                                env,
-                                signature.return_ty,
-                                ObservationEdge::CallableReturn { overload: 0 },
-                            ),
-                            observed.unchanged_or_unresolved(instance_type),
-                        )
+                        signature.has_compatible_receiver(db, env, context, &signature_observed)
+                            && constraints
+                                .load(
+                                    db,
+                                    env,
+                                    &context.when_assignable(
+                                        db,
+                                        env,
+                                        signature_observed.child_at(
+                                            db,
+                                            env,
+                                            signature.return_ty,
+                                            ObservationEdge::CallableReturn { overload: 0 },
+                                        ),
+                                        observed.unchanged_or_unresolved(instance_type),
+                                        TypeVarSet::None,
+                                        TypeVarEvaluation::Eager,
+                                    ),
+                                )
+                                .is_never_satisfied(db, env, TypeVarSet::None)
                     })
             });
 

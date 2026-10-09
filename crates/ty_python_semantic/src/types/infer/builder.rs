@@ -5754,6 +5754,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut bindings = self.bindings_for_call(dunder_callable).match_parameters(
                     db,
                     env,
+                    &ConstraintSetBuilder::new(),
                     argument_types,
                 );
 
@@ -9701,9 +9702,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             }
         }
-        let mut bindings =
-            self.bindings_for_call(callable_type)
-                .match_parameters(db, env, &call_arguments);
+        let mut bindings = self.bindings_for_call(callable_type).match_parameters(
+            db,
+            env,
+            &ConstraintSetBuilder::new(),
+            &call_arguments,
+        );
 
         report_missing_implicit_constructor_call(
             &self.context,
@@ -9850,7 +9854,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .unwrap_or_else(|recovery_ty| recovery_ty)
                     .inner_type()
                     .bindings(db, env)
-                    .match_parameters(db, env, &call_arguments)
+                    .match_parameters(db, env, &ConstraintSetBuilder::new(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(self.db(), collection_generic_context);
 

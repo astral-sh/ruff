@@ -2,6 +2,7 @@ use crate::types::class::{
     ClassLiteral, DynamicClassAnchor, DynamicClassLiteral, DynamicMetaclassConflict,
     dynamic_class_bases_argument,
 };
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, NO_MATCHING_OVERLOAD, report_conflicting_metaclass_from_bases,
     report_instance_layout_conflict,
@@ -254,10 +255,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             KnownClass::Iterable.to_specialized_instance(db, env, &[Type::object()]);
         let mut call_arguments = self.prepare_call_arguments(&call_expr.arguments);
 
-        let mut bindings =
-            callable_type
-                .bindings(db, env)
-                .match_parameters(db, env, &call_arguments);
+        let mut bindings = callable_type.bindings(db, env).match_parameters(
+            db,
+            env,
+            &ConstraintSetBuilder::new(),
+            &call_arguments,
+        );
         let bindings_result = self.infer_and_check_argument_types(
             ArgumentsIter::from_ast(&call_expr.arguments),
             &mut call_arguments,

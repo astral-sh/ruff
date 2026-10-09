@@ -3383,6 +3383,23 @@ static_assert(is_assignable_to(BytesValue, HasValue[str]))
 static_assert(not is_assignable_to(BytesValue, HasValue[int]))
 ```
 
+Materializing before a later class specialization preserves descriptor overload selection. The
+specialized descriptor still exposes `bytes` for `HasValue[str]`.
+
+```py
+from ty_extensions import Top
+
+class Holder(Generic[T]):
+    def materialized(self, value: Top[HasValue[T]]) -> Top[HasValue[T]]:
+        return value
+
+def inspect(holder: Holder[str], value: HasValue[str]):
+    result = holder.materialized(value)
+    reveal_type(result.value)  # revealed: bytes
+    valid: bytes = result.value  # no diagnostic
+    invalid: str = result.value  # error: [invalid-assignment]
+```
+
 ## Inferring through specialization-dependent protocol descriptors
 
 The descriptor's general overload refers back to `P`, but `P[int].value` is finite. Callback

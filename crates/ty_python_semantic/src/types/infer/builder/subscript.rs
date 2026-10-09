@@ -1667,7 +1667,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let mut identity_bindings = dunder_callable
                     .bindings(db, env)
-                    .match_parameters(db, env, &call_arguments)
+                    .match_parameters(db, env, &ConstraintSetBuilder::new(), &call_arguments)
                     // Perform inference against the type variables on the receiver's generic context.
                     .with_generic_context(db, collection_generic_context);
 

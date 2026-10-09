@@ -6164,41 +6164,7 @@ impl<'db> Type<'db> {
                     binding.bake_bound_type_into_overloads(db, env);
                     binding.into()
                 } else {
-                    // Solve exact receiver constraints before checking the other arguments, but
-                    // retain the receiver itself for call inference and receiver diagnostics.
-                    let callable = Type::Callable(CallableType::new(
-                        db,
-                        signature.clone(),
-                        callable::CallableTypeKind::Regular,
-                    ));
-                    let observed = proof.operand.unchanged_or_unresolved(callable);
-                    let overloads =
-                        signature
-                            .overloads
-                            .iter()
-                            .enumerate()
-                            .flat_map(|(index, overload)| {
-                                let observed = observed
-                                    .callable_overload(db, env, index)
-                                    .unwrap_or_else(|| observed.unresolved());
-                                if overload.has_receiver_determined_method_typevar(db, env)
-                                    && let Some(specialized) = overload
-                                        .specialize_for_bound_receiver(
-                                            db,
-                                            env,
-                                            self_instance,
-                                            bound_method.typing_self_type(db),
-                                            &proof.context,
-                                            &observed,
-                                        )
-                                {
-                                    specialized.overloads
-                                } else {
-                                    smallvec_inline![overload.clone()]
-                                }
-                            });
-
-                    CallableBinding::from_overloads(self, overloads)
+                    CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                         .with_bound_type(self_instance)
                         .into()
                 }
@@ -7335,7 +7301,7 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let constraints = ConstraintSetBuilder::new();
         self.bindings(db, env)
-            .match_parameters(db, env, argument_types)
+            .match_parameters(db, env, &constraints, argument_types)
             .check_types(
                 db,
                 env,
@@ -7432,7 +7398,7 @@ impl<'db> Type<'db> {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
+                    .match_parameters(db, env, &constraints, argument_types)
                     .check_types(db, env, &constraints, argument_types, tcx, &[]);
 
                 let bindings = match bindings {
@@ -7479,7 +7445,7 @@ impl<'db> Type<'db> {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db, env)
-                    .match_parameters(db, env, argument_types)
+                    .match_parameters(db, env, &constraints, argument_types)
                     .check_types(db, env, &constraints, argument_types, tcx, &[]);
 
                 let bindings = match bindings {
@@ -10114,7 +10080,7 @@ impl<'db> UnionType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let bindings = match dunder_callable
             .bindings(db, env)
-            .match_parameters(db, env, argument_types)
+            .match_parameters(db, env, &constraints, argument_types)
             .check_types(db, env, &constraints, argument_types, tcx, &[])
         {
             Ok(bindings) => bindings,

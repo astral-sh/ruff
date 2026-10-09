@@ -1130,16 +1130,18 @@ pub fn call_signature_details<'db>(
             CallArguments::from_arguments_typed(&call_expr.arguments, |expression| {
                 expression.inferred_type(model)
             });
-        let mut bindings =
-            callable_type
-                .bindings(db, env)
-                .match_parameters(db, env, &call_arguments);
+        let constraints = ConstraintSetBuilder::new();
+        let mut bindings = callable_type.bindings(db, env).match_parameters(
+            db,
+            env,
+            &constraints,
+            &call_arguments,
+        );
 
         // Run type checking to resolve TypeVar bindings from argument types.
         // For example, calling `dict[str, int].get("a")` resolves the `_KT`
         // TypeVar to `str`. We ignore errors since we still want signature
         // details even if the call has type errors.
-        let constraints = ConstraintSetBuilder::new();
         let _ = bindings.check_types_impl(
             db,
             env,
@@ -1179,7 +1181,7 @@ fn resolve_single_overload<'db>(
 
     let constraints = ConstraintSetBuilder::new();
     let mut resolved: Vec<_> = bindings
-        .match_parameters(db, env, &args)
+        .match_parameters(db, env, &constraints, &args)
         .check_types(db, env, &constraints, &args, TypeContext::default(), &[])
         .iter()
         .flat_map(super::call::bind::Bindings::iter_flat)
@@ -1224,7 +1226,7 @@ fn full_type_bindings_for_call<'db>(
 
     func_type
         .bindings(db, env)
-        .match_parameters(db, env, &call_arguments)
+        .match_parameters(db, env, &constraints, &call_arguments)
         .check_types(
             db,
             env,
@@ -1565,7 +1567,7 @@ pub fn resolved_call_signature<'db>(
     let constraints = ConstraintSetBuilder::new();
     let bindings = callable_type
         .bindings(db, env)
-        .match_parameters(db, env, &args)
+        .match_parameters(db, env, &constraints, &args)
         .check_types(db, env, &constraints, &args, TypeContext::default(), &[])
         .unwrap_or_else(|CallError(_, bindings)| *bindings);
 

@@ -287,6 +287,25 @@ impl<'db> BoundMethodType<'db> {
         self.callables(db).and_then(CallableTypes::exactly_one)
     }
 
+    /// Computes a receiver-specialized view for display without making receiver inference
+    /// a dependency of the cached semantic callable.
+    pub(super) fn into_callable_type_for_display(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Option<CallableType<'db>> {
+        let callable = self
+            .func(db)
+            .try_upcast_to_callable(db, env)?
+            .exactly_one()?;
+        Some(callable.bind_self_for_display(
+            db,
+            env,
+            self.signature_receiver(db),
+            self.typing_self_type(db),
+        ))
+    }
+
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
         Some(self.into_callable_type(db)?.signatures(db))
     }

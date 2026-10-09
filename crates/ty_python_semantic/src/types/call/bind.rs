@@ -371,14 +371,15 @@ impl<'db> CallableItem<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
         match self {
             CallableItem::Regular(binding) => {
-                binding.match_parameters(db, env, arguments);
+                binding.match_parameters(db, env, constraints, arguments);
             }
             CallableItem::Constructor(binding) => {
-                binding.match_parameters(db, env, arguments);
+                binding.match_parameters(db, env, constraints, arguments);
             }
         }
     }
@@ -1245,6 +1246,7 @@ impl<'db> Bindings<'db> {
     fn functools_partial_matched_bindings<'a>(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         wrapped_callable_ty: Type<'db>,
         call_arguments: &CallArguments<'a, 'db>,
     ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>, bool)> {
@@ -1254,10 +1256,12 @@ impl<'db> Bindings<'db> {
         let (bound_call_arguments, can_synthesize_signature) =
             call_arguments.functools_partial_bound_arguments(db, env)?;
 
-        let mut partial_bindings =
-            wrapped_callable_ty
-                .bindings(db, env)
-                .match_parameters(db, env, &bound_call_arguments);
+        let mut partial_bindings = wrapped_callable_ty.bindings(db, env).match_parameters(
+            db,
+            env,
+            constraints,
+            &bound_call_arguments,
+        );
         for binding in partial_bindings.iter_flat_mut() {
             binding.prepare_for_partial_application();
         }
@@ -1429,11 +1433,12 @@ impl<'db> Bindings<'db> {
         mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let nonce_generator = TypeVarNonceGenerator::default();
         self.freshen_generic_contexts_in_place(db, env, &nonce_generator);
-        self.match_parameters_in_place(db, env, arguments);
+        self.match_parameters_in_place(db, env, constraints, arguments);
         self
     }
 
@@ -1441,10 +1446,11 @@ impl<'db> Bindings<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
         for item in self.iter_callable_items_mut() {
-            item.match_parameters(db, env, arguments);
+            item.match_parameters(db, env, constraints, arguments);
         }
     }
 
@@ -2499,8 +2505,20 @@ impl<'db> Bindings<'db> {
                                     constraints.relation_context().clone(),
                                 )
                                 .map(|callables| {
-                                    let callables =
-                                        callables.map(|callable| callable.normalized(db, env));
+                                    let callables = callables.map(|callable| {
+                                        callable
+                                            .specialize_captured_receivers(
+                                                db,
+                                                env,
+                                                constraints.relation_context(),
+                                                &overload
+                                                    .observed_callable
+                                                    .unchanged_or_unresolved(Type::Callable(
+                                                        callable,
+                                                    )),
+                                            )
+                                            .normalized(db, env)
+                                    });
                                     if into_callable == KnownFunction::IntoRegularCallable {
                                         callables.map(|callable| callable.into_regular(db))
                                     } else {
@@ -3947,8 +3965,57 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
     ) {
+        // A call can use receiver-determined type variables to contextualize its explicit
+        // arguments. Defer this inference until the call, so describing a bound callable does
+        // not recursively inspect its receiver's protocol interface.
+        if let Some(receiver) = self.bound_type {
+            let typing_self = match self.callable_type {
+                Type::BoundMethod(method) => method.typing_self_type(db),
+                _ => receiver,
+            };
+            self.overloads = self
+                .overloads
+                .iter()
+                .flat_map(|overload| {
+                    // A constructor's receiver contains the class variables that the call
+                    // itself must infer. It is not an already constructed receiver from which
+                    // method variables can be specialized independently.
+                    if overload.constructor_context.is_none()
+                        && overload
+                            .signature
+                            .has_receiver_determined_method_typevar(db, env)
+                        && let Some(specialized) = overload.signature.specialize_for_bound_receiver(
+                            db,
+                            env,
+                            receiver,
+                            typing_self,
+                            constraints.relation_context(),
+                            &overload.observed_callable,
+                        )
+                    {
+                        Either::Left(specialized.overloads.into_iter().map(|signature| {
+                            let mut binding = overload.clone();
+                            binding.signature = signature;
+                            binding.observed_callable = binding
+                                .observed_callable
+                                .unchanged_or_unresolved(Type::Callable(CallableType::new(
+                                    db,
+                                    CallableSignature::single(binding.signature.clone()),
+                                    CallableTypeKind::Regular,
+                                )));
+                            binding.return_ty = binding.initial_return_type(db);
+                            binding
+                        }))
+                    } else {
+                        Either::Right(std::iter::once(overload.clone()))
+                    }
+                })
+                .collect();
+        }
+
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         let bound_arguments = arguments.with_self(self.bound_type);
@@ -6225,6 +6292,16 @@ impl<'db> CallInference<'_, 'db> {
         };
 
         let mut builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
+        let receiver_constraints = self.signature.infer_receiver_constraints(
+            db,
+            self.env,
+            constraints,
+            ObservedTypePair::new(
+                self.observed_callable.clone(),
+                self.observed_callable.clone(),
+            ),
+        );
+        let receiver_error = builder.add_constraint_set(receiver_constraints).err();
 
         // TODO: ParamSpec and TypeVarTuple inference still uses legacy type mappings, which
         // cannot distinguish validity constraints from inference evidence.
@@ -6422,7 +6499,14 @@ impl<'db> CallInference<'_, 'db> {
             })
             .unwrap_or_default();
 
-        let mut specialization_errors = Vec::new();
+        let mut specialization_errors: Vec<_> = receiver_error
+            .into_iter()
+            .map(|error| BindingError::SpecializationError {
+                error,
+                argument_index: None,
+                argument: None,
+            })
+            .collect();
         let assignable_to_declared_type = self.infer_argument_constraints(
             &mut builder,
             &preferred_type_mappings,
@@ -6439,6 +6523,13 @@ impl<'db> CallInference<'_, 'db> {
         if !assignable_to_declared_type {
             builder = SpecializationBuilder::new(db, self.env, constraints, generic_context);
             specialization_errors.clear();
+            if let Err(error) = builder.add_constraint_set(receiver_constraints) {
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: None,
+                    argument: None,
+                });
+            }
             constraint_set_errors.fill(false);
 
             self.infer_argument_constraints(
@@ -7228,6 +7319,35 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
+        if self.signature.has_impossible_receiver() {
+            self.errors.push(BindingError::TooManyPositionalArguments {
+                first_excess_argument_index: None,
+                expected_positional_count: 0,
+                provided_positional_count: 1,
+            });
+        }
+        for (receiver, annotation) in self.signature.receiver_relations() {
+            let expected_ty =
+                annotation.apply_optional_specialization(self.db, self.merged_specialization());
+            if self.argument_relation_fails_validation(receiver.when_assignable_to(
+                self.db,
+                self.env,
+                expected_ty,
+                constraints,
+                self.inferable_typevars,
+            )) {
+                self.errors.push(BindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(&Parameter::positional_only(None), 0, true),
+                    argument_index: None,
+                    last_argument_index: None,
+                    expected_ty,
+                    provided_ty: receiver,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                    parameter_source: None,
+                });
+            }
+        }
+
         let paramspec = self.signature.parameters().as_paramspec_with_prefix();
         let paramspec_component_start = paramspec.and_then(|(prefix, paramspec)| {
             let prefix_len = prefix.len();
@@ -7386,7 +7506,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let callable_binding =
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
         let bindings = match Bindings::from(callable_binding)
-            .match_parameters(db, self.env, &sub_arguments)
+            .match_parameters(db, self.env, constraints, &sub_arguments)
             .check_types(
                 db,
                 self.env,
@@ -8082,8 +8202,12 @@ impl<'db> Binding<'db> {
         // fixpoint iteration.
         sub_arguments.clear_types(sub_argument_index);
 
-        let mut specialized_bindings =
-            Bindings::from(specialized_binding).match_parameters(db, env, &sub_arguments);
+        let mut specialized_bindings = Bindings::from(specialized_binding).match_parameters(
+            db,
+            env,
+            constraints,
+            &sub_arguments,
+        );
         let _ = specialized_bindings.check_types_impl(
             db,
             env,
@@ -8667,7 +8791,13 @@ impl<'db> Binding<'db> {
             KnownClass::FunctoolsPartial.to_specialized_instance(db, env, &[Type::unknown()]);
 
         let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
-            Bindings::functools_partial_matched_bindings(db, env, func_ty, call_arguments)?;
+            Bindings::functools_partial_matched_bindings(
+                db,
+                env,
+                constraints,
+                func_ty,
+                call_arguments,
+            )?;
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
         // bound arguments and to surface binding diagnostics.
@@ -10764,7 +10894,7 @@ mod tests {
         let constraints = ConstraintSetBuilder::new();
         let bindings = callable
             .bindings(db, &env)
-            .match_parameters(db, &env, &arguments)
+            .match_parameters(db, &env, &constraints, &arguments)
             .check_types(db, &env, &constraints, &arguments, type_context, &[])
             .map_err(|error| anyhow::anyhow!("call binding failed: {error:?}"))?;
         let (_, binding) = bindings

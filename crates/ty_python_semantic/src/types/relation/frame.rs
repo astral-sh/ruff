@@ -60,13 +60,6 @@ impl<'db> RelationContext<'db> {
         self.provenance
     }
 
-    pub(in crate::types) fn with_provenance(&self, provenance: ConstraintProvenance) -> Self {
-        Self {
-            provenance,
-            ..self.clone()
-        }
-    }
-
     pub(in crate::types) fn perform_expensive_checks(&self) -> bool {
         self.perform_expensive_checks
     }

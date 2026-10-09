@@ -7,6 +7,7 @@ use strum::IntoEnumIterator;
 use super::{ArgumentsIter, TypeInferenceBuilder};
 use crate::TypeQualifiers;
 use crate::types::class::{ClassLiteral, DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
     INVALID_ARGUMENT_TYPE, INVALID_TYPE_FORM, MISSING_ARGUMENT, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT, report_mismatched_type_name,
@@ -435,9 +436,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             callable_type
         };
-        let mut bindings =
-            self.bindings_for_call(binding_callable)
-                .match_parameters(db, env, &call_arguments);
+        let mut bindings = self.bindings_for_call(binding_callable).match_parameters(
+            db,
+            env,
+            &ConstraintSetBuilder::new(),
+            &call_arguments,
+        );
 
         if can_infer && !bindings.satisfies(|_| true) {
             self.prepare_typed_dict_constructor(typed_dict, form, arguments, error_node);

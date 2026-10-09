@@ -93,7 +93,13 @@ class InvalidAliasedBoundedReceiver:
 class InvalidNestedBoundedReceiver(list[str]):
     def method[T: int](self: list[T]) -> None: ...
 
+class ValidNestedBoundedReceiver(list[int]):
+    def method[T: int](self: list[T]) -> None: ...
+
 class InvalidUnionConstrainedReceiver:
+    def method[T: (int, str)](self: T | None) -> None: ...
+
+class ValidUnionConstrainedReceiver(str):
     def method[T: (int, str)](self: T | None) -> None: ...
 
 invalid_bound: Callable[[], None] = InvalidBoundedReceiver().method  # error: [invalid-assignment]
@@ -104,9 +110,10 @@ valid_constraints: Callable[[], None] = ValidConstrainedReceiver().method
 
 invalid_aliased_bound: Callable[[], None] = InvalidAliasedBoundedReceiver().method  # error: [invalid-assignment]
 
-# TODO: Enforce valid specializations for TypeVars nested inside receiver annotations.
-invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # TODO: error: [invalid-assignment]
-invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # TODO: error: [invalid-assignment]
+invalid_nested_bound: Callable[[], None] = InvalidNestedBoundedReceiver().method  # error: [invalid-assignment]
+valid_nested_bound: Callable[[], None] = ValidNestedBoundedReceiver().method  # no diagnostic
+invalid_union_constraints: Callable[[], None] = InvalidUnionConstrainedReceiver().method  # error: [invalid-assignment]
+valid_union_constraints: Callable[[], None] = ValidUnionConstrainedReceiver().method  # no diagnostic
 ```
 
 When we coerce a generic callable into a `Callable` type, it remembers that it is generic:
@@ -1445,4 +1452,207 @@ def make_growing[T](value: Growing[T]) -> Callable[[T], T]:
 callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
+```
+
+## Captured explicit receiver inference
+
+An explicit receiver constrains method type variables after the receiver parameter has been bound.
+Converting the method to a regular callable preserves those constraints.
+
+```py
+from typing import Callable
+from ty_extensions._internal import into_regular_callable
+
+class Box[T]:
+    value: T
+
+    def get[U](self: "Box[U]") -> U:
+        return self.value
+
+    def only_int(self: "Box[int]") -> int:
+        return self.value
+
+    def forward[**P, U](self: "Box[U]", callback: Callable[P, object]) -> U:
+        return self.value
+
+    def collect[*Ts, U](self: "Box[U]", *values: *Ts) -> tuple[U, *Ts]:
+        return self.value, *values
+
+def check(value: Box[int], other: Box[str], label: str):
+    reveal_type(value.get())  # revealed: int
+    callback = into_regular_callable(value.get)
+    reveal_type(callback())  # revealed: int
+    valid: Callable[[], int] = value.get  # no diagnostic
+    invalid: Callable[[], str] = value.get  # error: [invalid-assignment]
+    other.only_int()  # error: [invalid-argument-type]
+    invalid_callback = into_regular_callable(other.only_int)
+    invalid_callback()  # error: [invalid-argument-type]
+    variadic = into_regular_callable(value.forward)
+    reveal_type(variadic(lambda: None))  # revealed: int
+    collect = into_regular_callable(value.collect)
+    reveal_type(collect(label))  # revealed: tuple[int, str]
+```
+
+## Covariant receiver inference
+
+A covariant receiver provides a lower bound for a method's type variable. Explicit arguments can
+widen that bound, so choosing a type from the receiver alone must not fix the variable prematurely.
+
+```py
+from typing import Protocol
+
+class Producer[T](Protocol):
+    def get(self) -> T: ...
+
+class Value:
+    def get(self) -> int:
+        return 1
+
+    def choose[U](self: Producer[U], value: U) -> U:
+        return value
+
+reveal_type(Value().choose("x"))  # revealed: int | Literal["x"]
+```
+
+## Explicit receivers on recursive protocols
+
+The recursive result of a generic method remains callable when its type argument is inferred from an
+explicit receiver annotation. A writable attribute makes the protocol invariant.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Any, Protocol
+
+class A[T](Protocol):
+    value: T
+    def f[U](self: A[U]) -> A[U & ~A[U & Any]]: ...
+
+def check(value: A[Any]):
+    value.f().f()  # no diagnostic
+
+def concrete(value: A[int]):
+    result = value.f().f()  # no diagnostic
+    good: int = result.value  # no diagnostic
+    bad: str = result.value  # error: [invalid-assignment]
+
+def generic[T](value: A[T]):
+    result = value.f().f()  # no diagnostic
+    good: T = result.value  # no diagnostic
+    bad: str = result.value  # error: [invalid-assignment]
+```
+
+## Explicit receivers with nested recursive complements
+
+Receiver constraints retain the original type argument when a method excludes a nested recursive
+specialization from its result.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Any, Protocol
+
+class A[T](Protocol):
+    value: T
+    def f[U](self: A[U]) -> A[U & ~A[A[U & Any]]]: ...
+
+def gradual(value: A[Any]):
+    value.f().f()  # no diagnostic
+
+def concrete(value: A[int]):
+    result = value.f().f()  # no diagnostic
+    good: int = result.value  # no diagnostic
+    bad: str = result.value  # error: [invalid-assignment]
+
+def generic[T](value: A[T]):
+    result = value.f().f()  # no diagnostic
+    good: T = result.value  # no diagnostic
+    bad: str = result.value  # error: [invalid-assignment]
+```
+
+## Capturing parameter lists from recursive receivers
+
+Inferring the return type of a bound generic method also checks its explicit receiver. A recursive
+receiver can lead back to the same callable while its `ParamSpec` is being specialized. The result
+retains the protocol's finite members even when the recursive comparison remains unresolved.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, Protocol, assert_type
+
+class Node[T](Protocol):
+    value: int
+    def step[**P, U](self: Node[Callable[P, U]], *args: P.args, **kwargs: P.kwargs) -> Node[~Node[U]]: ...
+
+def capture[R](callback: Callable[..., R]) -> R:
+    raise NotImplementedError
+
+def check(node: Node[int]):
+    result = capture(node.step)  # no diagnostic
+    assert_type(result.value, int)
+    wrong: str = result.value  # error: [invalid-assignment]
+```
+
+## Overloaded parameter lists with recursive receivers
+
+A recursive receiver on one overload does not prevent another overload from satisfying a callable
+contract. The incompatible string contract is still rejected.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable, Protocol, overload
+
+class Node[T](Protocol):
+    value: int
+    @overload
+    def step[**P, U](self: Node[Callable[P, U]], *args: P.args, **kwargs: P.kwargs) -> Node[~Node[U]]: ...
+    @overload
+    def step(self, value: int) -> int: ...
+
+def integers(callback: Callable[[int], int]) -> None: ...
+def strings(callback: Callable[[str], str]) -> None: ...
+def check(node: Node[int]):
+    integers(node.step)  # no diagnostic
+    strings(node.step)  # error: [invalid-argument-type]
+```
+
+## Metaclass receiver bounds
+
+A metaclass can construct classes unrelated to a type variable's bound. Restricting `cls` to that
+bound therefore narrows the receiver domain of `type.__call__`. An unbounded type variable can
+preserve the constructed type without restricting which classes the metaclass accepts.
+
+```py
+from typing import Any
+
+class UnboundedMeta(type):
+    def __call__[T](cls: type[T], *args: Any, **kwargs: Any) -> T:
+        raise NotImplementedError
+
+class Value(metaclass=UnboundedMeta): ...
+
+reveal_type(Value())  # revealed: Value
+
+class BoundedMeta(type):
+    # error: [invalid-method-override]
+    def __call__[T: int](cls: type[T]) -> T:
+        raise NotImplementedError
+
+class Unrelated(metaclass=BoundedMeta): ...
+
+Unrelated()  # error: [invalid-argument-type]
 ```

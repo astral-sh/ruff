@@ -13,7 +13,7 @@ use crate::{
         FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
-        constraints::{ConstraintSet, IteratorConstraintsExtension},
+        constraints::{ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension},
         cyclic::ActiveRecursionDetector,
         function::OverloadLiteral,
         known_instance::{FunctoolsPartialInstance, MethodWrapperKind},
@@ -1016,7 +1016,7 @@ impl<'db> CallableType<'db> {
         ))
     }
 
-    /// Binds a method receiver, specializing its signatures and removing incompatible overloads.
+    /// Binds a method receiver without solving its compatibility obligations.
     ///
     /// `typing_self_type` is used to replace `typing.Self`, which differs from `receiver_type`
     /// for class methods.
@@ -1027,35 +1027,53 @@ impl<'db> CallableType<'db> {
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
     ) -> CallableType<'db> {
-        self.bind_self_in_context(
+        Self::new_internal(
             db,
-            env,
-            receiver_type,
-            typing_self_type,
-            &ObservedType::root(Type::Callable(self)),
-            &RelationContext::default(),
+            self.signatures(db).bind_self_with_receiver(
+                db,
+                env,
+                Some(receiver_type),
+                Some(typing_self_type),
+            ),
+            CallableTypeKind::Regular,
+            self.deprecated(db),
         )
     }
 
-    /// Bind an eager receiver while retaining the proof that requested its callable view.
-    pub(super) fn bind_self_in_context(
+    /// Resolves captured receivers when exposing a concrete callable signature.
+    pub(super) fn specialize_captured_receivers(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        context: &RelationContext<'db>,
+        observed: &ObservedType<'db>,
+    ) -> Self {
+        Self::new_internal(
+            db,
+            self.signatures(db)
+                .specialize_captured_receivers(db, env, context, observed),
+            self.kind(db),
+            self.deprecated(db),
+        )
+    }
+
+    /// Specializes the bound receiver for the user-visible method signature.
+    pub(super) fn bind_self_for_display(
         self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         receiver_type: Type<'db>,
         typing_self_type: Type<'db>,
-        observed: &ObservedType<'db>,
-        context: &RelationContext<'db>,
     ) -> CallableType<'db> {
+        let constraints = ConstraintSetBuilder::new();
         Self::new_internal(
             db,
-            self.signatures(db).bind_method_receiver(
+            self.signatures(db).bind_method_receiver_for_display(
                 db,
                 env,
                 receiver_type,
                 typing_self_type,
-                context,
-                observed,
+                constraints.relation_context(),
             ),
             CallableTypeKind::Regular,
             self.deprecated(db),

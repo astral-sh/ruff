@@ -1798,7 +1798,7 @@ impl<'db> MemberEvaluator<'_, 'db> {
         let constraints = ConstraintSetBuilder::with_relation_context(self.context.clone());
         let result =
             Type::bindings_observed(self.db, self.env, callable.clone(), self.context.clone())
-                .match_parameters(self.db, self.env, arguments)
+                .match_parameters(self.db, self.env, &constraints, arguments)
                 .check_types(
                     self.db,
                     self.env,

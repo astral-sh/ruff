@@ -40,6 +40,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        projection::ObservedType,
         tuple::Tuple,
     },
 };
@@ -1066,6 +1067,7 @@ fn bind_new_for_override<'db>(
     }
     let receiver = Type::from(class);
     let instance_of_class = Type::instance(db, env, class);
+    let constraints = ConstraintSetBuilder::new();
     let Some(callables) = receiver
         .resolve_dunder_new_callable(db, env, Place::bound(ty))
         .ignore_possibly_undefined()
@@ -1076,7 +1078,15 @@ fn bind_new_for_override<'db>(
     // Overloads specialized for other subclasses do not constrain this override.
     // Compare call signatures independently of descriptor behavior.
     callables
-        .map(|callable| callable.bind_self(db, env, receiver, instance_of_class))
+        .map(|callable| {
+            let callable = callable.bind_self(db, env, receiver, instance_of_class);
+            callable.specialize_captured_receivers(
+                db,
+                env,
+                constraints.relation_context(),
+                &ObservedType::root(Type::Callable(callable)),
+            )
+        })
         .to_type(db, env)
 }
 
@@ -1177,6 +1187,7 @@ fn method_override_types<'db>(
     subclass_type: Type<'db>,
     superclass_type: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
+    let constraints = ConstraintSetBuilder::new();
     let (subclass_type, superclass_type) = match (subclass_type, superclass_type) {
         (Type::BoundMethod(subclass_method), Type::BoundMethod(superclass_method))
             if let Some(superclass_signature) = superclass_method.unbound_signatures(db) =>
@@ -1209,9 +1220,25 @@ fn method_override_types<'db>(
             (
                 subclass_method
                     .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .map(|callable| {
+                        callable.specialize_captured_receivers(
+                            db,
+                            env,
+                            constraints.relation_context(),
+                            &ObservedType::root(Type::Callable(callable)),
+                        )
+                    })
                     .to_type(db, env),
                 superclass_method
                     .callables_with_receiver(db, env, receiver, typing_self_type)?
+                    .map(|callable| {
+                        callable.specialize_captured_receivers(
+                            db,
+                            env,
+                            constraints.relation_context(),
+                            &ObservedType::root(Type::Callable(callable)),
+                        )
+                    })
                     .to_type(db, env),
             )
         }
@@ -1958,7 +1985,7 @@ fn check_enum_member_against_constructor_method<'db>(
     let constraints = ConstraintSetBuilder::new();
     let result = Type::FunctionLiteral(function)
         .bindings(db, env)
-        .match_parameters(db, env, &call_args)
+        .match_parameters(db, env, &constraints, &call_args)
         .check_types(
             db,
             env,
