@@ -83,3 +83,14 @@ pass;
 
 def foo():
     yield, x
+
+# `True`, `False`, and `None` are excluded from pycodestyle's keyword set
+
+#: Okay
+values = {
+    'X':    None,
+    'XXXX': None,
+}
+#: Okay
+x =   True
+f(None   , False)

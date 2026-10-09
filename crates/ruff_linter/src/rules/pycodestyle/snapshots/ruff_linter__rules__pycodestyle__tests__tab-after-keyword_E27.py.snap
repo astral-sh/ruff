@@ -20,24 +20,6 @@ help: Replace with single space
    |
 
 E273 [*] Tab after keyword
-  --> E27.py:13:5
-   |
-11 | True and        False
-12 | #: E273 E274
-13 | True        and    False
-   |     ^^^^^^^^
-14 | #: E271
-15 | a and  b
-   |
-help: Replace with single space
-   |
-12 | #: E273 E274
-   - True		and	False
-13 + True and	False
-14 | #: E271
-   |
-
-E273 [*] Tab after keyword
   --> E27.py:13:10
    |
 11 | True and        False
