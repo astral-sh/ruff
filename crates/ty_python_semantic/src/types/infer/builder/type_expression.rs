@@ -62,9 +62,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     | Type::Recursive(_)
                     | Type::TypeAlias(_)
                     | Type::KnownInstance(
-                        KnownInstanceType::UnionType(_)
-                            | KnownInstanceType::LiteralStringAlias(_)
-                            | KnownInstanceType::TypeAliasType(_)
+                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
                     )
             )
         }) {
