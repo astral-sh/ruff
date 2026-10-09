@@ -509,6 +509,30 @@ def _(base: BaseNA, derived: DerivedNA):
     reveal_type(derived.method())  # revealed: Unknown
 ```
 
+### Final classes and methods
+
+A method on a final class, or a final method, cannot be overridden. So its inferred return type can
+be precise and does not need to be widened:
+
+```py
+from typing import final
+
+@final
+class FinalClass:
+    def method(self):
+        return 1
+
+class SomeClass:
+    @final
+    def final_method(self):
+        return "a"
+
+# TODO: Should be `Literal[1]`
+reveal_type(FinalClass().method())  # revealed: Unknown
+# TODO: Should be `Literal["a"]`
+reveal_type(SomeClass().final_method())  # revealed: Unknown
+```
+
 ### Methods that return `None` or `Never`
 
 If a method returns `None` (explicitly or implicitly), or always raises, it seems particularly
