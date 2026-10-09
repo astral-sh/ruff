@@ -3304,7 +3304,7 @@ def narrow(value: Parent[S]) -> None:
         reveal_type(value)  # revealed: Parent[S@narrow] & Child[Unknown]
         reveal_type(value.get())  # revealed: S@narrow & Unknown
         # TODO: `Parent[S]` still requires the argument to be assignable to `S`.
-        value.put(42)  # no diagnostic
+        value.put(42)
 
 def narrow_bounded(value: Parent[BoundedS]) -> None:
     if isinstance(value, Child):

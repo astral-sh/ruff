@@ -898,12 +898,13 @@ def construct[**P, R: Factory[object]](factory: Callable[P, R], /, *args: P.args
 
 `P` captures an empty parameter list, so the forwarded call supplies no information for `T`. The
 result should therefore be `Factory[Unknown]`, which is assignable to `Factory[object]` and
-satisfies `R`'s bound. We accept the call, but currently infer `Factory[object]` instead:
+satisfies `R`'s bound.
 
 ```py
+# TODO: Accept the constructor by specializing its return type.
 # TODO: revealed: Factory[Unknown]
-# no diagnostic
-reveal_type(construct(Factory))  # revealed: Factory[object]
+# error: [invalid-argument-type]
+reveal_type(construct(Factory))  # revealed: Unknown
 ```
 
 ### Captured and fixed variables in a return type
@@ -933,8 +934,8 @@ def bounded[S: str](fixed: S) -> None:
 
 ### Specializing a captured variable to satisfy a return bound
 
-The bound check may specialize a callable's own type variable, even when its return type also
-contains a fixed variable from the enclosing function.
+The callable can be specialized with `T = str` to accept `"text"` and satisfy the return bound. The
+call with `1` is invalid even after specializing `T` to match the argument.
 
 ```py
 from typing import Callable
@@ -946,7 +947,11 @@ def outer[S: str](fixed: S) -> None:
     def make[T](value: T) -> tuple[T, S]:
         return value, fixed
 
-    forward(make, "text")  # no diagnostic
+    # TODO: Ty rejects this valid call because it checks the unspecialized `T` against `str`.
+    # error: [invalid-argument-type] "Argument type `tuple[T@make, S@outer]` does not satisfy upper bound"
+    forward(make, "text")
+    # error: [invalid-argument-type] "Argument type `tuple[T@make, S@outer]` does not satisfy upper bound"
+    forward(make, 1)
 ```
 
 ### `ParamSpec` in prepended positional parameters
