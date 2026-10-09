@@ -2934,19 +2934,25 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// Methods and other non-annotation declarations mask older annotations. A dynamic base
     /// cannot supply a known declaration, so continue to look for contracts from concrete bases.
     /// Final declarations are handled by override diagnostics instead of supplying context.
-    pub(super) fn class_body_declaration(self, name: &str) -> Option<ClassBodyDeclaration<'db>> {
+    pub(super) fn class_body_declaration(self, name: &str) -> ClassBodyDeclaration<'db> {
         let db = self.db;
+        let mut missing_declaration = ClassBodyDeclaration::Undeclared;
         for base in self.mro_iter {
             let base = match base {
-                ClassBase::Generic
-                | ClassBase::Protocol
-                | ClassBase::Any
-                | ClassBase::Dynamic(_) => continue,
+                ClassBase::Generic | ClassBase::Protocol => continue,
+                ClassBase::Any | ClassBase::Dynamic(_) => {
+                    missing_declaration = ClassBodyDeclaration::Unknown;
+                    continue;
+                }
                 ClassBase::Class(base) => base,
                 // A divergent base is not yet known, and TypedDict has a special member lookup.
-                ClassBase::Divergent(_) | ClassBase::TypedDict(_) => return None,
+                ClassBase::Divergent(_) | ClassBase::TypedDict(_) => {
+                    return ClassBodyDeclaration::Unknown;
+                }
             };
-            let (base, specialization) = base.static_class_literal(db)?;
+            let Some((base, specialization)) = base.static_class_literal(db) else {
+                return missing_declaration;
+            };
             let scope = base.body_scope(db);
             let Some(symbol) = place_table(db, scope).symbol_id(name) else {
                 continue;
@@ -2968,22 +2974,29 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     continue;
                 }
                 inherited_class_body_declaration(db, scope, symbol)
-            } else {
-                (!declared.qualifiers.contains(TypeQualifiers::FINAL)
-                    && declarations.contains_only_annotated_assignments(db))
-                .then_some(ClassBodyDeclaration {
+            } else if !declared.qualifiers.contains(TypeQualifiers::FINAL)
+                && declarations.contains_only_annotated_assignments(db)
+            {
+                ClassBodyDeclaration::Declared {
                     member: declared,
                     class: base,
-                })
+                }
+            } else {
+                ClassBodyDeclaration::Undeclared
             };
-            return declaration.map(|declaration| ClassBodyDeclaration {
-                member: declaration
-                    .member
-                    .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
-                ..declaration
-            });
+            return match declaration {
+                ClassBodyDeclaration::Declared { member, class } => {
+                    ClassBodyDeclaration::Declared {
+                        member: member
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization)),
+                        class,
+                    }
+                }
+                ClassBodyDeclaration::Undeclared => missing_declaration,
+                ClassBodyDeclaration::Unknown => ClassBodyDeclaration::Unknown,
+            };
         }
-        None
+        missing_declaration
     }
 
     /// Infer augmented-assignment results after finding the existing attribute they read.
