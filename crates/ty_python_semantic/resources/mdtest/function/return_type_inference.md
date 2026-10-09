@@ -664,6 +664,18 @@ reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
 reveal_type(fibonacci(5))  # revealed: Unknown
 ```
 
+In some cases, fixed-point iteration might be able to determine a precise return type:
+
+```py
+def alternating(n: int):
+    if n <= 0:
+        return 1
+    return -alternating(n - 1)
+
+# TODO: Should ideally be `Literal[-1, 1]`, or at least `Literal[-1, 1] | Unknown`
+reveal_type(alternating(3))  # revealed: Unknown
+```
+
 ### Divergent
 
 A function that would never return normally should still be analyzed without errors:
