@@ -1059,3 +1059,67 @@ Element = Ts if condition() else int
 def homogeneous_union(values: tuple[Element, ...]) -> None:
     reveal_type(values)  # revealed: tuple[Unknown | int, ...]
 ```
+
+## Recursive unpack shapes
+
+Unpacking a recursive alias must describe a finite sequence of tuple elements. This alias instead
+adds another required element each time its unpack operand is expanded, even though its type
+arguments also change. We reject that recursive shape while retaining the known first element for
+error recovery.
+
+```py
+from typing import TypeAlias, TypeVar, Unpack
+
+T = TypeVar("T")
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+Growing: TypeAlias = tuple[T, Unpack["Growing[Growing[T]]"]]
+
+def growing(value: Growing[int]) -> None:
+    integer: int = value[0]  # no diagnostic
+```
+
+The same rule applies when arguments do not grow, including a splice cycle that never contributes an
+element.
+
+```py
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+Repeated: TypeAlias = tuple[int, Unpack["Repeated"]]
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+EmptyCycle: TypeAlias = tuple[Unpack["EmptyCycle"]]
+```
+
+Recursion within a single element does not change the number of elements in the outer tuple.
+Unpacking a finite alias preserves every position, including through repeated applications of the
+same alias constructor.
+
+```py
+Tree: TypeAlias = tuple[T, "Tree[list[T]] | None"]
+Wrapped: TypeAlias = tuple[str, Unpack[Tree[T]]]
+Identity: TypeAlias = T
+Finite: TypeAlias = tuple[bytes, Unpack[Identity[Identity[tuple[int, str]]]]]
+
+wrapped: Wrapped[int] = ("prefix", 1, None)  # no diagnostic
+invalid: Wrapped[int] = ("prefix", "wrong", None)  # error: [invalid-assignment]
+finite: Finite = (b"prefix", 1, "tail")  # no diagnostic
+
+def inspect(value: Finite) -> None:
+    reveal_type(value)  # revealed: tuple[bytes, int, str]
+```
+
+An unbounded tuple is already a finite description of a variable-length segment. Aliases preserve
+that segment's gradual arity and the identity of an unpacked type variable tuple.
+
+```py
+from typing import Any, TypeVarTuple
+
+Ts = TypeVarTuple("Ts")
+Gradual: TypeAlias = tuple[int, Unpack[tuple[Any, ...]], str]
+Packed: TypeAlias = tuple[int, Unpack[Ts], str]
+
+def gradual(value: Gradual) -> None:
+    longer: tuple[int, bool, bytes, str] = value  # no diagnostic
+    shorter: tuple[int, str] = value  # no diagnostic
+
+packed: Packed[bool, bytes] = (1, True, b"data", "tail")  # no diagnostic
+invalid_pack: Packed[bool, bytes] = (1, b"data", "tail")  # error: [invalid-assignment]
+```

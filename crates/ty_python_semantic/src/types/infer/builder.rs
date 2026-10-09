@@ -2038,14 +2038,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         if let Some(name) = type_alias.name.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, &type_alias.value);
+            self.check_type_alias_cycle(
+                &name.id,
+                &type_alias.value,
+                self.index.expect_single_definition(type_alias),
+            );
         }
     }
 
     /// Check both alias syntaxes, including union members that disappear during expansion.
-    fn check_type_alias_cycle(&mut self, name: &str, value: &ast::Expr) {
+    fn check_type_alias_cycle(
+        &mut self,
+        name: &str,
+        value: &ast::Expr,
+        definition: Definition<'db>,
+    ) {
         let db = self.db();
         let value_ty = self.expression_type(value);
+        self.check_alias_tuple_shape(value, definition, value_ty);
         let expanded = value_ty.expand_eagerly(db, self.program_environment());
         if (expanded.is_recursive_divergent() || value_ty.has_unguarded_alias_cycle(db))
             && let Some(builder) = self
@@ -4287,7 +4297,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.typevar_binding_context = previous_context;
         if let Some(name) = target.as_name_expr() {
-            self.check_type_alias_cycle(&name.id, &arguments.args[1]);
+            self.check_type_alias_cycle(&name.id, &arguments.args[1], definition);
         }
     }
 

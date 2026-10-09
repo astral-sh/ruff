@@ -605,6 +605,11 @@ impl<'db> TypeAliasType<'db> {
         body
     }
 
+    /// Instantiate a selected expression without forcing any other part of the declaration.
+    pub(super) fn apply_to_node_structural(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
+        self.apply_application(db, node, None)
+    }
+
     /// Resolve this application without caching an observation that depends on active recursion.
     pub(super) fn value_type_with_recursion(
         self,

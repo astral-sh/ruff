@@ -361,6 +361,14 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    /// Return the tuple constructor without observing or expanding its sequence of elements.
+    pub(super) const fn own_tuple_type(self) -> Option<TupleType<'db>> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => Some(tuple),
+            _ => None,
+        }
+    }
+
     /// If this is a specialized instance of `slice`, returns a [`SliceLiteral`] describing it.
     /// Otherwise returns `None`.
     ///

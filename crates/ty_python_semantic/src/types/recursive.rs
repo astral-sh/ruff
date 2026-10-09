@@ -768,7 +768,30 @@ impl<'db> RecursiveType<'db> {
     /// Report whether unfolding returns exactly `Type::Recursive(self)`. An unfolded
     /// type can still contain recursive references, so callers must retain their recursion guards.
     pub fn unfold(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> UnfoldResult<'db> {
-        let mut unfolded = self.unfolded_body(db);
+        let unfolded = self.replay_operations(db, env, self.unfolded_body(db));
+        if unfolded == Type::Recursive(self) {
+            UnfoldResult::Unchanged(self)
+        } else {
+            UnfoldResult::Unfolded(unfolded)
+        }
+    }
+
+    /// The unspecialized finite body used to analyze tuple unpack dependencies.
+    pub(super) fn shape_body(self, db: &'db dyn Db) -> Type<'db> {
+        self.body(db)
+    }
+
+    /// Instantiate one body node with the same environment and operation order as unfolding.
+    pub(super) fn apply_to_node_structural(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
+        self.replay_operations(db, &self.environment(db), self.close_body_node(db, node))
+    }
+
+    fn replay_operations(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        mut unfolded: Type<'db>,
+    ) -> Type<'db> {
         for operation in self.operations(db) {
             operation.with_mapping(|mapping| {
                 let mut visitor = ApplyTypeMappingVisitor::new_for_type_construction(env);
@@ -783,11 +806,7 @@ impl<'db> RecursiveType<'db> {
                 );
             });
         }
-        if unfolded == Type::Recursive(self) {
-            UnfoldResult::Unchanged(self)
-        } else {
-            UnfoldResult::Unfolded(unfolded)
-        }
+        unfolded
     }
 
     /// Share the closed, specialized body across mappings with different visitors.
@@ -797,8 +816,12 @@ impl<'db> RecursiveType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn unfolded_body(self, db: &'db dyn Db) -> Type<'db> {
+        self.close_body_node(db, self.body(db))
+    }
+
+    fn close_body_node(self, db: &'db dyn Db, node: Type<'db>) -> Type<'db> {
         let env = self.environment(db);
-        let unfolded = self.body(db).apply_type_mapping_impl(
+        let unfolded = node.apply_type_mapping_impl(
             db,
             &TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Unfold(

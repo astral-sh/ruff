@@ -2170,3 +2170,63 @@ def f[*Ts](
     bad2: tuple[*tuple[str, ...], *Ts],  # error: [invalid-type-form]
 ) -> None: ...
 ```
+
+## Recursive unpack shapes
+
+Unpacking a recursive alias must describe a finite sequence of tuple elements. This alias instead
+adds another required element each time its unpack operand is expanded, even though its type
+arguments also change. We reject that recursive shape while retaining the known first element for
+error recovery.
+
+```py
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+type Growing[T] = tuple[T, *Growing[Growing[T]]]
+
+def growing(value: Growing[int]) -> None:
+    integer: int = value[0]  # no diagnostic
+```
+
+The same rule applies when arguments do not grow, including a splice cycle that never contributes an
+element.
+
+```py
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+type Repeated = tuple[int, *Repeated]
+# error: [invalid-type-form] "Recursive tuple unpacking does not have a finite shape"
+type EmptyCycle = tuple[*EmptyCycle]
+```
+
+Recursion within a single element does not change the number of elements in the outer tuple.
+Unpacking a finite alias preserves every position, including through repeated applications of the
+same alias constructor.
+
+```py
+type Tree[T] = tuple[T, Tree[list[T]] | None]
+type Wrapped[T] = tuple[str, *Tree[T]]
+type Identity[T] = T
+type Finite = tuple[bytes, *Identity[Identity[tuple[int, str]]]]
+
+wrapped: Wrapped[int] = ("prefix", 1, None)  # no diagnostic
+invalid: Wrapped[int] = ("prefix", "wrong", None)  # error: [invalid-assignment]
+finite: Finite = (b"prefix", 1, "tail")  # no diagnostic
+
+def inspect(value: Finite) -> None:
+    reveal_type(value)  # revealed: tuple[bytes, int, str]
+```
+
+An unbounded tuple is already a finite description of a variable-length segment. Aliases preserve
+that segment's gradual arity and the identity of an unpacked type variable tuple.
+
+```py
+from typing import Any
+
+type Gradual = tuple[int, *tuple[Any, ...], str]
+type Packed[*Ts] = tuple[int, *Ts, str]
+
+def gradual(value: Gradual) -> None:
+    longer: tuple[int, bool, bytes, str] = value  # no diagnostic
+    shorter: tuple[int, str] = value  # no diagnostic
+
+packed: Packed[bool, bytes] = (1, True, b"data", "tail")  # no diagnostic
+invalid_pack: Packed[bool, bytes] = (1, b"data", "tail")  # error: [invalid-assignment]
+```

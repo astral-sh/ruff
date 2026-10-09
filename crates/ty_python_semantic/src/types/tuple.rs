@@ -28,17 +28,22 @@ use crate::subscript::{
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker, TypeVarEvaluation};
-use crate::types::set_theoretic::RecursivelyDefined;
+use crate::types::set_theoretic::{RecursivelyDefined, TypeNormalization};
 use crate::types::visitor::any_over_type_expanding_aliases;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionType,
+    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::Truthiness;
 use ty_python_core::definition::Definition;
 
 pub(crate) mod promotion;
+mod shape;
+pub(super) use shape::{
+    TupleElementExpression, TupleShapeDiagnostic, TupleShapeError, alias_shape_diagnostic,
+};
+use shape::{TupleElements, TupleShapeObservation};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum TupleLength {
@@ -127,13 +132,13 @@ impl TupleLength {
     }
 }
 
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_raw, heap_size=ruff_memory_usage::heap_size)]
 pub struct TupleType<'db> {
     #[returns(copy)]
     pub(crate) program: Program<'db>,
 
     #[returns(ref)]
-    pub(crate) tuple: TupleSpec<'db>,
+    elements: TupleElements<'db>,
 }
 
 pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -141,6 +146,12 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
     tuple: TupleType<'db>,
     visitor: &V,
 ) {
+    if let TupleElements::Expression(elements) = tuple.elements(db) {
+        for element in elements {
+            visitor.visit_type(db, element.ty());
+        }
+        return;
+    }
     match tuple.tuple(db) {
         Tuple::Fixed(tuple) => {
             for element in tuple.iter_all_elements() {
@@ -171,6 +182,58 @@ impl get_size2::GetSize for TupleType<'_> {}
 
 #[salsa::tracked]
 impl<'db> TupleType<'db> {
+    fn new_internal(
+        db: &'db dyn Db,
+        program: Program<'db>,
+        spec: impl Into<TupleElements<'db>>,
+    ) -> Self {
+        Self::new_raw(db, program, spec.into())
+    }
+
+    /// Construct a sequence without expanding the operands of its unpack expressions.
+    pub(super) fn from_element_expressions(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        elements: Vec<TupleElementExpression<'db>>,
+    ) -> Self {
+        if elements
+            .iter()
+            .all(|element| matches!(element, TupleElementExpression::Element(_)))
+        {
+            return Self::heterogeneous(
+                db,
+                env,
+                elements.into_iter().map(TupleElementExpression::ty),
+            );
+        }
+        Self::new_raw(
+            db,
+            env.program(db),
+            TupleElements::Expression(elements.into_boxed_slice()),
+        )
+    }
+
+    /// Observe the finite sequence represented by this constructor. Invalid shapes retain a
+    /// recovery sequence; callers reporting annotations inspect `shape_diagnostic` separately.
+    pub(crate) fn tuple(self, db: &'db dyn Db) -> &'db TupleSpec<'db> {
+        match self.elements(db) {
+            TupleElements::Resolved(spec) => spec,
+            TupleElements::Expression(_) => &self.observe_shape(db).tuple,
+        }
+    }
+
+    #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+    fn observe_shape(self, db: &'db dyn Db) -> TupleShapeObservation<'db> {
+        shape::observe(db, self)
+    }
+
+    pub(super) fn shape_diagnostic(self, db: &'db dyn Db) -> Option<TupleShapeDiagnostic> {
+        match self.elements(db) {
+            TupleElements::Resolved(_) => None,
+            TupleElements::Expression(_) => self.observe_shape(db).diagnostic(),
+        }
+    }
+
     pub(crate) fn new(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
@@ -290,6 +353,22 @@ impl<'db> TupleType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
+        if let TupleElements::Expression(elements) = self.elements(db) {
+            let elements = elements
+                .iter()
+                .map(|element| {
+                    let normalized = element
+                        .ty()
+                        .recursive_type_normalized_impl(db, env, div, true);
+                    Some(element.with_type(if nested {
+                        normalized?
+                    } else {
+                        normalized.unwrap_or(div)
+                    }))
+                })
+                .collect::<Option<Vec<_>>>()?;
+            return Some(Self::from_element_expressions(db, env, elements));
+        }
         Some(Self::new_internal(
             db,
             env.program(db),
@@ -305,6 +384,64 @@ impl<'db> TupleType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if let TupleElements::Expression(elements) = self.elements(db) {
+            let visitor = visitor.for_type_construction();
+            return Self::from_element_expressions(
+                db,
+                visitor.env,
+                elements
+                    .iter()
+                    .map(|element| {
+                        // An unpack operand is a deferred sequence operation. Expanding its aliases
+                        // belongs to shape observation, which checks the declaration's splice graph.
+                        if matches!(
+                            element,
+                            TupleElementExpression::Unpack(_)
+                                | TupleElementExpression::UnpackSpecialization(_)
+                        ) && matches!(type_mapping, TypeMapping::EagerExpansion)
+                        {
+                            return *element;
+                        }
+                        let mapped =
+                            element
+                                .ty()
+                                .apply_type_mapping_impl(db, type_mapping, tcx, &visitor);
+                        if let TupleElementExpression::Unpack(Type::TypeVar(typevar)) = element
+                            && typevar.is_typevartuple(db)
+                            && mapped != element.ty()
+                        {
+                            TupleElementExpression::UnpackSpecialization(mapped)
+                        } else {
+                            element.with_type(mapped)
+                        }
+                    })
+                    .collect(),
+            );
+        }
+        if let Tuple::Variable(tuple) = self.tuple(db)
+            && let VariableSegment::TypeVarTuple(typevar) = tuple.variable()
+        {
+            let visitor = visitor.for_type_construction();
+            let mapped =
+                Type::TypeVar(typevar).apply_type_mapping_impl(db, type_mapping, tcx, &visitor);
+            if mapped != Type::TypeVar(typevar) {
+                let map_element = |ty: Type<'db>| {
+                    TupleElementExpression::Element(ty.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        &visitor,
+                    ))
+                };
+                let elements = tuple
+                    .iter_prefix_elements()
+                    .map(map_element)
+                    .chain([TupleElementExpression::UnpackSpecialization(mapped)])
+                    .chain(tuple.iter_suffix_elements().map(map_element))
+                    .collect();
+                return Self::from_element_expressions(db, visitor.env, elements);
+            }
+        }
         if type_mapping.is_structural() {
             return TupleType::new_internal(
                 db,
@@ -330,6 +467,14 @@ impl<'db> TupleType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
+        if let TupleElements::Expression(elements) = self.elements(db) {
+            for element in elements {
+                element
+                    .ty()
+                    .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
+            }
+            return;
+        }
         self.tuple(db)
             .find_legacy_typevars_impl(db, env, binding_context, typevars, visitor);
     }
@@ -2600,19 +2745,22 @@ impl<'db> Tuple<Type<'db>, VariableSegment<'db>> {
     }
 
     fn tuple_class_type(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
-        match self {
-            Tuple::Fixed(tuple) => {
-                UnionType::from_elements_leave_aliases(db, env, tuple.iter_all_elements())
-            }
-            Tuple::Variable(tuple) => UnionType::from_elements_leave_aliases(
-                db,
-                env,
+        // A class view is also projected from raw recursive constructor bodies. Its argument
+        // union must remain structural until the closed class application is compared.
+        let elements = match self {
+            Tuple::Fixed(tuple) => Either::Left(tuple.iter_all_elements()),
+            Tuple::Variable(tuple) => Either::Right(
                 tuple
                     .iter_prefix_elements()
                     .chain(std::iter::once(tuple.variable().tuple_class_type()))
                     .chain(tuple.iter_suffix_elements()),
             ),
+        };
+        let mut union = UnionBuilder::new(db, env).normalization(TypeNormalization::Structural);
+        for element in elements {
+            union.add_in_place(element);
         }
+        union.build()
     }
 
     pub(crate) fn variable_element_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {

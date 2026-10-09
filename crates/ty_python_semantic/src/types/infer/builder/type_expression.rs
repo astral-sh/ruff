@@ -25,11 +25,14 @@ use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
     implicit_alias_parameters, infer_implicit_alias_type,
 };
+use crate::types::instance::NominalInstanceType;
 use crate::types::set_theoretic::TypeNormalization;
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
-use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::tuple::{
+    TupleElementExpression, TupleShapeDiagnostic, TupleShapeError, TupleType,
+};
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place_table;
 use ty_python_core::scope::ScopeKind;
@@ -146,6 +149,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         self.context.inference_flags |=
             InferenceFlags::IN_TYPE_ALIAS | InferenceFlags::IN_ALIAS_CONSTRUCTOR;
         let ty = self.infer_type_expression(value);
+        self.check_alias_tuple_shape(value, definition, ty);
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
             let target = match definition.kind(db) {
@@ -1320,19 +1324,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .context
             .inference_flags
             .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
-        let starred_type = self.infer_type_expression(value).resolve_type_alias(db);
+        let starred_type = self.infer_type_expression(value);
         self.context.inference_flags.set(
             InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
             previously_in_unpack_type_argument,
         );
 
-        if starred_type.exact_tuple_instance_spec(self.db()).is_some()
+        if starred_type
+            .as_nominal_instance()
+            .and_then(NominalInstanceType::own_tuple_type)
+            .is_some()
+            || matches!(
+                starred_type,
+                Type::TypeAlias(_)
+                    | Type::Recursive(_)
+                    | Type::RecursiveVar(_)
+                    | Type::Divergent(_)
+            )
             || matches!(
                 starred_type,
                 Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
             )
         {
-            starred_type
+            self.deferred_unpack_type(starred.into(), starred_type)
         } else {
             self.store_type_expression_flags(
                 ast::ExprRef::from(starred),
@@ -1431,6 +1445,105 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
+    fn deferred_unpack_type(
+        &mut self,
+        expression: ast::ExprRef<'_>,
+        operand: Type<'db>,
+    ) -> Type<'db> {
+        // A pack parameter already names a symbolic sequence. Keep its identity for callable
+        // parameter matching and generic pack specialization.
+        if matches!(operand, Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())) {
+            return operand;
+        }
+        let tuple = operand
+            .as_nominal_instance()
+            .and_then(NominalInstanceType::own_tuple_type)
+            .unwrap_or_else(|| {
+                TupleType::from_element_expressions(
+                    self.db(),
+                    self.program_environment(),
+                    vec![TupleElementExpression::Unpack(operand)],
+                )
+            });
+        // The enclosing tuple reports its complete shape once; standalone starred annotations
+        // (such as *args) have no enclosing tuple consumer to perform that validation.
+        if !self
+            .inference_flags()
+            .contains(InferenceFlags::IN_VALID_UNPACK_CONTEXT)
+        {
+            self.check_tuple_shape(expression, tuple);
+        }
+        Type::tuple(tuple)
+    }
+
+    pub(super) fn check_alias_tuple_shape(
+        &mut self,
+        expression: &ast::Expr,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+    ) {
+        let error = crate::types::tuple::alias_shape_diagnostic(
+            self.db(),
+            self.program_environment(),
+            definition,
+            ty,
+        );
+        self.report_tuple_shape_error(expression.into(), error);
+    }
+
+    fn check_tuple_shape(&mut self, expression: ast::ExprRef<'_>, tuple: TupleType<'db>) {
+        if self
+            .inference_flags()
+            .intersects(InferenceFlags::IN_TYPE_ALIAS | InferenceFlags::IN_ALIAS_CONSTRUCTOR)
+        {
+            return;
+        }
+        self.report_tuple_shape_error(expression, tuple.shape_diagnostic(self.db()));
+    }
+
+    fn report_tuple_shape_error(
+        &mut self,
+        expression: ast::ExprRef<'_>,
+        diagnostic: Option<TupleShapeDiagnostic>,
+    ) {
+        let Some(diagnostic) = diagnostic else {
+            return;
+        };
+        let message = match diagnostic.error {
+            TupleShapeError::Recursive => "Recursive tuple unpacking does not have a finite shape",
+            TupleShapeError::NotTuple => "Only a tuple type or TypeVarTuple can be unpacked",
+            TupleShapeError::MultipleVariadic => {
+                "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
+            }
+        };
+        if diagnostic.error == TupleShapeError::MultipleVariadic
+            && let ast::ExprRef::Subscript(subscript) = expression
+            && let ast::Expr::Tuple(elements) = &*subscript.slice
+            && !diagnostic.multiple_variadic_parts.is_empty()
+        {
+            for &(first, later) in &diagnostic.multiple_variadic_parts {
+                if let Some(first) = elements.elts.get(first)
+                    && let Some(later) = elements.elts.get(later)
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression)
+                {
+                    let mut diagnostic = builder.into_diagnostic(message);
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(first)
+                            .message("First unpacked variadic tuple"),
+                    );
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(later)
+                            .message("Later unpacked variadic tuple"),
+                    );
+                }
+            }
+        } else if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expression) {
+            builder.into_diagnostic(message);
+        }
+    }
+
     /// Return the type represented by a `tuple[]` expression in a type annotation.
     ///
     /// This method assumes that a type has already been inferred and stored for the `value`
@@ -1474,9 +1587,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return result;
                 }
 
-                let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
-
-                let mut first_unpacked_variadic_tuple = None;
+                let mut element_types = Vec::with_capacity(elements.len());
 
                 for element in elements {
                     if element.is_ellipsis_literal_expr() {
@@ -1490,7 +1601,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             );
                         }
                         self.store_expression_type(element, Type::unknown());
-                        element_types.push(Type::unknown());
+                        element_types.push(TupleElementExpression::Element(Type::unknown()));
                         continue;
                     }
                     let previously_in_valid_unpack_context = self
@@ -1512,60 +1623,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
 
                     if is_unpack {
-                        let mut report_too_many_unpacked_tuples = || {
-                            if let Some(first_unpacked_variadic_tuple) =
-                                first_unpacked_variadic_tuple
+                        element_types.push(
+                            if self
+                                .type_expression_flags(element)
+                                .contains(TypeExpressionFlags::INVALID_UNPACK)
                             {
-                                if let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                                {
-                                    let mut diagnostic = builder.into_diagnostic(
-                                        "Multiple unpacked variadic tuples \
-                                            are not allowed in a `tuple` specialization",
-                                    );
-                                    diagnostic.annotate(
-                                        self.context
-                                            .secondary(first_unpacked_variadic_tuple)
-                                            .message("First unpacked variadic tuple"),
-                                    );
-                                    diagnostic.annotate(
-                                        self.context
-                                            .secondary(element)
-                                            .message("Later unpacked variadic tuple"),
-                                    );
-                                }
+                                TupleElementExpression::UnpackRecovery(element_ty)
                             } else {
-                                first_unpacked_variadic_tuple = Some(element);
-                            }
-                        };
-
-                        if let Some(inner_tuple) = element_ty.exact_tuple_instance_spec(self.db()) {
-                            element_types = element_types.concat(db, env, &inner_tuple);
-
-                            if inner_tuple.is_variadic() {
-                                report_too_many_unpacked_tuples();
-                            }
-                        } else if let Type::TypeVar(typevar) = element_ty
-                            && typevar.is_typevartuple(self.db())
-                        {
-                            report_too_many_unpacked_tuples();
-                            element_types = element_types.concat_variadic_typevar(db, env, typevar);
-                        } else {
-                            // TODO: emit a diagnostic
-                        }
+                                TupleElementExpression::Unpack(element_ty)
+                            },
+                        );
                     } else if self
                         .type_expression_flags(element)
                         .contains(TypeExpressionFlags::INVALID_BARE_TYPE_VAR_TUPLE)
                     {
                         // Do not count recovery as another explicit unpack.
-                        element_types =
-                            element_types.concat(db, env, &TupleSpec::homogeneous(Type::unknown()));
+                        element_types.push(TupleElementExpression::UnpackRecovery(
+                            Type::homogeneous_tuple(db, env, Type::unknown()),
+                        ));
                     } else {
-                        element_types.push(element_ty);
+                        element_types.push(TupleElementExpression::Element(element_ty));
                     }
                 }
 
-                let ty = TupleType::new(db, env, &element_types.build());
+                let ty = TupleType::from_element_expressions(db, env, element_types);
+                self.check_tuple_shape(tuple.into(), ty);
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
@@ -1612,15 +1694,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 == Type::SpecialForm(SpecialFormType::Unpack)
                     );
                 if single_element_is_unpack {
-                    if let Some(inner_tuple) =
-                        single_element_ty.exact_tuple_instance_spec(self.db())
-                    {
-                        return TupleType::new(db, env, &inner_tuple);
-                    } else if let Type::TypeVar(typevar) = single_element_ty
-                        && typevar.is_typevartuple(self.db())
-                    {
-                        return TupleType::unpacked_typevartuple(db, env, typevar);
-                    }
+                    let tuple_type = TupleType::from_element_expressions(
+                        db,
+                        env,
+                        vec![TupleElementExpression::Unpack(single_element_ty)],
+                    );
+                    self.check_tuple_shape(tuple.into(), tuple_type);
+                    return tuple_type;
                 }
                 TupleType::heterogeneous(db, env, [single_element_ty])
             }
@@ -2934,17 +3014,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return inner_ty;
                 }
 
-                let inner_ty = inner_ty.resolve_type_alias(db);
-
                 // Preserve valid unpack targets so that `Unpack[...]` follows the same
                 // argument-binding path as an equivalent starred annotation.
-                if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
+                if inner_ty
+                    .as_nominal_instance()
+                    .and_then(NominalInstanceType::own_tuple_type)
+                    .is_some()
+                    || matches!(
+                        inner_ty,
+                        Type::TypeAlias(_)
+                            | Type::Recursive(_)
+                            | Type::RecursiveVar(_)
+                            | Type::Divergent(_)
+                    )
                     || matches!(
                         inner_ty,
                         Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
                     )
                 {
-                    inner_ty
+                    self.deferred_unpack_type(subscript.into(), inner_ty)
                 } else {
                     self.store_type_expression_flags(
                         ast::ExprRef::from(subscript),
