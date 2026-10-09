@@ -6645,7 +6645,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // This context is only an inference hint. Discard it if inference reports a diagnostic
         // other than the explicitly allowed lint, then infer with the original context.
-        speculative_builder.infer_deferred_lambda_bodies();
         let ty = if speculative_builder.context.has_diagnostics() {
             infer_expression(self, fallback_tcx)
         } else {
@@ -8975,8 +8974,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::declared(None)
         };
 
-        // The file checker visits the body separately. Checking it here can create cycles
-        // through body diagnostics while the query that produces this callable is running.
         let input = LambdaSignature::new(
             db,
             parameters,
@@ -8987,6 +8984,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None,
         );
         self.lambda_inputs.insert(lambda_expression.into(), input);
+        // Infer the body for diagnostics, but keep its result out of the callable's identity.
+        self.extend_scope(input.infer_body(db));
         Type::Callable(CallableType::from_lambda(db, input))
     }
 
@@ -12420,26 +12419,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 declarations.into_vec(),
             ),
             extra,
-        }
-    }
-
-    /// Validate the body inputs recorded by this speculative inference attempt.
-    fn infer_deferred_lambda_bodies(&mut self) {
-        let db = self.db();
-        let mut checked = FxHashSet::default();
-        loop {
-            let mut pending: Vec<_> = self
-                .lambda_inputs
-                .iter()
-                .filter_map(|(scope, input)| checked.insert(*input).then_some((*scope, *input)))
-                .collect();
-            pending.sort_by_key(|(scope, _)| *scope);
-            if pending.is_empty() {
-                break;
-            }
-            for (_, input) in pending {
-                self.extend_scope(input.infer_body(db));
-            }
         }
     }
 

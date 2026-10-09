@@ -276,9 +276,8 @@ node.missing
 
 ## Recursive references during collection inference
 
-A lambda can refer to a name that is rebound by unpacking a collection. Checking the lambda's body
-separately lets inference converge while retaining the errors in the collection and the warning for
-using the lambda as a condition.
+A lambda can refer to a name that is rebound by unpacking a collection. Inference converges while
+retaining the errors in the collection and the warning for using the lambda as a condition.
 
 ```py
 node = lambda: node
@@ -321,4 +320,52 @@ inferred type is `Unknown`.
 # error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
 # error: [unresolved-reference] "Name `missing` used when not defined"
 value: lambda: missing = 1
+```
+
+## Recursive decorator with a lambda default
+
+A decorator's default can refer to the decorated class while its return value refers to another
+binding that later becomes a type alias. Inference converges and preserves the outer tuple.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+@lambda func, fallback=lambda: Result: (build,)
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result)  # revealed: tuple[Divergent]
+
+type build = int
+```
+
+## Recursive decorator returning a collection
+
+The cycle can also pass through a promoted collection element. The finite part of the decorator's
+return type remains available.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+values = [1]
+
+@lambda func, fallback=lambda: Result: (0, {build: 0 for _ in values})
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result[0])  # revealed: Literal[0]
+
+type build = int
 ```

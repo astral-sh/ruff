@@ -545,7 +545,7 @@ pub(crate) fn infer_complete_scope_types<'db>(
 /// unless you have already obtained the necessary type context while inferring the parent scope.
 /// Inferring a nested scope independently without type context can lead to incorrect inferred
 /// types or diagnostics.
-pub(crate) fn infer_scope_types<'db>(
+fn infer_scope_types<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     tcx: TypeContext<'db>,
