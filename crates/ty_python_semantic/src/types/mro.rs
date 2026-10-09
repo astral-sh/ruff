@@ -51,7 +51,7 @@ impl<'db> Mro<'db> {
     /// the default specialization of the class's type variables.)
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
-    /// [`super::infer::infer_scope_types`].)
+    /// [`super::infer::infer_complete_scope_types`].)
     pub(super) fn of_static_class(
         db: &'db dyn Db,
         class_literal: StaticClassLiteral<'db>,
