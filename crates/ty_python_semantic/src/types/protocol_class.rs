@@ -315,7 +315,7 @@ impl<'db> ProtocolClass<'db> {
         // TODO: Validate protocols with inherited members too. This single-base pattern skips
         // subclasses such as `class Child(Base[T], Protocol[T])`, even when their declared
         // variance disagrees with the inherited interface.
-        let [Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context))] =
+        let [Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(Some(generic_context)))] =
             class.explicit_bases(db)
         else {
             return;

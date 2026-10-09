@@ -268,7 +268,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             .node(&parsed)
             .type_params
             .as_ref()
-            .map(|type_params| {
+            .and_then(|type_params| {
                 let index = semantic_index(db, program_file);
                 let definition = index.expect_single_definition(type_alias_stmt_node);
                 GenericContext::from_type_params(db, index, definition, type_params)
@@ -403,7 +403,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             variables.insert(typevar);
         }
 
-        (!variables.is_empty()).then(|| GenericContext::from_typevar_instances(db, &env, variables))
+        GenericContext::try_from_typevar_instances(db, &env, variables)
     }
 }
 

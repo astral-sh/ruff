@@ -865,18 +865,17 @@ pub(crate) fn check_static_class_definitions<'db>(
         ));
     }
 
-    if let (Some(legacy), Some(inherited)) = (
-        class.legacy_generic_context(db),
-        class.inherited_legacy_generic_context(db),
-    ) {
-        if !inherited.is_subset_of(db, legacy)
-            && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-        {
-            builder.into_diagnostic(
-                "`Generic` base class must include all type \
-                    variables used in other base classes",
-            );
-        }
+    if class.has_explicit_legacy_generic_base(db)
+        && let Some(inherited) = class.inherited_legacy_generic_context(db)
+        && class
+            .legacy_generic_context(db)
+            .is_none_or(|legacy| !inherited.is_subset_of(db, legacy))
+        && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+    {
+        builder.into_diagnostic(
+            "`Generic` base class must include all type \
+                variables used in other base classes",
+        );
     }
 
     // Check that no type parameter with a default follows a TypeVarTuple.
