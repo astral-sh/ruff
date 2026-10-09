@@ -532,10 +532,6 @@ impl<'db> SpecializationFlowGraph<'db> {
             .is_disjoint(&definitions_reaching_target)
     }
 
-    fn definition_reaches(&self, from: Definition<'db>, to: Definition<'db>) -> bool {
-        self.definitions_reaching(to).contains(&from)
-    }
-
     fn definitions_reaching(&self, target: Definition<'db>) -> FxHashSet<Definition<'db>> {
         let mut incoming = FxHashMap::<Definition, SmallVec<[Definition; 2]>>::default();
         for &(source, target) in &self.definition_edges {
@@ -781,12 +777,21 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 }
 
 impl<'db> TypeAliasType<'db> {
-    /// Returns whether this alias can refer back to its own definition.
-    pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let root = RecursiveDefinition::TypeAlias(self.unspecialized(db));
-        let root_definition = root.definition(db);
-        SpecializationFlowGraph::build(db, root)
-            .definition_reaches(root_definition, root_definition)
+    /// Determine whether declaration edges return to this alias without following an unbounded
+    /// sequence of specialized applications. Recursive declarations retain names in display.
+    pub(super) fn has_recursive_definition(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked(returns(copy), cycle_initial=|_, _, _, _| true)]
+        fn has_recursive_definition<'db>(
+            db: &'db dyn Db,
+            definition: Definition<'db>,
+            alias: TypeAliasType<'db>,
+        ) -> bool {
+            let root = RecursiveDefinition::TypeAlias(alias);
+            SpecializationFlowGraph::build(db, root)
+                .definitions_reaching(definition)
+                .contains(&definition)
+        }
+        has_recursive_definition(db, self.definition(db), self.unspecialized(db))
     }
 }
 

@@ -10,7 +10,9 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
+use super::class::{
+    ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass, StaticClassLiteral,
+};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
@@ -24,7 +26,6 @@ use super::{
 };
 use crate::types::TypeContext;
 use crate::types::TypeDefinition;
-use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::set_theoretic::TypeNormalization;
@@ -269,6 +270,43 @@ impl<'db> TypedDictType<'db> {
     /// A class-based `TypedDict` inherits the first explicit policy from its bases unless it
     /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
+        // Declaration queries retain the unspecialized annotation. Applying arguments is a separate,
+        // structural projection, so observing a policy cannot start a comparison of its items.
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn declared_openness<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> Option<TypedDictOpenness<'db>> {
+            let program_file = class.program_file(db);
+            let python_file = program_file.python_file(db);
+            let env = ProgramEnvironment::from_file(program_file);
+            let module = parsed_module(db, python_file).load(db);
+            let definition = class.definition(db);
+            let class_stmt = definition.kind(db).as_class()?.node(&module);
+            let arguments = class_stmt.arguments.as_ref()?;
+            if let Some(extra_items) = arguments.find_keyword("extra_items") {
+                let annotation =
+                    definition_expression_annotation(db, definition, &extra_items.value);
+                return Some(TypedDictOpenness::extra(
+                    db,
+                    annotation.inner_type(),
+                    annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
+                ));
+            }
+            arguments.find_keyword("closed").map(|closed| {
+                let closed_ty = definition_expression_type(db, definition, &closed.value);
+                if closed_ty.bool(db, &env).is_always_true() {
+                    TypedDictOpenness::Closed
+                } else {
+                    TypedDictOpenness::ImplicitlyOpen
+                }
+            })
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
@@ -281,9 +319,7 @@ impl<'db> TypedDictType<'db> {
             let (class_literal, specialization) = class.class_literal_and_specialization(db);
             let static_class = match class_literal {
                 ClassLiteral::Static(static_class) => static_class,
-                ClassLiteral::DynamicTypedDict(dynamic) => {
-                    return dynamic.openness(db);
-                }
+                ClassLiteral::DynamicTypedDict(dynamic) => return dynamic.openness(db),
                 ClassLiteral::Dynamic(_)
                 | ClassLiteral::DynamicNamedTuple(_)
                 | ClassLiteral::DynamicEnum(_) => {
@@ -291,48 +327,25 @@ impl<'db> TypedDictType<'db> {
                     unreachable!("non-TypedDict dynamic class wrapped in `TypedDictType`")
                 }
             };
-
-            let program_file = static_class.program_file(db);
-            let python_file = program_file.python_file(db);
-            let env = ProgramEnvironment::from_file(program_file);
-            let module = parsed_module(db, python_file).load(db);
-            let class_definition = static_class.definition(db);
-            let class_stmt = class_definition
-                .kind(db)
-                .as_class()
-                .expect("StaticClassLiteral definition should be a class")
-                .node(&module);
-
-            if let Some(arguments) = &class_stmt.arguments {
-                if let Some(extra_items) = arguments.find_keyword("extra_items") {
-                    let annotation =
-                        definition_expression_annotation(db, class_definition, &extra_items.value)
-                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
-                    return TypedDictOpenness::extra(
+            if let Some(openness) = declared_openness(db, static_class) {
+                return match openness {
+                    TypedDictOpenness::Extra(extra_items) => TypedDictOpenness::extra(
                         db,
-                        annotation.inner_type(),
-                        annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
-                    );
-                }
-
-                if let Some(closed) = arguments.find_keyword("closed") {
-                    let closed_ty = definition_expression_type(db, class_definition, &closed.value);
-                    return if closed_ty.bool(db, &env).is_always_true() {
-                        TypedDictOpenness::Closed
-                    } else {
-                        TypedDictOpenness::ImplicitlyOpen
-                    };
-                }
+                        extra_items
+                            .declared_ty
+                            .apply_optional_specialization_structural(db, specialization),
+                        extra_items.is_read_only(),
+                    ),
+                    _ => openness,
+                };
             }
-
             for base in static_class.explicit_bases(db) {
-                let base = base.apply_optional_specialization(db, specialization);
+                let base = base.apply_optional_specialization_structural(db, specialization);
                 let base_class = match base {
                     Type::ClassLiteral(base) => ClassType::NonGeneric(base),
                     Type::GenericAlias(base) => ClassType::Generic(base),
                     _ => continue,
                 };
-
                 if base_class.class_literal(db).is_typed_dict(db) {
                     let openness = TypedDictType::new(base_class).openness(db);
                     if !openness.is_implicitly_open() {
@@ -340,10 +353,8 @@ impl<'db> TypedDictType<'db> {
                     }
                 }
             }
-
             TypedDictOpenness::ImplicitlyOpen
         }
-
         match self {
             Self::Class(defining_class) => class_based_openness(db, defining_class),
             Self::Synthesized(synthesized) => synthesized.openness(db),
@@ -552,49 +563,58 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
-        // Field annotations can recursively inspect this schema while the class fields are still
-        // being collected, e.g. through `typing.Self` in a `TypedDict` field.
+        // Cache an unspecialized schema, including inherited fields, independently of applications.
+        // An application's arguments only rewrite this schema; they never compare its fields.
+        #[salsa::tracked(
+            returns(ref),
+            cycle_initial=|_, _, _| TypedDictSchema::default(),
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn declaration_items<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> TypedDictSchema<'db> {
+            let (_, identity) = class
+                .identity_specialization(db)
+                .class_literal_and_specialization(db);
+            class
+                .fields(db, identity, CodeGeneratorKind::TypedDict)
+                .iter()
+                .map(|(name, field)| (name.clone(), TypedDictField::from_field(field)))
+                .collect()
+        }
+
+        // Field annotations can recursively inspect their schema while the declaration is
+        // collected, for example through `typing.Self` in a TypedDict field.
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _| TypedDictSchema::default(),
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
-            let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+            let Some((class, specialization)) = class.static_class_literal(db) else {
                 return TypedDictSchema::default();
             };
-            class_literal
-                .fields(db, specialization, CodeGeneratorKind::TypedDict)
-                .into_iter()
+            let (_, specialization) = class
+                .apply_optional_specialization(db, specialization)
+                .class_literal_and_specialization(db);
+            declaration_items(db, class)
+                .iter()
                 .map(|(name, field)| {
-                    let field = match field {
-                        Field {
-                            first_declaration,
-                            declared_ty,
-                            kind:
-                                FieldKind::TypedDict {
-                                    is_required,
-                                    is_read_only,
-                                },
-                        } => TypedDictFieldBuilder::new(*declared_ty)
-                            .required(*is_required)
-                            .read_only(*is_read_only)
-                            .first_declaration(*first_declaration)
-                            .build(),
-                        _ => unreachable!("TypedDict field expected"),
-                    };
+                    let mut field = field.clone();
+                    field.declared_ty = field
+                        .declared_ty
+                        .apply_optional_specialization_structural(db, specialization);
                     (name.clone(), field)
                 })
                 .collect()
         }
-
         match self {
             Self::Class(defining_class) => {
-                // Check if this is a dynamic TypedDict
+                // Check if this is a dynamic TypedDict.
                 if let ClassLiteral::DynamicTypedDict(class) = defining_class.class_literal(db) {
                     return class.items(db);
                 }
-
                 class_based_items(db, defining_class)
             }
             Self::Synthesized(synthesized) => synthesized.items(db),
@@ -3275,7 +3295,7 @@ impl<'db> TypedDictField<'db> {
     }
 
     /// Create a `TypedDictField` from a [`Field`] with `FieldKind::TypedDict`.
-    pub(crate) fn from_field(field: &super::class::Field<'db>) -> Self {
+    pub(crate) fn from_field(field: &Field<'db>) -> Self {
         TypedDictFieldBuilder::new(field.declared_ty)
             .required(field.is_required())
             .read_only(field.is_read_only())

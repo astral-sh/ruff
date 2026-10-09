@@ -627,8 +627,7 @@ impl<'db> RecursiveType<'db> {
                     db,
                     &mapping,
                     &[],
-                    &ApplyTypeMappingVisitor::new(&env)
-                        .with_normalization(TypeNormalization::Structural),
+                    &ApplyTypeMappingVisitor::new_for_type_construction(&env),
                 );
             });
         }
@@ -668,8 +667,8 @@ impl<'db> RecursiveType<'db> {
         variables.iter().copied().any(|mut variable| {
             for operation in self.operations(db) {
                 operation.with_mapping(|mapping| {
-                    let mut operation_visitor = ApplyTypeMappingVisitor::new(visitor.env)
-                        .with_normalization(TypeNormalization::Structural);
+                    let mut operation_visitor =
+                        ApplyTypeMappingVisitor::new_for_type_construction(visitor.env);
                     if let RecursiveOperation::Materialize(_, map_bounds) = operation {
                         operation_visitor.materialize_typevar_bounds_and_defaults = *map_bounds;
                     }
@@ -772,8 +771,7 @@ impl<'db> RecursiveType<'db> {
         let mut unfolded = self.unfolded_body(db);
         for operation in self.operations(db) {
             operation.with_mapping(|mapping| {
-                let mut visitor = ApplyTypeMappingVisitor::new(env)
-                    .with_normalization(TypeNormalization::Structural);
+                let mut visitor = ApplyTypeMappingVisitor::new_for_type_construction(env);
                 if let RecursiveOperation::Materialize(_, map_bounds) = operation {
                     visitor.materialize_typevar_bounds_and_defaults = *map_bounds;
                 }
@@ -808,7 +806,7 @@ impl<'db> RecursiveType<'db> {
                 ),
             )),
             TypeContext::default(),
-            &ApplyTypeMappingVisitor::new(&env),
+            &ApplyTypeMappingVisitor::new_for_type_construction(&env),
         );
         match self.base_arguments(db) {
             Some(arguments) => {
@@ -826,8 +824,7 @@ impl<'db> RecursiveType<'db> {
                     db,
                     &mapping,
                     TypeContext::default(),
-                    &ApplyTypeMappingVisitor::new(&env)
-                        .with_normalization(TypeNormalization::Structural),
+                    &ApplyTypeMappingVisitor::new_for_type_construction(&env),
                 )
             }
             None => unfolded,
@@ -902,9 +899,7 @@ impl<'db> RecursiveType<'db> {
                 // arguments. Its formal body must remain independent of the calling context.
                 let structural;
                 let visitor = if visitor.normalization == TypeNormalization::Semantic {
-                    structural = ApplyTypeMappingVisitor::new(visitor.env)
-                        .with_recursion_context(visitor.recursion_context)
-                        .with_normalization(TypeNormalization::Structural);
+                    structural = visitor.for_type_construction();
                     &structural
                 } else {
                     visitor
@@ -1296,6 +1291,24 @@ fn structurally_static<'db>(db: &'db dyn Db, env: &ProgramEnvironment<'db>, ty: 
     visitor.is_static.get()
 }
 
+/// Variables from outside a declaration can remain free in its members. The declaration's
+/// own parameters are supplied through its application, so only enclosing scopes contribute
+/// captures here. Retaining all enclosing parameters safely includes unused parameters.
+pub(super) fn enclosing_type_variables<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> impl Iterator<Item = Type<'db>> + 'db {
+    let index = semantic_index(db, definition.program_file(db));
+    index
+        .ancestor_scopes(definition.file_scope(db))
+        .filter_map(move |(_, scope)| GenericContext::lexical_of_node(db, scope.node(), index))
+        .flat_map(move |context| context.variables(db))
+        .filter(move |variable| {
+            variable.binding_context(db) != BindingContext::Definition(definition)
+        })
+        .map(Type::TypeVar)
+}
+
 /// Collect variables from the finite representation, without unfolding recursive references.
 fn stored_variables<'db>(
     db: &'db dyn Db,
@@ -1318,19 +1331,8 @@ fn stored_variables<'db>(
                 if let Some(arguments) = arguments {
                     super::generics::walk_specialization_types(db, arguments, self);
                 }
-                let definition = origin.definition(db);
-                let index = semantic_index(db, definition.program_file(db));
-                for (_, scope) in index.ancestor_scopes(definition.file_scope(db)) {
-                    if let Some(context) = GenericContext::lexical_of_node(db, scope.node(), index)
-                    {
-                        for variable in context.variables(db) {
-                            if variable.binding_context(db)
-                                != BindingContext::Definition(definition)
-                            {
-                                self.visit_type(db, Type::TypeVar(variable));
-                            }
-                        }
-                    }
+                for variable in enclosing_type_variables(db, origin.definition(db)) {
+                    self.visit_type(db, variable);
                 }
             } else {
                 self.complete.set(false);
@@ -1408,8 +1410,8 @@ fn stored_variables<'db>(
                     let mut capture = capture;
                     for operation in recursive.operations(db) {
                         operation.with_mapping(|mapping| {
-                            let mut operation_visitor = ApplyTypeMappingVisitor::new(env)
-                                .with_normalization(TypeNormalization::Structural);
+                            let mut operation_visitor =
+                                ApplyTypeMappingVisitor::new_for_type_construction(env);
                             if let RecursiveOperation::Materialize(_, map_bounds) = operation {
                                 operation_visitor.materialize_typevar_bounds_and_defaults =
                                     *map_bounds;
@@ -1425,6 +1427,7 @@ fn stored_variables<'db>(
                     visitor.visit_type(db, capture);
                 }
             }
+            Type::TypeAlias(alias) => alias.visit_application_types(db, &visitor),
             _ => {
                 if let visitor::TypeKind::NonAtomic(ty) = ty.into() {
                     visitor::walk_non_atomic_type(db, ty, &visitor);

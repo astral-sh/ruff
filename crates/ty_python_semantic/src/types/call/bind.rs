@@ -10386,20 +10386,23 @@ impl<'db> ClassInfoValidator<'_, 'db> {
     fn validate_constructor(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         // A growing recursive application is valid if its constructor is valid
         // independently of its arguments. Keep formal parameters unspecialized.
-        let ty =
-            match ty {
-                Type::TypeAlias(alias)
-                    if matches!(ty.to_type_identity(db), TypeIdentity::GrowingTypeAlias(_)) =>
-                {
-                    Type::TypeAlias(alias.apply_specialization(db, |parameters| {
-                        parameters.identity_specialization(db)
-                    }))
-                }
-                Type::Recursive(recursive) if recursive.may_have_unbounded_specialization(db) => {
-                    Type::Recursive(recursive.constructor(db))
-                }
-                _ => ty,
-            };
+        let ty = match ty {
+            Type::TypeAlias(alias)
+                if matches!(ty.to_type_identity(db), TypeIdentity::GrowingTypeAlias(_)) =>
+            {
+                Type::TypeAlias(
+                    alias
+                        .unspecialized(db)
+                        .apply_specialization(db, |parameters| {
+                            parameters.identity_specialization(db)
+                        }),
+                )
+            }
+            Type::Recursive(recursive) if recursive.may_have_unbounded_specialization(db) => {
+                Type::Recursive(recursive.constructor(db))
+            }
+            _ => ty,
+        };
         self.constructors.visit(db, ty, || {
             self.validate_impl(db, ty, |ty| self.validate_constructor(db, ty))
         })

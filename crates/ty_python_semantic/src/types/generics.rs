@@ -24,6 +24,7 @@ use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation,
     TypeRelationChecker, TypeVarEvaluation,
 };
+use crate::types::set_theoretic::TypeNormalization;
 use crate::types::signatures::{Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor};
 use crate::types::tuple::{
     TupleSpec, TupleSpecBuilder, TupleType, VariableSegment, walk_tuple_type,
@@ -41,8 +42,8 @@ use crate::types::{
     ClassLiteral, ErrorContext, FindLegacyTypeVarsVisitor, IntersectionBuilder, IntersectionType,
     KnownClass, KnownInstanceType, MaterializationKind, RecursiveType, SubclassOfInner, Type,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, UnionAccumulator, UnionType, binding_type, infer_definition_types,
-    inferred_declaration,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, binding_type,
+    infer_definition_types, inferred_declaration,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -1420,6 +1421,15 @@ impl<'db> Specialization<'db> {
         tcx: &[Type<'db>],
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        // Arguments are the stored representation of an application. Rebuilding them must
+        // not unfold references or run a separate subtype proof before the application exists.
+        let construction;
+        let visitor = if visitor.normalization == TypeNormalization::Semantic {
+            construction = visitor.for_type_construction();
+            &construction
+        } else {
+            visitor
+        };
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
@@ -1578,6 +1588,13 @@ impl<'db> Specialization<'db> {
         materialization_kind: MaterializationKind,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        let construction;
+        let visitor = if visitor.normalization == TypeNormalization::Semantic {
+            construction = visitor.for_type_construction();
+            &construction
+        } else {
+            visitor
+        };
         // The top and bottom materializations are fully static types already, so materializing them
         // further does nothing.
         if self.materialization_kind(db).is_some() {
@@ -1753,6 +1770,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // due to the need to preserve Divergent markers.
             // TODO: Resolve that issue so we can compare top/bottom subtyping here.
             !matches!(self.relation, TypeRelation::Redundancy { pure: false })
+                // A deferred materialization can have a different representation even when
+                // every argument is static. Staticness is independent of that representation.
+                || target.types(db).iter().all(|ty| ty.is_fully_static(db, env))
                 || target
                     == target.materialize_impl(
                         db,
@@ -1909,19 +1929,32 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             })
         });
 
+        // This projection describes the reachable materializations. Its construction must not
+        // start another proof; the enclosing relation observes the completed expression.
         match materialization {
-            MaterializationKind::Top => IntersectionType::from_two_elements(
-                db,
-                env,
-                argument_top,
-                UnionType::from_elements(db, env, viable_constraints),
-            ),
-            MaterializationKind::Bottom => UnionType::from_two_elements(
-                db,
-                env,
-                argument_bottom,
-                IntersectionType::from_elements(db, env, viable_constraints),
-            ),
+            MaterializationKind::Top => {
+                let mut alternatives =
+                    UnionBuilder::new(db, env).normalization(TypeNormalization::Structural);
+                for constraint in viable_constraints {
+                    alternatives.add_in_place(constraint);
+                }
+                IntersectionBuilder::new(db, env)
+                    .normalization(TypeNormalization::Structural)
+                    .add_positive(argument_top)
+                    .add_positive(alternatives.build())
+                    .build()
+            }
+            MaterializationKind::Bottom => {
+                let common = IntersectionBuilder::new(db, env)
+                    .normalization(TypeNormalization::Structural)
+                    .positive_elements(viable_constraints)
+                    .build();
+                UnionBuilder::new(db, env)
+                    .normalization(TypeNormalization::Structural)
+                    .add(argument_bottom)
+                    .add(common)
+                    .build()
+            }
         }
     }
 

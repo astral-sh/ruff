@@ -281,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn captured_alias_dependency_is_not_closed_by_its_argument() -> anyhow::Result<()> {
+    fn captured_alias_dependencies_resolve_with_their_bindings() -> anyhow::Result<()> {
         let mut db = setup_db();
         db.write_dedented(
             "/src/a.py",
@@ -321,17 +321,59 @@ mod tests {
                 Type::TypeAlias(alias),
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)),
             ] {
+                assert_eq!(
+                    resolve_solution(
+                        db,
+                        &env,
+                        TypeVarSet::from_typevars(db, [t, u]),
+                        &[binding(t, alias)]
+                    )
+                    .as_ref(),
+                    [SolutionType::Unresolved(alias)],
+                    "{name}: missing captured dependency",
+                );
                 let resolved = resolve_solution(
                     db,
                     &env,
                     TypeVarSet::from_typevars(db, [t, u]),
                     &[binding(t, alias), binding(u, int)],
                 );
-                assert_eq!(
-                    resolved.as_ref(),
-                    [SolutionType::Unresolved(alias), SolutionType::Resolved(int)],
-                    "{name}"
+                if matches!(alias, Type::KnownInstance(_)) {
+                    // A runtime alias declaration is not rewritten by type substitution.
+                    // It still retains its captured variable, unlike an alias application.
+                    assert_eq!(
+                        resolved.as_ref(),
+                        [SolutionType::Unresolved(alias), SolutionType::Resolved(int)]
+                    );
+                    continue;
+                }
+                let [
+                    SolutionType::Resolved(mapped),
+                    SolutionType::Resolved(resolved_u),
+                ] = resolved.as_ref()
+                else {
+                    anyhow::bail!("{name}: expected both dependencies to resolve");
+                };
+                assert_eq!(*resolved_u, int);
+                let (Type::TypeAlias(mapped)
+                | Type::KnownInstance(KnownInstanceType::TypeAliasType(mapped))) = *mapped
+                else {
+                    anyhow::bail!("{name}: expected the alias identity to be retained");
+                };
+                let body = mapped.value_type(db);
+                assert!(
+                    !body.has_typevar_or_typevar_instance(db, &env),
+                    "{name}: captured variable remains in the body"
                 );
+                if name == "Alias" {
+                    let Some(tuple) = body.exact_tuple_instance_spec(db) else {
+                        anyhow::bail!("expected a tuple body");
+                    };
+                    assert_eq!(
+                        tuple.fixed_elements().copied().collect::<Vec<_>>(),
+                        [int, int]
+                    );
+                }
             }
         }
         Ok(())
@@ -474,29 +516,23 @@ mod tests {
             );
             let resolved =
                 resolve_solution(db, &env, inferable, &[binding(t, alias), binding(u, int)]);
-            if matches!(alias, Type::TypeAlias(_)) {
-                // Declared aliases currently specialize only their explicit arguments.
-                assert_eq!(
-                    resolved.as_ref(),
-                    [SolutionType::Unresolved(alias), SolutionType::Resolved(int)]
-                );
-            } else {
-                let [
-                    SolutionType::Resolved(Type::Recursive(mapped)),
-                    SolutionType::Resolved(resolved_u),
-                ] = resolved.as_ref()
-                else {
-                    anyhow::bail!(
-                        "{parameter:?}: expected the captured dependency to resolve, got {resolved:?}"
-                    );
-                };
-                assert_eq!(*resolved_u, int);
-                let unfolded = mapped.unfold(db, &env).into_type();
-                let Some(tuple) = unfolded.exact_tuple_instance_spec(db) else {
-                    anyhow::bail!("expected an unfolded tuple, got {unfolded:?}");
-                };
-                assert_eq!(tuple.fixed_elements().next(), Some(&int));
-            }
+            let [
+                SolutionType::Resolved(mapped),
+                SolutionType::Resolved(resolved_u),
+            ] = resolved.as_ref()
+            else {
+                anyhow::bail!("{parameter:?}: expected the captured dependency to resolve");
+            };
+            assert_eq!(*resolved_u, int);
+            let unfolded = match *mapped {
+                Type::TypeAlias(alias) => alias.value_type(db),
+                Type::Recursive(recursive) => recursive.unfold(db, &env).into_type(),
+                _ => anyhow::bail!("expected the alias identity to be retained"),
+            };
+            let Some(tuple) = unfolded.exact_tuple_instance_spec(db) else {
+                anyhow::bail!("expected an unfolded tuple");
+            };
+            assert_eq!(tuple.fixed_elements().next(), Some(&int));
         }
         Ok(())
     }

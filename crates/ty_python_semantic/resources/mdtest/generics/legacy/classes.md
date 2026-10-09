@@ -745,6 +745,42 @@ def check(a: A[int], key: str):
     invalid: str = a.get("child")  # error: [invalid-assignment]
 ```
 
+## Recursive TypedDict schemas with complements
+
+Specializing a recursive extra-item type can introduce intersections with another application of
+that schema. A known-key lookup still preserves its callable field, including the type variables in
+its parameters and return type.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import Callable, assert_type
+from typing_extensions import Generic, NotRequired, ReadOnly, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class A(TypedDict, Generic[T], extra_items=ReadOnly["B[T & ~B[T]]"]):
+    child: NotRequired["Callable[[B[T]], B[B[T]]]"]
+
+class B(TypedDict, Generic[T], extra_items=ReadOnly["Callable[[A[T]], A[A[T]]]"]):
+    child: ReadOnly["A[T & ~A[T]]"]
+
+def check(a: A[T], b: B[T]):
+    child = a.get("child")
+    assert_type(child, Callable[[B[T]], B[B[T]]] | None)
+    if child is not None:
+        result = child(b)
+        assert_type(result, B[B[T]])
+        invalid: int = result  # error: [invalid-assignment]
+        child(1)  # error: [invalid-argument-type]
+```
+
 ## Declared fields and extra-item value types
 
 A known key retains its declared type. Reading an arbitrary key or iterating over values also
@@ -3331,6 +3367,38 @@ U = TypeVar("U")
 
 class Outer(Generic[U]):
     Captured = tuple[U, Any, Top["Captured"]]
+
+    def materialized(self, value: Top[Captured]) -> Top[Captured]:
+        return value
+
+def inspect(gradual: Outer[Any], static: Outer[int], value: Any):
+    reveal_type(gradual.materialized(value)[0])  # revealed: Any
+    reveal_type(gradual.materialized(value)[1])  # revealed: object
+    reveal_type(static.materialized(value)[0])  # revealed: int
+    reveal_type(static.materialized(value)[1])  # revealed: object
+    integer: int = static.materialized(value)[0]  # no diagnostic
+    text: str = static.materialized(value)[0]  # error: [invalid-assignment]
+```
+
+## Declared recursive aliases preserve materialization order
+
+A declared alias can capture its enclosing class's parameter. Materialization changes the explicit
+`Any` field to `object`, while a later class specialization still replaces the captured parameter.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+from typing_extensions import TypeAliasType
+from ty_extensions import Top
+
+U = TypeVar("U")
+
+class Outer(Generic[U]):
+    Captured = TypeAliasType("Captured", tuple[U, Any, "Captured | None"])
 
     def materialized(self, value: Top[Captured]) -> Top[Captured]:
         return value

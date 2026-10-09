@@ -545,6 +545,12 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         }
     }
 
+    /// Construct a substituted type without asking semantic questions about its children.
+    /// Recursive references remain closed applications until an observer unfolds them.
+    fn new_for_type_construction(env: &'env ProgramEnvironment<'db>) -> Self {
+        Self::new(env).with_normalization(TypeNormalization::Structural)
+    }
+
     fn with_recursion_context(mut self, context: Option<&'env TypeRecursionContext<'db>>) -> Self {
         self.recursion_context = context;
         self
@@ -607,7 +613,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             })
     }
 
-    fn for_new_materialization_root(&self) -> Self {
+    fn for_new_mapping(&self) -> Self {
         let materialization_equivalence = OnceCell::new();
         let was_empty =
             materialization_equivalence.set(Rc::clone(self.materialization_equivalence()));
@@ -620,6 +626,13 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
+    }
+    /// Fork a structural substitution while retaining the current observation's origins.
+    /// A constructor must not inherit semantic normalization from its caller: simplifying
+    /// a complement or union can otherwise unfold a growing reference before it is observed.
+    fn for_type_construction(&self) -> Self {
+        self.for_new_mapping()
+            .with_normalization(TypeNormalization::Structural)
     }
 }
 
@@ -2881,9 +2894,7 @@ impl<'db> Type<'db> {
         // the constructed result would ask for this same materialization before it is complete.
         let structural;
         let visitor = if visitor.normalization == TypeNormalization::Semantic {
-            structural = visitor
-                .for_new_materialization_root()
-                .with_normalization(TypeNormalization::Structural);
+            structural = visitor.for_type_construction();
             &structural
         } else {
             visitor
@@ -9316,6 +9327,31 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Substitute a declaration's arguments without normalizing the resulting type.
+    fn apply_optional_specialization_structural(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        specialization.map_or(self, |specialization| {
+            self.apply_specialization_structural(db, specialization)
+        })
+    }
+
+    /// Instantiate one declaration while keeping recursive references in its body closed.
+    fn apply_specialization_structural(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        let env = ProgramEnvironment::from_program(specialization.generic_context(db).program(db));
+        self.apply_specialization_with_visitor(
+            db,
+            specialization,
+            &ApplyTypeMappingVisitor::new_for_type_construction(&env),
+        )
+    }
+
     /// Projects a member from its generic owner, applying the owner's specialization to both
     /// ordinary occurrences and the domain of any retained synthetic `Self` variable.
     ///
@@ -9458,6 +9494,24 @@ impl<'db> Type<'db> {
         };
 
         self.apply_type_mapping(db, env, &type_mapping, TypeContext::default())
+    }
+
+    /// Apply a class specialization within an existing substitution, retaining its normalization policy.
+    fn apply_specialization_with_visitor(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
+        let specialization_mapping = ApplySpecialization::specialization(specialization);
+        let mapping = match specialization.materialization_kind(db) {
+            None => TypeMapping::ApplySpecialization(specialization_mapping),
+            Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                specialization: specialization_mapping,
+                materialization_kind,
+            },
+        };
+        self.apply_type_mapping_impl(db, &mapping, TypeContext::default(), visitor)
     }
 
     fn apply_type_mapping<'a>(

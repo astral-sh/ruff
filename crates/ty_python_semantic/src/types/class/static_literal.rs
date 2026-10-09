@@ -2766,7 +2766,8 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 let mut field = Field {
-                    declared_ty: attr_ty.apply_optional_specialization(db, specialization),
+                    declared_ty: attr_ty
+                        .apply_optional_specialization_structural(db, specialization),
                     kind,
                     first_declaration,
                 };

@@ -3167,3 +3167,32 @@ class BoundedSetter(Base):
     @value.setter
     def value(self, value: I) -> None: ...  # error: [invalid-property-type-override]
 ```
+
+## Complements in growing recursive alias arguments
+
+Specializing a recursive alias preserves the complement in its next argument without expanding that
+reference during construction. The first tuple element remains precise, and `None` provides a finite
+value for the recursive field.
+
+```toml
+[environment]
+python-version = "3.14"
+
+[rules]
+experimental-syntax = "ignore"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+Tree = tuple[T, "Tree[~Tree[T]] | None"]
+
+def inspect(value: Tree[int]):
+    reveal_type(value[0])  # revealed: int
+    valid: int = value[0]  # no diagnostic
+    invalid: str = value[0]  # error: [invalid-assignment]
+
+finite: Tree[int] = (1, None)  # no diagnostic
+invalid: Tree[int] = ("wrong", None)  # error: [invalid-assignment]
+```

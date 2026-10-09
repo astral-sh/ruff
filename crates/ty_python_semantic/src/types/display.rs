@@ -3,7 +3,7 @@
 use crate::ProgramEnvironment;
 use crate::types::typevar::TypeVarSet;
 use std::borrow::Cow;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
 use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
@@ -154,6 +154,8 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Alias views can expose the same declaration under changed arguments.
+    visited_type_aliases: Rc<FxHashSet<Definition<'db>>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -794,6 +796,24 @@ impl<'db> DisplayType<'_, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let db = self.db;
+        if let Type::TypeAlias(alias) = self.ty
+            && !self
+                .settings
+                .visited_type_aliases
+                .contains(&alias.definition(db))
+        {
+            let view = alias.display_view(db, self.env);
+            if view != self.ty {
+                let mut settings = self.settings.clone();
+                // Dropping a completed no-op does not expose a new body. Let another
+                // retained operation choose its view before entering the declaration.
+                if !matches!(view, Type::TypeAlias(other) if other.definition(db) == alias.definition(db))
+                {
+                    Rc::make_mut(&mut settings.visited_type_aliases).insert(alias.definition(db));
+                }
+                return view.display_with(db, self.env, settings).fmt_detailed(f);
+            }
+        }
         let representation = self.ty.representation(db, self.env, self.settings.clone());
         match self.ty.as_literal_value_kind() {
             Some(
@@ -958,6 +978,88 @@ impl<'db> TypeAliasType<'db> {
             settings,
         }
     }
+    /// Observe a completed transformation for display without changing its stored application.
+    fn display_view(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
+        let Some(input) = self.display_operation_input(db) else {
+            return Type::TypeAlias(self);
+        };
+        if self.materialization_kind(db).is_some()
+            && materialization_is_statically_noop(db, env, Type::TypeAlias(input))
+        {
+            return Type::TypeAlias(input);
+        }
+        let body = self.value_type(db);
+        if body == input.value_type(db) {
+            Type::TypeAlias(input)
+        } else if self.has_recursive_definition(db) {
+            Type::TypeAlias(self)
+        } else {
+            body
+        }
+    }
+}
+
+/// Inspect a completed view's finite declaration graph. Every application's arguments and
+/// captures are checked, but a declaration body is visited only once: static substitutions
+/// cannot introduce a gradual component into a body that has none of its own.
+/// Other lazy declarations remain indeterminate instead of being assumed static.
+fn materialization_is_statically_noop<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    struct StaticDeclarations<'a, 'db> {
+        env: &'a ProgramEnvironment<'db>,
+        types: RefCell<FxHashSet<Type<'db>>>,
+        declarations: RefCell<FxHashSet<Definition<'db>>>,
+        complete: Cell<bool>,
+    }
+    impl<'db> TypeVisitor<'db> for StaticDeclarations<'_, 'db> {
+        fn program_environment(&self) -> &ProgramEnvironment<'db> {
+            self.env
+        }
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+        fn notify_skipped_lazy_type_attributes(&self) {
+            self.complete.set(false);
+        }
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            if !self.complete.get() || !self.types.borrow_mut().insert(ty) {
+                return;
+            }
+            if ty.is_dynamic() || ty.is_divergent() {
+                self.complete.set(false);
+            } else if let visitor::TypeKind::NonAtomic(ty) = ty.into() {
+                visitor::walk_non_atomic_type(db, ty, self);
+            }
+        }
+        fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+            alias.visit_application_types(db, self);
+            if alias.specialization(db).is_none()
+                && let Some(context) = alias.generic_context(db)
+            {
+                walk_specialization_types(db, context.default_specialization(db, None), self);
+            }
+            if self.complete.get() && self.declarations.borrow_mut().insert(alias.definition(db)) {
+                // Inspect the declaration independently of which application was seen first.
+                // An earlier materialized application must not hide a gradual field from a
+                // later, unmaterialized reference to the same declaration.
+                self.visit_type(db, alias.raw_value_type(db));
+            }
+        }
+        fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+            walk_specialization_types(db, alias.specialization(db), self);
+        }
+    }
+    let visitor = StaticDeclarations {
+        env,
+        types: RefCell::default(),
+        declarations: RefCell::default(),
+        complete: Cell::new(true),
+    };
+    visitor.visit_type(db, ty);
+    visitor.complete.get()
 }
 
 impl<'db> Type<'db> {

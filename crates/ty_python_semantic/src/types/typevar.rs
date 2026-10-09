@@ -1369,7 +1369,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                         let env = visitor.env;
                         // Materialization uses a different mapping mode. Reuse of the outer
                         // visitor can incorrectly hit a cache entry from specialization.
-                        let materialization_visitor = visitor.for_new_materialization_root();
+                        let materialization_visitor = visitor.for_new_mapping();
                         let materialized =
                             mapped.materialize(db, *materialization_kind, &materialization_visitor);
 
@@ -1470,9 +1470,14 @@ impl<'db> BoundTypeVarInstance<'db> {
                 .typevar(db)
                 .bound_or_constraints(db, &env)
                 .map(|bound_or_constraints| {
+                    // This query observes a usable upper bound rather than constructing a
+                    // deferred application. Complete the outer alias projection while the
+                    // query's cycle handling is active, so aliases cannot conceal recursive
+                    // bounds that require the same materialization again.
                     bound_or_constraints
                         .as_type(db, &env)
                         .top_materialization(db, &env)
+                        .resolve_type_alias(db)
                 })
         }
 
