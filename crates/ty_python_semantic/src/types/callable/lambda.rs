@@ -266,6 +266,7 @@ impl<'db> LambdaSignature<'db> {
             self.body(db),
             self.return_context(db)
                 .with_annotation(self.return_context(db).annotation.map(map)),
+            self.environment(db),
             deferred,
         )
     }
@@ -384,6 +385,7 @@ impl<'db> LambdaSignature<'db> {
             source.scope(db),
             source.body(db),
             source.return_context(db),
+            source.environment(db),
             Some(LambdaSignatureMapping {
                 source,
                 mapping,

@@ -1465,14 +1465,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parameter_type
         } else if let Some(default_expr) = default {
             let default = self.index.expression(default_expr.as_ref());
-            let input = self
-                .lambda_input
-                .and_then(|input| input.enclosing(db, default.scope(db)));
-            let default_ty = crate::types::infer::infer_same_file_expression_type(
-                db,
-                default,
-                TypeContext::default().with_lambda_input(input),
-            );
+            let default_ty = self
+                .infer_expression_types(default, TypeContext::default())
+                .expression_type(default_expr.as_ref());
             UnionType::from_two_elements(
                 db,
                 self.program_environment(),
@@ -1547,8 +1542,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .try_node_scope(NodeWithScopeRef::Lambda(lambda))?
             .to_scope_id(db, self.program_file());
         let input = self
-            .lambda_input
-            .and_then(|input| input.enclosing(db, scope))
+            .environment
+            .for_scope(db, scope)
+            .lambda
             .filter(|input| input.scope(db) == scope)
             .or_else(|| {
                 let parent = self

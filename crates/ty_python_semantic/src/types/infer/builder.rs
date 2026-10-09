@@ -29,9 +29,9 @@ use ty_python_core::statement::StatementInner;
 use super::{
     CollectionUseConstraints, DeferredAndUndecorated, DefinitionInference,
     DefinitionInferenceExtra, DefinitionTypes, ExpressionInference, ExpressionInferenceExtra,
-    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceRegion,
-    OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_expression_types, infer_unpack_types_with_context,
+    FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference, InferenceEnvironment,
+    InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -102,8 +102,8 @@ use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
     StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
-    TypeAndRange, TypeExpressionFlags, infer_definition_types_with_context, infer_statement_types,
-    nearest_enclosing_class, nearest_enclosing_function, original_class_type,
+    TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
+    nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
 use crate::types::member::inherited_class_body_declaration;
@@ -134,7 +134,7 @@ use crate::types::{
     SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
     TypeVarVariance, TypingModule, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
-    extract_fixed_length_iterable_element_types, infer_complete_scope_types, infer_scope_types,
+    extract_fixed_length_iterable_element_types, infer_complete_scope_types,
     is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, FxOrderSet, SemanticModel};
@@ -154,7 +154,7 @@ use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, Sc
 use ty_python_core::symbol::ScopedSymbolId;
 use ty_python_core::{
     ApplicableConstraints, EvaluationMode, ProgramFile, SemanticIndex, Truthiness,
-    unpack::UnpackPosition,
+    unpack::{Unpack, UnpackPosition},
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -241,7 +241,7 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// a single AST node and are called as part of this AST visit.
 ///
 /// When the visit encounters a node which creates a [`Definition`], we look up the definition in
-/// the semantic index and call the [`infer_definition_types()`] query on it, which creates another
+/// the semantic index and call the [`super::infer_definition_types()`] query on it, which creates another
 /// [`TypeInferenceBuilder`] just for that definition, and we merge the returned inference result
 /// into the one we are currently building for the entire scope. Using the query in this way
 /// ensures that if we first infer types for some scattered definitions in a scope, and later for
@@ -257,14 +257,14 @@ const NUM_FIELD_SPECIFIERS_INLINE: usize = 1;
 /// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition), which takes
 /// both the node and the [`Definition`] id. The former is called as part of walking the AST, and
 /// it just looks up the [`Definition`] for that function in the semantic index and calls
-/// [`infer_definition_types()`] on it, which will create a new [`TypeInferenceBuilder`] with
+/// [`super::infer_definition_types()`] on it, which will create a new [`TypeInferenceBuilder`] with
 /// [`InferenceRegion::Definition`], and in that builder
 /// [`infer_region_definition`](TypeInferenceBuilder::infer_region_definition) will call
 /// [`infer_function_definition`](TypeInferenceBuilder::infer_function_definition) to actually
 /// infer a type for the definition.
 ///
 /// Similarly, when we encounter a standalone-inferable expression (right-hand side of an
-/// assignment, type narrowing guard), we use the [`infer_expression_types()`] query to ensure we
+/// assignment, type narrowing guard), we use the [`super::infer_expression_types()`] query to ensure we
 /// don't infer its types more than once.
 pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     context: InferContext<'db, 'ast>,
@@ -367,8 +367,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// Source inputs for lambda bodies discovered while inferring this region.
     lambda_inputs: FxHashMap<ExpressionNodeKey, LambdaSignature<'db>>,
-    /// Contextual inputs of the lambda whose body contains this region.
-    lambda_input: Option<LambdaSignature<'db>>,
+    /// Lexical bindings shared by this region and its speculative inference attempts.
+    environment: InferenceEnvironment<'db>,
 
     /// Whether we are in a context that binds unbound typevars.
     typevar_binding_context: Option<Definition<'db>>,
@@ -515,12 +515,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             implicit_aliases: FxIndexSet::default(),
             lambda_inputs: FxHashMap::default(),
-            lambda_input: match region {
-                InferenceRegion::Scope(_, tcx) | InferenceRegion::Expression(_, tcx) => {
-                    tcx.lambda_input
-                }
-                _ => None,
-            },
+            environment: InferenceEnvironment::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             comparison_truthiness: FxHashMap::default(),
@@ -600,9 +595,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn with_lambda_input(mut self, input: Option<LambdaSignature<'db>>) -> Self {
-        self.lambda_input = input;
+    pub(super) fn with_environment(mut self, environment: InferenceEnvironment<'db>) -> Self {
+        self.environment = environment;
         self
+    }
+
+    // Every nested inference query inherits this region's lexical bindings. Expected types can
+    // change independently, including when speculative inference retries without an annotation.
+    fn infer_expression_types(
+        &self,
+        expression: Expression<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ExpressionInference<'db> {
+        self.environment
+            .infer_expression(self.db(), expression, tcx)
+    }
+
+    fn infer_scope_types(
+        &self,
+        scope: ScopeId<'db>,
+        tcx: TypeContext<'db>,
+    ) -> &'db ScopeInference<'db> {
+        self.environment.infer_scope(self.db(), scope, tcx)
+    }
+
+    fn infer_definition_types(&self, definition: Definition<'db>) -> &'db DefinitionInference<'db> {
+        self.environment.infer_definition(self.db(), definition)
+    }
+
+    fn infer_unpack_types(&self, unpack: Unpack<'db>) -> &'db UnpackResult<'db> {
+        self.environment.infer_unpack(self.db(), unpack)
     }
 
     fn extend_definition(
@@ -1097,7 +1119,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Get the type of an expression from any scope in the same file.
     ///
     /// If the expression is in the current scope, and we are inferring the entire scope, just look
-    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// up the expression in our own results, otherwise call [`super::infer_scope_types()`] for the scope
     /// of the expression.
     ///
     /// ## Panics
@@ -2161,7 +2183,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn function_type(&self, function: &ast::StmtFunctionDef) -> Option<FunctionType<'db>> {
         let definition = self.index.expect_single_definition(function);
-        infer_definition_types_with_context(self.db(), definition, self.lambda_input)
+        self.infer_definition_types(definition)
             .function_type(definition)
     }
 
@@ -2175,8 +2197,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let definition = self.index.expect_single_definition(function);
 
-        let definition_types =
-            infer_definition_types_with_context(self.db(), definition, self.lambda_input);
+        let definition_types = self.infer_definition_types(definition);
 
         function
             .decorator_list
@@ -2287,13 +2308,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        infer_definition_types_with_context(self.db(), definition, self.lambda_input)
+        self.infer_definition_types(definition)
             .binding_type(definition)
     }
 
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
-        let result = infer_definition_types_with_context(self.db(), definition, self.lambda_input);
+        let result = self.infer_definition_types(definition);
         self.extend_definition(definition, result);
     }
 
@@ -2459,8 +2480,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let target_ty = match with_item.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked =
-                    infer_unpack_types_with_context(self.db(), unpack, self.lambda_input);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -3043,11 +3063,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             // The statement owns every binding created while evaluating its shared value,
             // including assignment expressions in lambda defaults.
-            let inference = infer_expression_types(
-                self.db(),
-                shared_value,
-                TypeContext::default().with_lambda_input(self.lambda_input),
-            );
+            let inference = self.infer_expression_types(shared_value, TypeContext::default());
             if let Some(extra) = &inference.extra {
                 self.bindings.extend(extra.bindings.iter().copied());
             }
@@ -3055,24 +3071,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for target in targets {
             if let Some(unpack) = self.index.try_unpack(target) {
-                let inference = infer_expression_types(
-                    self.db(),
-                    shared_value,
-                    TypeContext::default().with_lambda_input(self.lambda_input),
-                );
+                let inference = self.infer_expression_types(shared_value, TypeContext::default());
                 self.extend_expression_without_bindings(inference);
 
-                let unpacked =
-                    infer_unpack_types_with_context(self.db(), unpack, self.lambda_input);
+                let unpacked = self.infer_unpack_types(unpack);
                 self.context.extend(unpacked.diagnostics());
                 self.infer_unpacked_assignment_target(target, value, unpacked);
             } else {
                 self.infer_target(target, value, &|builder, tcx| {
-                    let inference = infer_expression_types(
-                        builder.db(),
-                        shared_value,
-                        tcx.with_lambda_input(builder.lambda_input),
-                    );
+                    let inference = builder.infer_expression_types(shared_value, tcx);
                     builder.extend_expression_without_bindings(inference);
                     inference.expression_type(value.as_ref())
                 });
@@ -3569,8 +3576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(unpack) => {
                 // The assignment statement owns unpacking diagnostics so that targets without a
                 // name definition are still checked, and each diagnostic is reported only once.
-                let unpacked =
-                    infer_unpack_types_with_context(self.db(), unpack, self.lambda_input);
+                let unpacked = self.infer_unpack_types(unpack);
                 unpacked.expression_type(target)
             }
             None => {
@@ -3582,11 +3588,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let value_ty = if let Some(standalone_expression) = self.index.try_expression(value)
                 {
-                    let inference = infer_expression_types(
-                        self.db(),
-                        standalone_expression,
-                        tcx.with_lambda_input(self.lambda_input),
-                    );
+                    let inference = self.infer_expression_types(standalone_expression, tcx);
                     match assignment.owner() {
                         BindingsOwner::Definition => {
                             self.extend_expression(inference);
@@ -5248,9 +5250,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         assignment: Definition<'db>,
         definition: Definition<'db>,
     ) {
-        let value_ty =
-            infer_definition_types_with_context(self.db(), assignment, self.lambda_input)
-                .expression_type(value);
+        let value_ty = self
+            .infer_definition_types(assignment)
+            .expression_type(value);
         self.add_binding(key.into(), definition)
             .insert(self, value_ty);
     }
@@ -5329,8 +5331,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let loop_var_value_type = match for_stmt.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked =
-                    infer_unpack_types_with_context(self.db(), unpack, self.lambda_input);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -6674,11 +6675,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(
-            self.db(),
-            standalone_expression,
-            tcx.with_lambda_input(self.lambda_input),
-        );
+        let types = self.infer_expression_types(standalone_expression, tcx);
         self.extend_expression(types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
@@ -6694,7 +6691,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let tcx = tcx.with_lambda_input(self.lambda_input);
         let Some(expression_cache) = &self.expression_cache else {
             return self.infer_expression_uncached(expression, tcx);
         };
@@ -8291,11 +8287,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             EvaluationMode::from_is_async(scope_id.is_async_comprehension(self.index));
         let yield_tcx = self.generator_yield_type_context(tcx, evaluation_mode);
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference = infer_scope_types(
-            self.db(),
-            scope,
-            yield_tcx.with_lambda_input(self.lambda_input),
-        );
+        let inference = self.infer_scope_types(scope, yield_tcx);
         self.extend_scope(inference);
         let yield_type = self.comprehension_element_type(elt, inference);
 
@@ -8375,8 +8367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference =
-            infer_scope_types(self.db(), scope, tcx.with_lambda_input(self.lambda_input));
+        let inference = self.infer_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8417,8 +8408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference =
-            infer_scope_types(self.db(), scope, tcx.with_lambda_input(self.lambda_input));
+        let inference = self.infer_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8460,8 +8450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.program_file());
-        let inference =
-            infer_scope_types(self.db(), scope, tcx.with_lambda_input(self.lambda_input));
+        let inference = self.infer_scope_types(scope, tcx);
         self.extend_scope(inference);
 
         self.infer_comprehension_specialization(
@@ -8629,11 +8618,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
             let (iterable_type, element_type) = if is_first {
-                let result = infer_expression_types(
-                    builder.db(),
-                    builder.index.expression(iter),
-                    tcx.with_lambda_input(builder.lambda_input),
-                );
+                let result = builder.infer_expression_types(builder.index.expression(iter), tcx);
                 (
                     result.expression_type(iter),
                     builder
@@ -8678,11 +8663,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            let result = infer_expression_types(
-                self.db(),
-                expression,
-                TypeContext::default().with_lambda_input(self.lambda_input),
-            );
+            let result = self.infer_expression_types(expression, TypeContext::default());
             let iterable_type = result.expression_type(iterable);
             let element_type = if comprehension.is_async() {
                 None
@@ -8705,8 +8686,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let target_type = match comprehension.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
-                let unpacked =
-                    infer_unpack_types_with_context(self.db(), unpack, self.lambda_input);
+                let unpacked = self.infer_unpack_types(unpack);
                 if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked.diagnostics());
                 }
@@ -8744,8 +8724,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() && !self.in_string_annotation() {
             let definition = self.index.expect_single_definition(named);
-            let result =
-                infer_definition_types_with_context(self.db(), definition, self.lambda_input);
+            let result = self.infer_definition_types(definition);
             self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
@@ -8862,7 +8841,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ParameterDefault::Inferred(default_ty),
             |parameter| ParameterDefault::Deferred {
                 parameter,
-                lambda_input: self.lambda_input,
+                environment: self.environment,
             },
         ))
     }
@@ -9003,7 +8982,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parameters,
             scope,
             ExpressionNodeKey::from(lambda_expression.body.as_ref()),
-            return_tcx.with_lambda_input(self.lambda_input),
+            return_tcx,
+            self.environment,
             None,
         );
         self.lambda_inputs.insert(lambda_expression.into(), input);
@@ -10780,11 +10760,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 place.into()
             }
             PlaceLoadSourceKind::DefinitionsFromOwningScope { scope, id } => {
-                if self
-                    .lambda_input
-                    .and_then(|input| input.enclosing(db, scope))
-                    .is_some()
-                {
+                if !self.environment.for_scope(db, scope).is_empty() {
                     place_by_id_with_context(
                         db,
                         scope,
@@ -12055,7 +12031,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             expressions,
             comparison_truthiness,
@@ -12123,7 +12099,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             expressions,
             comparison_truthiness,
@@ -12247,7 +12223,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             expressions,
             comparison_truthiness: _,
@@ -12303,7 +12279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             expressions,
             comparison_truthiness,
@@ -12473,7 +12449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             string_annotations,
             expected_types,
@@ -12566,7 +12542,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // expression.
             implicit_aliases: _,
             lambda_inputs: _,
-            lambda_input: _,
+            environment: _,
             context: _,
             collection_use_constraints: _,
             expressions: _,
@@ -12599,7 +12575,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.context.defuse();
 
         // Ensure the speculative builder has the same inference context as the current one.
-        builder.lambda_input = self.lambda_input;
+        builder.environment = self.environment;
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
@@ -12632,7 +12608,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             implicit_aliases,
             lambda_inputs,
-            lambda_input: _,
+            environment: _,
             context,
             expressions,
             comparison_truthiness,
@@ -12724,7 +12700,8 @@ struct ChainedBooleanResult<'db> {
 /// An expression cache shared across builders during multi-inference.
 ///
 /// This provides a cheap way of reusing inference results without the overhead
-/// of Salsa standalone expressions.
+/// of Salsa standalone expressions. All builders sharing this cache inherit the same lexical
+/// environment; only the expected type varies between attempts.
 #[derive(Default)]
 struct ExpressionCache<'db> {
     entries: FxHashMap<ExpressionNodeKey, ExpressionCacheEntries<'db>>,

@@ -22,7 +22,6 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, any_over_type, semantic_index};
 use crate::types::callable::CallableTypeKind;
-use crate::types::callable::LambdaSignature;
 use crate::types::constraints::{
     CandidateSolutions, ConstraintProvenance, ConstraintSet, ConstraintSetBuilder,
     IteratorConstraintsExtension, OwnedConstraintSet, Solutions,
@@ -33,8 +32,7 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::infer::{
-    TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
-    infer_same_file_expression_type,
+    InferenceEnvironment, TypeExpressionFlags, infer_deferred_types, infer_function_default_types,
 };
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
@@ -5176,7 +5174,7 @@ impl<'db> Parameters<'db> {
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|_| ParameterDefault::Deferred {
                 parameter: index.expect_single_definition(&param.parameter),
-                lambda_input: None,
+                environment: InferenceEnvironment::default(),
             })
         };
 
@@ -6132,7 +6130,7 @@ pub enum ParameterDefault<'db> {
     /// A source parameter whose default is inferred on demand.
     Deferred {
         parameter: Definition<'db>,
-        lambda_input: Option<LambdaSignature<'db>>,
+        environment: InferenceEnvironment<'db>,
     },
 }
 
@@ -6142,8 +6140,8 @@ impl<'db> ParameterDefault<'db> {
             Self::Inferred(ty) => ty,
             Self::Deferred {
                 parameter,
-                lambda_input,
-            } => parameter_default_type(db, parameter, lambda_input),
+                environment,
+            } => parameter_default_type(db, parameter, environment),
         }
     }
 
@@ -6175,7 +6173,7 @@ impl<'db> ParameterDefault<'db> {
 fn parameter_default_type<'db>(
     db: &'db dyn Db,
     parameter: Definition<'db>,
-    lambda_input: Option<LambdaSignature<'db>>,
+    environment: InferenceEnvironment<'db>,
 ) -> Type<'db> {
     match parameter.kind(db) {
         DefinitionKind::Parameter(ParameterDefinitionNodeKind::Parameter(node)) => {
@@ -6204,12 +6202,10 @@ fn parameter_default_type<'db>(
                 return Type::unknown();
             };
             let expression = semantic_index(db, file).expression(default);
-            infer_same_file_expression_type(
-                db,
-                expression,
-                TypeContext::default().with_lambda_input(lambda_input),
-            )
-            .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
+            environment
+                .infer_expression(db, expression, TypeContext::default())
+                .expression_type(default)
+                .replace_parameter_defaults(db, &ProgramEnvironment::from_definition(parameter))
         }
         _ => Type::unknown(),
     }
