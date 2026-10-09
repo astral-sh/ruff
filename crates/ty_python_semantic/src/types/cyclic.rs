@@ -783,10 +783,19 @@ impl<'db> TypeVisitor<'db> for SourceParameterCollector<'_, 'db> {
 impl<'db> TypeAliasType<'db> {
     /// Returns whether this alias can refer back to its own definition.
     pub(crate) fn is_recursive(self, db: &'db dyn Db) -> bool {
-        let root = RecursiveDefinition::TypeAlias(self.unspecialized(db));
-        let root_definition = root.definition(db);
-        SpecializationFlowGraph::build(db, root)
-            .definition_reaches(root_definition, root_definition)
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, ()| true,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn is_recursive_inner<'db>(db: &'db dyn Db, alias: TypeAliasType<'db>, _: ()) -> bool {
+            let root = RecursiveDefinition::TypeAlias(alias);
+            let root_definition = root.definition(db);
+            SpecializationFlowGraph::build(db, root)
+                .definition_reaches(root_definition, root_definition)
+        }
+
+        is_recursive_inner(db, self.unspecialized(db), ())
     }
 }
 

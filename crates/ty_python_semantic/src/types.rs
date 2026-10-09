@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -166,7 +166,7 @@ mod newtype;
 mod overrides;
 mod protocol_class;
 mod recursive;
-pub(crate) use recursive::RecursiveMapping;
+pub(crate) use recursive::{ActiveBodyMappings, MappingPolarity, RecursiveMapping};
 pub use recursive::{RecursiveType, RecursiveVar, UnfoldResult};
 pub(crate) mod relation;
 mod relation_error;
@@ -524,6 +524,9 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    /// The recursive constructors whose bodies are being mapped under their binders.
+    /// See the `recursive` module documentation on mapping under a binder.
+    body_mappings: RefCell<ActiveBodyMappings<'db>>,
 }
 
 impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
@@ -540,6 +543,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
+            body_mappings: RefCell::default(),
         }
     }
 
@@ -3341,9 +3345,9 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
-            // Revisit this and `is_hintable` when general recursive type inference can produce
-            // types without a declared alias.
+            // `Recursive` currently only represents type aliases with declared names, including
+            // the results of mapping their bodies. Revisit this and `is_hintable` when general
+            // recursive type inference can produce types without a declared alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
@@ -11277,6 +11281,34 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
+        }
+    }
+
+    /// The polarity of this mapping, which [`TypeMapping::flip`] toggles for mappings that treat
+    /// contravariant positions differently.
+    const fn polarity(&self) -> MappingPolarity {
+        match self {
+            TypeMapping::Materialize(MaterializationKind::Bottom)
+            | TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Bottom,
+                ..
+            }
+            | TypeMapping::Promote(PromotionMode::Off, _) => MappingPolarity::Negative,
+            TypeMapping::Materialize(MaterializationKind::Top)
+            | TypeMapping::ApplySpecializationWithMaterialization {
+                materialization_kind: MaterializationKind::Top,
+                ..
+            }
+            | TypeMapping::Promote(PromotionMode::On, _)
+            | TypeMapping::ApplySpecialization(_)
+            | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::FreshenBoundTypeVars { .. }
+            | TypeMapping::BindSelf(..)
+            | TypeMapping::ReplaceSelf { .. }
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::EagerExpansion
+            | TypeMapping::RescopeReturnCallables(_) => MappingPolarity::Positive,
         }
     }
 

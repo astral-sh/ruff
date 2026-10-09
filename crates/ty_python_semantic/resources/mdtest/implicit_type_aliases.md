@@ -2914,8 +2914,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[int]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[int]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3283,4 +3283,109 @@ def inspect(
     reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+```
+
+### Literal promotion of recursive aliases
+
+Inferring a collection literal promotes the literal types of its elements. A recursive alias is
+promoted under its binder, so the promotion reaches every level of its unfolding rather than only
+the outermost one. `TypeOf[1]` denotes a promotable `Literal[1]`; the `Literal[1]` of an explicit
+annotation is never promoted.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
+
+def collect(value: Stream):
+    stream = [value][0]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[0])  # revealed: int
+```
+
+The promoted alias is displayed by the alias's name. Promoting it again leaves it unchanged, so
+repeatedly inserting a value into a collection converges instead of unfolding the alias one level
+further on each iteration.
+
+```py
+def repeat(value: Stream, repetitions: int):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: Stream
+    for _ in range(repetitions):
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[0])  # revealed: int
+```
+
+Mutually recursive aliases are promoted together:
+
+```py
+Odd = tuple[TypeOf[1], Callable[[], "Even"]]
+Even = tuple[TypeOf[2], Callable[[], "Odd"]]
+
+def alternate(value: Odd):
+    odd = [value][0]
+    reveal_type(odd[0])  # revealed: int
+    reveal_type(odd[1]()[0])  # revealed: int
+    reveal_type(odd[1]()[1]()[0])  # revealed: int
+```
+
+Promotion leaves an alias unchanged when its body contains no promotable types:
+
+```py
+Callback = Callable[["Callback"], int]
+
+def invoke(callback: Callback):
+    reveal_type([callback])  # revealed: list[Callback]
+```
+
+### Literal promotion outside covariant positions
+
+Promotion widens covariant positions only. The parameter types of a callable and the type arguments
+of an invariant generic class are left unchanged, at every level of a recursive alias.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Handler = tuple[TypeOf[1], Callable[[TypeOf[2]], "Handler"]]
+
+def handle(value: Handler):
+    handler = [value][0]
+    reveal_type(handler[0])  # revealed: int
+    reveal_type(handler[1](2)[0])  # revealed: int
+    handler[1](3)  # error: [invalid-argument-type]
+    handler[1](2)[1](3)  # error: [invalid-argument-type]
+
+Nested = tuple[TypeOf[1], list["Nested"]]
+
+def nest(value: Nested):
+    nested = [value][0]
+    reveal_type(nested[0])  # revealed: int
+    reveal_type(nested[1][0][0])  # revealed: Literal[1]
+    reveal_type(nested[1][0][1][0][0])  # revealed: int
+```
+
+A self-reference in a parameter position denotes the alias promoted under the flipped mapping, which
+leaves the literals of that level unchanged and promotes those of the next level again. The result
+alternates between two bodies, which the pair of aliases `Promoted` and `Flipped` spells out. The
+original alias is assignable to its promotion but not equivalent to it.
+
+```py
+from typing import Literal
+from ty_extensions import static_assert
+from ty_extensions._internal import is_equivalent_to, is_subtype_of
+
+Consumer = tuple[TypeOf[1], Callable[["Consumer"], "Consumer"]]
+
+Promoted = tuple[int, Callable[["Flipped"], "Promoted"]]
+Flipped = tuple[Literal[1], Callable[["Promoted"], "Flipped"]]
+
+def consume(value: Consumer):
+    consumer = [value][0]
+    static_assert(is_equivalent_to(TypeOf[consumer], Promoted))
+    static_assert(is_subtype_of(Consumer, TypeOf[consumer]))
+    static_assert(not is_equivalent_to(TypeOf[consumer], Consumer))
 ```

@@ -70,6 +70,11 @@ impl<'db> NamedItem<'db> {
             (NamedItem::Recursive(left), NamedItem::Recursive(right)) => {
                 left.definition(db) == right.definition(db)
             }
+            // The structural form of a PEP 695 alias displays the alias's name.
+            (NamedItem::TypeAlias(alias), NamedItem::Recursive(recursive))
+            | (NamedItem::Recursive(recursive), NamedItem::TypeAlias(alias)) => {
+                alias.definition(db) == recursive.definition(db)
+            }
             _ => false,
         }
     }

@@ -1798,3 +1798,82 @@ def foo(x: A):
     reveal_type(x + 1)  # revealed: int
     reveal_type(1 + x)  # revealed: int
 ```
+
+### Literal promotion of recursive aliases
+
+Inferring a collection literal promotes the literal types of its elements. A recursive alias is
+promoted under its binder, so the promotion reaches every level of its unfolding rather than only
+the outermost one. The promoted alias is displayed by the alias's name. `TypeOf[1]` denotes a
+promotable `Literal[1]`; the `Literal[1]` of an explicit annotation is never promoted.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Stream = tuple[TypeOf[1], Callable[[], Stream]]
+
+def collect(value: Stream):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: Stream
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[0])  # revealed: int
+```
+
+Promoting the promoted alias again leaves it unchanged, so repeatedly inserting a value into a
+collection converges instead of unfolding the alias one level further on each iteration.
+
+```py
+def repeat(value: Stream, repetitions: int):
+    stream = [value][0]
+    for _ in range(repetitions):
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[0])  # revealed: int
+```
+
+Mutually recursive aliases are promoted together:
+
+```py
+type Odd = tuple[TypeOf[1], Callable[[], Even]]
+type Even = tuple[TypeOf[2], Callable[[], Odd]]
+
+def alternate(value: Odd):
+    odd = [value][0]
+    reveal_type(odd[0])  # revealed: int
+    reveal_type(odd[1]()[0])  # revealed: int
+    reveal_type(odd[1]()[1]()[0])  # revealed: int
+```
+
+The body of a generic alias is promoted once for all of its applications, and the type arguments of
+an application are promoted like the arguments of a generic class:
+
+```py
+type Nested[T] = tuple[T, TypeOf[1], Callable[[], Nested[list[T]]]]
+
+def nest(value: Nested[int]):
+    nested = [value][0]
+    reveal_type(nested)  # revealed: Nested[int]
+    reveal_type(nested[1])  # revealed: int
+    reveal_type(nested[2]()[0])  # revealed: list[int]
+    reveal_type(nested[2]()[1])  # revealed: int
+    reveal_type(nested[2]()[2]()[0])  # revealed: list[list[int]]
+```
+
+Promotion leaves an alias unchanged when its body contains no promotable types, and the parameter
+types of a callable are never promoted:
+
+```py
+type Callback = Callable[[Callback], int]
+
+def invoke(callback: Callback):
+    reveal_type([callback])  # revealed: list[Callback]
+
+type Handler = tuple[TypeOf[1], Callable[[TypeOf[2]], Handler]]
+
+def handle(value: Handler):
+    handler = [value][0]
+    reveal_type(handler[0])  # revealed: int
+    handler[1](3)  # error: [invalid-argument-type]
+    handler[1](2)[1](3)  # error: [invalid-argument-type]
+```

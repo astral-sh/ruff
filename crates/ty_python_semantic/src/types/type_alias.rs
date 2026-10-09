@@ -5,8 +5,9 @@ use crate::{
     Db, FxOrderSet,
     types::{
         ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind, Type,
-        TypeContext, TypeMapping, TypeRecursionContext, TypingModule, UnionType, VarianceTerm,
+        DivergentFlags, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        RecursiveType, Type, TypeContext, TypeMapping, TypeRecursionContext, TypingModule,
+        UnionType, VarianceTerm,
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
@@ -701,8 +702,40 @@ impl<'db> TypeAliasType<'db> {
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
         match type_mapping {
-            TypeMapping::ApplyRecursiveSubstitution(_) => {
-                Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+            TypeMapping::ApplyRecursiveSubstitution(mapping) => mapping
+                .bind_alias_reference(db, self, visitor)
+                .unwrap_or_else(|| {
+                    Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
+                }),
+            // Mapping the body of a recursive alias must map it under the alias's binder, which
+            // its structural form makes explicit. See the `recursive` module documentation.
+            TypeMapping::Promote(..)
+            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::RescopeReturnCallables(_)
+                if let Some(structural) = self.structural_form(db) =>
+            {
+                let mapped = Type::Recursive(structural).apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                );
+                match mapped {
+                    // Only the arguments changed, if anything: keep the alias.
+                    Type::Recursive(recursive)
+                        if recursive.constructor(db) == structural.constructor(db) =>
+                    {
+                        Type::TypeAlias(
+                            self.apply_specialization(db, |generic_context| {
+                                recursive.arguments(db).unwrap_or_else(|| {
+                                    generic_context.default_specialization(db, None)
+                                })
+                            })
+                            .with_materialization_kind(db, recursive.materialization_kind(db)),
+                        )
+                    }
+                    mapped => mapped,
+                }
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
             TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
@@ -762,6 +795,41 @@ impl<'db> TypeAliasType<'db> {
                 }
             }
         }
+    }
+
+    /// The structural form of this alias if it is recursive: a [`RecursiveType`] whose body is
+    /// the alias's value type with self-references bound, applied to this alias's arguments and
+    /// materialization.
+    ///
+    /// Only mappings that rewrite the body use this form; semantic operations on the alias keep
+    /// expanding it lazily.
+    fn structural_form(self, db: &'db dyn Db) -> Option<RecursiveType<'db>> {
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, ()| None,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn structural_constructor<'db>(
+            db: &'db dyn Db,
+            alias: TypeAliasType<'db>,
+            (): (),
+        ) -> Option<RecursiveType<'db>> {
+            if !alias.is_recursive(db) {
+                return None;
+            }
+            RecursiveType::from_alias(db, alias)
+        }
+
+        let constructor = structural_constructor(db, self.unspecialized(db), ())?;
+        let arguments = self.specialization(db).or_else(|| {
+            self.generic_context(db)
+                .map(|generic_context| generic_context.default_specialization(db, None))
+        });
+        Some(
+            constructor
+                .with_arguments(db, arguments)
+                .with_materialization(db, self.materialization_kind(db)),
+        )
     }
 
     /// Rewrite stored arguments without evaluating the alias's definition or defaults.
