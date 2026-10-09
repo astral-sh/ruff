@@ -28,9 +28,9 @@ use declarations::{DependencyDeclaration, declarations};
 
 /// Checks declarations in fully included workspace members, including imports in unopened files.
 ///
-/// These diagnostics belong to `pyproject.toml`, so document diagnostics for individual Python
-/// files cannot deliver them. Both the command line and language server report them separately.
-pub fn project_dependency_diagnostics(db: &dyn Db) -> &[Diagnostic] {
+/// These diagnostics belong to `pyproject.toml` and are reported separately from Python file
+/// diagnostics.
+pub(crate) fn project_dependency_diagnostics(db: &dyn Db) -> &[Diagnostic] {
     let project = db.project();
     if project.metadata(db).uv_workspace().is_none() {
         return &[];

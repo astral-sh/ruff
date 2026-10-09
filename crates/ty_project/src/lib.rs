@@ -41,7 +41,7 @@ pub use uv::{
 };
 
 mod db;
-pub mod dependency;
+mod dependency;
 mod files;
 pub mod glob;
 pub mod metadata;
