@@ -2938,7 +2938,8 @@ def _(bar: Bar):
     bar |= reveal_type({"bar": [1]})  # revealed: Bar
 
 class X:
-    def __ior__(self, other: Baz): ...
+    def __ior__(self, other: Baz):
+        return self
 
 def _(x: X):
     x |= reveal_type({"bar": [1]})  # revealed: Baz
@@ -2947,7 +2948,8 @@ def _(x: X | Bar):
     x |= reveal_type({"bar": [1]})  # revealed: dict[str, list[int]]
 
 class Y:
-    def __ior__(self, other: Bar): ...
+    def __ior__(self, other: Bar):
+        return self
 
 def _(x: Intersection[X, Y]):
     # TODO: Reveal `Bar` and `Baz` here.

@@ -92,6 +92,34 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
 }
 
 #[test]
+fn inferred_returns_update_across_files() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from typing_extensions import reveal_type
+        from library import value
+        reveal_type(value())
+        "#,
+    )?;
+    db.write_file("/src/library.py", "def value():\n    return 1\n")?;
+    assert_revealed_type(&db, "/src/main.py", "Literal[1]");
+
+    db.write_file("/src/library.py", "def value():\n    return 'a'\n")?;
+    assert_revealed_type(&db, "/src/main.py", "Literal[\"a\"]");
+
+    db.write_file(
+        "/src/library.py",
+        "def value() -> object:\n    return 'a'\n",
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "object");
+
+    db.write_file("/src/library.py", "def value():\n    return None\n")?;
+    assert_revealed_type(&db, "/src/main.py", "None");
+    Ok(())
+}
+
+#[test]
 fn same_file_at_different_python_versions() -> anyhow::Result<()> {
     let mut db = TestDbBuilder::new()
         .with_python_version(PythonVersion::PY311)

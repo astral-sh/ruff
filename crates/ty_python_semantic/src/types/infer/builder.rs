@@ -47,7 +47,8 @@ use crate::place_load::{
     PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
 };
 use crate::reachability::{
-    ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
+    ReachabilityConstraintsExtension, ReachabilityEvaluationCache, analyze_condition_expression,
+    evaluate_reachability_with_cache,
 };
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -12282,6 +12283,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
 
+        let db = self.db();
+        let env = self.program_environment();
+        let return_type = self
+            .scope()
+            .node(db)
+            .as_function()
+            .filter(|function| {
+                let function = function.node(self.module());
+                function.returns.is_none()
+                    && !function.is_async
+                    && !self
+                        .scope()
+                        .file_scope_id(db)
+                        .is_generator_function(self.index)
+            })
+            .map(|_| {
+                let mut returns = UnionBuilder::new(db, env);
+                if let Some(fallback) = self.cycle_recovery {
+                    returns = returns.add(fallback);
+                }
+                for returned in &self.return_types_and_ranges {
+                    if self.context.is_range_reachable(returned.range) {
+                        returns = returns.add(returned.ty);
+                    }
+                }
+                let use_def = self.index.use_def_map(self.scope().file_scope_id(db));
+                if !use_def
+                    .reachability_constraints()
+                    .evaluate(
+                        db,
+                        use_def.predicates(),
+                        use_def.end_of_scope_reachability(),
+                    )
+                    .is_always_false()
+                {
+                    returns = returns.add(Type::none(db, env));
+                }
+                returns.build()
+            });
+
         let Self {
             implicit_aliases,
             context,
@@ -12327,7 +12368,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || cycle_recovery.is_some()
             || !type_expression_flags.is_empty()
             || !collection_use_constraints.is_empty()
-            || !qualifiers.is_empty())
+            || !qualifiers.is_empty()
+            || return_type.is_some())
         .then(|| {
             collection_use_constraints.shrink_to_fit();
             Box::new(ScopeInferenceExtra {
@@ -12339,6 +12381,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 collection_use_constraints,
                 cycle_recovery,
                 diagnostics,
+                return_type,
             })
         });
 

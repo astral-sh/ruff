@@ -1138,7 +1138,7 @@ def chain(depth):
     cur = count
     for _ in range(depth):
         cur = functools.partial(cur)
-    reveal_type(cur())  # revealed: Unknown | Divergent
+    reveal_type(cur())  # revealed: int | Divergent
     return cur
 ```
 
