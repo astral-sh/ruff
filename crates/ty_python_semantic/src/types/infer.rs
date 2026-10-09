@@ -72,9 +72,7 @@ use ty_python_core::expression::Expression;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeId};
 use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
-use ty_python_core::{
-    ExpressionNodeKey, ProgramFile, SemanticIndex, Statement, Truthiness, semantic_index,
-};
+use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
 mod builder;
 mod implicit_alias;
@@ -539,7 +537,9 @@ pub(crate) fn infer_complete_scope_types<'db>(
     infer_scope_types(db, scope, TypeContext::default())
 }
 
-/// Infer the definitions and expressions in a scope, excluding nested lambda bodies.
+/// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
+/// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
+/// scope.
 ///
 /// Note that you should generally use [`infer_complete_scope_types`] instead of this method,
 /// unless you have already obtained the necessary type context while inferring the parent scope.
@@ -658,42 +658,6 @@ fn expression_cycle_initial<'db>(
     let (expression, _, _) = input.into_inner(db);
     let cycle_recovery = Type::divergent(id);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
-}
-
-/// Read an expression using the lambda inputs recorded by its enclosing inference region.
-/// Nested bodies retain their own contextual inputs; looking up an expression must not replace
-/// those inputs with the context selected by a separate inference of the enclosing statement.
-pub(super) fn expression_type_with_deferred_bodies<'db>(
-    db: &'db dyn Db,
-    file: ProgramFile<'db>,
-    expression: &ast::Expr,
-    mut lookup: impl FnMut(ExpressionNodeKey) -> (Option<Type<'db>>, Option<LambdaSignature<'db>>),
-) -> Type<'db> {
-    if let (Some(ty), _) = lookup(expression.into()) {
-        return ty;
-    }
-    let index = semantic_index(db, file);
-    let Some(scope) = index.try_expression_scope_id(expression) else {
-        return Type::unknown();
-    };
-    let lambdas: Vec<_> = index
-        .ancestor_scopes(scope)
-        .filter_map(|(_, scope)| match scope.node() {
-            NodeWithScopeKind::Lambda(lambda) => Some(ExpressionNodeKey::from(lambda)),
-            _ => None,
-        })
-        .collect();
-    let mut body: Option<&ScopeInference<'db>> = None;
-    for lambda in lambdas.into_iter().rev() {
-        let input = match body {
-            Some(body) => body.lambda_input(lambda),
-            None => lookup(lambda).1,
-        };
-        if let Some(input) = input {
-            body = Some(input.infer_body(db));
-        }
-    }
-    body.map_or_else(Type::unknown, |body| body.expression_type(expression))
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -1831,15 +1795,6 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
-    fn lambda_input(&self, lambda: impl Into<ExpressionNodeKey>) -> Option<LambdaSignature<'db>> {
-        match self.extra.as_deref()? {
-            DefinitionInferenceExtra::Other(extra) => {
-                extra.lambda_inputs.get(&lambda.into()).copied()
-            }
-            _ => None,
-        }
-    }
-
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -2280,14 +2235,6 @@ struct ExpressionInferenceExtra<'db> {
 }
 
 impl<'db> ExpressionInference<'db> {
-    fn lambda_input(&self, lambda: impl Into<ExpressionNodeKey>) -> Option<LambdaSignature<'db>> {
-        self.extra
-            .as_ref()?
-            .lambda_inputs
-            .get(&lambda.into())
-            .copied()
-    }
-
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {

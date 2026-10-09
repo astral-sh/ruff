@@ -1086,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.try_expression_type(expr).unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expr: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expr: &ast::Expr) -> Option<Type<'db>> {
         self.expressions
             .get(&expr.into())
             .copied()
