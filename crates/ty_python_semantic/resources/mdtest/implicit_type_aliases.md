@@ -2791,8 +2791,8 @@ python-version = "3.12"
 ```py
 type Identity[T] = T
 
-Direct = Identity["Direct"]
-Repeated = Identity[Identity["Repeated"]]
+Direct = Identity["Direct"]  # error: [cyclic-type-alias-definition]
+Repeated = Identity[Identity["Repeated"]]  # error: [cyclic-type-alias-definition]
 
 def inspect(direct: Direct, repeated: Repeated):
     reveal_type(direct)  # revealed: Divergent
