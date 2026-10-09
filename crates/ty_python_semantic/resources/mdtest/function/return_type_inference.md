@@ -11,19 +11,19 @@ For a simple standalone function with a missing return type annotation, ty can i
 based on the type of the expression in the `return` statement.
 
 ```py
-def returns_int():
+def returns_1():
     return 1
 
-def returns_str():
+def returns_a():
     return "a"
 
 def returns_none():
     return None
 
 # TODO: should be `Literal[1]`
-reveal_type(returns_int())  # revealed: Unknown
+reveal_type(returns_1())  # revealed: Unknown
 # TODO: should be `Literal["a"]`
-reveal_type(returns_str())  # revealed: Unknown
+reveal_type(returns_a())  # revealed: Unknown
 # TODO: should be `None`
 reveal_type(returns_none())  # revealed: Unknown
 ```
@@ -47,10 +47,10 @@ For all the functions defined above, the inferred return type is also reflected 
 signature:
 
 ```py
-# TODO: should be `def returns_int() -> int`
-reveal_type(returns_int)  # revealed: def returns_int() -> Unknown
-# TODO: should be `def returns_str() -> str`
-reveal_type(returns_str)  # revealed: def returns_str() -> Unknown
+# TODO: should be `def returns_1() -> Literal[1]`
+reveal_type(returns_1)  # revealed: def returns_1() -> Unknown
+# TODO: should be `def returns_a() -> Literal["a"]`
+reveal_type(returns_a)  # revealed: def returns_a() -> Unknown
 # TODO: should be `def returns_none() -> None`
 reveal_type(returns_none)  # revealed: def returns_none() -> Unknown
 reveal_type(returns_unknown)  # revealed: def returns_unknown(unknown) -> Unknown
@@ -143,7 +143,7 @@ def returns_from_loop(some_condition):
 reveal_type(returns_from_loop(True))  # revealed: Unknown
 ```
 
-### Unreachable branches
+### Unreachable `return` statements
 
 The `else` branch here is unreachable, so the inferred type should only consider the first branch.
 
@@ -158,7 +158,7 @@ def can_only_return_int(flag: bool):
 reveal_type(can_only_return_int(True))  # revealed: Unknown
 ```
 
-### Non-returning branches
+### Branches that do not return
 
 Here, the `else` branch never returns, so there is no path that implicitly returns `None`:
 
@@ -171,6 +171,20 @@ def non_returning_else(flag: bool):
 
 # TODO: should be `Literal[1]`
 reveal_type(non_returning_else(True))  # revealed: Unknown
+```
+
+### Exhaustive matches
+
+```py
+def type_name(x: int | str):
+    match x:
+        case int():
+            return "int"
+        case str():
+            return "str"
+
+# TODO: should be `Literal["int", "str"]`
+reveal_type(type_name(1))  # revealed: Unknown
 ```
 
 ### Returning from `finally` clauses
@@ -379,6 +393,19 @@ def _(x: int):
     reveal_type(inner.attr)  # revealed: Unknown
 ```
 
+## Generators
+
+```py
+def yields_and_returns():
+    yield "yield"
+    return "return"
+
+# TODO: should ideally be `GeneratorType[Literal["yield"], Any, Literal["return"]]`
+# once we also support yield-type inference. With return type inference along, we
+# should at least infer `GeneratorType[Any, Any, Literal["return"]]`.
+reveal_type(yields_and_returns())  # revealed: Unknown
+```
+
 ## Asynchronous functions
 
 For async functions, the inferred return type will be wrapped in `CoroutineType`:
@@ -389,6 +416,52 @@ async def async_func():
 
 # TODO: should be `def async_func() -> CoroutineType[Any, Any, Literal[1]]`
 reveal_type(async_func)  # revealed: def async_func() -> CoroutineType[Any, Any, Unknown]
+```
+
+## Decorated functions
+
+Decorators that pass through the original function should not affect return type inference:
+
+```py
+from typing import Callable
+
+def identity_1[T](func: T) -> T:
+    return func
+
+@identity_1
+def returns_1():
+    return 1
+
+# TODO: should be `Literal[1]`
+reveal_type(returns_1())  # revealed: Unknown
+```
+
+This should also work with decorators that use `Callable` and `ParamSpec`:
+
+```py
+def identity_2[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@identity_2
+def returns_2():
+    return 2
+
+# TODO: should be `Literal[2]`
+reveal_type(returns_2())  # revealed: Unknown
+```
+
+pyright can also handle unannotated decorators, but this might be much harder to support:
+
+```py
+def identity_3(func):
+    return func
+
+@identity_3  # error: [dynamic-function-decorator-return]
+def returns_3():
+    return 3
+
+# TODO: should ideally be `Literal[3]`
+reveal_type(returns_3())  # revealed: Unknown
 ```
 
 ## Methods
@@ -508,6 +581,122 @@ reveal_type(WidenedReceiver.method)  # revealed: def method(self: object) -> Unk
 reveal_type(NarrowedReceiver.method)  # revealed: def method(self: NarrowedReceiverSub) -> Unknown
 ```
 
+### Methods returning `cls`
+
+Similar to the above, a classmethod that returns `cls` should have its return type inferred as
+`type[Self]`:
+
+```py
+class Factory:
+    @classmethod
+    def reference(cls):
+        return cls
+
+    @classmethod
+    def create(cls):
+        return cls()
+
+class FactorySub(Factory): ...
+
+# TODO: Should be `type[Factory]`
+reveal_type(Factory.reference())  # revealed: Unknown
+
+# TODO: Should be `Factory`
+reveal_type(Factory.create())  # revealed: Unknown
+
+# TODO: Should be `type[FactorySub]`
+reveal_type(FactorySub.reference())  # revealed: Unknown
+
+# TODO: Should be `FactorySub`
+reveal_type(FactorySub.create())  # revealed: Unknown
+```
+
+## Overloaded functions
+
+Return type inference (on the actual implementation function) should not influence the return type
+of the overload set somehow:
+
+```py
+from typing import overload
+
+@overload
+def func(x: int) -> int: ...
+@overload
+def func(x: str) -> str: ...
+def func(x):
+    # This wrong return type should not affect the overall return type
+    # TODO: Ideally, this would be an error
+    return b"wrong"
+
+reveal_type(func(1))  # revealed: int
+reveal_type(func("a"))  # revealed: str
+```
+
 ## Recursive functions
 
-To do
+### Basic
+
+Recursive functions can make return type inference more interesting, since type inference of the
+returned expression can be self-referential:
+
+```py
+def factorial(n: int):
+    if n == 0:
+        return 1
+    return n * factorial(n - 1)
+
+# TODO: Should ideally be `def factorial(n: int) -> int`
+reveal_type(factorial)  # revealed: def factorial(n: int) -> Unknown
+# TODO: Should ideally be `int`
+reveal_type(factorial(5))  # revealed: Unknown
+
+def fibonacci(n: int):
+    if n == 0:
+        return 0
+    if n == 1:
+        return 1
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+# TODO: Should ideally be `def f    ibonacci(n: int) -> int`
+reveal_type(fibonacci)  # revealed: def fibonacci(n: int) -> Unknown
+# TODO: Should ideally be `int`
+reveal_type(fibonacci(5))  # revealed: Unknown
+```
+
+### Divergent
+
+A function that would never return normally should can still be analyzed:
+
+```py
+def divergent():
+    return divergent()
+
+# TODO: Should ideally be `Never`, but `Unknown` is also okay
+reveal_type(divergent())  # revealed: Unknown
+
+def expanding(x):
+    return (expanding(x), expanding(x))
+
+# TODO: Should ideally be `Never` or `tuple[Never, Never]`, but `Unknown` is also okay
+reveal_type(expanding(5))  # revealed: Unknown
+```
+
+### Mutual recursion
+
+Functions that mutually depend on each others' return values can also be analyzed:
+
+```py
+def left(n: int):
+    if n <= 0:
+        return 1
+    return right(n - 1)
+
+def right(n: int):
+    if n <= 0:
+        return "a"
+    return left(n - 1)
+
+# TODO: Should be `Literal[1, "a"]` or `Literal[1, "a"] | Unknown`
+reveal_type(left(3))  # revealed: Unknown
+reveal_type(right(3))  # revealed: Unknown
+```
