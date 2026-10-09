@@ -24,9 +24,8 @@ Released on 2026-10-09.
     [`DTZ011`](https://docs.astral.sh/ruff/rules/call-date-today/),
     [`DTZ012`](https://docs.astral.sh/ruff/rules/call-date-fromtimestamp/), and
     [`DTZ901`](https://docs.astral.sh/ruff/rules/datetime-min-max/)) are no longer enabled by default,
-    while [`undefined-local-with-nested-import-star-usage`
-    (`F406`)](https://docs.astral.sh/ruff/rules/undefined-local-with-nested-import-star-usage/), which
-    corresponds to a syntax error, is now enabled by default.
+    while [`undefined-local-with-nested-import-star-usage`](https://docs.astral.sh/ruff/rules/undefined-local-with-nested-import-star-usage/)
+    (`F406`), which corresponds to a syntax error, is now enabled by default.
 
 - Update Rust crate quick-junit to 0.8.0 ([#27295](https://github.com/astral-sh/ruff/pull/27295))
 
@@ -47,8 +46,8 @@ Released on 2026-10-09.
 - Always show unsafe and display-only fixes in the CLI ([#27810](https://github.com/astral-sh/ruff/pull/27810))
 
     The default `full` output format now shows unsafe fixes and suggestions requiring manual review,
-    regardless of the `unsafe-fixes` setting. Actually applying unsafe fixes still requires explicit
-    opt-in.
+    regardless of the [`unsafe-fixes`](https://docs.astral.sh/ruff/settings/#unsafe-fixes) setting.
+    Actually applying unsafe fixes still requires explicit opt-in.
 
 - Remove the Python dependency from conda-forge builds ([conda-forge/ruff-feedstock#361](https://github.com/conda-forge/ruff-feedstock/pull/361))
 
@@ -75,9 +74,9 @@ The following rules have been stabilized and are no longer in preview:
 
 The following behaviors have been stabilized:
 
-- The formatter, [`unsorted-imports` (`I001`)](https://docs.astral.sh/ruff/rules/unsorted-imports/),
-    [`line-too-long` (`E501`)](https://docs.astral.sh/ruff/rules/line-too-long/), and
-    [`doc-line-too-long` (`W505`)](https://docs.astral.sh/ruff/rules/doc-line-too-long/) now
+- The formatter, [`unsorted-imports`](https://docs.astral.sh/ruff/rules/unsorted-imports/) (`I001`),
+    [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) (`E501`), and
+    [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) (`W505`) now
     consistently ignore trailing pragma comments when computing line length. This resolved several
     bugs involving interactions between these rules
     ([#27313](https://github.com/astral-sh/ruff/pull/27313)) but may also cause existing imports to be

@@ -6,8 +6,7 @@
 
     Ruff now defaults to Python 3.11 instead of 3.10 if no Python version is configured using
     [`target-version`](https://docs.astral.sh/ruff/settings/#target-version) or
-    [`project.requires-python`](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)
-    ([#28792](https://github.com/astral-sh/ruff/pull/28792)).
+    [`project.requires-python`](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version).
 
 - **Default to Python 3.15 for syntax errors**
 
@@ -17,7 +16,13 @@
 
 - **Updated default rules**
 
-    Ruff no longer enables `DTZ001`, `DTZ005`, `DTZ006`, `DTZ007`, `DTZ011`, `DTZ012`, or `DTZ901`
+    Ruff no longer enables [`DTZ001`](https://docs.astral.sh/ruff/rules/call-datetime-without-tzinfo/),
+    [`DTZ005`](https://docs.astral.sh/ruff/rules/call-datetime-now-without-tzinfo/),
+    [`DTZ006`](https://docs.astral.sh/ruff/rules/call-datetime-fromtimestamp/),
+    [`DTZ007`](https://docs.astral.sh/ruff/rules/call-datetime-strptime-without-zone/),
+    [`DTZ011`](https://docs.astral.sh/ruff/rules/call-date-today/),
+    [`DTZ012`](https://docs.astral.sh/ruff/rules/call-date-fromtimestamp/), or
+    [`DTZ901`](https://docs.astral.sh/ruff/rules/datetime-min-max/)
     by default. These rules restrict the use of timezone-naive dates and datetimes, which are
     appropriate in many applications. The other `DTZ` rules remain in the default rule set.
 
@@ -41,7 +46,8 @@
 - **Unsafe fixes and manual suggestions in CLI output**
 
     The default `full` output format now displays all suggested fix diffs, including unsafe fixes
-    and suggestions that require manual review. Enabling `unsafe-fixes` in the configuration or
+    and suggestions that require manual review. Enabling
+    [`unsafe-fixes`](https://docs.astral.sh/ruff/settings/#unsafe-fixes) in the configuration or
     passing `--unsafe-fixes` alongside `--fix` are still required to _apply_ unsafe fixes.
 
 - **JUnit output**
@@ -51,12 +57,11 @@
 
 - **Pragma comments and line length**
 
-    The formatter, [`unsorted-imports` (`I001`)](https://docs.astral.sh/ruff/rules/unsorted-imports/),
-    [`line-too-long` (`E501`)](https://docs.astral.sh/ruff/rules/line-too-long/), and
-    [`doc-line-too-long` (`W505`)](https://docs.astral.sh/ruff/rules/doc-line-too-long/) now
+    The formatter, [`unsorted-imports`](https://docs.astral.sh/ruff/rules/unsorted-imports/) (`I001`),
+    [`line-too-long`](https://docs.astral.sh/ruff/rules/line-too-long/) (`E501`), and
+    [`doc-line-too-long`](https://docs.astral.sh/ruff/rules/doc-line-too-long/) (`W505`) now
     consistently ignore trailing pragma comments when computing line length. This resolved several
-    bugs involving interactions between these rules
-    ([#27313](https://github.com/astral-sh/ruff/pull/27313)) but may also cause existing imports to be
+    bugs involving interactions between these rules but may also cause existing imports to be
     reformatted.
 
 - **conda-forge package**
