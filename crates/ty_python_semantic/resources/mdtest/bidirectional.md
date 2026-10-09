@@ -2349,10 +2349,12 @@ def _(x: bool):
     f = signatures.get("", reveal_type(lambda x: x))
 ```
 
-A callable annotation also supplies the parameter type when the lambda has a default argument:
+A callable annotation also supplies the parameter type when the lambda has a default argument. The
+default still allows the caller to omit that argument:
 
 ```py
 callback: Callable[[str], str] = lambda value="": reveal_type(value)  # revealed: str
+callback()  # no diagnostic
 
 invalid_callback: Callable[[str], str] = lambda value="": value.bit_length()  # error: [unresolved-attribute]
 ```

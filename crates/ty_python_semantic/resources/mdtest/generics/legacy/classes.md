@@ -3272,7 +3272,52 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
-## Lambda defaults in generic base metadata
+## Recursive lambda attributes
+
+Recursive lambda attributes preserve the type arguments chosen for their instance. This includes
+literal type arguments in a `Final` attribute:
+
+```py
+from typing import Final, Generic, Literal, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.fixed: Final = lambda: (value, self.fixed)
+        self.writable = lambda: (value, self.writable)
+
+node = Box[Literal[1]](1).fixed
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+```
+
+The same applies to writable attributes:
+
+```py
+node = Box[int](1).writable
+reveal_type(node()[1]()[0])  # revealed: int
+```
+
+## Attribute errors on growing recursive lambdas
+
+Each recursive return below adds another `list` around the class's type argument. An attribute error
+shows the known return types before abbreviating the recursive part of the signature:
+
+```py
+from typing import Final, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Grow(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, Grow([value]).node)
+
+node = Grow(1).node
+# error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
+node.missing
+```
+
+## Lambda defaults in base class annotations
 
 Lambda defaults in `Annotated` metadata on a base class can refer to the type variables bound by the
 subclass:

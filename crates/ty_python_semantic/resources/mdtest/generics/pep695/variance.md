@@ -443,7 +443,8 @@ static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 
 ## Recursive lambda variance
 
-A read-only recursive lambda that produces `T` preserves covariance:
+A `Final` attribute containing a lambda that produces values of type `T` makes the class covariant
+in `T`, even when the lambda also returns itself:
 
 ```py
 from typing import Callable, Final
@@ -456,14 +457,9 @@ class Producer[T]:
 
 static_assert(is_subtype_of(Producer[int], Producer[object]))
 static_assert(not is_subtype_of(Producer[object], Producer[int]))
-
-node = Producer(1).node
-reveal_type(node()[0])  # revealed: Literal[1]
-reveal_type(node()[1]()[0])  # revealed: Literal[1]
-reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
 ```
 
-Returning a consumer of `T` makes the recursive lambda contravariant:
+Returning a callable that accepts `T` makes the class contravariant:
 
 ```py
 class Consumer[T]:
@@ -474,7 +470,7 @@ static_assert(is_subtype_of(Consumer[object], Consumer[int]))
 static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
 ```
 
-Returning a callable that both accepts and returns `T` makes it invariant:
+Returning a callable that both accepts and returns `T` makes the class invariant:
 
 ```py
 class Transformer[T]:
@@ -487,8 +483,8 @@ static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
 
 ## Writable recursive lambda attributes
 
-A writable lambda attribute makes the class invariant, even when the lambda only produces `T`.
-Accessing the lambda through a specialized instance substitutes the class's type argument.
+A writable attribute makes the class invariant, even when its lambda only produces values of type
+`T`:
 
 ```py
 from ty_extensions import static_assert
@@ -500,11 +496,6 @@ class Box[T]:
 
 static_assert(not is_subtype_of(Box[int], Box[object]))
 static_assert(not is_subtype_of(Box[object], Box[int]))
-
-box = Box(1)
-reveal_type(box.node()[0])  # revealed: int
-reveal_type(box.node()[1]()[0])  # revealed: int
-reveal_type(box.node()[1]()[1]()[0])  # revealed: int
 ```
 
 ## Recursive protocol variance

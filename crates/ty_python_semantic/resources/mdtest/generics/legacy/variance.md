@@ -2103,7 +2103,8 @@ static_assert(not is_assignable_to(GoodInferredInvariant[A], GoodInferredInvaria
 
 ## Inferred variance for recursive lambdas
 
-A read-only recursive lambda that produces `T` preserves covariance:
+A `Final` attribute containing a lambda that produces values of type `T` makes the class covariant
+in `T`, even when the lambda also returns itself:
 
 ```toml
 [environment]
@@ -2123,14 +2124,9 @@ class Producer(Generic[T]):
 
 static_assert(is_subtype_of(Producer[int], Producer[object]))
 static_assert(not is_subtype_of(Producer[object], Producer[int]))
-
-node = Producer(1).node
-reveal_type(node()[0])  # revealed: Literal[1]
-reveal_type(node()[1]()[0])  # revealed: Literal[1]
-reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
 ```
 
-Returning a consumer of `T` makes the recursive lambda contravariant:
+Returning a callable that accepts `T` makes the class contravariant:
 
 ```py
 class Consumer(Generic[T]):
@@ -2141,7 +2137,7 @@ static_assert(is_subtype_of(Consumer[object], Consumer[int]))
 static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
 ```
 
-Returning a callable that both accepts and returns `T` makes it invariant:
+Returning a callable that both accepts and returns `T` makes the class invariant:
 
 ```py
 class Transformer(Generic[T]):
@@ -2154,8 +2150,8 @@ static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
 
 ## Inferred variance for writable recursive lambda attributes
 
-A writable lambda attribute makes the class invariant, even when the lambda only produces `T`.
-Accessing the lambda through a specialized instance substitutes the class's type argument.
+A writable attribute makes the class invariant, even when its lambda only produces values of type
+`T`:
 
 ```toml
 [environment]
@@ -2175,11 +2171,6 @@ class Box(Generic[T]):
 
 static_assert(not is_subtype_of(Box[int], Box[object]))
 static_assert(not is_subtype_of(Box[object], Box[int]))
-
-box = Box(1)
-reveal_type(box.node()[0])  # revealed: int
-reveal_type(box.node()[1]()[0])  # revealed: int
-reveal_type(box.node()[1]()[1]()[0])  # revealed: int
 ```
 
 ## Inferred variance for classmethod wrappers

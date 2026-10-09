@@ -2030,12 +2030,11 @@ def apply(value: T, callback: Callable[[T], T] = lambda item=cast(T, None): item
     return callback(value)
 ```
 
-The binding is also preserved in the defaults of nested lambdas:
+Nested defaults refer to the same type variable. Calling both lambdas retains `T` in the result:
 
 ```py
 def nested(value: T, callback=lambda outer=(lambda inner=cast(T, None): inner): outer) -> T:
-    # revealed: Unknown | ((outer=...) -> Unknown | ((inner=...) -> Unknown | T@nested))
-    reveal_type(callback)
+    reveal_type(callback()())  # revealed: Unknown | T@nested
     return value
 ```
 

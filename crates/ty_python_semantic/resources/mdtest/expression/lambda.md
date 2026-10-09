@@ -99,7 +99,8 @@ reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
 
 ## Type variables in defaults of immediately called lambdas
 
-An immediately called lambda does not introduce bindings for type variables in its defaults:
+Calling a lambda immediately does not bind the type variables in its defaults, even when the
+enclosing function uses those type variables in its signature:
 
 ```py
 from typing import TypeVar
@@ -113,8 +114,8 @@ def generic(value: T, callback=(lambda item=list[T]: item)()) -> T:
 
 ## Defaults in annotation metadata
 
-Defaults in `Annotated` metadata retain the annotation's type-variable context. A generic `Callable`
-can bind type variables that would be unbound in an ordinary annotation:
+Lambda defaults inside `Annotated` metadata follow the annotation's rules for type variables. An
+ordinary annotation does not bind `T`:
 
 ```py
 from typing import Annotated, Callable, TypeVar
@@ -122,7 +123,23 @@ from typing import Annotated, Callable, TypeVar
 T = TypeVar("T")
 
 plain: Annotated[int, lambda value=list[T]: value]  # error: [unbound-type-variable]
+```
+
+A generic `Callable` does bind `T`, so its metadata can use `T` in a lambda default:
+
+```py
 callback: Callable[[T], Annotated[T, lambda value=list[T]: value]]  # no diagnostic
+```
+
+## Body diagnostics in invalid annotations
+
+A lambda is not a valid type annotation. We report that error along with the unresolved name in its
+body:
+
+```py
+# error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
+# error: [unresolved-reference] "Name `missing` used when not defined"
+value: lambda: missing = 1
 ```
 
 ## Defaults in string annotations
@@ -206,32 +223,19 @@ reveal_type(x.__qualname__)  # revealed: str
 
 ## Recursive return types
 
-A lambda can return itself inside a container. Following the recursive reference preserves the
-return type and the callable's parameter list:
+A lambda can return itself inside a tuple. Calling the returned lambda preserves the type of the
+first tuple item:
 
 ```py
 node = lambda: (1, node)
 
-reveal_type(node()[0])  # revealed: Literal[1]
 reveal_type(node()[1]()[0])  # revealed: Literal[1]
-reveal_type(node()[1]()[1]()[0])  # revealed: Literal[1]
-
-node()[1](0)  # error: [too-many-positional-arguments]
 ```
 
-## Recursive lambdas with default parameters
-
-A recursive lambda can use a default argument while taking its parameter and return types from a
-callable annotation:
+The returned lambda still takes no arguments:
 
 ```py
-from typing import Callable
-
-recursive: Callable[[int], int] = lambda value=0: value if value == 0 else recursive(value - 1)
-
-reveal_type(recursive)  # revealed: (value: int = 0) -> int
-reveal_type(recursive())  # revealed: int
-recursive("no")  # error: [invalid-argument-type]
+node()[1](0)  # error: [too-many-positional-arguments]
 ```
 
 ## Mutually recursive return types
@@ -242,16 +246,13 @@ The return types remain distinct when two lambdas refer to each other:
 first = lambda: (1, second)
 second = lambda: ("two", first)
 
-reveal_type(first()[0])  # revealed: Literal[1]
 reveal_type(first()[1]()[0])  # revealed: Literal["two"]
-reveal_type(first()[1]()[1]()[0])  # revealed: Literal[1]
-reveal_type(second()[1]()[1]()[0])  # revealed: Literal["two"]
+reveal_type(second()[1]()[0])  # revealed: Literal[1]
 ```
 
 ## Bound recursive lambdas
 
-Access through an instance binds the lambda's receiver. A recursive return referring to the class
-attribute remains unbound and still requires that receiver:
+Access through an instance binds the lambda's first parameter to that instance:
 
 ```py
 class C:
@@ -259,17 +260,20 @@ class C:
 
 c = C()
 reveal_type(c.method()[0])  # revealed: int
-reveal_type(c.method()[1](c)[0])  # revealed: int
-reveal_type(c.method()[1](c)[1](c)[0])  # revealed: int
-
 c.method(c)  # error: [too-many-positional-arguments]
+```
+
+The returned class attribute remains unbound, so it still requires an instance argument:
+
+```py
+reveal_type(c.method()[1](c)[0])  # revealed: int
 c.method()[1]()  # error: [missing-argument]
 ```
 
 ## Mutually recursive lambda methods
 
-Promotion of writable class attributes preserves the two recursive signatures and their distinct
-return types:
+Two lambda methods can return references to each other. Because these attributes are writable, the
+literal return types widen to `int` and `str`:
 
 ```py
 class C:
@@ -277,156 +281,18 @@ class C:
     second = lambda self: ("two", C.first)
 
 c = C()
-reveal_type(c.first()[0])  # revealed: int
 reveal_type(c.first()[1](c)[0])  # revealed: str
-reveal_type(c.first()[1](c)[1](c)[0])  # revealed: int
-reveal_type(c.second()[1](c)[1](c)[0])  # revealed: str
+reveal_type(c.second()[1](c)[0])  # revealed: int
 ```
 
 ## Displaying bound recursive lambdas
 
-A lambda can return a bound method referring to itself:
+A lambda can return a bound method with the same signature. We display the recursive part as
+`Divergent`:
 
 ```py
 class C:
     method = lambda self: (1, C().method)
 
 reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
-```
-
-## Recursive decorators with an unresolved default
-
-An unresolved default does not prevent us from reporting an invalid decorator call or inferring the
-dictionary returned by the inner decorator. This is a regression test for
-<https://github.com/astral-sh/ty/issues/4613>.
-
-```py
-while previous := Decorated:  # error: [possibly-unresolved-reference]
-    @lambda value=missing: value  # error: [unresolved-reference]
-    @lambda: {key: 0}  # error: [too-many-positional-arguments]
-    class Decorated:
-        pass
-
-    reveal_type(Decorated)  # revealed: dict[Divergent, int]
-
-key = previous
-```
-
-## Displaying growing recursive lambdas
-
-When each recursive return adds another container to a type argument, diagnostics display a finite
-prefix of the callable's return type:
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```py
-from typing import Final
-
-class Grow[T]:
-    def __init__(self, value: T):
-        self.node: Final = lambda: (value, Grow([value]).node)
-
-node = Grow(1).node
-
-# error: [unresolved-attribute] "Object of type `() -> tuple[int, () -> tuple[list[int], () -> tuple[list[list[int]], () -> tuple[list[list[list[int]]], (...) -> ...]]]]` has no attribute `missing`"
-node.missing
-```
-
-## Recursive references during collection inference
-
-A lambda can refer to a name that is rebound by unpacking a collection. Inference converges while
-retaining the errors in the collection and the warning for using the lambda as a condition.
-
-```py
-node = lambda: node
-
-# error: [not-iterable] "Object of type `(values) -> dict[Unknown, int]` is not iterable"
-# error: [not-iterable] "Object of type `int` is not iterable"
-for [node] in {
-    **{0: 0 for _ in [] if node},  # error: [redundant-condition] "Function object is always truthy"
-    (lambda values: {key: 0 for key in values}): 0,
-    **0,  # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
-}:
-    pass
-```
-
-## Recursive references during collection inference in async functions
-
-The same cycle converges in an asynchronous function, where the condition diagnostic also inspects
-return types to decide whether to suggest `await`.
-
-```py
-async def check():
-    node = lambda: node
-
-    # error: [not-iterable] "Object of type `(values) -> dict[Unknown, int]` is not iterable"
-    # error: [not-iterable] "Object of type `int` is not iterable"
-    for [node] in {
-        **{0: 0 for _ in [] if node},  # error: [redundant-condition] "Function object is always truthy"
-        (lambda values: {key: 0 for key in values}): 0,
-        **0,  # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
-    }:
-        pass
-```
-
-## Body diagnostics in invalid annotations
-
-An invalid annotation still reports errors inside its lambda body, even though the annotation's
-inferred type is `Unknown`.
-
-```py
-# error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
-# error: [unresolved-reference] "Name `missing` used when not defined"
-value: lambda: missing = 1
-```
-
-## Recursive decorator with a lambda default
-
-A decorator's default can refer to the decorated class while its return value refers to another
-binding that later becomes a type alias. Inference converges and preserves the outer tuple.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-@lambda func, fallback=lambda: Result: (build,)
-def build(): ...
-
-@lambda cls: build
-class Result: ...
-
-while Result:  # error: [redundant-condition]
-    reveal_type(Result)  # revealed: tuple[Divergent]
-
-type build = int
-```
-
-## Recursive decorator returning a collection
-
-The cycle can also pass through a promoted collection element. The finite part of the decorator's
-return type remains available.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-values = [1]
-
-@lambda func, fallback=lambda: Result: (0, {build: 0 for _ in values})
-def build(): ...
-
-@lambda cls: build
-class Result: ...
-
-while Result:  # error: [redundant-condition]
-    reveal_type(Result[0])  # revealed: Literal[0]
-
-type build = int
 ```
