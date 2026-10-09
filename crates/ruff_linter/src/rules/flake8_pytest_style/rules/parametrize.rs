@@ -13,8 +13,12 @@ use crate::codes::Category;
 use crate::registry::Rule;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
-use crate::rules::flake8_pytest_style::helpers::{is_pytest_parametrize, split_names};
+use crate::rules::flake8_pytest_style::helpers::{
+    is_pytest_parametrize, parametrize_has_value_rows, split_names,
+};
 use crate::rules::flake8_pytest_style::types;
+
+use super::pytest_parametrize_unstable_id::pytest_parametrize_unstable_id;
 
 /// ## What it does
 /// Checks for the type of parameter names passed to `pytest.mark.parametrize`.
@@ -529,11 +533,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
         .flake8_pytest_style
         .parametrize_values_row_type;
 
-    let is_multi_named = if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = &names {
-        split_names(value.to_str()).len() > 1
-    } else {
-        true
-    };
+    let has_value_rows = parametrize_has_value_rows(names).unwrap_or(true);
 
     match values {
         Expr::List(ast::ExprList { elts, .. }) => {
@@ -542,7 +542,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
-                        is_single_param: !is_multi_named,
+                        is_single_param: !has_value_rows,
                     },
                     values.range(),
                 );
@@ -580,7 +580,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                 });
             }
 
-            if is_multi_named {
+            if has_value_rows {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
         }
@@ -590,7 +590,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
-                        is_single_param: !is_multi_named,
+                        is_single_param: !has_value_rows,
                     },
                     values.range(),
                 );
@@ -628,7 +628,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                 });
             }
 
-            if is_multi_named {
+            if has_value_rows {
                 handle_value_rows(checker, elts, values_type, values_row_type);
             }
         }
@@ -896,25 +896,27 @@ pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
+    let names = call.arguments.find_argument_value("argnames", 0);
+    let values = call.arguments.find_argument_value("argvalues", 1);
 
-        if let (Some(names), Some(values)) = (names, values) {
-            check_names(checker, call, names, values);
-        }
+    if checker.is_rule_enabled(Rule::PytestParametrizeNamesWrongType)
+        && let (Some(names), Some(values)) = (names, values)
+    {
+        check_names(checker, call, names, values);
     }
-    if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType) {
-        let names = call.arguments.find_argument_value("argnames", 0);
-        let values = call.arguments.find_argument_value("argvalues", 1);
-
-        if let (Some(names), Some(values)) = (names, values) {
-            check_values(checker, names, values);
-        }
+    if checker.is_rule_enabled(Rule::PytestParametrizeValuesWrongType)
+        && let (Some(names), Some(values)) = (names, values)
+    {
+        check_values(checker, names, values);
     }
-    if checker.is_rule_enabled(Rule::PytestDuplicateParametrizeTestCases) {
-        if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
-            check_duplicates(checker, values);
-        }
+    if checker.is_rule_enabled(Rule::PytestDuplicateParametrizeTestCases)
+        && let Some(values) = values
+    {
+        check_duplicates(checker, values);
+    }
+    if checker.is_rule_enabled(Rule::PytestParametrizeUnstableId)
+        && let (Some(names), Some(values)) = (names, values)
+    {
+        pytest_parametrize_unstable_id(checker, call, names, values);
     }
 }
