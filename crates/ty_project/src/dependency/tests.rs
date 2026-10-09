@@ -267,11 +267,13 @@ fn namespace_import_credits_all_owners_but_child_import_is_specific() -> anyhow:
     }
     assert!(project_diagnostics(&db, &metadata).is_empty());
 
-    db.write_file("/project/main.py", "import shared.a\n")?;
-    assert_eq!(
-        declarations(&db, &project_diagnostics(&db, &metadata))?,
-        [("/project/pyproject.toml".into(), "'b-lib'".into())]
-    );
+    for import in ["import shared.a\n", "from shared import a\n"] {
+        db.write_file("/project/main.py", import)?;
+        assert_eq!(
+            declarations(&db, &project_diagnostics(&db, &metadata))?,
+            [("/project/pyproject.toml".into(), "'b-lib'".into())]
+        );
+    }
     Ok(())
 }
 

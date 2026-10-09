@@ -3,9 +3,9 @@ use ruff_db::source::source_text;
 use ruff_python_ast as ast;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ty_module_resolver::{ImportingFile, Module, ModuleName, resolve_module};
-use ty_python_core::{ProgramFile, SemanticIndex, semantic_index};
+use ty_python_core::ProgramFile;
 
-use crate::types::{KnownFunction, Type, infer_definition_types};
+use crate::types::{KnownFunction, Type};
 use crate::{Db, FxIndexSet, HasType, SemanticModel};
 
 /// The modules imported anywhere in one file, including imports used only for typing.
@@ -39,7 +39,6 @@ pub fn imported_modules<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Importe
 
     let mut collector = ImportCollector {
         model: SemanticModel::new(db, file),
-        index: semantic_index(db, file),
         modules: FxIndexSet::default(),
         unresolved: FxIndexSet::default(),
         incomplete: false,
@@ -54,7 +53,6 @@ pub fn imported_modules<'db>(db: &'db dyn Db, file: ProgramFile<'db>) -> Importe
 
 struct ImportCollector<'db> {
     model: SemanticModel<'db>,
-    index: &'db SemanticIndex<'db>,
     modules: FxIndexSet<Module<'db>>,
     unresolved: FxIndexSet<ModuleName>,
     incomplete: bool,
@@ -107,29 +105,16 @@ impl<'db> ImportCollector<'db> {
                 self.modules.insert(parent);
                 continue;
             }
-            let Some(definitions) = self.index.try_definitions(ast::AnyNodeRef::Alias(alias))
-            else {
-                self.incomplete = true;
-                continue;
-            };
-            let mut found_child = false;
-            for definition in definitions {
-                // Follow the same attribute-versus-submodule decision as import inference.
-                // A value re-exported from another distribution does not directly import it.
-                if let Some(declaration) = infer_definition_types(db, *definition)
-                    .inferred_declaration(*definition)
-                    .declared()
-                    && let Type::ModuleLiteral(literal) = declaration.inner_type()
-                    && let child = literal.module(db)
-                    && let child_name = child.name(db)
-                    && child_name.parent().as_ref() == Some(parent.name(db))
-                    && child_name.components().next_back() == Some(alias.name.as_str())
-                {
-                    self.modules.insert(child);
-                    found_child = true;
-                }
-            }
-            if !found_child {
+            // Follow the same attribute-versus-submodule decision as import inference.
+            // A value re-exported from another distribution does not directly import it.
+            if let Some(Type::ModuleLiteral(literal)) = alias.inferred_type(&self.model)
+                && let child = literal.module(db)
+                && let child_name = child.name(db)
+                && child_name.parent().as_ref() == Some(parent.name(db))
+                && child_name.components().next_back() == Some(alias.name.as_str())
+            {
+                self.modules.insert(child);
+            } else {
                 self.modules.insert(parent);
             }
         }
