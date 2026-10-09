@@ -3,7 +3,6 @@
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use rustc_hash::FxHashSet;
 use ty_python_core::{definition::Definition, place_table};
 
 use crate::{
@@ -18,7 +17,6 @@ use crate::{
         diagnostic::{
             INVALID_ATTRIBUTE_OVERRIDE, INVALID_MUTABLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
         },
-        list_members::{MemberWithDefinition, all_end_of_scope_members},
     },
 };
 
@@ -597,11 +595,10 @@ fn already_inherited<'db>(
         })
 }
 
-/// Check the attribute selected by an MRO against every inherited declaration of that name.
+/// Check the selected attribute against every inherited declaration of that name.
 ///
-/// Explicit overrides are checked separately. Lookup selects only one source before the
-/// first dynamic base, but all inherited generic specializations remain target contracts.
-/// Conflicts already present in a parent hierarchy are suppressed.
+/// Explicit overrides are checked separately. All inherited generic specializations remain
+/// target contracts, and conflicts already present in a parent hierarchy are suppressed.
 ///
 /// ```python
 /// class Integer:
@@ -612,155 +609,93 @@ fn already_inherited<'db>(
 ///
 /// class Combined(Integer, String): ...  # Integer.value cannot satisfy String.value.
 /// ```
-pub(super) fn check_inherited_conflicts<'db>(
+pub(super) fn check_inherited_conflict<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     class_type: ClassType<'db>,
-    own_members: &FxHashSet<MemberWithDefinition<'db>>,
+    owner: ClassType<'db>,
+    contracts: &[ClassType<'db>],
+    name: &Name,
 ) {
-    let Some((mro, first_dynamic_base)) = super::inherited_conflict_mro(context, class, class_type)
-    else {
-        return;
-    };
     let db = context.db();
     let env = &context.program_environment();
     let receiver = Type::instance(db, env, class_type);
-    let mut seen: FxHashSet<Name> = own_members
-        .iter()
-        .map(|member| member.member.name.clone())
-        .collect();
-    seen.extend(class.slot_names(db).unwrap_or_default().iter().cloned());
-    seen.extend(
-        class_type
-            .own_instance_attribute_names(db)
-            .iter()
-            .filter(|name| {
-                attribute_declarations(db, class.body_scope(db), name).any(
-                    |(mut declarations, _)| {
-                        declarations
-                            .any(|declaration| declaration.declaration.definition().is_some())
-                    },
-                )
-            })
-            .filter(|name| {
-                matches!(class_type.own_instance_member(db, env, name).inner.place,
-            Place::Defined(place) if place.origin == TypeOrigin::Declared)
-            })
-            .cloned(),
-    );
-    let contracts: Vec<_> = mro
-        .iter()
-        .copied()
-        .chain(class_type.iter_explicit_ancestors(db, env).skip(1))
-        .collect();
-    for (index, owner) in mro.iter().copied().enumerate() {
-        if first_dynamic_base.is_some_and(|position| index >= position) {
-            break;
-        }
-        let Some((literal, _)) = owner.static_class_literal(db) else {
+    let Some(source) = attribute_contract(db, env, owner, receiver, name) else {
+        return;
+    };
+    for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
+        let Some(target) = attribute_contract(db, env, target_owner, receiver, name) else {
             continue;
         };
-        let names = all_end_of_scope_members(db, literal.body_scope(db))
-            .map(|member| member.member.name)
-            .chain(owner.own_instance_attribute_names(db).iter().cloned())
-            .chain(literal.slot_names(db).unwrap_or_default().iter().cloned());
-        for name in names {
-            if is_mangled_private(&name)
-                || !seen.insert(name.clone())
-                || class
-                    .own_synthesized_member(db, env, None, None, &name)
-                    .is_some()
-            {
-                continue;
-            }
-            // Synthesized members can precede the first source declaration of this name.
-            // Resolve ownership before comparing contracts, just as ordinary lookup does.
-            let owner = mro[..=index]
-                .iter()
-                .copied()
-                .find(|owner| {
-                    !owner.own_class_member(db, env, None, &name).is_undefined()
-                        || !owner.own_instance_member(db, env, &name).is_undefined()
-                })
-                .unwrap_or(owner);
-            let Some(source) = attribute_contract(db, env, owner, receiver, &name) else {
-                continue;
-            };
-            for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
-                let Some(target) = attribute_contract(db, env, target_owner, receiver, &name)
-                else {
-                    continue;
-                };
-                let Some(violation) = attribute_violation(
-                    db,
-                    env,
-                    receiver,
-                    Type::instance(db, env, target_owner),
-                    &name,
-                    &source,
-                    &target,
-                ) else {
-                    continue;
-                };
-                if already_inherited(db, env, class_type, target_owner, &name, &source) {
-                    continue;
-                }
-                let rule = if source.is_property || target.is_property {
-                    &INVALID_PROPERTY_TYPE_OVERRIDE
-                } else if matches!(violation, AttributeViolation::Write { .. }) {
-                    &INVALID_MUTABLE_OVERRIDE
-                } else {
-                    &INVALID_ATTRIBUTE_OVERRIDE
-                };
-                let Some(builder) = context.report_lint(rule, class.header_range(db)) else {
-                    continue;
-                };
-                let mut diagnostic = builder
-                    .into_diagnostic(format_args!("Incompatible inherited attribute `{name}`"));
-                diagnostic.set_primary_annotation_message(format_args!(
-                    "`{}.{name}` is incompatible with `{}.{name}`",
-                    owner.name(db),
-                    target_owner.name(db),
-                ));
-                match violation {
-                    AttributeViolation::Read { source, target } => diagnostic.info(format_args!(
-                        "Type `{}` is not assignable to inherited type `{}`",
-                        source.display(db, env),
-                        target.display(db, env),
-                    )),
-                    AttributeViolation::Write { target } => diagnostic.info(format_args!(
-                        "Inherited attribute does not accept writes of type `{}`",
-                        target.display(db, env),
-                    )),
-                    AttributeViolation::ReadOnly => diagnostic
-                        .info("Inherited read-only attribute replaces a writable attribute"),
-                }
-                for owner in [owner, target_owner] {
-                    let Some((literal, _)) = owner.static_class_literal(db) else {
-                        continue;
-                    };
-                    let definition = place_table(db, literal.body_scope(db))
-                        .symbol_id(&name)
-                        .and_then(|id| super::symbol_definition(db, literal.body_scope(db), id))
-                        .or_else(
-                            || match owner.own_instance_member(db, env, &name).inner.place {
-                                Place::Defined(place) => place.provenance.definition(),
-                                Place::Undefined => None,
-                            },
-                        );
-                    if let Some(definition) = definition
-                        && definition.file(db) == context.file()
-                    {
-                        diagnostic.annotate(
-                            Annotation::secondary(
-                                context.span(definition.focus_range(db, context.module())),
-                            )
-                            .message(format_args!("`{}.{name}` declared here", owner.name(db))),
-                        );
-                    }
-                }
-                break;
+        let Some(violation) = attribute_violation(
+            db,
+            env,
+            receiver,
+            Type::instance(db, env, target_owner),
+            name,
+            &source,
+            &target,
+        ) else {
+            continue;
+        };
+        if already_inherited(db, env, class_type, target_owner, name, &source) {
+            continue;
+        }
+        let rule = if source.is_property || target.is_property {
+            &INVALID_PROPERTY_TYPE_OVERRIDE
+        } else if matches!(violation, AttributeViolation::Write { .. }) {
+            &INVALID_MUTABLE_OVERRIDE
+        } else {
+            &INVALID_ATTRIBUTE_OVERRIDE
+        };
+        let Some(builder) = context.report_lint(rule, class.header_range(db)) else {
+            continue;
+        };
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Incompatible inherited attribute `{name}`"));
+        diagnostic.set_primary_annotation_message(format_args!(
+            "`{}.{name}` is incompatible with `{}.{name}`",
+            owner.name(db),
+            target_owner.name(db),
+        ));
+        match violation {
+            AttributeViolation::Read { source, target } => diagnostic.info(format_args!(
+                "Type `{}` is not assignable to inherited type `{}`",
+                source.display(db, env),
+                target.display(db, env),
+            )),
+            AttributeViolation::Write { target } => diagnostic.info(format_args!(
+                "Inherited attribute does not accept writes of type `{}`",
+                target.display(db, env),
+            )),
+            AttributeViolation::ReadOnly => {
+                diagnostic.info("Inherited read-only attribute replaces a writable attribute");
             }
         }
+        for owner in [owner, target_owner] {
+            let Some((literal, _)) = owner.static_class_literal(db) else {
+                continue;
+            };
+            let definition = place_table(db, literal.body_scope(db))
+                .symbol_id(name)
+                .and_then(|id| super::symbol_definition(db, literal.body_scope(db), id))
+                .or_else(
+                    || match owner.own_instance_member(db, env, name).inner.place {
+                        Place::Defined(place) => place.provenance.definition(),
+                        Place::Undefined => None,
+                    },
+                );
+            if let Some(definition) = definition
+                && definition.file(db) == context.file()
+            {
+                diagnostic.annotate(
+                    Annotation::secondary(
+                        context.span(definition.focus_range(db, context.module())),
+                    )
+                    .message(format_args!("`{}.{name}` declared here", owner.name(db))),
+                );
+            }
+        }
+        break;
     }
 }

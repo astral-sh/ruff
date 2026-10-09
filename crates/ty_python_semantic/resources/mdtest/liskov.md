@@ -1002,6 +1002,40 @@ class ReturnsInt:
 class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
 ```
 
+### Instance attributes take precedence over methods
+
+The callback stored by the first base is the selected member. The later methods do not need to be
+compatible with each other; each is checked against the callback's type.
+
+```py
+from typing import Any, Callable
+
+class Callback:
+    def __init__(self, callback: Callable[[], Any]) -> None:
+        self.method: Callable[[], Any] = callback
+
+class ReturnsStr:
+    def method(self) -> str:
+        return ""
+
+class ReturnsInt:
+    def method(self) -> int:
+        return 0
+
+class Combined(Callback, ReturnsStr, ReturnsInt): ...  # no diagnostic
+```
+
+A non-callable instance attribute still conflicts with the inherited methods. The error describes
+that attribute's type, without also comparing the hidden methods with each other.
+
+```py
+class Value:
+    def __init__(self) -> None:
+        self.method: int = 0
+
+class Invalid(Value, ReturnsStr, ReturnsInt): ...  # error: [invalid-attribute-override]
+```
+
 ### Subclass overrides must satisfy both contracts
 
 A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
