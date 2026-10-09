@@ -381,7 +381,7 @@ fn attribute_violation<'db>(
         return None;
     }
     if let (Some(source_kind), Some(target_kind)) = (source.variable_kind, target.variable_kind)
-        && !source_kind.can_override(target_kind)
+        && !source_kind.can_override(target_kind, target_receiver.is_protocol_instance())
         && (target_kind == super::VariableKind::Class || target.write.is_some())
     {
         return Some(AttributeViolation::Storage {
