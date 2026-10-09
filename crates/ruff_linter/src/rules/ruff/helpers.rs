@@ -168,10 +168,7 @@ pub(super) fn dataclass_kind<'a>(
 }
 
 /// Return true if dataclass (stdlib or `attrs`) is frozen
-fn is_frozen_dataclass(
-    dataclass_decorator: &ast::Decorator,
-    semantic: &SemanticModel,
-) -> bool {
+fn is_frozen_dataclass(dataclass_decorator: &ast::Decorator, semantic: &SemanticModel) -> bool {
     let Some(qualified_name) =
         semantic.resolve_qualified_name(map_callable(&dataclass_decorator.expression))
     else {
