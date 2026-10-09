@@ -1259,13 +1259,19 @@ attribute narrows the subject to the subclass whose attribute can match:
 
 ```py
 class Holder:
-    value: object
+    @property
+    def value(self) -> object:
+        return None
 
 class IntHolder(Holder):
-    value: int
+    @property
+    def value(self) -> int:
+        return 0
 
 class StrHolder(Holder):
-    value: str
+    @property
+    def value(self) -> str:
+        return ""
 
 def filter_holders(holder: IntHolder | StrHolder) -> None:
     match holder:
@@ -2069,7 +2075,7 @@ class GenericOverlapB(Generic[OverlapT]):
     member: OverlapT
 
 class GenericOverlapC(GenericOverlapB[str], GenericOverlapA):
-    member: str
+    member: str  # error: [invalid-attribute-override]
 
 class GenericListOverlapA: ...
 

@@ -46,9 +46,7 @@ use crate::place_load::{
     ImplicitPlaceLoad, PlaceExprPrefixLoad, PlaceExprPrefixLoads, PlaceLoadFailure, PlaceLoadMode,
     PlaceLoadResolutionStep, PlaceLoadSource, PlaceLoadSourceKind, resolve_place_load,
 };
-use crate::reachability::{
-    ReachabilityEvaluationCache, analyze_condition_expression, evaluate_reachability_with_cache,
-};
+use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::abstract_methods::AbstractMethods;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::attribute_write::{AssignmentAttributeMembers, assignment_attribute_members};
@@ -103,8 +101,8 @@ use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
 use crate::types::infer::{
-    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TypeAndRange,
-    TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
+    StatementInference, StatementInferenceInner, StatementInferenceInnerExtra, TruthinessAnalyzer,
+    TypeAndRange, TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::match_pattern::{ClassPatternPositionalResult, class_pattern_positional_result};
@@ -147,7 +145,7 @@ use ty_python_core::definition::{
     LoopHeaderDefinitionKind, NestedBindingExecution, NestedBindingsDefinitionKind,
     ParameterDefinitionNodeKind, TargetKind, WithItemDefinitionKind,
 };
-use ty_python_core::expression::{Expression, ExpressionKind};
+use ty_python_core::expression::{Expression, ExpressionContext, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
@@ -3123,7 +3121,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if positive.iter().any(|element_ty| {
                     self.validate_attribute_deletion(target, *element_ty, attribute, false)
                 }) {
-                    true
+                    !self.validate_final_attribute_deletion(
+                        target,
+                        object_ty,
+                        attribute,
+                        emit_diagnostics,
+                    )
                 } else {
                     if emit_diagnostics && let Some(element_ty) = positive.first() {
                         self.validate_attribute_deletion(target, *element_ty, attribute, true);
@@ -8667,6 +8670,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         add.insert(self, ty)
     }
 
+    /// Evaluate an already-inferred expression, preserving the absence of a result.
+    fn expression_truthiness(
+        &self,
+        expression: &ast::Expr,
+        context: ExpressionContext,
+    ) -> Truthiness {
+        TruthinessAnalyzer::new(
+            self.db(),
+            self.program_environment(),
+            |node| self.expression_type(node),
+            |node| self.comparison_truthiness.get(&node.into()).copied(),
+        )
+        .truthiness(expression, context)
+    }
+
     fn infer_if_expression(
         &mut self,
         if_expression: &ast::ExprIf,
@@ -8685,6 +8703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
         let (body_ty, orelse_ty) = if is_collection_literal(body)
             && prefer_collection_literal_peer_context(db, env, tcx)
+            && !is_nonempty_collection_literal_with_empty_peer(body, orelse)
         {
             // Infer the peer branch first so the body can use its type as context.
             let orelse_ty = self.infer_expression(orelse, tcx);
@@ -8705,13 +8724,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let test_truthiness = match test_ty.try_bool(db, env) {
-            Ok(_) => analyze_condition_expression(test, &|node| {
-                self.comparison_truthiness
-                    .get(&node.into())
-                    .copied()
-                    .or_else(|| self.expression_type(node).bool_if_inhabited(db, env))
-            })
-            .unwrap_or(Truthiness::Ambiguous),
+            Ok(_) => self.expression_truthiness(test, ExpressionContext::Condition),
             Err(err) => {
                 err.report_diagnostic(&self.context, &**test);
                 err.fallback_truthiness()
@@ -8724,6 +8737,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
             Truthiness::Ambiguous => UnionType::from_two_elements(db, env, body_ty, orelse_ty),
+            Truthiness::Uninhabited => Type::Never,
         }
     }
 
@@ -11483,7 +11497,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     err.fallback_truthiness()
                 });
 
-                self.check_negation_redundancy(unary, ty, original_truthiness);
+                self.check_negation_redundancy(unary);
 
                 Type::from_truthiness(db, env, original_truthiness.negate())
             }
@@ -11740,6 +11754,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     match (truthiness, op) {
+                        (Truthiness::Uninhabited, _) => {
+                            done = true;
+                            Type::Never
+                        }
                         (Truthiness::AlwaysTrue, ast::BoolOp::And) => Type::Never,
                         (Truthiness::AlwaysFalse, ast::BoolOp::Or) => Type::Never,
 
@@ -12792,6 +12810,23 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
+}
+
+// An empty literal cannot provide element types for the other branch. Infer the
+// nonempty branch first so the empty branch can use those types as context.
+fn is_nonempty_collection_literal_with_empty_peer(
+    expression: &ast::Expr,
+    peer: &ast::Expr,
+) -> bool {
+    match (expression, peer) {
+        (ast::Expr::List(expression), ast::Expr::List(peer)) => {
+            !expression.elts.is_empty() && peer.elts.is_empty()
+        }
+        (ast::Expr::Dict(expression), ast::Expr::Dict(peer)) => {
+            !expression.items.is_empty() && peer.items.is_empty()
+        }
+        _ => false,
+    }
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.

@@ -40,9 +40,9 @@ hyperfine --ignore-failure \
   "yapf ${TARGET_DIR} --parallel --recursive --in-place"
 
 # Benchmark 2: Write to disk, but only use one thread.
-hyperfine --ignore-failure \
+hyperfine --ignore-failure --env RAYON_NUM_THREADS=1 \
   --prepare "./target/release/ruff format ${TARGET_DIR}" \
-  "env RAYON_NUM_THREADS=1 ./target/release/ruff format ${TARGET_DIR}" \
+  "./target/release/ruff format ${TARGET_DIR}" \
   --prepare "black --no-cache ${TARGET_DIR} --safe" \
   "black --no-cache ${TARGET_DIR} --workers=1 --safe" \
   --prepare "black --no-cache ${TARGET_DIR} --fast" \

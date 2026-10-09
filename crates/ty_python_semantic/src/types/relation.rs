@@ -354,6 +354,29 @@ impl<'db> Type<'db> {
             .query(|_constraints, when| when.is_always_satisfied(db, env, TypeVarSet::None))
     }
 
+    /// Whether an attribute accepts every value of `value_ty` through ordinary assignment.
+    pub(super) fn is_attribute_writable_with(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        name: &str,
+        value_ty: Type<'db>,
+    ) -> bool {
+        let constraints = ConstraintSetBuilder::new();
+        TypeRelationChecker::new(
+            env,
+            TypeRelation::Assignability,
+            &constraints,
+            TypeVarSet::None,
+            &HasRelationToVisitor::default(&constraints),
+            &IsDisjointVisitor::default(&constraints),
+            &SignatureRelationVisitor::default(),
+            &ApplyTypeMappingVisitor::new(env),
+        )
+        .check_attribute_write(db, self, name, value_ty)
+        .is_always_satisfied(db, env, TypeVarSet::None)
+    }
+
     /// Re-run the assignability check with error context collection enabled.
     ///
     /// This should normally be called when `is_assignable_to` has returned `false` and we
@@ -2399,10 +2422,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
             (_, Type::AlwaysFalsy) => {
-                ConstraintSet::from_bool(self.constraints, source.bool(db, env).is_always_false())
+                ConstraintSet::from_bool(self.constraints, !source.bool(db, env).may_be_true())
             }
             (_, Type::AlwaysTruthy) => {
-                ConstraintSet::from_bool(self.constraints, source.bool(db, env).is_always_true())
+                ConstraintSet::from_bool(self.constraints, !source.bool(db, env).may_be_false())
             }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
@@ -2950,10 +2973,21 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
-            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => self
-                .with_recursion_guard(db, source, target, || {
+            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => {
+                // As an optimization, skip the recursion guard when the target is
+                // non-generic and has no tuple specification. These comparisons only
+                // inspect MRO class identities; there are no type arguments or tuple
+                // elements whose comparison could recurse.
+                if target_i.own_tuple_spec(db).is_none()
+                    && matches!(target_i.class(db, env), ClassType::NonGeneric(_))
+                {
                     self.check_nominal_instance_pair(db, source_i, target_i)
-                }),
+                } else {
+                    self.with_recursion_guard(db, source, target, || {
+                        self.check_nominal_instance_pair(db, source_i, target_i)
+                    })
+                }
+            }
 
             (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => self
                 .with_recursion_guard(db, source, target, || {
@@ -3332,9 +3366,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         self.with_recursion_guard(db, left, right, || {
             let negative_elements = intersection.negative(db);
             let subtyping_checker = self.as_relation_checker(TypeRelation::Subtyping);
+
             (
-                // Test an exact exclusion before unrelated positive components. Gradual types
-                // need the full reflexive subtyping check: `Any` is not a subtype of itself.
+                // As an optimization, test an exact exclusion before unrelated positive components.
+                // Gradual types need the full reflexive subtyping check: `Any` is not a subtype of itself.
                 ConstraintSet::from_bool(self.constraints, negative_elements.contains(&other)).and(
                     db,
                     self.constraints,
@@ -3348,13 +3383,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     .when_any(db, self.constraints, |&pos_ty| {
                         self.check_type_pair(db, pos_ty, other)
                     })
-                    // A & B & Not[C] is disjoint from C
-                    .or(db, self.constraints, || {
-                        negative_elements
-                            .iter()
-                            .when_any(db, self.constraints, |&neg_ty| {
-                                subtyping_checker.check_type_pair(db, other, neg_ty)
-                            })
+            })
+            .or(db, self.constraints, || {
+                // A & B & Not[C] is disjoint from C
+                negative_elements
+                    .iter()
+                    .when_any(db, self.constraints, |&neg_ty| {
+                        subtyping_checker.check_type_pair(db, other, neg_ty)
                     })
             })
         })
@@ -3789,15 +3824,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
-                // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
+                // They are disjoint if `ty` cannot produce a truthy value.
                 nontrivial_check(self, || {
-                    ConstraintSet::from_bool(self.constraints, ty.bool(db, env).is_always_false())
+                    ConstraintSet::from_bool(self.constraints, !ty.bool(db, env).may_be_true())
                 })
             }
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
-                // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
+                // Similarly, they are disjoint if `ty` cannot produce a falsy value.
                 nontrivial_check(self, || {
-                    ConstraintSet::from_bool(self.constraints, ty.bool(db, env).is_always_true())
+                    ConstraintSet::from_bool(self.constraints, !ty.bool(db, env).may_be_false())
                 })
             }
 
@@ -4127,7 +4162,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::LiteralValue(_), _) | (_, Type::LiteralValue(_)) => self.always(),
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
-            // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
+            // unless the type expressing "all instances of `Z`" is a subtype of `Y`,
             // where `Z` is `X`'s metaclass.
             (Type::ClassLiteral(class), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::ClassLiteral(class)) => {

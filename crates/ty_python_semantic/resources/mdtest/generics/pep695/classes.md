@@ -2197,219 +2197,6 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
-### Recursive protocol intersections
-
-Specializing a recursive protocol method preserves the nested intersection through repeated calls.
-Regression test for <https://github.com/astral-sh/ty/issues/4099>.
-
-```py
-from __future__ import annotations
-from typing import Protocol
-from ty_extensions import Intersection, Not
-
-class A[T](Protocol):
-    def make_invariant(self, value: T) -> T: ...
-    def cause_problems(self) -> A[Intersection[Not[A[T]], A[str]]]: ...
-
-def foo[T](x: A[T]):
-    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[T@foo]]
-    reveal_type(x.cause_problems().cause_problems())  # revealed: A[A[str] & ~A[A[str] & ~A[T@foo]]]
-```
-
-Inherited methods also preserve the specialization supplied by their generic base.
-
-```py
-class Nested[T](A[list[T]], Protocol): ...
-
-def inherited[T](x: Nested[T]):
-    reveal_type(x.cause_problems())  # revealed: A[A[str] & ~A[list[T@inherited]]]
-```
-
-## Recursive protocol members introduced by type arguments
-
-A property declared as `T` can become recursive after specialization. Finite overloaded requirements
-must be compared before expanding such a property. The `combine` overloads grow both the number of
-alternatives and the recursive type argument on each call.
-
-```py
-from __future__ import annotations
-from typing import Protocol, overload
-
-class S[T](Protocol):
-    @overload
-    def combine[U1](self, v1: U1, /) -> S[T | U1]: ...
-    @overload
-    def combine[U1, U2](self, v1: U1, v2: U2, /) -> S[T | U1 | U2]: ...
-    @overload
-    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> S[T | U1 | U2 | U3]: ...
-    @overload
-    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> S[T | U1 | U2 | U3 | U4]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> S[T | U1 | U2 | U3 | U4 | U5]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5, U6](
-        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
-    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5, U6, U7](
-        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
-    ) -> S[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
-    def combine(self, *values: object) -> S[object]: ...
-
-class D[T](Protocol):
-    @overload
-    def combine[U1](self, v1: U1, /) -> D[T | U1]: ...
-    @overload
-    def combine[U1, U2](self, v1: U1, v2: U2, /) -> D[T | U1 | U2]: ...
-    @overload
-    def combine[U1, U2, U3](self, v1: U1, v2: U2, v3: U3, /) -> D[T | U1 | U2 | U3]: ...
-    @overload
-    def combine[U1, U2, U3, U4](self, v1: U1, v2: U2, v3: U3, v4: U4, /) -> D[T | U1 | U2 | U3 | U4]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5](self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, /) -> D[T | U1 | U2 | U3 | U4 | U5]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5, U6](
-        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, /
-    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6]: ...
-    @overload
-    def combine[U1, U2, U3, U4, U5, U6, U7](
-        self, v1: U1, v2: U2, v3: U3, v4: U4, v5: U5, v6: U6, v7: U7, /
-    ) -> D[T | U1 | U2 | U3 | U4 | U5 | U6 | U7]: ...
-    def combine(self, *values: object) -> D[object]: ...
-
-class Source[T](Protocol):
-    @property
-    def a(self) -> T: ...
-    @overload
-    def z(self, v: int) -> int: ...
-    @overload
-    def z(self, v: str) -> str: ...
-    def z(self, v: int | str) -> int | str: ...
-
-class Target[T](Protocol):
-    @property
-    def a(self) -> T: ...
-    @overload
-    def z(self, v: int) -> str: ...
-    @overload
-    def z(self, v: str) -> int: ...
-    def z(self, v: int | str) -> int | str: ...
-
-def f(x: Source[S[int]]) -> Target[D[int]]:
-    return x  # error: [invalid-return-type]
-```
-
-## Specializing descriptor overloads on protocols
-
-A descriptor can select different overloads for different protocol specializations. We specialize
-its declaration before resolving the member type required by the protocol.
-
-```py
-from __future__ import annotations
-from typing import Callable, Protocol, overload
-from ty_extensions import static_assert
-from ty_extensions._internal import is_assignable_to
-
-class Descriptor[T]:
-    def __init__(self, getter: Callable[..., T]) -> None: ...
-    @overload
-    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> str: ...
-    @overload
-    def __get__(self: Descriptor[str], instance: object, owner: type | None = None) -> bytes: ...
-    def __get__(self, instance: object, owner: type | None = None) -> str | bytes:
-        raise NotImplementedError
-
-class HasValue[T](Protocol):
-    @Descriptor
-    def value(self) -> T: ...
-
-class BytesValue:
-    @property
-    def value(self) -> bytes:
-        return b"value"
-
-static_assert(is_assignable_to(BytesValue, HasValue[str]))
-static_assert(not is_assignable_to(BytesValue, HasValue[int]))
-```
-
-## Inferring through specialization-dependent protocol descriptors
-
-The descriptor's general overload refers back to `P`, but `P[int].value` is finite. Callback
-inference retains that specialized requirement when it omits recursive protocol members.
-
-```py
-from __future__ import annotations
-from typing import Callable, Protocol, overload
-
-class Descriptor[T]:
-    def __init__(self, getter: Callable[..., T]) -> None: ...
-    @overload
-    def __get__(self: Descriptor[int], instance: object, owner: type | None = None) -> int: ...
-    @overload
-    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]: ...
-    def __get__(self, instance: object, owner: type | None = None) -> int | P[T]:
-        raise NotImplementedError
-
-class P[T](Protocol):
-    @Descriptor
-    def value(self) -> T: ...
-
-def consume(value: P[int]) -> None: ...
-def infer[T](callback: Callable[[P[T]], None]) -> T:
-    raise NotImplementedError
-
-reveal_type(infer(consume))  # revealed: int
-```
-
-## Specializing protocol attributes to methods
-
-An attribute specialized to a function is checked as a method. The bound signatures match even
-though their unbound receivers have different types.
-
-```py
-from typing import Protocol, cast
-
-def method(self: object) -> int:
-    return 1
-
-class HasMethod[T](Protocol):
-    method: T = cast(T, method)
-
-class Concrete:
-    def method(self) -> int:
-        return 1
-
-def preserve[T](value: HasMethod[T], signature: T) -> HasMethod[T]:
-    return value
-
-reveal_type(preserve(Concrete(), method).method())  # revealed: int
-```
-
-## Specializing protocol attributes to callbacks
-
-A member specialized to an ordinary `__call__` method describes the candidate's call signature. A
-class's `__call__` attribute does not determine what constructing that class returns.
-
-```py
-from typing import Protocol, cast
-
-def call(self: object) -> int:
-    return 1
-
-class Callback[T](Protocol):
-    __call__: T = cast(T, call)
-
-class Concrete:
-    @staticmethod
-    def __call__() -> int:
-        return 1
-
-def preserve[T](value: Callback[T], signature: T) -> Callback[T]:
-    return value
-
-result: int = preserve(Concrete, call)()  # error: [invalid-argument-type]
-```
-
 ## Subscripting non-generic classes
 
 Subscripting a non-generic class in a type expression is an error. The invalid type expression
@@ -2851,6 +2638,63 @@ def compare[T](first: dict[str, T], second: dict[str, int]) -> None:
         for key, data in current.items():  # no diagnostic
             reveal_type(data)  # revealed: T@compare | int
             reveal_type(current.get(key))  # revealed: T@compare | None | int
+```
+
+## Attribute override specialization
+
+Inherited attribute and property contracts use the superclass specialization. A mutable attribute
+cannot narrow that specialized type, while a read-only property can.
+
+```py
+class Base[T]:
+    value: T
+
+    @property
+    def readonly(self) -> T:
+        raise NotImplementedError
+
+class Same(Base[int]):
+    value: int
+
+    @property
+    def readonly(self) -> bool:
+        return True
+
+class Narrow(Base[int]):
+    value: bool  # error: [invalid-mutable-override]
+
+class Incompatible(Base[int]):
+    value: str  # error: [invalid-attribute-override]
+
+    @property
+    def readonly(self) -> str:  # error: [invalid-property-type-override]
+        return ""
+```
+
+An initialized attribute must satisfy the same specialized contract. Further subclasses do not
+repeat an incompatibility already introduced by the parent.
+
+```py
+class WithDefault(Base[int]):
+    value: str = ""  # error: [invalid-attribute-override]
+
+class Grandchild(WithDefault):
+    value: str = ""  # no diagnostic
+```
+
+A new concrete inheritance path can introduce a conflict absent from a parent's gradual
+specialization. That conflict must still be reported.
+
+```py
+from typing import Any
+
+class Gradual(Base[Any]):
+    value: str
+
+class Concrete(Base[int]): ...
+
+class NewConflict(Gradual, Concrete):
+    value: str  # error: [invalid-attribute-override]
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

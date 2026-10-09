@@ -38,8 +38,8 @@ pub(crate) use self::diagnostic::TypeCheckDiagnostics;
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
-    InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
-    infer_definition_types, infer_expression_type, infer_expression_types,
+    InferredDeclaration, TruthinessAnalyzer, TypeContext, infer_complete_scope_types,
+    infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
 };
 use self::infer::{
@@ -5471,6 +5471,21 @@ impl<'db> Type<'db> {
     ) -> MemberLookupResult<'db> {
         let meta_attr_plain =
             Self::instance_lookup_class_member_with_policy(db, env, key, receiver);
+        Self::resolve_descriptor_access(db, env, meta_attr_plain, receiver, fallback, policy)
+    }
+
+    /// Apply descriptor precedence to already-resolved class and instance members.
+    ///
+    /// Override checks supply one owner's declarations here, retaining the same descriptor,
+    /// slot, and instance-storage behavior as ordinary access without looking up an override.
+    fn resolve_descriptor_access(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        meta_attr_plain: PlaceAndQualifiers<'db>,
+        receiver: Type<'db>,
+        fallback: MemberLookupResult<'db>,
+        policy: InstanceFallbackShadowsNonDataDescriptor,
+    ) -> MemberLookupResult<'db> {
         let meta_attr_ty = meta_attr_plain.place.ignore_possibly_undefined();
         // Preserve the receiver's type variables and all its narrowed class constraints.
         let owner = receiver.to_meta_type(db, env);
@@ -10589,6 +10604,7 @@ impl<'db> Type<'db> {
             Truthiness::AlwaysTrue => Type::bool_literal(true),
             Truthiness::AlwaysFalse => Type::bool_literal(false),
             Truthiness::Ambiguous => KnownClass::Bool.to_instance(db, env),
+            Truthiness::Uninhabited => Type::Never,
         }
     }
 

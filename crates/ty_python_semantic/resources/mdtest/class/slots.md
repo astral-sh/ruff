@@ -461,8 +461,8 @@ IntegerChild().value = "wrong"  # error: [invalid-assignment]
 
 ## Subclass annotations override inherited slot types
 
-A subclass can narrow an inherited attribute declaration even when its storage remains in a base
-class's slot. Reads and writes use the subclass's declared type, as they do without slots.
+A subclass declaration determines its read and write types even when storage remains in a base
+class's slot. Narrowing the type is unsafe because it rejects writes accepted by the base.
 
 ```py
 class Base:
@@ -471,8 +471,7 @@ class Base:
 
 class Child(Base):
     __slots__ = ()
-    # TODO: Reject this unsafe override when mutable attribute overrides are checked.
-    value: int
+    value: int  # error: [invalid-mutable-override]
 
 reveal_type(Child().value)  # revealed: int
 Child().value = 2

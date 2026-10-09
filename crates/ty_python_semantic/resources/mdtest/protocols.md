@@ -1222,7 +1222,7 @@ still permits assignment to the attribute:
 
 ```py
 class WithExcludedMember(Protocol):
-    __doc__: str
+    __doc__: str  # error: [invalid-mutable-override]
 
     def method(self) -> None:
         self.__doc__ = "Protocol documentation"  # no error
@@ -6180,11 +6180,11 @@ class X(Protocol):
     x: int
 
 class YProto(X, Protocol):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 @final
 class YNominal(X):
-    x: None = None  # TODO: we should emit an error here due to the Liskov violation
+    x: None = None  # error: [invalid-attribute-override]
 
 static_assert(is_subtype_of(YProto, X))
 static_assert(is_subtype_of(YNominal, X))

@@ -3,6 +3,8 @@
 //!
 //! [Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 
+mod attributes;
+
 use bitflags::bitflags;
 use ruff_db::{
     diagnostic::{Annotation, Span},
@@ -27,11 +29,11 @@ use crate::{
         context::InferContext,
         diagnostic::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
-            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
-            INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_MUTABLE_OVERRIDE,
+            INVALID_NAMED_TUPLE, INVALID_NAMED_TUPLE_OVERRIDE, INVALID_PROPERTY_TYPE_OVERRIDE,
+            MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_incompatible_base_method, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
@@ -89,7 +91,7 @@ pub(super) fn check_class<'db>(
     let enum_info = enum_metadata(db, class.into());
 
     let mut bases: Vec<_> = class_specialized.iter_mro(db).skip(1).collect();
-    if configuration.check_method_liskov_violations() {
+    if configuration.check_liskov_violations() {
         let generic_bases: FxHashMap<_, _> = bases
             .iter()
             .filter_map(|base| base.into_class()?.into_generic_alias())
@@ -651,9 +653,9 @@ fn check_class_declaration<'db>(
     let is_private_member = is_mangled_private(member.name.as_str());
     let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
-    // Track the first superclass that defines this method so we can distinguish inherited
+    // Track the first superclass that defines this member so we can distinguish inherited
     // conflicts from violations introduced by the child.
-    let mut inherited_method_owner = None;
+    let mut inherited_member_owner = None;
     let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
@@ -748,7 +750,7 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            inherited_method_owner.get_or_insert(superclass);
+            inherited_member_owner.get_or_insert(superclass);
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()
@@ -879,6 +881,24 @@ fn check_class_declaration<'db>(
                 }
             }
 
+            if configuration.check_attribute_type_violations()
+                // Constructors may change their signature. Leave their special receiver
+                // binding and `@override` checks to the method checker below.
+                && !is_constructor_like_method(&member.name)
+                && attributes::check_override(
+                    context,
+                    class,
+                    superclass,
+                    inherited_member_owner,
+                    &member.name,
+                    *first_reachable_definition,
+                    superclass_symbol.and_then(|(scope, id)| symbol_definition(db, scope, id)),
+                )
+            {
+                liskov_diagnostic_emitted = true;
+                continue;
+            }
+
             if !configuration.check_method_liskov_violations() {
                 continue;
             }
@@ -916,7 +936,7 @@ fn check_class_declaration<'db>(
 
             // Do not repeat a violation that already exists in the parent's hierarchy.
             // See: https://github.com/astral-sh/ty/issues/2000
-            if let Some(method_owner) = inherited_method_owner
+            if let Some(method_owner) = inherited_member_owner
                 && method_owner != superclass
                 && is_inherited_method_violation(
                     db,
@@ -1384,14 +1404,16 @@ fn variable_kind<'db>(
     // class Sub(Base):
     //     def f(self) -> int: ...
     // ```
-    if matches!(
-        class_member.place,
-        Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(_),
-            ..
-        })
-    ) {
-        return None;
+    if let Place::Defined(DefinedPlace { ty, .. }) = class_member.place {
+        let alternatives = ty
+            .as_union()
+            .map_or(std::slice::from_ref(&ty), |union| union.elements(db));
+        if alternatives
+            .iter()
+            .all(|ty| matches!(ty, Type::FunctionLiteral(_) | Type::PropertyInstance(_)))
+        {
+            return None;
+        }
     }
 
     // Descriptor values are not normal instance variables: lookup calls `__get__`, so the value
@@ -1507,6 +1529,8 @@ bitflags! {
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 7;
         const INVALID_ENUM_VALUE = 1 << 8;
         const MISSING_OVERRIDE_DECORATOR = 1 << 9;
+        const LISKOV_PROPERTIES = 1 << 10;
+        const LISKOV_MUTABLE = 1 << 11;
     }
 }
 
@@ -1522,6 +1546,12 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_ATTRIBUTE_OVERRIDE)) {
             config |= OverrideRulesConfig::LISKOV_ATTRIBUTES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_PROPERTY_TYPE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_PROPERTIES;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_MUTABLE_OVERRIDE)) {
+            config |= OverrideRulesConfig::LISKOV_MUTABLE;
         }
         if rule_selection.is_enabled(LintId::of(&INVALID_EXPLICIT_OVERRIDE)) {
             config |= OverrideRulesConfig::EXPLICIT_OVERRIDE;
@@ -1565,9 +1595,16 @@ impl OverrideRulesConfig {
         self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
     }
 
+    const fn check_attribute_type_violations(self) -> bool {
+        self.intersects(
+            Self::LISKOV_ATTRIBUTES
+                .union(Self::LISKOV_PROPERTIES)
+                .union(Self::LISKOV_MUTABLE),
+        )
+    }
+
     const fn check_liskov_violations(self) -> bool {
-        self.contains(OverrideRulesConfig::LISKOV_METHODS)
-            || self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
+        self.check_method_liskov_violations() || self.check_attribute_type_violations()
     }
 
     const fn check_final_method_overridden(self) -> bool {
