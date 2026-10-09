@@ -75,8 +75,24 @@ fn attribute_contract<'db>(
         class_member.place.ignore_possibly_undefined(),
         Some(Type::SlotDescriptor(_))
     ) {
-        // A slot provides storage for the inherited instance contract. Unannotated writes
-        // in this class do not replace an ancestor's declared type.
+        // A slot provides storage without replacing an inherited annotation:
+        //
+        // ```python
+        // class Base:
+        //     value: int
+        //
+        // class Slotted(Base):
+        //     __slots__ = ("value",)
+        //
+        //     def set_value(self, value):
+        //         self.value = value
+        //
+        // class Child(Slotted):
+        //     value: str  # Incompatible with Base.value.
+        // ```
+        //
+        // For `owner = Slotted`, looking only at its own assignments would infer `Unknown`
+        // for `value`. Full instance lookup preserves the inherited `int` annotation.
         owner.instance_member(db, env, name)
     } else {
         owner.own_instance_member(db, env, name).inner
