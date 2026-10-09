@@ -43,8 +43,8 @@ use std::convert::Infallible;
 use std::hint::cold_path;
 use std::ops::ControlFlow;
 
-use super::RecursivelyDefined;
 use super::generic_gradual_intersections::{GenericIntersection, generic_gradual_intersection};
+use super::{RecursivelyDefined, TypeNormalization};
 use crate::types::enums::EnumComplement;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::visitor::any_over_type;
@@ -574,6 +574,7 @@ pub(crate) struct UnionBuilder<'db> {
     /// introduce a new cycle, relation-based union simplifications are skipped in this mode.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
+    normalization: TypeNormalization,
 }
 
 /// Accumulates types into a union.
@@ -648,7 +649,13 @@ impl<'db> UnionBuilder<'db> {
             unpack_aliases: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
+            normalization: TypeNormalization::Semantic,
         }
+    }
+
+    pub(in crate::types) fn normalization(mut self, normalization: TypeNormalization) -> Self {
+        self.normalization = normalization;
+        self
     }
 
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
@@ -715,7 +722,35 @@ impl<'db> UnionBuilder<'db> {
     /// Adds a type to this union.
     pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
         ty.assert_not_recursive_var();
+        if self.normalization == TypeNormalization::Structural {
+            self.add_structural(ty);
+            return;
+        }
         self.add_in_place_impl(ty, &mut vec![]);
+    }
+
+    /// Join already-constructed types without querying the relationships between their atoms.
+    fn add_structural(&mut self, ty: Type<'db>) {
+        if let Type::LiteralValue(literal) = ty {
+            self.recursively_defined = self.recursively_defined.or(literal.recursively_defined());
+        }
+        match ty {
+            Type::Never => {}
+            Type::Union(union) => {
+                self.recursively_defined = self.recursively_defined.or(union.recursively_defined(self.db));
+                for element in union.elements(self.db) {
+                    self.add_structural(*element);
+                }
+            }
+            _ if ty == Type::object() => self.collapse_to_object(),
+            _ => {
+                if !self.elements.iter().any(|element| {
+                    matches!(element, UnionElement::Type(existing) if *existing == ty || *existing == Type::object())
+                }) {
+                    self.elements.push(UnionElement::Type(ty));
+                }
+            }
+        }
     }
 
     fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
@@ -1241,11 +1276,24 @@ impl<'db> UnionBuilder<'db> {
                         )
                     }));
                 }
+                UnionElement::Type(Type::LiteralValue(literal))
+                    if self.normalization == TypeNormalization::Structural =>
+                {
+                    // Flattening a recursive union must retain literal provenance even when
+                    // only one element remains. Updating that flag can expose duplicates.
+                    let literal =
+                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined));
+                    if !types.contains(&literal) {
+                        types.push(literal);
+                    }
+                }
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
 
-        if normalize_enum_complement_unions(db, &self.env, &mut types) {
+        if self.normalization == TypeNormalization::Semantic
+            && normalize_enum_complement_unions(db, &self.env, &mut types)
+        {
             let builder = UnionBuilder::new(db, &self.env)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
@@ -2367,8 +2415,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{
         IntersectionBuilder, IntersectionPolarity, MAX_NON_RECURSIVE_UNION_LITERALS,
-        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, UnionBuilder, UnionType,
-        simplify_intersection_pair, simplify_intersection_pair_impl,
+        MAX_RECURSIVE_UNION_LITERALS, RecursivelyDefined, Type, TypeNormalization, UnionBuilder,
+        UnionType, simplify_intersection_pair, simplify_intersection_pair_impl,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -2417,6 +2465,36 @@ mod tests {
         let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(db), &[t0, t1]);
+    }
+
+    #[test]
+    fn structural_union_preserves_recursive_literals() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let literal_count = MAX_RECURSIVE_UNION_LITERALS + 1;
+        let literals = (0..literal_count)
+            .map(|value| Type::int_literal(i64::try_from(value).expect("literal fits in i64")));
+        let original = literals
+            .fold(
+                UnionBuilder::new(db, &env)
+                    .normalization(TypeNormalization::Structural)
+                    .or_recursively_defined(RecursivelyDefined::Yes),
+                UnionBuilder::add,
+            )
+            .build();
+        let flattened = UnionBuilder::new(db, &env)
+            .normalization(TypeNormalization::Structural)
+            .add(original)
+            .add(Type::int_literal(0))
+            .build()
+            .expect_union();
+
+        assert_eq!(flattened.elements(db).len(), literal_count);
+        assert!(flattened.recursively_defined(db).is_yes());
+        assert!(flattened.elements(db).iter().all(|element| {
+            matches!(element, Type::LiteralValue(literal) if literal.recursively_defined().is_yes())
+        }));
     }
 
     #[test]

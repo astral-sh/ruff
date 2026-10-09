@@ -2882,7 +2882,7 @@ impl<'db, 'pattern> PatternSuccessAnalyzer<'db, 'pattern> {
                             .then_some(Type::object())
                     });
             }
-            return Some(typed_dict.value_type(db, &self.env));
+            return Some(typed_dict.normalized_value_type(db, &self.env));
         }
 
         let Some((_, mapping_value_ty)) = subject_ty.unpack_keys_and_items(db, &self.env) else {

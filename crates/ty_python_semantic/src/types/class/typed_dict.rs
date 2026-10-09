@@ -62,7 +62,7 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 env,
                 [
                     KnownClass::Str.to_instance(db, env),
-                    typed_dict.value_type(db, env),
+                    typed_dict.normalized_value_type(db, env),
                 ],
             );
             Some(synthesize_typed_dict_no_argument_method(
@@ -251,7 +251,7 @@ fn synthesize_typed_dict_getitem<'db>(
                     .with_annotated_type(KnownClass::Str.to_instance(db, env)),
             ]),
             if typed_dict.explicit_extra_items(db).is_some() {
-                typed_dict.value_type(db, env)
+                typed_dict.normalized_value_type(db, env)
             } else {
                 Type::object()
             },
@@ -387,7 +387,7 @@ fn synthesize_typed_dict_get<'db>(
     let fallback_value_ty = if typed_dict.openness(db).is_implicitly_open() {
         Type::unknown()
     } else {
-        typed_dict.value_type(db, env)
+        typed_dict.normalized_value_type(db, env)
     };
     let overloads = fields
         .iter()
@@ -638,7 +638,7 @@ fn synthesize_typed_dict_pop<'db>(
                 .then(|| {
                     pop_overloads(
                         KnownClass::Str.to_instance(db, env),
-                        typed_dict.value_type(db, env),
+                        typed_dict.normalized_value_type(db, env),
                     )
                 })
                 .into_iter()
@@ -690,7 +690,7 @@ fn synthesize_typed_dict_setdefault<'db>(
                     ];
                     Signature::new(
                         Parameters::standard(parameters),
-                        typed_dict.value_type(db, env),
+                        typed_dict.normalized_value_type(db, env),
                     )
                 }),
         );
@@ -732,7 +732,10 @@ fn synthesize_typed_dict_view_method<'db>(
             class.apply_specialization(db, |generic_context| {
                 generic_context.specialize(
                     db,
-                    &[typed_dict.key_type(db, env), typed_dict.value_type(db, env)],
+                    &[
+                        typed_dict.key_type(db, env),
+                        typed_dict.normalized_value_type(db, env),
+                    ],
                 )
             })
         })

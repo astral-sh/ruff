@@ -21,6 +21,20 @@ mod generic_gradual_intersections;
 
 pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
 
+/// Whether constructing a type can inspect the relationships between its elements.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum TypeNormalization {
+    /// Simplify types using subtype and disjointness relations.
+    #[default]
+    Semantic,
+    /// Flatten unions and apply elementary identities without unfolding recursive definitions.
+    ///
+    /// A projection used by a type relation must finish constructing its result before another
+    /// relation can inspect it. Otherwise, simplifying the projection can recursively request
+    /// that same projection with a fresh recursion guard.
+    Structural,
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
     /// The union type includes values in any of these types.

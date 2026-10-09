@@ -522,12 +522,12 @@ fn typed_dict_subscript<'db>(
         if typed_dict.explicit_extra_items(db).is_some()
             && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
-            return Ok(typed_dict.value_type(db, env));
+            return Ok(typed_dict.normalized_value_type(db, env));
         }
         let result_ty = if typed_dict.openness(db).is_closed()
             && slice_ty.is_assignable_to(db, env, KnownClass::Str.to_instance(db, env))
         {
-            typed_dict.value_type(db, env)
+            typed_dict.normalized_value_type(db, env)
         } else {
             Type::unknown()
         };

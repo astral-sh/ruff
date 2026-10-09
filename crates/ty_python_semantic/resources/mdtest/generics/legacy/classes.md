@@ -721,6 +721,51 @@ def as_shape_class(cls: type[T]) -> TypeOf[Shape[int]]:
     return cls  # error: [invalid-return-type]
 ```
 
+## Recursive TypedDict value projections
+
+A recursive `TypedDict` can specialize another `TypedDict` inside its extra-item type. Reading its
+values preserves both declared fields and extra items without repeatedly expanding that recursion.
+
+```py
+from typing_extensions import Generic, ReadOnly, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class A(TypedDict, Generic[T], extra_items=ReadOnly["B[B[T]]"]):
+    child: "type[B[T]]"
+
+class B(TypedDict, Generic[T], extra_items=ReadOnly["type[A[T]]"]):
+    child: "A[T]"
+
+def check(a: A[int], key: str):
+    reveal_type(a.get("child"))  # revealed: type[B[int]]
+    reveal_type(a["child"])  # revealed: type[B[int]]
+    reveal_type(a.get(key))  # revealed: type[B[int]] | B[B[int]] | None
+    reveal_type(a.values())  # revealed: dict_values[str, type[B[int]] | B[B[int]]]
+    invalid: str = a.get("child")  # error: [invalid-assignment]
+```
+
+## Declared fields and extra-item value types
+
+A known key retains its declared type. Reading an arbitrary key or iterating over values also
+includes the specialized extra-item type.
+
+```py
+from typing_extensions import Generic, ReadOnly, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Extras(TypedDict, Generic[T], extra_items=ReadOnly[T]):
+    count: int
+
+def check(value: Extras[str], key: str):
+    reveal_type(value.get("count"))  # revealed: int
+    reveal_type(value.get(key))  # revealed: int | str | None
+    reveal_type(value.values())  # revealed: dict_values[str, int | str]
+    invalid: str = value.get("count")  # error: [invalid-assignment]
+    invalid_extra: int | None = value.get(key)  # error: [invalid-assignment]
+```
+
 ## A subclass of a fully specialized generic is not generic
 
 A subclass is generic only if its bases leave at least one type variable unspecialized. Omitting a

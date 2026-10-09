@@ -27,6 +27,7 @@ use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::set_theoretic::TypeNormalization;
 use crate::types::variance::VarianceOrigin;
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::Truthiness;
@@ -354,17 +355,35 @@ impl<'db> TypedDictType<'db> {
         self.openness(db).explicit_extra_items()
     }
 
-    /// Returns a type that contains every value that may be stored in this `TypedDict`.
+    /// Normalize the completed value projection for a method return type or a value read.
+    ///
+    /// Type relations instead use [`Self::value_type`] so comparisons of its elements stay
+    /// within the caller's recursion guard.
+    pub(super) fn normalized_value_type(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        UnionBuilder::new(db, env)
+            .add(self.value_type(db, env))
+            .build()
+    }
+
+    /// Return a type containing every possible value without comparing the item types.
     ///
     /// An implicitly open `TypedDict` immediately returns `object` because hidden items may have
     /// any value type. This also avoids unnecessarily materializing its declared items.
+    ///
+    /// Type relations use this projection when constructing the `Mapping` fallback. They must
+    /// compare its elements using their existing recursion guard; simplifying the projection
+    /// here would start a fresh relation that could request the same projection again.
     pub(crate) fn value_type(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Type<'db> {
         let openness = self.openness(db);
         if openness.is_implicitly_open() {
             return Type::object();
         }
 
-        let mut builder = UnionBuilder::new(db, env);
+        let mut builder = UnionBuilder::new(db, env).normalization(TypeNormalization::Structural);
         for field in self.items(db).values() {
             builder = builder.add(field.declared_ty);
         }
