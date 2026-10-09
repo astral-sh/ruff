@@ -212,3 +212,46 @@ PYI036 Annotations for a three-argument `__exit__` overload (excluding `self`) s
     |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 169 |     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
     |
+
+PYI036 The first argument in `__exit__` should be annotated with `object` or `type[BaseException] | None`
+   --> PYI036.py:191:14
+    |
+189 |     def __exit__(
+190 |         self,
+191 |         typ: "type[BaseException]",
+    |              ^^^^^^^^^^^^^^^^^^^^^
+192 |         exc: "BaseException | None",
+193 |         tb: "Exception | None",
+    |
+
+PYI036 The third argument in `__exit__` should be annotated with `object` or `types.TracebackType | None`
+   --> PYI036.py:193:13
+    |
+191 |         typ: "type[BaseException]",
+192 |         exc: "BaseException | None",
+193 |         tb: "Exception | None",
+    |             ^^^^^^^^^^^^^^^^^^
+194 |     ) -> None: ...  # PYI036: First arg has bad annotation
+195 |     async def __aexit__(
+    |
+
+PYI036 The second argument in `__aexit__` should be annotated with `object` or `BaseException | None`
+   --> PYI036.py:198:14
+    |
+196 |         self,
+197 |         typ: type[BaseException] | None,
+198 |         exc: "BaseException",
+    |              ^^^^^^^^^^^^^^^
+199 |         tb: "TracebackType",
+200 |     ) -> None: ...  # PYI036: Second arg has bad annotation
+    |
+
+PYI036 The third argument in `__aexit__` should be annotated with `object` or `types.TracebackType | None`
+   --> PYI036.py:199:13
+    |
+197 |         typ: type[BaseException] | None,
+198 |         exc: "BaseException",
+199 |         tb: "TracebackType",
+    |             ^^^^^^^^^^^^^^^
+200 |     ) -> None: ...  # PYI036: Second arg has bad annotation
+    |
