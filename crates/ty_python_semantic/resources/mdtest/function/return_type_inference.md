@@ -533,6 +533,52 @@ reveal_type(FinalClass().method())  # revealed: Unknown
 reveal_type(SomeClass().final_method())  # revealed: Unknown
 ```
 
+### Overriding annotated base class methods
+
+Another interesting case is when the base class method has an explicit return type annotation, but
+the child class does not:
+
+```py
+class Parent:
+    def method(self) -> int | None:
+        return None
+
+class Child(Parent):
+    def method(self):
+        return 1
+```
+
+In this case, we let the child class "inherit" the base class annotation:
+
+```py
+# TODO: Should be `int | None`
+reveal_type(Child().method())  # revealed: Unknown
+```
+
+This also works for subclasses further down:
+
+```py
+class GrandChild(Child):
+    def method(self):
+        return 2
+
+# TODO: Should be `int | None`
+reveal_type(GrandChild().method())  # revealed: Unknown
+```
+
+When a subclass method returns an incompatible type compared to its base class annotation, we union
+the inferred return type with the base class annotation:
+
+```py
+class IncompatibleChild(Parent):
+    # TODO: This should be an invalid-method-override error.
+    def value(self):
+        return "a"
+
+# TODO: Should be `int | None | Literal["a"]`
+reveal_type(IncompatibleChild().value())  # revealed: Unknown
+```
+
 ### Methods that return `None` or `Never`
 
 If a method returns `None` (explicitly or implicitly), or always raises, it seems particularly
@@ -655,6 +701,24 @@ def func(x):
 
 reveal_type(func(1))  # revealed: int
 reveal_type(func("a"))  # revealed: str
+```
+
+## Stub files
+
+Stub bodies do not provide return type information. An omitted annotation remains `Unknown`:
+
+`library.pyi`:
+
+```pyi
+def value(): ...
+```
+
+`main.py`:
+
+```py
+from library import value
+
+reveal_type(value())  # revealed: Unknown
 ```
 
 ## Recursive functions
