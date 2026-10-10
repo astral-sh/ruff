@@ -247,11 +247,27 @@ impl<'src> Parser<'src> {
         left_precedence: OperatorPrecedence,
         context: ExpressionContext,
     ) -> ParsedExpr {
-        self.with_recursion(|parser| {
-            let start = parser.node_start();
-            let lhs = parser.parse_lhs_expression(left_precedence, context);
-            parser.parse_binary_expression_or_higher_recursive(lhs, left_precedence, context, start)
-        })
+        self.with_recursion(
+            |parser| {
+                let start = parser.node_start();
+                let lhs = parser.parse_lhs_expression(left_precedence, context);
+                parser.parse_binary_expression_or_higher_recursive(
+                    lhs,
+                    left_precedence,
+                    context,
+                    start,
+                )
+            },
+            |parser| parser.recursion_recovery_parsed_expr(),
+        )
+    }
+
+    /// The placeholder returned when an expression is nested too deeply to parse.
+    fn recursion_recovery_parsed_expr(&self) -> ParsedExpr {
+        ParsedExpr {
+            expr: self.recursion_recovery_expr(),
+            is_parenthesized: false,
+        }
     }
 
     fn parse_binary_expression_or_higher_recursive(
@@ -1837,13 +1853,16 @@ impl<'src> Parser<'src> {
 
         let format_spec = if self.eat(TokenKind::Colon) {
             let spec_start = self.node_start();
-            let elements = self.with_recursion(|parser| {
-                parser.parse_interpolated_string_elements(
-                    flags,
-                    InterpolatedStringElementsKind::FormatSpec(string_kind),
-                    string_kind,
-                )
-            });
+            let elements = self.with_recursion(
+                |parser| {
+                    parser.parse_interpolated_string_elements(
+                        flags,
+                        InterpolatedStringElementsKind::FormatSpec(string_kind),
+                        string_kind,
+                    )
+                },
+                |_| InterpolatedStringElements::default(),
+            );
             Some(Box::new(ast::InterpolatedStringFormatSpec {
                 range: self.node_range(spec_start),
                 elements,
@@ -2923,7 +2942,9 @@ impl<'src> Parser<'src> {
         // lambda x: yield from y
 
         // Lambda bodies recurse through the conditional layer without entering the binary parser.
-        let body = self.with_recursion(Self::parse_conditional_expression_or_higher);
+        let body = self.with_recursion(Self::parse_conditional_expression_or_higher, |parser| {
+            parser.recursion_recovery_parsed_expr()
+        });
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -2948,7 +2969,9 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Else);
 
         // The binary-expression guard has already returned before parsing the `else` branch.
-        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher);
+        let orelse = self.with_recursion(Self::parse_conditional_expression_or_higher, |parser| {
+            parser.recursion_recovery_parsed_expr()
+        });
 
         ast::ExprIf {
             body: Box::new(body),
