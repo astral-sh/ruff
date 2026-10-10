@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/pep8_naming/mod.rs
+---
+N998 Module name `MixedCaseFile` should be snake_case
+--> MixedCaseFile.py:1:1
