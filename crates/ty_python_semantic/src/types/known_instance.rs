@@ -8,7 +8,7 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
         ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
         PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm, any_over_type,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -848,6 +848,11 @@ pub struct UnionTypeInstance<'db> {
     /// contains the first encountered error.
     #[returns(ref)]
     pub(super) union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+
+    /// Whether cycle recovery may have removed recursive members from this union or an operand.
+    /// A successfully converted union can still require separate alias validation after recovery.
+    #[returns(copy)]
+    pub(super) had_cycle: bool,
 }
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
@@ -861,6 +866,11 @@ impl<'db> UnionTypeInstance<'db> {
         inference_flags: InferenceFlags,
     ) -> Type<'db> {
         let env = ProgramEnvironment::from_scope(scope_id);
+        let had_cycle = value_expr_types.iter().any(|&ty| {
+            any_over_type(db, &env, ty, false, |ty| {
+                matches!(ty, Type::KnownInstance(KnownInstanceType::UnionType(union)) if union.had_cycle(db))
+            })
+        });
         let mut builder = UnionBuilder::new(db, &env);
         for ty in &value_expr_types {
             match ty.in_type_expression_impl(db, scope_id, typevar_binding_context, inference_flags)
@@ -868,7 +878,7 @@ impl<'db> UnionTypeInstance<'db> {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error), had_cycle),
                     ));
                 }
             }
@@ -883,6 +893,7 @@ impl<'db> UnionTypeInstance<'db> {
             if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
                 && let Ok(&existing_union) = union.union_type(db).as_ref()
                 && existing_union == union_type
+                && union.had_cycle(db) == had_cycle
             {
                 return *ty;
             }
@@ -892,6 +903,7 @@ impl<'db> UnionTypeInstance<'db> {
             db,
             Some(value_expr_types),
             Ok(union_type),
+            had_cycle,
         )))
     }
 
@@ -915,6 +927,7 @@ impl<'db> UnionTypeInstance<'db> {
                 db,
                 value_expr_types,
                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                self.had_cycle(db),
             )
         } else {
             self
@@ -990,7 +1003,7 @@ impl<'db> UnionTypeInstance<'db> {
             Err(err) => Err(err),
         };
 
-        Some(Self::new(db, value_expr_types, union_type))
+        Some(Self::new(db, value_expr_types, union_type, true))
     }
 }
 

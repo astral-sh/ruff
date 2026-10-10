@@ -2371,6 +2371,48 @@ Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alia
 def inspect(first: First, second: Second): ...
 ```
 
+### Invalid cycles in chained assignments
+
+Each target of a chained assignment refers to the same union value. Recovering that value does not
+make a circular alias valid.
+
+```py
+from typing import Union
+
+First = Second = Union[int, "Second"]  # error: [cyclic-type-alias-definition]
+
+def inspect(first: First, second: Second):
+    reveal_type(first)  # revealed: int | Divergent
+    reveal_type(second)  # revealed: Divergent
+```
+
+### Unions containing invalid aliases
+
+Adding a union member to an invalid alias preserves the circular-definition error, even when value
+inference has already recovered the original alias.
+
+```py
+from typing import Union
+
+Recursive = Union[int, "Recursive"]  # error: [cyclic-type-alias-definition]
+Alias = Recursive | str  # error: [cyclic-type-alias-definition]
+
+def inspect(value: Alias):
+    reveal_type(value)  # revealed: Divergent | str
+```
+
+A union remains invalid even if the other operand already includes its non-recursive member.
+
+```py
+Base = int | str
+Redundant = Base | Recursive  # error: [cyclic-type-alias-definition]
+Reversed = Recursive | Base  # error: [cyclic-type-alias-definition]
+
+def inspect_redundant(first: Redundant, second: Reversed):
+    reveal_type(first)  # revealed: int | str | Divergent
+    reveal_type(second)  # revealed: Divergent | int | str
+```
+
 ### Invalid generic cycles
 
 Specializing a recursive reference does not guard its cycle. A generic implicit alias cannot include

@@ -51,21 +51,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
         let db = self.db();
         let mut definition = definition?;
-        // A resolved non-recursive value already describes the alias. Gradual types, unions,
-        // and quoted aliases can hide recursive references, so they still need inference.
-        // Even a valid union can have lost a cyclic member during value inference.
-        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
-            matches!(
-                ty,
+        // A resolved non-recursive value already describes the alias. Gradual types, invalid
+        // unions, and quoted aliases can hide recursive references. A valid union also needs
+        // inference if cycle recovery may have removed one of its recursive members.
+        if !any_over_type(
+            db,
+            self.program_environment(),
+            value_ty,
+            false,
+            |ty| match ty {
                 Type::Dynamic(_)
-                    | Type::Divergent(_)
-                    | Type::Recursive(_)
-                    | Type::TypeAlias(_)
-                    | Type::KnownInstance(
-                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
-                    )
-            )
-        }) {
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_)
+                | Type::KnownInstance(KnownInstanceType::LiteralStringAlias(_)) => true,
+                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
+                    union.union_type(db).is_err() || union.had_cycle(db)
+                }
+                _ => false,
+            },
+        ) {
             return None;
         }
         if definition.kind(db).is_import() {
