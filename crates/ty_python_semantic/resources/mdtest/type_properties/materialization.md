@@ -1356,6 +1356,49 @@ static_assert(is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedC
 static_assert(not is_assignable_to(Bottom[MixedConstrained[GradualInt, Any]], MixedConstrained[str, int]))
 ```
 
+## Repeated aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Materialization handles aliases shared by callable results and invariant containers without
+repeatedly expanding every path through the aliases.
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+
+type A0 = int
+type A1 = tuple[int, Callable[[int], A0] | None, list[A0], Any]
+type A2 = tuple[int, Callable[[int], A1] | None, list[A1], Any]
+type A3 = tuple[int, Callable[[int], A2] | None, list[A2], Any]
+type A4 = tuple[int, Callable[[int], A3] | None, list[A3], Any]
+type A5 = tuple[int, Callable[[int], A4] | None, list[A4], Any]
+type A6 = tuple[int, Callable[[int], A5] | None, list[A5], Any]
+type A7 = tuple[int, Callable[[int], A6] | None, list[A6], Any]
+type A8 = tuple[int, Callable[[int], A7] | None, list[A7], Any]
+type A9 = tuple[int, Callable[[int], A8] | None, list[A8], Any]
+type A10 = tuple[int, Callable[[int], A9] | None, list[A9], Any]
+type A11 = tuple[int, Callable[[int], A10] | None, list[A10], Any]
+type A12 = tuple[int, Callable[[int], A11] | None, list[A11], Any]
+type A13 = tuple[int, Callable[[int], A12] | None, list[A12], Any]
+type A14 = tuple[int, Callable[[int], A13] | None, list[A13], Any]
+type A15 = tuple[int, Callable[[int], A14] | None, list[A14], Any]
+type A16 = tuple[int, Callable[[int], A15] | None, list[A15], Any]
+type A17 = tuple[int, Callable[[int], A16] | None, list[A16], Any]
+type A18 = tuple[int, Callable[[int], A17] | None, list[A17], Any]
+
+def upper(top: Top[A18]):
+    reveal_type(top[3])  # revealed: object
+    if top[1] is not None:
+        reveal_type(top[1](0)[3])  # revealed: object
+
+def lower(bottom: Bottom[A18]):
+    reveal_type(bottom[3])  # revealed: Never
+```
+
 ## Growing recursive aliases
 
 A recursive alias can keep nesting its type argument as it unfolds. This does not change the

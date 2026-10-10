@@ -72,7 +72,7 @@ use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::cyclic::TypeIdentity;
 use super::generics::{ApplySpecialization, Specialization, walk_specialization_types};
 use super::relation::{TypeRelation, TypeRelationChecker};
-use super::type_alias::AliasCycleSummary;
+use super::type_alias::{AliasCycleSummary, TypeAliasType};
 use super::variance::{VarianceInferable, VarianceOrigin};
 use super::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use super::{
@@ -652,16 +652,30 @@ impl<'db> RecursiveMappingReference<'db> {
 /// Each completed body binds its own placeholder; the result contains no pending mapping.
 /// Growing constructors use separate formal arguments for each mapping state, so occurrences
 /// of a parameter in opposite variances can have different results without unfolding forever.
+///
+/// The probe visits each alias in each mapping state and lexical scope once. The transformation
+/// shares completed results in the same parameter environment, but never results containing
+/// placeholders for enclosing frames. Substitutions need separate visitor caches; materialization
+/// equivalence checks share their cache across those visitors to avoid repeating nested mappings.
 pub(super) struct RecursiveTypeMapping<'a, 'db> {
     scope: Type<'db>,
     mappings: Vec<TypeMapping<'a, 'db>>,
     active: RefCell<Vec<RecursiveMappingFrame<'db>>>,
     next_binder: Cell<usize>,
     references: Rc<RefCell<FxHashMap<Type<'db>, RecursiveMappingReference<'db>>>>,
+    completed: RefCell<FxHashMap<RecursiveMappingKey<'db>, Type<'db>>>,
     probe: Option<&'a RecursiveMappingProbe<'db>>,
     outer: Option<&'a RecursiveTypeMapping<'a, 'db>>,
     /// Function variables reaching each formal argument, used to bind returned callables.
     parameter_sources: FxHashMap<BoundTypeVarIdentity<'db>, FxOrderSet<BoundTypeVarInstance<'db>>>,
+}
+
+#[derive(PartialEq, Eq, Hash)]
+struct RecursiveMappingKey<'db> {
+    source: Type<'db>,
+    state: usize,
+    context: TypeContext<'db>,
+    parameters: Box<[Specialization<'db>]>,
 }
 
 struct RecursiveMappingAnalysis<'db> {
@@ -703,7 +717,7 @@ struct RecursiveMappingFrame<'db> {
 }
 
 impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
-    /// Retain reference metadata while giving each distinct substitution its own cache.
+    /// Separate substitution caches while retaining references and materialization comparisons.
     fn visitor<'v>(
         &'v self,
         visitor: &'v ApplyTypeMappingVisitor<'_, 'db>,
@@ -713,7 +727,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             recursion_context: visitor.recursion_context,
             materialize_typevar_bounds_and_defaults: visitor
                 .materialize_typevar_bounds_and_defaults,
-            ..ApplyTypeMappingVisitor::new(visitor.env)
+            ..visitor.for_new_materialization_root()
         }
     }
 
@@ -811,6 +825,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             active: RefCell::default(),
             next_binder: Cell::new(0),
             references: Rc::default(),
+            completed: RefCell::default(),
             probe: None,
             outer: None,
             parameter_sources: FxHashMap::default(),
@@ -844,13 +859,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             }
         }
         context.parameter_sources = analysis.parameter_sources;
-        let nested_visitor = ApplyTypeMappingVisitor {
-            recursive_mapping: Some(&context),
-            recursion_context: visitor.recursion_context,
-            materialize_typevar_bounds_and_defaults: visitor
-                .materialize_typevar_bounds_and_defaults,
-            ..ApplyTypeMappingVisitor::new(visitor.env)
-        };
+        let nested_visitor = context.visitor(visitor);
         source.apply_type_mapping_impl(db, mapping, tcx, &nested_visitor)
     }
 
@@ -870,17 +879,12 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             active: RefCell::default(),
             next_binder: Cell::new(0),
             references: Rc::clone(&self.references),
+            completed: RefCell::default(),
             probe: Some(&usage),
             outer: Some(self),
             parameter_sources: FxHashMap::default(),
         };
-        let probe_visitor = ApplyTypeMappingVisitor {
-            recursive_mapping: Some(&probe),
-            recursion_context: visitor.recursion_context,
-            materialize_typevar_bounds_and_defaults: visitor
-                .materialize_typevar_bounds_and_defaults,
-            ..ApplyTypeMappingVisitor::new(visitor.env)
-        };
+        let probe_visitor = probe.visitor(visitor);
         source.apply_type_mapping_impl(db, mapping, tcx, &probe_visitor);
         let mut checked = FxHashSet::default();
         loop {
@@ -1081,6 +1085,109 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             }
             return self.mapped_parameter(db, variable, mapping);
         }
+        if !matches!(ty, Type::Recursive(_) | Type::TypeAlias(_)) {
+            return None;
+        }
+        let key = self.probe.is_none().then(|| RecursiveMappingKey {
+            source: ty,
+            state,
+            context: tcx,
+            parameters: self
+                .active
+                .borrow()
+                .iter()
+                .flat_map(|frame| frame.parameter_mappings.iter().copied())
+                .collect(),
+        });
+        if let Some(key) = &key
+            && let Some(mapped) = self.completed.borrow().get(key)
+        {
+            return Some(*mapped);
+        }
+        let mapped = self.map_alias(db, ty, mapping, tcx, visitor, state)?;
+        if let Some(key) = key
+            && !self.contains_reference(db, visitor.env, mapped)
+        {
+            self.completed.borrow_mut().insert(key, mapped);
+        }
+        Some(mapped)
+    }
+
+    /// Completed results can be shared only after all references to enclosing frames are closed.
+    fn contains_reference(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        ty: Type<'db>,
+    ) -> bool {
+        struct PlaceholderSearch<'a, 'db> {
+            env: &'a ProgramEnvironment<'db>,
+            references: &'a FxHashMap<Type<'db>, RecursiveMappingReference<'db>>,
+            found: Cell<bool>,
+            seen: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for PlaceholderSearch<'_, 'db> {
+            fn program_environment(&self) -> &ProgramEnvironment<'db> {
+                self.env
+            }
+
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if self.found.get() {
+                    return;
+                }
+                if self.references.contains_key(&ty) {
+                    self.found.set(true);
+                    return;
+                }
+                if let Type::RecursiveVar(variable) = ty {
+                    if let Some(arguments) = variable.arguments(db) {
+                        walk_specialization_types(db, arguments, self);
+                    }
+                    return;
+                }
+                walk_type_with_recursion_guard(db, ty, self, &self.seen);
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                // Inspect stored bodies without unfolding open recursive variables.
+                self.visit_type(db, recursive.body(db));
+                if let Some(arguments) = recursive.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+            }
+
+            fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+                if let Some(arguments) = alias.specialization(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+            }
+        }
+
+        let references = self.references.borrow();
+        let search = PlaceholderSearch {
+            env,
+            references: &references,
+            found: Cell::new(false),
+            seen: TypeCollector::default(),
+        };
+        search.visit_type(db, ty);
+        search.found.get()
+    }
+
+    fn map_alias(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+        state: usize,
+    ) -> Option<Type<'db>> {
         let (source, arguments) = match ty {
             Type::Recursive(recursive) if recursive.is_cycle_seed(db) => return Some(ty),
             Type::Recursive(recursive) if recursive.may_have_unbounded_specialization(db) => (
@@ -1127,13 +1234,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             let materialization = TypeMapping::Materialize(kind);
             let mut context = Self::new(unmaterialized, &materialization);
             context.references = Rc::clone(&self.references);
-            let materialization_visitor = ApplyTypeMappingVisitor {
-                recursive_mapping: Some(&context),
-                recursion_context: visitor.recursion_context,
-                materialize_typevar_bounds_and_defaults: visitor
-                    .materialize_typevar_bounds_and_defaults,
-                ..ApplyTypeMappingVisitor::new(visitor.env)
-            };
+            let materialization_visitor = context.visitor(visitor);
             let materialized = unmaterialized.apply_type_mapping_impl(
                 db,
                 &materialization,
