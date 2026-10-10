@@ -1222,7 +1222,7 @@ still permits assignment to the attribute:
 
 ```py
 class WithExcludedMember(Protocol):
-    __doc__: str  # error: [invalid-mutable-override]
+    __doc__: str  # no diagnostic
 
     def method(self) -> None:
         self.__doc__ = "Protocol documentation"  # no error
@@ -2165,11 +2165,17 @@ static_assert(is_assignable_to(UsesMeta, HasX))
 
 ## `ClassVar` attribute members
 
-If a protocol `ClassVarX` has a `ClassVar` attribute member `x` with type `int`, this indicates that
-the non-callable attribute must be readable with the same type through both an inhabitant of
-`ClassVarX` and the type of that inhabitant. An implementing class must declare the member as a
-`ClassVar`; an instance attribute does not satisfy the requirement merely because it has a default
-value in the class body:
+A `ClassVar` protocol member must be readable through an instance and both readable and writable
+through its class. ty also requires an implementing variable to retain the `ClassVar` qualifier. It
+therefore rejects a regular attribute with a class-body default even when that attribute supports
+all three operations.
+
+Requiring the matching qualifier is ty's current policy, not an unambiguous requirement of the
+[typing spec](https://typing.python.org/en/latest/spec/protocol.html#protocol-members). The
+[conformance suite](https://github.com/python/typing/blob/main/conformance/tests/protocols_definition.py)
+makes an error optional when a regular attribute supplies those operations. It permits both ty's
+stricter interpretation and checking only the interface the attribute exposes. Instance-only
+attributes remain invalid under either interpretation, since the class does not provide the member.
 
 `classvars.py`:
 
@@ -2296,13 +2302,49 @@ info: └── protocol member `x` is incompatible
 info:     └── protocol member `x` is an instance variable on type `InstanceAttrX`, but a class variable is required
 ```
 
-This is mentioned by the
-[spec](https://typing.python.org/en/latest/spec/protocol.html#protocol-members) and tested in the
-[conformance suite](https://github.com/python/typing/blob/main/conformance/tests/protocols_definition.py)
-as something that must be supported by type checkers:
+## Explicit `ClassVar` protocol implementations
 
-> To distinguish between protocol class variables and protocol instance variables, the special
-> `ClassVar` annotation should be used.
+ty applies the same qualifier-matching policy when a class explicitly inherits from a protocol. An
+annotation without `ClassVar` is rejected here for the same reason that a structurally matched
+regular attribute is rejected above. This is not an additional requirement imposed by the spec on
+explicit subclasses; changing the policy would require updating both forms of protocol matching.
+
+```py
+from typing import ClassVar, Protocol
+
+class HasValue(Protocol):
+    value: ClassVar[int]
+
+class ExplicitRegular(HasValue):
+    value: int = 1  # error: [invalid-attribute-override]
+
+class ExplicitClassVar(HasValue):
+    value: ClassVar[int] = 1  # no diagnostic
+```
+
+An assignment without an annotation inherits the `ClassVar` qualifier.
+
+```py
+class Initialized(HasValue):
+    value = 1  # no diagnostic
+```
+
+The requirement also applies to a subclass of a valid implementation.
+
+```py
+class Descendant(ExplicitClassVar):
+    value: int = 1  # error: [invalid-attribute-override]
+```
+
+Inheriting an ordinary attribute from another base does not satisfy the protocol's `ClassVar`
+requirement either.
+
+```py
+class Regular:
+    value: int = 1
+
+class Combined(Regular, HasValue): ...  # error: [invalid-attribute-override]
+```
 
 ## Declared instance attribute members
 

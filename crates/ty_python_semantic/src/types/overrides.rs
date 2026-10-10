@@ -18,7 +18,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::{
     Db, ProgramEnvironment, attribute_declarations,
     lint::LintId,
-    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{
+        DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin, place_from_bindings,
+        place_from_declarations,
+    },
+    reachability::binding_reachability,
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType, KnownClass,
         MemberLookupPolicy, Parameter, Parameters, Signature, StaticClassLiteral, Type,
@@ -40,6 +44,7 @@ use crate::{
         list_members::{
             Member, MemberWithDefinition, all_end_of_scope_members, extract_underlying_functions,
         },
+        member::{ClassBodyDeclaration, inherited_class_body_declaration},
         tuple::Tuple,
     },
 };
@@ -590,6 +595,13 @@ fn check_class_declaration<'db>(
     };
     let class_kind = CodeGeneratorKind::from_class(db, literal.into());
 
+    // Declarations and later bindings produce separate member entries, but resolve to
+    // the same attribute contract. Check that contract at its declaration when present.
+    let is_attribute_contract_definition = place_table(db, class_scope)
+        .symbol_id(&member.name)
+        .and_then(|symbol| symbol_definition(db, class_scope, symbol))
+        .is_none_or(|definition| definition == *first_reachable_definition);
+
     // Check for prohibited `NamedTuple` attribute overrides.
     //
     // `NamedTuple` classes have certain synthesized attributes (like `_asdict`, `_make`, etc.)
@@ -747,12 +759,10 @@ fn check_class_declaration<'db>(
     let mut overridden_final_method = None;
     let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
-    let mut subclass_variable_kind: Option<Option<VariableKind>> = None;
 
     // Track the first superclass that defines this member so we can distinguish inherited
     // conflicts from violations introduced by the child.
     let mut inherited_member_owner = None;
-    let mut immediate_parent_variable_kind: Option<(ClassType<'db>, VariableKind)> = None;
 
     if !is_private_member {
         for &class_base in bases {
@@ -931,69 +941,8 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            if configuration.check_attribute_liskov_violations() {
-                if let Some(superclass_variable_kind) =
-                    effective_superclass_variable_kind(db, superclass, member.name.clone())
-                {
-                    if immediate_parent_variable_kind.is_none() {
-                        immediate_parent_variable_kind =
-                            Some((superclass, superclass_variable_kind));
-                    }
-
-                    let subclass_kind = *subclass_variable_kind.get_or_insert_with(|| {
-                        variable_kind(
-                            db,
-                            env,
-                            class.own_class_member(db, env, None, &member.name).inner,
-                            subclass_instance_member,
-                        )
-                    });
-
-                    if let Some(subclass_kind) = subclass_kind
-                        && subclass_kind != superclass_variable_kind
-                    {
-                        // An unannotated class-body assignment can inherit an overridden `ClassVar`
-                        // declaration instead of introducing a conflicting instance variable. This
-                        // also applies to augmented assignments after the initial class-body
-                        // assignment, e.g. `epilog = "..."; epilog += "..."`.
-                        if subclass_kind == VariableKind::Instance
-                            && superclass_variable_kind == VariableKind::Class
-                            && matches!(
-                                first_reachable_definition.kind(db),
-                                DefinitionKind::Assignment(_)
-                                    | DefinitionKind::AugmentedAssignment(_)
-                            )
-                        {
-                            continue;
-                        }
-
-                        if let Some((immediate_parent, immediate_parent_kind)) =
-                            immediate_parent_variable_kind
-                            && immediate_parent != superclass
-                            && immediate_parent.is_subclass_of(db, env, superclass)
-                            && immediate_parent_kind != superclass_variable_kind
-                        {
-                            continue;
-                        }
-
-                        let superclass_definition = superclass_symbol
-                            .and_then(|(scope, id)| symbol_definition(db, scope, id));
-                        report_invalid_attribute_override(
-                            context,
-                            &member.name,
-                            *first_reachable_definition,
-                            superclass,
-                            superclass_definition,
-                            subclass_kind,
-                            superclass_variable_kind,
-                        );
-                        liskov_diagnostic_emitted = true;
-                        continue;
-                    }
-                }
-            }
-
             if configuration.check_attribute_type_violations()
+                && is_attribute_contract_definition
                 // Constructors may change their signature. Leave their special receiver
                 // binding and `@override` checks to the method checker below.
                 && !is_constructor_like_method(&member.name)
@@ -1337,21 +1286,49 @@ fn method_override_types<'db>(
     Some((subclass_type, superclass_callable.to_type(db, env)))
 }
 
-/// Whether an attribute declaration is a class variable or an instance variable.
+/// The storage available for an attribute declaration.
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub(super) enum VariableKind {
     /// A variable annotated with `ClassVar`.
     Class,
-    /// An instance variable, including an unannotated class-body assignment.
+    /// A regular attribute available through both classes and instances.
+    Regular,
+    /// An attribute declared only on instances, including dataclass fields.
     Instance,
 }
 
 impl VariableKind {
+    /// Whether the kinds themselves preserve the base's storage restrictions.
+    ///
+    /// Regular and instance-only attributes can replace each other; neither may replace
+    /// a `ClassVar`. The caller must also check base writability: replacing a read-only
+    /// instance attribute removes no permitted write, even when this method returns
+    /// `false`.
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    /// from typing import ClassVar
+    ///
+    /// @dataclass(frozen=True)
+    /// class Base:
+    ///     value: int
+    ///
+    /// class Child(Base):
+    ///     value: ClassVar[int] = 1  # Allowed: Base already forbids instance writes.
+    /// ```
+    const fn can_override(self, base: Self) -> bool {
+        !matches!(
+            (self, base),
+            (Self::Class, Self::Instance | Self::Regular)
+                | (Self::Instance | Self::Regular, Self::Class)
+        )
+    }
+
     /// Returns the wording used for this variable kind in diagnostics.
     const fn description(self) -> &'static str {
         match self {
             VariableKind::Class => "class variable",
-            VariableKind::Instance => "instance variable",
+            VariableKind::Instance | VariableKind::Regular => "instance variable",
         }
     }
 }
@@ -1390,66 +1367,32 @@ pub(super) fn effective_superclass_variable_kind<'db>(
             .find_map(|base| effective_superclass_variable_kind(db, base, name.clone()))
     };
 
-    let (superclass_literal, superclass_specialization) = superclass.static_class_literal(db)?;
+    let (superclass_literal, _) = superclass.static_class_literal(db)?;
     let superclass_scope = superclass_literal.body_scope(db);
-    let superclass_symbol_table = place_table(db, superclass_scope);
-    let superclass_symbol_id = superclass_symbol_table.symbol_id(&name);
-
-    let has_own_member = if let Some(id) = superclass_symbol_id {
-        let superclass_symbol = superclass_symbol_table.symbol(id);
-        superclass_symbol.is_bound() || superclass_symbol.is_declared()
-    } else {
-        superclass_literal
-            .own_synthesized_member(db, env, superclass_specialization, None, &name)
-            .is_some()
-    };
-
-    if has_own_member {
-        // Method definitions and properties are not instance-variable declarations. Check the symbol
-        // definition before class/instance member lookup can erase that distinction. For example,
-        // resolving an abstract `@property def f(self) -> int` through instance-member lookup would
-        // make it look like an instance variable of type `int`, causing this rule to report
-        // `f: ClassVar[int]` as an invalid attribute override even though the superclass member is not
-        // an instance-attribute declaration.
-        if superclass_symbol_id.is_some_and(|id| is_function_definition(db, superclass_scope, id)) {
-            return inherited_variable_kind();
-        }
-
-        let class_member = superclass.own_class_member(db, env, None, &name).inner;
-
-        // Final attributes have their own override rule and diagnostic. Treating them as class
-        // variables here would report both diagnostics for the same override.
-        if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
-            return inherited_variable_kind();
-        }
-
-        let superclass_variable_kind = variable_kind(
-            db,
-            env,
-            class_member,
-            superclass.own_instance_member(db, env, &name).inner,
-        );
-
-        if superclass_variable_kind == Some(VariableKind::Instance)
-            && superclass_symbol_id.is_some_and(|id| {
-                symbol_definition(db, superclass_scope, id).is_some_and(|definition| {
-                    matches!(
-                        definition.kind(db),
-                        DefinitionKind::Assignment(_) | DefinitionKind::AugmentedAssignment(_)
-                    )
-                })
-            })
-            && inherited_variable_kind() == Some(VariableKind::Class)
-        {
-            return Some(VariableKind::Class);
-        }
-
-        if superclass_variable_kind.is_some() {
-            return superclass_variable_kind;
-        }
+    // Resolve syntax before lookup: a decorator may erase the distinction between a
+    // function definition and a variable binding. Such definitions don't declare
+    // instance variables for protocol matching.
+    if place_table(db, superclass_scope)
+        .symbol_id(&name)
+        .is_some_and(|id| is_function_definition(db, superclass_scope, id))
+    {
+        return inherited_variable_kind();
     }
 
-    inherited_variable_kind()
+    let class_member = superclass.own_class_member(db, env, None, &name).inner;
+    // Protocol matching ignores final members even when also annotated as ClassVar.
+    if class_member.qualifiers.contains(TypeQualifiers::FINAL) {
+        return inherited_variable_kind();
+    }
+    variable_kind(
+        db,
+        env,
+        superclass,
+        &name,
+        class_member,
+        superclass.own_instance_member(db, env, &name).inner,
+    )
+    .or_else(inherited_variable_kind)
 }
 
 /// Salsa-tracked query to check whether any of the definitions of a symbol
@@ -1481,19 +1424,30 @@ fn is_function_definition<'db>(
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> bool {
-    use_def_map(db, scope)
+    let use_def = use_def_map(db, scope);
+    use_def
         .end_of_scope_symbol_bindings(symbol)
+        .filter(|binding| binding_reachability(db, use_def, binding).may_be_true())
         .filter_map(|binding| binding.binding.definition())
         .any(|definition| definition.kind(db).is_function_def())
 }
 
-/// Returns the variable kind for an attribute if it should participate in `ClassVar` override checks.
+/// Classifies the storage declared by an owner's own attribute. An inherited annotation
+/// may govern an unannotated binding in this owner. `None` means the member does not
+/// establish a storage contract, either because it is not a variable or because an
+/// unknown base hides its declaration.
 fn variable_kind<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
+    owner: ClassType<'db>,
+    name: &str,
     class_member: PlaceAndQualifiers<'db>,
     instance_member: PlaceAndQualifiers<'db>,
 ) -> Option<VariableKind> {
+    // Syntactic definitions in inactive branches do not establish a storage contract.
+    if class_member.place.is_undefined() && instance_member.place.is_undefined() {
+        return None;
+    }
     if class_member.is_class_var() || instance_member.is_class_var() {
         return Some(VariableKind::Class);
     }
@@ -1548,69 +1502,51 @@ fn variable_kind<'db>(
         return None;
     }
 
-    Some(VariableKind::Instance)
+    if class_member.place.is_undefined()
+        || matches!(
+            class_member.place.ignore_possibly_undefined(),
+            Some(Type::SlotDescriptor(_))
+        )
+        || owner
+            .static_class_literal(db)
+            .is_some_and(|(literal, _)| literal.is_own_dataclass_instance_field(db, name))
+    {
+        return Some(VariableKind::Instance);
+    }
+    if let Place::Defined(DefinedPlace {
+        origin: TypeOrigin::Inferred,
+        ..
+    }) = class_member.place
+        && let Some((literal, _)) = owner.static_class_literal(db)
+        && let Some(symbol) = place_table(db, literal.body_scope(db)).symbol_id(name)
+        && inherited_class_body_declaration(db, literal.body_scope(db), symbol)
+            == ClassBodyDeclaration::Unknown
+    {
+        // An unknown base can hide the ClassVar qualifier of an unannotated default.
+        None
+    } else {
+        Some(VariableKind::Regular)
+    }
 }
 
-/// Returns the definition to use as the secondary annotation for an overridden symbol.
+/// Returns the first reachable declaration or binding for an overridden symbol.
 fn symbol_definition<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     symbol: ScopedSymbolId,
 ) -> Option<Definition<'db>> {
     let use_def_map = use_def_map(db, scope);
-    use_def_map
-        .end_of_scope_symbol_declarations(symbol)
-        .find_map(|declaration| declaration.declaration.definition())
-        .or_else(|| {
-            use_def_map
-                .end_of_scope_symbol_bindings(symbol)
-                .find_map(|binding| binding.binding.definition())
-        })
-}
-
-/// Reports an invalid override between a class variable and an instance variable.
-fn report_invalid_attribute_override<'db>(
-    context: &InferContext<'db, '_>,
-    member: &Name,
-    subclass_definition: Definition<'db>,
-    superclass: ClassType<'db>,
-    superclass_definition: Option<Definition<'db>>,
-    subclass_kind: VariableKind,
-    superclass_kind: VariableKind,
-) {
-    let db = context.db();
-
-    let Some(builder) = context.report_lint(
-        &INVALID_ATTRIBUTE_OVERRIDE,
-        subclass_definition.focus_range(db, context.module()),
-    ) else {
-        return;
-    };
-
-    let superclass_name = superclass.name(db);
-    let superclass_member = format!("{superclass_name}.{member}");
-    let subclass_kind = subclass_kind.description();
-    let superclass_kind = superclass_kind.description();
-
-    let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of attribute `{member}`"));
-    diagnostic.set_primary_annotation_message(format_args!(
-        "{subclass_kind} cannot override {superclass_kind} `{superclass_member}`"
-    ));
-    diagnostic.info("This violates the Liskov Substitution Principle");
-
-    if let Some(superclass_definition) = superclass_definition
-        && superclass_definition.file(db) == context.file()
-    {
-        diagnostic.annotate(
-            Annotation::secondary(
-                context.span(superclass_definition.focus_range(db, context.module())),
-            )
-            .message(format_args!(
-                "{superclass_kind} `{superclass_member}` declared here"
-            )),
-        );
-    }
+    let env = ProgramEnvironment::from_scope(scope);
+    place_from_declarations(
+        db,
+        &env,
+        use_def_map.end_of_scope_symbol_declarations(symbol),
+    )
+    .first_declaration
+    .or_else(|| {
+        place_from_bindings(db, &env, use_def_map.end_of_scope_symbol_bindings(symbol))
+            .first_definition
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1701,10 +1637,6 @@ impl OverrideRulesConfig {
 
     const fn check_method_liskov_violations(self) -> bool {
         self.contains(OverrideRulesConfig::LISKOV_METHODS)
-    }
-
-    const fn check_attribute_liskov_violations(self) -> bool {
-        self.contains(OverrideRulesConfig::LISKOV_ATTRIBUTES)
     }
 
     const fn check_attribute_type_violations(self) -> bool {
