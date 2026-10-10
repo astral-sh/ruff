@@ -20,6 +20,7 @@ ruff_unicode_names2 = { workspace = true }
 
 bitflags = { workspace = true }
 bstr = { workspace = true }
+char_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true }
 hashbrown = { workspace = true }
