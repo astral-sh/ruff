@@ -37,6 +37,8 @@ exploration of new features, we will often close these pull requests immediately
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
 team before it is appropriate to begin work on an implementation.
 
+For rule enhancements (e.g., `lazy-import-mismatch` supporting `__lazy_modules__`), please open an issue first.
+
 ### Avoiding duplicate work
 
 Before starting on an issue, take a look at the discussion and any linked pull requests, including
