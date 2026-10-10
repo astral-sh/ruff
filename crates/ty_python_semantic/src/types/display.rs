@@ -26,6 +26,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
+use crate::types::mapping::DeferredTypeMapping;
 use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
@@ -1019,16 +1020,15 @@ impl<'db> TypeAliasDisplay<'db> {
         &self,
         env: &ProgramEnvironment<'db>,
         specialization: Option<Specialization<'db>>,
-        materialization: Option<MaterializationKind>,
+        mappings: Option<DeferredTypeMapping<'db>>,
         f: &mut TypeWriter<'_, '_, 'db>,
     ) -> fmt::Result {
-        if let Some(kind) = materialization {
-            let (name, form) = match kind {
-                MaterializationKind::Top => ("Top", SpecialFormType::Top),
-                MaterializationKind::Bottom => ("Bottom", SpecialFormType::Bottom),
-            };
-            f.with_type(Type::SpecialForm(form)).write_str(name)?;
-            f.write_char('[')?;
+        let mut current = mappings;
+        let mut depth = 0;
+        while let Some(mapping) = current {
+            write!(f, "{}[", mapping.display_name(self.db))?;
+            current = mapping.preceding(self.db);
+            depth += 1;
         }
 
         self.fmt_detailed(f)?;
@@ -1038,7 +1038,7 @@ impl<'db> TypeAliasDisplay<'db> {
                 .fmt_detailed(f)?;
         }
 
-        if materialization.is_some() {
+        for _ in 0..depth {
             f.write_char(']')?;
         }
         Ok(())
@@ -1791,12 +1791,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             }
             Type::TypeAlias(alias) => alias
                 .display_with(db, self.settings.clone())
-                .fmt_specialized(
-                    self.env,
-                    alias.specialization(db),
-                    alias.materialization_kind(db),
-                    f,
-                ),
+                .fmt_specialized(self.env, alias.specialization(db), alias.mappings(db), f),
             Type::Recursive(recursive) => TypeAliasDisplay {
                 db,
                 ty: self.ty,
@@ -1807,7 +1802,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
             .fmt_specialized(
                 self.env,
                 recursive.arguments(db),
-                recursive.materialization_kind(db),
+                recursive.mappings(db),
                 f,
             ),
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(db)),

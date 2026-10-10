@@ -11,6 +11,7 @@ use crate::{
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
+        mapping::DeferredTypeMapping,
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -179,9 +180,9 @@ pub struct PEP695TypeAliasType<'db> {
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
 
-    /// Keeps recursive references stable while their alias body is materialized lazily.
+    /// Mappings applied after the alias's specialization when its body is requested.
     #[returns(copy)]
-    pub(super) materialization_kind: Option<MaterializationKind>,
+    pub(super) mappings: Option<DeferredTypeMapping<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -250,7 +251,7 @@ impl<'db> PEP695TypeAliasType<'db> {
                     self.name(db),
                     self.rhs_scope(db),
                     Some(specialization),
-                    self.materialization_kind(db),
+                    self.mappings(db),
                 )
             }
         }
@@ -293,9 +294,9 @@ pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(copy)]
     pub(super) specialization: Option<Specialization<'db>>,
 
-    /// Keeps recursive references stable while their alias body is materialized lazily.
+    /// Mappings applied after the alias's specialization when its body is requested.
     #[returns(copy)]
-    pub(super) materialization_kind: Option<MaterializationKind>,
+    pub(super) mappings: Option<DeferredTypeMapping<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -363,7 +364,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.definition(db),
             self.typing_module(db),
             Some(f(generic_context)),
-            self.materialization_kind(db),
+            self.mappings(db),
         )
     }
 
@@ -509,8 +510,8 @@ impl<'db> TypeAliasType<'db> {
     }
 
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        if let Some(materialization_kind) = self.materialization_kind(db) {
-            return self.materialized_value_type(db, materialization_kind);
+        if self.mappings(db).is_some() {
+            return self.mapped_value_type(db, ());
         }
 
         match self {
@@ -560,47 +561,46 @@ impl<'db> TypeAliasType<'db> {
             return self.value_type(db);
         };
 
-        let alias = self.with_materialization_kind(db, None);
-        let value_type = alias.specialized_value_type(db, Some(context));
-
-        let Some(materialization_kind) = self.materialization_kind(db) else {
-            return value_type;
-        };
-        let env = match alias {
-            TypeAliasType::PEP695(alias) => ProgramEnvironment::from_scope(alias.rhs_scope(db)),
-            TypeAliasType::ManualPEP695(alias) => {
-                ProgramEnvironment::from_definition(alias.definition(db))
-            }
-        };
-        value_type.materialize(
-            db,
-            materialization_kind,
-            &ApplyTypeMappingVisitor::new(&env).with_recursion_context(Some(context)),
-        )
+        let value_type = self
+            .with_mappings(db, None)
+            .specialized_value_type(db, Some(context));
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        match self.mappings(db) {
+            Some(mapping) => mapping.apply(
+                db,
+                value_type,
+                &ApplyTypeMappingVisitor::new(&env).with_recursion_context(Some(context)),
+            ),
+            None => value_type,
+        }
     }
 
-    /// Materialize the alias body lazily, keeping this alias as the recursive fallback.
-    ///
-    /// Comparing a recursive specialization with its materialization can request this same body
-    /// before it has finished materializing. Returning the already-marked alias closes that cycle
-    /// without losing its materialization polarity.
+    /// Keep the marked alias as the fallback if forcing its mappings returns to this query.
     #[salsa::tracked(
         returns(copy),
-        cycle_initial=|_, _, alias: TypeAliasType<'db>, _| Type::TypeAlias(alias),
+        cycle_initial=|_, _, alias: TypeAliasType<'db>, ()| Type::TypeAlias(alias),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn materialized_value_type(
+    fn mapped_value_type(self, db: &'db dyn Db, (): ()) -> Type<'db> {
+        let value_type = self.with_mappings(db, None).value_type(db);
+        let env = ProgramEnvironment::from_definition(self.definition(db));
+        match self.mappings(db) {
+            Some(mapping) => mapping.apply(db, value_type, &ApplyTypeMappingVisitor::new(&env)),
+            None => value_type,
+        }
+    }
+
+    /// Force deferred mappings under the caller's materialization recursion guard.
+    pub(super) fn value_type_with_mapping_visitor(
         self,
         db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        let value_type = self.with_materialization_kind(db, None).value_type(db);
-        let env = ProgramEnvironment::from_definition(self.definition(db));
-        value_type.materialize(
-            db,
-            materialization_kind,
-            &ApplyTypeMappingVisitor::new(&env),
-        )
+        let value = self
+            .with_mappings(db, None)
+            .value_type_with_recursion(db, visitor.recursion_context);
+        self.mappings(db)
+            .map_or(value, |mapping| mapping.apply(db, value, visitor))
     }
 
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -633,29 +633,30 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+    pub(super) fn mappings(self, db: &'db dyn Db) -> Option<DeferredTypeMapping<'db>> {
         match self {
-            TypeAliasType::PEP695(alias) => alias.materialization_kind(db),
-            TypeAliasType::ManualPEP695(alias) => alias.materialization_kind(db),
+            TypeAliasType::PEP695(alias) => alias.mappings(db),
+            TypeAliasType::ManualPEP695(alias) => alias.mappings(db),
         }
     }
 
-    fn with_materialization_kind(
+    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+        self.mappings(db)
+            .and_then(|mapping| mapping.materialization_kind(db))
+    }
+
+    pub(super) fn with_mappings(
         self,
         db: &'db dyn Db,
-        materialization_kind: Option<MaterializationKind>,
+        mappings: Option<DeferredTypeMapping<'db>>,
     ) -> Self {
-        if self.materialization_kind(db) == materialization_kind {
-            return self;
-        }
-
         match self {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,
                 alias.name(db),
                 alias.rhs_scope(db),
                 alias.specialization(db),
-                materialization_kind,
+                mappings,
             )),
             TypeAliasType::ManualPEP695(alias) => {
                 TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
@@ -664,7 +665,7 @@ impl<'db> TypeAliasType<'db> {
                     alias.definition(db),
                     alias.typing_module(db),
                     alias.specialization(db),
-                    materialization_kind,
+                    mappings,
                 ))
             }
         }
@@ -700,13 +701,27 @@ impl<'db> TypeAliasType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
+        if visitor.defer_recursive_aliases
+            && self.is_recursive(db)
+            && !matches!(
+                type_mapping,
+                TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
+            )
+            && !(self.mappings(db).is_none()
+                && matches!(type_mapping, TypeMapping::ApplySpecialization(_)))
+        {
+            return Type::TypeAlias(self.with_mappings(
+                db,
+                DeferredTypeMapping::append(db, self.mappings(db), type_mapping, tcx, visitor),
+            ));
+        }
         match type_mapping {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
-            TypeMapping::EagerExpansion if self.materialization_kind(db).is_some() => self
-                .value_type_with_recursion(db, visitor.recursion_context)
+            TypeMapping::EagerExpansion if self.mappings(db).is_some() => self
+                .value_type_with_mapping_visitor(db, visitor)
                 .expand_eagerly(db, visitor.env),
             // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
             // detection rather than the visitor's cycle detection, because the visitor tracks
@@ -715,17 +730,9 @@ impl<'db> TypeAliasType<'db> {
             // When specializing a generic type alias, instead of specializing the expanded type, the type alias itself is specialized.
             // Without this special handling, recursive type aliases would result in cycles, returning an unspecialized fallback type.
             TypeMapping::ApplySpecialization(specialization)
-            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. }
-                if let Some(mut current_specialization) = specialization.as_specialization(db) =>
+                if self.mappings(db).is_none()
+                    && let Some(current_specialization) = specialization.as_specialization(db) =>
             {
-                if let TypeMapping::ApplySpecializationWithMaterialization {
-                    materialization_kind,
-                    ..
-                } = type_mapping
-                {
-                    current_specialization = current_specialization
-                        .with_materialization_kind(db, Some(*materialization_kind));
-                }
                 Type::TypeAlias(self.apply_specialization(db, |generic_context| {
                     self.specialization(db)
                         .unwrap_or_else(|| generic_context.default_specialization(db, None))
@@ -742,21 +749,26 @@ impl<'db> TypeAliasType<'db> {
                 // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
                 // will detect the cycle and return the fallback value.
                 let mapped = visitor.visit(db, ty, type_mapping, || {
-                    self.value_type_with_recursion(db, visitor.recursion_context)
+                    self.value_type_with_mapping_visitor(db, visitor)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 });
 
                 // If the type mapping does not result in any change to this type alias, keep the
                 // alias node instead of eagerly expanding it. A recursive backedge also returns
                 // the alias itself, and fully static aliases must retain their original identity.
-                if mapped == ty
-                    || self.value_type_with_recursion(db, visitor.recursion_context) == mapped
-                {
+                if mapped == ty || self.value_type_with_mapping_visitor(db, visitor) == mapped {
                     ty
-                } else if let TypeMapping::Materialize(materialization_kind) = type_mapping
-                    && self.is_recursive(db)
-                {
-                    Type::TypeAlias(self.with_materialization_kind(db, Some(*materialization_kind)))
+                } else if self.is_recursive(db) {
+                    Type::TypeAlias(self.with_mappings(
+                        db,
+                        DeferredTypeMapping::append(
+                            db,
+                            self.mappings(db),
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
+                    ))
                 } else {
                     mapped
                 }
@@ -784,7 +796,7 @@ impl<'db> TypeAliasType<'db> {
                 alias.name(db),
                 alias.rhs_scope(db),
                 Some(mapped),
-                alias.materialization_kind(db),
+                alias.mappings(db),
             )),
             Self::ManualPEP695(alias) => Self::ManualPEP695(ManualPEP695TypeAliasType::new(
                 db,
@@ -792,7 +804,7 @@ impl<'db> TypeAliasType<'db> {
                 alias.definition(db),
                 alias.typing_module(db),
                 Some(mapped),
-                alias.materialization_kind(db),
+                alias.mappings(db),
             )),
         }
     }

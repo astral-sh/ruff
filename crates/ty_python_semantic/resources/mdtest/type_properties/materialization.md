@@ -3867,3 +3867,37 @@ def _(top: Top[ReadAny], bottom: Bottom[ReadAny]) -> None:
     reveal_type(top)  # revealed: Top[ReadAny]
     reveal_type(bottom)  # revealed: Bottom[ReadAny]
 ```
+
+## Materialized members with recursive alias types
+
+A property of a materialized generic object materializes the substituted type variable at each
+occurrence, including in callbacks reached through recursive aliases.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+Legacy = tuple[T, Callable[[T], T], Callable[[], "Legacy[T]"]]
+type Modern[T] = tuple[T, Callable[[T], T], Callable[[], Modern[T]]]
+
+class Box[T]:
+    @property
+    def legacy(self) -> Legacy[T]:
+        raise NotImplementedError
+
+    @property
+    def modern(self) -> Modern[T]:
+        raise NotImplementedError
+
+def inspect(value: Top[Box[Any]]):
+    reveal_type(value.legacy[1])  # revealed: (Never, /) -> object
+    reveal_type(value.legacy[2]()[1])  # revealed: (Never, /) -> object
+    reveal_type(value.modern[1])  # revealed: (Never, /) -> object
+    reveal_type(value.modern[2]()[1])  # revealed: (Never, /) -> object
+```

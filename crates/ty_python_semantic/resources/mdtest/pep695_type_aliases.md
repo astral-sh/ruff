@@ -1798,3 +1798,37 @@ def foo(x: A):
     reveal_type(x + 1)  # revealed: int
     reveal_type(1 + x)  # revealed: int
 ```
+
+### Lazy promotion of recursive streams
+
+Collecting a stream widens its inferred literals at every recursive depth. Collecting the result
+again applies the same widening without adding another transformation.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Stream = tuple[TypeOf[1], Callable[[], Stream]]
+
+def collect(value: Stream, flag: bool):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: tuple[int, () -> Promote[Stream]]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+    while flag:
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+```
+
+### Singleton promotion through recursive aliases
+
+Aliases are transparent to widening `None` inside nested tuples.
+
+```py
+type Node = tuple[None, tuple[Node]]
+
+def collect(value: Node):
+    widened = [value][0]
+    reveal_type(widened[0])  # revealed: None | Unknown
+    reveal_type(widened[1][0][1][0][0])  # revealed: None | Unknown
+```

@@ -1418,3 +1418,22 @@ callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
 ```
+
+## Promotion at each occurrence of a recursive type argument
+
+A callback's result is widened while its parameter retains its inferred literal type. The same rule
+applies after a recursive call changes the type argument to a list.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import TypeOf
+
+type G[T] = tuple[TypeOf[1], Callable[[T], T], Callable[[], G[list[T]]]]
+
+def collect(value: G[TypeOf[2]]):
+    widened = [value][0]
+    reveal_type(widened[1])  # revealed: (Literal[2], /) -> int
+    reveal_type(widened[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
+    repeated = [widened][0]
+    reveal_type(repeated[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
+```

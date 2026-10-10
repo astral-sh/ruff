@@ -2914,8 +2914,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[int | tuple[Tree[int]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Promote[Tree[Literal[1]]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Promote[Tree[Literal[1]]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3283,4 +3283,38 @@ def inspect(
     reveal_type([bottom])  # revealed: list[Bottom[Tree[Any]]]
     reveal_type([top_growing])  # revealed: list[Top[Growing[Any]]]
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
+```
+
+### Lazy promotion of recursive streams
+
+Collecting a stream widens its inferred literals at every recursive depth. Collecting the result
+again applies the same widening without adding another transformation.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
+
+def collect(value: Stream, flag: bool):
+    stream = [value][0]
+    reveal_type(stream)  # revealed: Promote[Stream]
+    reveal_type(stream[0])  # revealed: int
+    reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+    while flag:
+        stream = [stream][0]
+    reveal_type(stream[0])  # revealed: int
+```
+
+### Singleton promotion through recursive aliases
+
+Aliases are transparent to widening `None` inside nested tuples.
+
+```py
+Node = tuple[None, tuple["Node"]]
+
+def collect(value: Node):
+    widened = [value][0]
+    reveal_type(widened[0])  # revealed: None | Unknown
+    reveal_type(widened[1][0][1][0][0])  # revealed: None | Unknown
 ```

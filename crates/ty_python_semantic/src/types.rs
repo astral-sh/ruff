@@ -157,6 +157,7 @@ mod iteration;
 mod known_instance;
 pub mod list_members;
 mod literal;
+mod mapping;
 mod match_pattern;
 mod member;
 mod method;
@@ -514,6 +515,8 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    /// A deferred step traverses one unfolding and stops at recursive alias boundaries.
+    defer_recursive_aliases: bool,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -531,6 +534,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            defer_recursive_aliases: false,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -608,6 +612,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            defer_recursive_aliases: self.defer_recursive_aliases,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9453,13 +9458,15 @@ impl<'db> Type<'db> {
             _ => {}
         }
 
-        // Recursive singleton promotion only recurses into `NominalInstance` types (tuples
-        // and specialized generics). For all other types, return early.
+        // Aliases are transparent to singleton promotion. Their exposed body still determines
+        // whether traversal continues: only nominal instances (including tuples) are traversed.
         if matches!(
             type_mapping,
             TypeMapping::Promote(_, PromotionKind::SingletonsOnly)
-        ) && !matches!(self, Type::NominalInstance(_))
-        {
+        ) && !matches!(
+            self,
+            Type::NominalInstance(_) | Type::Recursive(_) | Type::TypeAlias(_)
+        ) {
             return self;
         }
 
@@ -11001,7 +11008,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
@@ -11041,7 +11048,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
 /// is in the MRO of the self type's class.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,
