@@ -346,7 +346,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ty,
                                 Type::none(db, env),
                             )),
-                            false,
                         ),
                     )));
                 }
@@ -359,7 +358,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 None,
                                 Ok(UnionType::from_elements(db, env, elements)),
-                                false,
                             ),
                         ));
 

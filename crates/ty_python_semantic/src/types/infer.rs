@@ -75,7 +75,7 @@ use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, se
 
 mod builder;
 mod implicit_alias;
-pub(super) use implicit_alias::implicit_alias_parameters;
+pub(super) use implicit_alias::{implicit_alias_is_acyclic, implicit_alias_parameters};
 mod comparisons;
 mod expression_truthiness;
 pub(crate) use expression_truthiness::TruthinessAnalyzer;

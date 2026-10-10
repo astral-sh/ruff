@@ -23,7 +23,7 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, InferenceFlags, TypeExpressionFlags,
-    implicit_alias_parameters, infer_implicit_alias_type,
+    implicit_alias_is_acyclic, implicit_alias_parameters, infer_implicit_alias_type,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -51,26 +51,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Option<(Type<'db>, Option<GenericContext<'db>>)> {
         let db = self.db();
         let mut definition = definition?;
-        // A resolved non-recursive value already describes the alias. Gradual types, invalid
-        // unions, and quoted aliases can hide recursive references. A valid union also needs
-        // inference if cycle recovery may have removed one of its recursive members.
-        if !any_over_type(
-            db,
-            self.program_environment(),
-            value_ty,
-            false,
-            |ty| match ty {
+        // A resolved non-recursive value already describes the alias. Gradual types, unions,
+        // and quoted aliases can hide recursive references, so they still need inference.
+        // Even a valid union can have lost a cyclic member during value inference.
+        if !any_over_type(db, self.program_environment(), value_ty, false, |ty| {
+            matches!(
+                ty,
                 Type::Dynamic(_)
-                | Type::Divergent(_)
-                | Type::Recursive(_)
-                | Type::TypeAlias(_)
-                | Type::KnownInstance(KnownInstanceType::LiteralStringAlias(_)) => true,
-                Type::KnownInstance(KnownInstanceType::UnionType(union)) => {
-                    union.union_type(db).is_err() || union.had_cycle(db)
-                }
-                _ => false,
-            },
-        ) {
+                    | Type::Divergent(_)
+                    | Type::Recursive(_)
+                    | Type::TypeAlias(_)
+                    | Type::KnownInstance(
+                        KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
+                    )
+            )
+        }) {
             return None;
         }
         if definition.kind(db).is_import() {
@@ -88,6 +83,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return None;
             };
             definition = resolved.definition()?;
+        }
+        // Value inference already computed this union. Reuse it when the alias's source
+        // dependencies prove it cannot hide a recursive reference removed during recovery.
+        if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = value_ty
+            && union.union_type(db).is_ok()
+            && implicit_alias_is_acyclic(db, definition)
+        {
+            return None;
         }
         let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
         let value = definition.kind(db).value(&module)?;

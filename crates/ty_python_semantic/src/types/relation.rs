@@ -2001,12 +2001,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            // Recovery history does not change the runtime union value represented by this type.
-            (
-                Type::KnownInstance(KnownInstanceType::UnionType(source)),
-                Type::KnownInstance(KnownInstanceType::UnionType(target)),
-            ) if source.merge_cycle_history(db, target).is_some() => self.always(),
-
             (
                 Type::KnownInstance(KnownInstanceType::Annotated(source)),
                 Type::KnownInstance(KnownInstanceType::Annotated(target)),
@@ -3778,12 +3772,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     )
                 })
             }),
-
-            // Different recovery histories can describe the same runtime union value.
-            (
-                Type::KnownInstance(KnownInstanceType::UnionType(left)),
-                Type::KnownInstance(KnownInstanceType::UnionType(right)),
-            ) if left.merge_cycle_history(db, right).is_some() => self.never(),
 
             (
                 Type::KnownInstance(KnownInstanceType::Annotated(left)),
