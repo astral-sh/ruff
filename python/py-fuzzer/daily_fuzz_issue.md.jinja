@@ -1,13 +1,12 @@
 Run listed here: {{ run_url }}
 
-{% if reproducers %}
+{% if not reproducers %}
+Test executable: {{ executable }} at commit `{{ executable_revision }}`.
+
+{% else %}
 {{ failure_description }}
 
-Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run:
-
-```shell
-{{ reproduction_command }}
-```
+Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build --locked --bin={{ executable }}`. Save a snippet to `repro.py`, then run `{{ reproduction_command }}`.
 {% for reproducer in reproducers %}
 {% if reproducer.bug.minimization_succeeded %}
 
@@ -32,4 +31,26 @@ Build {{ executable }} from commit `{{ executable_revision }}` with `cargo build
 {% if omitted %}
 
 Some reproducers were omitted to fit the issue body. The workflow logs list all failing seeds; run py-fuzzer from Ruff commit `{{ fuzzer_revision }}` with a seed to regenerate its input.
+{% endif %}
+{% if unchecked_count %}
+
+### Unchecked seeds
+
+The time budget expired before {{ unchecked_count }} seed{{ 's' if unchecked_count != 1 else '' }} could be checked.
+
+{% for seed in unchecked_seeds %}
+- `{{ seed }}`
+{% endfor %}
+{% if seeds_omitted %}
+
+The full list of unchecked seeds is in the workflow logs.
+{% endif %}
+{% endif %}
+{% if seed_rerun_command %}
+
+To check all seeds that failed or were left unchecked, check out Ruff commit `{{ fuzzer_revision }}` and run from the repository root:
+
+```shell
+{{ seed_rerun_command }}
+```
 {% endif %}

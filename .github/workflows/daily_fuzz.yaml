@@ -34,6 +34,9 @@ jobs:
     name: Fuzz
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'github-ubuntu-24.04-x86_64-4' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    env:
+      # Keep in sync with the job's timeout-minutes.
+      FUZZ_JOB_TIMEOUT_MINUTES: 20
     permissions:
       contents: read
     outputs:
@@ -41,6 +44,8 @@ jobs:
     # Don't run the cron job on forks:
     if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
     steps:
+      - name: Record job start time
+        run: echo "FUZZ_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -65,6 +70,7 @@ jobs:
           if [[ "$GITHUB_EVENT_NAME" == "schedule" ]]; then
             issue_options+=(--write-github-issue="$RUNNER_TEMP/fuzz-issue.md")
           fi
+          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           # shellcheck disable=SC2046
           (
             uv run \
@@ -73,6 +79,7 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
+            --budget-minutes="${budget_minutes}" \
             --bin=ruff \
             "${issue_options[@]}" \
             $(shuf -i 0-9999999999999999999 -n 1000)
