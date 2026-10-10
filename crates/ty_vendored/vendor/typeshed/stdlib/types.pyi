@@ -140,7 +140,7 @@ class FunctionType:
             closure: tuple[CellType, ...] | None = None,
         ) -> Self: ...
 
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> object:
         """Call self as a function."""
 
     @overload
