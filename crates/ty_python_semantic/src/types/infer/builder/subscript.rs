@@ -1163,7 +1163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
                             .value_expression_types(db, env)
                             .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
-                        _ => false,
+                        _ => value_ty.is_specialized_generic(db),
                     };
                     if already_specialized {
                         diagnostic.annotate(
