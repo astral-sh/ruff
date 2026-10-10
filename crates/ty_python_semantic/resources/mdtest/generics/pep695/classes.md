@@ -2721,10 +2721,10 @@ node = Box[int](1).writable
 reveal_type(node()[1]()[0])  # revealed: int
 ```
 
-## Attribute errors on growing recursive lambdas
+## Growing recursive lambda attributes
 
-Each recursive return below adds another `list` around the class's type argument. An attribute error
-shows the known return types before abbreviating the recursive part of the signature:
+Each recursive return below adds another `list` around the class's type argument. Calling the
+returned lambda preserves that specialization:
 
 ```py
 from typing import Final
@@ -2734,8 +2734,31 @@ class Grow[T]:
         self.node: Final = lambda: (value, Grow([value]).node)
 
 node = Grow(1).node
+reveal_type(node()[1]()[0])  # revealed: list[int]
+```
+
+An attribute error shows the known return types before abbreviating the recursive part of the
+signature:
+
+```py
 # error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
 node.missing
+```
+
+## Recursive lambdas with swapped type arguments
+
+Each recursive return applies the new type arguments, even when it reaches the same lambda again:
+
+```py
+from typing import Final
+
+class Swap[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node: Final = lambda: (value, Swap(other, value).node)
+
+node = Swap[int, str](1, "two").node
+reveal_type(node()[1]()[0])  # revealed: str
+reveal_type(node()[1]()[1]()[0])  # revealed: int
 ```
 
 ## Lambda defaults in base class annotations

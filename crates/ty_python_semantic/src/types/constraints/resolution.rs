@@ -5,6 +5,7 @@ use std::cell::{Cell, RefCell};
 use rustc_hash::FxHashMap;
 
 use super::TypeVarSolution;
+use crate::types::callable::SignatureSource;
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::generics::{ApplySpecialization, GenericContext};
@@ -77,7 +78,10 @@ impl<'db> Resolver<'_, 'db> {
             .visit(db, Type::TypeVar(binding.bound_typevar), || {
                 let original = binding.solution;
                 let replacements = RefCell::new(FxOrderMap::default());
-                if !Dependencies::check(db, self.env, self.inferable, original, |dependency| {
+                if !Dependencies::check(db, self.env, original, |dependency| {
+                    if !dependency.is_inferable(db, self.inferable) {
+                        return true;
+                    }
                     let Some(&index) = self.indices.get(&dependency.identity(db)) else {
                         return false;
                     };
@@ -117,18 +121,45 @@ impl<'db> Resolver<'_, 'db> {
                 // Some type forms preserve captured variables when specialized. For example, an
                 // alias changes its explicit arguments but can retain a free variable in its body.
                 // Verify closure on the actual result without performing further substitutions.
-                Dependencies::check(db, self.env, self.inferable, mapped, |_| false)
-                    .then_some(mapped)
+                Dependencies::check(db, self.env, mapped, |dependency| {
+                    !dependency.is_inferable(db, self.inferable)
+                })
+                .then_some(mapped)
             })
     }
 }
 
 struct VisitDependencies;
 
-/// Visits occurrences of inferable variables, leaving their declarations' bounds and defaults alone.
+/// Collect the variables occurring in types, including lazy callable returns.
+pub(in crate::types) fn type_dependencies<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    types: impl IntoIterator<Item = Type<'db>>,
+) -> TypeVarSet<'db> {
+    let variables = RefCell::new(FxOrderMap::default());
+    let query = |variable: BoundTypeVarInstance<'db>| {
+        variables
+            .borrow_mut()
+            .entry(variable.identity(db))
+            .or_insert(variable);
+        true
+    };
+    let visitor = Dependencies {
+        env,
+        query: &query,
+        satisfied: Cell::new(true),
+        visited: CycleDetector::new(()),
+    };
+    for ty in types {
+        visitor.visit_type(db, ty);
+    }
+    TypeVarSet::from_typevars(db, variables.into_inner().into_values())
+}
+
+/// Visits typevar occurrences, leaving their declarations' bounds and defaults alone.
 struct Dependencies<'a, 'db> {
     env: &'a ProgramEnvironment<'db>,
-    inferable: TypeVarSet<'db>,
     query: &'a dyn Fn(BoundTypeVarInstance<'db>) -> bool,
     satisfied: Cell<bool>,
     visited: CycleDetector<'db, VisitDependencies, Type<'db>, (), 3>,
@@ -138,13 +169,11 @@ impl<'db> Dependencies<'_, 'db> {
     fn check(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
-        inferable: TypeVarSet<'db>,
         ty: Type<'db>,
         query: impl Fn(BoundTypeVarInstance<'db>) -> bool,
     ) -> bool {
         let visitor = Dependencies {
             env,
-            inferable,
             query: &query,
             satisfied: Cell::new(true),
             visited: CycleDetector::new(()),
@@ -189,9 +218,7 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
             }
         }
         if let Type::TypeVar(typevar) = ty {
-            if typevar.is_inferable(db, self.inferable) {
-                self.satisfied.set((self.query)(typevar));
-            }
+            self.satisfied.set((self.query)(typevar));
         } else if let TypeKind::NonAtomic(non_atomic) = TypeKind::from(ty) {
             // Revisiting a recursive structural type adds no new dependencies. Binding cycles
             // are handled separately by Resolver, where their fallback is unresolved.
@@ -224,8 +251,26 @@ impl<'db> TypeVisitor<'db> for Dependencies<'_, 'db> {
     }
 
     fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
-        for signature in &callable.signatures(db).overloads {
-            self.signature(db, signature);
+        match callable.signature_source(db) {
+            SignatureSource::Explicit(signatures) => {
+                for signature in &signatures.overloads {
+                    self.signature(db, signature);
+                }
+            }
+            SignatureSource::Lambda(lambda) => {
+                for parameter in lambda.parameters(db) {
+                    self.visit_type(db, parameter.annotated_type());
+                    if let Some(default) = parameter.eager_default_type() {
+                        self.visit_type(db, default);
+                    }
+                }
+                if !self.satisfied.get() {
+                    return;
+                }
+                for variable in lambda.return_type_dependencies(db).iter(db) {
+                    self.visit_type(db, Type::TypeVar(variable));
+                }
+            }
         }
     }
 
