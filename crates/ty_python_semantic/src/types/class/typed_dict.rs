@@ -23,9 +23,9 @@ use crate::types::typed_dict::{
     deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
 };
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-    ClassType, KnownClass, MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance,
-    TypedDictType, TypingModule, UnionType, determine_upper_bound,
+    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType,
+    TypingModule, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -899,36 +899,6 @@ pub struct DynamicTypedDictLiteral<'db> {
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
 
 impl<'db> DynamicTypedDictLiteral<'db> {
-    /// Map an eagerly stored schema without inferring a deferred `TypedDict` definition.
-    pub(in crate::types) fn map_stored_types(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let DynamicTypedDictAnchor::ScopeOffset {
-            scope,
-            offset,
-            schema,
-            openness,
-        } = self.anchor(db)
-        else {
-            return self;
-        };
-        Self::new(
-            db,
-            self.name(db),
-            DynamicTypedDictAnchor::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                schema: schema.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                openness: openness.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            },
-            self.typed_dict_module(db),
-        )
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

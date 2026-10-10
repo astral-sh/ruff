@@ -2005,7 +2005,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (
                 Type::KnownInstance(KnownInstanceType::UnionType(source)),
                 Type::KnownInstance(KnownInstanceType::UnionType(target)),
-            ) if source.merge_cycle_history(db, self.env, target).is_some() => self.always(),
+            ) if source.merge_cycle_history(db, target).is_some() => self.always(),
 
             (
                 Type::KnownInstance(KnownInstanceType::Annotated(source)),
@@ -3783,7 +3783,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (
                 Type::KnownInstance(KnownInstanceType::UnionType(left)),
                 Type::KnownInstance(KnownInstanceType::UnionType(right)),
-            ) if left.merge_cycle_history(db, self.env, right).is_some() => self.never(),
+            ) if left.merge_cycle_history(db, right).is_some() => self.never(),
 
             (
                 Type::KnownInstance(KnownInstanceType::Annotated(left)),

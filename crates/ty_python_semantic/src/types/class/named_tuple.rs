@@ -7,10 +7,9 @@ use crate::{
     Db,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral,
-        ClassType, GenericContext, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-        Parameters, PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext,
-        TypeMapping,
+        BindingContext, BoundTypeVarInstance, ClassBase, ClassLiteral, ClassType, GenericContext,
+        KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter, Parameters,
+        PropertyInstanceType, Signature, SubclassOfType, Type, TypeContext, TypeMapping,
         class::{DynamicClassHeaderAnchor, DynamicClassScopeOffset, dynamic_class_header_range},
         definition_expression_type,
         member::Member,
@@ -171,35 +170,6 @@ pub struct DynamicNamedTupleLiteral<'db> {
 impl get_size2::GetSize for DynamicNamedTupleLiteral<'_> {}
 
 impl<'db> DynamicNamedTupleLiteral<'db> {
-    /// Map stored field types and defaults without evaluating a deferred named-tuple definition.
-    pub(in crate::types) fn map_stored_fields(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let anchor = match self.anchor(db) {
-            DynamicNamedTupleAnchor::CollectionsDefinition { definition, spec } => {
-                DynamicNamedTupleAnchor::CollectionsDefinition {
-                    definition: *definition,
-                    spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                }
-            }
-            DynamicNamedTupleAnchor::TypingDefinition(_) => return self,
-            DynamicNamedTupleAnchor::ScopeOffset {
-                scope,
-                offset,
-                spec,
-            } => DynamicNamedTupleAnchor::ScopeOffset {
-                scope: *scope,
-                offset: *offset,
-                spec: spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            },
-        };
-        Self::new(db, self.name(db), anchor)
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -614,31 +584,6 @@ impl<'db> NamedTupleSpec<'db> {
     /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false)
-    }
-
-    /// Map stored field types and defaults without resolving the fields' source definitions.
-    pub(crate) fn apply_type_mapping_impl(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        let fields = self
-            .fields(db)
-            .iter()
-            .map(|field| NamedTupleField {
-                name: field.name.clone(),
-                ty: field
-                    .ty
-                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                default: field
-                    .default
-                    .map(|default| default.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-                definition: field.definition,
-            })
-            .collect::<Box<_>>();
-        Self::new(db, fields, self.has_known_fields(db))
     }
 
     pub(crate) fn recursive_type_normalized_impl(

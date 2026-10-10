@@ -1074,17 +1074,11 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, env, context)),
             definition: self.definition,
-            extras: if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) {
-                // Cycle normalization leaves receiver constraints unchanged. Preserve them here
-                // too, so comparing recovery history does not evaluate or rebuild constraints.
-                self.extras.clone()
-            } else {
-                SignatureExtras::new(
-                    self.source_overload_index_raw(),
-                    self.map_receiver_constraints(db, type_mapping, tcx, visitor),
-                    self.is_paramspec_value(),
-                )
-            },
+            extras: SignatureExtras::new(
+                self.source_overload_index_raw(),
+                self.map_receiver_constraints(db, type_mapping, tcx, visitor),
+                self.is_paramspec_value(),
+            ),
             parameters: self
                 .parameters
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),

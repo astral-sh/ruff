@@ -109,7 +109,7 @@ impl<'db> RecursiveVar<'db> {
             )) if self.cycle(db) == recursive.cycle(db) => {
                 Type::Recursive(recursive.with_arguments(db, arguments))
             }
-            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::MarkUnionCycleHistory => {
+            TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::RecursiveVar(Self::new_internal(db, self.cycle(db), arguments))
             }
             _ => unreachable!("semantic operation on an unbound recursive variable"),
@@ -403,22 +403,6 @@ impl<'db> RecursiveType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         match mapping {
-            TypeMapping::MarkUnionCycleHistory => {
-                let body = self
-                    .body(db)
-                    .apply_type_mapping_impl(db, mapping, tcx, visitor);
-                let arguments = self
-                    .arguments(db)
-                    .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
-                Type::Recursive(Self::new_internal(
-                    db,
-                    self.definition(db),
-                    self.cycle(db),
-                    body,
-                    arguments,
-                    self.materialization_kind(db),
-                ))
-            }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),
             )) if self.cycle(db) == *cycle && self.materialization_kind(db).is_none() => {

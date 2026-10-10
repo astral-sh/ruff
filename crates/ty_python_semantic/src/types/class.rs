@@ -631,31 +631,6 @@ pub enum ClassLiteral<'db> {
 
 #[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
-    /// Map stored dynamic-class data while leaving source definitions unevaluated.
-    pub(super) fn map_stored_types(
-        self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        match self {
-            Self::Static(_) => self,
-            Self::Dynamic(class) => {
-                Self::Dynamic(class.map_stored_types(db, type_mapping, tcx, visitor))
-            }
-            Self::DynamicNamedTuple(class) => {
-                Self::DynamicNamedTuple(class.map_stored_fields(db, type_mapping, tcx, visitor))
-            }
-            Self::DynamicTypedDict(class) => {
-                Self::DynamicTypedDict(class.map_stored_types(db, type_mapping, tcx, visitor))
-            }
-            Self::DynamicEnum(class) => {
-                Self::DynamicEnum(class.map_stored_types(db, type_mapping, tcx, visitor))
-            }
-        }
-    }
-
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         KnownClass::Object
@@ -1393,11 +1368,6 @@ impl<'db> ClassType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
         match self {
-            Self::NonGeneric(class)
-                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
-            {
-                Self::NonGeneric(class.map_stored_types(db, type_mapping, tcx, visitor))
-            }
             Self::NonGeneric(_) => self,
             Self::Generic(generic) => {
                 Self::Generic(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))

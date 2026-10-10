@@ -125,7 +125,7 @@ impl<'db> TypedDictOpenness<'db> {
         matches!(self, Self::Closed)
     }
 
-    pub(super) fn apply_type_mapping_impl<'a>(
+    fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
@@ -134,21 +134,13 @@ impl<'db> TypedDictOpenness<'db> {
     ) -> Self {
         match self {
             Self::ImplicitlyOpen | Self::Closed => self,
-            Self::Extra(extra_items) => {
-                let declared_ty =
-                    extra_items
-                        .declared_ty
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) {
-                    // Preserve the stored policy without expanding aliases to check for `Never`.
-                    Self::Extra(TypedDictExtraItems {
-                        declared_ty,
-                        is_read_only: extra_items.is_read_only,
-                    })
-                } else {
-                    Self::extra(db, declared_ty, extra_items.is_read_only)
-                }
-            }
+            Self::Extra(extra_items) => Self::extra(
+                db,
+                extra_items
+                    .declared_ty
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                extra_items.is_read_only,
+            ),
         }
     }
 
@@ -3162,7 +3154,15 @@ impl<'db> SynthesizedTypedDictType<'db> {
     ) -> Self {
         let items = self
             .items(db)
-            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            .iter()
+            .map(|(name, field)| {
+                let field = field
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
+                (name.clone(), field)
+            })
+            .collect::<TypedDictSchema<'db>>();
 
         let openness = self
             .openness(db)
@@ -3176,26 +3176,6 @@ impl<'db> SynthesizedTypedDictType<'db> {
 pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
 
 impl<'db> TypedDictSchema<'db> {
-    /// Map stored field types while preserving field qualifiers and declaration provenance.
-    pub(super) fn apply_type_mapping_impl(
-        &self,
-        db: &'db dyn Db,
-        type_mapping: &TypeMapping<'_, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
-    ) -> Self {
-        self.iter()
-            .map(|(name, field)| {
-                (
-                    name.clone(),
-                    field
-                        .clone()
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                )
-            })
-            .collect()
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
