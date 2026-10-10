@@ -30,6 +30,9 @@ use crate::package::PackageRoot;
 /// `__init__.py` file is typically meant to be a regular package, and
 /// the absence of the `__init__.py` file is probably an oversight.
 ///
+/// Files under a top-level `tests` directory are ignored because test
+/// directories are not required to be Python packages.
+///
 /// ## Options
 /// - `namespace-packages`
 #[derive(ViolationMetadata)]
@@ -70,6 +73,14 @@ pub(crate) fn implicit_namespace_package(
     allow_nested_roots: bool,
     context: &LintContext,
 ) {
+    // Ignore files under a top-level `tests` directory.
+    if path
+        .strip_prefix(project_root)
+        .is_ok_and(|relative| relative.starts_with("tests"))
+    {
+        return;
+    }
+
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
         && PySourceType::try_from_path(path).is_some_and(PySourceType::is_py_file)
