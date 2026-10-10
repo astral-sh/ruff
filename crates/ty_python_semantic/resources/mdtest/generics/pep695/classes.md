@@ -1363,6 +1363,45 @@ reveal_type(PartiallyFixed.fixed)  # revealed: int
 reveal_type(PartiallyFixed.unresolved)  # revealed: Unknown
 ```
 
+## Unions of generic intersections
+
+Sharing one class constraint does not make two intersections interchangeable. Neither of these
+alternatives covers the other:
+
+```py
+from ty_extensions import Intersection
+
+class Cell[T]:
+    value: T
+
+class Other[T]: ...
+class Marker: ...
+
+def different_classes(value: Intersection[Cell[int], Marker] | Intersection[Marker, Other[int]]):
+    reveal_type(value)  # revealed: (Cell[int] & Marker) | (Marker & Other[int])
+```
+
+An alternative with an additional constraint is redundant when the other constraints match. However,
+the writable `Cell.value` makes `Cell` invariant, so `Cell[bool]` is not a subtype of `Cell[int]`:
+
+```py
+def specializations(
+    narrower: Intersection[Other[int], Marker, Cell[int]] | Intersection[Cell[int], Marker],
+    incompatible: Intersection[Cell[bool], Marker] | Intersection[Cell[int], Marker],
+):
+    reveal_type(narrower)  # revealed: Cell[int] & Marker
+    reveal_type(incompatible)  # revealed: (Cell[bool] & Marker) | (Cell[int] & Marker)
+```
+
+An inherited specialization can also make an intersection redundant:
+
+```py
+class Child(Cell[int]): ...
+
+def inherited(value: Intersection[Child, Marker] | Intersection[Cell[int], Marker]):
+    reveal_type(value)  # revealed: Cell[int] & Marker
+```
+
 ## Fallback MROs preserve generic class identity
 
 Putting `Base` before its subclass makes the MRO inconsistent. During error recovery, the fallback
