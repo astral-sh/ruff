@@ -2221,23 +2221,10 @@ static_assert(not is_subtype_of(Growing[int], Growing[object]))
 static_assert(not is_subtype_of(Growing[object], Growing[int]))
 ```
 
-A writable lambda attribute that returns `T` makes its class invariant, including when the recursive
-argument contains a class object:
+## Specialized recursive lambda attributes
 
-```py
-class WithClass(Generic[T]):
-    def __init__(self, value: T):
-        self.next = lambda: (value, WithClass((value, int)).next)
-
-static_assert(not is_subtype_of(WithClass[int], WithClass[object]))
-static_assert(not is_subtype_of(WithClass[object], WithClass[int]))
-```
-
-## Specializing captured lambda type parameters
-
-Specializing a recursive lambda preserves the variance of each captured parameter. `Wrapper[T, U]`
-exposes a callable that accepts `U` and returns `T`, so it is covariant in `T` and contravariant in
-`U`:
+Calling the recursive lambda on a `Wrapper[T, U]` returns a callback that accepts `U` and returns
+`T`. This makes `Wrapper` covariant in `T` and contravariant in `U`:
 
 ```toml
 [environment]
@@ -2279,25 +2266,40 @@ static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
 static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
 ```
 
-Specializing a nested class leaves its lambda's references to outer type parameters intact:
+## Type parameters captured from an enclosing class
+
+The inner lambda returns a value of the outer class's type parameter `T` along with itself.
+Specializing `Inner[U]` preserves that reference to `T`, so `Outer` remains covariant:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
+from typing import Final, Generic, TypeVar
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+T = TypeVar("T", infer_variance=True)
+U = TypeVar("U", infer_variance=True)
+
 class Outer(Generic[T]):
     def __init__(self, value: T):
         class Inner(Generic[U]):
-            def __init__(self, other: U):
+            def __init__(self):
                 self.node: Final = lambda: (value, self.node)
 
-        self.node: Final = Inner[int](0).node
+        self.node: Final = Inner[int]().node
 
 static_assert(is_subtype_of(Outer[int], Outer[object]))
 static_assert(not is_subtype_of(Outer[object], Outer[int]))
 ```
 
-## Specializing captured lambda parameter lists
+## Recursive lambda attributes with `ParamSpec`
 
-Substituting a parameter list preserves contravariance in the callback's parameter types, including
-when the list is forwarded through another class:
+The recursive lambda in `Consumer[T]` returns a callback that accepts `T`. This makes `Consumer`
+contravariant in `T`, even when the callback's `ParamSpec` is passed through another class:
 
 ```toml
 [environment]

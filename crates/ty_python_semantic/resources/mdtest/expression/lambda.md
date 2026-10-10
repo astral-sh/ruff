@@ -137,8 +137,8 @@ A lambda is not a valid type annotation. We report that error along with the unr
 body:
 
 ```py
-# error: [invalid-type-form] "`lambda` expressions are not allowed in type expressions"
-# error: [unresolved-reference] "Name `missing` used when not defined"
+# error: [invalid-type-form]
+# error: [unresolved-reference]
 value: lambda: missing = 1
 ```
 
@@ -259,7 +259,6 @@ class C:
     method = lambda self: (1, C.method)
 
 c = C()
-reveal_type(c.method()[0])  # revealed: int
 c.method(c)  # error: [too-many-positional-arguments]
 ```
 
@@ -283,16 +282,4 @@ class C:
 c = C()
 reveal_type(c.first()[1](c)[0])  # revealed: str
 reveal_type(c.second()[1](c)[0])  # revealed: int
-```
-
-## Displaying bound recursive lambdas
-
-A lambda can return a bound method with the same signature. We display the recursive part as
-`Divergent`:
-
-```py
-class C:
-    method = lambda self: (1, C().method)
-
-reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
 ```

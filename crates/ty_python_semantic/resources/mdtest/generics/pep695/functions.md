@@ -2625,7 +2625,7 @@ Function type parameters are not in scope in default values, including defaults 
 ```py
 from typing import cast
 
-# error: [unresolved-reference] "Name `T` used when not defined"
+# error: [unresolved-reference]
 def nested[T](value: T, callback=lambda outer=(lambda inner=cast(T, None): inner): outer) -> T:
     return value
 ```

@@ -3298,58 +3298,6 @@ node = Box[int](1).writable
 reveal_type(node()[1]()[0])  # revealed: int
 ```
 
-## Materializing specialized lambda returns
-
-Materialization applies to an invariant return type as a whole. Materializing the substituted `Any`
-in isolation would incorrectly produce `list[object]` or `list[Never]`:
-
-```py
-from typing import Any, Final, Generic, TypeVar
-from ty_extensions import Bottom, Top
-from ty_extensions._internal import TypeOf
-
-T = TypeVar("T")
-
-class Box(Generic[T]):
-    def __init__(self, value: T):
-        self.node: Final = lambda: [value]
-
-node = Box[Any](None).node
-
-def _(top: Top[TypeOf[node]], bottom: Bottom[TypeOf[node]]):
-    reveal_type(top())  # revealed: Top[list[Any]]
-    reveal_type(bottom())  # revealed: Bottom[list[Any]]
-```
-
-## Materializing a promoted lambda return
-
-Looking up a writable lambda attribute promotes the returned class object to a subclass type. For a
-generic class, that type can contain `Unknown` arguments. Materialization still applies to those
-arguments even if the original lambda was already materialized:
-
-```py
-from typing import Generic, TypeVar
-from ty_extensions import Top
-from ty_extensions._internal import TypeOf
-
-T = TypeVar("T")
-
-class Box(Generic[T]):
-    item: T
-
-node = lambda: Box
-
-def check(source: Top[TypeOf[node]]):
-    class Holder:
-        def __init__(self):
-            self.node = source
-
-    holder = Holder()
-
-    def inner(top: Top[TypeOf[holder.node]]):
-        reveal_type(top())  # revealed: type[Top[Box[Unknown]]]
-```
-
 ## Growing recursive lambda attributes
 
 Each recursive return below adds another `list` around the class's type argument. Calling the
@@ -3368,8 +3316,7 @@ node = Grow(1).node
 reveal_type(node()[1]()[0])  # revealed: list[int]
 ```
 
-An attribute error shows the known return types before abbreviating the recursive part of the
-signature:
+Attribute errors include the specialized return type:
 
 ```py
 # error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
@@ -3429,6 +3376,58 @@ class Swap(Generic[T, U]):
 node = Swap[int, str](1, "two").node
 reveal_type(node()[1]()[0])  # revealed: str
 reveal_type(node()[1]()[1]()[0])  # revealed: int
+```
+
+## Materializing specialized lambda returns
+
+Since `list` is invariant, both materializations of a lambda returning `list[Any]` apply to the
+whole list:
+
+```py
+from typing import Any, Final, Generic, TypeVar
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: [value]
+
+node = Box[Any](None).node
+
+def _(top: Top[TypeOf[node]], bottom: Bottom[TypeOf[node]]):
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Materializing a promoted lambda return
+
+A writable lambda attribute widens a returned class object to a subclass type. For `Box`, this
+introduces an `Unknown` type argument. Materializing the widened return includes that argument, even
+if the original lambda was already materialized:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    item: T
+
+node = lambda: Box
+
+def check(source: Top[TypeOf[node]]):
+    class Holder:
+        def __init__(self):
+            self.node = source
+
+    holder = Holder()
+
+    def inner(top: Top[TypeOf[holder.node]]):
+        reveal_type(top())  # revealed: type[Top[Box[Unknown]]]
 ```
 
 ## Lambda defaults in base class annotations

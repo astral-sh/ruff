@@ -167,3 +167,15 @@ def f(
     reveal_type(at_limit)  # revealed: () -> (() -> (() -> (() -> int)))
     reveal_type(beyond_limit)  # revealed: () -> (() -> (() -> (() -> ((...) -> ...))))
 ```
+
+## Recursive lambda methods
+
+When a lambda method returns a bound method with the same signature, we display the recursive part
+as `Divergent`:
+
+```py
+class C:
+    method = lambda self: (1, C().method)
+
+reveal_type(C().method)  # revealed: () -> tuple[int, Divergent]
+```

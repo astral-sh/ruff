@@ -5773,18 +5773,15 @@ impl<'db> Parameter<'db> {
     }
 
     pub(crate) fn with_default_type(self, default: Type<'db>) -> Self {
-        self.with_default(ParameterDefault::Inferred(default))
+        self.with_optional_default_type(Some(default))
     }
 
     /// Attach a default while preserving whether its value is inferred eagerly or on demand.
-    pub(crate) fn with_optional_default(self, default: Option<ParameterDefault<'db>>) -> Self {
-        match default {
-            Some(default) => self.with_default(default),
-            None => self,
-        }
-    }
+    pub(crate) fn with_optional_default(mut self, default: Option<ParameterDefault<'db>>) -> Self {
+        let Some(default) = default else {
+            return self;
+        };
 
-    fn with_default(mut self, default: ParameterDefault<'db>) -> Self {
         match &mut self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
             | ParameterKind::PositionalOrKeyword { default_type, .. }
@@ -5799,11 +5796,7 @@ impl<'db> Parameter<'db> {
     }
 
     pub(crate) fn with_optional_default_type(self, default: Option<Type<'db>>) -> Self {
-        if let Some(default) = default {
-            self.with_default_type(default)
-        } else {
-            self
-        }
+        self.with_optional_default(default.map(ParameterDefault::Inferred))
     }
 
     /// Set the source definition represented by this parameter.
