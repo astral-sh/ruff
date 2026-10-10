@@ -115,6 +115,10 @@ pub(super) fn check_class<'db>(
         }
     }
 
+    if configuration.check_attribute_type_violations() {
+        attributes::check_instance_overrides(context, class_specialized, &bases);
+    }
+
     #[expect(
         clippy::iter_over_hash_type,
         reason = "each class member is checked independently"
@@ -692,6 +696,19 @@ fn check_class_declaration<'db>(
                         }
                         (Some((superclass_scope, id)), MethodKind::default())
                     } else {
+                        // A method can declare an instance attribute without adding its name
+                        // to the class-body symbol table:
+                        //
+                        // ```python
+                        // class Base:
+                        //     def __init__(self):
+                        //         self.value: int = 0
+                        //
+                        // class Child(Base):
+                        //     value: str  # Incompatible with Base.value.
+                        // ```
+                        //
+                        // Keep this base as an override target even without a class-body symbol.
                         if superclass_literal
                             .own_synthesized_member(
                                 db,
@@ -701,6 +718,9 @@ fn check_class_declaration<'db>(
                                 &member.name,
                             )
                             .is_none()
+                            && superclass
+                                .own_instance_member(db, env, &member.name)
+                                .is_undefined()
                         {
                             continue;
                         }

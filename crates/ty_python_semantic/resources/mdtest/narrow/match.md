@@ -2181,22 +2181,27 @@ def test_match_mapping_uses_get(value: CustomGet) -> None:
     match value:
         case {"item": item}:
             reveal_type(item)  # revealed: object
+```
 
+A callable stored on the instance can also provide `get`. The captured value still has type
+`object`.
+
+```py
 class InstanceGet(Protocol):
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
 
 class InstanceGetImpl:
     @overload
-    def __call__(self, key: object) -> str | None: ...
+    def __call__(self, key: object) -> int | str | None: ...
     @overload
-    def __call__(self, key: object, default: Default) -> str | Default: ...
+    def __call__(self, key: object, default: Default) -> int | str | Default: ...
     def __call__(self, key: object, default: object = None) -> object:
         return "custom" if key == "item" else default
 
-class InstanceGetMapping(Mapping[str, int]):
+class InstanceGetMapping(Mapping[str, int | str]):
     def __init__(self) -> None:
         self.get: InstanceGet = InstanceGetImpl()
 

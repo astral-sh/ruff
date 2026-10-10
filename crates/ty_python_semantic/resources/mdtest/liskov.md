@@ -3339,3 +3339,89 @@ class Child(Base):
     @property
     def value(self) -> str: ...  # error: [invalid-property-type-override]
 ```
+
+## Attributes declared in methods
+
+An annotation on `self.value` declares an attribute just like an annotation in the class body. A
+subclass can repeat the same annotation.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.value: int = 0
+
+class Same(Base):
+    def __init__(self) -> None:
+        self.value: int = 1  # no diagnostic
+```
+
+An incompatible type is rejected. Narrowing to `bool` also violates the mutable-override rule: code
+using the base class can assign any `int` to the attribute.
+
+```py
+class Incompatible(Base):
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class Narrow(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+An assignment without an annotation does not change the inherited type.
+
+```py
+class Initialized(Base):
+    def __init__(self) -> None:
+        self.value = True  # no diagnostic
+```
+
+An annotation in the subclass's body is also checked against the base's constructor annotation.
+
+```py
+class ClassBodyOverride(Base):
+    value: str  # error: [invalid-attribute-override]
+```
+
+Repeating an incompatible annotation in a further subclass does not report the same error again.
+
+```py
+class Grandchild(Incompatible):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+```
+
+## Method annotations overriding class-body declarations
+
+An annotation on `self.value` must also be compatible with an annotation in the base class body.
+
+```py
+class Base:
+    value: int
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+## Slots preserve inherited declarations
+
+A subclass can add a slot for an inherited attribute. Assignments to that slot do not replace the
+inherited annotation, so an override must still accept the declared type.
+
+```py
+class Base:
+    value: int
+
+class Slotted(Base):
+    __slots__ = ("value",)
+
+    def set_untyped(self, value):
+        self.value = value
+
+    def set_typed(self, value: int):
+        self.value = value
+
+class Child(Slotted):
+    value: str  # error: [invalid-attribute-override]
+```
