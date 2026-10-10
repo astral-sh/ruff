@@ -11,7 +11,7 @@ use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTup
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, ClassBase, ClassLiteral, KnownClass, KnownFunction, KnownUnion,
+    CallDunderError, ClassBase, ClassLiteral, FunctionType, KnownClass, KnownFunction, KnownUnion,
     PropertyAccessorRole, Type, TypeContext, TypeVarBoundOrConstraints, binding_type,
 };
 use crate::{Db, HasDefinition, HasType, ProgramEnvironment, SemanticModel};
@@ -922,6 +922,84 @@ pub fn definitions_and_overloads_for_function<'db>(
     } else {
         vec![ResolvedDefinition::Definition(function.definition(model))]
     }
+}
+
+/// The definitions that make up an overloaded function.
+///
+/// This is a convenience wrapper used by go-to-definition and go-to-declaration
+/// to group the `@overload` signatures and the implementation of a function.
+#[derive(Debug)]
+pub struct OverloadDefinitions<'db> {
+    function: FunctionType<'db>,
+
+    /// The definition of the implementation, if the function has one.
+    ///
+    /// Overloads declared in stub files or protocols usually have no implementation.
+    pub implementation: Option<Definition<'db>>,
+}
+
+impl<'db> OverloadDefinitions<'db> {
+    /// Returns `true` if `definition` is one of the overloads or the implementation.
+    pub fn contains(&self, db: &'db dyn Db, definition: Definition<'db>) -> bool {
+        self.function.contains_definition(db, definition)
+    }
+}
+
+/// Returns the overload and implementation definitions of `ty` if it is an overloaded function
+/// or a method bound to an overloaded function.
+pub fn overload_definitions<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<OverloadDefinitions<'db>> {
+    let function = match ty {
+        Type::FunctionLiteral(function) => function,
+        Type::BoundMethod(method) => method.function(db)?,
+        _ => return None,
+    };
+
+    let (overloads, implementation) = function.overloads_and_implementation(db);
+    if overloads.is_empty() {
+        return None;
+    }
+
+    // An implementation is always the last `def` of an overloaded function.
+    Some(OverloadDefinitions {
+        function,
+        implementation: implementation.map(|_| function.last_definition(db)),
+    })
+}
+
+/// Returns the definitions of the overloads that the arguments of `call_expr` select.
+///
+/// ```py
+/// @overload
+/// def f(x: int) -> int: ...
+/// @overload
+/// def f(x: str) -> str: ...
+/// def f(x): ...
+///
+/// def _(a: int, b: int | str):
+///     f(a)  # The first overload
+///     f(b)  # Both overloads, one for each element of the union
+/// ```
+///
+/// The result is empty if no overload matches the call's arguments.
+pub fn selected_overload_definitions<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Vec<Definition<'db>> {
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
+
+    full_type_bindings_for_call(model, func_type, call_expr)
+        .iter_flat()
+        .flat_map(|binding| {
+            binding
+                .selected_overloads()
+                .filter_map(|(_, overload)| overload.signature.definition)
+        })
+        .collect()
 }
 
 /// Details about a callable signature for IDE support.
