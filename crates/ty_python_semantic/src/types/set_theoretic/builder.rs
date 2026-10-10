@@ -141,6 +141,24 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Combine inference history for runtime union values with otherwise identical contents.
+fn merge_union_instance_cycle_history<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (
+        Type::KnownInstance(KnownInstanceType::UnionType(left)),
+        Type::KnownInstance(KnownInstanceType::UnionType(right)),
+    ) = (left, right)
+    else {
+        return None;
+    };
+    Some(Type::KnownInstance(KnownInstanceType::UnionType(
+        left.merge_cycle_history(db, right)?,
+    )))
+}
+
 /// Fold `(T & ~A) | (T & ~B)` to `T` when `A` and `B` are disjoint.
 ///
 /// The common part can itself contain exclusions. For example,
@@ -1084,6 +1102,12 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if let Some(merged) = merge_union_instance_cycle_history(db, ty, element_type) {
+                to_remove.push(i);
+                ty = merged;
+                continue;
+            }
+
             // `object` already contains every possible union element.
             if !self.cycle_recovery && element_type == Type::object() {
                 return;
@@ -2013,6 +2037,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
+                    if let Some(merged) =
+                        merge_union_instance_cycle_history(db, new_positive, *existing_positive)
+                    {
+                        if merged == *existing_positive {
+                            return;
+                        }
+                        replacement = Some((index, merged));
+                        break;
+                    }
                     if let Some(result) =
                         generic_gradual_intersection(db, env, new_positive, *existing_positive)
                     {
@@ -2161,7 +2194,17 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let new_negative_enum = new_negative.as_enum_literal();
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
+                let mut replacement = None;
                 for (index, existing_negative) in self.negative.iter().enumerate() {
+                    if let Some(merged) =
+                        merge_union_instance_cycle_history(db, new_negative, *existing_negative)
+                    {
+                        if merged == *existing_negative {
+                            return;
+                        }
+                        replacement = Some((index, merged));
+                        break;
+                    }
                     if let Some(new_enum) = new_negative_enum
                         && existing_negative
                             .as_enum_literal()
@@ -2191,6 +2234,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             return;
                         }
                     }
+                }
+                if let Some((index, value)) = replacement {
+                    self.negative.swap_remove_index(index);
+                    self.add_negative(db, env, value);
+                    return;
                 }
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
@@ -2378,7 +2426,7 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        Signature, StringLiteralType, Truthiness, TypePair,
+        Signature, StringLiteralType, Truthiness, TypePair, UnionTypeInstance,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -2417,6 +2465,65 @@ mod tests {
         let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(db), &[t0, t1]);
+    }
+
+    #[test]
+    fn runtime_union_comparisons_preserve_cycle_history() {
+        let db = setup_db();
+        let db = &db;
+        let env = db.program_environment();
+        let members = UnionType::from_two_elements(
+            db,
+            &env,
+            KnownClass::Int.to_instance(db, &env),
+            KnownClass::Str.to_instance(db, &env),
+        );
+        let value = |had_cycle| {
+            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+                db,
+                None,
+                Ok(members),
+                had_cycle,
+            )))
+        };
+        let ordinary = value(false);
+        let recovered = value(true);
+
+        for (first, second) in [(ordinary, recovered), (recovered, ordinary)] {
+            assert!(first.is_equivalent_to(db, &env, second));
+            assert!(!first.is_disjoint_from(db, &env, second));
+            for cycle_recovery in [false, true] {
+                assert_eq!(
+                    UnionBuilder::new(db, &env)
+                        .cycle_recovery(cycle_recovery)
+                        .add(first)
+                        .add(second)
+                        .build(),
+                    recovered,
+                );
+            }
+            assert_eq!(
+                IntersectionBuilder::new(db, &env)
+                    .add_positive(first)
+                    .add_positive(second)
+                    .build(),
+                recovered,
+            );
+            assert_eq!(
+                IntersectionBuilder::new(db, &env)
+                    .add_negative(first)
+                    .add_negative(second)
+                    .build(),
+                recovered.negate(db, &env),
+            );
+            assert_eq!(
+                IntersectionBuilder::new(db, &env)
+                    .add_positive(first)
+                    .add_negative(second)
+                    .build(),
+                Type::Never,
+            );
+        }
     }
 
     #[test]

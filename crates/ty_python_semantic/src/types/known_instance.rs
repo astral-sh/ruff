@@ -858,6 +858,50 @@ pub struct UnionTypeInstance<'db> {
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
 impl<'db> UnionTypeInstance<'db> {
+    /// Merge cycle history for otherwise identical runtime union values.
+    ///
+    /// Recovery history affects alias validation, but not the value represented by this type.
+    /// Nested union operands can also differ only in their recovery history, as in
+    /// `(int | str) | bytes` after normalization.
+    pub(super) fn merge_cycle_history(self, db: &'db dyn Db, other: Self) -> Option<Self> {
+        if self == other {
+            return Some(self);
+        }
+        if self.union_type(db) != other.union_type(db) {
+            return None;
+        }
+
+        let merge_operand = |left: Type<'db>, right: Type<'db>| {
+            if left == right {
+                return Some(left);
+            }
+            match (left, right) {
+                (
+                    Type::KnownInstance(KnownInstanceType::UnionType(left)),
+                    Type::KnownInstance(KnownInstanceType::UnionType(right)),
+                ) => left
+                    .merge_cycle_history(db, right)
+                    .map(|union| Type::KnownInstance(KnownInstanceType::UnionType(union))),
+                _ => None,
+            }
+        };
+        let value_expr_types = match (self._value_expr_types(db), other._value_expr_types(db)) {
+            (Some([left_a, left_b]), Some([right_a, right_b])) => Some([
+                merge_operand(*left_a, *right_a)?,
+                merge_operand(*left_b, *right_b)?,
+            ]),
+            (None, None) => None,
+            _ => return None,
+        };
+
+        Some(Self::new(
+            db,
+            value_expr_types,
+            self.union_type(db).clone(),
+            self.had_cycle(db) || other.had_cycle(db),
+        ))
+    }
+
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: [Type<'db>; 2],
