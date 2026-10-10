@@ -8764,20 +8764,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // TODO: We could perform multi-inference here if there are multiple `Callable` annotations
         // in the union/intersection.
-        let callable_tcx = if let Some(tcx) = tcx.annotation
-            && let Some(callable) = tcx
-                .filter_union(db, env, Type::is_callable_type)
-                .resolve_type_alias(db)
-                .as_callable()
-        {
-            match callable.signatures(self.db()).overloads.as_slice() {
+        let contextual_callable = |ty: Type<'db>| {
+            match ty.resolve_type_alias(db) {
+                Type::Callable(callable) => Some(callable),
+                Type::Intersection(intersection) => {
+                    // A callable signature can carry an additional nominal constraint, such
+                    // as FunctionType for class-method replacements. Retain its lambda context.
+                    let mut callables = intersection
+                        .iter_positive(db)
+                        .filter_map(|ty| ty.resolve_type_alias(db).as_callable());
+                    let callable = callables.next()?;
+                    if callables.next().is_some() {
+                        return None;
+                    }
+                    Some(callable)
+                }
+                _ => None,
+            }
+        };
+        let callable_tcx = tcx.annotation.and_then(|tcx| {
+            let callable = contextual_callable(
+                tcx.filter_union(db, env, |ty| contextual_callable(*ty).is_some()),
+            )?;
+            match callable.signatures(db).overloads.as_slice() {
                 [signature] => Some(signature),
                 // TODO: We could similarly perform multi-inference here if there are multiple overloads.
                 _ => None,
             }
-        } else {
-            None
-        };
+        });
 
         // Extract the annotated parameter types.
         //

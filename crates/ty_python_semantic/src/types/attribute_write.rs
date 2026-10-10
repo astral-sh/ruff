@@ -18,9 +18,9 @@ use super::constraints::{ConstraintSet, IteratorConstraintsExtension, OptionCons
 use super::dedicated::pydantic;
 use super::relation::TypeRelationChecker;
 use super::{
-    BindingContext, IntersectionType, KnownClass, KnownInstanceType, MemberLookupPolicy, Parameter,
-    PropertyInstanceType, SelfBinding, Signature, Type, TypeContext, TypeMapping, TypeQualifiers,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    BindingContext, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, Parameter, PropertyInstanceType, SelfBinding, Signature, Type, TypeContext,
+    TypeMapping, TypeQualifiers, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::ProgramEnvironment;
 use crate::place::{
@@ -760,11 +760,18 @@ fn class_fallback_write_requirement<'db>(
         return FallbackAttributeWriteRequirement::PossiblyMissing;
     };
     let ty = ty.bind_self_typevars(db, env, class_attr_self_ty);
-    let ty = if matches!(object_ty, Type::ClassLiteral(_))
+    let ty = if matches!(object_ty, Type::ClassLiteral(_) | Type::SubclassOf(_))
         && let Type::FunctionLiteral(function) = ty
         && function.callable_type_kind(db) == CallableTypeKind::FunctionLike
     {
-        Type::Callable(function.into_callable_type(db))
+        // A class replacement must bind an instance like the original function. Signature
+        // compatibility alone would also accept bound methods, which do not bind again.
+        IntersectionBuilder::new(db, env)
+            .add_positive(Type::Callable(
+                function.into_callable_type(db).into_regular(db),
+            ))
+            .add_positive(KnownClass::FunctionType.to_instance(db, env))
+            .build()
     } else {
         ty
     };

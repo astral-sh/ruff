@@ -1505,6 +1505,67 @@ def incompatible_replacement(self: Foo, x: str, y: str, /) -> str:
 Foo.add = incompatible_replacement  # error: [invalid-assignment]
 ```
 
+## Replacing methods through a subclass receiver
+
+An ordinary method can also be replaced through `type[Base]`, including the implicit class receiver
+of `__init_subclass__`. The replacement must still accept a base instance and retain the original
+parameter and return types.
+
+The replacement must also retain ordinary function binding. A bound method with the same signature
+does not bind the base instance again after assignment to the class. Lambdas still receive the
+original signature's parameter types, so an incompatible inferred return is rejected.
+
+```py
+class Base:
+    def method(self, value: int) -> str:
+        return str(value)
+
+    def __init_subclass__(cls):
+        def replacement(self: Base, value: int) -> str:
+            return str(value)
+
+        cls.method = replacement  # no diagnostic
+
+def replacement(self: Base, value: int) -> str:
+    return str(value)
+
+def incompatible(self: Base, value: int) -> int:
+    return value
+
+def patch(cls: type[Base]) -> None:
+    cls.method = replacement  # no diagnostic
+    cls.method = incompatible  # error: [invalid-assignment]
+
+class Child(Base): ...
+
+reveal_type(Child().method(1))  # revealed: str
+Child().method("wrong")  # error: [invalid-argument-type]
+
+def child_only(self: Child, value: int) -> str:
+    return str(value)
+
+def patch_base(cls: type[Base]) -> None:
+    cls.method = child_only  # error: [invalid-assignment]
+
+class Other:
+    def replacement(owner, self: Base, value: int) -> str:
+        return str(value)
+
+def patch_bound(cls: type[Base]) -> None:
+    cls.method = Other().replacement  # error: [invalid-assignment]
+
+Base.method = Other().replacement  # error: [invalid-assignment]
+
+Base.method = lambda self, value: str(value)  # no diagnostic
+Base.method = lambda self, value: value  # error: [invalid-assignment]
+
+def patch_lambda(cls: type[Base]) -> None:
+    cls.method = lambda self, value: str(value)  # no diagnostic
+    cls.method = lambda self, value: value  # error: [invalid-assignment]
+```
+
+## Replacing decorated methods
+
 `staticmethod` and `classmethod` attributes cannot yet be replaced this way. If `static` were
 replaced with a plain function, `DescriptorMethods.static(1)` would pass only `1`, as before, but
 `DescriptorMethods().static(1)` would also pass the instance as the first argument. If `class_` were
@@ -1531,6 +1592,10 @@ def class_replacement(cls: type[DescriptorMethods], x: int) -> str:
 
 DescriptorMethods.static = static_replacement  # error: [invalid-assignment]
 DescriptorMethods.class_ = class_replacement  # error: [invalid-assignment]
+
+def patch_descriptors(cls: type[DescriptorMethods]) -> None:
+    cls.static = static_replacement  # error: [invalid-assignment]
+    cls.class_ = class_replacement  # error: [invalid-assignment]
 ```
 
 ## Shadowing static methods on instances
