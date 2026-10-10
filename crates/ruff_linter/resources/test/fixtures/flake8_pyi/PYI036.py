@@ -167,3 +167,60 @@ class UnacceptableOverload2:
     @overload
     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+class StringizedGoodOne:
+    def __exit__(self, *args: "object") -> None: ...
+    async def __aexit__(self, *args: "object") -> None: ...
+
+class StringizedGoodTwo:
+    def __exit__(
+        self,
+        typ: "type[BaseException] | None",
+        exc: "BaseException | None",
+        tb: "TracebackType | None",
+    ) -> None: ...
+    async def __aexit__(
+        self,
+        typ: "type[BaseException] | None",
+        exc: "BaseException | None",
+        tb: "types.TracebackType | None",
+    ) -> None: ...
+
+class StringizedGoodThree:
+    def __exit__(self, typ: "object", exc: "object", tb: "object") -> None: ...
+    async def __aexit__(self, typ: object, exc: "object", tb: object) -> None: ...
+
+class StringizedBadOne:
+    def __exit__(
+        self,
+        typ: "type[BaseException]",
+        exc: "BaseException | None",
+        tb: "TracebackType | None",
+    ) -> None: ...  # PYI036
+    async def __aexit__(
+        self,
+        typ: "type[BaseException] | None",
+        exc: "BaseException",
+        tb: "TracebackType | None",
+    ) -> None: ...  # PYI036
+
+class StringizedGoodOverload:
+    @overload
+    def __exit__(self, exc_typ: "None", exc: "None", tb: "None") -> None: ...
+    @overload
+    def __exit__(
+        self,
+        exc_typ: "type[BaseException]",
+        exc: "BaseException",
+        tb: "TracebackType",
+    ) -> None: ...
+    def __exit__(
+        self,
+        exc_typ: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> None: ...
+
+class StringizedBadVariadic:
+    def __exit__(self, *args: "str") -> None: ...  # PYI036
+    async def __aexit__(self, *args: "int") -> None: ...  # PYI036
