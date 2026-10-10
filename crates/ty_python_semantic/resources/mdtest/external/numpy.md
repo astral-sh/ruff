@@ -112,6 +112,6 @@ class Normal(
 
 def make_normal() -> Normal[tuple[int], np.float32]: ...
 
-# revealed: ndarray[ShapeT@phantom_parameter, dtype[ScalarT@phantom_parameter]] | ndarray[tuple[int], dtype[floating[_32Bit]]]
+# revealed: ndarray[tuple[int], dtype[floating[_32Bit]]]
 reveal_type(make_normal().value)
 ```

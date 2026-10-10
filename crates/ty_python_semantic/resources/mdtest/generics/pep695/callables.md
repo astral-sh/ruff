@@ -1388,6 +1388,99 @@ class IPolys[T](Protocol):
     def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
 ```
 
+## Inferring independent specializations of protocol members
+
+A generic function used for two protocol members can specialize independently for each member.
+
+```py
+from typing import Protocol
+
+def identity[T](value: T, /) -> T:
+    return value
+
+class Required[A, B](Protocol):
+    @staticmethod
+    def first(value: int, /) -> A: ...
+    @staticmethod
+    def second(value: str, /) -> B: ...
+
+class Implementation:
+    first = staticmethod(identity)
+    second = staticmethod(identity)
+
+def infer[A, B](value: Required[A, B]) -> tuple[A, B]:
+    return value.first(1), value.second("a")
+
+reveal_type(infer(Implementation()))  # revealed: tuple[int, str]
+```
+
+## Specializing generic protocol methods
+
+A method can use its own type parameter as the class argument of another instance of its protocol.
+That class argument stays fixed while the other instance's method accepts independently chosen
+argument types. An implementation that always returns `int` in the first tuple element therefore
+satisfies `Required[int]`, but cannot satisfy `Required[T]` for an arbitrary `T`. The local `accept`
+function captures `method`'s `T`, so passing an argument cannot infer a new value for it.
+
+```py
+from typing import Protocol
+
+class Implementation:
+    def method[U](self, value: U) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required[C](Protocol):
+    def method[T](self, value: T) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
+## Specializing overloaded generic protocol methods
+
+Each overload's type parameter is independent of the class argument. The local `accept` function
+captures the first overload's type parameter. The second overload's return type places no
+restriction on the class argument.
+
+```toml
+[environment]
+python-version = "3.12"
+
+[rules]
+useless-overload-body = "ignore"
+```
+
+```py
+from typing import Literal, Protocol, overload
+
+class Implementation:
+    def method[U](self, value: U, flag: bool) -> tuple[int, U]:
+        raise NotImplementedError
+
+class Required[C](Protocol):
+    @overload
+    def method[T](self, value: T, flag: Literal[False]) -> tuple[C, T]:
+        def accept(value: Required[T]) -> None: ...
+
+        accept(Implementation())  # error: [invalid-argument-type]
+        raise NotImplementedError
+    @overload
+    def method[T](self, value: T, flag: Literal[True]) -> object: ...
+
+def accept_int(value: Required[int]) -> None: ...
+def accept_str(value: Required[str]) -> None: ...
+
+accept_int(Implementation())  # no diagnostic
+accept_str(Implementation())  # error: [invalid-argument-type]
+```
+
 ## Returned callables with recursive parameter aliases
 
 A type variable used by a recursive parameter alias belongs to the function. The returned callable
@@ -1417,4 +1510,128 @@ def make_growing[T](value: Growing[T]) -> Callable[[T], T]:
 callback_growing = make_growing((1, None))
 reveal_type(callback_growing)  # revealed: (int, /) -> int
 callback_growing("bad")  # error: [invalid-argument-type]
+```
+
+## Inferring aliased return types from generic methods
+
+A receiver can determine a generic method's return type through a type alias. Passing the instance
+to a generic function preserves that concrete return type.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+type Alias[T] = Box[T]
+
+class Producer[T](Protocol):
+    def produce(self) -> T: ...
+
+class Factory[T]:
+    def produce[S](self: Factory[S]) -> Alias[S]:
+        raise NotImplementedError
+
+def extract[T](producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+def check(factory: Factory[int]):
+    reveal_type(extract(factory))  # revealed: Box[int]
+```
+
+Nested applications of the same alias preserve the inferred type argument at every level.
+
+```py
+class NestedFactory[T]:
+    def produce[S](self: NestedFactory[S]) -> Alias[Alias[S]]:
+        raise NotImplementedError
+
+def check_nested(factory: NestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[int]]
+
+class DeeplyNestedFactory[T]:
+    def produce[S](self: DeeplyNestedFactory[S]) -> Alias[Alias[Alias[S]]]:
+        raise NotImplementedError
+
+def check_deeply_nested(factory: DeeplyNestedFactory[int]):
+    reveal_type(extract(factory))  # revealed: Box[Box[Box[int]]]
+```
+
+An unused alias parameter does not affect the return type.
+
+```py
+type Ignore[T] = int
+
+class IgnoringFactory[T]:
+    def produce[S](self: IgnoringFactory[S]) -> Ignore[S]:
+        raise NotImplementedError
+
+def check_ignored(factory: IgnoringFactory[str]):
+    reveal_type(extract(factory))  # revealed: int
+```
+
+## Inferring recursive aliased return types
+
+An explicitly annotated receiver can also specialize a recursive return type. Here the writable
+`item` attribute makes the receiver invariant, so its argument determines `S` exactly.
+
+```py
+from __future__ import annotations
+from typing import Protocol
+
+type Growing[T] = tuple[T, Growing[list[T]] | None]
+type Rotate[A, B] = tuple[A, Rotate[B, A] | None]
+type First[T] = tuple[int, Second[T] | None]
+type Second[T] = tuple[T, First[T] | None]
+
+class Producer[T](Protocol):
+    def produce(self) -> T: ...
+
+def extract[T](producer: Producer[T]) -> T:
+    raise NotImplementedError
+
+class GrowingFactory[T]:
+    item: T
+
+    def produce[S](self: GrowingFactory[S]) -> Growing[S]:
+        raise NotImplementedError
+
+def check_growing(factory: GrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: tuple[int, Growing[list[int]] | None]
+```
+
+Nested applications of a recursive alias also preserve the inferred type argument.
+
+```py
+class NestedGrowingFactory[T]:
+    item: T
+
+    def produce[S](self: NestedGrowingFactory[S]) -> Growing[Growing[Growing[S]]]:
+        raise NotImplementedError
+
+def check_nested_growing(factory: NestedGrowingFactory[int]):
+    reveal_type(extract(factory))  # revealed: tuple[Growing[Growing[int]], Growing[list[Growing[Growing[int]]]] | None]
+```
+
+Recursive references can move an argument into another parameter position or pass it through another
+alias before it appears in the return type.
+
+```py
+class RotatingFactory[T]:
+    item: T
+
+    def produce[S](self: RotatingFactory[S]) -> Rotate[str, S]:
+        raise NotImplementedError
+
+class MutualFactory[T]:
+    item: T
+
+    def produce[S](self: MutualFactory[S]) -> First[S]:
+        raise NotImplementedError
+
+def check_recursive(rotating: RotatingFactory[int], mutual: MutualFactory[bytes]):
+    reveal_type(extract(rotating))  # revealed: tuple[str, Rotate[int, str] | None]
+    reveal_type(extract(mutual))  # revealed: tuple[int, Second[bytes] | None]
 ```

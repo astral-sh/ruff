@@ -13,7 +13,8 @@ use crate::types::attribute_write::{
 };
 use crate::types::overrides::{VariableKind, effective_superclass_variable_kind};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::visitor::any_over_type_expanding_aliases;
+use crate::types::typevar::max_typevar_freshness_matching_generic_context;
+use crate::types::visitor::{any_over_type, any_over_type_expanding_aliases};
 use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
@@ -800,7 +801,7 @@ impl<'db> ProtocolInterface<'db> {
             .map(|(name, callable)| {
                 (
                     Name::new(name),
-                    ProtocolMemberData::method(db, callable, None),
+                    ProtocolMemberData::method(db, env, callable, None, None),
                 )
             })
             .collect();
@@ -1704,7 +1705,9 @@ pub(super) struct ProtocolMemberData<'db> {
 impl<'db> ProtocolMemberData<'db> {
     fn method(
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         callable: CallableType<'db>,
+        specialization: Option<Specialization<'db>>,
         definition: Option<Definition<'db>>,
     ) -> Self {
         let (method_kind, callable) = if callable.is_classmethod_like(db) {
@@ -1715,8 +1718,41 @@ impl<'db> ProtocolMemberData<'db> {
             (ProtocolMethodKind::Instance, callable)
         };
 
+        let ty = if let Some(specialization) = specialization {
+            // Projecting `P[T]` inside `P.method[T]` must keep the class argument separate from
+            // the projected method's local T. Freshen each overload before substituting the
+            // class arguments, while those occurrences are still distinguishable.
+            let signatures = CallableSignature::from_overloads(callable.signatures(db).iter().map(
+                |signature| {
+                    if let Some(generic_context) = signature.generic_context
+                        && specialization.types(db).iter().any(|ty| {
+                            any_over_type(db, env, *ty, false, |ty| {
+                                matches!(ty, Type::TypeVar(typevar) if generic_context.contains(db, typevar.identity(db)))
+                            })
+                        })
+                        && let Some(freshness) = max_typevar_freshness_matching_generic_context(
+                            db,
+                            specialization.types(db).iter().copied(),
+                            generic_context,
+                        )
+                    {
+                        signature.freshen_bound_typevars(db, env, freshness.increment().value())
+                    } else {
+                        // A different nonce already distinguishes two occurrences. Freshening
+                        // merely because they share a declaration would make recursive protocol
+                        // projection introduce an unbounded sequence of new identities.
+                        signature.clone()
+                    }
+                },
+            ));
+            Type::Callable(callable.with_signatures(db, signatures))
+                .apply_specialization(db, specialization)
+        } else {
+            Type::Callable(callable)
+        };
+
         Self {
-            kind: ProtocolMemberKind::Method(Type::Callable(callable), method_kind),
+            kind: ProtocolMemberKind::Method(ty, method_kind),
             qualifiers: TypeQualifiers::default(),
             definition,
         }
@@ -2661,29 +2697,74 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         };
         if required.mode == ProtocolMemberAccessMode::Instance {
-            attribute_type
-                .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
-                .when_some_and(db, self.constraints, |callables| {
-                    self.check_callables_vs_callable(
-                        db,
-                        &callables.map(|callable| {
-                            protocol_apply_self_with_receiver(
-                                db,
-                                env.program(db),
-                                callable,
-                                implementation_receiver_binding_ty,
-                                implementation_self_binding_ty,
-                            )
-                        }),
+            // Specializing a protocol receiver here would check its members using a separate
+            // relation checker, which can repeatedly expand recursive receiver annotations.
+            // Keep its receiver constraint deferred so the signature comparison below checks it
+            // with our active recursion guards. Nominal receivers still benefit from early
+            // specialization, particularly when their type variables occur in recursive aliases.
+            let callables = if let Type::BoundMethod(method) = attribute_type {
+                method
+                    .func(db)
+                    .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
+                    .map(|callables| {
+                        callables.map(|callable| {
+                            if callable.signatures(db).iter().any(|signature| {
+                                signature.parameters().get(0).is_some_and(|parameter| {
+                                    matches!(
+                                        parameter.annotated_type().resolve_type_alias(db),
+                                        Type::ProtocolInstance(_)
+                                    )
+                                })
+                            }) {
+                                callable
+                                    .with_signatures(
+                                        db,
+                                        callable.signatures(db).bind_self_with_receiver(
+                                            db,
+                                            env,
+                                            Some(method.signature_receiver(db)),
+                                            Some(method.typing_self_type(db)),
+                                        ),
+                                    )
+                                    .into_regular(db)
+                            } else {
+                                callable.bind_self(
+                                    db,
+                                    env,
+                                    method.signature_receiver(db),
+                                    method.typing_self_type(db),
+                                )
+                            }
+                        })
+                    })
+            } else {
+                attribute_type.try_upcast_to_callable_with_policy(
+                    db,
+                    env,
+                    UpcastPolicy::from(self.relation),
+                )
+            };
+            callables.when_some_and(db, self.constraints, |callables| {
+                self.check_callables_vs_callable(
+                    db,
+                    &callables.map(|callable| {
                         protocol_apply_self_with_receiver(
                             db,
                             env.program(db),
-                            required_callable,
-                            protocol_receiver_binding_ty,
-                            protocol_self_binding_ty,
-                        ),
-                    )
-                })
+                            callable,
+                            implementation_receiver_binding_ty,
+                            implementation_self_binding_ty,
+                        )
+                    }),
+                    protocol_apply_self_with_receiver(
+                        db,
+                        env.program(db),
+                        required_callable,
+                        protocol_receiver_binding_ty,
+                        protocol_self_binding_ty,
+                    ),
+                )
+            })
         } else if member.is_instance_method() {
             attribute_type
                 .try_upcast_to_callable_with_policy(db, env, UpcastPolicy::from(self.relation))
@@ -3330,6 +3411,82 @@ impl<'db> ProtocolMemberCandidate<'db> {
         self
     }
 
+    fn into_member(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        class: ClassType<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> ProtocolMemberData<'db> {
+        let method = match self.ty {
+            Type::Callable(callable)
+                if self.bound_on_class.is_yes() && callable.is_method_like(db) =>
+            {
+                Some(callable)
+            }
+            Type::FunctionLiteral(function)
+                if self.bound_on_class.is_yes()
+                    || function.is_staticmethod(db)
+                    || function.is_classmethod(db) =>
+            {
+                Some(function.into_callable_type(db))
+            }
+            _ => None,
+        };
+        if let Some(callable) = method {
+            return ProtocolMemberData::method(db, env, callable, specialization, self.definition);
+        }
+
+        // Specialization can also turn an attribute into a method or property.
+        let Self {
+            ty,
+            qualifiers,
+            definition,
+            bound_on_class,
+        } = self.apply_specialization(db, specialization);
+
+        match ty {
+            Type::PropertyInstance(property) => ProtocolMemberData::property(
+                property
+                    .getter(db)
+                    .map(ProtocolPropertyType::property_getter),
+                property
+                    .setter(db)
+                    .map(ProtocolPropertyType::property_setter)
+                    .map(ProtocolMemberWrite::from_type),
+                definition,
+            ),
+            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
+                ProtocolMemberData::method(db, env, callable, None, definition)
+            }
+            Type::FunctionLiteral(function)
+                if bound_on_class.is_yes()
+                    || function.is_staticmethod(db)
+                    || function.is_classmethod(db) =>
+            {
+                ProtocolMemberData::method(
+                    db,
+                    env,
+                    function.into_callable_type(db),
+                    None,
+                    definition,
+                )
+            }
+            _ if bound_on_class.is_yes()
+                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
+            {
+                if let Some(descriptor) =
+                    descriptor_decorated_protocol_member(db, env, ty, class, definition)
+                {
+                    descriptor
+                } else {
+                    ProtocolMemberData::attribute(ty, qualifiers, definition)
+                }
+            }
+            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
+        }
+    }
+
     fn is_bound_method_like(self, db: &'db dyn Db) -> bool {
         self.bound_on_class.is_yes()
             && match self.ty {
@@ -3478,48 +3635,7 @@ fn cached_protocol_interface<'db>(
 
         let specialization =
             specialization.map(|specialization| specialization.with_typevar_bounds(db));
-        let candidate = candidate.apply_specialization(db, specialization);
-        let ProtocolMemberCandidate {
-            ty,
-            qualifiers,
-            definition,
-            bound_on_class,
-        } = candidate;
-
-        let member = match ty {
-            Type::PropertyInstance(property) => ProtocolMemberData::property(
-                property
-                    .getter(db)
-                    .map(ProtocolPropertyType::property_getter),
-                property
-                    .setter(db)
-                    .map(ProtocolPropertyType::property_setter)
-                    .map(ProtocolMemberWrite::from_type),
-                definition,
-            ),
-            Type::Callable(callable) if bound_on_class.is_yes() && callable.is_method_like(db) => {
-                ProtocolMemberData::method(db, callable, definition)
-            }
-            Type::FunctionLiteral(function)
-                if bound_on_class.is_yes()
-                    || function.is_staticmethod(db)
-                    || function.is_classmethod(db) =>
-            {
-                ProtocolMemberData::method(db, function.into_callable_type(db), definition)
-            }
-            _ if bound_on_class.is_yes()
-                && definition.is_some_and(|definition| definition.kind(db).is_function_def()) =>
-            {
-                if let Some(descriptor) =
-                    descriptor_decorated_protocol_member(db, &env, ty, class, definition)
-                {
-                    descriptor
-                } else {
-                    ProtocolMemberData::attribute(ty, qualifiers, definition)
-                }
-            }
-            _ => ProtocolMemberData::attribute(ty, qualifiers, definition),
-        };
+        let member = candidate.into_member(db, &env, class, specialization);
 
         members.insert(name.clone(), member);
     });

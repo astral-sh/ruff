@@ -15,7 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::relation_error::ErrorRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
-use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::signatures::{ParametersKind, ReceiverConstraints, SignatureRelationVisitor};
 use crate::types::tuple::TupleType;
 use crate::types::typevar::TypeVarDomain;
 use crate::types::{
@@ -551,7 +551,11 @@ impl<'db> Type<'db> {
 
     /// Returns whether constraint-set assignability is known to be unconditionally satisfied
     /// before constructing the relation checker.
-    fn is_trivially_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+    pub(super) fn is_trivially_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
         if self.materialized_divergent_fallback().is_none() && self == target {
             return true;
         }
@@ -1219,6 +1223,52 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
     }
 
+    pub(super) fn when_receiver_constraints_satisfied(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        receiver_constraints: Option<&ReceiverConstraints<'db>>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(constraints);
+        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let materialization_visitor = ApplyTypeMappingVisitor::new(env);
+        let checker = TypeRelationChecker::constraint_set_assignability(
+            env,
+            constraints,
+            &relation_visitor,
+            &disjointness_visitor,
+            &signature_relation_visitor,
+            &materialization_visitor,
+        );
+        checker.check_receiver_constraints(db, receiver_constraints)
+    }
+
+    /// Evaluates receiver constraints within an existing checker. In particular, this reuses the
+    /// existing recursion guards, which helps prevent runaway recursion when checking recursive
+    /// signatures.
+    pub(super) fn check_receiver_constraints(
+        &self,
+        db: &'db dyn Db,
+        receiver_constraints: Option<&ReceiverConstraints<'db>>,
+    ) -> ConstraintSet<'db, 'c> {
+        let pairs = match receiver_constraints {
+            None => return self.always(),
+            Some(ReceiverConstraints::Unsatisfiable) => return self.never(),
+            Some(ReceiverConstraints::Conjunction(pairs)) => pairs,
+        };
+        let checker = Self {
+            relation: TypeRelation::Assignability,
+            typevar_evaluation: TypeVarEvaluation::Lazy,
+            ..self.clone()
+        };
+        pairs
+            .iter()
+            .when_all(db, self.constraints, |(receiver, annotation)| {
+                checker.check_type_pair(db, *receiver, *annotation)
+            })
+    }
+
     pub(super) fn with_inferable_typevars(&self, inferable: TypeVarSet<'db>) -> Self {
         Self {
             inferable,
@@ -1609,7 +1659,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         let collect_context = self.is_context_collection_enabled();
-        self.relation_visitor
+        let mut reused = false;
+        let result = self
+            .relation_visitor
             .try_visit(
                 db,
                 (source, target, self.relation, self.typevar_evaluation),
@@ -1618,11 +1670,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // guards. Satisfiable constraints remain reusable, including those that
                 // constrain type variables.
                 |result| {
-                    !collect_context || !result.is_never_satisfied(db, self.env, self.inferable)
+                    reused = !collect_context
+                        || !result.is_never_satisfied(db, self.env, self.inferable);
+                    reused
                 },
                 work,
             )
-            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1))
+            .unwrap_or_else(|item| self.recursive_type_pair_fallback(db, item.0, item.1));
+        if reused {
+            result.freshen_quantified_typevars(db, self.env)
+        } else {
+            result
+        }
     }
 
     fn recursive_type_pair_fallback(

@@ -3055,6 +3055,121 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Generic constructors inheriting recursive protocols
+
+A constructor can infer its type argument from an expected protocol even when an inherited method's
+receiver is annotated with that same protocol.
+
+```py
+from __future__ import annotations
+from collections.abc import Iterable
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise RuntimeError
+    def combine(self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise RuntimeError
+
+class Concrete(Chain[T]):
+    def __init__(self, values: Iterable[T]) -> None: ...
+
+contextual: Chain[int] = Concrete(())  # no diagnostic
+reveal_type(contextual)  # revealed: Concrete[int]
+
+def make() -> Chain[int]:
+    return Concrete(())  # no diagnostic
+```
+
+We still reject incompatible arguments. Without an expected type, the empty iterable determines the
+constructor's type argument.
+
+```py
+wrong: Chain[int] = Concrete(("wrong",))  # error: [invalid-assignment]
+reveal_type(Concrete(()))  # revealed: Concrete[Never]
+```
+
+## Structural implementations with recursive receiver annotations
+
+A class can satisfy a protocol without inheriting from it, even when checking a method's receiver
+requires checking the same protocol. The remaining parameters must still be compatible.
+
+```py
+from __future__ import annotations
+from typing import Generic, Protocol, TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine(self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Valid(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine(self: Chain[S], pair: tuple[S, T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Invalid(Generic[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def combine(self: Chain[S], pair: tuple[S, str]) -> Chain[T]:
+        raise NotImplementedError
+
+def check(valid: Valid[int], invalid: Invalid[int]):
+    accepted: Chain[int] = valid  # no diagnostic
+    rejected: Chain[int] = invalid  # error: [invalid-assignment]
+```
+
+## Multiple inherited recursive protocol methods
+
+A subclass with several inherited recursive methods satisfies the matching protocol specialization.
+An arbitrary type argument does not satisfy `Chain[int]`.
+
+```py
+from __future__ import annotations
+from collections.abc import Callable
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+
+class Chain(Protocol[T]):
+    def value(self) -> T:
+        raise NotImplementedError
+    def first(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def second(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+    def third(self: Chain[tuple[A]], callback: Callable[[A], T]) -> Chain[T]:
+        raise NotImplementedError
+
+class Concrete(Chain[T]): ...
+
+def check(value: Concrete[T]) -> None:
+    matching: Chain[T] = value  # no diagnostic
+    incompatible: Chain[int] = value  # snapshot: invalid-assignment
+```
+
+```snapshot
+error[invalid-assignment]: Object of type `Concrete[T@check]` is not assignable to `Chain[int]`
+  --> src/mdtest_snippet.py:22:32
+   |
+22 |     incompatible: Chain[int] = value  # snapshot: invalid-assignment
+   |                   ----------   ^^^^^ Incompatible value of type `Concrete[T@check]`
+   |                   |
+   |                   Declared type
+info: type `Concrete[T@check]` is not assignable to protocol `Chain[int]`
+info: └── protocol member `value` is incompatible
+info:     └── incompatible return types: `T@check` is not assignable to `int`
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.
