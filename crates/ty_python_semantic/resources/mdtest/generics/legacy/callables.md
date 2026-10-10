@@ -1422,3 +1422,76 @@ def collect(
     reveal_type(widened(first)[0]())  # revealed: int
     reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
 ```
+
+## Specializing a promoted recursive type
+
+Promotion widens the stream's inferred literals. A type argument supplied afterwards keeps its own
+literal types, even if that argument is another stream. Promoting an already specialized stream
+instead widens the literals inside its type argument as well.
+
+```py
+from typing import Any, Callable, TypeVar, cast
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+Stream = tuple[TypeOf[1], T, Callable[[], "Stream[T]"]]
+Promoted = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
+
+def specialize(value: Promoted[Stream[int]]):
+    reveal_type(value[0])  # revealed: int
+    reveal_type(value[1][0])  # revealed: Literal[1]
+    reveal_type(value[2]()[2]()[1][0])  # revealed: Literal[1]
+
+def promote(value: Stream[TypeOf[2]]):
+    widened = [value][0]
+    reveal_type(widened[1])  # revealed: int
+    reveal_type(widened[2]()[2]()[2]()[1])  # revealed: int
+```
+
+## Promoting materialized aliases with growing arguments
+
+Collecting a materialized stream widens its inferred literals while preserving the materialization
+of callback parameters and results. This also holds when the type argument grows at each step.
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+Stream = tuple[TypeOf[1], None, Callable[[T], T], Callable[[], "Stream[tuple[T]]"]]
+
+def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int):
+    widened_top = [top][0]
+    widened_bottom = [bottom][0]
+    for _ in range(repetitions):
+        widened_top = [widened_top][0]
+        widened_bottom = [widened_bottom][0]
+    reveal_type(widened_top[0])  # revealed: int
+    reveal_type(widened_top[1])  # revealed: None | Unknown
+    reveal_type(widened_top[2])  # revealed: (Never, /) -> object
+    reveal_type(widened_top[3]()[2])  # revealed: (tuple[Never], /) -> tuple[object]
+    reveal_type(widened_bottom[2])  # revealed: (object, /) -> Never
+    reveal_type(widened_bottom[3]()[2])  # revealed: (tuple[object], /) -> tuple[Never]
+```
+
+## Specialization after promotion with growing recursive arguments
+
+A promoted alias can remain generic even when each recursive step changes its type argument. A
+literal argument supplied after promotion stays literal at every depth.
+
+```py
+from typing import Any, Callable, TypeVar, cast
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+Stream = tuple[TypeOf[1], T, Callable[[], "Stream[list[T]]"]]
+Promoted = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
+
+def specialize(value: Promoted[TypeOf[2]]):
+    reveal_type(value[0])  # revealed: int
+    reveal_type(value[1])  # revealed: Literal[2]
+    reveal_type(value[2]()[0])  # revealed: int
+    reveal_type(value[2]()[1])  # revealed: list[Literal[2]]
+    reveal_type(value[2]()[2]()[1])  # revealed: list[list[Literal[2]]]
+```

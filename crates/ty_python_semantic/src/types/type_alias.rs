@@ -706,9 +706,14 @@ impl<'db> TypeAliasType<'db> {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))
             }
             TypeMapping::Materialize(_) if self.materialization_kind(db).is_some() => ty,
-            TypeMapping::EagerExpansion if self.mappings(db).is_some() => self
-                .value_type_with_mapping_visitor(db, visitor)
-                .expand_eagerly(db, visitor.env),
+            TypeMapping::EagerExpansion if self.mappings(db).is_some() => {
+                // Specialized unfoldings can keep growing; keep the alias identity under the
+                // same guard instead of starting a new expansion query for each unfolding.
+                visitor.visit(db, ty, type_mapping, || {
+                    self.value_type_with_mapping_visitor(db, visitor)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                })
+            }
             // For EagerExpansion, expand the raw value type. This path relies on Salsa's cycle
             // detection rather than the visitor's cycle detection, because the visitor tracks
             // Type values and `RecursiveList` is different from `RecursiveList[T]`.
