@@ -26,6 +26,14 @@ pub trait Db: PythonCoreDb {
     /// Returns the package manager's dependency information for this file.
     fn dependency_metadata(&self, file: File) -> Option<&DependencyMetadata>;
 
+    /// Dependency diagnostics attached to this Python file's inline metadata.
+    ///
+    /// Project implementations compute these from the script's declarations and local imports.
+    /// They are incorporated before checking suppressions, alongside ordinary Python diagnostics.
+    fn unused_dependency_diagnostics(&self, _file: File) -> &[Diagnostic] {
+        &[]
+    }
+
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
 
