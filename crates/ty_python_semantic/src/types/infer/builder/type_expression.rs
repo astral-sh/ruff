@@ -21,7 +21,7 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
-    CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, TypeExpressionFlags,
+    CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, LegacyTypeAliasInferenceExtra, TypeExpressionFlags,
     infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
     non_alias_type_expression_diagnostics,
 };
@@ -181,11 +181,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } else {
             Ok(ty)
         };
-        LegacyTypeAliasInference {
-            ty,
-            context: self.context.finish(),
-            legacy_aliases: self.legacy_aliases.into_iter().collect(),
-        }
+        let context = self.context.finish();
+        let extra = (!context.is_empty() || !self.legacy_aliases.is_empty()).then(|| {
+            Box::new(LegacyTypeAliasInferenceExtra {
+                context,
+                legacy_aliases: self.legacy_aliases.into_iter().collect(),
+            })
+        });
+        LegacyTypeAliasInference { ty, extra }
     }
 
     const fn type_expression_context(&self) -> &'static str {

@@ -112,8 +112,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         LegacyTypeAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
-            context: InferContextResult::default(),
-            legacy_aliases: Box::default(),
+            extra: None,
         }
     },
     cycle_fn=|db, cycle: &salsa::Cycle, _: &LegacyTypeAliasInference<'db>, mut result: LegacyTypeAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
@@ -136,8 +135,7 @@ pub(super) fn infer_legacy_type_alias<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return LegacyTypeAliasInference {
             ty: Ok(Type::unknown()),
-            context: InferContextResult::default(),
-            legacy_aliases: Box::default(),
+            extra: None,
         };
     };
     let env = ProgramEnvironment::from_file(program_file);
@@ -153,6 +151,12 @@ pub(super) fn infer_legacy_type_alias<'db>(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct LegacyTypeAliasInference<'db> {
     pub(super) ty: LegacyTypeAliasResult<'db>,
+    pub(super) extra: Option<Box<LegacyTypeAliasInferenceExtra<'db>>>,
+}
+
+/// Inference state retained only when an alias contributed context or referenced another alias.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct LegacyTypeAliasInferenceExtra<'db> {
     pub(super) context: InferContextResult,
     pub(super) legacy_aliases: Box<[Definition<'db>]>,
 }
