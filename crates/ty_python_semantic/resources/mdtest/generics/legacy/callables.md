@@ -1475,6 +1475,40 @@ def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int
     reveal_type(widened_bottom[3]()[2])  # revealed: (tuple[object], /) -> tuple[Never]
 ```
 
+## Display of specialization after recursive promotion
+
+A deferred specialization shows which types replace the promoted stream's parameters. Class names
+are qualified when different modules supply equally named classes.
+
+`a.py`:
+
+```py
+class Widget: ...
+```
+
+`b.py`:
+
+```py
+class Widget: ...
+```
+
+`main.py`:
+
+```py
+from typing import Any, Callable, TypeVar, cast
+from ty_extensions._internal import TypeOf
+import a
+import b
+
+T = TypeVar("T")
+Stream = tuple[TypeOf[1], T, Callable[[], "Stream[T]"]]
+Promoted = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
+
+def inspect(first: Promoted[a.Widget], second: Promoted[b.Widget]):
+    # revealed: tuple[() -> Specialize[Promote[Stream[T@Promoted]], T@Promoted = a.Widget], () -> Specialize[Promote[Stream[T@Promoted]], T@Promoted = b.Widget]]
+    reveal_type((first[2], second[2]))
+```
+
 ## Specialization after promotion with growing recursive arguments
 
 A promoted alias can remain generic even when each recursive step changes its type argument. A

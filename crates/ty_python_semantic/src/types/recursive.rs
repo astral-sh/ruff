@@ -282,11 +282,7 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
-    pub(super) fn with_mappings(
-        self,
-        db: &'db dyn Db,
-        mappings: Option<DeferredTypeMapping<'db>>,
-    ) -> Self {
+    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -297,7 +293,7 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
-    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+    fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
         self.mappings(db)
             .and_then(|mapping| mapping.materialization_kind(db))
     }

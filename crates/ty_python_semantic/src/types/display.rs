@@ -26,7 +26,7 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization, walk_specialization_types};
-use crate::types::mapping::DeferredTypeMapping;
+use crate::types::mapping::{DeferredTypeMapping, MappingOperation};
 use crate::types::recursive::RecursiveType;
 use crate::types::signatures::{Parameter, Parameters, ParametersKind, Signature};
 use crate::types::tuple::{TupleSpec, VariableSegment};
@@ -35,10 +35,10 @@ use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceClass,
-    PropertyInstanceType, Protocol, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-    TypeAliasType, TypeGuardLike, TypedDictType, TypingModule, UnionType, WrapperDescriptorKind,
-    visitor,
+    KnownUnion, LiteralValueType, LiteralValueTypeKind, MaterializationKind, PromotionKind,
+    PromotionMode, PropertyInstanceClass, PropertyInstanceType, Protocol, SpecialFormType,
+    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType,
+    TypingModule, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::ProgramFile;
 use ty_python_core::definition::Definition;
@@ -716,6 +716,32 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
         if let Some(arguments) = recursive.arguments(db) {
             walk_specialization_types(db, arguments, self);
         }
+        self.visit_mappings(db, recursive.mappings(db));
+    }
+
+    fn visit_type_alias_type(&self, db: &'db dyn Db, alias: TypeAliasType<'db>) {
+        if let Some(arguments) = alias.specialization(db) {
+            walk_specialization_types(db, arguments, self);
+        }
+        self.visit_mappings(db, alias.mappings(db));
+    }
+}
+
+impl<'db> AmbiguousNameCollector<'_, 'db> {
+    fn visit_mappings(&self, db: &'db dyn Db, mut mappings: Option<DeferredTypeMapping<'db>>) {
+        while let Some(mapping) = mappings {
+            match mapping.operation(db) {
+                MappingOperation::Specialize(specialization, _) => {
+                    for ty in specialization.bindings(db).into_values() {
+                        self.visit_type(db, ty);
+                    }
+                }
+                MappingOperation::BindSelf(binding) => self.visit_type(db, binding.self_type()),
+                MappingOperation::ReplaceSelf(ty) => self.visit_type(db, *ty),
+                _ => {}
+            }
+            mappings = mapping.preceding(db);
+        }
     }
 }
 
@@ -1023,12 +1049,25 @@ impl<'db> TypeAliasDisplay<'db> {
         mappings: Option<DeferredTypeMapping<'db>>,
         f: &mut TypeWriter<'_, '_, 'db>,
     ) -> fmt::Result {
-        let mut current = mappings;
-        let mut depth = 0;
-        while let Some(mapping) = current {
-            write!(f, "{}[", mapping.display_name(self.db))?;
-            current = mapping.preceding(self.db);
-            depth += 1;
+        if let Some(mapping) = mappings {
+            let operation = mapping.operation(self.db);
+            let name = operation.display_name();
+            if let MappingOperation::Materialize(kind) = operation {
+                let form = match kind {
+                    MaterializationKind::Top => SpecialFormType::Top,
+                    MaterializationKind::Bottom => SpecialFormType::Bottom,
+                };
+                f.with_type(Type::SpecialForm(form)).write_str(name)?;
+            } else {
+                f.set_invalid_type_annotation();
+                f.write_str(name)?;
+            }
+            f.write_char('[')?;
+            self.fmt_specialized(env, specialization, mapping.preceding(self.db), f)?;
+            mapping
+                .operation(self.db)
+                .fmt_arguments(self.db, env, &self.settings, f)?;
+            return f.write_char(']');
         }
 
         self.fmt_detailed(f)?;
@@ -1038,8 +1077,85 @@ impl<'db> TypeAliasDisplay<'db> {
                 .fmt_detailed(f)?;
         }
 
-        for _ in 0..depth {
-            f.write_char(']')?;
+        Ok(())
+    }
+}
+
+impl<'db> MappingOperation<'db> {
+    fn display_name(&self) -> &'static str {
+        match self {
+            Self::Promote(PromotionMode::On, PromotionKind::Regular) => "Promote",
+            Self::Promote(PromotionMode::Off, PromotionKind::Regular) => "PromoteContravariant",
+            Self::Promote(PromotionMode::On, PromotionKind::ClassLiteralsOnly) => {
+                "PromoteClassLiterals"
+            }
+            Self::Promote(PromotionMode::Off, PromotionKind::ClassLiteralsOnly) => {
+                "PromoteClassLiteralsContravariant"
+            }
+            Self::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => "PromoteSingletons",
+            Self::Promote(PromotionMode::Off, PromotionKind::SingletonsOnly) => {
+                "PromoteSingletonsContravariant"
+            }
+            Self::Materialize(MaterializationKind::Top) => "Top",
+            Self::Materialize(MaterializationKind::Bottom) => "Bottom",
+            Self::Specialize(_, Some(MaterializationKind::Top)) => "SpecializeTop",
+            Self::Specialize(_, Some(MaterializationKind::Bottom)) => "SpecializeBottom",
+            Self::Specialize(_, None) => "Specialize",
+            Self::BindLegacyTypevars(_) => "Bind",
+            Self::FreshenBoundTypeVars(..) => "Freshen",
+            Self::BindSelf(_) => "BindSelf",
+            Self::ReplaceSelf(_) => "ReplaceSelf",
+            Self::ReplaceParameterDefaults => "WithoutDefaults",
+            Self::RescopeReturnCallables(_) => "Generic",
+        }
+    }
+
+    fn fmt_arguments(
+        &self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        settings: &DisplaySettings<'db>,
+        f: &mut TypeWriter<'_, '_, 'db>,
+    ) -> fmt::Result {
+        match self {
+            Self::Specialize(specialization, _) => {
+                for (variable, ty) in specialization.bindings(db) {
+                    f.write_str(", ")?;
+                    Type::TypeVar(variable)
+                        .display_with(db, env, settings.clone())
+                        .fmt_detailed(f)?;
+                    f.write_str(" = ")?;
+                    ty.display_with(db, env, settings.clone()).fmt_detailed(f)?;
+                }
+            }
+            Self::BindSelf(binding) => {
+                f.write_str(", ")?;
+                binding
+                    .self_type()
+                    .display_with(db, env, settings.clone())
+                    .fmt_detailed(f)?;
+            }
+            Self::ReplaceSelf(ty) => {
+                f.write_str(", ")?;
+                ty.display_with(db, env, settings.clone()).fmt_detailed(f)?;
+            }
+            Self::BindLegacyTypevars(context) => {
+                if let Some(name) = context.name(db) {
+                    write!(f, ", {name}")?;
+                }
+            }
+            Self::RescopeReturnCallables(variables) => {
+                for (variable, _) in variables {
+                    f.write_str(", ")?;
+                    Type::TypeVar(*variable)
+                        .display_with(db, env, settings.clone())
+                        .fmt_detailed(f)?;
+                }
+            }
+            Self::FreshenBoundTypeVars(_, _)
+            | Self::Promote(..)
+            | Self::Materialize(_)
+            | Self::ReplaceParameterDefaults => {}
         }
         Ok(())
     }

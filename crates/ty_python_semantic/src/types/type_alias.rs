@@ -640,16 +640,12 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+    fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
         self.mappings(db)
             .and_then(|mapping| mapping.materialization_kind(db))
     }
 
-    pub(super) fn with_mappings(
-        self,
-        db: &'db dyn Db,
-        mappings: Option<DeferredTypeMapping<'db>>,
-    ) -> Self {
+    fn with_mappings(self, db: &'db dyn Db, mappings: Option<DeferredTypeMapping<'db>>) -> Self {
         match self {
             TypeAliasType::PEP695(alias) => TypeAliasType::PEP695(PEP695TypeAliasType::new(
                 db,

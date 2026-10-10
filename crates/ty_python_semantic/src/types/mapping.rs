@@ -1,5 +1,9 @@
 //! Deferred mappings on aliases. Each step acts on a closed, specialized unfolding;
 //! recursive references retain the step without rebuilding the recursive constructor.
+//!
+//! Mapping first checks whether the closed body changes, using the ordinary visitor's cycle
+//! guard and cache. Unchanged aliases keep their identity. Each retained step has a separate
+//! transformation cache, while nested materialization comparisons share their recursion guard.
 
 use super::generics::{ApplySpecialization, Specialization};
 use super::{
@@ -17,6 +21,7 @@ pub struct DeferredTypeMapping<'db> {
     step: MappingStep<'db>,
 }
 
+/// A retained operation and the inference context under which it was requested.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct MappingStep<'db> {
     operation: MappingOperation<'db>,
@@ -27,25 +32,8 @@ pub struct MappingStep<'db> {
 impl get_size2::GetSize for DeferredTypeMapping<'_> {}
 
 impl<'db> DeferredTypeMapping<'db> {
-    pub(super) fn display_name(self, db: &'db dyn Db) -> &'static str {
-        match &self.step(db).operation {
-            MappingOperation::Promote(PromotionMode::On, PromotionKind::Regular) => "Promote",
-            MappingOperation::Promote(PromotionMode::Off, PromotionKind::Regular) => {
-                "PromoteContravariant"
-            }
-            MappingOperation::Promote(_, PromotionKind::ClassLiteralsOnly) => {
-                "PromoteClassLiterals"
-            }
-            MappingOperation::Promote(_, PromotionKind::SingletonsOnly) => "PromoteSingletons",
-            MappingOperation::Materialize(MaterializationKind::Top) => "Top",
-            MappingOperation::Materialize(MaterializationKind::Bottom) => "Bottom",
-            MappingOperation::Specialize(..) => "Specialize",
-            MappingOperation::BindLegacyTypevars(_) => "Bind",
-            MappingOperation::FreshenBoundTypeVars(..) => "Freshen",
-            MappingOperation::BindSelf(_) | MappingOperation::ReplaceSelf(_) => "BindSelf",
-            MappingOperation::ReplaceParameterDefaults => "WithoutDefaults",
-            MappingOperation::RescopeReturnCallables(_) => "Generic",
-        }
+    pub(super) fn operation(self, db: &'db dyn Db) -> &'db MappingOperation<'db> {
+        &self.step(db).operation
     }
 
     pub(super) fn preceding(self, db: &'db dyn Db) -> Option<Self> {
@@ -66,14 +54,7 @@ impl<'db> DeferredTypeMapping<'db> {
         };
         if let Some(previous) = previous
             && operation.is_idempotent()
-            && (previous.step(db).operation == operation
-                || matches!(
-                    (&previous.step(db).operation, &operation),
-                    (
-                        MappingOperation::Materialize(_),
-                        MappingOperation::Materialize(_)
-                    )
-                ))
+            && previous.step(db).operation == operation
             && previous.step(db).context == context
             && previous.step(db).materialize_bounds
                 == visitor.materialize_typevar_bounds_and_defaults
@@ -126,7 +107,7 @@ impl<'db> DeferredTypeMapping<'db> {
 
 /// Owns the data borrowed by a mapping, so an alias can retain it after inference returns.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum MappingOperation<'db> {
+pub(super) enum MappingOperation<'db> {
     Specialize(OwnedSpecialization<'db>, Option<MaterializationKind>),
     Promote(PromotionMode, PromotionKind),
     BindLegacyTypevars(BindingContext<'db>),
@@ -171,10 +152,7 @@ impl<'db> MappingOperation<'db> {
     }
 
     fn is_idempotent(&self) -> bool {
-        matches!(
-            self,
-            Self::Promote(..) | Self::Materialize(_) | Self::ReplaceParameterDefaults
-        )
+        matches!(self, Self::Promote(..) | Self::ReplaceParameterDefaults)
     }
 
     fn with_mapping<R>(&self, f: &mut dyn FnMut(TypeMapping<'_, 'db>) -> R) -> R {
@@ -210,7 +188,7 @@ impl<'db> MappingOperation<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-enum OwnedSpecialization<'db> {
+pub(super) enum OwnedSpecialization<'db> {
     Specialization(Specialization<'db>, bool),
     TypeAlias(Specialization<'db>),
     Partial(GenericContext<'db>, Box<[Type<'db>]>, Option<usize>),
@@ -220,6 +198,43 @@ enum OwnedSpecialization<'db> {
 }
 
 impl<'db> OwnedSpecialization<'db> {
+    /// The substitutions shown in the marker, including overrides not in its generic context.
+    pub(super) fn bindings(
+        &self,
+        db: &'db dyn Db,
+    ) -> FxIndexMap<BoundTypeVarInstance<'db>, Type<'db>> {
+        match self {
+            Self::Specialization(specialization, _) | Self::TypeAlias(specialization) => {
+                specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(specialization.types(db).iter().copied())
+                    .collect()
+            }
+            Self::Partial(context, types, skip) => context
+                .variables(db)
+                .enumerate()
+                .filter_map(|(index, variable)| {
+                    if skip == &Some(index) {
+                        Some((variable, Type::Never))
+                    } else {
+                        types.get(index).map(|ty| (variable, *ty))
+                    }
+                })
+                .collect(),
+            Self::ReturnCallables(replacements) => replacements
+                .iter()
+                .map(|(from, to)| (*from, Type::TypeVar(*to)))
+                .collect(),
+            Self::Single(variable, ty) => [(*variable, *ty)].into_iter().collect(),
+            Self::WithBindings(specialization, overrides) => {
+                let mut bindings = specialization.bindings(db);
+                bindings.extend(overrides.iter().copied());
+                bindings
+            }
+        }
+    }
+
     fn new(specialization: ApplySpecialization<'_, 'db>) -> Self {
         match specialization {
             ApplySpecialization::Specialization {
