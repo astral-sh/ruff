@@ -1,11 +1,9 @@
 //! Deferred mappings on aliases. Each step acts on a closed, specialized unfolding;
 //! recursive references retain the step without rebuilding the recursive constructor.
 
-use salsa::plumbing::AsId;
-
 use super::generics::{ApplySpecialization, Specialization};
 use super::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, GenericContext,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, GenericContext,
     MaterializationKind, PromotionKind, PromotionMode, SelfBinding, Type, TypeContext, TypeMapping,
 };
 use crate::{Db, FxIndexMap};
@@ -138,7 +136,7 @@ enum MappingOperation<'db> {
     ReplaceSelf(Type<'db>),
     Materialize(MaterializationKind),
     ReplaceParameterDefaults,
-    RescopeReturnCallables(Box<[(CallableType<'db>, CallableType<'db>)]>),
+    RescopeReturnCallables(Box<[(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)]>),
 }
 
 impl<'db> MappingOperation<'db> {
@@ -165,9 +163,7 @@ impl<'db> MappingOperation<'db> {
             TypeMapping::Materialize(kind) => Self::Materialize(*kind),
             TypeMapping::ReplaceParameterDefaults => Self::ReplaceParameterDefaults,
             TypeMapping::RescopeReturnCallables(replacements) => {
-                let mut replacements: Vec<_> = replacements.iter().map(|(a, b)| (*a, *b)).collect();
-                replacements.sort_unstable_by_key(|(source, _)| source.as_id());
-                Self::RescopeReturnCallables(replacements.into_boxed_slice())
+                Self::RescopeReturnCallables(replacements.iter().map(|(a, b)| (*a, *b)).collect())
             }
             TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion => {
                 return None;

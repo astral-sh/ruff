@@ -1437,3 +1437,24 @@ def collect(value: G[TypeOf[2]]):
     repeated = [widened][0]
     reveal_type(repeated[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
 ```
+
+## Generic callables with growing recursive arguments
+
+Each returned callback binds its own type variables, including callbacks reached through a recursive
+alias with different arguments. Calling one callback does not specialize the others.
+
+```py
+from typing import Callable, TypeVar
+
+type Callbacks[T, U] = tuple[Callable[[T], T], list[Callbacks[tuple[T, U], U]]]
+
+def factory[T, U]() -> tuple[Callbacks[T, U], Callable[[U], U]]:
+    raise NotImplementedError
+
+callbacks, other = factory()
+reveal_type(callbacks[0](1))  # revealed: Literal[1]
+reveal_type(callbacks[1][0][0]((1, "value")))  # revealed: tuple[Literal[1], Literal["value"]]
+nested = callbacks[1][0][1][0][0](((2, "value"), "value"))
+reveal_type(nested)  # revealed: tuple[tuple[Literal[2], Literal["value"]], Literal["value"]]
+reveal_type(other(True))  # revealed: Literal[True]
+```

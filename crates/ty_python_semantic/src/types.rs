@@ -1,7 +1,7 @@
 use compact_str::{CompactString, ToCompactString};
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
@@ -116,7 +116,7 @@ use crate::types::variance::{VarianceInferable, VarianceTerm};
 use crate::types::visitor::{
     any_over_type, any_over_type_including_alias_arguments, dynamic_content,
 };
-use crate::{Db, FxOrderSet, HasType, NameKind, Program, SemanticModel};
+use crate::{Db, FxIndexMap, FxOrderSet, HasType, NameKind, Program, SemanticModel};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator, SlotDescriptorType};
 use instance::Protocol;
@@ -11159,7 +11159,7 @@ pub enum TypeMapping<'a, 'db> {
     EagerExpansion,
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
-    RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
+    RescopeReturnCallables(&'a FxIndexMap<BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>>),
 }
 
 impl<'db> TypeMapping<'_, 'db> {
