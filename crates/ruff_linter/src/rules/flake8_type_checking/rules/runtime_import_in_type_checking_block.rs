@@ -11,9 +11,11 @@ use crate::checkers::ast::Checker;
 use crate::codes::{Category, Rule};
 use crate::fix;
 use crate::importer::ImportedMembers;
-use crate::rules::flake8_type_checking::helpers::{filter_contained, quote_annotation};
+use crate::rules::flake8_type_checking::helpers::{
+    contains_escape, filter_contained, quote_annotation,
+};
 use crate::rules::flake8_type_checking::imports::ImportBinding;
-use crate::{Fix, FixAvailability, Violation};
+use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for imports that are required at runtime but are only defined in
@@ -47,6 +49,16 @@ use crate::{Fix, FixAvailability, Violation};
 /// def bar() -> None:
 ///     foo.bar()
 /// ```
+///
+/// ## Fix safety
+/// This rule's fixes are unsafe because moving an import out of a type-checking block
+/// changes when the module is imported, which can affect runtime behavior, including
+/// import-time side effects.
+///
+/// With `lint.flake8-type-checking.quote-annotations` enabled, the fix may quote the runtime
+/// references instead. That fix is display-only when quoting one of them would introduce an
+/// escape sequence, since tools like ty can't analyze forward references that contain escape
+/// sequences.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
@@ -307,9 +319,15 @@ fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) 
             .collect::<Vec<_>>(),
     );
 
+    let applicability = if quote_reference_edits.iter().any(contains_escape) {
+        Applicability::DisplayOnly
+    } else {
+        Applicability::Unsafe
+    };
+
     let mut rest = quote_reference_edits.into_iter();
     let head = rest.next().expect("Expected at least one reference");
-    Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
+    Fix::applicable_edits(head, rest, applicability).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
     ))
 }
