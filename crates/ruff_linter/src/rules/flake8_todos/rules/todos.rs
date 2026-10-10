@@ -103,6 +103,8 @@ impl Violation for MissingTodoAuthor {
 ///
 /// # TODO(charlie): this comment has an issue code (matches the regex `[A-Z]+\-?\d+`)
 /// # SIXCHR-003
+///
+/// # TODO(charlie): PROJ-123 issue codes also work on the same line
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.269", category = Category::Pedantic)]
@@ -252,6 +254,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"\s*(http|https)://.*", // issue link
         r"\s*#\d+.*",            // issue code - like "#003"
+        r"\s*[A-Z]+\-?\d+",      // issue code - like "PROJ-123"
     ])
     .unwrap()
 });
