@@ -21,8 +21,8 @@ use crate::types::diagnostic::{
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::legacy_type_alias::non_alias_assignment;
 use crate::types::infer::{
-    CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference, LegacyTypeAliasInferenceExtra, TypeExpressionFlags,
-    infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
+    AliasInferenceCache, CyclicTypeAliasError, InferenceFlags, LegacyTypeAliasInference,
+    LegacyTypeAliasInferenceExtra, TypeExpressionFlags, infer_legacy_type_alias, legacy_type_alias_definition, legacy_type_alias_parameters,
     non_alias_type_expression_diagnostics,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
@@ -156,7 +156,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> LegacyTypeAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        self.value_inference = Some(crate::types::infer_definition_types(self.db(), definition));
+        self.alias_cache = AliasInferenceCache::Reusing(crate::types::infer_definition_types(
+            self.db(),
+            definition,
+        ));
         let ty = self.infer_type_expression(value);
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {

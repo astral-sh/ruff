@@ -65,7 +65,8 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use builder::{DeferredExpressionState, TypeInferenceBuilder};
+use alias_inputs::{AliasInferenceCache, AliasInferenceInputs, AliasInferenceInputsBuilder};
+use builder::TypeInferenceBuilder;
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
@@ -74,6 +75,7 @@ use ty_python_core::statement::StatementInner;
 use ty_python_core::unpack::Unpack;
 use ty_python_core::{ExpressionNodeKey, SemanticIndex, Statement, Truthiness, semantic_index};
 
+mod alias_inputs;
 mod builder;
 mod legacy_type_alias;
 use legacy_type_alias::legacy_type_alias_definition;
@@ -183,27 +185,6 @@ pub(super) fn non_alias_type_expression_diagnostics<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_non_alias_type_expression_diagnostics(definition, value)
-}
-
-/// A name or attribute resolved while inferring an expression's value.
-///
-/// Type-expression inference can reuse the resolution without losing the definition behind a
-/// normalized value. Deferred lookups and type-variable binding contexts must still agree.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct ResolvedReference<'db> {
-    ty: Type<'db>,
-    definition: Option<Definition<'db>>,
-    deferred_state: DeferredExpressionState,
-    typevar_binding_context: Option<Definition<'db>>,
-}
-
-/// Inputs retained by value inference for a later interpretation of an alias's right-hand side.
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
-struct AliasInferenceInputs<'db> {
-    references: FrozenMap<ExpressionNodeKey, ResolvedReference<'db>>,
-    /// Binding contexts of expressions evaluated eagerly with default type context. Their types
-    /// are in the region's expression table.
-    runtime_values: FrozenMap<ExpressionNodeKey, Option<Definition<'db>>>,
 }
 
 bitflags::bitflags! {
@@ -1745,16 +1726,7 @@ impl<'db> DefinitionInference<'db> {
         }
 
         if let Some(inputs) = &mut self.alias_inputs {
-            for (expression, reference) in &mut inputs.references {
-                reference.ty = match previous_inference
-                    .alias_inputs
-                    .as_ref()
-                    .and_then(|inputs| inputs.references.get(expression))
-                {
-                    Some(previous) => reference.ty.cycle_normalized(db, &env, previous.ty, cycle),
-                    None => reference.ty.recursive_type_normalized(db, &env, cycle),
-                };
-            }
+            inputs.normalize_cycle(db, &env, previous_inference.alias_inputs.as_deref(), cycle);
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -2146,16 +2118,7 @@ impl<'db> ExpressionInference<'db> {
         }
 
         if let Some(inputs) = &mut self.alias_inputs {
-            for (expression, reference) in &mut inputs.references {
-                reference.ty = match previous
-                    .alias_inputs
-                    .as_ref()
-                    .and_then(|inputs| inputs.references.get(expression))
-                {
-                    Some(previous) => reference.ty.cycle_normalized(db, env, previous.ty, cycle),
-                    None => reference.ty.recursive_type_normalized(db, env, cycle),
-                };
-            }
+            inputs.normalize_cycle(db, env, previous.alias_inputs.as_deref(), cycle);
         }
 
         for (expr, ty) in &mut self.expressions {

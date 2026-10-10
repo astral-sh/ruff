@@ -73,18 +73,13 @@ impl<'db> TypeExpressionUnion<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        // The value of a single-argument `typing.Union` retains the argument itself.
-        if self.unpack_aliases(db)
-            && let [element] = self.elements(db).as_slice()
-        {
-            return *element;
-        }
         let env = ProgramEnvironment::from_program(self.program(db));
-        let mut builder = UnionBuilder::new(db, &env).unpack_aliases(self.unpack_aliases(db));
-        for element in self.elements(db) {
-            builder.add_in_place(*element);
+        let elements = self.elements(db).iter().copied();
+        if self.unpack_aliases(db) {
+            UnionType::from_elements(db, &env, elements)
+        } else {
+            UnionType::from_elements_leave_aliases(db, &env, elements)
         }
-        builder.build()
     }
 }
 
