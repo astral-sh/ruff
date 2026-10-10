@@ -1473,7 +1473,7 @@ type G[T] = tuple[TypeOf[1], Callable[[T], T], Callable[[], G[list[T]]]]
 
 def collect(value: G[TypeOf[2]]):
     widened = [value][0]
-    # revealed: (μ$0[$T0, $T1, $T2]. tuple[int, ($T2, /) -> $T1, () -> $0[list[$T0], list[$T2], list[$T1]]])[Literal[2], int, Literal[2]]
+    # revealed: (μ$0[$T0, $T1]. tuple[int, ($T1, /) -> $T0, () -> $0[list[$T1], list[$T0]]])[int, Literal[2]]
     reveal_type(widened)
     reveal_type(widened[1])  # revealed: (Literal[2], /) -> int
     reveal_type(widened[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
@@ -1507,8 +1507,83 @@ from ty_extensions._internal import TypeOf
 type G[T, U] = tuple[TypeOf[1], T, Callable[[], G[list[U], T]]]
 
 def collect(value: G[A, B]):
-    # revealed: (μ$0[$T0, $T1, $T2, $T3, $T4, $T5]. tuple[int, $T2, () -> $0[list[$T1], $T0, list[$T5], $T2, list[$T3], $T4]])[a.Widget, b.Widget, a.Widget, b.Widget, a.Widget, b.Widget]
+    # revealed: (μ$0[$T0, $T1]. tuple[int, $T0, () -> $0[list[$T1], $T0]])[a.Widget, b.Widget]
     reveal_type([value][0])
+```
+
+## Unused parameters in transformed recursive types
+
+A parameter passed only to another unused parameter does not affect the recursive type. Widening the
+inferred literal does not retain these parameters in the resulting constructor.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Unused[T] = tuple[TypeOf[0], Callable[[], Unused[list[T]]]]
+
+def collect(value: Unused[int]):
+    widened = [value][0]
+    reveal_type(widened)  # revealed: μ$0. tuple[int, () -> $0]
+    reveal_type(widened[1]()[0])  # revealed: int
+```
+
+## Recursive arguments that diverge on one branch
+
+Equal initial arguments remain distinct when any recursive branch transforms them differently.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Fork[T, U] = tuple[TypeOf[0], T, U, Callable[[], Fork[list[T], list[U]]], Callable[[], Fork[list[T], set[U]]]]
+
+def collect(value: Fork[int, int]):
+    widened = [value][0]
+    # revealed: (μ$0[$T0, $T1]. tuple[int, $T0, $T1, () -> $0[list[$T0], list[$T1]], () -> $0[list[$T0], set[$T1]]])[int, int]
+    reveal_type(widened)
+    reveal_type(widened[4]()[1])  # revealed: list[int]
+    reveal_type(widened[4]()[2])  # revealed: set[int]
+```
+
+## Recursive arguments that diverge after several steps
+
+The first recursive step is insufficient to decide which arguments can share a parameter. Here the
+third argument eventually reaches both tuple elements, so all three parameters are needed.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Delayed[T, U, V] = tuple[TypeOf[0], T, U, Callable[[], Delayed[U, V, list[T]]]]
+
+def collect(value: Delayed[int, int, int]):
+    widened = [value][0]
+    # revealed: (μ$0[$T0, $T1, $T2]. tuple[int, $T0, $T1, () -> $0[$T1, $T2, list[$T0]]])[int, int, int]
+    reveal_type(widened)
+    reveal_type(widened[3]()[3]()[1])  # revealed: int
+    reveal_type(widened[3]()[3]()[2])  # revealed: list[int]
+```
+
+## Parameters shared through mutually recursive constructors
+
+Only the first parameter determines an element type. The unused second parameter disappears from
+both constructors, including the recursive calls that return from `B` to `A`.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type A[T, U] = tuple[TypeOf[0], Callable[[], B[T, U]]]
+type B[T, U] = tuple[T, Callable[[], B[list[T], U]], Callable[[], A[T, U]]]
+
+def collect(value: A[int, str]):
+    widened = [value][0]
+    # revealed: (μ$0[$T0]. tuple[int, () -> (μ$1[$T1]. tuple[$T1, () -> $1[list[$T1]], () -> $0[$T1]])[$T0]])[int]
+    reveal_type(widened)
+    reveal_type(widened[1]()[0])  # revealed: int
+    reveal_type(widened[1]()[1]()[0])  # revealed: list[int]
+    reveal_type(widened[1]()[2]()[1]()[0])  # revealed: int
 ```
 
 ## Generic callables with growing recursive arguments

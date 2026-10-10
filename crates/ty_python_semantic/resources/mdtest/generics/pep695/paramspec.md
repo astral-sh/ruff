@@ -2485,7 +2485,7 @@ type Chain[**P] = tuple[TypeOf[1], Callable[P, int], Callable[[], Chain[Concaten
 
 def collect(value: Chain[[int]]):
     widened = [value][0]
-    # revealed: (μ$0[**$T0, **$T1, **$T2]. tuple[int, (**$T0) -> int, () -> $0[(str, /, *args: $T0.args, **kwargs: $T0.kwargs), (str, /, *args: $T0.args, **kwargs: $T0.kwargs), (str, /, *args: $T0.args, **kwargs: $T0.kwargs)]])[(int, /), (int, /), (int, /)]
+    # revealed: (μ$0[**$T0]. tuple[int, (**$T0) -> int, () -> $0[(str, /, *args: $T0.args, **kwargs: $T0.kwargs)]])[(int, /)]
     reveal_type(widened)
     reveal_type(widened[2]()[1])  # revealed: (str, int, /) -> int
 ```

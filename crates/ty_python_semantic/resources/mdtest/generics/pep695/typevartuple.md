@@ -2184,7 +2184,7 @@ type Tup[*Ts] = tuple[TypeOf[1], tuple[*Ts], Callable[[], Tup[*Ts]]]
 
 def collect(value: Tup[int, str]):
     widened = [value][0]
-    # revealed: (μ$0[*$T0, *$T1, *$T2]. tuple[int, tuple[*$T1], () -> $0[*tuple[*$T0], *tuple[*$T1], *tuple[*$T2]]])[*tuple[int, str], *tuple[int, str], *tuple[int, str]]
+    # revealed: (μ$0[*$T0]. tuple[int, tuple[*$T0], () -> $0[*tuple[*$T0]]])[*tuple[int, str]]
     reveal_type(widened)
     reveal_type(widened[2]()[0])  # revealed: int
     reveal_type(widened[2]()[1])  # revealed: tuple[int, str]

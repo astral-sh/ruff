@@ -81,6 +81,9 @@ use super::{
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 
+mod parameters;
+use parameters::RecursiveParameters;
+
 /// A recursive variable named by its binder's query cycle.
 /// An escaping reference has no type semantics; in particular, it is neither a
 /// gradual type nor an assignability operand.
@@ -148,6 +151,11 @@ enum RecursiveSubstitution<'db> {
     },
     /// Replace only this transformation's fresh references with bound variables.
     BindFresh(RecursiveMappingReference<'db>),
+    /// Abstract a stored constructor while reducing the parameters of nested binders.
+    Abstract {
+        constructor: RecursiveType<'db>,
+        placeholder: RecursiveMappingReference<'db>,
+    },
 }
 
 impl RecursiveSubstitution<'_> {
@@ -158,6 +166,7 @@ impl RecursiveSubstitution<'_> {
             Self::Restore { placeholder, .. } => placeholder.cycle(db),
             Self::Close { cycle, .. } => cycle,
             Self::BindFresh(placeholder) => placeholder.cycle(db),
+            Self::Abstract { constructor, .. } => constructor.cycle(db),
         }
     }
 }
@@ -648,6 +657,50 @@ impl<'db> RecursiveMappingReference<'db> {
         )
     }
 
+    /// Rebind arguments by position when closing a body under renamed formal parameters.
+    fn rebind_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
+        let arguments = self
+            .arguments(db)
+            .zip(arguments)
+            .map(|(parameters, arguments)| {
+                Specialization::new(
+                    db,
+                    parameters.generic_context(db),
+                    arguments.types(db),
+                    arguments.materialization_kind(db),
+                    None,
+                )
+            });
+        self.with_arguments(db, arguments)
+    }
+
+    /// Retain the surviving parameters when binding or restoring a reduced constructor.
+    fn project_arguments(
+        self,
+        db: &'db dyn Db,
+        arguments: Option<Specialization<'db>>,
+    ) -> Option<Specialization<'db>> {
+        let parameters = self.arguments(db)?.generic_context(db);
+        let arguments = arguments?;
+        let types = arguments
+            .generic_context(db)
+            .variables(db)
+            .zip(arguments.types(db))
+            .filter_map(|(variable, ty)| {
+                parameters
+                    .contains(db, variable.identity(db))
+                    .then_some(*ty)
+            })
+            .collect::<Box<[_]>>();
+        Some(Specialization::new(
+            db,
+            parameters,
+            types,
+            arguments.materialization_kind(db),
+            None,
+        ))
+    }
+
     fn restore(self, db: &'db dyn Db, source: Type<'db>) -> Type<'db> {
         if self.arguments(db).is_none() && self.materialization_kind(db).is_none() {
             return source;
@@ -809,12 +862,31 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
                     placeholder,
                     source,
                 },
-            )) if reference.cycle(db) == placeholder.cycle(db) => reference.restore(db, *source),
+            )) if reference.cycle(db) == placeholder.cycle(db) => reference
+                .with_arguments(db, placeholder.project_arguments(db, arguments))
+                .restore(db, *source),
+            TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Close { cycle, placeholder },
+            )) if reference.cycle(db) == *cycle => {
+                let closed = placeholder.rebind_arguments(db, arguments);
+                let closed = RecursiveMappingReference::new(
+                    db,
+                    closed.scope(db),
+                    closed.index(db),
+                    closed.arguments(db),
+                    reference.materialization_kind(db),
+                );
+                self.reference_type(db, visitor.env, closed)
+            }
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::BindFresh(placeholder),
-            )) if reference.cycle(db) == placeholder.cycle(db) => Type::RecursiveVar(
-                RecursiveVar::new_internal(db, placeholder.cycle(db), arguments),
-            ),
+            )) if reference.cycle(db) == placeholder.cycle(db) => {
+                Type::RecursiveVar(RecursiveVar::new_internal(
+                    db,
+                    placeholder.cycle(db),
+                    placeholder.project_arguments(db, arguments),
+                ))
+            }
             TypeMapping::Materialize(kind) => self.reference_type(
                 db,
                 visitor.env,
@@ -1067,6 +1139,25 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Option<Type<'db>> {
+        if let Type::Recursive(recursive) = ty
+            && let TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
+                RecursiveSubstitution::Abstract {
+                    constructor,
+                    placeholder,
+                },
+            )) = mapping
+            && recursive.constructor(db) == *constructor
+        {
+            let reference = placeholder.rebind_arguments(db, recursive.arguments(db));
+            let reference = RecursiveMappingReference::new(
+                db,
+                reference.scope(db),
+                reference.index(db),
+                reference.arguments(db),
+                recursive.materialization_kind(db),
+            );
+            return Some(self.reference_type(db, visitor.env, reference));
+        }
         if let Type::RecursiveVar(variable) = ty
             && let TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Close { cycle, placeholder },
@@ -1079,7 +1170,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             return Some(self.reference_type(
                 db,
                 visitor.env,
-                placeholder.with_arguments(db, arguments),
+                placeholder.rebind_arguments(db, arguments),
             ));
         }
         let reference = self.references.borrow().get(&ty).copied();
@@ -1467,12 +1558,18 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             },
         ));
         let mapped = mapped.apply_type_mapping_impl(db, &restore, tcx, &self.visitor(visitor));
+        let (mapped, placeholder, mapped_arguments) = match mapped_arguments {
+            Some(arguments) => {
+                RecursiveParameters::reduce(db, self, mapped, frame.placeholder, arguments, visitor)
+            }
+            None => (mapped, frame.placeholder, None),
+        };
         let bind = TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
-            RecursiveSubstitution::BindFresh(frame.placeholder),
+            RecursiveSubstitution::BindFresh(placeholder),
         ));
         let body = mapped.apply_type_mapping_impl(db, &bind, tcx, &self.visitor(visitor));
         let mapped = if body.has_unguarded_alias_cycle(db) {
-            Type::divergent_alias(frame.placeholder.cycle(db).0)
+            Type::divergent_alias(placeholder.cycle(db).0)
         } else if body == mapped {
             mapped
         } else {
@@ -1484,9 +1581,9 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             Type::Recursive(RecursiveType::new_internal(
                 db,
                 RecursiveOrigin::Transformed(definition),
-                frame.placeholder.cycle(db),
+                placeholder.cycle(db),
                 body,
-                frame.placeholder.arguments(db),
+                placeholder.arguments(db),
                 None,
             ))
         };
