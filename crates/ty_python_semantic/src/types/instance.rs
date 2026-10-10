@@ -257,7 +257,7 @@ impl<'db> NominalInstanceType<'db> {
     }
 
     /// Returns the class literal for this instance.
-    pub(super) fn class_literal(
+    pub(crate) fn class_literal(
         &self,
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
