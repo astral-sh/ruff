@@ -1,6 +1,7 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashMap;
 
 use crate::{
     Db, DisplaySettings,
@@ -864,14 +865,39 @@ impl<'db> UnionTypeInstance<'db> {
     /// Nested union operands can also differ only in their recovery history, as in
     /// `(int | str) | bytes` after normalization.
     pub(super) fn merge_cycle_history(self, db: &'db dyn Db, other: Self) -> Option<Self> {
+        self.merge_cycle_history_impl(db, other, &mut FxHashMap::default())
+    }
+
+    fn merge_cycle_history_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        cache: &mut FxHashMap<(Self, Self), Option<Self>>,
+    ) -> Option<Self> {
         if self == other {
             return Some(self);
         }
         if self.union_type(db) != other.union_type(db) {
             return None;
         }
+        if let Some(merged) = cache.get(&(self, other)) {
+            return *merged;
+        }
 
-        let merge_operand = |left: Type<'db>, right: Type<'db>| {
+        // Operands can share nested unions. Reuse each pair's result instead of expanding
+        // the same subgraph once for every path through the operands.
+        let merged = self.merge_cycle_history_uncached(db, other, cache);
+        cache.insert((self, other), merged);
+        merged
+    }
+
+    fn merge_cycle_history_uncached(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        cache: &mut FxHashMap<(Self, Self), Option<Self>>,
+    ) -> Option<Self> {
+        let mut merge_operand = |left: Type<'db>, right: Type<'db>| {
             if left == right {
                 return Some(left);
             }
@@ -880,7 +906,7 @@ impl<'db> UnionTypeInstance<'db> {
                     Type::KnownInstance(KnownInstanceType::UnionType(left)),
                     Type::KnownInstance(KnownInstanceType::UnionType(right)),
                 ) => left
-                    .merge_cycle_history(db, right)
+                    .merge_cycle_history_impl(db, right, cache)
                     .map(|union| Type::KnownInstance(KnownInstanceType::UnionType(union))),
                 _ => None,
             }
