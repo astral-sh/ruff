@@ -5,13 +5,18 @@ use std::fmt::Display;
 use std::hash::BuildHasherDefault;
 
 use itertools::{Either, Itertools};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
+use ty_python_core::definition::{BindingsOwner, DefinitionKind};
+use ty_python_core::scope::{ScopeId, ScopeKind};
+use ty_python_core::semantic_index;
 
 use crate::FxIndexMap;
 use crate::ProgramEnvironment;
 use crate::subscript::PyIndex;
+use crate::types::infer::infer_definition_types;
 use crate::types::tuple::{TupleLength, TupleSpec};
 use crate::types::type_expansion::expand_elements;
 use crate::types::typed_dict::{
@@ -345,6 +350,75 @@ pub(crate) struct UnpackedKeywords<'db> {
     pub(crate) openness: TypedDictOpenness<'db>,
 }
 
+impl<'db> UnpackedKeywords<'db> {
+    fn from_literal(
+        dictionary: &ast::ExprDict,
+        mut expression_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
+    ) -> Option<Self> {
+        let mut keywords = FxIndexMap::with_capacity_and_hasher(
+            dictionary.items.len(),
+            BuildHasherDefault::default(),
+        );
+        for ast::DictItem { key, value } in &dictionary.items {
+            let key = key.as_ref()?.as_string_literal_expr()?;
+            let value_ty = expression_type(value)?;
+            // Replacing a duplicate key preserves its first position in the dictionary.
+            keywords.insert(
+                Name::new(key.value.to_str()),
+                UnpackedTypedDictKey {
+                    value_ty,
+                    is_required: true,
+                    definition: None,
+                },
+            );
+        }
+        Some(Self {
+            keys: keywords.into_iter().collect(),
+            openness: TypedDictOpenness::Closed,
+        })
+    }
+
+    /// Recover a fresh local dictionary when its recorded uses cannot expose or mutate it.
+    /// Checking every use of the name also excludes aliases carried across loop iterations.
+    fn from_local(db: &'db dyn Db, scope: ScopeId<'db>, expression: &ast::Expr) -> Option<Self> {
+        if scope.scope(db).kind() != ScopeKind::Function {
+            return None;
+        }
+        let name = expression.as_name_expr()?;
+        let file = scope.program_file(db);
+        let index = semantic_index(db, file);
+        let file_scope = scope.file_scope_id(db);
+        let symbol = index.place_table(file_scope).symbol_by_name(&name.id)?;
+        if !symbol.is_local()
+            || symbol.is_declared()
+            || !symbol.is_used_only_for_keyword_unpacking()
+        {
+            return None;
+        }
+        let use_id = index.try_expression_use_id(expression.into())?;
+        let binding = index
+            .use_def_map(file_scope)
+            .bindings_at_use(use_id)
+            .exactly_one()
+            .ok()?;
+        let definition = binding.binding.definition()?;
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return None;
+        };
+        // Chained and destructuring assignments can bind another name to the same dictionary.
+        if assignment.owner() != BindingsOwner::Definition {
+            return None;
+        }
+        let module = parsed_module(db, file.python_file(db)).load(db);
+        let dictionary = assignment.value(&module).as_dict_expr()?;
+        let inference = infer_definition_types(db, definition);
+        if inference.discards_dict_key_assignments() {
+            return None;
+        }
+        Self::from_literal(dictionary, |value| inference.try_expression_type(value))
+    }
+}
+
 impl<'db> KeywordArgument<'db> {
     fn source_types(&self) -> &CallArgumentTypes<'db> {
         match self {
@@ -547,6 +621,8 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// This currently only exists for the LSP usecase, and shouldn't be used in normal
     /// typechecking.
     pub(crate) fn from_arguments_typed(
+        db: &'db dyn Db,
+        scope: Option<ScopeId<'db>>,
         arguments: &'a ast::Arguments,
         mut infer_argument_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
     ) -> Self {
@@ -573,10 +649,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 }
             })
             .collect();
-        call_arguments.with_known_unpacking(arguments, infer_argument_type)
+        call_arguments.with_known_unpacking(db, scope, arguments, infer_argument_type)
     }
 
-    /// Retain the elements of collections constructed directly at an unpacking site.
+    /// Retain known collection elements at an unpacking site.
     ///
     /// ```py
     /// def pair(x: int, y: str) -> None: ...
@@ -587,13 +663,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ///
     /// The sequence records each element's type in order. The keyword collection associates each
     /// name with its value's type, so `1` binds to `x` and `"two"` binds to `y` in both calls.
-    /// Aliases retain ordinary type-based unpacking, since their contents may have changed.
+    /// Local dictionaries also qualify when their initializer is known and every use is a direct
+    /// keyword unpacking. Other aliases retain ordinary type-based unpacking.
     ///
     /// Ordinary tuple types already describe their elements. List and dictionary types do not
     /// retain the contents needed for call binding, even when those contents are known here.
     /// The callback reads types inferred while checking the enclosing collection expression.
     pub(crate) fn with_known_unpacking(
         mut self,
+        db: &'db dyn Db,
+        scope: Option<ScopeId<'db>>,
         arguments: &ast::Arguments,
         mut expression_type: impl FnMut(&ast::Expr) -> Option<Type<'db>>,
     ) -> Self {
@@ -632,38 +711,16 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                         arg: None, value, ..
                     }),
                 ) => {
-                    let ast::Expr::Dict(ast::ExprDict { items, .. }) = value else {
-                        continue;
+                    let keywords = match value {
+                        ast::Expr::Dict(dictionary) => {
+                            UnpackedKeywords::from_literal(dictionary, &mut expression_type)
+                        }
+                        _ => scope.and_then(|scope| UnpackedKeywords::from_local(db, scope, value)),
                     };
-                    let mut keywords = FxIndexMap::with_capacity_and_hasher(
-                        items.len(),
-                        BuildHasherDefault::default(),
-                    );
-                    let all_entries_known = items.iter().all(|ast::DictItem { key, value }| {
-                        let Some(ast::Expr::StringLiteral(key)) = key else {
-                            return false;
-                        };
-                        let Some(value_ty) = expression_type(value) else {
-                            return false;
-                        };
-                        // Replacing a duplicate key preserves its first position in the dictionary.
-                        keywords.insert(
-                            Name::new(key.value.to_str()),
-                            UnpackedTypedDictKey {
-                                value_ty,
-                                is_required: true,
-                                definition: None,
-                            },
-                        );
-                        true
-                    });
-                    if all_entries_known {
+                    if let Some(keywords) = keywords {
                         *argument = KeywordArgument::Known {
                             types: argument.source_types().clone(),
-                            keywords: UnpackedKeywords {
-                                keys: keywords.into_iter().collect(),
-                                openness: TypedDictOpenness::Closed,
-                            },
+                            keywords,
                         };
                     }
                 }
