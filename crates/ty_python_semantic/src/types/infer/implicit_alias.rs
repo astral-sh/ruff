@@ -11,9 +11,29 @@ use ty_python_core::semantic_index;
 
 use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
-    binding_type,
+    any_over_type, binding_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
+
+/// Whether interpreting a value as an alias can reveal additional recursive references.
+pub(super) fn may_require_implicit_alias_inference<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    ty: Type<'db>,
+) -> bool {
+    any_over_type(db, env, ty, false, |ty| {
+        matches!(
+            ty,
+            Type::Dynamic(_)
+                | Type::Divergent(_)
+                | Type::Recursive(_)
+                | Type::TypeAlias(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::UnionType(_) | KnownInstanceType::LiteralStringAlias(_)
+                )
+        )
+    })
+}
 
 /// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
 ///
