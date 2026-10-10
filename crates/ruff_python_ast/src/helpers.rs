@@ -777,6 +777,49 @@ where
     body.iter().any(|stmt| any_over_stmt(stmt, &mut func))
 }
 
+/// Returns `true` if `body` contains a `break` for its enclosing loop.
+pub fn loop_exits_early(body: &[Stmt]) -> bool {
+    body.iter().any(|stmt| match stmt {
+        Stmt::If(ast::StmtIf {
+            body,
+            elif_else_clauses,
+            ..
+        }) => {
+            loop_exits_early(body)
+                || elif_else_clauses
+                    .iter()
+                    .any(|clause| loop_exits_early(&clause.body))
+        }
+        Stmt::With(ast::StmtWith { body, .. }) => loop_exits_early(body),
+        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
+            .iter()
+            .any(|MatchCase { body, .. }| loop_exits_early(body)),
+        Stmt::Try(ast::StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            ..
+        }) => {
+            loop_exits_early(body)
+                || loop_exits_early(orelse)
+                || loop_exits_early(finalbody)
+                || handlers.iter().any(|handler| match handler {
+                    ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                        body, ..
+                    }) => loop_exits_early(body),
+                })
+        }
+        // A nested loop's `break` targets that loop, but a `break` in its
+        // `else` clause targets the enclosing loop.
+        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+            loop_exits_early(orelse)
+        }
+        Stmt::Break(_) => true,
+        _ => false,
+    })
+}
+
 pub fn is_dunder(id: &str) -> bool {
     id.starts_with("__") && id.ends_with("__")
 }
