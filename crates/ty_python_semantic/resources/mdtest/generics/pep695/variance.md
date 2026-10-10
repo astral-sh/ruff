@@ -441,6 +441,187 @@ static_assert(not is_subtype_of(Wrapper[int], Wrapper[object]))
 static_assert(not is_subtype_of(Wrapper[object], Wrapper[int]))
 ```
 
+## Recursive lambda variance
+
+A `Final` attribute containing a lambda that produces values of type `T` makes the class covariant
+in `T`, even when the lambda also returns itself:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Producer[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, self.node)
+
+static_assert(is_subtype_of(Producer[int], Producer[object]))
+static_assert(not is_subtype_of(Producer[object], Producer[int]))
+```
+
+Returning a callable that accepts `T` makes the class contravariant:
+
+```py
+class Consumer[T]:
+    def __init__(self, consume: Callable[[T], None]):
+        self.node: Final = lambda: (consume, self.node)
+
+static_assert(is_subtype_of(Consumer[object], Consumer[int]))
+static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
+Returning a callable that both accepts and returns `T` makes the class invariant:
+
+```py
+class Transformer[T]:
+    def __init__(self, transform: Callable[[T], T]):
+        self.node: Final = lambda: (transform, self.node)
+
+static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
+static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Writable recursive lambda attributes
+
+A writable attribute makes the class invariant, even when its lambda only produces values of type
+`T`:
+
+```py
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, self.node)
+
+static_assert(not is_subtype_of(Box[int], Box[object]))
+static_assert(not is_subtype_of(Box[object], Box[int]))
+```
+
+## Recursive lambdas with growing type arguments
+
+Each call returns another lambda with a more deeply nested type argument. No call exposes a value of
+type `T`, so variance inference falls back to covariance:
+
+```py
+from typing import Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Chain[T]:
+    def __init__(self, value: T):
+        self.next: Final = lambda: Chain([value]).next
+
+static_assert(is_subtype_of(Chain[int], Chain[object]))
+static_assert(not is_subtype_of(Chain[object], Chain[int]))
+```
+
+Making the attribute writable still does not expose `T`:
+
+```py
+class WritableChain[T]:
+    def __init__(self, value: T):
+        self.next = lambda: WritableChain([value]).next
+
+static_assert(is_subtype_of(WritableChain[int], WritableChain[object]))
+static_assert(not is_subtype_of(WritableChain[object], WritableChain[int]))
+```
+
+If each call also returns its captured value, the second call exposes a `list[T]`. The class is then
+invariant, even though the attribute is `Final`:
+
+```py
+class Growing[T]:
+    def __init__(self, value: T):
+        self.next: Final = lambda: (value, Growing([value]).next)
+
+static_assert(not is_subtype_of(Growing[int], Growing[object]))
+static_assert(not is_subtype_of(Growing[object], Growing[int]))
+```
+
+## Specialized recursive lambda attributes
+
+Calling the recursive lambda on a `Wrapper[T, U]` returns a callback that accepts `U` and returns
+`T`. This makes `Wrapper` covariant in `T` and contravariant in `U`:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callback[P, R]:
+    def __init__(self, callback: Callable[[P], R]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Wrapper[T, U]:
+    def __init__(self, callback: Callable[[U], T]):
+        self.node: Final = Callback[U, T](callback).node
+
+static_assert(is_subtype_of(Wrapper[int, object], Wrapper[object, object]))
+static_assert(not is_subtype_of(Wrapper[object, object], Wrapper[int, object]))
+static_assert(is_subtype_of(Wrapper[int, object], Wrapper[int, int]))
+static_assert(not is_subtype_of(Wrapper[int, int], Wrapper[int, object]))
+```
+
+Using the same type parameter in both positions makes the containing class invariant:
+
+```py
+class Transformer[T]:
+    def __init__(self, callback: Callable[[T], T]):
+        self.node: Final = Callback[T, T](callback).node
+
+static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
+static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+## Type parameters captured from an enclosing class
+
+The inner lambda returns a value of the outer class's type parameter `T` along with itself.
+Specializing `Inner[U]` preserves that reference to `T`, so `Outer` remains covariant:
+
+```py
+from typing import Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Outer[T]:
+    def __init__(self, value: T):
+        class Inner[U]:
+            def __init__(self):
+                self.node: Final = lambda: (value, self.node)
+
+        self.node: Final = Inner[int]().node
+
+static_assert(is_subtype_of(Outer[int], Outer[object]))
+static_assert(not is_subtype_of(Outer[object], Outer[int]))
+```
+
+## Recursive lambda attributes with `ParamSpec`
+
+The recursive lambda in `Consumer[T]` returns a callback that accepts `T`. This makes `Consumer`
+contravariant in `T`, even when the callback's `ParamSpec` is passed through another class:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callbacks[**P]:
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Forward[**P]:
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = Callbacks[P](callback).node
+
+class Consumer[T]:
+    def __init__(self, callback: Callable[[T], None]):
+        self.node: Final = Forward[[T]](callback).node
+
+static_assert(is_subtype_of(Consumer[object], Consumer[int]))
+static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
 ## Recursive protocol variance
 
 A recursive protocol that only produces its type parameter is covariant. Returning that protocol

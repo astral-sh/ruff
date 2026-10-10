@@ -2697,5 +2697,154 @@ class NewConflict(Gradual, Concrete):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Recursive lambda attributes
+
+Recursive lambda attributes preserve the type arguments chosen for their instance. This includes
+literal type arguments in a `Final` attribute:
+
+```py
+from typing import Final, Literal
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.fixed: Final = lambda: (value, self.fixed)
+        self.writable = lambda: (value, self.writable)
+
+node = Box[Literal[1]](1).fixed
+reveal_type(node()[1]()[0])  # revealed: Literal[1]
+```
+
+The same applies to writable attributes:
+
+```py
+node = Box[int](1).writable
+reveal_type(node()[1]()[0])  # revealed: int
+```
+
+## Growing recursive lambda attributes
+
+Each recursive return below adds another `list` around the class's type argument. Calling the
+returned lambda preserves that specialization:
+
+```py
+from typing import Final
+
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: (value, Grow([value]).node)
+
+node = Grow(1).node
+reveal_type(node()[1]()[0])  # revealed: list[int]
+```
+
+Attribute errors include the specialized return type:
+
+```py
+# error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
+node.missing
+```
+
+## Class objects in recursive lambda arguments
+
+Each recursive call can include a class object in its argument. The next lambda returns a tuple
+containing the original value and the `int` class object:
+
+```py
+class WithClass[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, WithClass((value, int)).node)
+
+node = WithClass(1).node
+reveal_type(node()[1]()[0])  # revealed: tuple[int, type[int]]
+```
+
+## Collections of growing recursive lambdas
+
+A collection can contain different specializations of a recursive lambda. Calling an element keeps
+the possible return types from each specialization:
+
+```py
+class Grow[T]:
+    def __init__(self, value: T):
+        self.node = lambda: (value, Grow([value]).node)
+
+nodes = [Grow(1).node, Grow("two").node]
+reveal_type(nodes[0]()[1]()[0])  # revealed: list[int] | list[str]
+```
+
+## Recursive lambdas with swapped type arguments
+
+Each recursive return applies the new type arguments, even when it reaches the same lambda again:
+
+```py
+from typing import Final
+
+class Swap[T, U]:
+    def __init__(self, value: T, other: U):
+        self.node: Final = lambda: (value, Swap(other, value).node)
+
+node = Swap[int, str](1, "two").node
+reveal_type(node()[1]()[0])  # revealed: str
+reveal_type(node()[1]()[1]()[0])  # revealed: int
+```
+
+## Materializing specialized lambda returns
+
+Since `list` is invariant, both materializations of a lambda returning `list[Any]` apply to the
+whole list:
+
+```py
+from typing import Any, Final
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    def __init__(self, value: T):
+        self.node: Final = lambda: [value]
+
+node = Box[Any](None).node
+
+def _(top: Top[TypeOf[node]], bottom: Bottom[TypeOf[node]]):
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Materializing a promoted lambda return
+
+A writable lambda attribute widens a returned class object to a subclass type. For `Box`, this
+introduces an `Unknown` type argument. Materializing the widened return includes that argument, even
+if the original lambda was already materialized:
+
+```py
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+class Box[T]:
+    item: T
+
+node = lambda: Box
+
+def check(source: Top[TypeOf[node]]):
+    class Holder:
+        def __init__(self):
+            self.node = source
+
+    holder = Holder()
+
+    def inner(top: Top[TypeOf[holder.node]]):
+        reveal_type(top())  # revealed: type[Top[Box[Unknown]]]
+```
+
+## Lambda defaults in base class annotations
+
+Lambda defaults in `Annotated` metadata on a base class can refer to the subclass's type parameters:
+
+```py
+from typing import Annotated, cast
+
+class Base[T]: ...
+class Derived[T](Annotated[Base[T], lambda value=reveal_type(cast(T, None)): value]): ...  # revealed: T@Derived
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification

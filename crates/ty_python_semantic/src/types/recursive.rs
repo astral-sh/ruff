@@ -509,6 +509,32 @@ impl<'db> RecursiveType<'db> {
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
         let env = self.environment(db);
+        let constructor = self.constructor(db);
+        if self != constructor
+            && self.materialization_kind(db).is_none()
+            && let Some(arguments) = self.arguments(db)
+        {
+            // Recursive applications contribute through their arguments. Expanding their
+            // specialized bodies would create a new equation at every `Alias[list[T]]` edge.
+            return VarianceTerm::join(
+                db,
+                arguments
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(arguments.types(db))
+                    .map(|(parameter, argument)| {
+                        argument
+                            .variance_of(db, &env, typevar)
+                            .compose_thunk(db, || {
+                                VarianceTerm::variable(
+                                    db,
+                                    VarianceOrigin::Recursive(constructor),
+                                    parameter.identity(db),
+                                )
+                            })
+                    }),
+            );
+        }
         self.unfold(db, &env)
             .map(|unfolded| unfolded.variance_of(db, &env, typevar))
             .unwrap_or(VarianceTerm::BIVARIANT)

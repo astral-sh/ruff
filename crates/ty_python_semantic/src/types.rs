@@ -6,7 +6,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::OnceCell;
-use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -29,7 +28,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
@@ -40,7 +39,7 @@ pub use self::diagnostic::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     InferredDeclaration, TruthinessAnalyzer, TypeContext, infer_complete_scope_types,
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_same_file_expression_type, is_discarded_dict_key_assignment,
 };
 use self::infer::{
     implicit_alias_parameters, infer_function_default_types, infer_implicit_alias_type,
@@ -205,13 +204,12 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
     let mut implicit_aliases = Vec::new();
 
     for scope_id in index.scope_ids() {
-        // Scopes that may require type context are inferred during the inference of
-        // their outer scope.
+        // Scopes with a type context are inferred and checked with their enclosing expression.
         if scope_id.accepts_type_context(db) {
             continue;
         }
 
-        let result = infer_scope_types(db, scope_id, TypeContext::default());
+        let result = infer_complete_scope_types(db, scope_id);
 
         if let Some(scope_diagnostics) = result.diagnostics() {
             diagnostics.extend(scope_diagnostics);
@@ -620,26 +618,6 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> =
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
-
-/// A [`CycleDetector`] that is used in `visit_specialization` methods.
-type SpecializationVisitor<'db> =
-    CycleDetector<'db, VisitSpecialization, (Type<'db>, TypeVarVariance), (), 3>;
-struct VisitSpecialization;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, TypeVarVariance) {
-    type Id = (TypeIdentity<'db>, TypeVarVariance);
-
-    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        let (self_ty, self_variance) = self;
-        let (other_ty, other_variance) = other;
-        self_variance == other_variance && self_ty.may_share_type_identity(db, *other_ty)
-    }
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        let (ty, variance) = self;
-        (ty.to_type_identity(db), *variance)
-    }
-}
 
 /// The standard-library `typing` module or its `typing_extensions` backport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -3856,91 +3834,6 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
         }
-    }
-
-    /// Recursively visit a type and its specializations.
-    ///
-    /// The provided closure will be called on the type itself and its nested types, along with
-    /// their variance with respect to the outermost type. Repeated types with the same variance
-    /// may be skipped.
-    fn visit_specialization<F>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, mut f: F)
-    where
-        F: FnMut(Type<'db>, TypeVarVariance),
-    {
-        self.visit_specialization_impl(
-            db,
-            env,
-            TypeVarVariance::Covariant,
-            &mut f,
-            &SpecializationVisitor::default(),
-        );
-    }
-
-    fn visit_specialization_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        polarity: TypeVarVariance,
-        f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
-        visitor: &SpecializationVisitor<'db>,
-    ) {
-        f(self, polarity);
-
-        visitor.visit(db, (self, polarity), || {
-            let Some((_, specialization)) = self.class_specialization(db, env) else {
-                match self {
-                    Type::Union(union) => {
-                        for element in union.elements(db) {
-                            element.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    Type::Intersection(intersection) => {
-                        for element in intersection.positive(db) {
-                            element.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                        for element in intersection.negative(db) {
-                            element.visit_specialization_impl(db, env, polarity.flip(), f, visitor);
-                        }
-                    }
-                    Type::TypeAlias(alias) => alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, env, polarity, f, visitor),
-                    Type::Recursive(recursive) => {
-                        if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
-                            unfolded.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    Type::Callable(callable) => {
-                        for signature in callable.signatures(db) {
-                            for parameter in signature.parameters() {
-                                parameter.annotated_type().visit_specialization_impl(
-                                    db,
-                                    env,
-                                    polarity.flip(),
-                                    f,
-                                    visitor,
-                                );
-                            }
-
-                            signature
-                                .return_ty
-                                .visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    _ => {}
-                }
-
-                return;
-            };
-
-            for (typevar, ty) in iter::zip(
-                specialization.generic_context(db).variables(db),
-                specialization.types(db),
-            ) {
-                let variance = typevar.variance_with_polarity(db, polarity);
-                ty.visit_specialization_impl(db, env, variance, f, visitor);
-            }
-        });
     }
 
     /// Return true if there is just a single inhabitant for this type.
@@ -9492,6 +9385,20 @@ impl<'db> Type<'db> {
         | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } =
             type_mapping
         {
+            // A lambda's parameters are available without evaluating its return query.
+            // Inspecting that query here would expand recursive signatures before the
+            // specialization can create a stable reference to the transformed lambda.
+            let callable_parameters = match self {
+                Type::Callable(callable) => callable.single_parameters(db),
+                Type::BoundMethod(method)
+                | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
+                    method
+                        .func(db)
+                        .as_callable()
+                        .and_then(|callable| callable.single_parameters(db))
+                }
+                _ => None,
+            };
             let function_signatures = |function: FunctionType<'db>| {
                 if specialization.preserves_lazy_signatures() {
                     function.updated_signature(db)
@@ -9501,6 +9408,7 @@ impl<'db> Type<'db> {
             };
 
             let signatures = match self {
+                _ if callable_parameters.is_some() => None,
                 Type::FunctionLiteral(function) => function_signatures(function),
                 Type::BoundMethod(method)
                 | Type::KnownBoundMethod(KnownBoundMethodType::MethodTypeDunderGet(method)) => {
@@ -9517,11 +9425,15 @@ impl<'db> Type<'db> {
             };
 
             let mut seen = FxHashSet::default();
-            let union_paramspecs = signatures
+            let union_paramspecs = callable_parameters
                 .into_iter()
-                .flat_map(|signatures| signatures.iter())
-                .filter_map(|signature| {
-                    let (_, typevar) = signature.parameters().as_paramspec_with_prefix()?;
+                .chain(
+                    signatures
+                        .into_iter()
+                        .flat_map(|signatures| signatures.iter().map(Signature::parameters)),
+                )
+                .filter_map(|parameters| {
+                    let (_, typevar) = parameters.as_paramspec_with_prefix()?;
                     let Type::Union(union) = specialization.get(db, typevar)? else {
                         return None;
                     };
@@ -10907,9 +10819,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
                 nominal_instance_type.variance_of(db, env, typevar)
             }
             Type::GenericAlias(generic_alias) => generic_alias.variance_of(db, env, typevar),
-            Type::Callable(callable_type) => {
-                callable_type.signatures(db).variance_of(db, env, typevar)
-            }
+            Type::Callable(callable_type) => callable_type.variance_of(db, env, typevar),
             // A type variable is always covariant in itself.
             Type::TypeVar(other_typevar) if other_typevar.identity(db) == typevar => {
                 // type variables are covariant in themselves
@@ -11017,7 +10927,7 @@ impl PromotionMode {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum PromotionKind {
     /// Default promotion behaviour: recurse into nested types
     Regular,
@@ -11057,7 +10967,7 @@ fn class_mro_literals<'db>(
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
 /// is in the MRO of the self type's class.
-#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::SalsaValue)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,

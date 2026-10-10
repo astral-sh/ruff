@@ -245,7 +245,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
-    current_statements: Vec<CurrentStatement<'ast, 'db>>,
+    current_statements: Vec<CurrentStatement<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -289,8 +289,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     seen_submodule_imports: FxHashSet<String>,
-    // A map from a lambda expression to its enclosing statement.
-    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     // A map from a constraining use of a collection initializer to its definition.
     collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
     // A map from a collection initializer definition to statements containing a constraining use.
@@ -351,7 +349,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             unpacks_by_target: FxHashMap::default(),
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
-            enclosing_lambda_statements: FxHashMap::default(),
             collections_by_use: FxHashMap::default(),
             uses_by_collection: FxHashMap::default(),
 
@@ -2680,16 +2677,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_assignments.last_mut()
     }
 
-    fn push_statement(&mut self, statement: CurrentStatement<'ast, 'db>) {
+    fn push_statement(&mut self, statement: CurrentStatement<'db>) {
         self.current_statements.push(statement);
     }
 
-    fn pop_statement(&mut self) -> CurrentStatement<'ast, 'db> {
+    fn pop_statement(&mut self) -> CurrentStatement<'db> {
         self.current_statements.pop().unwrap()
-    }
-
-    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast, 'db>> {
-        self.current_statements.last_mut()
     }
 
     /// Return whether a pattern contains any capture that changes the current flow state.
@@ -3429,7 +3422,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 .into_iter()
                 .map(|builder| use_def_map_interner.intern(builder.finish()))
                 .collect(),
-            enclosing_lambda_statements: FrozenMap::from(self.enclosing_lambda_statements),
             collections_by_use: FrozenMap::from(self.collections_by_use),
             uses_by_collection,
             imported_modules: FrozenSet::from(self.imported_modules),
@@ -3562,11 +3554,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 }
             }
             ast::Expr::Lambda(lambda) => {
-                self.current_statement_mut()
-                    .expect("every lambda expression is part of a statement")
-                    .lambda_expressions
-                    .push(lambda);
-
                 if let Some(parameters) = &lambda.parameters {
                     // The default value of the parameters needs to be evaluated in the
                     // enclosing scope.
@@ -3574,6 +3561,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .iter_non_variadic_params()
                         .filter_map(|param| param.default.as_deref())
                     {
+                        self.add_standalone_expression_impl(
+                            default,
+                            ExpressionKind::ParameterDefault,
+                            None,
+                        );
                         self.visit_expr(default);
                     }
                     self.visit_parameters(parameters);
@@ -5616,24 +5608,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             });
 
-        if current_statement.lambda_expressions.is_empty()
-            && current_statement.collection_uses.is_empty()
-        {
+        if current_statement.collection_uses.is_empty() {
             return;
         }
 
         let standalone_statement = self.add_standalone_statement(stmt);
-
-        // The body of a lambda expression needs access to the `Callable` type
-        // context the lambda is being inferred with, and so any statement
-        // containing a lambda must be inferable as a standalone statement
-        // to avoid large scope-level cycles.
-        self.enclosing_lambda_statements.extend(
-            current_statement
-                .lambda_expressions
-                .into_iter()
-                .map(|lambda| (lambda.into(), standalone_statement)),
-        );
 
         // The inferred element type of a collection initializer depends on uses of
         // the collection in its containing scope, and so each use must be part
@@ -6025,9 +6004,7 @@ impl CurrentAssignment<'_, '_> {
 }
 
 #[derive(Default)]
-struct CurrentStatement<'ast, 'db> {
-    /// A list of lambda expressions contained in this statement.
-    lambda_expressions: Vec<&'ast ast::ExprLambda>,
+struct CurrentStatement<'db> {
     /// A list of collection definitions whose uses are contained in this statement.
     collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }

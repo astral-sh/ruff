@@ -22,6 +22,37 @@ if not (lambda: f):  # error: [redundant-condition] "always truthy"
     f = 0
 ```
 
+## Recursive lambda in a boolean conditional
+
+A recursive lambda remains truthy when combined with another condition, even when its return type
+depends on an assignment in the branch.
+
+```py
+f = lambda: f
+if True and (lambda: f):  # error: [redundant-condition] "always truthy"
+    f = 0
+```
+
+## Recursive lambda in a boolean loop condition
+
+A loop condition can depend on a lambda whose return type changes in the loop body.
+
+```py
+f = lambda: f
+while True and (lambda: f):  # error: [redundant-condition] "always truthy"
+    f = 0
+```
+
+## Recursive lambda in a boolean assertion
+
+The warning also applies in an assertion, even when the lambda refers to a later assignment:
+
+```py
+f = lambda: f
+assert True and (lambda: f)  # error: [redundant-condition] "always truthy"
+f = 0
+```
+
 ## Function signature
 
 Deferred annotations can result in cycles in resolving a function signature:
@@ -258,25 +289,24 @@ class D:
 
 ### Lambdas
 
+Each lambda returns its parameter, whose type is unknown when supplied by the caller. The default
+refers back to the same attribute, so the return type also contains a recursive callable:
+
 ```py
 class C:
     def f(self: "C"):
         self.a = lambda positional=self.a: positional
         self.b = lambda *, kw_only=self.b: kw_only
         self.c = lambda positional_only=self.c, /: positional_only
-        self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Divergent)
+        # revealed: (positional: Unknown = ...) -> Unknown | ((positional=...) -> Unknown | Divergent)
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
+        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Unknown | Divergent)
         reveal_type(self.b)
 
-        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Divergent)
+        # revealed: (positional_only: Unknown = ..., /) -> Unknown | ((positional_only=..., /) -> Unknown | Divergent)
         reveal_type(self.c)
-
-        # revealed: (*, kw_only=...) -> Unknown | ((*, kw_only=...) -> Divergent)
-        reveal_type(self.d)
 ```
 
 ### Self-referential decorated functions
@@ -500,6 +530,71 @@ except Exception:
     result = make
 finally:
     from unknown_module import member as result  # error: [unresolved-import]
+```
+
+## Recursive decorators with an unresolved default
+
+We report errors in both decorators without losing the dictionary type returned by the inner one.
+This is a regression test for <https://github.com/astral-sh/ty/issues/4613>.
+
+```py
+while previous := Decorated:  # error: [possibly-unresolved-reference]
+    @lambda value=missing: value  # error: [unresolved-reference]
+    @lambda: {key: 0}  # error: [too-many-positional-arguments]
+    class Decorated:
+        pass
+
+    reveal_type(Decorated)  # revealed: dict[Divergent, int]
+
+key = previous
+```
+
+## Recursive decorator with a lambda default
+
+These decorators refer to each other's results, and `build` is later reassigned to a type alias. We
+can still infer that `Result` is a tuple, even though its item type is unresolved:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+@lambda func, fallback=lambda: Result: (build,)
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result)  # revealed: tuple[Divergent]
+
+type build = int
+```
+
+## Recursive decorator returning a collection
+
+The dictionary in the decorator's result refers back to the decorated function. We can infer the
+literal type of the other tuple item independently:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+values = [1]
+
+@lambda func, fallback=lambda: Result: (0, {build: 0 for _ in values})
+def build(): ...
+
+@lambda cls: build
+class Result: ...
+
+while Result:  # error: [redundant-condition]
+    reveal_type(Result[0])  # revealed: Literal[0]
+
+type build = int
 ```
 
 ## Decorated methods with implicit class attributes

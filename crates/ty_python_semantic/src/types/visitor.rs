@@ -6,6 +6,7 @@ use std::hash::Hash;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 use smallvec::SmallVec;
 use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 
 use crate::types::{
     BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
@@ -14,7 +15,7 @@ use crate::types::{
     StaticClassLiteral, SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType,
     TypeIsType, TypedDictType, UnionType,
     bound_super::walk_bound_super_type,
-    callable::walk_callable_type,
+    callable::{SignatureSource, walk_callable_type},
     class::walk_generic_alias,
     cyclic::{ActiveRecursionDetector, TypeIdentity},
     function::{FunctionType, walk_function_type},
@@ -499,6 +500,7 @@ pub(super) fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector<StaticClassLiteral<'db>>,
         active_type_aliases: ActiveRecursionDetector<Definition<'db>>,
         active_recursive_types: ActiveRecursionDetector<RecursiveType<'db>>,
+        active_lambdas: ActiveRecursionDetector<ScopeId<'db>>,
         content: Cell<DynamicContent>,
         mode: DynamicContentMode,
     }
@@ -539,6 +541,23 @@ pub(super) fn dynamic_content_impl<'db>(
             }
 
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            if !self.content.get().is_absent() {
+                return;
+            }
+            let SignatureSource::Lambda(lambda) = callable.signature_source(db) else {
+                walk_callable_type(db, callable, self);
+                return;
+            };
+            // A recursive return can reach the same lambda with different captured arguments.
+            // An exact-type guard cannot finish that walk or prove the absence of dynamic types.
+            self.active_lambdas.visit(
+                &lambda.scope(db),
+                || self.record(DynamicContent::Indeterminate),
+                || walk_callable_type(db, callable, self),
+            );
         }
 
         fn visit_function_type(&self, db: &'db dyn Db, function: FunctionType<'db>) {
@@ -661,6 +680,7 @@ pub(super) fn dynamic_content_impl<'db>(
         active_class_typed_dicts: ActiveRecursionDetector::default(),
         active_type_aliases: ActiveRecursionDetector::default(),
         active_recursive_types: ActiveRecursionDetector::default(),
+        active_lambdas: ActiveRecursionDetector::default(),
         content: Cell::new(DynamicContent::Absent),
         mode,
     };
@@ -670,9 +690,9 @@ pub(super) fn dynamic_content_impl<'db>(
 
 /// Whether inspecting `ty` can encounter recursive types with changing specializations.
 ///
-/// Exact recursive types are safe to inspect once. For protocol methods, conservatively treat
-/// a new specialization of an active protocol definition as potentially growing: their signatures
-/// are not included in the specialization-flow analysis used by [`TypeIdentity`].
+/// Exact recursive types are safe to inspect once. For protocol methods and lambda returns,
+/// conservatively treat another use of the same active definition as potentially growing:
+/// their signatures are not included in the specialization-flow analysis used by [`TypeIdentity`].
 pub(super) fn contains_growing_type<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
@@ -682,6 +702,7 @@ pub(super) fn contains_growing_type<'db>(
         env: &'a ProgramEnvironment<'db>,
         recursion_guard: TypeCollector<'db>,
         active_class_protocols: ActiveRecursionDetector<StaticClassLiteral<'db>>,
+        active_lambdas: ActiveRecursionDetector<ScopeId<'db>>,
         found: Cell<bool>,
     }
 
@@ -728,6 +749,18 @@ pub(super) fn contains_growing_type<'db>(
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
 
+        fn visit_callable_type(&self, db: &'db dyn Db, callable: CallableType<'db>) {
+            let SignatureSource::Lambda(lambda) = callable.signature_source(db) else {
+                walk_callable_type(db, callable, self);
+                return;
+            };
+            self.active_lambdas.visit(
+                &lambda.scope(db),
+                || self.found.set(true),
+                || walk_callable_type(db, callable, self),
+            );
+        }
+
         fn visit_protocol_instance_type(
             &self,
             db: &'db dyn Db,
@@ -767,6 +800,7 @@ pub(super) fn contains_growing_type<'db>(
         env,
         recursion_guard: TypeCollector::default(),
         active_class_protocols: ActiveRecursionDetector::default(),
+        active_lambdas: ActiveRecursionDetector::default(),
         found: Cell::new(false),
     };
     visitor.visit_type(db, ty);

@@ -1,0 +1,540 @@
+//! Transform lambda signatures without making their inferred return types part of their identity.
+
+use std::cell::RefCell;
+
+use super::{LambdaSignature, infer_lambda_signature};
+use crate::types::constraints::resolution::type_dependencies;
+use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
+use crate::types::typevar::TypeVarSet;
+use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
+use crate::types::visitor::any_over_type_including_alias_arguments;
+use crate::types::{
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, MaterializationKind,
+    PromotionKind, PromotionMode, SelfBinding, Type, TypeContext, TypeMapping, TypeVarVariance,
+};
+use crate::{Db, FxOrderSet, ProgramEnvironment};
+use ty_python_core::semantic_index;
+
+/// The source and context of a deferred lambda transformation. The inferred result is
+/// deliberately absent: recursive returns refer to another application of this same mapping.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub struct LambdaSignatureMapping<'db> {
+    source: LambdaSignature<'db>,
+    mapping: LambdaMapping<'db>,
+    context: TypeContext<'db>,
+    materialize_typevar_bounds_and_defaults: bool,
+}
+
+impl<'db> LambdaSignatureMapping<'db> {
+    /// Derive variance from the source and substitution arguments. Expanding the specialized
+    /// signature would create unbounded equations for returns such as `C[list[T]].callback`.
+    pub(super) fn variance_equation(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<VarianceTerm<'db>> {
+        if matches!(self.mapping, LambdaMapping::Promote(..)) {
+            // Promotion widens literals without introducing type variables or changing their
+            // polarity. Reuse the source equation; it is conservative if union simplification
+            // removes an occurrence. The full signature still retains the promotion.
+            return Some(VarianceTerm::variable(
+                db,
+                VarianceOrigin::Lambda(self.source),
+                typevar,
+            ));
+        }
+        let LambdaMapping::Specialize {
+            specialization,
+            materialization: None,
+            ..
+        } = &self.mapping
+        else {
+            return None;
+        };
+        let source = self.source;
+        let env = ProgramEnvironment::from_scope(source.scope(db));
+        // Keep source equations in terms of their own captures. Variables introduced by
+        // a caller belong in the argument terms, and do not create new source equations.
+        let arguments = source.captured_typevars(db).variables(db).map(|parameter| {
+            let argument = specialization
+                .get(db, parameter)
+                .unwrap_or(Type::TypeVar(parameter));
+            let argument = if parameter.is_paramspec(db) {
+                // ParamSpec arguments encode parameter lists as callables. Their variance
+                // already includes parameter contravariance, which the source equation also
+                // accounts for. Reverse it here so that composition counts it only once.
+                Self::paramspec_argument_variance(db, &env, argument, typevar)
+                    .compose_thunk(db, || TypeVarVariance::Contravariant.into())
+            } else {
+                argument.variance_of(db, &env, typevar)
+            };
+            argument.compose_thunk(db, || {
+                VarianceTerm::variable(db, VarianceOrigin::Lambda(source), parameter.identity(db))
+            })
+        });
+        Some(VarianceTerm::join(db, arguments))
+    }
+
+    /// Give an unspecialized `ParamSpec` the variance of its callable parameter-list value.
+    fn paramspec_argument_variance(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument: Type<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        match argument {
+            Type::Union(union) => VarianceTerm::join(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|argument| Self::paramspec_argument_variance(db, env, *argument, typevar)),
+            ),
+            Type::TypeVar(parameter) if parameter.is_paramspec(db) => argument
+                .variance_of(db, env, typevar)
+                .compose_thunk(db, || TypeVarVariance::Contravariant.into()),
+            _ => argument.variance_of(db, env, typevar),
+        }
+    }
+
+    /// Apply the saved mapping in the context in which it was requested.
+    pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        let env = ProgramEnvironment::from_scope(self.source.scope(db));
+        let visitor = ApplyTypeMappingVisitor {
+            materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
+            ..ApplyTypeMappingVisitor::new(&env)
+        };
+        infer_lambda_signature(db, self.source)
+            .overload_return_type_or_unknown(db, &env)
+            .apply_type_mapping_impl(db, &self.mapping.as_type_mapping(), self.context, &visitor)
+    }
+}
+
+/// An owned semantic mapping that can be applied when a lambda's return type is requested.
+/// Structural substitutions never enter an inferred body and are handled separately.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) enum LambdaMapping<'db> {
+    Specialize {
+        specialization: Specialization<'db>,
+        specialize_self_domain: bool,
+        materialization: Option<MaterializationKind>,
+    },
+    Promote(PromotionMode, PromotionKind),
+    BindLegacyTypevars(BindingContext<'db>),
+    FreshenBoundTypeVars(GenericContext<'db>, u32),
+    BindSelf(SelfBinding<'db>),
+    ReplaceSelf(Type<'db>),
+    Materialize(MaterializationKind),
+    ReplaceParameterDefaults,
+    EagerExpansion,
+}
+
+impl<'db> LambdaMapping<'db> {
+    /// Own the mapping's inputs, retaining only substitutions available to this lambda.
+    pub(super) fn from_type_mapping(
+        db: &'db dyn Db,
+        lambda: LambdaSignature<'db>,
+        mapping: &TypeMapping<'_, 'db>,
+    ) -> Option<Self> {
+        Some(match mapping {
+            TypeMapping::ApplySpecialization(specialization)
+            | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
+                if specialization.preserves_lazy_signatures() {
+                    return None;
+                }
+                Self::Specialize {
+                    specialization: {
+                        let (variables, types): (Vec<_>, Vec<_>) = lambda
+                            .captured_typevars(db)
+                            .variables(db)
+                            .filter_map(|variable| {
+                                specialization.get(db, variable).map(|ty| (variable, ty))
+                            })
+                            .unzip();
+                        // An absent substitution can still specialize a Self bound. Adding
+                        // an identity substitution would suppress that existing behavior.
+                        let context = GenericContext::from_typevar_instances(
+                            db,
+                            &ProgramEnvironment::from_scope(lambda.scope(db)),
+                            variables,
+                        );
+                        Specialization::new(db, context, types.into_boxed_slice(), None, None)
+                    },
+                    specialize_self_domain: specialization.specialize_self_domain(),
+                    materialization: match mapping {
+                        TypeMapping::ApplySpecializationWithMaterialization {
+                            materialization_kind,
+                            ..
+                        } => Some(*materialization_kind),
+                        _ => None,
+                    },
+                }
+            }
+            TypeMapping::Promote(mode, kind) => Self::Promote(*mode, *kind),
+            TypeMapping::BindLegacyTypevars(context) => Self::BindLegacyTypevars(*context),
+            TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta,
+            } => Self::FreshenBoundTypeVars(*generic_context, *delta),
+            TypeMapping::BindSelf(binding) => Self::BindSelf(binding.clone()),
+            TypeMapping::ReplaceSelf { new_upper_bound } => Self::ReplaceSelf(*new_upper_bound),
+            TypeMapping::Materialize(kind) => Self::Materialize(*kind),
+            TypeMapping::ReplaceParameterDefaults => Self::ReplaceParameterDefaults,
+            TypeMapping::EagerExpansion => Self::EagerExpansion,
+            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::RescopeReturnCallables(_) => {
+                return None;
+            }
+        })
+    }
+
+    fn as_type_mapping(&self) -> TypeMapping<'_, 'db> {
+        match self {
+            Self::Specialize {
+                specialization,
+                specialize_self_domain,
+                materialization,
+            } => {
+                let specialization = ApplySpecialization::Specialization {
+                    specialization: *specialization,
+                    specialize_self_domain: *specialize_self_domain,
+                };
+                match materialization {
+                    Some(kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                        specialization,
+                        materialization_kind: *kind,
+                    },
+                    None => TypeMapping::ApplySpecialization(specialization),
+                }
+            }
+            Self::Promote(mode, kind) => TypeMapping::Promote(*mode, *kind),
+            Self::BindLegacyTypevars(context) => TypeMapping::BindLegacyTypevars(*context),
+            Self::FreshenBoundTypeVars(generic_context, delta) => {
+                TypeMapping::FreshenBoundTypeVars {
+                    generic_context: *generic_context,
+                    delta: *delta,
+                }
+            }
+            Self::BindSelf(binding) => TypeMapping::BindSelf(binding.clone()),
+            Self::ReplaceSelf(new_upper_bound) => TypeMapping::ReplaceSelf {
+                new_upper_bound: *new_upper_bound,
+            },
+            Self::Materialize(kind) => TypeMapping::Materialize(*kind),
+            Self::ReplaceParameterDefaults => TypeMapping::ReplaceParameterDefaults,
+            Self::EagerExpansion => TypeMapping::EagerExpansion,
+        }
+    }
+}
+
+#[salsa::tracked]
+impl<'db> LambdaSignature<'db> {
+    /// Summarize dependencies without expanding each specialization of a recursive return.
+    /// Recursive references query the source's variable set; deferred mappings transform that
+    /// set instead of the return graph. Joining cycle approximations preserves dependencies
+    /// that are first encountered through another lambda.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|_, _, _| TypeVarSet::None,
+        cycle_fn=|db, _, previous: &TypeVarSet<'db>, current, _| previous.merge(db, current),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(in crate::types) fn return_type_dependencies(self, db: &'db dyn Db) -> TypeVarSet<'db> {
+        let env = ProgramEnvironment::from_scope(self.scope(db));
+        if let Some(mapping) = self.mapping(db) {
+            let visitor = ApplyTypeMappingVisitor {
+                materialize_typevar_bounds_and_defaults: mapping
+                    .materialize_typevar_bounds_and_defaults,
+                ..ApplyTypeMappingVisitor::new(&env)
+            };
+            let transformation = mapping.mapping.as_type_mapping();
+            let flipped = transformation.flip();
+            return type_dependencies(
+                db,
+                &env,
+                mapping
+                    .source
+                    .return_type_dependencies(db)
+                    .iter(db)
+                    .flat_map(|variable| {
+                        // A returned type can contain both variance positions, e.g. in a callable.
+                        [&transformation, &flipped].map(|transformation| {
+                            Type::TypeVar(variable).apply_type_mapping_impl(
+                                db,
+                                transformation,
+                                mapping.context,
+                                &visitor,
+                            )
+                        })
+                    }),
+            );
+        }
+
+        type_dependencies(
+            db,
+            &env,
+            [infer_lambda_signature(db, self).overload_return_type_or_unknown(db, &env)],
+        )
+    }
+
+    /// Variables in the lambda's lexical and contextual inputs after transformation.
+    /// Inferring the body here would re-enter the transformation of its recursive references.
+    #[salsa::tracked(
+        returns(copy),
+        cycle_initial=|db, _, lambda: LambdaSignature<'db>| GenericContext::from_typevar_instances(
+            db, &ProgramEnvironment::from_scope(lambda.scope(db)), []
+        ),
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    fn captured_typevars(self, db: &'db dyn Db) -> GenericContext<'db> {
+        let scope = self.scope(db);
+        let env = ProgramEnvironment::from_scope(scope);
+        let index = semantic_index(db, scope.program_file(db));
+        let mut source = self;
+        let mut mappings = Vec::new();
+        while let Some(mapping) = source.mapping(db) {
+            mappings.push(mapping);
+            source = mapping.source;
+        }
+        let variables = RefCell::new(
+            index
+                .ancestor_scopes(scope.file_scope_id(db))
+                .filter_map(|(_, scope)| GenericContext::lexical_of_node(db, scope.node(), index))
+                .flat_map(|context| context.variables(db))
+                .collect::<FxOrderSet<_>>(),
+        );
+        let collect = |ty| {
+            any_over_type_including_alias_arguments(db, &env, ty, |ty| {
+                if let Type::TypeVar(variable) = ty {
+                    variables.borrow_mut().insert(variable);
+                }
+                false
+            });
+        };
+        for parameter in source.parameters(db) {
+            collect(parameter.annotated_type());
+        }
+        if let Some(annotation) = source.return_context(db).annotation {
+            collect(annotation);
+        }
+        for mapping in mappings.into_iter().rev() {
+            let current = variables.take();
+            let visitor = ApplyTypeMappingVisitor {
+                materialize_typevar_bounds_and_defaults: mapping
+                    .materialize_typevar_bounds_and_defaults,
+                ..ApplyTypeMappingVisitor::new(&env)
+            };
+            let context = mapping.context;
+            let mapping = mapping.mapping.as_type_mapping();
+            for variable in current {
+                // Captured variables can occur in either variance position in the body.
+                for mapping in [&mapping, &mapping.flip()] {
+                    collect(
+                        Type::TypeVar(variable)
+                            .apply_type_mapping_impl(db, mapping, context, &visitor),
+                    );
+                }
+            }
+        }
+        GenericContext::from_typevar_instances(db, &env, variables.into_inner())
+    }
+
+    /// Rewrite stored inputs without evaluating the lambda's body. Recursive binding
+    /// and unfolding must also rewrite captured arguments in deferred specializations.
+    pub(super) fn map_inputs(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let map = |ty: Type<'db>| ty.apply_type_mapping_impl(db, mapping, tcx, visitor);
+        let deferred = self.mapping(db).as_ref().map(|deferred| {
+            let deferred_mapping = match &deferred.mapping {
+                LambdaMapping::Specialize {
+                    specialization,
+                    specialize_self_domain,
+                    materialization,
+                } => LambdaMapping::Specialize {
+                    specialization: specialization.apply_type_mapping_impl(
+                        db,
+                        mapping,
+                        &[],
+                        visitor,
+                    ),
+                    specialize_self_domain: *specialize_self_domain,
+                    materialization: *materialization,
+                },
+                LambdaMapping::BindSelf(binding) => LambdaMapping::BindSelf(SelfBinding {
+                    ty: map(binding.ty),
+                    ..binding.clone()
+                }),
+                LambdaMapping::ReplaceSelf(ty) => LambdaMapping::ReplaceSelf(map(*ty)),
+                other => other.clone(),
+            };
+            LambdaSignatureMapping {
+                source: deferred.source.map_inputs(db, mapping, tcx, visitor),
+                mapping: deferred_mapping,
+                context: deferred
+                    .context
+                    .with_annotation(deferred.context.annotation.map(map)),
+                materialize_typevar_bounds_and_defaults: deferred
+                    .materialize_typevar_bounds_and_defaults,
+            }
+        });
+        Self::new(
+            db,
+            self.parameters(db)
+                .apply_type_mapping_impl(db, mapping, tcx, visitor),
+            self.scope(db),
+            self.body(db),
+            self.return_context(db)
+                .with_annotation(self.return_context(db).annotation.map(map)),
+            self.environment(db),
+            deferred,
+        )
+    }
+
+    /// Compose transformations on the source rather than traversing the inferred return graph.
+    pub(super) fn apply_mapping(
+        self,
+        db: &'db dyn Db,
+        mut mapping: LambdaMapping<'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        // Repeating a promotion, or materializing an already-materialized type, has no effect.
+        // Promotions commute with each other. A substitution can occur between matching
+        // operations only if its arguments stay unchanged in both variance positions. Promotion
+        // and materialization must keep their order: promotion can introduce gradual types.
+        // Preserve the original operation order and discard only the redundant new operation.
+        if matches!(
+            mapping,
+            LambdaMapping::Promote(..) | LambdaMapping::Materialize(_)
+        ) {
+            let transformation = mapping.as_type_mapping();
+            let flipped = transformation.flip();
+            let mut source = self;
+            while let Some(previous) = source.mapping(db)
+                && previous.context == tcx
+                && previous.materialize_typevar_bounds_and_defaults
+                    == visitor.materialize_typevar_bounds_and_defaults
+            {
+                match (&mapping, &previous.mapping) {
+                    (LambdaMapping::Promote(..), LambdaMapping::Promote(..))
+                    | (LambdaMapping::Materialize(_), LambdaMapping::Materialize(_)) => {}
+                    (
+                        _,
+                        LambdaMapping::Specialize {
+                            specialization,
+                            materialization: None,
+                            ..
+                        },
+                    ) if specialization.types(db).iter().all(|argument| {
+                        [&transformation, &flipped]
+                            .into_iter()
+                            .all(|transformation| {
+                                argument.apply_type_mapping_impl(db, transformation, tcx, visitor)
+                                    == *argument
+                            })
+                    }) => {}
+                    _ => break,
+                }
+                if previous.mapping == mapping
+                    || matches!(
+                        (&previous.mapping, &mapping),
+                        (LambdaMapping::Materialize(_), LambdaMapping::Materialize(_))
+                    )
+                {
+                    return self;
+                }
+                source = previous.source;
+            }
+        }
+        if let LambdaMapping::Specialize { specialization, .. } = &mapping
+            && specialization
+                .generic_context(db)
+                .variables(db)
+                .zip(specialization.types(db))
+                .all(|(variable, ty)| Type::TypeVar(variable) == *ty)
+        {
+            return self;
+        }
+
+        if let Some(previous) = self.mapping(db)
+            && previous.mapping == mapping
+            && previous.context == tcx
+            && previous.materialize_typevar_bounds_and_defaults
+                == visitor.materialize_typevar_bounds_and_defaults
+            && matches!(
+                mapping,
+                LambdaMapping::BindSelf(_)
+                    | LambdaMapping::BindLegacyTypevars(_)
+                    | LambdaMapping::ReplaceSelf(_)
+                    | LambdaMapping::ReplaceParameterDefaults
+                    | LambdaMapping::EagerExpansion
+            )
+        {
+            return self;
+        }
+
+        let parameters = self.parameters(db).apply_type_mapping_impl(
+            db,
+            &mapping.as_type_mapping(),
+            tcx,
+            visitor,
+        );
+        let mut source = self;
+        if let Some(previous_mapping) = self.mapping(db)
+            && previous_mapping.context == tcx
+            && previous_mapping.materialize_typevar_bounds_and_defaults
+                == visitor.materialize_typevar_bounds_and_defaults
+            && let LambdaMapping::Specialize {
+                specialization: previous,
+                specialize_self_domain: previous_self_domain,
+                materialization: None,
+            } = &previous_mapping.mapping
+            && let LambdaMapping::Specialize {
+                specialization,
+                specialize_self_domain,
+                materialization: None,
+            } = &mut mapping
+            && specialize_self_domain == previous_self_domain
+        {
+            let mapping = TypeMapping::ApplySpecialization(ApplySpecialization::Specialization {
+                specialization: *specialization,
+                specialize_self_domain: *specialize_self_domain,
+            });
+            let (variables, types): (Vec<_>, Vec<_>) = previous_mapping
+                .source
+                .captured_typevars(db)
+                .variables(db)
+                .filter_map(|variable| {
+                    previous
+                        .get(db, variable)
+                        .map(|ty| ty.apply_type_mapping_impl(db, &mapping, tcx, visitor))
+                        .or_else(|| specialization.get(db, variable))
+                        .map(|ty| (variable, ty))
+                })
+                .unzip();
+            let context = GenericContext::from_typevar_instances(db, visitor.env, variables);
+            *specialization =
+                Specialization::new(db, context, types.into_boxed_slice(), None, None);
+            source = previous_mapping.source;
+        }
+
+        Self::new(
+            db,
+            parameters,
+            source.scope(db),
+            source.body(db),
+            source.return_context(db),
+            source.environment(db),
+            Some(LambdaSignatureMapping {
+                source,
+                mapping,
+                context: tcx,
+                materialize_typevar_bounds_and_defaults: visitor
+                    .materialize_typevar_bounds_and_defaults,
+            }),
+        )
+    }
+}

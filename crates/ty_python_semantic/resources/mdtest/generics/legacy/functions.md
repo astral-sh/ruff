@@ -2016,6 +2016,28 @@ def _(value: str | None):
     accept(value)  # error: [invalid-argument-type] "does not satisfy constraints"
 ```
 
+## Type variables in lambda defaults
+
+A lambda used as a function's default value can refer to the type variables bound by that function:
+
+```py
+from typing import Callable, TypeVar, cast
+
+T = TypeVar("T")
+
+# no diagnostic
+def apply(value: T, callback: Callable[[T], T] = lambda item=cast(T, None): item) -> T:
+    return callback(value)
+```
+
+Nested defaults refer to the same type variable. Calling both lambdas retains `T` in the result:
+
+```py
+def nested(value: T, callback=lambda outer=(lambda inner=cast(T, None): inner): outer) -> T:
+    reveal_type(callback()())  # revealed: Unknown | T@nested
+    return value
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py
