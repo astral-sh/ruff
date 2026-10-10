@@ -599,7 +599,6 @@ fn comparison_truthiness_widens_across_sparse_cycle_results() -> anyhow::Result<
                 scope,
             },
             DefinitionInference {
-                alias_inputs: None,
                 expressions: [(expression, ty)].into_iter().collect(),
                 types: DefinitionTypes::Empty,
                 extra: truthiness.map(|truthiness| {

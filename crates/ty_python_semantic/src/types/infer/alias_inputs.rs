@@ -161,8 +161,7 @@ impl<'db> AliasInferenceCache<'db> {
             return None;
         };
         let reference = inference
-            .alias_inputs
-            .as_ref()?
+            .alias_inputs()?
             .references
             .get(&expression.into())?;
         (reference.deferred_state == deferred_state
@@ -182,8 +181,7 @@ impl<'db> AliasInferenceCache<'db> {
         };
         if deferred_state.is_deferred()
             || inference
-                .alias_inputs
-                .as_ref()?
+                .alias_inputs()?
                 .runtime_values
                 .get(&expression.into())
                 != Some(&typevar_binding_context)

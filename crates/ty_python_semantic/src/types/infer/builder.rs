@@ -657,8 +657,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.alias_cache
-            .extend_cached(inference.alias_inputs.as_deref());
+        self.alias_cache.extend_cached(inference.alias_inputs());
         self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations(definition));
 
@@ -691,7 +690,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.string_annotations
                         .extend(string_annotations.iter().copied());
                 }
-                DefinitionInferenceExtra::Undecorated(_)
+                DefinitionInferenceExtra::AliasInputs(_)
+                | DefinitionInferenceExtra::Undecorated(_)
                 | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
                 DefinitionInferenceExtra::Other(extra) => {
                     self.implicit_aliases
@@ -12299,7 +12299,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
+        let alias_inputs = alias_cache.into_inputs().finish();
+        let non_undecorated_extra_field_count = usize::from(alias_inputs.is_some())
+            + usize::from(!string_annotations.is_empty())
             + usize::from(!implicit_aliases.is_empty())
             + usize::from(!comparison_truthiness.is_empty())
             + usize::from(!expected_types.is_empty())
@@ -12315,6 +12317,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let extra = match (non_undecorated_extra_field_count, undecorated_type) {
             (0, None) => None,
+            (1, None) if let Some(inputs) = alias_inputs => {
+                Some(Box::new(DefinitionInferenceExtra::AliasInputs(inputs)))
+            }
             (1, None) if !qualifiers.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::Qualifiers(FrozenMap::from(qualifiers)),
             )),
@@ -12355,6 +12360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, undecorated_type) => {
                 collection_use_constraints.shrink_to_fit();
                 let extra = OtherDefinitionInferenceExtra {
+                    alias_inputs,
                     implicit_aliases: implicit_aliases.into_iter().collect(),
                     comparison_truthiness: FrozenMap::from(comparison_truthiness),
                     string_annotations: FrozenSet::from(string_annotations),
@@ -12396,7 +12402,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            alias_inputs: alias_cache.into_inputs().finish(),
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
