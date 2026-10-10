@@ -461,3 +461,23 @@ def f():
     x = (1
               )
     return x
+
+
+# `pytest.raises` and `unittest`'s `assertRaises` can also swallow an exception, so the
+# assignment in the body may not have run by the time the `with` statement exits
+import pytest
+
+
+def foo():
+    x = 2
+    with pytest.raises(Exception):
+        x = x + 1
+    return x
+
+
+class Class:
+    def method(self):
+        x = 2
+        with self.assertRaises(Exception):
+            x = x + 1
+        return x
