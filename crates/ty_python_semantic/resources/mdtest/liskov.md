@@ -2909,6 +2909,121 @@ class PropertyChild(PropertyParent):
         return True
 ```
 
+## Inferred attributes against declared read types
+
+An inferred default still has a readable value. When it comes from another base, that value must
+satisfy a declared read type. Its inferred literal type does not narrow the writes promised by the
+base.
+
+```py
+class Declared:
+    value: int = 0
+
+class Number:
+    value = 1
+
+class Text:
+    value = "text"
+
+class Compatible(Number, Declared): ...  # no diagnostic
+class Incompatible(Text, Declared): ...  # error: [invalid-attribute-override]
+```
+
+## Inferred instance assignments keep inherited declarations
+
+An unannotated instance assignment is checked against an annotation in its own base classes. It does
+not introduce a new type in a later subclass. In particular, a valid TypedDict initializer must not
+be rechecked as an ordinary `dict`.
+
+```py
+from typing import TypedDict
+
+class Context(TypedDict, total=False):
+    source: str
+
+class Flow:
+    context: Context
+
+class Firmware(Flow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class Options(Flow): ...
+class Combined(Options, Firmware): ...  # no diagnostic
+
+reveal_type(Combined().context)  # revealed: Context
+```
+
+The inherited declaration must still be compared with a different base's more restrictive contract.
+
+```py
+class RequiredContext(TypedDict):
+    source: str
+
+class NeedsSource:
+    context: RequiredContext
+
+class Incompatible(Firmware, NeedsSource): ...  # error: [invalid-attribute-override]
+```
+
+The same applies if the inherited annotation is on an instance rather than in the class body.
+
+```py
+class InstanceFlow:
+    def __init__(self) -> None:
+        self.context: Context = {}
+
+class InstanceFirmware(InstanceFlow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class InstanceOptions(InstanceFlow): ...
+class InstanceCombined(InstanceOptions, InstanceFirmware): ...  # no diagnostic
+```
+
+An initializer in the class body establishes the same contract. Assignments in subclasses still use
+that annotation, even when the defining class never assigns the attribute on `self`.
+
+```py
+class DefaultFlow:
+    context: Context = {}
+
+class DefaultFirmware(DefaultFlow):
+    def __init__(self) -> None:
+        self.context = {}  # no diagnostic
+
+class DefaultOptions(DefaultFlow): ...
+class DefaultCombined(DefaultOptions, DefaultFirmware): ...  # no diagnostic
+class DefaultIncompatible(DefaultFirmware, NeedsSource): ...  # error: [invalid-attribute-override]
+
+class BadFirmware(DefaultFlow):
+    def __init__(self) -> None:
+        self.context = {"source": 0}  # error: [invalid-assignment]
+```
+
+A base's unannotated default is different: it cannot hide an incompatible value assigned in a
+method. Nor can an inferred assignment take its type from an unrelated base added later.
+
+```py
+class Default:
+    count = 0
+
+class SetsText(Default):
+    def __init__(self) -> None:
+        self.count = "unknown"  # error: [invalid-assignment]
+
+class NeedsInt:
+    count: int
+
+class WrongDefault(SetsText, NeedsInt): ...  # error: [invalid-attribute-override]
+
+class Unrelated:
+    def __init__(self) -> None:
+        self.context = {}
+
+class NotAFlow(Unrelated, NeedsSource): ...  # error: [invalid-attribute-override]
+```
+
 ## Mutable attribute narrowing
 
 When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
@@ -2969,6 +3084,57 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
    |
  3 |     def value(self) -> int: ...
    |         ----- `Base.value` declared here
+```
+
+## Assignments to inherited properties
+
+Assigning to a writable property calls its setter. The assignment does not turn the property into an
+instance attribute, even when methods in both a base and a subclass assign to it. Further overrides
+preserve the property's getter and setter types.
+
+```py
+class Base:
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int | str) -> None:
+        pass
+
+    def set_value(self, value: int) -> None:
+        self.value = value
+
+class Middle(Base):
+    def reset(self) -> None:
+        self.value = 0
+
+class Compatible(Middle):
+    @property
+    def value(self) -> int:  # no diagnostic
+        return super().value
+
+    @value.setter
+    def value(self, value: int | str) -> None:
+        pass
+
+class Incompatible(Middle):
+    @property
+    def value(self) -> str:
+        return ""
+
+    @value.setter
+    def value(self, value: int | str) -> None:  # error: [invalid-property-type-override]
+        pass
+
+class NarrowSetter(Middle):
+    @property
+    def value(self) -> int:
+        return 0
+
+    @value.setter
+    def value(self, value: int) -> None:  # error: [invalid-property-type-override]
+        pass
 ```
 
 ## Methods and attributes with the same name
