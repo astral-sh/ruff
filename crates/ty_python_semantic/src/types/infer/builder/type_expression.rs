@@ -156,6 +156,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> LegacyTypeAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
+        self.value_inference = Some(crate::types::infer_definition_types(self.db(), definition));
         let ty = self.infer_type_expression(value);
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
@@ -259,6 +260,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         expression: &ast::Expr,
     ) -> (Type<'db>, Option<Definition<'db>>) {
+        if let Some(reference) = self.cached_reference(expression) {
+            return reference;
+        }
         match expression {
             ast::Expr::Name(name) if name.ctx.is_load() => {
                 self.infer_name_load_with_definition(name)
@@ -536,15 +540,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
                         if !ignore_runtime_errors(self) {
                             let mut speculative_builder = self.speculate_without_diagnostics();
-                            // If the left-hand side of the union is itself a PEP-604 union,
-                            // we'll already have checked whether it can be used with `|` in a previous inference step
-                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
-                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
-                            // in that case.
-                            let left_type_value = speculative_builder
-                                .infer_expression(&binary.left, TypeContext::default());
-                            let right_type_value = speculative_builder
-                                .infer_expression(&binary.right, TypeContext::default());
+                            // An alias's value inference already evaluated these operands. Its
+                            // cached values preserve their runtime meaning: for example, `int`
+                            // denotes a class here, while its type-expression result is an instance.
+                            let left_type_value =
+                                self.cached_runtime_value(&binary.left).unwrap_or_else(|| {
+                                    speculative_builder
+                                        .infer_expression(&binary.left, TypeContext::default())
+                                });
+                            let right_type_value =
+                                self.cached_runtime_value(&binary.right).unwrap_or_else(|| {
+                                    speculative_builder
+                                        .infer_expression(&binary.right, TypeContext::default())
+                                });
 
                             let dunder_fails = Type::try_call_bin_op(
                                 db,
@@ -670,7 +678,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
 
-                        UnionType::from_elements_leave_aliases(db, env, [left_ty, right_ty])
+                        UnionType::from_type_expression_elements(
+                            db,
+                            env,
+                            [left_ty, right_ty],
+                            false,
+                        )
                     }
                     ast::Operator::BitAnd => {
                         if let Some(builder) =
@@ -1773,12 +1786,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
                     Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
                         ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements_leave_aliases(
+                            let ty = UnionType::from_type_expression_elements(
                                 db,
                                 env,
                                 tuple
                                     .iter()
                                     .map(|element| self.infer_subclass_of_type_expression(element)),
+                                false,
                             );
                             self.store_expression_type(parameters, ty);
                             ty
@@ -2484,7 +2498,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             },
             SpecialFormType::Optional => {
                 let param_type = self.infer_type_expression(arguments_slice);
-                UnionType::from_elements_leave_aliases(db, env, [param_type, Type::none(db, env)])
+                UnionType::from_type_expression_elements(
+                    db,
+                    env,
+                    [param_type, Type::none(db, env)],
+                    false,
+                )
             }
             SpecialFormType::Union => {
                 // TODO: Support the union of a `TypeVarTuple`'s elements. Until then, reject
@@ -2495,7 +2514,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 let mut has_unpacked_typevartuple = false;
-                let union_ty = UnionType::from_elements_leave_aliases(
+                let union_ty = UnionType::from_type_expression_elements(
                     db,
                     env,
                     arguments.iter().map(|argument| {
@@ -2534,6 +2553,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                         ty
                     }),
+                    false,
                 );
                 let ty = if has_unpacked_typevartuple {
                     Type::object()

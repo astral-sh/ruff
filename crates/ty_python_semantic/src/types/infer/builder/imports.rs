@@ -48,6 +48,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         qualifiers: TypeQualifiers,
         provenance: Provenance<'db>,
     ) {
+        if let Some(source) = provenance.definition()
+            && super::may_require_implicit_alias_inference(
+                self.db(),
+                self.program_environment(),
+                ty,
+            )
+        {
+            self.imported_definition = if source.kind(self.db()).is_import() {
+                infer_definition_types(self.db(), source)
+                    .alias_inputs
+                    .as_ref()
+                    .and_then(|inputs| inputs.imported_definition)
+            } else {
+                Some(source)
+            };
+        }
         // Check the imported value before assignment recovery can replace its type.
         if definition.kind(self.db()).as_star_import().is_none() {
             self.check_deprecated(alias, ty);

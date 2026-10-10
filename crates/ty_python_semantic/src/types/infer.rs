@@ -65,7 +65,7 @@ use crate::types::{
 };
 use crate::{Db, FxIndexSet};
 
-use builder::TypeInferenceBuilder;
+use builder::{DeferredExpressionState, TypeInferenceBuilder};
 pub(super) use comparisons::UnsupportedComparisonError;
 use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::expression::Expression;
@@ -179,6 +179,29 @@ pub(super) fn non_alias_type_expression_diagnostics<'db>(
     let env = ProgramEnvironment::from_file(program_file);
     TypeInferenceBuilder::for_definition(db, &env, definition, &module)
         .finish_non_alias_type_expression_diagnostics(definition, value)
+}
+
+/// A name or attribute resolved while inferring an expression's value.
+///
+/// Type-expression inference can reuse the resolution without losing the definition behind a
+/// normalized value. Deferred lookups and type-variable binding contexts must still agree.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct ResolvedReference<'db> {
+    ty: Type<'db>,
+    definition: Option<Definition<'db>>,
+    deferred_state: DeferredExpressionState,
+    typevar_binding_context: Option<Definition<'db>>,
+}
+
+/// Inputs retained by value inference for a later interpretation of an alias's right-hand side.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+struct AliasInferenceInputs<'db> {
+    /// The original definition selected by import inference, after following re-exports.
+    imported_definition: Option<Definition<'db>>,
+    references: FrozenMap<ExpressionNodeKey, ResolvedReference<'db>>,
+    /// Binding contexts of expressions evaluated eagerly with default type context. Their types
+    /// are in the region's expression table.
+    runtime_values: FrozenMap<ExpressionNodeKey, Option<Definition<'db>>>,
 }
 
 bitflags::bitflags! {
@@ -1250,6 +1273,8 @@ impl<'db> InferredDeclaration<'db> {
 /// The inferred types for a definition region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinitionInference<'db> {
+    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
+
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -1691,6 +1716,7 @@ impl<'db> DefinitionInference<'db> {
         }
 
         Self {
+            alias_inputs: None,
             expressions: FrozenMap::default(),
             types,
             #[cfg(debug_assertions)]
@@ -1714,6 +1740,19 @@ impl<'db> DefinitionInference<'db> {
         let env = ProgramEnvironment::from_definition(definition);
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, &env, previous_inference);
+        }
+
+        if let Some(inputs) = &mut self.alias_inputs {
+            for (expression, reference) in &mut inputs.references {
+                reference.ty = match previous_inference
+                    .alias_inputs
+                    .as_ref()
+                    .and_then(|inputs| inputs.references.get(expression))
+                {
+                    Some(previous) => reference.ty.cycle_normalized(db, &env, previous.ty, cycle),
+                    None => reference.ty.recursive_type_normalized(db, &env, cycle),
+                };
+            }
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -1991,6 +2030,8 @@ fn widen_comparison_truthiness(
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
+    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
+
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -2065,6 +2106,7 @@ impl<'db> ExpressionInference<'db> {
     fn cycle_initial(scope: ScopeId<'db>, cycle_recovery: Type<'db>) -> Self {
         let _ = scope;
         Self {
+            alias_inputs: None,
             extra: Some(Box::new(ExpressionInferenceExtra {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
@@ -2099,6 +2141,19 @@ impl<'db> ExpressionInference<'db> {
 
         if cycle.iteration() > crate::TAINTED_CYCLES {
             self.widen_comparison_truthiness(db, env, previous);
+        }
+
+        if let Some(inputs) = &mut self.alias_inputs {
+            for (expression, reference) in &mut inputs.references {
+                reference.ty = match previous
+                    .alias_inputs
+                    .as_ref()
+                    .and_then(|inputs| inputs.references.get(expression))
+                {
+                    Some(previous) => reference.ty.cycle_normalized(db, env, previous.ty, cycle),
+                    None => reference.ty.recursive_type_normalized(db, env, cycle),
+                };
+            }
         }
 
         for (expr, ty) in &mut self.expressions {
