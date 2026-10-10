@@ -7889,6 +7889,10 @@ static_assert(is_equivalent_to(Extra, Closed))
 static_assert(is_subtype_of(Extra, Closed))
 static_assert(is_subtype_of(Closed, Extra))
 static_assert(is_equivalent_to(AliasedExtra, Closed))
+
+def _(extra: Extra, aliased: AliasedExtra) -> None:
+    reveal_type(extra.get("missing"))  # revealed: None
+    reveal_type(aliased.get("missing", False))  # revealed: Literal[False]
 ```
 
 ### Empty closed TypedDict truthiness
@@ -8533,6 +8537,43 @@ def _(closed: Closed, functional: FunctionalClosed, empty: EmptyClosed, key: str
     reveal_type(closed.get(key))  # revealed: str | int | None
     reveal_type(functional.get(key))  # revealed: str | int | None
     reveal_type(empty.get(key))  # revealed: None
+    reveal_type(closed.get(key, b"missing"))  # revealed: str | int | Literal[b"missing"]
+    reveal_type(closed.get("name", False))  # revealed: str
+    reveal_type(empty.get(key, False))  # revealed: Literal[False]
+```
+
+A literal key outside the declared schema returns only `None` or the supplied default. This also
+applies to saved method references, and defaults receive context from the expected result type:
+
+```py
+from typing import Literal
+
+def _(closed: Closed, functional: FunctionalClosed, missing: Literal["missing", "other"]) -> None:
+    reveal_type(closed.get("missing"))  # revealed: None
+    reveal_type(closed.get("missing", False))  # revealed: Literal[False]
+    reveal_type(functional.get("missing", 0))  # revealed: Literal[0]
+    reveal_type(closed.get(missing))  # revealed: None
+    reveal_type(closed.get(missing, False))  # revealed: Literal[False]
+
+    get = closed.get
+    reveal_type(get("missing"))  # revealed: None
+    reveal_type(get("missing", False))  # revealed: Literal[False]
+
+    values: list[int] = closed.get("missing", reveal_type([]))  # revealed: list[int]
+    saved_values: list[int] = get("missing", reveal_type([]))  # revealed: list[int]
+    wrong: int = closed.get("missing", "wrong")  # error: [invalid-assignment]
+```
+
+Declared non-required items still provide context for their defaults:
+
+```py
+class ClosedPartial(TypedDict, total=False, closed=True):
+    values: list[int]
+
+def _(partial: ClosedPartial) -> None:
+    reveal_type(partial.get("values", []))  # revealed: list[int]
+    get = partial.get
+    reveal_type(get("values", []))  # revealed: list[int]
 ```
 
 ### `pop` and `setdefault` support literal extra-item keys
