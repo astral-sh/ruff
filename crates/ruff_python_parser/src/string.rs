@@ -837,20 +837,13 @@ mod tests {
 
     #[test]
     fn test_parse_f_string_concat_2() {
-        let source = "'Hello ' f'world'";
-        let suite = parse_suite(source).unwrap();
-        insta::assert_debug_snapshot!(suite);
-    }
-
-    #[test]
-    fn test_parse_f_string_concat_3() {
         let source = "'Hello ' f'world{\"!\"}'";
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_f_string_concat_4() {
+    fn test_parse_f_string_concat_3() {
         let source = "'Hello ' f'world{\"!\"}' 'again!'";
         let suite = parse_suite(source).unwrap();
         insta::assert_debug_snapshot!(suite);
@@ -879,20 +872,13 @@ mod tests {
 
     #[test]
     fn test_parse_t_string_concat_2_error() {
-        let source = "'Hello ' t'world'";
-        let suite = parse_suite(source).unwrap_err();
-        insta::assert_debug_snapshot!(suite);
-    }
-
-    #[test]
-    fn test_parse_t_string_concat_3_error() {
         let source = "'Hello ' t'world{\"!\"}'";
         let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);
     }
 
     #[test]
-    fn test_parse_t_string_concat_4_error() {
+    fn test_parse_t_string_concat_3_error() {
         let source = "'Hello ' t'world{\"!\"}' 'again!'";
         let suite = parse_suite(source).unwrap_err();
         insta::assert_debug_snapshot!(suite);

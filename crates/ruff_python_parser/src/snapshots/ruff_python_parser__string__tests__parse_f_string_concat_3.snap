@@ -6,11 +6,11 @@ expression: suite
     Expr(
         StmtExpr {
             node_index: NodeIndex(None),
-            range: 0..22,
+            range: 0..31,
             value: FString(
                 ExprFString {
                     node_index: NodeIndex(None),
-                    range: 0..22,
+                    range: 0..31,
                     value: FStringValue {
                         inner: Concatenated(
                             [
@@ -73,6 +73,19 @@ expression: suite
                                         flags: FStringFlags {
                                             quote_style: Single,
                                             prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
+                                        },
+                                    },
+                                ),
+                                Literal(
+                                    StringLiteral {
+                                        range: 23..31,
+                                        node_index: NodeIndex(None),
+                                        value: "again!",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
                                             triple_quoted: false,
                                             unclosed: false,
                                         },

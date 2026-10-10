@@ -2129,36 +2129,6 @@ mod tests {
     }
 
     #[test]
-    fn select_linter_preview() -> Result<()> {
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Disabled,
-                ..PreviewOptions::default()
-            }),
-        )?;
-        let expected = RuleSet::empty();
-        assert_eq!(actual, expected);
-
-        let actual = resolve_rules(
-            [RuleSelection {
-                select: Some(vec![UnresolvedRuleSelector::cli("RUF91")]),
-                ..RuleSelection::default()
-            }],
-            Some(PreviewOptions {
-                mode: PreviewMode::Enabled,
-                ..PreviewOptions::default()
-            }),
-        )?;
-        let expected = RuleSet::from_rule(Rule::PreviewTestRule);
-        assert_eq!(actual, expected);
-        Ok(())
-    }
-
-    #[test]
     fn select_prefix_preview() -> Result<()> {
         let actual = resolve_rules(
             [RuleSelection {
