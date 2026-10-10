@@ -44,7 +44,7 @@ fn exact<'db, 'c>(
         db,
         &db.program_environment(),
         builder,
-        ConstraintProvenance::Evidence,
+        ConstraintProvenance::INFERRED,
         typevar,
         ty,
     )
@@ -93,7 +93,7 @@ fn collect_paths<'db, 'c>(
         &env,
         inferable,
         budget,
-        |_, bound| CandidateSolutions::default_solve(db, &env, builder, bound),
+        |_, bound| bound.solve(db, &env, builder, inferable),
         Paths::default(),
         |mut paths, path, budget| {
             for binding in path {
@@ -138,7 +138,7 @@ fn path_limit_is_checked_before_solving() {
             },
             |_, bound| {
                 selected += 1;
-                CandidateSolutions::default_solve(db, &env, &builder, bound)
+                bound.solve(db, &env, &builder, inferable)
             },
             0,
             |count, _, _| {
@@ -178,7 +178,7 @@ fn invalid_paths_respect_projection_budgets() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -252,7 +252,7 @@ fn alternative_constraint_failures_keep_upper_bounds_on_separate_paths() {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             ty,
         )
@@ -468,7 +468,7 @@ fn incomplete_solution_discards_the_projection() {
     for alternatives in [[int, str], [str, int]] {
         let set = binary_choice(db, &builder, t, alternatives);
         let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-            let lower = candidate.inference_lower(db, &env);
+            let lower = candidate.inference_lower();
             if lower == Some(str) {
                 PathBoundSolution::BudgetExceeded {
                     fallback: Some(str),
@@ -535,7 +535,7 @@ fn rejected_exhausted_path_does_not_poison_valid_sibling() {
                 },
             ] {
                 let choose = |_, candidate: &CandidateTypeVarSolution<'_>| {
-                    let lower = candidate.inference_lower(db, &env);
+                    let lower = candidate.inference_lower();
                     if candidate.bound_typevar == u {
                         PathBoundSolution::Unsatisfiable
                     } else if lower == Some(str) {
@@ -650,7 +650,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
         let mut selected = 0;
         let collected = set.solutions_with(db, &env, inferable, budget, |_, bound| {
             selected += 1;
-            CandidateSolutions::default_solve(db, &env, &builder, bound)
+            bound.solve(db, &env, &builder, inferable)
         });
         // One additional path is selected to discover that it exceeds the budget; later
         // paths are not solved.
@@ -662,7 +662,7 @@ fn type_budget_is_charged_before_constructing_a_union() {
             &env,
             inferable,
             budget,
-            |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+            |_, bound| bound.solve(db, &env, &builder, inferable),
             Type::Never,
             |accumulated, path, budget| {
                 assert_eq!(path.len(), 1);
@@ -789,7 +789,7 @@ class E: ...
 
         assert_eq!(
             paths.try_fold_with(
-                |_, bound| CandidateSolutions::default_solve(db, &env, &builder, bound),
+                |_, bound| bound.solve(db, &env, &builder, TypeVarSet::from_typevars(db, [t])),
                 Type::object(),
                 &mut ProjectionTypeBudget::new(7),
                 |accumulated, path, budget| {

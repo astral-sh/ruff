@@ -137,8 +137,7 @@ class Manager(Generic[T]):
     response: T
 
     async def __aenter__(self) -> T:
-        # TODO(#26680): Keep the return error, but report `Response | (T@Manager & Socket)`.
-        # error: [invalid-return-type] "expected `T@Manager`, found `Response | T@Manager`"
+        # error: [invalid-return-type] "expected `T@Manager`, found `Response | (T@Manager & Socket)`"
         return await self.response.__aenter__()
 ```
 

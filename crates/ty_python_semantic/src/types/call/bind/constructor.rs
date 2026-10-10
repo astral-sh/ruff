@@ -865,7 +865,7 @@ impl<'db> Binding<'db> {
     /// instance type.
     ///
     /// Return `None` if this is not a constructor call.
-    pub(crate) fn normalized_constructor_return(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn normalized_constructor_return(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         let constructor_context = self.constructor_context?;
         let instance_type = constructor_context.instance_type();
 

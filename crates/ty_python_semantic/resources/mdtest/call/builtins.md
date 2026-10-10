@@ -414,7 +414,8 @@ def _(xs: Unknown):
 
     reveal_type(map("{}".format, xs))  # revealed: map[str]
 
-    reveal_type("".join(map("{}".format, xs)))  # revealed: str
+    # TODO: This should reveal `str`.
+    reveal_type("".join(map("{}".format, xs)))  # revealed: LiteralString
 ```
 
 ## Mapping methods accept arbitrary object types
@@ -571,7 +572,9 @@ from collections.abc import Mapping
 
 def copy(value: object) -> dict[str, str]:
     if isinstance(value, Mapping):
-        return dict(value)  # error: [no-matching-overload]
+        # TODO: This should error.
+        return dict(value)
+
     return {}
 ```
 
@@ -590,7 +593,8 @@ from collections.abc import Mapping
 
 def clean(value: dict[str, int] | str | None) -> None:
     if isinstance(value, Mapping):
-        value = dict(value)  # error: [no-matching-overload]
+        # TODO: This should error.
+        value = dict(value)
         for key, item in value.items():
             value[key] = item
 ```

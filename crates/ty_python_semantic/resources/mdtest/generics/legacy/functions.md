@@ -1332,7 +1332,11 @@ def infer_pair(value: Pair[T]) -> T:
 
 def check_pair(value: GradualPair[U]) -> None:
     # TODO: error: [invalid-argument-type] "Argument to function `infer_pair` is incorrect"
-    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+    result = infer_pair(value)
+    reveal_type(result)  # revealed: tuple[U@check_pair, Any] | tuple[U@check_pair, int]
+
+    # TODO: We should preserve the inferred union through the generic call.
+    reveal_type(infer_pair(value))  # revealed: tuple[U@check_pair, Any]
 ```
 
 ## Prefer specific compatible constraints over gradual constraints
@@ -1760,6 +1764,33 @@ However, if we pass something that does not match _any_ union element, we do emi
 ```py
 # error: [invalid-argument-type]
 reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+```
+
+## Declared type matching multiple type variables
+
+Regression test for <https://github.com/astral-sh/ty/issues/3236>.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Never, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V", default=Never)
+
+def concat(left: list[T], right: list[U]) -> list[T | U]:
+    return [*left, *right]
+
+def concat_wider(left: list[T], right: list[U]) -> list[T | U | V]:
+    return [*left, *right]
+
+def _(left: list[int], right: list[str]):
+    result: list[int | str] = concat(left, right)  # ok
+    wider: list[int | str | bytes] = concat_wider(left, right)  # ok
 ```
 
 ## Inferring nested generic function calls

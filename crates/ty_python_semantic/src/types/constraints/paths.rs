@@ -837,6 +837,11 @@ impl PathAssignments {
                 .get(replacement)
                 .is_some_and(Option::is_some)
                 && !self.substituted_constraints.contains(&replacement)
+                // An unspecialized type variable supplies no inference evidence.
+                && !storage
+                    .constraint_data(replacement)
+                    .as_concrete()
+                    .is_some_and(|(_, bound)| bound.has_unspecialized_type_var(db, env))
             {
                 self.substituted_constraints.insert(original);
             }
@@ -1214,7 +1219,7 @@ mod tests {
             db,
             &env,
             builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             bound_typevar,
             ty,
         )
@@ -1243,7 +1248,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Bool.to_instance(db, &env),
         );
@@ -1251,7 +1256,7 @@ mod tests {
             db,
             &env,
             &builder,
-            ConstraintProvenance::Evidence,
+            ConstraintProvenance::INFERRED,
             t,
             KnownClass::Int.to_instance(db, &env),
         );

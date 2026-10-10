@@ -640,8 +640,8 @@ reveal_type(Explicit(1))  # revealed: Explicit[Literal[1]]
 
 ### Failed constructor inference
 
-A failed constructor call reports its argument error without exposing an unsolved class type
-parameter or producing an additional assignment error.
+A failed constructor call reports an assignability error without exposing an unsolved class type
+parameter or producing an additional argument error.
 
 ```py
 from collections.abc import Callable
@@ -655,7 +655,8 @@ class Consumer[T]:
 
 def accepts_dog(value: Dog) -> None: ...
 
-consumer: Consumer[Animal] = Consumer(accepts_dog)  # error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `Consumer[Dog]` is not assignable to `Consumer[Animal]`"
+consumer: Consumer[Animal] = Consumer(accepts_dog)
 ```
 
 ### Constrained constructor inference uses argument evidence
@@ -686,13 +687,13 @@ class C[T]:
     def __init__(self, value: T) -> None:
         reveal_type(C(value))  # revealed: C[T@C]
 
-        # error: [invalid-assignment] "Object of type `C[T@C]` is not assignable to `C[int]`"
+        # error: [invalid-argument-type] "Expected `int`, found `T@C`"
         invalid: C[int] = C(value)
 
     def from_union(self, value: T | list[T]) -> None:
         reveal_type(C(value))  # revealed: C[T@C | list[T@C]]
 
-        # error: [invalid-assignment] "Object of type `C[T@C | list[T@C]]` is not assignable to `C[list[T@C]]`"
+        # error: [invalid-argument-type] "Expected `list[T@C]`, found `T@C | list[T@C]`"
         invalid_union: C[list[T]] = C(value)
 ```
 
