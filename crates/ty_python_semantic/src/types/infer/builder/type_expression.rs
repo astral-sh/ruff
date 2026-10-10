@@ -38,7 +38,7 @@ use crate::types::{
     IntersectionType, InvalidTypeExpression, KnownClass, KnownInstanceType, LintDiagnosticGuard,
     Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeContext, TypeFormType,
     TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type,
-    binding_type, todo_type,
+    any_over_type_including_alias_arguments, binding_type, todo_type,
 };
 use crate::{FxOrderSet, SemanticModel, add_inferred_python_version_hint_to_diagnostic};
 
@@ -112,9 +112,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Preserve cycle errors even when recovery removes every recursive reference. Both
         // runtime-value inference and enclosing aliases need the fallback type to converge.
         let ty = result.unwrap_or_else(|error| error.fallback_type);
-        let is_recursive = any_over_type(db, self.program_environment(), ty, false, |ty| {
-            matches!(ty, Type::Recursive(_))
-        });
+        // References in stored alias arguments must keep participating in cycle recovery.
+        let is_recursive =
+            any_over_type_including_alias_arguments(db, self.program_environment(), ty, |ty| {
+                matches!(ty, Type::Recursive(_))
+            });
         if result.is_ok() && !is_recursive {
             return None;
         }
