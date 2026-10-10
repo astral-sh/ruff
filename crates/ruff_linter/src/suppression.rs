@@ -23,8 +23,7 @@ use crate::preview::is_human_readable_names_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    RuleCodesInSuppressionComments, UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA,
-    UnusedNOQAKind, code_is_valid,
+    RuleCodesInSuppressionComments, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
 use crate::settings::types::PreviewMode;
@@ -397,6 +396,21 @@ impl Suppressions {
         false
     }
 
+    /// Returns the ranges of all unmatched `disable` comments that were used.
+    pub(crate) fn unmatched_disable_ranges(&self) -> impl Iterator<Item = TextRange> + '_ {
+        self.valid
+            .iter()
+            .filter_map(|suppression| match &suppression.comments {
+                SuppressionComments::Single(SuppressionComment {
+                    action: SuppressionAction::Disable,
+                    range,
+                    ..
+                }) if suppression.used.get() => Some(*range),
+                _ => None,
+            })
+            .unique()
+    }
+
     /// Check for rule codes in valid suppression comments.
     pub(crate) fn check_rule_codes(&self, context: &LintContext, locator: &Locator) {
         if !context.is_rule_enabled(Rule::RuleCodesInSuppressionComments) {
@@ -498,7 +512,6 @@ impl Suppressions {
         }
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
-        let mut unmatched_ranges = FxHashSet::default();
 
         for suppression in &self.valid {
             let first_comment = suppression.comments.first();
@@ -543,16 +556,6 @@ impl Suppressions {
                     }
                 } else {
                     group.disabled_codes.push(code_str);
-                }
-            } else if let SuppressionComments::Single(SuppressionComment {
-                action: SuppressionAction::Disable,
-                range,
-                ..
-            }) = &suppression.comments
-            {
-                // UnmatchedSuppressionComment
-                if unmatched_ranges.insert(range) {
-                    context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, *range);
                 }
             }
         }
