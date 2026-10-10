@@ -2024,9 +2024,15 @@ impl<'db> StaticClassLiteral<'db> {
             }
             (
                 field_policy @ CodeGeneratorKind::DataclassLike(_),
-                "__lt__" | "__le__" | "__gt__" | "__ge__",
+                "__eq__" | "__lt__" | "__le__" | "__gt__" | "__ge__",
             ) => {
-                if !self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER) {
+                let (flag, other_ty) = if name == "__eq__" {
+                    (DataclassFlags::EQ, Type::object())
+                } else {
+                    // TODO: could be `Self`.
+                    (DataclassFlags::ORDER, instance_ty)
+                };
+                if !self.has_dataclass_param(db, field_policy, flag) {
                     return None;
                 }
 
@@ -2036,8 +2042,7 @@ impl<'db> StaticClassLiteral<'db> {
                             // TODO: could be `Self`.
                             .with_annotated_type(instance_ty),
                         Parameter::positional_or_keyword(Name::new_static("other"))
-                            // TODO: could be `Self`.
-                            .with_annotated_type(instance_ty),
+                            .with_annotated_type(other_ty),
                     ]),
                     KnownClass::Bool.to_instance(db, env),
                 );
