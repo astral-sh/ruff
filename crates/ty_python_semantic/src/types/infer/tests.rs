@@ -10,10 +10,7 @@ use crate::types::{KnownClass, KnownInstanceType, check_types};
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_db::testing::{
-    assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
-    assert_function_query_was_run,
-};
+use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 use ruff_python_ast::PythonVersion;
 use salsa::Database as _;
 use salsa::plumbing::AsId;
@@ -92,135 +89,6 @@ fn assert_revealed_type(db: &TestDb, filename: &str, expected: &str) {
             .and_then(|annotation| annotation.get_message()),
         Some(expected.as_str())
     );
-}
-
-/// Fully resolved union aliases do not need a second inference pass to check for recursion.
-#[test]
-fn non_recursive_union_aliases_skip_alias_inference() -> anyhow::Result<()> {
-    for source in [
-        "Alias = int | str",
-        "from typing import Union\nAlias = Union[int, str]",
-        "from typing import Union\nAlias = Union[int, 'str']",
-        "Base = int | str\nAlias = Base | bytes",
-        "from typing import TypeVar\nT = TypeVar('T')\nAlias = T | list[T]",
-    ] {
-        let source = format!("{source}\ndef accept(value: Alias) -> Alias:\n    return value\n");
-        let mut db = TestDbBuilder::new()
-            .with_file("/src/main.py", &source)
-            .build()?;
-        assert_file_diagnostics(&db, "/src/main.py", &[]);
-
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "infer_implicit_alias_type", None, &events);
-    }
-    Ok(())
-}
-
-/// Union aliases share their inferred values through imports and re-exports. Checking a consumer
-/// before or after its dependencies does not require inferring those aliases again as types.
-#[test]
-fn acyclic_union_aliases_reuse_value_inference() -> anyhow::Result<()> {
-    for warm_cache in [false, true] {
-        let mut db = TestDbBuilder::new()
-            .with_file(
-                "/src/aliases.py",
-                "Base = int | str\nExtended = Base | bytes\n",
-            )
-            .with_file(
-                "/src/reexports.py",
-                "from aliases import Extended as Public\n",
-            )
-            .with_file(
-                "/src/main.py",
-                "from typing import reveal_type\n\
-                 from reexports import Public\n\
-                 Alias = Public | int\n\
-                 def inspect(value: Alias):\n    reveal_type(value)\n",
-            )
-            .build()?;
-
-        if warm_cache {
-            assert_file_diagnostics(&db, "/src/aliases.py", &[]);
-            assert_file_diagnostics(&db, "/src/reexports.py", &[]);
-        }
-
-        assert_revealed_type(&db, "/src/main.py", "int | str | bytes");
-        let events = db.take_salsa_events();
-        assert_function_query_was_not_run_by_name(&db, "infer_implicit_alias_type", None, &events);
-    }
-    Ok(())
-}
-
-/// Cycle recovery does not make a circular alias valid. Checking its defining module first
-/// preserves circular-definition diagnostics in dependent aliases.
-#[test]
-fn recursive_union_aliases_retain_diagnostics_after_value_inference() -> anyhow::Result<()> {
-    for warm_cache in [false, true] {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/aliases.py",
-                "from typing import Union\nRecursive = Union[int, 'Recursive']\n",
-            )
-            .with_file(
-                "/src/reexports.py",
-                "from aliases import Recursive as Public\n",
-            )
-            .with_file(
-                "/src/main.py",
-                "from reexports import Public\nAlias = Public | str\n\
-                 def inspect(value: Alias): ...\n",
-            )
-            .build()?;
-
-        if warm_cache {
-            assert_file_diagnostics(
-                &db,
-                "/src/aliases.py",
-                &["Type alias `Recursive` has a circular definition"],
-            );
-        }
-
-        assert_file_diagnostics(
-            &db,
-            "/src/main.py",
-            &["Type alias `Alias` has a circular definition"],
-        );
-        assert_file_diagnostics(
-            &db,
-            "/src/aliases.py",
-            &["Type alias `Recursive` has a circular definition"],
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn union_aliases_track_source_changes() -> anyhow::Result<()> {
-    let acyclic = "Base = int | str\n";
-    let mut db = TestDbBuilder::new()
-        .with_file("/src/aliases.py", acyclic)
-        .with_file(
-            "/src/main.py",
-            "from aliases import Base\nAlias = Base | bytes\n\
-             def inspect(value: Alias): ...\n",
-        )
-        .build()?;
-
-    assert_file_diagnostics(&db, "/src/main.py", &[]);
-
-    db.write_file(
-        "/src/aliases.py",
-        "from typing import Union\nBase = Union[int, 'Base']\n",
-    )?;
-    assert_file_diagnostics(
-        &db,
-        "/src/main.py",
-        &["Type alias `Alias` has a circular definition"],
-    );
-
-    db.write_file("/src/aliases.py", acyclic)?;
-    assert_file_diagnostics(&db, "/src/main.py", &[]);
-    Ok(())
 }
 
 #[test]

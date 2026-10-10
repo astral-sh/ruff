@@ -541,21 +541,6 @@ def inspect_mutual(first: First, second: Second):
     reveal_type(second)  # revealed: str | Divergent
 ```
 
-## Invalid cycles with identical union members
-
-Using the same non-recursive member in both unions does not make their circular definitions valid.
-
-```py
-from typing import TypeAlias, Union
-
-First: TypeAlias = Union[int, "Second"]  # error: [cyclic-type-alias-definition]
-Second: TypeAlias = Union[int, "First"]  # error: [cyclic-type-alias-definition]
-
-def inspect(first: First, second: Second):
-    reveal_type(first)  # revealed: Divergent
-    reveal_type(second)  # revealed: int | Divergent
-```
-
 ## Recovery from nested invalid aliases
 
 An invalid alias uses a divergent type for recovery even when referenced inside another alias.

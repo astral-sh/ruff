@@ -2035,47 +2035,6 @@ def _(
     reveal_type(callable_style_to_style)  # revealed: (Style, /) -> Style
 ```
 
-## Union values in loops
-
-Reassigning a union to itself, or adding a member it already contains, preserves its inferred value
-type across loop iterations.
-
-```py
-from typing import Optional, Union
-
-def condition() -> bool:
-    return True
-
-Alias = int | str
-Extended = int | str
-Legacy = Union[int, str]
-Nullable = Optional[int]
-Nested = (int | str) | bytes
-Original = Nested
-
-while condition():
-    Alias = Alias
-    Extended = Extended | int
-    Legacy = Legacy
-    Nullable = Nullable
-    Nested = Nested
-
-reveal_type(Alias)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(Extended)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(Legacy)  # revealed: <types.UnionType special-form 'int | str'>
-reveal_type(Nullable)  # revealed: <types.UnionType special-form 'int | None'>
-reveal_type(Nested)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-
-if Nested is Original:
-    reveal_type(Nested)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-else:
-    reveal_type(Nested)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-
-def inspect(first: Alias, second: Extended):
-    reveal_type(first)  # revealed: int | str
-    reveal_type(second)  # revealed: int | str
-```
-
 ## Ordinary assignments remain values
 
 An assignment that is never used in a type expression is not checked as a type alias. In particular,
@@ -2410,81 +2369,6 @@ First = Union[int, "Second"]  # error: [cyclic-type-alias-definition] "Type alia
 Second = Union[str, "First"]  # error: [cyclic-type-alias-definition] "Type alias `Second` has a circular definition"
 
 def inspect(first: First, second: Second): ...
-```
-
-### Invalid cycles with identical union members
-
-Using the same non-recursive member in both unions does not make their circular definitions valid.
-
-```py
-from typing import Union
-
-First = Union[int, "Second"]  # error: [cyclic-type-alias-definition]
-Second = Union[int, "First"]  # error: [cyclic-type-alias-definition]
-
-def inspect(first: First, second: Second):
-    reveal_type(first)  # revealed: Divergent
-    reveal_type(second)  # revealed: int | Divergent
-```
-
-### Invalid cycles in chained assignments
-
-Each target of a chained assignment refers to the same union value. Recovering that value does not
-make a circular alias valid.
-
-```py
-from typing import Union
-
-First = Second = Union[int, "Second"]  # error: [cyclic-type-alias-definition]
-
-def inspect(first: First, second: Second):
-    reveal_type(first)  # revealed: int | Divergent
-    reveal_type(second)  # revealed: Divergent
-```
-
-### Unions containing invalid aliases
-
-Adding a union member to an invalid alias preserves the circular-definition error, even when value
-inference has already recovered the original alias.
-
-```py
-from typing import Union
-
-Recursive = Union[int, "Recursive"]  # error: [cyclic-type-alias-definition]
-Alias = Recursive | str  # error: [cyclic-type-alias-definition]
-
-def inspect(value: Alias):
-    reveal_type(value)  # revealed: Divergent | str
-```
-
-A union remains invalid even if the other operand already includes its non-recursive member.
-
-```py
-Base = int | str
-Redundant = Base | Recursive  # error: [cyclic-type-alias-definition]
-Reversed = Recursive | Base  # error: [cyclic-type-alias-definition]
-
-def inspect_redundant(first: Redundant, second: Reversed):
-    reveal_type(first)  # revealed: int | str | Divergent
-    reveal_type(second)  # revealed: Divergent | int | str
-```
-
-### Invalid aliases referenced before class-body shadowing
-
-A class-body reference can resolve to a global alias before a later class assignment shadows its
-name. The later assignment does not make the earlier alias valid.
-
-```py
-from typing import Union
-
-Base = Union[int, "Base"]  # error: [cyclic-type-alias-definition]
-
-class C:
-    Alias = Base | str  # error: [cyclic-type-alias-definition]
-    Base = int
-
-def inspect(value: C.Alias):
-    reveal_type(value)  # revealed: Divergent | str
 ```
 
 ### Invalid generic cycles

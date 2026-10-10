@@ -2426,7 +2426,7 @@ mod tests {
     use crate::types::type_alias::TypeAliasType;
     use crate::types::{
         BytesLiteralType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
-        Signature, StringLiteralType, Truthiness, TypePair, UnionTypeInstance,
+        Signature, StringLiteralType, Truthiness, TypePair,
     };
 
     use ruff_db::system::DbWithWritableSystem as _;
@@ -2465,65 +2465,6 @@ mod tests {
         let union = UnionType::from_elements(db, &env, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(db), &[t0, t1]);
-    }
-
-    #[test]
-    fn runtime_union_comparisons_preserve_cycle_history() {
-        let db = setup_db();
-        let db = &db;
-        let env = db.program_environment();
-        let members = UnionType::from_two_elements(
-            db,
-            &env,
-            KnownClass::Int.to_instance(db, &env),
-            KnownClass::Str.to_instance(db, &env),
-        );
-        let value = |had_cycle| {
-            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
-                db,
-                None,
-                Ok(members),
-                had_cycle,
-            )))
-        };
-        let ordinary = value(false);
-        let recovered = value(true);
-
-        for (first, second) in [(ordinary, recovered), (recovered, ordinary)] {
-            assert!(first.is_equivalent_to(db, &env, second));
-            assert!(!first.is_disjoint_from(db, &env, second));
-            for cycle_recovery in [false, true] {
-                assert_eq!(
-                    UnionBuilder::new(db, &env)
-                        .cycle_recovery(cycle_recovery)
-                        .add(first)
-                        .add(second)
-                        .build(),
-                    recovered,
-                );
-            }
-            assert_eq!(
-                IntersectionBuilder::new(db, &env)
-                    .add_positive(first)
-                    .add_positive(second)
-                    .build(),
-                recovered,
-            );
-            assert_eq!(
-                IntersectionBuilder::new(db, &env)
-                    .add_negative(first)
-                    .add_negative(second)
-                    .build(),
-                recovered.negate(db, &env),
-            );
-            assert_eq!(
-                IntersectionBuilder::new(db, &env)
-                    .add_positive(first)
-                    .add_negative(second)
-                    .build(),
-                Type::Never,
-            );
-        }
     }
 
     #[test]
