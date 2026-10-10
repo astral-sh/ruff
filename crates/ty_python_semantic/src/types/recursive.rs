@@ -176,9 +176,9 @@ impl get_size2::GetSize for RecursiveCycle {}
 /// Use the binding operations in this module to construct recursive types.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
-    /// The defining symbol of the alias, including for qualified references.
+    /// Whether the stored body still denotes the source alias or a transformation of it.
     #[returns(copy)]
-    pub(super) definition: Definition<'db>,
+    origin: RecursiveOrigin<'db>,
     /// Names the binder and distinguishes provisional types of different alias queries.
     #[returns(copy)]
     cycle: RecursiveCycle,
@@ -195,8 +195,23 @@ pub struct RecursiveType<'db> {
 
 impl get_size2::GetSize for RecursiveType<'_> {}
 
+/// Retains the source environment without naming a transformed body after the original alias.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
+pub enum RecursiveOrigin<'db> {
+    Alias(Definition<'db>),
+    Transformed(Definition<'db>),
+}
+
 #[salsa::tracked]
 impl<'db> RecursiveType<'db> {
+    pub(super) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        match self.origin(db) {
+            RecursiveOrigin::Alias(definition) | RecursiveOrigin::Transformed(definition) => {
+                definition
+            }
+        }
+    }
+
     /// Summarize the open constructor body without applying semantic substitutions.
     pub(super) fn cycle_summary(self, db: &'db dyn Db) -> &'db AliasCycleSummary<'db> {
         #[salsa::tracked(
@@ -232,7 +247,7 @@ impl<'db> RecursiveType<'db> {
         let arguments = parameters.map(|parameters| parameters.identity_specialization(db));
         Self::new_internal(
             db,
-            definition,
+            RecursiveOrigin::Alias(definition),
             cycle,
             Type::RecursiveVar(RecursiveVar::new_internal(db, cycle, arguments)),
             arguments,
@@ -283,7 +298,7 @@ impl<'db> RecursiveType<'db> {
         } else {
             Type::Recursive(Self::new_internal(
                 db,
-                self.definition(db),
+                self.origin(db),
                 self.cycle(db),
                 body,
                 self.arguments(db),
@@ -292,10 +307,15 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
+    /// Apply this constructor to new arguments, preserving its body and materialization.
+    pub(super) fn with_arguments(
+        self,
+        db: &'db dyn Db,
+        arguments: Option<Specialization<'db>>,
+    ) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
+            self.origin(db),
             self.cycle(db),
             self.body(db),
             arguments,
@@ -310,7 +330,7 @@ impl<'db> RecursiveType<'db> {
     ) -> Self {
         Self::new_internal(
             db,
-            self.definition(db),
+            self.origin(db),
             self.cycle(db),
             self.body(db),
             self.arguments(db),
@@ -333,13 +353,12 @@ impl<'db> RecursiveType<'db> {
             .name()
     }
 
-    /// The source alias's definition and name, if this binder comes from an alias.
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "Keep alias metadata optional for inferred recursive types"
-    )]
+    /// The alias this body denotes, if it has not been structurally transformed.
     pub(super) fn alias(self, db: &'db dyn Db) -> Option<(Definition<'db>, &'db str)> {
-        Some((self.definition(db), self.name(db)))
+        match self.origin(db) {
+            RecursiveOrigin::Alias(definition) => Some((definition, self.name(db))),
+            RecursiveOrigin::Transformed(_) => None,
+        }
     }
 
     /// Restore the formal arguments for constructor analysis.
@@ -470,7 +489,7 @@ impl<'db> RecursiveType<'db> {
                     .map(|arguments| arguments.apply_type_mapping_impl(db, mapping, &[], visitor));
                 Type::Recursive(Self::new_internal(
                     db,
-                    self.definition(db),
+                    self.origin(db),
                     self.cycle(db),
                     body,
                     arguments,
@@ -1464,7 +1483,7 @@ impl<'a, 'db> RecursiveTypeMapping<'a, 'db> {
             };
             Type::Recursive(RecursiveType::new_internal(
                 db,
-                definition,
+                RecursiveOrigin::Transformed(definition),
                 frame.placeholder.cycle(db),
                 body,
                 frame.placeholder.arguments(db),

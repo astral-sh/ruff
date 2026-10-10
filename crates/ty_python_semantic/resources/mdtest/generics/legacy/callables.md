@@ -1397,6 +1397,61 @@ def collect(value: Transform[TypeOf[1]], repetitions: int):
     reveal_type(transform(1)[1]((1,))[1](((1,),))[0])  # revealed: tuple[tuple[int]]
 ```
 
+## Display of transformed recursive constructors
+
+Promotion changes the callback's result but preserves its parameter type. Since each recursive step
+changes those types again, the display binds a parameterized recursive constructor and applies it to
+the current arguments. Parameters named `$T0`, `$T1`, and so on are local to that constructor.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+G = tuple[TypeOf[1], Callable[[T], T], Callable[[], "G[list[T]]"]]
+
+def collect(value: G[TypeOf[2]]):
+    widened = [value][0]
+    # revealed: (μ$0[$T0, $T1, $T2]. tuple[int, ($T2, /) -> $T1, () -> $0[list[$T0], list[$T2], list[$T1]]])[Literal[2], int, Literal[2]]
+    reveal_type(widened)
+    reveal_type(widened[1])  # revealed: (Literal[2], /) -> int
+    reveal_type(widened[2]()[1])  # revealed: (list[int], /) -> list[Literal[2]]
+```
+
+## Names in recursive constructor arguments
+
+Distinct classes with the same name remain distinguishable even when a type argument first appears
+in the body after a recursive step.
+
+`a.py`:
+
+```py
+class Widget: ...
+```
+
+`b.py`:
+
+```py
+class Widget: ...
+```
+
+`main.py`:
+
+```py
+from typing import Callable, TypeVar
+from a import Widget as A
+from b import Widget as B
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+U = TypeVar("U")
+G = tuple[TypeOf[1], T, Callable[[], "G[list[U], T]"]]
+
+def collect(value: G[A, B]):
+    # revealed: (μ$0[$T0, $T1, $T2, $T3, $T4, $T5]. tuple[int, $T2, () -> $0[list[$T1], $T0, list[$T5], $T2, list[$T3], $T4]])[a.Widget, b.Widget, a.Widget, b.Widget, a.Widget, b.Widget]
+    reveal_type([value][0])
+```
+
 ## Generic callables with growing recursive arguments
 
 A factory's type variable can belong to each returned callable even when successive callbacks accept

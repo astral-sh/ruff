@@ -154,6 +154,10 @@ pub struct DisplaySettings<'db> {
     visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
     /// Callable signatures can refer back to the same lambda through its lazy return type.
     visited_callable_types: Rc<FxHashSet<CallableType<'db>>>,
+    /// Recursive types in scope, named `$0`, `$1`, and so on.
+    recursive_binders: Rc<[RecursiveType<'db>]>,
+    /// Parameters of growing recursive constructors, named `$T0`, `$T1`, and so on.
+    recursive_parameters: Rc<[BoundTypeVarIdentity<'db>]>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     hide_return_type: bool,
@@ -689,6 +693,20 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'_, 'db> {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
             Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
+            Type::Recursive(recursive) if recursive.alias(db).is_none() => {
+                if let Some(arguments) = recursive.arguments(db) {
+                    walk_specialization_types(db, arguments, self);
+                }
+                // Track constructors rather than applications, whose arguments can keep growing.
+                if self
+                    .visited_types
+                    .borrow_mut()
+                    .insert(Type::Recursive(recursive.constructor(db)))
+                {
+                    self.visit_type(db, recursive.unfold(db, self.env).into_type());
+                }
+                return;
+            }
             Type::Recursive(recursive) => self.record(db, NamedItem::Recursive(recursive)),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
@@ -1797,6 +1815,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
                     alias.materialization_kind(db),
                     f,
                 ),
+            Type::Recursive(recursive) if recursive.alias(db).is_none() => DisplayRecursiveType {
+                recursive,
+                db,
+                env: self.env,
+                settings: self.settings.clone(),
+            }
+            .fmt_detailed(f),
             Type::Recursive(recursive) => TypeAliasDisplay {
                 db,
                 ty: self.ty,
@@ -1815,6 +1840,109 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'_, 'db> {
     }
 }
 
+struct DisplayRecursiveType<'env, 'db> {
+    recursive: RecursiveType<'db>,
+    db: &'db dyn Db,
+    env: &'env ProgramEnvironment<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> RecursiveType<'db> {
+    /// Growing applications bind their constructor; stable applications bind the concrete type.
+    fn display_binder(self, db: &'db dyn Db) -> Self {
+        if self.may_have_unbounded_specialization(db) {
+            self.with_arguments(
+                db,
+                self.parameters(db)
+                    .map(|parameters| parameters.identity_specialization(db)),
+            )
+        } else {
+            self
+        }
+    }
+}
+
+impl<'db> FmtDetailed<'db> for DisplayRecursiveType<'_, 'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let db = self.db;
+        let recursive = self.recursive;
+        let binder = recursive.display_binder(db);
+        let arguments = recursive
+            .arguments(db)
+            .filter(|_| recursive.may_have_unbounded_specialization(db));
+        let binders = &self.settings.recursive_binders;
+        f.set_invalid_type_annotation();
+        if let Some(index) = binders.iter().position(|active| *active == binder) {
+            write!(f, "${index}")?;
+        } else {
+            let index = binders.len();
+            let mut settings = self.settings.clone();
+            settings.recursive_binders = binders.iter().copied().chain([binder]).collect();
+            if arguments.is_some() {
+                f.write_char('(')?;
+            }
+            write!(f, "μ${index}")?;
+            if let Some(arguments) = arguments {
+                let parameters = arguments
+                    .generic_context(db)
+                    .variables(db)
+                    .collect::<Vec<_>>();
+                let offset = settings.recursive_parameters.len();
+                settings.recursive_parameters = settings
+                    .recursive_parameters
+                    .iter()
+                    .copied()
+                    .chain(parameters.iter().map(|parameter| parameter.identity(db)))
+                    .collect();
+                f.write_char('[')?;
+                for (index, parameter) in parameters.iter().enumerate() {
+                    if index > 0 {
+                        f.write_str(", ")?;
+                    }
+                    if parameter.is_paramspec(db) {
+                        f.write_str("**")?;
+                    } else if parameter.is_typevartuple(db) {
+                        f.write_char('*')?;
+                    }
+                    write!(f, "$T{}", offset + index)?;
+                }
+                f.write_char(']')?;
+            }
+            f.write_str(". ")?;
+            binder
+                .unfold(db, self.env)
+                .into_type()
+                .display_with(db, self.env, settings)
+                .fmt_detailed(f)?;
+            if arguments.is_some() {
+                f.write_char(')')?;
+            }
+        }
+        if let Some(arguments) = arguments {
+            // Keep each pack grouped: flattening several packs would erase their boundaries.
+            f.write_char('[')?;
+            for (index, (parameter, argument)) in arguments
+                .generic_context(db)
+                .variables(db)
+                .zip(arguments.types(db))
+                .enumerate()
+            {
+                if index > 0 {
+                    f.write_str(", ")?;
+                }
+                if parameter.is_typevartuple(db) {
+                    f.write_char('*')?;
+                }
+                argument
+                    .display_with(db, self.env, self.settings.clone())
+                    .fmt_detailed(f)?;
+            }
+            f.write_char(']')?;
+        }
+        Ok(())
+    }
+}
+
 impl<'db> BoundTypeVarIdentity<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.display_with(db, DisplaySettings::default())
@@ -1822,6 +1950,19 @@ impl<'db> BoundTypeVarIdentity<'db> {
 
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> impl Display {
         std::fmt::from_fn(move |f| {
+            let mut parameter = self;
+            parameter.paramspec_attr = None;
+            if let Some(index) = settings
+                .recursive_parameters
+                .iter()
+                .rposition(|candidate| *candidate == parameter)
+            {
+                write!(f, "$T{index}")?;
+                if let Some(attr) = self.paramspec_attr {
+                    write!(f, ".{attr}")?;
+                }
+                return Ok(());
+            }
             f.write_str(self.identity.name(db))?;
             let binding_context = self.binding_context;
             if let Some(binding_context_name) = binding_context.name(db)
@@ -2902,15 +3043,11 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             }
             ParametersKind::ParamSpec(typevar) => {
                 let parameter_name = format!("**{}", typevar.name(db));
-                let mut parameter = f.with_detail(TypeDetail::Parameter(parameter_name.clone()));
-                write!(parameter, "{parameter_name}")?;
-                let binding_context = typevar.binding_context(db);
-                if let Some(binding_context_name) = binding_context.name(db)
-                    && let Some(definition) = binding_context.definition()
-                    && !self.settings.active_scopes.contains(&definition)
-                {
-                    write!(parameter, "@{binding_context_name}")?;
-                }
+                write!(
+                    f.with_detail(TypeDetail::Parameter(parameter_name)),
+                    "**{}",
+                    typevar.identity(db).display_with(db, self.settings.clone())
+                )?;
             }
         }
 
@@ -3731,6 +3868,14 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'_, 'db> {
                 write_parentheses(f)
             }
             Type::Intersection(intersection) if !intersection.has_one_element(db) => {
+                write_parentheses(f)
+            }
+            // A mu binder's body extends as far to the right as possible.
+            Type::Recursive(recursive)
+                if recursive.alias(db).is_none()
+                    && !recursive.may_have_unbounded_specialization(db)
+                    && !self.settings.recursive_binders.contains(&recursive) =>
+            {
                 write_parentheses(f)
             }
             _ => self

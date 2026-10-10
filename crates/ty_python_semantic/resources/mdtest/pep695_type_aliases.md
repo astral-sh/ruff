@@ -1811,8 +1811,27 @@ type Stream = tuple[TypeOf[1], Callable[[], Stream]]
 
 def collect(value: Stream):
     stream = [value][0]
+    reveal_type(stream)  # revealed: μ$0. tuple[int, () -> $0]
     reveal_type(stream[0])  # revealed: int
     reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
+```
+
+### Display of transformed recursive types
+
+Widening the inferred literal changes the recursive body, so the resulting type no longer denotes
+`R`. The notation `μ$0. ...` binds `$0` to the whole recursive type. Its body extends as far to the
+right as possible, so parentheses keep the binding separate from another union member.
+
+```py
+from ty_extensions._internal import TypeOf
+
+type R = tuple[TypeOf[1], R]
+
+def collect(value: R, cond: bool):
+    widened = [value][0]
+    reveal_type(widened)  # revealed: μ$0. tuple[int, $0]
+    reveal_type(widened if cond else None)  # revealed: (μ$0. tuple[int, $0]) | None
+    reveal_type([widened, widened])  # revealed: list[μ$0. tuple[int, $0]]
 ```
 
 ### Singleton promotion through recursive aliases
@@ -1866,6 +1885,8 @@ def collect(top: Top[Stream], bottom: Bottom[Stream]):
     reveal_type(top)  # revealed: tuple[Literal[1], () -> object, () -> Top[Stream]]
     widened_top = [top][0]
     widened_bottom = [bottom][0]
+    reveal_type(widened_top)  # revealed: μ$0. tuple[int, () -> object, () -> $0]
+    reveal_type(widened_bottom)  # revealed: μ$0. tuple[int, () -> Never, () -> $0]
     reveal_type(widened_top[2]()[2]()[0])  # revealed: int
     reveal_type(widened_top[2]()[2]()[1]())  # revealed: object
     reveal_type(widened_bottom[2]()[2]()[1]())  # revealed: Never

@@ -2472,9 +2472,10 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     box.invoke(callback, 1)
 ```
 
-## Promotion of recursive parameter specifications
+## Display of transformed recursive parameter specifications
 
-Promotion preserves the parameter specification as each recursive step adds a positional parameter.
+Each recursive step adds a positional parameter. After widening the label, the displayed recursive
+constructor binds the parameter specification used by both the callback and the next step.
 
 ```py
 from typing import Callable, Concatenate
@@ -2484,5 +2485,7 @@ type Chain[**P] = tuple[TypeOf[1], Callable[P, int], Callable[[], Chain[Concaten
 
 def collect(value: Chain[[int]]):
     widened = [value][0]
+    # revealed: (μ$0[**$T0, **$T1, **$T2]. tuple[int, (**$T0) -> int, () -> $0[(str, /, *args: $T0.args, **kwargs: $T0.kwargs), (str, /, *args: $T0.args, **kwargs: $T0.kwargs), (str, /, *args: $T0.args, **kwargs: $T0.kwargs)]])[(int, /), (int, /), (int, /)]
+    reveal_type(widened)
     reveal_type(widened[2]()[1])  # revealed: (str, int, /) -> int
 ```

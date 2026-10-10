@@ -500,6 +500,66 @@ class name_4[name_1: [{}]]:
 
 ## Diagnostics for common errors
 
+### Transformed recursive types are not suggested as annotation syntax
+
+Widening a recursive alias can produce a type with no declared name. Its recursive display notation
+is not valid Python, so we do not suggest copying it into an annotation.
+
+```py
+from ty_extensions._internal import TypeOf
+
+R = tuple[TypeOf[1], "R"]
+
+def collect(value: R):
+    widened = [value][0]
+    # snapshot: invalid-type-form
+    def invalid(x: [TypeOf[widened]]): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+ --> src/mdtest_snippet.py:8:20
+  |
+8 |     def invalid(x: [TypeOf[widened]]): ...
+  |                    ^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+  |
+7 |     # snapshot: invalid-type-form
+  -     def invalid(x: [TypeOf[widened]]): ...
+8 +     def invalid(x: list[TypeOf[widened]]): ...
+9 | def nested(value: R):
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
+The same restriction applies when a collection contains the anonymous recursive type.
+
+```py
+def nested(value: R):
+    widened = [value]
+    # snapshot: invalid-type-form
+    def invalid(x: [TypeOf[widened]]): ...
+```
+
+```snapshot
+error[invalid-type-form]: List literals are not allowed in this context in a parameter annotation
+  --> src/mdtest_snippet.py:12:20
+   |
+12 |     def invalid(x: [TypeOf[widened]]): ...
+   |                    ^^^^^^^^^^^^^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace with `list[...]`
+   |
+11 |     # snapshot: invalid-type-form
+   -     def invalid(x: [TypeOf[widened]]): ...
+12 +     def invalid(x: list[TypeOf[widened]]): ...
+   |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ### Module-literal used when you meant to use a class from that module
 
 <!-- snapshot-diagnostics -->

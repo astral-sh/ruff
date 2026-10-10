@@ -3344,9 +3344,7 @@ impl<'db> Type<'db> {
             // but they are both exactly equivalent to `Any`
             Type::Dynamic(_) => true,
             Type::TypeVar(_) | Type::SubclassOf(_) => true,
-            // `Recursive` currently only represents implicit type aliases with declared names.
-            // Revisit this and `is_hintable` when general recursive type inference can produce
-            // types without a declared alias.
+            // A transformed recursive type can be spelled by defining a new alias.
             Type::TypeAlias(_) | Type::Recursive(_) => true,
             Type::TypeForm(typeform) => typeform.type_argument(db).is_spellable(db),
             Type::Intersection(_) => false,
@@ -3376,8 +3374,8 @@ impl<'db> Type<'db> {
 
     /// Return `true` if `self` is a type that is suitable for displaying
     /// in a "Did you mean...?" hint message in diagnostics
-    fn is_hintable(&self, db: &'db dyn Db) -> bool {
-        match self {
+    fn is_hintable(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        let hintable = match self {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -3423,13 +3421,13 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
                 SubclassOfInner::Protocol(_) => true,
-                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db),
-                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db),
+                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db, env),
+                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db, env),
             },
 
             Type::TypeVar(tvar) => tvar.typevar(db).definition(db).is_some(),
 
-            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db)),
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db, env)),
 
             Type::TypedDict(td) => td.defining_class().is_some(),
 
@@ -3445,7 +3443,9 @@ impl<'db> Type<'db> {
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::AmbiguousOverload => false,
             },
-        }
+        };
+        // Check the whole display: a nested anonymous recursive type also makes a hint invalid.
+        hintable && self.display(db, env).to_string_parts().is_valid_syntax
     }
 
     /// If the type is a union (or a type alias that resolves to a union), filters union elements

@@ -732,7 +732,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let mut speculative_builder = self.speculate_without_diagnostics();
                     let inner_type = speculative_builder.infer_type_expression(single_element);
 
-                    if inner_type.is_hintable(self.db()) {
+                    if inner_type.is_hintable(db, env) {
                         let hinted_type =
                             KnownClass::List.to_specialized_instance(db, env, &[inner_type]);
 
@@ -781,7 +781,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             .map(|element| speculative.infer_type_expression(element))
                             .collect();
 
-                        if inner_types.iter().all(|ty| ty.is_hintable(self.db())) {
+                        if inner_types.iter().all(|ty| ty.is_hintable(db, env)) {
                             let hinted_type = Type::heterogeneous_tuple(db, env, inner_types);
                             diagnostic.set_primary_annotation_message(format_args!(
                                 "Did you mean `{}`?",
@@ -966,7 +966,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let mut speculative = self.speculate_without_diagnostics();
                     let key_type = speculative.infer_type_expression(key);
                     let value_type = speculative.infer_type_expression(value);
-                    if key_type.is_hintable(self.db()) && value_type.is_hintable(self.db()) {
+                    if key_type.is_hintable(db, env) && value_type.is_hintable(db, env) {
                         let hinted_type = KnownClass::Dict.to_specialized_instance(
                             db,
                             env,
@@ -1026,7 +1026,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let mut speculative_builder = self.speculate_without_diagnostics();
                     let inner_type = speculative_builder.infer_type_expression(single_element);
 
-                    if inner_type.is_hintable(self.db()) {
+                    if inner_type.is_hintable(db, env) {
                         let hinted_type =
                             KnownClass::Set.to_specialized_instance(db, env, &[inner_type]);
 
