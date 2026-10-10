@@ -12,7 +12,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
-use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::diagnostic::{
     self, CYCLIC_TYPE_ALIAS_DEFINITION, EXPERIMENTAL_SYNTAX, INVALID_INIT_TYPE_VARIABLE,
     INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
@@ -22,7 +21,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::implicit_alias::{
-    is_implicit_alias_value, may_require_implicit_alias_inference,
+    imported_alias_definition, is_implicit_alias_value, may_require_implicit_alias_inference,
 };
 use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, ImplicitAliasInferenceExtra, InferenceFlags,
@@ -33,7 +32,6 @@ use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
 use ty_python_core::definition::{Definition, DefinitionKind};
-use ty_python_core::place_table;
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
@@ -61,28 +59,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
         if definition.kind(db).is_import() {
-            if let Some(source) = crate::types::infer_definition_types(db, definition)
-                .alias_inputs
-                .as_ref()
-                .and_then(|inputs| inputs.imported_definition)
-            {
-                definition = source;
-            } else {
-                // Imports bind names without declaring their types, so resolve their definitions directly.
-                let table = place_table(db, definition.scope(db));
-                let symbol = table.symbol(definition.place(db).as_symbol()?);
-                let definitions = resolve_definition(
-                    db,
-                    self.program_environment(),
-                    definition,
-                    Some(symbol.name().as_str()),
-                    ImportAliasResolution::ResolveAliases,
-                );
-                let [resolved] = definitions.as_slice() else {
-                    return None;
-                };
-                definition = resolved.definition()?;
-            }
+            definition = imported_alias_definition(db, definition)?;
         }
         let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
         let value = definition.kind(db).value(&module)?;

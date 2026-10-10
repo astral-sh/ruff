@@ -7,13 +7,38 @@ use ruff_python_ast::{self as ast, visitor as ast_visitor};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::FileScopeId;
-use ty_python_core::semantic_index;
+use ty_python_core::{place_table, semantic_index};
 
+use crate::types::definition_resolution::{ImportAliasResolution, resolve_definition};
 use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
     any_over_type, binding_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
+
+/// Resolve an imported alias only when it has one reachable source definition.
+///
+/// Runtime lookup can merge identical types from several definitions and retain one definition's
+/// provenance. Alias interpretation needs the full set of definitions to preserve ambiguity.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+pub(super) fn imported_alias_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<Definition<'db>> {
+    let table = place_table(db, definition.scope(db));
+    let symbol = table.symbol(definition.place(db).as_symbol()?);
+    let definitions = resolve_definition(
+        db,
+        &ProgramEnvironment::from_definition(definition),
+        definition,
+        Some(symbol.name().as_str()),
+        ImportAliasResolution::ResolveAliases,
+    );
+    let [resolved] = definitions.as_slice() else {
+        return None;
+    };
+    resolved.definition()
+}
 
 /// Whether an assignment's right-hand side can be interpreted as an implicit alias.
 pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
