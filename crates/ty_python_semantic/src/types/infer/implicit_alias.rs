@@ -76,6 +76,22 @@ impl ImplicitAliasAcyclicityProof<'_> {
         match expression {
             ast::Expr::Name(name) => {
                 let db = self.db;
+                let index = semantic_index(db, self.definition.program_file(db));
+                // A forwarding scope can assign a different value from the outer definition
+                // returned by source-name lookup, including when read from a nested function.
+                for (scope, _) in index.visible_ancestor_scopes(self.definition.file_scope(db)) {
+                    let table = index.place_table(scope);
+                    let Some(symbol) = table.symbol_id(&name.id) else {
+                        continue;
+                    };
+                    let symbol = table.symbol(symbol);
+                    if symbol.is_global() || symbol.is_nonlocal() {
+                        return false;
+                    }
+                    if symbol.is_bound() || symbol.is_declared() {
+                        break;
+                    }
+                }
                 let definitions = definitions_for_name(
                     db,
                     self.definition.scope(db),
