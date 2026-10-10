@@ -104,7 +104,7 @@ use crate::types::infer::implicit_alias::{
     is_implicit_alias_value, may_require_implicit_alias_inference,
 };
 use crate::types::infer::{
-    AliasInferenceInputs, ResolvedReference, StatementInference, StatementInferenceInner,
+    AliasInferenceCache, AliasInferenceInputsBuilder, StatementInference, StatementInferenceInner,
     StatementInferenceInnerExtra, TruthinessAnalyzer, TypeAndRange, TypeExpressionFlags,
     infer_statement_types, nearest_enclosing_class, nearest_enclosing_function,
     original_class_type,
@@ -279,12 +279,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
-    references: FxHashMap<ExpressionNodeKey, ResolvedReference<'db>>,
-    runtime_values: FxHashMap<ExpressionNodeKey, Option<Definition<'db>>>,
-    collect_alias_inputs: bool,
-
-    /// Value inference for the alias whose type expression is being interpreted.
-    value_inference: Option<&'db DefinitionInference<'db>>,
+    alias_cache: AliasInferenceCache<'db>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for why these are stored
@@ -541,10 +536,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             implicit_aliases: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
-            references: FxHashMap::default(),
-            runtime_values: FxHashMap::default(),
-            collect_alias_inputs,
-            value_inference: None,
+            alias_cache: AliasInferenceCache::new(collect_alias_inputs),
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
             reachability_cache: OnceCell::new(),
@@ -581,58 +573,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .as_ref()
     }
 
-    fn collects_alias_inputs(&self) -> bool {
-        self.collect_alias_inputs && self.value_inference.is_none()
-    }
-
     fn record_reference(
         &mut self,
         expression: impl Into<ExpressionNodeKey>,
         ty: Type<'db>,
         definition: Option<Definition<'db>>,
     ) {
-        if self.collects_alias_inputs() {
-            self.references.insert(
-                expression.into(),
-                ResolvedReference {
-                    ty,
-                    definition,
-                    deferred_state: self.deferred_state,
-                    typevar_binding_context: self.typevar_binding_context,
-                },
-            );
-        }
+        self.alias_cache.record_reference(
+            expression,
+            ty,
+            definition,
+            self.deferred_state,
+            self.typevar_binding_context,
+        );
     }
 
     fn cached_reference(
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<(Type<'db>, Option<Definition<'db>>)> {
-        let reference = self
-            .value_inference?
-            .alias_inputs
-            .as_ref()?
-            .references
-            .get(&expression.into())?;
-        (reference.deferred_state == self.deferred_state
-            && reference.typevar_binding_context == self.typevar_binding_context)
-            .then_some((reference.ty, reference.definition))
+        self.alias_cache.reference(
+            expression,
+            self.deferred_state,
+            self.typevar_binding_context,
+        )
     }
 
     /// Read the operand's original runtime type without interpreting it as an annotation.
     fn cached_runtime_value(&self, expression: &ast::Expr) -> Option<Type<'db>> {
-        let inference = self.value_inference?;
-        if self.is_deferred()
-            || inference
-                .alias_inputs
-                .as_ref()?
-                .runtime_values
-                .get(&expression.into())
-                != Some(&self.typevar_binding_context)
-        {
-            return None;
-        }
-        inference.try_expression_type(expression)
+        self.alias_cache.runtime_value(
+            expression,
+            self.deferred_state,
+            self.typevar_binding_context,
+        )
     }
 
     fn discard_dict_key_assignments_for(&mut self, definition: Definition<'db>) {
@@ -684,13 +657,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        if self.collects_alias_inputs()
-            && let Some(inputs) = &inference.alias_inputs
-        {
-            self.references.extend(inputs.references.iter().copied());
-            self.runtime_values
-                .extend(inputs.runtime_values.iter().copied());
-        }
+        self.alias_cache
+            .extend_cached(inference.alias_inputs.as_deref());
         self.extend_expression_types(inference.expressions.iter().copied());
         self.declarations.extend(inference.declarations(definition));
 
@@ -835,13 +803,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Merges expression results without claiming bindings owned by their enclosing statement.
     fn extend_expression_without_bindings(&mut self, inference: &ExpressionInference<'db>) {
-        if self.collects_alias_inputs()
-            && let Some(inputs) = &inference.alias_inputs
-        {
-            self.references.extend(inputs.references.iter().copied());
-            self.runtime_values
-                .extend(inputs.runtime_values.iter().copied());
-        }
+        self.alias_cache
+            .extend_cached(inference.alias_inputs.as_deref());
         self.extend_expression_types(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
@@ -877,20 +840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        if self.collects_alias_inputs() {
-            self.references.extend(
-                inference
-                    .references
-                    .iter()
-                    .map(|(key, reference)| (*key, *reference)),
-            );
-            self.runtime_values.extend(
-                inference
-                    .runtime_values
-                    .iter()
-                    .map(|(key, context)| (*key, *context)),
-            );
-        }
+        self.alias_cache.extend_collected(&inference.alias_inputs);
         self.extend_expression_types(inference.expressions.iter().map(|(key, ty)| (*key, *ty)));
         self.comparison_truthiness.extend(
             inference
@@ -6883,10 +6833,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let ty = self.apply_type_context(expression, ty, tcx);
         self.store_expression_type(expression, ty);
-        if self.collects_alias_inputs() && tcx == TypeContext::default() && !self.is_deferred() {
-            self.runtime_values
-                .insert(expression.into(), self.typevar_binding_context);
-        }
+        self.alias_cache.record_runtime_value(
+            expression,
+            tcx,
+            self.deferred_state,
+            self.typevar_binding_context,
+        );
         ty
     }
 
@@ -12032,7 +11984,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
-        if self.collect_alias_inputs
+        if self.alias_cache.is_collecting()
             && let InferenceRegion::Expression(expression, _) = self.region
             && !may_require_implicit_alias_inference(
                 self.db(),
@@ -12040,8 +11992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.expression_type(expression.node_ref(self.db()).node(self.module())),
             )
         {
-            self.references.clear();
-            self.runtime_values.clear();
+            self.alias_cache = AliasInferenceCache::Disabled;
         }
         self.into_expression_inference()
     }
@@ -12056,10 +12007,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Consume the results already collected by this builder without compacting them.
     fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
-            collect_alias_inputs: _,
-            references,
-            runtime_values,
-            value_inference: _,
+            alias_cache,
             implicit_aliases,
             context,
             expressions,
@@ -12105,8 +12053,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         FullExpressionCacheEntry {
-            references,
-            runtime_values,
+            alias_inputs: alias_cache.into_inputs(),
             implicit_aliases,
             expressions,
             comparison_truthiness,
@@ -12127,10 +12074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let Self {
-            collect_alias_inputs: _,
-            references: _,
-            runtime_values: _,
-            value_inference: _,
+            alias_cache: _,
             implicit_aliases,
             context,
             expressions,
@@ -12251,10 +12195,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Self {
-            collect_alias_inputs: _,
-            references: _,
-            runtime_values: _,
-            value_inference: _,
+            alias_cache: _,
             implicit_aliases,
             context,
             expressions,
@@ -12311,7 +12252,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         // Only retain these inputs when interpreting the binding as an alias can need them.
-        if (!self.references.is_empty() || !self.runtime_values.is_empty())
+        if self.alias_cache.has_collected_inputs()
             && !self.bindings.iter().any(|(binding, ty)| {
                 *binding == definition
                     && may_require_implicit_alias_inference(
@@ -12321,14 +12262,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
             })
         {
-            self.references.clear();
-            self.runtime_values.clear();
+            self.alias_cache = AliasInferenceCache::Disabled;
         }
         let Self {
-            collect_alias_inputs: _,
-            references,
-            runtime_values,
-            value_inference: _,
+            alias_cache,
             implicit_aliases,
             context,
             expressions,
@@ -12459,12 +12396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            alias_inputs: (!references.is_empty() || !runtime_values.is_empty()).then(|| {
-                Box::new(AliasInferenceInputs {
-                    references: FrozenMap::from(references),
-                    runtime_values: FrozenMap::from(runtime_values),
-                })
-            }),
+            alias_inputs: alias_cache.into_inputs().finish(),
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
@@ -12481,10 +12413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let Self {
-            collect_alias_inputs: _,
-            references: _,
-            runtime_values: _,
-            value_inference: _,
+            alias_cache: _,
             implicit_aliases,
             context,
             string_annotations,
@@ -12562,10 +12491,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn speculate(&self) -> Self {
         let db = self.db();
         let Self {
-            collect_alias_inputs: _,
-            references: _,
-            runtime_values: _,
-            value_inference,
+            ref alias_cache,
             region,
             index,
             cycle_recovery,
@@ -12611,7 +12537,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.context.defuse();
 
         // Ensure the speculative builder has the same inference context as the current one.
-        builder.value_inference = value_inference;
+        builder.alias_cache = alias_cache.speculate();
         builder.cycle_recovery = cycle_recovery;
         builder.deferred_state = deferred_state;
         builder.typevar_binding_context = typevar_binding_context;
@@ -12642,10 +12568,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
-            collect_alias_inputs: _,
-            references,
-            runtime_values,
-            value_inference: _,
+            alias_cache,
             implicit_aliases,
             context,
             expressions,
@@ -12690,8 +12613,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.references.extend(references);
-        self.runtime_values.extend(runtime_values);
+        self.alias_cache.merge(alias_cache);
         self.extend_expression_types(expressions);
         self.comparison_truthiness.extend(comparison_truthiness);
         self.context.extend(&diagnostics);
@@ -12820,8 +12742,7 @@ enum ExpressionCacheEntry<'db> {
 /// Unlike [`ExpressionInference`], this type is short-lived, and avoids the cost of compaction
 /// that is otherwise performed for Salsa results.
 struct FullExpressionCacheEntry<'db> {
-    references: FxHashMap<ExpressionNodeKey, ResolvedReference<'db>>,
-    runtime_values: FxHashMap<ExpressionNodeKey, Option<Definition<'db>>>,
+    alias_inputs: AliasInferenceInputsBuilder<'db>,
     implicit_aliases: FxIndexSet<Definition<'db>>,
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
     comparison_truthiness: FxHashMap<ExpressionNodeKey, Truthiness>,
@@ -12848,8 +12769,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
 
     fn is_single_expression(&self, expression: ExpressionNodeKey, ty: Type<'db>) -> bool {
         self.implicit_aliases.is_empty()
-            && self.references.is_empty()
-            && self.runtime_values.is_empty()
+            && self.alias_inputs.is_empty()
             && self.expressions.len() == 1
             && self.expressions.get(&expression) == Some(&ty)
             && self.comparison_truthiness.is_empty()
@@ -12904,14 +12824,7 @@ impl<'db> FullExpressionCacheEntry<'db> {
         });
 
         ExpressionInference {
-            alias_inputs: (!self.references.is_empty() || !self.runtime_values.is_empty()).then(
-                || {
-                    Box::new(AliasInferenceInputs {
-                        references: FrozenMap::from(self.references),
-                        runtime_values: FrozenMap::from(self.runtime_values),
-                    })
-                },
-            ),
+            alias_inputs: self.alias_inputs.finish(),
             expressions: FrozenMap::from(self.expressions),
             extra,
             #[cfg(debug_assertions)]
@@ -13144,7 +13057,7 @@ pub(super) enum DeferredExpressionState {
 }
 
 impl DeferredExpressionState {
-    const fn is_deferred(self) -> bool {
+    pub(super) const fn is_deferred(self) -> bool {
         matches!(
             self,
             DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation(_)

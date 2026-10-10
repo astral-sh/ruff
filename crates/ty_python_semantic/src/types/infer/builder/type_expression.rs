@@ -24,8 +24,8 @@ use crate::types::infer::implicit_alias::{
     imported_alias_definition, is_implicit_alias_value, may_require_implicit_alias_inference,
 };
 use crate::types::infer::{
-    CyclicTypeAliasError, ImplicitAliasInference, ImplicitAliasInferenceExtra, InferenceFlags,
-    TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
+    AliasInferenceCache, CyclicTypeAliasError, ImplicitAliasInference, ImplicitAliasInferenceExtra,
+    InferenceFlags, TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
 };
 use crate::types::signatures::{ConcatenateTail, Signature};
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
@@ -105,7 +105,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> ImplicitAliasInference<'db> {
         self.typevar_binding_context = Some(definition);
         self.context.inference_flags |= InferenceFlags::IN_TYPE_ALIAS;
-        self.value_inference = Some(crate::types::infer_definition_types(self.db(), definition));
+        self.alias_cache = AliasInferenceCache::Reusing(crate::types::infer_definition_types(
+            self.db(),
+            definition,
+        ));
         let ty = self.infer_type_expression(value);
         let db = self.db();
         let ty = if ty.has_unguarded_alias_cycle(db) {
