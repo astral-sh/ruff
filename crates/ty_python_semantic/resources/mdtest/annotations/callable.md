@@ -144,6 +144,40 @@ def _(c: Callable[[int, ...], int]):
     reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```
 
+### Invalid parameter list with a widened recursive return type
+
+The return type's alias name no longer describes its widened elements. We omit a replacement
+annotation using that name, but can still fix the parameter list while preserving the return type.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+Tree = tuple[TypeOf[1], "Tree"]
+
+def collect(tree: Tree):
+    widened = [tree][0]
+
+    def consume(callback: Callable[[...], TypeOf[widened]]): ...  # snapshot: invalid-type-form
+```
+
+```snapshot
+error[invalid-type-form]: `[...]` is not a valid parameter list for `Callable`
+ --> src/mdtest_snippet.py:9:36
+  |
+9 |     def consume(callback: Callable[[...], TypeOf[widened]]): ...  # snapshot: invalid-type-form
+  |                                    ^^^^^
+info: See the following page for a reference on valid type expressions:
+info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
+help: Replace `[...]` with `...`
+  |
+8 |
+  -     def consume(callback: Callable[[...], TypeOf[widened]]): ...  # snapshot: invalid-type-form
+9 +     def consume(callback: Callable[..., TypeOf[widened]]): ...  # snapshot: invalid-type-form
+  |
+note: This is an unsafe fix and may change runtime behavior
+```
+
 ### Missing return type
 
 Using a parameter list:

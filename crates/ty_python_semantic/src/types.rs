@@ -3377,8 +3377,8 @@ impl<'db> Type<'db> {
 
     /// Return `true` if `self` is a type that is suitable for displaying
     /// in a "Did you mean...?" hint message in diagnostics
-    fn is_hintable(&self, db: &'db dyn Db) -> bool {
-        match self {
+    fn is_hintable(&self, db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> bool {
+        let is_hintable = match self {
             Type::RecursiveVar(_) => {
                 unreachable!("semantic operation on an unbound recursive variable")
             }
@@ -3424,13 +3424,13 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(_) => true,
                 SubclassOfInner::Protocol(_) => true,
-                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db),
-                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db),
+                SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic).is_hintable(db, env),
+                SubclassOfInner::TypeVar(tvar) => Type::TypeVar(tvar).is_hintable(db, env),
             },
 
             Type::TypeVar(tvar) => tvar.typevar(db).definition(db).is_some(),
 
-            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db)),
+            Type::Union(union) => union.elements(db).iter().all(|ty| ty.is_hintable(db, env)),
 
             Type::TypedDict(td) => td.defining_class().is_some(),
 
@@ -3446,7 +3446,8 @@ impl<'db> Type<'db> {
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::AmbiguousOverload => false,
             },
-        }
+        };
+        is_hintable && self.display(db, env).to_string_parts().is_valid_syntax
     }
 
     /// If the type is a union (or a type alias that resolves to a union), filters union elements

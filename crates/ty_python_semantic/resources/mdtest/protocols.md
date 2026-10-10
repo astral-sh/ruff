@@ -1524,6 +1524,37 @@ class C(A, Protocol):
     x = 42  # fine, due to declaration in the base class
 ```
 
+## Annotation suggestions for widened recursive defaults
+
+We still require an annotation for a protocol attribute whose default contains widened recursive
+values. The original alias would not describe those values, so we do not suggest it as an
+annotation.
+
+```py
+from typing import Protocol
+from ty_extensions._internal import TypeOf
+
+Tree = tuple[TypeOf[1], "Tree"]
+
+def collect(tree: Tree):
+    class Container(Protocol):
+        values = [tree]  # snapshot: ambiguous-protocol-member
+```
+
+```snapshot
+warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
+ --> src/mdtest_snippet.py:8:9
+  |
+8 |         values = [tree]  # snapshot: ambiguous-protocol-member
+  |         ^^^^^^^^^^^^^^^ Consider adding an annotation for `values`
+info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
+ --> src/mdtest_snippet.py:7:11
+  |
+7 |     class Container(Protocol):
+  |           ^^^^^^^^^^^^^^^^^^^ `Container` declared as a protocol here
+info: No declarations found for `values` in the body of `Container` or any of its superclasses
+```
+
 ## Imported `Final` values do not declare protocol members
 
 An imported `Final` qualifier does not turn an import into an explicit protocol-member declaration.

@@ -294,7 +294,8 @@ pub struct TypeDisplayDetails<'db> {
     pub targets: Vec<TextRange>,
     /// Metadata for each range
     pub details: Vec<TypeDetail<'db>>,
-    /// Whether the label is valid Python syntax
+    /// Whether the label can be used as a type annotation. Even syntactically valid alias
+    /// names can omit transformations that change the represented type.
     pub is_valid_syntax: bool,
 }
 
@@ -1028,6 +1029,20 @@ impl<'db> TypeAliasDisplay<'db> {
         materialization: Option<MaterializationKind>,
         f: &mut TypeWriter<'_, '_, 'db>,
     ) -> fmt::Result {
+        let mappings = match self.ty {
+            Type::TypeAlias(alias) => alias.mappings(self.db),
+            Type::Recursive(recursive) => recursive.mappings(self.db),
+            _ => None,
+        };
+        // Only the final materialization is displayed. Other retained mappings make the
+        // alias name unsuitable for annotation suggestions, including inside containers.
+        if mappings
+            .and_then(|mapping| mapping.without_materialization(self.db))
+            .is_some()
+        {
+            f.set_invalid_type_annotation();
+        }
+
         if let Some(kind) = materialization {
             let (name, form) = match kind {
                 MaterializationKind::Top => ("Top", SpecialFormType::Top),

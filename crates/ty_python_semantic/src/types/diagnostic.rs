@@ -4079,7 +4079,12 @@ pub(crate) fn report_undeclared_protocol_member(
         let binding_type = binding_type(db, definition);
         let suggestion = binding_type.promote(db, env);
 
-        if should_give_hint(db, env, suggestion) {
+        if should_give_hint(db, env, suggestion)
+            && suggestion
+                .display(db, env)
+                .to_string_parts()
+                .is_valid_syntax
+        {
             diagnostic.set_primary_annotation_message(format_args!(
                 "Consider adding an annotation, e.g. `{symbol_name}: {} = ...`",
                 suggestion.display(db, env)

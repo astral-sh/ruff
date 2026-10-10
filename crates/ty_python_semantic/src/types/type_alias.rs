@@ -633,7 +633,7 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    fn mappings(self, db: &'db dyn Db) -> Option<DeferredTypeMapping<'db>> {
+    pub(super) fn mappings(self, db: &'db dyn Db) -> Option<DeferredTypeMapping<'db>> {
         match self {
             TypeAliasType::PEP695(alias) => alias.mappings(db),
             TypeAliasType::ManualPEP695(alias) => alias.mappings(db),
