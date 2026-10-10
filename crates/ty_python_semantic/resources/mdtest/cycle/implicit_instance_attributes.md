@@ -599,3 +599,39 @@ class ChildContext(Context):
         if not isinstance(cls.current, ChildContext):  # no diagnostic
             cls.current = ChildContext()
 ```
+
+## Lazy initialization in a class property
+
+The metaclass initializes `_name` to `None`. Reading the class property can therefore enter the
+branch that fills the cache, including on a class with multiple bases.
+
+```toml
+[rules]
+redundant-condition-strict = "error"
+```
+
+```py
+def module_name(module: str) -> str:
+    return module
+
+class ClassProperty:
+    def __init__(self, getter):
+        self.getter = getter
+
+    def __get__(self, instance, owner):
+        return self.getter(owner)
+
+class Meta(type):
+    def __new__(cls, name, bases, namespace):
+        namespace["_name"] = None
+        return super(Meta, cls).__new__(cls, name, bases, namespace)
+
+class Left: ...
+class Right: ...
+
+class Package(Left, Right, metaclass=Meta):
+    @ClassProperty
+    def name(cls):
+        if cls._name is None:  # no diagnostic
+            cls._name = module_name(cls.__module__)
+```

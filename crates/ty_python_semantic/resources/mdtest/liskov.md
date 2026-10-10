@@ -1002,6 +1002,40 @@ class ReturnsInt:
 class Compatible(SatisfiesBoth, ReturnsStr, ReturnsInt): ...
 ```
 
+### Instance attributes take precedence over methods
+
+The callback stored by the first base is the selected member. The later methods do not need to be
+compatible with each other; each is checked against the callback's type.
+
+```py
+from typing import Any, Callable
+
+class Callback:
+    def __init__(self, callback: Callable[[], Any]) -> None:
+        self.method: Callable[[], Any] = callback
+
+class ReturnsStr:
+    def method(self) -> str:
+        return ""
+
+class ReturnsInt:
+    def method(self) -> int:
+        return 0
+
+class Combined(Callback, ReturnsStr, ReturnsInt): ...  # no diagnostic
+```
+
+A non-callable instance attribute still conflicts with the inherited methods. The error describes
+that attribute's type, without also comparing the hidden methods with each other.
+
+```py
+class Value:
+    def __init__(self) -> None:
+        self.method: int = 0
+
+class Invalid(Value, ReturnsStr, ReturnsInt): ...  # error: [invalid-attribute-override]
+```
+
 ### Subclass overrides must satisfy both contracts
 
 A subclass can provide an implementation that satisfies otherwise-incompatible base definitions.
@@ -1124,7 +1158,7 @@ class IndirectConflict(Intermediate, ReturnsInt): ...  # error: [invalid-method-
 
 ### Properties
 
-Incompatible properties inherited from different bases are not yet checked.
+Incompatible properties inherited from different bases are rejected at the class that joins them.
 
 ```pyi
 class ReturnsStr:
@@ -1135,8 +1169,7 @@ class ReturnsInt:
     @property
     def value(self) -> int: ...
 
-# TODO: Incompatible inherited properties should be reported here.
-class PropertyConflict(ReturnsStr, ReturnsInt): ...
+class PropertyConflict(ReturnsStr, ReturnsInt): ...  # error: [invalid-property-type-override]
 ```
 
 ### Synthesized members
@@ -3147,6 +3180,45 @@ def check(base: Neutral, child: Frozen) -> None:
     child.value = 1  # error: [invalid-assignment]
 ```
 
+## Inheriting frozen fields from a dataclass-transform base
+
+A `dataclass_transform` base permits both frozen and non-frozen subclasses. A frozen subclass's
+fields can remain read-only when inherited alongside another base.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class ModelMeta(type): ...
+
+class Base(metaclass=ModelMeta):
+    value: int
+
+class Mixin: ...
+
+class Frozen(Base):
+    value: int
+
+class Child(Mixin, Frozen): ...  # no diagnostic
+```
+
+The inherited field is still read-only.
+
+```py
+def assign(child: Child) -> None:
+    child.value = 1  # error: [invalid-assignment]
+```
+
+This permission applies to frozen fields. Replacing the base's writable attribute with a getter-only
+property is still an invalid override.
+
+```py
+class PropertyChild(Base):
+    @property
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
+```
+
 ## Descriptors preserving instance access
 
 A descriptor may replace an ordinary attribute when its instance reads and writes preserve the
@@ -3424,4 +3496,154 @@ class Slotted(Base):
 
 class Child(Slotted):
     value: str  # error: [invalid-attribute-override]
+```
+
+## Attribute conflicts between base classes
+
+A class must preserve every base's attribute contract, even when it does not redeclare the
+attribute. The first definition in the MRO supplies the effective attribute.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(Integer, String): ...  # snapshot: invalid-attribute-override
+```
+
+```snapshot
+error[invalid-attribute-override]: Incompatible inherited attribute `value`
+ --> src/mdtest_snippet.py:7:7
+  |
+2 |     value: int
+  |     ----- `Integer.value` declared here
+3 |
+4 | class String:
+5 |     value: str
+  |     ----- `String.value` declared here
+6 |
+7 | class Conflict(Integer, String): ...  # snapshot: invalid-attribute-override
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^ `Integer.value` is incompatible with `String.value`
+info: Type `int` is not assignable to inherited type `str`
+```
+
+The error is not repeated in subclasses, including when the conflicting parent is not the first base
+class.
+
+```py
+class Descendant(Conflict): ...  # no diagnostic
+class Independent: ...
+class JoinedAgain(Independent, Conflict): ...  # no diagnostic
+```
+
+## Explicit overrides with multiple bases
+
+An explicit annotation is checked against both bases. The error belongs to that annotation; there is
+no additional error on the class definition for the same attribute.
+
+```py
+class Integer:
+    value: int
+
+class String:
+    value: str
+
+class Conflict(String, Integer):
+    value: str  # error: [invalid-attribute-override]
+```
+
+Repeating the same annotation in a subclass does not report the existing error again, even when the
+conflicting parent is not the first base.
+
+```py
+class Independent: ...
+
+class JoinedAgain(Independent, Conflict):
+    value: str  # no diagnostic
+```
+
+## `Any` on an intermediate base
+
+Annotating `value` as `Any` in an intermediate class does not hide the `int` annotation on its base.
+
+```py
+from typing import Any
+
+class Integer:
+    value: int
+
+class Gradual(Integer):
+    value: Any
+
+class String:
+    value: str
+
+class Conflict(String, Gradual): ...  # error: [invalid-attribute-override]
+```
+
+## Generated `__hash__`
+
+With the default `dataclass_transform` settings, ty infers `__hash__ = None` for subclasses without
+an explicit hash method. Override checks use this member instead of an older method in the
+hierarchy.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Base: ...
+
+class Hashable(Base):
+    def __hash__(self) -> int:
+        return 0
+
+class Unhashable(Hashable): ...
+class Mixin: ...
+class Child(Unhashable, Mixin): ...  # no diagnostic
+```
+
+## Generated `__match_args__`
+
+A `dataclass_transform` base tells ty to infer dataclass members for its subclasses. An empty
+subclass gets an empty `__match_args__` tuple. The inherited annotation must not cause an override
+error, even when the subclass has another base.
+
+```py
+from typing import ClassVar
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+class Concrete(Base): ...
+class Mixin: ...
+class Child(Concrete, Mixin): ...  # no diagnostic
+```
+
+## Inherited `__match_args__`
+
+An ordinary subclass inherits the `__match_args__` generated by `@dataclass`. That empty tuple is
+used instead of the older annotation on `Base`. With mutable narrowing allowed, this is a valid
+override.
+
+```toml
+[rules]
+invalid-mutable-override = "ignore"
+```
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar
+
+class Base:
+    __match_args__: ClassVar[tuple[str, ...]]
+
+@dataclass
+class Generated(Base): ...
+
+class Mixin: ...
+class Child(Generated, Mixin): ...  # no diagnostic
 ```

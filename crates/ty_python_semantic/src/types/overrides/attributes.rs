@@ -3,14 +3,15 @@
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use ty_python_core::definition::Definition;
+use ty_python_core::{definition::Definition, place_table};
 
 use crate::{
-    Db, ProgramEnvironment, attribute_declarations,
+    Db, ProgramEnvironment,
+    lint::LintMetadata,
     place::{Place, TypeOrigin},
     types::{
         ClassBase, ClassType, InstanceFallbackShadowsNonDataDescriptor, IntersectionType,
-        KnownInstanceType, MemberLookupPolicy, Type, TypeQualifiers,
+        KnownInstanceType, MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
         attribute_write::{DescriptorSetterDomain, descriptor_setter_domain},
         class::CodeGeneratorKind,
         context::InferContext,
@@ -29,6 +30,7 @@ struct AttributeContract<'db> {
     write: Option<Type<'db>>,
     is_property: bool,
     is_method: bool,
+    is_frozen_field: bool,
     qualifiers: TypeQualifiers,
 }
 
@@ -120,6 +122,8 @@ fn attribute_contract<'db>(
     let is_final = qualifiers.contains(TypeQualifiers::FINAL);
     let is_class_var = qualifiers.contains(TypeQualifiers::CLASS_VAR);
     let is_property = alternatives.iter().any(Type::is_property_instance);
+    let is_frozen_field = literal.is_frozen_dataclass(db) == Some(true)
+        && literal.is_own_dataclass_instance_field(db, name);
     let is_slot = matches!(own_place.ty, Type::SlotDescriptor(_));
     let is_descriptor = !is_class_var
         && !class_member.place.is_undefined()
@@ -193,6 +197,7 @@ fn attribute_contract<'db>(
         },
         is_property,
         is_method,
+        is_frozen_field,
         qualifiers,
     })
 }
@@ -245,6 +250,17 @@ enum AttributeViolation<'db> {
     ReadOnly,
 }
 
+impl AttributeViolation<'_> {
+    /// Property violations have a dedicated rule, including incompatible writes.
+    const fn rule(&self, involves_property: bool) -> &'static LintMetadata {
+        match self {
+            _ if involves_property => &INVALID_PROPERTY_TYPE_OVERRIDE,
+            Self::Write { .. } => &INVALID_MUTABLE_OVERRIDE,
+            Self::Read { .. } | Self::ReadOnly => &INVALID_ATTRIBUTE_OVERRIDE,
+        }
+    }
+}
+
 /// Find the first read or write that the overriding contract fails to preserve.
 ///
 /// Both contracts are bound to the subclass receiver. `target_receiver` is the base
@@ -280,18 +296,13 @@ fn attribute_violation<'db>(
     let write = target.write?;
     // A neutral dataclass-transform base explicitly permits frozen subclasses. Its
     // fields can become read-only there, even though writes to the base are allowed.
+    // Preserve this permission when that frozen field is inherited by another subclass.
     if !target.is_property
         && target_receiver
             .nominal_class(db, env)
             .and_then(|class| class.static_class_literal(db))
             .is_some_and(|(literal, _)| literal.is_neutral_dataclass(db))
-        && receiver
-            .nominal_class(db, env)
-            .and_then(|class| class.static_class_literal(db))
-            .is_some_and(|(literal, _)| {
-                literal.is_frozen_dataclass(db) == Some(true)
-                    && literal.is_own_dataclass_instance_field(db, name)
-            })
+        && source.is_frozen_field
     {
         return None;
     }
@@ -392,14 +403,11 @@ pub(super) fn check_override<'db>(
             return false;
         }
     }
+    if already_inherited(db, env, class, superclass, name, &source) {
+        return false;
+    }
     let involves_property = source.is_property || target.is_property;
-    let rule = if involves_property {
-        &INVALID_PROPERTY_TYPE_OVERRIDE
-    } else if matches!(violation, AttributeViolation::Write { .. }) {
-        &INVALID_MUTABLE_OVERRIDE
-    } else {
-        &INVALID_ATTRIBUTE_OVERRIDE
-    };
+    let rule = violation.rule(involves_property);
     let Some(builder) = context.report_lint(rule, definition.focus_range(db, context.module()))
     else {
         return false;
@@ -474,11 +482,7 @@ pub(super) fn check_instance_overrides<'db>(
         // Ordinary assignments introduce no override contract. Do not infer their method
         // bodies just to discard the inferred type; a lazy cache can depend on its own reads.
         if is_mangled_private(name)
-            || !attribute_declarations(db, literal.body_scope(db), name).any(
-                |(mut declarations, _)| {
-                    declarations.any(|declaration| declaration.declaration.definition().is_some())
-                },
-            )
+            || !super::has_own_instance_declaration(db, literal.body_scope(db), name)
             || !class.own_class_member(db, env, None, name).is_undefined()
         {
             continue;
@@ -522,5 +526,172 @@ pub(super) fn check_instance_overrides<'db>(
                 break;
             }
         }
+    }
+}
+
+/// Whether a parent already contains the same incompatible attribute contract.
+///
+/// Inspect every parent hierarchy, since the conflicting parent need not be first in
+/// the child's MRO. Match the selected read/write contract in the child's context, then
+/// recheck the conflict with the parent's own specializations. A parent that satisfies
+/// `Base[Any]` cannot suppress a conflict with a newly inherited `Base[int]`.
+fn already_inherited<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    class: ClassType<'db>,
+    target_owner: ClassType<'db>,
+    name: &str,
+    source: &AttributeContract<'db>,
+) -> bool {
+    let child_receiver = Type::instance(db, env, class);
+    class
+        .iter_mro(db)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .any(|parent| {
+            let Some(owner) = parent
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .find(|owner| {
+                    !owner.own_class_member(db, env, None, name).is_undefined()
+                        || !owner.own_instance_member(db, env, name).is_undefined()
+                })
+            else {
+                return false;
+            };
+            let Some(inherited) = attribute_contract(db, env, owner, child_receiver, name) else {
+                return false;
+            };
+            if inherited.read != source.read
+                || inherited.write != source.write
+                || inherited.is_frozen_field != source.is_frozen_field
+                || inherited.qualifiers != source.qualifiers
+            {
+                return false;
+            }
+            let receiver = Type::instance(db, env, parent);
+            let Some(inherited) = attribute_contract(db, env, owner, receiver, name) else {
+                return false;
+            };
+            parent
+                .iter_mro(db)
+                .skip(1)
+                .filter_map(ClassBase::into_class)
+                .chain(parent.iter_explicit_ancestors(db, env).skip(1))
+                .filter(|ancestor| ancestor.class_literal(db) == target_owner.class_literal(db))
+                .any(|ancestor| {
+                    let Some(target) = attribute_contract(db, env, ancestor, receiver, name) else {
+                        return false;
+                    };
+                    attribute_violation(
+                        db,
+                        env,
+                        receiver,
+                        Type::instance(db, env, ancestor),
+                        name,
+                        &inherited,
+                        &target,
+                    )
+                    .is_some()
+                })
+        })
+}
+
+/// Check the selected attribute against every inherited declaration of that name.
+///
+/// Explicit overrides are checked separately. All inherited generic specializations remain
+/// target contracts, and conflicts already present in a parent hierarchy are suppressed.
+///
+/// ```python
+/// class Integer:
+///     value: int
+///
+/// class String:
+///     value: str
+///
+/// class Combined(Integer, String): ...  # Integer.value cannot satisfy String.value.
+/// ```
+pub(super) fn check_inherited_conflict<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_type: ClassType<'db>,
+    owner: ClassType<'db>,
+    contracts: &[ClassType<'db>],
+    name: &Name,
+) {
+    let db = context.db();
+    let env = &context.program_environment();
+    let receiver = Type::instance(db, env, class_type);
+    let Some(source) = attribute_contract(db, env, owner, receiver, name) else {
+        return;
+    };
+    for target_owner in contracts.iter().copied().filter(|target| *target != owner) {
+        let Some(target) = attribute_contract(db, env, target_owner, receiver, name) else {
+            continue;
+        };
+        let Some(violation) = attribute_violation(
+            db,
+            env,
+            receiver,
+            Type::instance(db, env, target_owner),
+            name,
+            &source,
+            &target,
+        ) else {
+            continue;
+        };
+        if already_inherited(db, env, class_type, target_owner, name, &source) {
+            continue;
+        }
+        let rule = violation.rule(source.is_property || target.is_property);
+        let Some(builder) = context.report_lint(rule, class.header_range(db)) else {
+            continue;
+        };
+        let mut diagnostic =
+            builder.into_diagnostic(format_args!("Incompatible inherited attribute `{name}`"));
+        diagnostic.set_primary_annotation_message(format_args!(
+            "`{}.{name}` is incompatible with `{}.{name}`",
+            owner.name(db),
+            target_owner.name(db),
+        ));
+        match violation {
+            AttributeViolation::Read { source, target } => diagnostic.info(format_args!(
+                "Type `{}` is not assignable to inherited type `{}`",
+                source.display(db, env),
+                target.display(db, env),
+            )),
+            AttributeViolation::Write { target } => diagnostic.info(format_args!(
+                "Inherited attribute does not accept writes of type `{}`",
+                target.display(db, env),
+            )),
+            AttributeViolation::ReadOnly => {
+                diagnostic.info("Inherited read-only attribute replaces a writable attribute");
+            }
+        }
+        for owner in [owner, target_owner] {
+            let Some((literal, _)) = owner.static_class_literal(db) else {
+                continue;
+            };
+            let definition = place_table(db, literal.body_scope(db))
+                .symbol_id(name)
+                .and_then(|id| super::symbol_definition(db, literal.body_scope(db), id))
+                .or_else(
+                    || match owner.own_instance_member(db, env, name).inner.place {
+                        Place::Defined(place) => place.provenance.definition(),
+                        Place::Undefined => None,
+                    },
+                );
+            if let Some(definition) = definition
+                && definition.file(db) == context.file()
+            {
+                diagnostic.annotate(
+                    Annotation::secondary(
+                        context.span(definition.focus_range(db, context.module())),
+                    )
+                    .message(format_args!("`{}.{name}` declared here", owner.name(db))),
+                );
+            }
+        }
+        break;
     }
 }

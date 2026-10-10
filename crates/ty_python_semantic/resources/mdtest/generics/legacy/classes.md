@@ -3303,5 +3303,39 @@ class Incompatible(Base[int]):
     value: str  # error: [invalid-attribute-override]
 ```
 
+## Inheriting different specializations of a property
+
+`String` can return `str` for the property inherited from `Base[Any]`. Combining it with `Integer`
+also requires the property to return `int`, so the new subclass is invalid.
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Base(Generic[T]):
+    @property
+    def value(self) -> T:
+        raise NotImplementedError
+
+class String(Base[Any]):  # no diagnostic
+    @property
+    def value(self) -> str:
+        return ""
+
+class Integer(Base[int]): ...
+class Conflict(String, Integer): ...  # error: [invalid-property-type-override]
+```
+
+An explicit override is also checked against `Base[int]`, and the error is reported only at the
+override.
+
+```py
+class Explicit(String, Integer):
+    @property
+    def value(self) -> str:  # error: [invalid-property-type-override]
+        return ""
+```
+
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 [f-bound]: https://en.wikipedia.org/wiki/Bounded_quantification#F-bounded_quantification
