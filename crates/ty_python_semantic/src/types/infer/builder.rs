@@ -102,7 +102,9 @@ use crate::types::generics::{
 use crate::types::infer::builder::binary_expressions::BinaryInferenceState;
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
-use crate::types::infer::implicit_alias::may_require_implicit_alias_inference;
+use crate::types::infer::implicit_alias::{
+    is_implicit_alias_value, may_require_implicit_alias_inference,
+};
 use crate::types::infer::{
     AliasInferenceInputs, ResolvedReference, StatementInference, StatementInferenceInner,
     StatementInferenceInnerExtra, TruthinessAnalyzer, TypeAndRange, TypeExpressionFlags,
@@ -282,6 +284,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     references: FxHashMap<ExpressionNodeKey, ResolvedReference<'db>>,
     runtime_values: FxHashMap<ExpressionNodeKey, Option<Definition<'db>>>,
     imported_definition: Option<Definition<'db>>,
+    collect_alias_inputs: bool,
 
     /// Value inference for the alias whose type expression is being interpreted.
     value_inference: Option<&'db DefinitionInference<'db>>,
@@ -530,6 +533,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let scope = region.scope(db);
+        let collect_alias_inputs = match region {
+            InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition)
+                if matches!(
+                    definition.kind(db),
+                    DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
+                ) =>
+            {
+                definition
+                    .kind(db)
+                    .value(module)
+                    .is_some_and(is_implicit_alias_value)
+            }
+            InferenceRegion::Expression(expression, _)
+                if expression.kind(db) == ExpressionKind::Normal =>
+            {
+                is_implicit_alias_value(expression.node_ref(db).node(module))
+            }
+            _ => false,
+        };
         Self {
             context: InferContext::new(db, env, scope, file, program_file, module),
             index,
@@ -543,6 +565,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             references: FxHashMap::default(),
             runtime_values: FxHashMap::default(),
             imported_definition: None,
+            collect_alias_inputs,
             value_inference: None,
             comparison_truthiness: FxHashMap::default(),
             expression_cache: None,
@@ -581,17 +604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn collects_alias_inputs(&self) -> bool {
-        self.value_inference.is_none()
-            && match self.region {
-                InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
-                    matches!(
-                        definition.kind(self.db()),
-                        DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
-                    )
-                }
-                InferenceRegion::Expression(..) => true,
-                _ => false,
-            }
+        self.collect_alias_inputs && self.value_inference.is_none()
     }
 
     fn record_reference(
@@ -12196,6 +12209,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_expression(mut self) -> ExpressionInference<'db> {
         self.infer_region();
+        if self.collect_alias_inputs
+            && let InferenceRegion::Expression(expression, _) = self.region
+            && !may_require_implicit_alias_inference(
+                self.db(),
+                self.program_environment(),
+                self.expression_type(expression.node_ref(self.db()).node(self.module())),
+            )
+        {
+            self.references.clear();
+            self.runtime_values.clear();
+        }
         self.into_expression_inference()
     }
 
@@ -12209,6 +12233,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Consume the results already collected by this builder without compacting them.
     fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references,
             runtime_values,
@@ -12280,6 +12305,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_region();
 
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references: _,
             runtime_values: _,
@@ -12404,6 +12430,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references: _,
             runtime_values: _,
@@ -12478,6 +12505,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.runtime_values.clear();
         }
         let Self {
+            collect_alias_inputs: _,
             imported_definition,
             references,
             runtime_values,
@@ -12690,6 +12718,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let return_type = self.inferred_return_type();
 
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references: _,
             runtime_values: _,
@@ -12773,6 +12802,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn speculate(&self) -> Self {
         let db = self.db();
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references: _,
             runtime_values: _,
@@ -12856,6 +12886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Extend the current region with the results of a speculative [`TypeInferenceBuilder`].
     fn extend(&mut self, other: Self) {
         let Self {
+            collect_alias_inputs: _,
             imported_definition: _,
             references,
             runtime_values,
