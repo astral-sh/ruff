@@ -283,7 +283,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     references: FxHashMap<ExpressionNodeKey, ResolvedReference<'db>>,
     runtime_values: FxHashMap<ExpressionNodeKey, Option<Definition<'db>>>,
-    imported_definition: Option<Definition<'db>>,
     collect_alias_inputs: bool,
 
     /// Value inference for the alias whose type expression is being interpreted.
@@ -564,7 +563,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FxHashMap::default(),
             references: FxHashMap::default(),
             runtime_values: FxHashMap::default(),
-            imported_definition: None,
             collect_alias_inputs,
             value_inference: None,
             comparison_truthiness: FxHashMap::default(),
@@ -12234,7 +12232,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn into_expression_cache_entry(self) -> FullExpressionCacheEntry<'db> {
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references,
             runtime_values,
             value_inference: _,
@@ -12306,7 +12303,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references: _,
             runtime_values: _,
             value_inference: _,
@@ -12431,7 +12427,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references: _,
             runtime_values: _,
             value_inference: _,
@@ -12506,7 +12501,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
         let Self {
             collect_alias_inputs: _,
-            imported_definition,
             references,
             runtime_values,
             value_inference: _,
@@ -12642,12 +12636,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         DefinitionInference {
-            alias_inputs: (imported_definition.is_some()
-                || !references.is_empty()
-                || !runtime_values.is_empty())
-            .then(|| {
+            alias_inputs: (!references.is_empty() || !runtime_values.is_empty()).then(|| {
                 Box::new(AliasInferenceInputs {
-                    imported_definition,
                     references: FrozenMap::from(references),
                     runtime_values: FrozenMap::from(runtime_values),
                 })
@@ -12719,7 +12709,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references: _,
             runtime_values: _,
             value_inference: _,
@@ -12803,7 +12792,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references: _,
             runtime_values: _,
             value_inference,
@@ -12887,7 +12875,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn extend(&mut self, other: Self) {
         let Self {
             collect_alias_inputs: _,
-            imported_definition: _,
             references,
             runtime_values,
             value_inference: _,
@@ -13147,7 +13134,6 @@ impl<'db> FullExpressionCacheEntry<'db> {
             alias_inputs: (!self.references.is_empty() || !self.runtime_values.is_empty()).then(
                 || {
                     Box::new(AliasInferenceInputs {
-                        imported_definition: None,
                         references: FrozenMap::from(self.references),
                         runtime_values: FrozenMap::from(self.runtime_values),
                     })

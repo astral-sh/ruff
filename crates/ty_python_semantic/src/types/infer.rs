@@ -200,8 +200,6 @@ struct ResolvedReference<'db> {
 /// Inputs retained by value inference for a later interpretation of an alias's right-hand side.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 struct AliasInferenceInputs<'db> {
-    /// The original definition selected by import inference, after following re-exports.
-    imported_definition: Option<Definition<'db>>,
     references: FrozenMap<ExpressionNodeKey, ResolvedReference<'db>>,
     /// Binding contexts of expressions evaluated eagerly with default type context. Their types
     /// are in the region's expression table.
