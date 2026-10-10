@@ -225,6 +225,16 @@ class C: pass
 Relative file names are always relative to the "workspace root", which is also an import root (that
 is, the equivalent of a runtime entry on `sys.path`).
 
+Explicit paths cannot contain components that begin with escape-like text such as `x64`, `u200b`, or
+an octal digit (`0`–`7`). In diagnostic snapshots, these components can look like Python escape
+sequences when preceded by a Windows path separator. For example, `src/x64.py` is rejected, while
+`src/file_x64.py` is allowed. Single-letter components such as `n` are allowed.
+
+Explicit paths also cannot contain whitespace or the characters `'`, `"`, `` ` ``, `<`, `>`, `|`,
+`(`, `)`, `[`, `]`, `,`, `;`, `{`, or `}`. A colon is allowed only after a drive letter. These
+characters delimit paths in diagnostic snapshots. The `<path-to-site-packages>` placeholder is an
+exception and can be used as a path component; it is explained under [mocking a Python environment](#mocking-a-python-environment).
+
 The default workspace root is `/src/`. Currently it is not possible to customize this in a test, but
 this is a feature we will want to add in the future.
 
