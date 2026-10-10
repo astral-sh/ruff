@@ -64,7 +64,12 @@ markdown_extensions:
   - pymdownx.tabbed:
       alternate_style: true
 plugins:
-  - search
+  - search:
+      # Keep language keywords searchable (e.g. `while`), rather than dropping
+      # them as English stop words.
+      pipeline:
+        - stemmer
+        - trimmer
   - gh-admonitions
   - llmstxt:
       markdown_description: |
