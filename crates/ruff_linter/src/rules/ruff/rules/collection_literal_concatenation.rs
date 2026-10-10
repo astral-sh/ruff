@@ -40,9 +40,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
 /// implementations, causing the fix to change program behaviour.
 ///
+/// ## See also
+/// [`unnecessary-literal-unpacking`][PIE811] removes the leftover unpacking this fix leaves behind
+/// when the concatenation is itself the operand of a `*` unpacking.
+///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
+///
+/// [PIE811]: https://docs.astral.sh/ruff/rules/unnecessary-literal-unpacking/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.227", category = Category::Pedantic)]
 pub(crate) struct CollectionLiteralConcatenation {
