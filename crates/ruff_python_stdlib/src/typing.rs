@@ -306,7 +306,11 @@ pub fn is_mutable_return_type(qualified_name: &[&str]) -> bool {
         ["" | "builtins", "dict" | "list" | "set"]
             | [
                 "collections",
-                "Counter" | "OrderedDict" | "defaultdict" | "deque"
+                "ChainMap" | "Counter" | "OrderedDict" | "UserDict" | "defaultdict" | "deque"
+            ]
+            | [
+                "weakref",
+                "WeakKeyDictionary" | "WeakValueDictionary" | "WeakSet"
             ]
     )
 }
