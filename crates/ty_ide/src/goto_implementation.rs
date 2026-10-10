@@ -58,9 +58,11 @@
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
 use crate::{Db, NavigationTarget, NavigationTargets, RangedValue};
 use rayon::prelude::*;
+use ruff_db::PythonFile;
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleGuard, parsed_module};
 use ruff_text_size::{Ranged, TextSize};
+use rustc_hash::FxHashSet;
 use ty_project::parallel::ParallelIteratorExt;
 use ty_python_core::ProgramFile;
 use ty_python_semantic::{
@@ -95,6 +97,13 @@ pub fn goto_implementation(
         .into_par_iter()
         .map_with_db(db, |db, file| {
             let file = ProgramFile::new(db, file, program);
+            if !finder.may_have_implementations_in_file(db, file) {
+                return Vec::new();
+            }
+            // Go-to-implementation searches can scan the whole project, so release closed files'
+            // ASTs as we go.
+            // Keep the AST loaded until the navigation targets have been built.
+            let _module = parsed_module(db, file.python_file(db)).load_clear_on_drop(db);
             let definitions = finder.implementations_for_file(db, file);
             definitions_to_implementation_targets(db, definitions)
         })
@@ -160,19 +169,53 @@ fn prepare_implementations_finder_for_goto_target<'a>(
     }
 }
 
-fn definitions_to_implementation_targets(
-    db: &dyn Db,
-    definitions: Vec<ResolvedDefinition>,
+fn definitions_to_implementation_targets<'db>(
+    db: &'db dyn Db,
+    definitions: Vec<ResolvedDefinition<'db>>,
 ) -> Vec<NavigationTarget> {
-    Definitions::new(definitions)
-        .map_stubs_for_implementation(db)
-        .map(|definitions| {
-            definitions
-                .into_navigation_targets(db)
-                .into_iter()
-                .collect()
-        })
-        .unwrap_or_default()
+    let definitions = Definitions::new(definitions);
+    let mut files = FxHashSet::default();
+    let mut guards = Vec::new();
+    // Stub mapping and target conversion can load ASTs in different files.
+    guard_definition_modules(db, &definitions, &mut files, &mut guards);
+
+    let Some(definitions) = definitions.map_stubs_for_implementation(db, |file| {
+        guard_module(db, file.python_file(db), &mut files, &mut guards);
+    }) else {
+        return Vec::new();
+    };
+    guard_definition_modules(db, &definitions, &mut files, &mut guards);
+
+    definitions
+        .into_navigation_targets(db)
+        .into_iter()
+        .collect()
+}
+
+fn guard_definition_modules<'db>(
+    db: &'db dyn Db,
+    definitions: &Definitions<'db>,
+    files: &mut FxHashSet<PythonFile<'db>>,
+    guards: &mut Vec<ParsedModuleGuard>,
+) {
+    for definition in definitions {
+        if let Some(definition) = definition.definition() {
+            guard_module(db, definition.python_file(db), files, guards);
+        }
+    }
+}
+
+fn guard_module<'db>(
+    db: &'db dyn Db,
+    file: PythonFile<'db>,
+    files: &mut FxHashSet<PythonFile<'db>>,
+    guards: &mut Vec<ParsedModuleGuard>,
+) {
+    if files.insert(file) {
+        // Mapping stubs and building targets can load ASTs in other files, so release closed
+        // files' ASTs as we go.
+        guards.push(parsed_module(db, file).load_clear_on_drop(db));
+    }
 }
 
 #[cfg(test)]

@@ -381,6 +381,7 @@ impl<'db> Definitions<'db> {
     pub(crate) fn map_stubs_for_implementation(
         self,
         db: &'db dyn ty_python_semantic::Db,
+        mut on_source_file: impl FnMut(ProgramFile<'db>),
     ) -> Option<Definitions<'db>> {
         let stub_mapper = StubMapper::new(db);
         let resolved: Vec<_> = self
@@ -389,7 +390,7 @@ impl<'db> Definitions<'db> {
             .flat_map(|definition| {
                 if definition.focus_range(db).file().is_stub(db) {
                     stub_mapper
-                        .map_definition_to_source(&definition)
+                        .map_definition_to_source(&definition, &mut on_source_file)
                         .unwrap_or_default()
                 } else {
                     vec![definition]

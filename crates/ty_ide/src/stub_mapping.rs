@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_db::system::SystemPathBuf;
+use ty_python_core::ProgramFile;
 use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
 
 use crate::cached_vendored_root;
@@ -32,7 +33,7 @@ impl<'db> StubMapper<'db> {
         &self,
         def: ResolvedDefinition<'db>,
     ) -> impl Iterator<Item = ResolvedDefinition<'db>> {
-        if let Some(definitions) = self.map_definition_to_source(&def) {
+        if let Some(definitions) = self.map_definition_to_source(&def, |_| {}) {
             return Either::Left(definitions.into_iter());
         }
         Either::Right(std::iter::once(def))
@@ -41,8 +42,14 @@ impl<'db> StubMapper<'db> {
     pub(crate) fn map_definition_to_source(
         &self,
         def: &ResolvedDefinition<'db>,
+        on_source_file: impl FnOnce(ProgramFile<'db>),
     ) -> Option<Vec<ResolvedDefinition<'db>>> {
-        map_stub_definition(self.db, def, self.cached_vendored_root.as_deref())
+        map_stub_definition(
+            self.db,
+            def,
+            self.cached_vendored_root.as_deref(),
+            on_source_file,
+        )
     }
 
     /// Map multiple `ResolvedDefinitions`, applying stub-to-source mapping to each.
