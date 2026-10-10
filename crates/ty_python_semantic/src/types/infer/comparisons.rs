@@ -459,6 +459,7 @@ impl<'db> Type<'db> {
                     | KnownInstanceType::NewType(_)
                     | KnownInstanceType::Sentinel(_)
                     | KnownInstanceType::NamedTupleSpec(_)
+                    | KnownInstanceType::Regex(_)
                     | KnownInstanceType::Range { .. },
                 ) => UpcastResult::stable(ty),
                 Type::TypeVar(typevar) => visit_type(db, ty, visitor, || {
