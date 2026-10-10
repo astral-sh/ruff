@@ -1150,11 +1150,41 @@ pub fn call_signature_details<'db>(
             CheckTypesMode::Finalize,
         );
 
-        // Extract signature details from all callable bindings
+        // Parser recovery retains positional arguments after keywords or keyword unpackings.
+        // Do not highlight a parameter for these invalid arguments.
+        let parsed = parsed_module(db, model.program_file().python_file(db)).load(db);
+        let invalid_arguments: Vec<_> = call_expr
+            .arguments
+            .iter_source_order()
+            .map(|argument| {
+                parsed.errors().iter().any(|error| {
+                    matches!(
+                        error.error,
+                        ruff_python_parser::ParseErrorType::PositionalAfterKeywordArgument
+                            | ruff_python_parser::ParseErrorType::PositionalAfterKeywordUnpacking
+                    ) && call_expr.arguments.range().contains_range(error.location)
+                        && error.location.contains_range(argument.range())
+                })
+            })
+            .collect();
+
+        // Extract signature details from all callable bindings.
         bindings
             .iter_flat()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, env, binding))
+            .map(|binding| {
+                let mut details = CallSignatureDetails::from_binding(db, env, binding);
+                for (mapped, invalid) in details
+                    .argument_to_displayed_parameter_mapping
+                    .iter_mut()
+                    .zip(&invalid_arguments)
+                {
+                    if *invalid {
+                        *mapped = None;
+                    }
+                }
+                details
+            })
             .collect()
     } else {
         // Type is not callable, return empty signatures
