@@ -242,6 +242,23 @@ pub(super) fn walk_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     }
 }
 
+/// Evaluate and visit a type variable's bounds, constraints, and default.
+///
+/// The caller must guard against recursive types.
+pub(super) fn walk_type_var_attributes<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    typevar: TypeVarInstance<'db>,
+    visitor: &V,
+) {
+    let env = visitor.program_environment();
+    if let Some(bounds) = typevar.bound_or_constraints(db, env) {
+        walk_type_var_bounds(db, bounds, visitor);
+    }
+    if let Some(default) = typevar.default_type(db, env) {
+        visitor.visit_type(db, default);
+    }
+}
+
 #[salsa::tracked]
 impl<'db> TypeVarInstance<'db> {
     pub(crate) fn with_binding_context(

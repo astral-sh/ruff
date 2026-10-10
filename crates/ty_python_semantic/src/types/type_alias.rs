@@ -10,7 +10,7 @@ use crate::{
         cyclic::CycleDetector,
         definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization, bind_typevar},
+        generics::{ApplySpecialization, Specialization, bind_typevar, walk_specialization_types},
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -443,6 +443,18 @@ pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+}
+
+/// Visit an alias's type arguments without evaluating its value.
+/// This includes arguments for parameters that the alias's value does not use.
+pub(super) fn walk_type_alias_arguments<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    visitor: &V,
+) {
+    if let Some(specialization) = type_alias.specialization(db) {
+        walk_specialization_types(db, specialization, visitor);
+    }
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
