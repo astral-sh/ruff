@@ -1740,6 +1740,54 @@ def _(x: X):
     reveal_type(x is x)  # revealed: bool
 ```
 
+### Recursive aliases and their complements
+
+For a fully static alias `A`, every object is either an `A` or not an `A`. This also holds when the
+alias refers to itself: the list element type `Not[A] | A` is `object`.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: object
+```
+
+### Negated recursive aliases
+
+The list element is not an `A`. We can describe its type without expanding the recursive list each
+time it is inspected.
+
+```py
+from ty_extensions import Not
+
+type A = list[Not[A]]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: ~A
+```
+
+### Equivalent complements of a gradual recursive alias
+
+The presence of `Any` must not change what an alias means. Negating this recursive alias is
+equivalent to negating its definition. Generic inference respects that equivalence in either
+direction.
+
+```py
+from typing import Any, assert_type
+from ty_extensions import Not
+
+type A = list[tuple[Any, A]]
+
+def identity[T](x: T) -> T:
+    return x
+
+def f(x: Not[A], y: Not[list[tuple[Any, A]]]):
+    assert_type(identity(x), Not[list[tuple[Any, A]]])
+    assert_type(identity(y), Not[A])
+```
+
 ### Recursive invariant
 
 ```py

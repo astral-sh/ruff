@@ -474,6 +474,118 @@ def _(x: DivergentList[int]):
     d2: DivergentList[int] = x[0]
 ```
 
+## Negation after specializing a recursive alias
+
+Substituting `object` for `T` makes `A[T]` equal to `object`, even though its definition is
+recursive. Its negation is therefore `Never`.
+
+```py
+from typing import Never, assert_type
+from ty_extensions import Not
+
+type A[T] = T | list[A[T]]
+
+def f(x: Not[A[object]]):
+    assert_type(x, Never)
+```
+
+Specialization can also expose two negations. They cancel, leaving the specialized list or `int`.
+
+```py
+type B[T] = Not[list[B[T]] | T]
+
+def g(x: Not[B[int]]):
+    assert_type(x, list[B[int]] | int)
+```
+
+## Excluding a recursive alias from a list
+
+`Without[A]` describes a list that is not an `A`. Since `list[Any]` is gradual, its `Any` can stand
+for a different type in each union member. The exclusion still matters: the element type does not
+simplify to `list[Any]`.
+
+```py
+from typing import Any
+from ty_extensions import Intersection, Not
+
+type Without[T] = Intersection[list[Any], Not[T]]
+type A = list[Without[A] | A]
+
+def f(x: A):
+    reveal_type(x[0])  # revealed: (list[Any] & ~A) | list[Without[A] | A]
+```
+
+## Excluding a recursive alias from `object`
+
+Here, specializing `Without` with `object` leaves just `Not[A]`. The alias `A` contains no gradual
+types, so `Without[object, A] | A` covers every object.
+
+```py
+from typing import assert_type
+from ty_extensions import Intersection, Not
+
+type Without[T, U] = Intersection[T, Not[U]]
+type A = list[Without[object, A] | A]
+
+def f(x: A):
+    assert_type(x[0], object)
+```
+
+## Recursive tuple elements in a protocol
+
+Each element of `A` must be both another `A` and an `Items`. We can inspect an element without
+expanding the tuple indefinitely, and an integer still fails that requirement.
+
+```py
+from collections.abc import Iterator
+from typing import Any, Protocol, assert_type
+from ty_extensions import Intersection
+
+class Items(Protocol):
+    def __iter__(self) -> Iterator[Any]: ...
+
+type WithItems[T] = Intersection[Items, T]
+type A = tuple[WithItems[A], ...]
+
+def f(x: A):
+    assert_type(x[0], WithItems[A])
+    y: int = x[0]  # error: [invalid-assignment]
+```
+
+## Recursive tuple elements in `Iterable`
+
+Ty can use the element type of `Iterable` when simplifying its intersection with a tuple. That
+simplification also preserves a recursive element type.
+
+```py
+from collections.abc import Iterable
+from typing import Any, assert_type
+from ty_extensions import Intersection
+
+type WithIterable[T] = Intersection[Iterable[Any], T]
+type A = tuple[WithIterable[A], ...]
+
+def f(x: A):
+    assert_type(x[0], WithIterable[A])
+```
+
+## Boolean aliases after substitution
+
+Subtracting `True` from `bool` leaves only `False`. Using aliases for the arguments to `Minus` does
+not prevent that simplification.
+
+```py
+from typing import Literal
+from ty_extensions import Intersection, Not
+
+type Minus[T, U] = Intersection[T, Not[U]]
+type Boolean = bool
+type TrueLiteral = Literal[True]
+
+def f(x: Minus[Boolean, TrueLiteral]):
+    reveal_type(x)  # revealed: Literal[False]
+```
+
 ## Solving generics with type alias parameters
 
 A generic function parameter annotated with a PEP 695 type alias that contains a type variable

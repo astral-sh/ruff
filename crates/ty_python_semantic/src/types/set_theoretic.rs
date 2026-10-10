@@ -916,6 +916,31 @@ pub(crate) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Returns whether a direct positive or negative element is a type alias.
+    pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
+        self.positive(db)
+            .iter()
+            .chain(self.negative(db))
+            .copied()
+            .any(Type::is_alias_like)
+    }
+
+    /// Normalize direct aliases without expanding aliases nested inside containers.
+    pub(crate) fn expand_aliases(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+    ) -> Type<'db> {
+        let mut builder = IntersectionBuilder::new(db, env);
+        for positive in self.positive(db) {
+            builder.add_positive_in_place(positive.resolve_type_alias(db));
+        }
+        for negative in self.negative(db) {
+            builder.add_negative_in_place(negative.resolve_type_alias(db));
+        }
+        builder.build()
+    }
+
     /// Return the compact enum-complement view of this intersection, if it has one.
     pub(crate) fn enum_complement(
         self,
@@ -1110,7 +1135,7 @@ impl<'db> IntersectionType<'db> {
             }
             Type::Intersection(IntersectionType::new(db, positive, negative))
         } else {
-            let mut builder = IntersectionBuilder::new(db, visitor.env);
+            let mut builder = IntersectionBuilder::new(db, visitor.env).preserve_aliases(true);
             for positive in self.positive(db) {
                 builder.add_positive_in_place(positive.apply_type_mapping_impl(
                     db,
@@ -1380,7 +1405,7 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db, env);
     for &element in positive {
-        match element {
+        match element.resolve_type_alias(db) {
             Type::TypeVar(tvar) => match tvar.require_bound_or_constraints(db, env) {
                 TypeVarBoundOrConstraints::UpperBound(bound) => {
                     builder.add_positive_in_place(bound);
