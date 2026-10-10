@@ -595,6 +595,57 @@ Stop2T = TypeVar("Stop2T", default=int)
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
+## Specializing generic class objects from context
+
+A `type[...]` annotation informs the specialization of a bare generic class, taking precedence over
+any type variable defaults:
+
+```py
+from typing_extensions import Generic, TypeVar
+
+T = TypeVar("T", default=int)
+
+class C(Generic[T]): ...
+
+defaulted_factory: type[C[str]] = C
+reveal_type(defaulted_factory())  # revealed: C[str]
+```
+
+The context can also refer to a type variable of an enclosing class:
+
+```py
+class Box(Generic[T]):
+    value: T
+
+    def factory(self) -> "type[Box[T]]":
+        return Box  # ok
+
+class Connection(Generic[T]):
+    factory: type[Box[T]]
+
+    def __init__(self) -> None:
+        self.factory = Box  # ok
+
+reveal_type(Box[str]().factory()())  # revealed: Box[str]
+reveal_type(Connection[str]().factory())  # revealed: Box[str]
+```
+
+A declared union containing a class type is narrowed to provide useful type context:
+
+```py
+factory: type[Box[str]] | None = Box
+reveal_type(factory())  # revealed: Box[str]
+```
+
+Without a concrete type context, the default still applies:
+
+```py
+def value(factory: type[Box[T]]) -> T:
+    return factory().value
+
+reveal_type(value(Box))  # revealed: int
+```
+
 ## Narrowing class objects of final generic classes
 
 A specialized alias is distinct from the bare class object, even when the specialization matches the
