@@ -430,6 +430,56 @@ def _(x: bool, y: int):
     reveal_type(y + 4.12)  # revealed: float
 ```
 
+## Builtin true division return types
+
+Builtin true division methods return actual float or complex values. Their call results preserve
+that precision even though their annotations admit broader numeric types.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def parse(value: str, percent: bool) -> bool:
+    number = float(value)
+    if percent:
+        number = number / 100
+    reveal_type(number)  # revealed: float*
+    return number.is_integer()  # no diagnostic
+
+def divide(value: int):
+    reveal_type(value / 2)  # revealed: float*
+
+reveal_type(1.0 / 2)  # revealed: float*
+reveal_type(2 / 1.0)  # revealed: float*
+reveal_type(1j / 2)  # revealed: complex*
+reveal_type(float.__truediv__(1.0, 2))  # revealed: float*
+1.0 / "wrong"  # error: [unsupported-operator]
+```
+
+User-defined methods can return an integer when their return annotation is `float`:
+
+```py
+class Custom:
+    def __truediv__(self, value: int) -> float:
+        return 1
+
+reveal_type(Custom() / 2)  # revealed: float
+
+class FloatSubclass(float):
+    def __truediv__(self, value: float) -> float:
+        return 1
+
+reveal_type(FloatSubclass() / 2)  # revealed: float
+
+class Reflected:
+    def __rtruediv__(self, value: float) -> str:
+        return "custom"
+
+reveal_type(1.0 / Reflected())  # revealed: str
+```
+
 ## With literal types
 
 When we have a literal type for one operand, we're able to fall back to the instance handling for

@@ -1907,6 +1907,25 @@ pub(super) enum FunctionBodyKind {
     Regular,
 }
 
+/// Builtin true division returns a concrete float or complex value. Keep its declared signature
+/// unchanged for override checking, but avoid widening the result of a call to include integers.
+#[salsa::tracked]
+pub(super) fn builtin_true_division_return_type<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+) -> Option<KnownClass> {
+    if !matches!(function.name(db).as_str(), "__truediv__" | "__rtruediv__") {
+        return None;
+    }
+    let index = semantic_index(db, function.program_file(db));
+    let class = nearest_enclosing_class(db, index, function.definition(db).scope(db))?;
+    match class.known(db)? {
+        KnownClass::Int | KnownClass::Float => Some(KnownClass::Float),
+        KnownClass::Complex => Some(KnownClass::Complex),
+        _ => None,
+    }
+}
+
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
 #[derive(

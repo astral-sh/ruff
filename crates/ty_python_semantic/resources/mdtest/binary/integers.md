@@ -21,7 +21,7 @@ def lhs(x: int):
     reveal_type(x - 4)  # revealed: int
     reveal_type(x * -1)  # revealed: int
     reveal_type(x // 3)  # revealed: int
-    reveal_type(x / 3)  # revealed: float
+    reveal_type(x / 3)  # revealed: float*
     reveal_type(x % 3)  # revealed: int
 
 def rhs(x: int):
@@ -29,7 +29,7 @@ def rhs(x: int):
     reveal_type(3 - x)  # revealed: int
     reveal_type(3 * x)  # revealed: int
     reveal_type(-3 // x)  # revealed: int
-    reveal_type(-3 / x)  # revealed: float
+    reveal_type(-3 / x)  # revealed: float*
     reveal_type(5 % x)  # revealed: int
 
 def both(x: int):
@@ -37,7 +37,7 @@ def both(x: int):
     reveal_type(x - x)  # revealed: int
     reveal_type(x * x)  # revealed: int
     reveal_type(x // x)  # revealed: int
-    reveal_type(x / x)  # revealed: float
+    reveal_type(x / x)  # revealed: float*
     reveal_type(x % x)  # revealed: int
 
 # Edge case: the runtime value is 9223372036854775808,
@@ -126,7 +126,7 @@ c = 3 % 0  # error: "Cannot reduce object of type `Literal[3]` modulo zero"
 reveal_type(c)  # revealed: int
 
 # error: "Cannot divide object of type `int` by zero"
-reveal_type(int() / 0)  # revealed: float
+reveal_type(int() / 0)  # revealed: float*
 
 # error: "Cannot divide object of type `Literal[1]` by zero"
 reveal_type(1 / False)  # revealed: float*
@@ -136,12 +136,12 @@ True / False
 bool(1) / False
 
 # error: "Cannot divide object of type `float*` by zero"
-reveal_type(1.0 / 0)  # revealed: float
+reveal_type(1.0 / 0)  # revealed: float*
 
 class MyInt(int): ...
 
 # No error for a subclass of int
-reveal_type(MyInt(3) / 0)  # revealed: float
+reveal_type(MyInt(3) / 0)  # revealed: float*
 ```
 
 ## Bit-shifting

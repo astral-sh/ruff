@@ -45,7 +45,7 @@ def f4(x: float, y: float):
     reveal_type(x + y)  # revealed: float
     reveal_type(x - y)  # revealed: float
     reveal_type(x * y)  # revealed: float
-    reveal_type(x / y)  # revealed: float
+    reveal_type(x / y)  # revealed: float*
     reveal_type(x // y)  # revealed: float
     reveal_type(x % y)  # revealed: float
 ```

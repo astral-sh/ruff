@@ -394,11 +394,11 @@ explicit `Union` on the left side:
 reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
 reveal_type(Foo(3.14) + Foo(42))  # revealed: float
-reveal_type(Foo(3.14) / Foo(42))  # revealed: float
+reveal_type(Foo(3.14) / Foo(42))  # revealed: float*
 reveal_type(FooFoo(Foo(3.14)) < FooFoo(Foo(42)))  # revealed: bool
 reveal_type(FooFoo(Foo(3.14)) == FooFoo(Foo(42)))  # revealed: bool
 reveal_type(FooFoo(Foo(3.14)) + FooFoo(Foo(42)))  # revealed: float
-reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: float
+reveal_type(FooFoo(Foo(3.14)) / FooFoo(Foo(42)))  # revealed: float*
 ```
 
 But again as above, we can't _always_ lower `Foo` to `int | float`, because there are also binary

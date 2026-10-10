@@ -50,7 +50,7 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionType, KnownFunction,
-    OverloadLiteral,
+    OverloadLiteral, builtin_true_division_return_type,
 };
 use crate::types::generics::{
     GenericContext, Specialization, SpecializationBuilder, SpecializationError, TypeVarInference,
@@ -1695,7 +1695,21 @@ impl<'db> Bindings<'db> {
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
         for binding in self.iter_flat_mut() {
             let binding_type = binding.callable_type;
+            let function = match binding_type {
+                Type::FunctionLiteral(function) => Some(function),
+                Type::BoundMethod(method) => method.function(db),
+                _ => None,
+            };
+            let division_return_type = function
+                .filter(|function| {
+                    matches!(function.name(db).as_str(), "__truediv__" | "__rtruediv__")
+                })
+                .and_then(|function| *builtin_true_division_return_type(db, function));
             for (overload_index, overload) in binding.matching_overloads_mut() {
+                if let Some(return_type) = division_return_type {
+                    overload.set_return_type(return_type.to_instance(db, env));
+                    continue;
+                }
                 match binding_type {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                         function,
