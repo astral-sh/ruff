@@ -21,7 +21,9 @@ use crate::types::diagnostic::{
     report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
-use crate::types::infer::implicit_alias::may_require_implicit_alias_inference;
+use crate::types::infer::implicit_alias::{
+    is_implicit_alias_value, may_require_implicit_alias_inference,
+};
 use crate::types::infer::{
     CyclicTypeAliasError, ImplicitAliasInference, ImplicitAliasInferenceExtra, InferenceFlags,
     TypeExpressionFlags, implicit_alias_parameters, infer_implicit_alias_type,
@@ -84,14 +86,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
         let module = parsed_module(db, definition.program_file(db).python_file(db)).load(db);
         let value = definition.kind(db).value(&module)?;
-        if !matches!(
-            value,
-            ast::Expr::Name(_)
-                | ast::Expr::Attribute(_)
-                | ast::Expr::Subscript(_)
-                | ast::Expr::BinOp(_)
-                | ast::Expr::StringLiteral(_)
-        ) {
+        if !is_implicit_alias_value(value) {
             return None;
         }
         match definition.kind(db) {

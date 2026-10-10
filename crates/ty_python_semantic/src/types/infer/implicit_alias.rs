@@ -15,6 +15,18 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 
+/// Whether an assignment's right-hand side can be interpreted as an implicit alias.
+pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
+    matches!(
+        value,
+        ast::Expr::Name(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::StringLiteral(_)
+    )
+}
+
 /// Whether interpreting a value as an alias can reveal additional recursive references.
 pub(super) fn may_require_implicit_alias_inference<'db>(
     db: &'db dyn Db,
