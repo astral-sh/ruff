@@ -3055,6 +3055,29 @@ def invalid() -> Nested:
     return Box("wrong")  # error: [invalid-return-type]
 ```
 
+## Writable `__class__` protocol specializations
+
+Specializing a writable `__class__` property to `object` still requires the exact class.
+
+```py
+from typing import Protocol, TypeVar
+
+T = TypeVar("T")
+
+class Just(Protocol[T]):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+
+class Custom: ...
+
+exact: Just[object] = object()  # no diagnostic
+subclass: Just[object] = Custom()  # error: [invalid-assignment]
+exact_class: type[Just[object]] = object  # no diagnostic
+subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
+```
+
 ## Aliased `Self` in explicit receivers
 
 Specializing a generic class also specializes the upper bound of `Self` inside type alias arguments.

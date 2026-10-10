@@ -2197,6 +2197,27 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions._internal.Gener
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions._internal.GenericContext[Self@foo]
 ```
 
+## Writable `__class__` protocol specializations
+
+Specializing a writable `__class__` property to `object` still requires the exact class.
+
+```py
+from typing import Protocol
+
+class Just[T](Protocol):
+    @property
+    def __class__(self) -> type[T]: ...
+    @__class__.setter
+    def __class__(self, value: type[T]) -> None: ...
+
+class Custom: ...
+
+exact: Just[object] = object()  # no diagnostic
+subclass: Just[object] = Custom()  # error: [invalid-assignment]
+exact_class: type[Just[object]] = object  # no diagnostic
+subclass_class: type[Just[object]] = Custom  # error: [invalid-assignment]
+```
+
 ## Subscripting non-generic classes
 
 Subscripting a non-generic class in a type expression is an error. The invalid type expression
