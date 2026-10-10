@@ -1584,3 +1584,21 @@ def specialize(value: Promoted[TypeOf[2]]):
     reveal_type(value[2]()[1])  # revealed: list[Literal[2]]
     reveal_type(value[2]()[2]()[1])  # revealed: list[list[Literal[2]]]
 ```
+
+## Promotion through recursive callables with a parameter specification
+
+Widening a callable stream preserves its parameters and reaches the payload of subsequent calls.
+
+```py
+from typing import Callable
+from ty_extensions._internal import TypeOf
+
+type Stream[**P] = Callable[P, tuple[TypeOf[1], Stream[P]]]
+
+def collect(value: Stream[[int, str]]):
+    widened = [value][0]
+    reveal_type(widened(1, "first")[0])  # revealed: int
+    reveal_type(widened(1, "first")[1](2, "second")[0])  # revealed: int
+    reveal_type(widened(1, "first")[1](2, "second")[1](3, "third")[0])  # revealed: int
+    widened(1, "first")[1]("second", "payload")  # error: [invalid-argument-type]
+```

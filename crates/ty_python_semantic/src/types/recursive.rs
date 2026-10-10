@@ -65,7 +65,7 @@ use ty_python_core::place_table;
 
 use super::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use super::generics::{ApplySpecialization, Specialization};
-use super::mapping::DeferredTypeMapping;
+use super::mapping::{DeferredTypeMapping, MappingProbe};
 use super::relation::{TypeRelation, TypeRelationChecker};
 use super::type_alias::AliasCycleSummary;
 use super::variance::{VarianceInferable, VarianceOrigin};
@@ -271,7 +271,11 @@ impl<'db> RecursiveType<'db> {
         }
     }
 
-    fn with_arguments(self, db: &'db dyn Db, arguments: Option<Specialization<'db>>) -> Self {
+    pub(super) fn with_arguments(
+        self,
+        db: &'db dyn Db,
+        arguments: Option<Specialization<'db>>,
+    ) -> Self {
         Self::new_internal(
             db,
             self.definition(db),
@@ -478,27 +482,16 @@ impl<'db> RecursiveType<'db> {
                         .into_type()
                 })
             }
-            _ => visitor.visit(db, Type::Recursive(self), mapping, || {
-                self.unfold_with_mapping_visitor(db, visitor)
-                    .map(|unfolded| {
-                        let mapped = unfolded.apply_type_mapping_impl(db, mapping, tcx, visitor);
-                        if mapped == unfolded {
-                            Type::Recursive(self)
-                        } else {
-                            Type::Recursive(self.with_mappings(
-                                db,
-                                DeferredTypeMapping::append(
-                                    db,
-                                    self.mappings(db),
-                                    mapping,
-                                    tcx,
-                                    visitor,
-                                ),
-                            ))
-                        }
-                    })
-                    .into_type()
-            }),
+            _ => {
+                if MappingProbe::changes(db, Type::Recursive(self), mapping, tcx, visitor) {
+                    Type::Recursive(self.with_mappings(
+                        db,
+                        DeferredTypeMapping::append(db, self.mappings(db), mapping, tcx, visitor),
+                    ))
+                } else {
+                    Type::Recursive(self)
+                }
+            }
         }
     }
 

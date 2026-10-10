@@ -11,7 +11,7 @@ use crate::{
         definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization, bind_typevar},
-        mapping::DeferredTypeMapping,
+        mapping::{DeferredTypeMapping, MappingProbe},
         variance::{VarianceInferable, VarianceOrigin},
         visitor,
     },
@@ -732,9 +732,24 @@ impl<'db> TypeAliasType<'db> {
                 }))
             }
             _ => {
-                // IMPORTANT: All processing must happen inside a single visitor.visit() call so that if we encounter
-                // this same TypeAlias again (e.g., in `type RecursiveT = int | tuple[RecursiveT, ...]`), the visitor
-                // will detect the cycle and return the fallback value.
+                if self.is_recursive(db) {
+                    return if MappingProbe::changes(db, ty, type_mapping, tcx, visitor) {
+                        Type::TypeAlias(self.with_mappings(
+                            db,
+                            DeferredTypeMapping::append(
+                                db,
+                                self.mappings(db),
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            ),
+                        ))
+                    } else {
+                        ty
+                    };
+                }
+                // Expansion can revisit this alias through another recursive type, so retain
+                // the ordinary transformation guard for aliases that are not themselves recursive.
                 let mapped = visitor.visit(db, ty, type_mapping, || {
                     self.value_type_with_mapping_visitor(db, visitor)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -745,17 +760,6 @@ impl<'db> TypeAliasType<'db> {
                 // the alias itself, and fully static aliases must retain their original identity.
                 if mapped == ty || self.value_type_with_mapping_visitor(db, visitor) == mapped {
                     ty
-                } else if self.is_recursive(db) {
-                    Type::TypeAlias(self.with_mappings(
-                        db,
-                        DeferredTypeMapping::append(
-                            db,
-                            self.mappings(db),
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ),
-                    ))
                 } else {
                     mapped
                 }

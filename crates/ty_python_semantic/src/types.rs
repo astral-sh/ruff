@@ -515,6 +515,7 @@ type MaterializationEquivalenceVisitor<'db> =
 pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     env: &'env ProgramEnvironment<'db>,
     recursion_context: Option<&'env TypeRecursionContext<'db>>,
+    mapping_probe: Option<mapping::MappingProbeContext<'env, 'db>>,
     /// Whether materialization also transforms type-variable bounds and defaults.
     materialize_typevar_bounds_and_defaults: bool,
     default: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
@@ -532,6 +533,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             env,
             recursion_context: None,
+            mapping_probe: None,
             materialize_typevar_bounds_and_defaults: true,
             default: OnceCell::default(),
             top_materialization: OnceCell::default(),
@@ -609,6 +611,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         Self {
             materialization_equivalence,
             recursion_context: self.recursion_context,
+            mapping_probe: self.mapping_probe,
             materialize_typevar_bounds_and_defaults: self.materialize_typevar_bounds_and_defaults,
             ..Self::new(self.env)
         }
@@ -9473,6 +9476,12 @@ impl<'db> Type<'db> {
             )
         {
             return SubclassOfType::from(db, visitor.env, class.default_specialization(db));
+        }
+
+        if let Some(probe) = visitor.mapping_probe
+            && let Some(mapped) = probe.map_type(db, self, type_mapping, tcx, visitor)
+        {
+            return mapped;
         }
 
         // Expand union-valued `ParamSpec`s before specializing a given callable.

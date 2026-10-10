@@ -1396,6 +1396,71 @@ static_assert(not is_subtype_of(Top[WithAny[int]], Bottom[WithAny[int]]))
 static_assert(is_subtype_of(Top[Phantom[int]], Top[Phantom[str]]))
 ```
 
+## Materialization of recursively returned callables
+
+Materialization reaches the payload at every step, including when the alias itself is callable. An
+`Any` returned by an unmaterialized stream cannot escape its top materialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable
+from ty_extensions import Bottom, Top
+
+Stream = Callable[[], tuple[Any, "Stream"]]
+type NamedStream = Callable[[], tuple[Any, NamedStream]]
+
+def payloads(implicit: Top[Stream], explicit: Top[NamedStream]):
+    reveal_type(implicit()[0])  # revealed: object
+    reveal_type(implicit()[1]()[0])  # revealed: object
+    reveal_type(implicit()[1]()[1]()[0])  # revealed: object
+    reveal_type(explicit()[0])  # revealed: object
+    reveal_type(explicit()[1]()[0])  # revealed: object
+    reveal_type(explicit()[1]()[1]()[0])  # revealed: object
+    implicit()[1]()[0].missing()  # error: [unresolved-attribute]
+    explicit()[1]()[0].missing()  # error: [unresolved-attribute]
+
+ListStream = Callable[[], tuple[list[Any], "ListStream"]]
+type NamedListStream = Callable[[], tuple[list[Any], NamedListStream]]
+
+def bottom_payloads(implicit: Bottom[ListStream], explicit: Bottom[NamedListStream]):
+    reveal_type(implicit()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(implicit()[1]()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(explicit()[0])  # revealed: Bottom[list[Any]]
+    reveal_type(explicit()[1]()[0])  # revealed: Bottom[list[Any]]
+```
+
+## Materialization of payloads introduced by recursive specialization
+
+A recursive specialization can introduce a gradual payload even when the initial arguments are fully
+static. Top materialization also constrains those later payloads.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, TypeVar
+from ty_extensions import Top
+
+T = TypeVar("T")
+U = TypeVar("U")
+Stream = Callable[[], tuple[T, U, "Stream[list[T], Any]"]]
+type NamedStream[T, U] = Callable[[], tuple[T, U, NamedStream[list[T], Any]]]
+
+def payloads(implicit: Top[Stream[int, int]], explicit: Top[NamedStream[int, int]]):
+    reveal_type(implicit()[2]()[1])  # revealed: object
+    reveal_type(implicit()[2]()[2]()[1])  # revealed: object
+    reveal_type(explicit()[2]()[1])  # revealed: object
+    reveal_type(explicit()[2]()[2]()[1])  # revealed: object
+    implicit()[2]()[1].missing()  # error: [unresolved-attribute]
+    explicit()[2]()[1].missing()  # error: [unresolved-attribute]
+```
+
 ## Materialization does not force invalid recursive specializations
 
 An invalid self-referential bound must produce the expected diagnostics without forcing recursive
