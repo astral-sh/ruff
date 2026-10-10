@@ -648,7 +648,11 @@ jobs:
     timeout-minutes: 20
     env:
       FORCE_COLOR: 1
+      # Keep in sync with the job's timeout-minutes.
+      FUZZ_JOB_TIMEOUT_MINUTES: 20
     steps:
+      - name: Record job start time
+        run: echo "FUZZ_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -672,6 +676,7 @@ jobs:
         run: cargo build --bin ruff
       - name: Fuzz
         run: |
+          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           (
             uv run \
             --python="${PYTHON_VERSION}" \
@@ -679,6 +684,7 @@ jobs:
             --locked \
             fuzz \
             --test-executable=target/debug/ruff \
+            --budget-minutes="${budget_minutes}" \
             --bin=ruff \
             0-500
           )
@@ -854,7 +860,12 @@ jobs:
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && (needs.determine_changes.outputs.ty == 'true' || needs.determine_changes.outputs.py-fuzzer == 'true') }}
     timeout-minutes: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
+    env:
+      # Keep in sync with the job's timeout-minutes.
+      FUZZ_JOB_TIMEOUT_MINUTES: ${{ github.repository == 'astral-sh/ruff' && 20 || 40 }}
     steps:
+      - name: Record job start time
+        run: echo "FUZZ_JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -897,6 +908,7 @@ jobs:
 
           git checkout --detach "$GITHUB_SHA"
 
+          budget_minutes=$(bash python/py-fuzzer/ci_budget.sh "$FUZZ_JOB_TIMEOUT_MINUTES")
           (
             uv run \
             --python="${PYTHON_VERSION}" \
@@ -906,6 +918,7 @@ jobs:
             --test-executable=ty-new \
             --baseline-executable=ty-old \
             --only-new-bugs \
+            --budget-minutes="${budget_minutes}" \
             --bin=ty \
             0-1000
           )
