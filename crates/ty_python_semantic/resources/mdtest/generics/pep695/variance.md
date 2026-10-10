@@ -498,6 +498,136 @@ static_assert(not is_subtype_of(Box[int], Box[object]))
 static_assert(not is_subtype_of(Box[object], Box[int]))
 ```
 
+## Recursive lambdas with growing type arguments
+
+Each call returns another lambda with a more deeply nested type argument. No call exposes a value of
+type `T`, so variance inference falls back to covariance:
+
+```py
+from typing import Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Chain[T]:
+    def __init__(self, value: T):
+        self.next: Final = lambda: Chain([value]).next
+
+static_assert(is_subtype_of(Chain[int], Chain[object]))
+static_assert(not is_subtype_of(Chain[object], Chain[int]))
+```
+
+Making the attribute writable still does not expose `T`:
+
+```py
+class WritableChain[T]:
+    def __init__(self, value: T):
+        self.next = lambda: WritableChain([value]).next
+
+static_assert(is_subtype_of(WritableChain[int], WritableChain[object]))
+static_assert(not is_subtype_of(WritableChain[object], WritableChain[int]))
+```
+
+If each call also returns its captured value, the second call exposes a `list[T]`. The class is then
+invariant, even though the attribute is `Final`:
+
+```py
+class Growing[T]:
+    def __init__(self, value: T):
+        self.next: Final = lambda: (value, Growing([value]).next)
+
+static_assert(not is_subtype_of(Growing[int], Growing[object]))
+static_assert(not is_subtype_of(Growing[object], Growing[int]))
+```
+
+A writable lambda attribute that returns `T` makes its class invariant, including when the recursive
+argument contains a class object:
+
+```py
+class WithClass[T]:
+    def __init__(self, value: T):
+        self.next = lambda: (value, WithClass((value, int)).next)
+
+static_assert(not is_subtype_of(WithClass[int], WithClass[object]))
+static_assert(not is_subtype_of(WithClass[object], WithClass[int]))
+```
+
+## Specializing captured lambda type parameters
+
+Specializing a recursive lambda preserves the variance of each captured parameter. `Wrapper[T, U]`
+exposes a callable that accepts `U` and returns `T`, so it is covariant in `T` and contravariant in
+`U`:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callback[P, R]:
+    def __init__(self, callback: Callable[[P], R]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Wrapper[T, U]:
+    def __init__(self, callback: Callable[[U], T]):
+        self.node: Final = Callback[U, T](callback).node
+
+static_assert(is_subtype_of(Wrapper[int, object], Wrapper[object, object]))
+static_assert(not is_subtype_of(Wrapper[object, object], Wrapper[int, object]))
+static_assert(is_subtype_of(Wrapper[int, object], Wrapper[int, int]))
+static_assert(not is_subtype_of(Wrapper[int, int], Wrapper[int, object]))
+```
+
+Using the same type parameter in both positions makes the containing class invariant:
+
+```py
+class Transformer[T]:
+    def __init__(self, callback: Callable[[T], T]):
+        self.node: Final = Callback[T, T](callback).node
+
+static_assert(not is_subtype_of(Transformer[int], Transformer[object]))
+static_assert(not is_subtype_of(Transformer[object], Transformer[int]))
+```
+
+Specializing a nested class leaves its lambda's references to outer type parameters intact:
+
+```py
+class Outer[T]:
+    def __init__(self, value: T):
+        class Inner[U]:
+            def __init__(self, other: U):
+                self.node: Final = lambda: (value, self.node)
+
+        self.node: Final = Inner[int](0).node
+
+static_assert(is_subtype_of(Outer[int], Outer[object]))
+static_assert(not is_subtype_of(Outer[object], Outer[int]))
+```
+
+## Specializing captured lambda parameter lists
+
+Substituting a parameter list preserves contravariance in the callback's parameter types, including
+when the list is forwarded through another class:
+
+```py
+from typing import Callable, Final
+from ty_extensions import static_assert
+from ty_extensions._internal import is_subtype_of
+
+class Callbacks[**P]:
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = lambda: (callback, self.node)
+
+class Forward[**P]:
+    def __init__(self, callback: Callable[P, None]):
+        self.node: Final = Callbacks[P](callback).node
+
+class Consumer[T]:
+    def __init__(self, callback: Callable[[T], None]):
+        self.node: Final = Forward[[T]](callback).node
+
+static_assert(is_subtype_of(Consumer[object], Consumer[int]))
+static_assert(not is_subtype_of(Consumer[int], Consumer[object]))
+```
+
 ## Recursive protocol variance
 
 A recursive protocol that only produces its type parameter is covariant. Returning that protocol

@@ -3298,6 +3298,58 @@ node = Box[int](1).writable
 reveal_type(node()[1]()[0])  # revealed: int
 ```
 
+## Materializing specialized lambda returns
+
+Materialization applies to an invariant return type as a whole. Materializing the substituted `Any`
+in isolation would incorrectly produce `list[object]` or `list[Never]`:
+
+```py
+from typing import Any, Final, Generic, TypeVar
+from ty_extensions import Bottom, Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, value: T):
+        self.node: Final = lambda: [value]
+
+node = Box[Any](None).node
+
+def _(top: Top[TypeOf[node]], bottom: Bottom[TypeOf[node]]):
+    reveal_type(top())  # revealed: Top[list[Any]]
+    reveal_type(bottom())  # revealed: Bottom[list[Any]]
+```
+
+## Materializing a promoted lambda return
+
+Looking up a writable lambda attribute promotes the returned class object to a subclass type. For a
+generic class, that type can contain `Unknown` arguments. Materialization still applies to those
+arguments even if the original lambda was already materialized:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import Top
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    item: T
+
+node = lambda: Box
+
+def check(source: Top[TypeOf[node]]):
+    class Holder:
+        def __init__(self):
+            self.node = source
+
+    holder = Holder()
+
+    def inner(top: Top[TypeOf[holder.node]]):
+        reveal_type(top())  # revealed: type[Top[Box[Unknown]]]
+```
+
 ## Growing recursive lambda attributes
 
 Each recursive return below adds another `list` around the class's type argument. Calling the
@@ -3322,6 +3374,42 @@ signature:
 ```py
 # error: [unresolved-attribute] "() -> tuple[int, () -> tuple[list[int],"
 node.missing
+```
+
+## Class objects in recursive lambda arguments
+
+Each recursive call can include a class object in its argument. The next lambda returns a tuple
+containing the original value and the `int` class object:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class WithClass(Generic[T]):
+    def __init__(self, value: T):
+        self.node = lambda: (value, WithClass((value, int)).node)
+
+node = WithClass(1).node
+reveal_type(node()[1]()[0])  # revealed: tuple[int, type[int]]
+```
+
+## Collections of growing recursive lambdas
+
+A collection can contain different specializations of a recursive lambda. Calling an element keeps
+the possible return types from each specialization:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Grow(Generic[T]):
+    def __init__(self, value: T):
+        self.node = lambda: (value, Grow([value]).node)
+
+nodes = [Grow(1).node, Grow("two").node]
+reveal_type(nodes[0]()[1]()[0])  # revealed: list[int] | list[str]
 ```
 
 ## Recursive lambdas with swapped type arguments

@@ -6,10 +6,11 @@ use super::{LambdaSignature, infer_lambda_signature};
 use crate::types::constraints::resolution::type_dependencies;
 use crate::types::generics::{ApplySpecialization, GenericContext, Specialization};
 use crate::types::typevar::TypeVarSet;
+use crate::types::variance::{VarianceInferable, VarianceOrigin, VarianceTerm};
 use crate::types::visitor::any_over_type_including_alias_arguments;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, MaterializationKind, PromotionKind, PromotionMode,
-    SelfBinding, Type, TypeContext, TypeMapping,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, MaterializationKind,
+    PromotionKind, PromotionMode, SelfBinding, Type, TypeContext, TypeMapping, TypeVarVariance,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
 use ty_python_core::semantic_index;
@@ -25,6 +26,77 @@ pub struct LambdaSignatureMapping<'db> {
 }
 
 impl<'db> LambdaSignatureMapping<'db> {
+    /// Derive variance from the source and substitution arguments. Expanding the specialized
+    /// signature would create unbounded equations for returns such as `C[list[T]].callback`.
+    pub(super) fn variance_equation(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> Option<VarianceTerm<'db>> {
+        if matches!(self.mapping, LambdaMapping::Promote(..)) {
+            // Promotion widens literals without introducing type variables or changing their
+            // polarity. Reuse the source equation; it is conservative if union simplification
+            // removes an occurrence. The full signature still retains the promotion.
+            return Some(VarianceTerm::variable(
+                db,
+                VarianceOrigin::Lambda(self.source),
+                typevar,
+            ));
+        }
+        let LambdaMapping::Specialize {
+            specialization,
+            materialization: None,
+            ..
+        } = &self.mapping
+        else {
+            return None;
+        };
+        let source = self.source;
+        let env = ProgramEnvironment::from_scope(source.scope(db));
+        // Keep source equations in terms of their own captures. Variables introduced by
+        // a caller belong in the argument terms, and do not create new source equations.
+        let arguments = source.captured_typevars(db).variables(db).map(|parameter| {
+            let argument = specialization
+                .get(db, parameter)
+                .unwrap_or(Type::TypeVar(parameter));
+            let argument = if parameter.is_paramspec(db) {
+                // ParamSpec arguments encode parameter lists as callables. Their variance
+                // already includes parameter contravariance, which the source equation also
+                // accounts for. Reverse it here so that composition counts it only once.
+                Self::paramspec_argument_variance(db, &env, argument, typevar)
+                    .compose_thunk(db, || TypeVarVariance::Contravariant.into())
+            } else {
+                argument.variance_of(db, &env, typevar)
+            };
+            argument.compose_thunk(db, || {
+                VarianceTerm::variable(db, VarianceOrigin::Lambda(source), parameter.identity(db))
+            })
+        });
+        Some(VarianceTerm::join(db, arguments))
+    }
+
+    /// Give an unspecialized `ParamSpec` the variance of its callable parameter-list value.
+    fn paramspec_argument_variance(
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        argument: Type<'db>,
+        typevar: BoundTypeVarIdentity<'db>,
+    ) -> VarianceTerm<'db> {
+        match argument {
+            Type::Union(union) => VarianceTerm::join(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|argument| Self::paramspec_argument_variance(db, env, *argument, typevar)),
+            ),
+            Type::TypeVar(parameter) if parameter.is_paramspec(db) => argument
+                .variance_of(db, env, typevar)
+                .compose_thunk(db, || TypeVarVariance::Contravariant.into()),
+            _ => argument.variance_of(db, env, typevar),
+        }
+    }
+
     /// Apply the saved mapping in the context in which it was requested.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let env = ProgramEnvironment::from_scope(self.source.scope(db));
@@ -329,23 +401,43 @@ impl<'db> LambdaSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
-        // Promotions commute with each other and with materialization. Materializing an
-        // already materialized type has no effect. These operations must remain idempotent
-        // when a recursive member lookup alternates between them.
+        // Repeating a promotion, or materializing an already-materialized type, has no effect.
+        // Promotions commute with each other. A substitution can occur between matching
+        // operations only if its arguments stay unchanged in both variance positions. Promotion
+        // and materialization must keep their order: promotion can introduce gradual types.
+        // Preserve the original operation order and discard only the redundant new operation.
         if matches!(
             mapping,
             LambdaMapping::Promote(..) | LambdaMapping::Materialize(_)
         ) {
+            let transformation = mapping.as_type_mapping();
+            let flipped = transformation.flip();
             let mut source = self;
             while let Some(previous) = source.mapping(db)
-                && matches!(
-                    previous.mapping,
-                    LambdaMapping::Promote(..) | LambdaMapping::Materialize(_)
-                )
                 && previous.context == tcx
                 && previous.materialize_typevar_bounds_and_defaults
                     == visitor.materialize_typevar_bounds_and_defaults
             {
+                match (&mapping, &previous.mapping) {
+                    (LambdaMapping::Promote(..), LambdaMapping::Promote(..))
+                    | (LambdaMapping::Materialize(_), LambdaMapping::Materialize(_)) => {}
+                    (
+                        _,
+                        LambdaMapping::Specialize {
+                            specialization,
+                            materialization: None,
+                            ..
+                        },
+                    ) if specialization.types(db).iter().all(|argument| {
+                        [&transformation, &flipped]
+                            .into_iter()
+                            .all(|transformation| {
+                                argument.apply_type_mapping_impl(db, transformation, tcx, visitor)
+                                    == *argument
+                            })
+                    }) => {}
+                    _ => break,
+                }
                 if previous.mapping == mapping
                     || matches!(
                         (&previous.mapping, &mapping),

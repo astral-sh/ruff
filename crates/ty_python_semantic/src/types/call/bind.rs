@@ -6278,17 +6278,10 @@ impl<'db> CallInference<'_, 'db> {
                 return None;
             }
 
-            let mut variance_in_return = TypeVarVariance::Bivariant;
-
-            // Find all occurrences of the type variable in the return type.
-            self.return_ty
-                .visit_specialization(db, self.env, |ty, variance| {
-                    if ty != Type::TypeVar(typevar) {
-                        return;
-                    }
-
-                    variance_in_return = variance_in_return.join(variance);
-                });
+            let variance_in_return = self
+                .return_ty
+                .variance_of(db, self.env, typevar.identity(db))
+                .evaluate(db);
 
             // Promotion is only useful if the type variable is in non-covariant position
             // in the return type.

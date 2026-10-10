@@ -6,7 +6,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::OnceCell;
-use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -29,7 +28,7 @@ pub(crate) use self::callable::UpcastPolicy;
 use self::class::ClassInstanceFlags;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::TypeTransformer;
-use self::cyclic::{ActiveRecursionDetector, HasIdentity, TypeIdentity};
+use self::cyclic::{ActiveRecursionDetector, TypeIdentity};
 pub use self::dedicated::pytest::{
     FixtureBinding, FixtureExposure, FixtureNameSource, PytestTest, fixture_bindings_for_parameter,
     fixture_exposures_for_definition, pytest_global_plugin_files, pytest_tests_in_file,
@@ -619,26 +618,6 @@ pub(crate) type FindLegacyTypeVarsVisitor<'db> =
 
 #[derive(Debug)]
 pub(crate) struct FindLegacyTypeVars;
-
-/// A [`CycleDetector`] that is used in `visit_specialization` methods.
-type SpecializationVisitor<'db> =
-    CycleDetector<'db, VisitSpecialization, (Type<'db>, TypeVarVariance), (), 3>;
-struct VisitSpecialization;
-
-impl<'db> HasIdentity<'db> for (Type<'db>, TypeVarVariance) {
-    type Id = (TypeIdentity<'db>, TypeVarVariance);
-
-    fn may_share_identity(&self, db: &'db dyn Db, other: &Self) -> bool {
-        let (self_ty, self_variance) = self;
-        let (other_ty, other_variance) = other;
-        self_variance == other_variance && self_ty.may_share_type_identity(db, *other_ty)
-    }
-
-    fn to_identity(&self, db: &'db dyn Db) -> Self::Id {
-        let (ty, variance) = self;
-        (ty.to_type_identity(db), *variance)
-    }
-}
 
 /// The standard-library `typing` module or its `typing_extensions` backport.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
@@ -3855,91 +3834,6 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
         }
-    }
-
-    /// Recursively visit a type and its specializations.
-    ///
-    /// The provided closure will be called on the type itself and its nested types, along with
-    /// their variance with respect to the outermost type. Repeated types with the same variance
-    /// may be skipped.
-    fn visit_specialization<F>(self, db: &'db dyn Db, env: &ProgramEnvironment<'db>, mut f: F)
-    where
-        F: FnMut(Type<'db>, TypeVarVariance),
-    {
-        self.visit_specialization_impl(
-            db,
-            env,
-            TypeVarVariance::Covariant,
-            &mut f,
-            &SpecializationVisitor::default(),
-        );
-    }
-
-    fn visit_specialization_impl(
-        self,
-        db: &'db dyn Db,
-        env: &ProgramEnvironment<'db>,
-        polarity: TypeVarVariance,
-        f: &mut dyn FnMut(Type<'db>, TypeVarVariance),
-        visitor: &SpecializationVisitor<'db>,
-    ) {
-        f(self, polarity);
-
-        visitor.visit(db, (self, polarity), || {
-            let Some((_, specialization)) = self.class_specialization(db, env) else {
-                match self {
-                    Type::Union(union) => {
-                        for element in union.elements(db) {
-                            element.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    Type::Intersection(intersection) => {
-                        for element in intersection.positive(db) {
-                            element.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                        for element in intersection.negative(db) {
-                            element.visit_specialization_impl(db, env, polarity.flip(), f, visitor);
-                        }
-                    }
-                    Type::TypeAlias(alias) => alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, env, polarity, f, visitor),
-                    Type::Recursive(recursive) => {
-                        if let UnfoldResult::Unfolded(unfolded) = recursive.unfold(db, env) {
-                            unfolded.visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    Type::Callable(callable) => {
-                        for signature in callable.signatures(db) {
-                            for parameter in signature.parameters() {
-                                parameter.annotated_type().visit_specialization_impl(
-                                    db,
-                                    env,
-                                    polarity.flip(),
-                                    f,
-                                    visitor,
-                                );
-                            }
-
-                            signature
-                                .return_ty
-                                .visit_specialization_impl(db, env, polarity, f, visitor);
-                        }
-                    }
-                    _ => {}
-                }
-
-                return;
-            };
-
-            for (typevar, ty) in iter::zip(
-                specialization.generic_context(db).variables(db),
-                specialization.types(db),
-            ) {
-                let variance = typevar.variance_with_polarity(db, polarity);
-                ty.visit_specialization_impl(db, env, variance, f, visitor);
-            }
-        });
     }
 
     /// Return true if there is just a single inhabitant for this type.

@@ -829,6 +829,11 @@ impl<'db> LambdaSignature<'db> {
         db: &'db dyn Db,
         typevar: BoundTypeVarIdentity<'db>,
     ) -> VarianceTerm<'db> {
+        if let Some(mapping) = self.mapping(db)
+            && let Some(variance) = mapping.variance_equation(db, typevar)
+        {
+            return variance;
+        }
         let env = ProgramEnvironment::from_scope(self.scope(db));
         infer_lambda_signature(db, self).variance_of(db, &env, typevar)
     }
