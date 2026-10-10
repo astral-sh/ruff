@@ -105,6 +105,56 @@ pub(crate) fn check_noqa(
         }
     }
 
+    // Report unmatched suppression comments (RUF104) after AST diagnostics have been suppressed,
+    // so we know which disable comments were actually used.
+    if context.is_rule_enabled(Rule::UnmatchedSuppressionComment) {
+        let unmatched_ranges: Vec<TextRange> = suppressions.unmatched_disable_ranges().collect();
+        'unmatched: for range in unmatched_ranges {
+            context.report_diagnostic(ruff::rules::UnmatchedSuppressionComment, range);
+            let index = context.as_mut_vec().len() - 1;
+            let diagnostic = &context.as_mut_vec()[index];
+
+            // Apply file-level suppressions first
+            if exemption.includes(Rule::UnmatchedSuppressionComment) {
+                ignored_diagnostics.push(index);
+                continue;
+            }
+
+            // Apply ranged suppressions next
+            if suppressions.check_diagnostic(diagnostic) {
+                ignored_diagnostics.push(index);
+                continue;
+            }
+
+            // Apply end-of-line noqa suppressions last
+            let noqa_offsets = [range.start(), range.end()]
+                .into_iter()
+                .map(|position| noqa_line_for.resolve(position))
+                .unique();
+
+            for noqa_offset in noqa_offsets {
+                if let Some(directive_line) =
+                    noqa_directives.find_line_with_directive_mut(noqa_offset)
+                {
+                    let suppressed = match &directive_line.directive {
+                        Directive::All(_) => true,
+                        Directive::Codes(directive) => diagnostic
+                            .secondary_code()
+                            .is_some_and(|code| directive.includes(code)),
+                    };
+
+                    if suppressed {
+                        directive_line
+                            .matches
+                            .push(Rule::UnmatchedSuppressionComment);
+                        ignored_diagnostics.push(index);
+                        continue 'unmatched;
+                    }
+                }
+            }
+        }
+    }
+
     // Only migrate directives that don't require RUF100 cleanup first.
     let check_unused_noqa = context.is_rule_enabled(Rule::UnusedNOQA)
         && analyze_directives
