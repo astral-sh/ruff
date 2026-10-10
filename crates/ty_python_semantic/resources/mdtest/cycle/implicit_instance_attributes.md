@@ -365,8 +365,8 @@ class Base:
 ## Class attributes independently establish presence
 
 A class attribute is present before an initializer runs, including when it is inherited. Assigning
-to the same name inside a negative guard does not make that branch reachable. This applies to both
-`hasattr` and named protocols with a read-only `object` property.
+to the same name inside a negative `hasattr` or `isinstance` guard does not make that branch
+reachable.
 
 ```py
 from typing import Protocol, runtime_checkable
@@ -381,8 +381,8 @@ class Base:
 
     def __init__(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__
-            self.missing
+            self.x = self.__str__  # no diagnostic
+            self.missing  # no diagnostic
         if not isinstance(self, HasX):
             self.x = self.__str__
             self.missing
@@ -390,8 +390,8 @@ class Base:
 class Child(Base):
     def initialize(self):
         if not hasattr(self, "x"):
-            self.x = self.__str__
-            self.missing
+            self.x = self.__str__  # no diagnostic
+            self.missing  # no diagnostic
 ```
 
 ## Class attributes establish presence through aliased protocol members
@@ -444,6 +444,9 @@ class Base:
             self.unreachable = self.__str__
         if not hasattr(self, "deleted"):
             self.deleted = self.__str__
+
+reveal_type(Base().unreachable())  # revealed: str
+reveal_type(Base().deleted())  # revealed: str
 ```
 
 `child.py`:
@@ -523,15 +526,15 @@ def fail() -> NoReturn:
 class C:
     def initialize(self):
         if not hasattr(self, "x"):
-            self.x = fail()  # error: [invalid-assignment]
+            self.x = fail()  # error: [unresolved-attribute]
 
 C().x  # error: [unresolved-attribute]
 ```
 
-## Assignments in the opposite guard branch do not initialize an attribute
+## Assignments in both guard branches
 
-Assigning an existing attribute when `hasattr` succeeds does not initialize it in the opposite
-branch. That branch remains unreachable and cannot create another instance attribute.
+An assignment in `__init__` does not make a negative `hasattr` branch unreachable. We infer
+attributes assigned in either branch.
 
 ```py
 class C:
@@ -542,23 +545,25 @@ class C:
         if hasattr(self, "x"):
             self.x = 2
         else:
-            self.y = self.missing
+            self.y = self.missing  # error: [unresolved-attribute]
 
-C().y  # error: [unresolved-attribute]
+reveal_type(C().y)  # revealed: Unknown
 ```
 
-## Contradictory attribute guards do not initialize an attribute
+## Contradictory attribute guards
 
-An impossible inner `hasattr` branch cannot create an instance attribute.
+We do not yet recognize contradictory `hasattr` guards as unreachable, so an assignment inside them
+can contribute an instance attribute.
 
 ```py
 class C:
     def initialize(self):
         if hasattr(self, "x"):
             if not hasattr(self, "x"):
-                self.x = self.missing
+                self.x = self.missing  # error: [unresolved-attribute]
 
-C().x  # error: [unresolved-attribute]
+# TODO: This assignment is unreachable, so `x` should be an unresolved attribute.
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 ## Lazy cached property behind `hasattr`

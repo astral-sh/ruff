@@ -12,6 +12,7 @@ use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::iteration::extract_literal_container_element_types;
 use crate::types::match_pattern::PatternCacheKey;
+use crate::types::member::has_definitely_present_attribute;
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{TupleElement, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictFieldBuilder, TypedDictSchema, TypedDictType};
@@ -19,12 +20,12 @@ use crate::types::unpacker::collected_list_type;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassPatternPositionalSource, ClassType, CycleDetector,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult, UnionBuilder, binding_type,
-    class_pattern_positional_sources, definite_match_pattern_type_for_subject,
-    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
-    pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type, typed_dict_matches_class_pattern,
+    Parameter, Parameters, Signature, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnfoldResult,
+    UnionBuilder, binding_type, class_pattern_positional_sources,
+    definite_match_pattern_type_for_subject, exact_sequence_pattern_type, infer_expression_types,
+    mapping_pattern_type, pattern_binding_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
 use crate::{Db, ProgramEnvironment};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -770,12 +771,16 @@ enum NarrowingOperation<'db> {
     Intersection(Type<'db>),
     /// Narrow to this generic type while preserving type arguments already known about the subject.
     GenericFiltering(Type<'db>),
+    /// Exclude alternatives whose attribute is present independently of instance initialization.
+    HasAttrNegative(StringLiteralType<'db>),
 }
 
 impl<'db> NarrowingOperation<'db> {
     const fn ty(self) -> Type<'db> {
         match self {
             Self::Intersection(ty) | Self::GenericFiltering(ty) => ty,
+            // Without a subject, absence alone does not exclude any type.
+            Self::HasAttrNegative(_) => Type::object(),
         }
     }
 }
@@ -823,16 +828,53 @@ impl<'db> Conjunctions<'db> {
         }
 
         // Collapse shared union arms before distributing the next constraint over them.
+        let narrowed =
+            self.conjuncts
+                .iter()
+                .copied()
+                .fold(Type::object(), |accumulated, conjunct| match conjunct {
+                    NarrowingOperation::Intersection(ty) => {
+                        IntersectionType::from_two_elements(db, env, accumulated, ty)
+                    }
+                    NarrowingOperation::GenericFiltering(ty) => {
+                        filter_generic_narrowing_constraint(db, env, accumulated, ty)
+                    }
+                    NarrowingOperation::HasAttrNegative(_) => accumulated,
+                });
+
+        // Apply absence checks after the other constraints have established the possible types.
+        // Otherwise, `not hasattr(x, "method") and isinstance(x, C)` could lose the chance to
+        // exclude `C` merely because the attribute check came first.
         self.conjuncts
             .into_iter()
-            .fold(Type::object(), |accumulated, conjunct| match conjunct {
-                NarrowingOperation::Intersection(ty) => {
-                    IntersectionType::from_two_elements(db, env, accumulated, ty)
-                }
-                NarrowingOperation::GenericFiltering(ty) => {
-                    filter_generic_narrowing_constraint(db, env, accumulated, ty)
+            .fold(narrowed, |subject, conjunct| {
+                if let NarrowingOperation::HasAttrNegative(attribute) = conjunct {
+                    filter_hasattr_negative_constraint(db, env, subject, attribute.value(db))
+                } else {
+                    subject
                 }
             })
+    }
+}
+
+fn filter_hasattr_negative_constraint<'db>(
+    db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
+    subject: Type<'db>,
+    attribute: &str,
+) -> Type<'db> {
+    if let Type::Union(union) = subject.expand_top_level_aliases(db, env) {
+        return union.map(db, env, |element| {
+            filter_hasattr_negative_constraint(db, env, *element, attribute)
+        });
+    }
+
+    if has_definitely_present_attribute(db, env, subject, attribute) {
+        Type::Never
+    } else {
+        // Do not retain a negated structural protocol: a later intersection with an annotated
+        // instance type could incorrectly eliminate it, even though the attribute can be unset.
+        subject
     }
 }
 
@@ -1164,6 +1206,12 @@ impl<'db> NarrowingConstraint<'db> {
     fn generic_filtering(constraint: Type<'db>) -> Self {
         Self(NarrowingConstraintKind::Intersection(
             NarrowingOperation::GenericFiltering(constraint),
+        ))
+    }
+
+    fn hasattr_negative(attribute: StringLiteralType<'db>) -> Self {
+        Self(NarrowingConstraintKind::Intersection(
+            NarrowingOperation::HasAttrNegative(attribute),
         ))
     }
 
@@ -4593,13 +4641,17 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                 let place = self.expect_place(&first_arg);
 
                 if function == KnownFunction::HasAttr {
-                    let attr = inference
-                        .expression_type(second_arg)
-                        .as_string_literal()?
-                        .value(db);
+                    let attr = inference.expression_type(second_arg).as_string_literal()?;
 
-                    if !is_identifier(attr) {
+                    if !is_identifier(attr.value(db)) {
                         return None;
+                    }
+
+                    if !is_positive {
+                        return Some(NarrowingConstraints::from_iter([(
+                            place,
+                            NarrowingConstraint::hasattr_negative(attr),
+                        )]));
                     }
 
                     // Since `hasattr` only checks if an attribute is readable,
@@ -4607,16 +4659,12 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
                     let constraint = Type::protocol_with_readonly_members(
                         db,
                         &self.env,
-                        [(attr, Type::object())],
+                        [(attr.value(db), Type::object())],
                     );
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
-                        NarrowingConstraint::intersection(constraint.negate_if(
-                            db,
-                            &self.env,
-                            !is_positive,
-                        )),
+                        NarrowingConstraint::intersection(constraint),
                     )]));
                 }
 
