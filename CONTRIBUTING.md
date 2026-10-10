@@ -35,7 +35,8 @@ issues with these labels.
 Please do not open pull requests for new features without prior discussion. While we appreciate
 exploration of new features, we will often close these pull requests immediately. Adding a
 new feature to ruff creates a long-term maintenance burden and requires strong consensus from the ruff
-team before it is appropriate to begin work on an implementation.
+team before it is appropriate to begin work on an implementation. For example, generalizing existing
+rules like PYI026 to all source files (as proposed in #8704) requires such consensus.
 
 ### Avoiding duplicate work
 
