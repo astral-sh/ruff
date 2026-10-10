@@ -565,7 +565,10 @@ impl<'db> TypeVisitor<'db> for FreeVariableMapping<'_, 'db> {
         }
         let arguments = match ty {
             Type::TypeVar(variable) => {
-                if !self.bound.contains(&variable.identity(db))
+                // P.args and P.kwargs belong to the binder that owns P.
+                let mut identity = variable.identity(db);
+                identity.paramspec_attr = None;
+                if !self.bound.contains(&identity)
                     && ty.apply_type_mapping_impl(
                         db,
                         self.mapping,

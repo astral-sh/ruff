@@ -2471,3 +2471,18 @@ def concrete(a: Box[str], b: Box[int], cond: bool):
     # error: [missing-argument]
     box.invoke(callback, 1)
 ```
+
+## Promotion of recursive parameter specifications
+
+Promotion preserves the parameter specification as each recursive step adds a positional parameter.
+
+```py
+from typing import Callable, Concatenate
+from ty_extensions._internal import TypeOf
+
+type Chain[**P] = tuple[TypeOf[1], Callable[P, int], Callable[[], Chain[Concatenate[str, P]]]]
+
+def collect(value: Chain[[int]]):
+    widened = [value][0]
+    reveal_type(widened[2]()[1])  # revealed: (str, int, /) -> int
+```
