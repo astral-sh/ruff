@@ -1,15 +1,15 @@
 use crate::ProgramEnvironment;
 use itertools::Either;
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
 
 use crate::{
-    Db, DisplaySettings,
+    Db, DisplaySettings, Program,
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
-        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
-        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
-        TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm, any_over_type,
+        ClassType, GenericContext, InferenceFlags, InvalidTypeExpression,
+        InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode, StringLiteralType,
+        Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, UnionBuilder, VarianceTerm,
+        any_over_type,
         callable::{CallableTypeKind, CallableTypes},
         class::NamedTupleSpec,
         constraints::{OwnedConstraintSet, TypeVarSolution},
@@ -611,7 +611,8 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
                 | TypeMapping::RescopeReturnCallables(_)
-                | TypeMapping::ApplyRecursiveSubstitution(_) => Type::KnownInstance(self),
+                | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::MarkUnionCycleHistory => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {
                 Type::KnownInstance(KnownInstanceType::UnionType(
@@ -667,6 +668,40 @@ impl<'db> KnownInstanceType<'db> {
                     ty.inner(db)
                         .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )))
+            }
+
+            KnownInstanceType::Literal(ty)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
+                    db,
+                    ty.inner(db)
+                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                )))
+            }
+            KnownInstanceType::NewType(newtype)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::KnownInstance(KnownInstanceType::NewType(newtype.map_stored_base(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )))
+            }
+            KnownInstanceType::Specialization(specialization)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::KnownInstance(KnownInstanceType::Specialization(
+                    specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor),
+                ))
+            }
+            KnownInstanceType::NamedTupleSpec(spec)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::KnownInstance(KnownInstanceType::NamedTupleSpec(
+                    spec.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
             }
 
             KnownInstanceType::SubscriptedProtocol(_)
@@ -858,74 +893,39 @@ pub struct UnionTypeInstance<'db> {
 
 impl get_size2::GetSize for UnionTypeInstance<'_> {}
 
+#[salsa::tracked]
 impl<'db> UnionTypeInstance<'db> {
     /// Merge cycle history for otherwise identical runtime union values.
     ///
     /// Recovery history affects alias validation, but not the value represented by this type.
-    /// Nested union operands can also differ only in their recovery history, as in
-    /// `(int | str) | bytes` after normalization.
-    pub(super) fn merge_cycle_history(self, db: &'db dyn Db, other: Self) -> Option<Self> {
-        self.merge_cycle_history_impl(db, other, &mut FxHashMap::default())
-    }
-
-    fn merge_cycle_history_impl(
+    /// Mark nested unions conservatively before comparing, including those inside generic
+    /// arguments and invalid type expressions. The structural mapping preserves operand order
+    /// and alias boundaries, and memoizes shared subtrees within this merge.
+    pub(super) fn merge_cycle_history(
         self,
         db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
         other: Self,
-        cache: &mut FxHashMap<(Self, Self), Option<Self>>,
     ) -> Option<Self> {
         if self == other {
             return Some(self);
         }
-        if self.union_type(db) != other.union_type(db) {
-            return None;
-        }
-        if let Some(merged) = cache.get(&(self, other)) {
-            return *merged;
-        }
-
-        // Operands can share nested unions. Reuse each pair's result instead of expanding
-        // the same subgraph once for every path through the operands.
-        let merged = self.merge_cycle_history_uncached(db, other, cache);
-        cache.insert((self, other), merged);
-        merged
+        let program = env.program(db);
+        let left = self.with_cycle_history(db, program);
+        let right = other.with_cycle_history(db, program);
+        (left == right).then_some(left)
     }
 
-    fn merge_cycle_history_uncached(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        cache: &mut FxHashMap<(Self, Self), Option<Self>>,
-    ) -> Option<Self> {
-        let mut merge_operand = |left: Type<'db>, right: Type<'db>| {
-            if left == right {
-                return Some(left);
-            }
-            match (left, right) {
-                (
-                    Type::KnownInstance(KnownInstanceType::UnionType(left)),
-                    Type::KnownInstance(KnownInstanceType::UnionType(right)),
-                ) => left
-                    .merge_cycle_history_impl(db, right, cache)
-                    .map(|union| Type::KnownInstance(KnownInstanceType::UnionType(union))),
-                _ => None,
-            }
-        };
-        let value_expr_types = match (self._value_expr_types(db), other._value_expr_types(db)) {
-            (Some([left_a, left_b]), Some([right_a, right_b])) => Some([
-                merge_operand(*left_a, *right_a)?,
-                merge_operand(*left_b, *right_b)?,
-            ]),
-            (None, None) => None,
-            _ => return None,
-        };
-
-        Some(Self::new(
+    /// Cache each union's conservative representation across comparisons with different values.
+    #[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+    fn with_cycle_history(self, db: &'db dyn Db, program: Program<'db>) -> Self {
+        let env = ProgramEnvironment::from_program(program);
+        self.apply_type_mapping_impl(
             db,
-            value_expr_types,
-            self.union_type(db).clone(),
-            self.had_cycle(db) || other.had_cycle(db),
-        ))
+            &TypeMapping::MarkUnionCycleHistory,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::new(&env),
+        )
     }
 
     pub(crate) fn from_value_expression_types(
@@ -984,6 +984,27 @@ impl<'db> UnionTypeInstance<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Self {
+        if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) {
+            let map = |ty: Type<'db>| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            let value_expr_types = self._value_expr_types(db).map(|types| types.map(map));
+            let union_type = match self.union_type(db) {
+                Ok(ty) => Ok(map(*ty)),
+                Err(error) => Err(InvalidTypeExpressionError {
+                    fallback_type: map(error.fallback_type),
+                    invalid_expressions: error
+                        .invalid_expressions
+                        .iter()
+                        .map(|error| match *error {
+                            InvalidTypeExpression::InvalidType(ty, scope) => {
+                                InvalidTypeExpression::InvalidType(map(ty), scope)
+                            }
+                            error => error,
+                        })
+                        .collect(),
+                }),
+            };
+            return Self::new(db, value_expr_types, union_type, true);
+        }
         if let Ok(union_type) = self.union_type(db) {
             let value_expr_types = match *self._value_expr_types(db) {
                 Some([first, second]) if type_mapping.is_structural() => Some([

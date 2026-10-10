@@ -144,6 +144,7 @@ fn merge_truthiness_guarded_pair<'db>(
 /// Combine inference history for runtime union values with otherwise identical contents.
 fn merge_union_instance_cycle_history<'db>(
     db: &'db dyn Db,
+    env: &ProgramEnvironment<'db>,
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
@@ -155,7 +156,7 @@ fn merge_union_instance_cycle_history<'db>(
         return None;
     };
     Some(Type::KnownInstance(KnownInstanceType::UnionType(
-        left.merge_cycle_history(db, right)?,
+        left.merge_cycle_history(db, env, right)?,
     )))
 }
 
@@ -1102,7 +1103,9 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if let Some(merged) = merge_union_instance_cycle_history(db, ty, element_type) {
+            if let Some(merged) =
+                merge_union_instance_cycle_history(db, &self.env, ty, element_type)
+            {
                 to_remove.push(i);
                 ty = merged;
                 continue;
@@ -2037,9 +2040,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut replacement = None;
                 for (index, existing_positive) in self.positive.iter().enumerate() {
-                    if let Some(merged) =
-                        merge_union_instance_cycle_history(db, new_positive, *existing_positive)
-                    {
+                    if let Some(merged) = merge_union_instance_cycle_history(
+                        db,
+                        env,
+                        new_positive,
+                        *existing_positive,
+                    ) {
                         if merged == *existing_positive {
                             return;
                         }
@@ -2196,9 +2202,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 let mut replacement = None;
                 for (index, existing_negative) in self.negative.iter().enumerate() {
-                    if let Some(merged) =
-                        merge_union_instance_cycle_history(db, new_negative, *existing_negative)
-                    {
+                    if let Some(merged) = merge_union_instance_cycle_history(
+                        db,
+                        env,
+                        new_negative,
+                        *existing_negative,
+                    ) {
                         if merged == *existing_negative {
                             return;
                         }

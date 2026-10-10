@@ -13,7 +13,7 @@ use crate::types::class::{
 use crate::types::class_base::ClassBase;
 use crate::types::member::Member;
 use crate::types::mro::{DynamicMroError, Mro};
-use crate::types::{Type, TypeQualifiers};
+use crate::types::{ApplyTypeMappingVisitor, Type, TypeContext, TypeMapping, TypeQualifiers};
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::ScopeId;
 
@@ -110,6 +110,49 @@ pub struct DynamicEnumLiteral<'db> {
 impl get_size2::GetSize for DynamicEnumLiteral<'_> {}
 
 impl<'db> DynamicEnumLiteral<'db> {
+    /// Map stored member values and the mixin without looking up the enum's definition.
+    pub(in crate::types) fn map_stored_types(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let map = |ty: Type<'db>| ty.apply_type_mapping_impl(db, mapping, tcx, visitor);
+        let map_spec = |spec: EnumSpec<'db>| {
+            EnumSpec::new(
+                db,
+                spec.members(db)
+                    .iter()
+                    .map(|(name, ty)| (name.clone(), map(*ty)))
+                    .collect::<Box<_>>(),
+                spec.has_known_members(db),
+            )
+        };
+        let anchor = match self.anchor(db) {
+            DynamicEnumAnchor::Definition { definition, spec } => DynamicEnumAnchor::Definition {
+                definition: *definition,
+                spec: map_spec(*spec),
+            },
+            DynamicEnumAnchor::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => DynamicEnumAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: map_spec(*spec),
+            },
+        };
+        Self::new(
+            db,
+            self.name(db),
+            anchor,
+            self.base_class(db),
+            self.mixin_type(db).map(map),
+        )
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,

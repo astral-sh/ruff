@@ -9,10 +9,10 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DivergentType, DynamicType,
-        IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
-        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
-        TypeVarBoundOrConstraints, UnionBuilder,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassBase, ClassType, DivergentType,
+        DynamicType, IntersectionBuilder, KnownClass, MemberLookupErrorKind, MemberLookupPolicy,
+        MemberLookupResult, SpecialFormType, SubclassOfInner, SubclassOfType, Type, TypeContext,
+        TypeMapping, TypeVarBoundOrConstraints, UnionBuilder,
         constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -1002,6 +1002,35 @@ impl<'db> BoundSuperType<'db> {
         }
 
         result
+    }
+
+    /// Map the stored pivot and owner without resolving descriptors or traversing their MROs.
+    pub(super) fn map_stored_types(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let pivot_class = match self.pivot_class(db) {
+            ClassBase::Class(class) => {
+                ClassBase::Class(class.apply_type_mapping_impl(db, mapping, tcx, visitor))
+            }
+            pivot => pivot,
+        };
+        let owner = match self.owner(db) {
+            SuperOwnerKind::Resolved(owner) => SuperOwnerKind::Resolved(ResolvedSuperOwner {
+                owner_type: owner
+                    .owner_type
+                    .apply_type_mapping_impl(db, mapping, tcx, visitor),
+                lookup_anchor: owner
+                    .lookup_anchor
+                    .apply_type_mapping_impl(db, mapping, tcx, visitor),
+                receiver: owner.receiver,
+            }),
+            owner => owner,
+        };
+        Self::new(db, pivot_class, owner)
     }
 
     pub(super) fn recursive_type_normalized_impl(

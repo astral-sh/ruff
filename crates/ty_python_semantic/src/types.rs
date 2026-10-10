@@ -5,7 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use smallvec::SmallVec;
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{OnceCell, RefCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -523,6 +523,7 @@ pub(crate) struct ApplyTypeMappingVisitor<'env, 'db> {
     bottom_specialization_materialization: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
     skip_promotion: OnceCell<Box<TypeTransformer<'db, ApplyTypeMappingTag>>>,
+    union_cycle_history: OnceCell<RefCell<FxHashMap<Type<'db>, Type<'db>>>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
 }
 
@@ -539,6 +540,7 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
             bottom_specialization_materialization: OnceCell::default(),
             promotion: OnceCell::default(),
             skip_promotion: OnceCell::default(),
+            union_cycle_history: OnceCell::default(),
             materialization_equivalence: OnceCell::default(),
         }
     }
@@ -567,6 +569,11 @@ impl<'env, 'db> ApplyTypeMappingVisitor<'env, 'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
+        if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) {
+            // This structural projection caches exact types at its entry point and never unfolds
+            // definitions. Definition-based recursion detection would introduce inference here.
+            return func();
+        }
         let type_transformer = match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => &self.top_materialization,
             TypeMapping::Materialize(MaterializationKind::Bottom) => &self.bottom_materialization,
@@ -1925,6 +1932,21 @@ pub struct DataclassParams<'db> {
 impl get_size2::GetSize for DataclassParams<'_> {}
 
 impl<'db> DataclassParams<'db> {
+    fn apply_type_mapping_impl(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let fields = self
+            .field_specifiers(db)
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, mapping, tcx, visitor))
+            .collect::<Box<_>>();
+        Self::new(db, self.flags(db), fields)
+    }
+
     fn default_params(db: &'db dyn Db, env: &ProgramEnvironment<'db>) -> Self {
         Self::from_flags(db, env, DataclassFlags::default())
     }
@@ -9460,6 +9482,26 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
+        if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) {
+            let cache = visitor.union_cycle_history.get_or_init(RefCell::default);
+            let cached = cache.borrow().get(&self).copied();
+            if let Some(cached) = cached {
+                return cached;
+            }
+            let mapped = self.apply_type_mapping_uncached(db, type_mapping, tcx, visitor);
+            cache.borrow_mut().insert(self, mapped);
+            return mapped;
+        }
+        self.apply_type_mapping_uncached(db, type_mapping, tcx, visitor)
+    }
+
+    fn apply_type_mapping_uncached<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Type<'db> {
         // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
@@ -9659,6 +9701,11 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }
 
+            Type::NewTypeInstance(newtype)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::NewTypeInstance(newtype.map_stored_base(db, type_mapping, tcx, visitor))
+            }
             Type::NewTypeInstance(newtype) => visitor.visit(db, self, type_mapping, || {
                 Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
                     class_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
@@ -9784,6 +9831,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::MarkUnionCycleHistory
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf { .. }
@@ -9806,6 +9854,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::ApplyRecursiveSubstitution(_)
+                | TypeMapping::MarkUnionCycleHistory
                 | TypeMapping::BindLegacyTypevars(_)
                 | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
@@ -9828,6 +9877,35 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
+
+            Type::DataclassDecorator(params)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::DataclassDecorator(params.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                ))
+            }
+            Type::DataclassTransformer(params)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::DataclassTransformer(DataclassTransformerParams::new(
+                    db,
+                    params.flags(db),
+                    params
+                        .field_specifiers(db)
+                        .iter()
+                        .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                        .collect::<Box<_>>(),
+                ))
+            }
+            Type::BoundSuper(bound_super)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::BoundSuper(bound_super.map_stored_types(db, type_mapping, tcx, visitor))
+            }
 
             Type::Never
             | Type::AlwaysTruthy
@@ -9857,6 +9935,11 @@ impl<'db> Type<'db> {
             | Type::BoundSuper(_)
             | Type::SpecialForm(_) => self,
 
+            Type::ClassLiteral(class)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::ClassLiteral(class.map_stored_types(db, type_mapping, tcx, visitor))
+            }
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
             // some other generic context's specialization is applied to it.
@@ -11143,6 +11226,9 @@ pub enum TypeMapping<'a, 'db> {
     },
     /// A structural substitution constructed only by the recursive-type binder.
     ApplyRecursiveSubstitution(RecursiveMapping<'db>),
+    /// Mark stored runtime unions as potentially recovered, without changing their type structure.
+    /// This gives values with different recovery histories a shared conservative representation.
+    MarkUnionCycleHistory,
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     Promote(PromotionMode, PromotionKind),
@@ -11224,6 +11310,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::Promote(..)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::MarkUnionCycleHistory
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
@@ -11270,6 +11357,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::ApplyRecursiveSubstitution(_)
+            | TypeMapping::MarkUnionCycleHistory
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
@@ -11285,7 +11373,10 @@ impl<'db> TypeMapping<'_, 'db> {
     /// Binding and unfolding may traverse open recursive bodies, so neither inference queries
     /// nor semantic operations may run on the intermediate types.
     const fn is_structural(&self) -> bool {
-        matches!(self, TypeMapping::ApplyRecursiveSubstitution(_))
+        matches!(
+            self,
+            TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::MarkUnionCycleHistory
+        )
     }
 }
 

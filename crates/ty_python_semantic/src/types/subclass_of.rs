@@ -220,6 +220,18 @@ impl<'db> SubclassOfType<'db> {
                     visitor,
                 )),
             }),
+            SubclassOfInner::Protocol(protocol)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::SubclassOf(Self {
+                    subclass_of: SubclassOfInner::Protocol(protocol.apply_type_mapping_impl(
+                        db,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )),
+                })
+            }
             SubclassOfInner::Protocol(protocol) => protocol
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 .to_meta_type(db, visitor.env),
@@ -230,6 +242,11 @@ impl<'db> SubclassOfType<'db> {
                 },
                 _ => Type::SubclassOf(self),
             },
+            SubclassOfInner::TypeVar(_)
+                if matches!(type_mapping, TypeMapping::MarkUnionCycleHistory) =>
+            {
+                Type::SubclassOf(self)
+            }
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
                 Self::try_from_instance(db, visitor.env, mapped)

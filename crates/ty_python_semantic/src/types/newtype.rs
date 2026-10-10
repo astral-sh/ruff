@@ -2,7 +2,10 @@ use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
+use crate::types::{
+    ApplyTypeMappingVisitor, ClassType, KnownUnion, Type, TypeContext, TypeMapping,
+    definition_expression_type, visitor,
+};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::{self as ast};
 use rustc_hash::FxHashSet;
@@ -187,6 +190,30 @@ impl<'db> NewType<'db> {
     ) -> Self {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
+    }
+
+    /// Map an already stored base without inferring a deferred `NewType` definition.
+    pub(super) fn map_stored_base(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let Some(base) = self.eager_base(db) else {
+            return self;
+        };
+        let base =
+            match base {
+                NewTypeBase::ClassType(class) => NewTypeBase::ClassType(
+                    class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ),
+                NewTypeBase::NewType(newtype) => {
+                    NewTypeBase::NewType(newtype.map_stored_base(db, type_mapping, tcx, visitor))
+                }
+                NewTypeBase::Float | NewTypeBase::Complex => base,
+            };
+        Self::new(db, self.name(db), self.definition(db), Some(base))
     }
 
     pub(super) fn recursive_type_normalized_impl(

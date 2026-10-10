@@ -7,8 +7,8 @@ use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        ApplyTypeMappingVisitor, ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass,
+        MemberLookupPolicy, SubclassOfType, Type, TypeContext, TypeMapping,
         class::{
             ClassMemberResult, ClassMetaclass, CodeGeneratorKind, DisjointBase,
             DynamicClassHeaderAnchor, DynamicClassScopeOffset, InstanceMemberResult, MroLookup,
@@ -555,6 +555,47 @@ impl<'db> DynamicClassLiteral<'db> {
 }
 
 impl<'db> DynamicClassLiteral<'db> {
+    /// Map stored members, bases, and dataclass metadata without evaluating the class definition.
+    pub(in crate::types) fn map_stored_types(
+        self,
+        db: &'db dyn Db,
+        mapping: &TypeMapping<'_, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'_, 'db>,
+    ) -> Self {
+        let map = |ty: Type<'db>| ty.apply_type_mapping_impl(db, mapping, tcx, visitor);
+        let anchor = match self.anchor(db) {
+            DynamicClassAnchor::Definition(definition) => {
+                DynamicClassAnchor::Definition(*definition)
+            }
+            DynamicClassAnchor::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => DynamicClassAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                explicit_bases: explicit_bases.iter().copied().map(map).collect(),
+            },
+        };
+        let members = self
+            .members(db)
+            .iter()
+            .map(|(name, ty)| (name.clone(), map(*ty)))
+            .collect::<Box<_>>();
+        let dataclass_params = self
+            .dataclass_params(db)
+            .map(|params| params.apply_type_mapping_impl(db, mapping, tcx, visitor));
+        Self::new(
+            db,
+            self.name(db),
+            anchor,
+            members,
+            self.has_dynamic_namespace(db),
+            dataclass_params,
+        )
+    }
+
     /// Normalize types that are part of this dynamic class's interned identity.
     pub(super) fn recursive_type_normalized_impl(
         self,
