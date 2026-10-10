@@ -1,9 +1,9 @@
 use crate::Db;
 use crate::ProgramEnvironment;
 use crate::types::{
-    AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-    LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionType,
+    AwaitError, Bindings, CallArguments, CallDunderError, ClassBase, KnownClass,
+    LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionType,
     call::CallErrorKind,
     context::InferContext,
     diagnostic::NOT_ITERABLE,
@@ -258,7 +258,35 @@ impl<'db> Type<'db> {
                 Type::RecursiveVar(_) => {
                     unreachable!("semantic operation on an unbound recursive variable")
                 }
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db, env),
+                Type::NominalInstance(nominal) => {
+                    let spec = nominal.tuple_spec(db, env)?;
+                    if nominal.has_known_class(db, KnownClass::Tuple)
+                        || nominal.is_sys_version_info()
+                    {
+                        return Some(spec);
+                    }
+
+                    // A tuple subclass can yield different elements through an overridden
+                    // `__iter__`. Its stored positions describe iteration only when it inherits
+                    // the builtin implementation.
+                    for base in nominal.class(db, env).iter_mro(db) {
+                        let class = match base {
+                            ClassBase::Class(class) => class,
+                            ClassBase::Generic | ClassBase::Protocol => continue,
+                            _ => return None,
+                        };
+                        if class.known(db) == Some(KnownClass::Tuple) {
+                            return Some(spec);
+                        }
+                        if !class
+                            .own_class_member(db, env, None, "__iter__")
+                            .is_undefined()
+                        {
+                            return None;
+                        }
+                    }
+                    None
+                }
                 Type::NewTypeInstance(newtype) => {
                     non_async_special_case(db, env, newtype.concrete_base_type(db))
                 }
