@@ -1678,6 +1678,30 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Reconstructing a generic receiver through a union parameter
+
+A mapping matches the constructor's mapping protocol; its keys do not also have to be key-value
+pairs. Reconstructing the receiver preserves `Self` and the enclosing key type.
+
+```py
+from collections.abc import Iterable, Mapping
+from typing import Generic, Protocol, TypeVar
+from typing_extensions import Self
+
+K = TypeVar("K")
+
+class Maplike(Protocol[K]):
+    def keys(self) -> Iterable[K]: ...
+    def __getitem__(self, key: K, /) -> int: ...
+
+class Container(Generic[K]):
+    def __init__(self, value: Maplike[K] | Iterable[tuple[K, int]]) -> None: ...
+    def copy(self, other: Mapping[K, int]) -> Self:
+        result = self.__class__(other)
+        reveal_type(result)  # revealed: Self@copy
+        return result
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py

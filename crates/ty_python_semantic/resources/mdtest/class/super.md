@@ -796,11 +796,11 @@ class Child(Base[S], Generic[S]):
         super().__init__(check)
 ```
 
-## Subclass Using Concrete Type Instead of `Self`
+## Inferring `Self` in `super()` calls
 
-When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
-type, passing that parameter to `super().__init__()` is a type error. This is because `Self` in the
-parent could represent a further subclass. The fix is to use `Self` consistently in the subclass.
+A parent method's `Self` is inferred from both the receiver and the other arguments. Inferring it as
+`Child` accepts a `Child`-typed argument even when the receiver could be a further subclass; this
+does not require specializing the caller's own `Self` type variable.
 
 ```toml
 [environment]
@@ -818,18 +818,16 @@ class Parent:
 
 class Child(Parent):
     def __init__(self, children: Mapping[str, Child] | None = None) -> None:
-        # error: [invalid-argument-type] "Argument to `Parent.__init__` is incorrect: Expected `Mapping[str, Self@__init__] | None`, found `Mapping[str, Child] | None`"
-        super().__init__(children)
+        super().__init__(children)  # no diagnostic
+```
 
-# The fix is to use `Self` consistently in the subclass:
+The caller's `Self` type variable is also a valid argument for the parent's independently inferred
+`Self`:
 
-class Parent2:
+```py
+class ChildWithSelf(Parent):
     def __init__(self, children: Mapping[str, Self] | None = None) -> None:
-        self.children = children
-
-class Child2(Parent2):
-    def __init__(self, children: Mapping[str, Self] | None = None) -> None:
-        super().__init__(children)  # OK
+        super().__init__(children)  # no diagnostic
 ```
 
 ## Super in Protocol Classes

@@ -429,6 +429,42 @@ reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
+### Union arguments containing `Self`
+
+The receiver and argument jointly determine `Self`. An argument member matching `int` contributes no
+evidence for `Self` and does not need to satisfy its bound.
+
+```py
+from typing import Self
+
+class Shape:
+    @classmethod
+    def ensure(cls, value: Self | int) -> Self:
+        raise NotImplementedError
+
+class Circle(Shape): ...
+
+def check(value: Circle | int):
+    reveal_type(Circle.ensure(value))  # revealed: Circle
+```
+
+An inherited method can infer the base class from another argument. `Self = Shape` satisfies the
+declared bound and accepts both the subclass receiver and a base-class argument:
+
+```py
+reveal_type(Circle.ensure(Shape()))  # revealed: Shape
+
+def base_argument(value: Shape | int):
+    reveal_type(Circle.ensure(value))  # revealed: Shape
+```
+
+We also reject a union containing an unrelated type:
+
+```py
+def invalid_member(value: Circle | str):
+    Circle.ensure(value)  # error: [invalid-argument-type]
+```
+
 ### Calling `super()` in overridden methods with `Self` return type
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.
