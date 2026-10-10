@@ -1216,7 +1216,9 @@ class C:
 
 
 name = re.sub(
-    r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"]
+    r"[^\x21\x23-\x5b\x5d-\x7e]...............",
+    lambda m: f"\\{m.group(0)}",
+    p["name"],
 )
 
 
@@ -1292,7 +1294,9 @@ very_long_variable_name_x, very_long_variable_name_y = (
 
 very_long_variable_name_for_result += lambda x: (
     very_long_function_call_that_should_definitely_be_parenthesized_now(
-        x, more_args, additional_parameters
+        x,
+        more_args,
+        additional_parameters,
     )
 )
 
@@ -1758,7 +1762,8 @@ foo = lambda x: (
 ).foo()
 
 foo = lambda: (result := some_really_long_callable_expression)(
-    extra_argument_one, extra_argument_two
+    extra_argument_one,
+    extra_argument_two,
 )
 
 foo = lambda: (result := some_really_long_subscriptable_expression)[
@@ -1766,11 +1771,15 @@ foo = lambda: (result := some_really_long_subscriptable_expression)[
 ]
 
 foo = lambda: (await some_coroutine)(
-    extra_argument_one, extra_argument_two, extra_argument_three
+    extra_argument_one,
+    extra_argument_two,
+    extra_argument_three,
 )
 
 foo = lambda: call()(
-    extra_argument_one, extra_argument_two, extra_argument_threeeeeeeee
+    extra_argument_one,
+    extra_argument_two,
+    extra_argument_threeeeeeeee,
 )
 
 foo = lambda: call()(
@@ -1784,12 +1793,16 @@ foo = lambda: call(
 )(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
 
 foo = lambda: call(
-    argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee
+    argument_one,
+    argument_two,
+    argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee,
 )(extra_argument_one, extra_argument_twooooooooooooooooooo, extra_argument_threeeeeeeee)
 
 foo = lambda: (
     callllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll(
-        argument_one, argument_two, argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee
+        argument_one,
+        argument_two,
+        argument_threeeeeeeeeeeeeeeeeeeeeeeeeeee,
     )(
         extra_argument_one,
         extra_argument_twooooooooooooooooooo,
@@ -1843,7 +1856,7 @@ class CantFormat:
 ```diff
 --- Stable
 +++ Preview
-@@ -471,7 +471,8 @@
+@@ -475,7 +475,8 @@
          # inside the body.
          param(
              lambda left, right: (
@@ -1853,7 +1866,7 @@ class CantFormat:
                  .cast(dt.date)
                  .between(left, right)
                  .between(left, right)
-@@ -594,7 +595,8 @@
+@@ -598,7 +599,8 @@
  
  (
      lambda left, right: (
