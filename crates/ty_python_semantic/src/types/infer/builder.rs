@@ -6867,16 +6867,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let signatures = CallableSignature::from_overloads(
                 callable.signatures(db).overloads.iter().map(|signature| {
                     let signature_generic_context = signature.generic_context.and_then(|context| {
-                        let mut variables = context
-                            .variables(db)
-                            .filter(|typevar| {
+                        GenericContext::try_from_typevar_instances(
+                            db,
+                            env,
+                            context.variables(db).filter(|typevar| {
                                 !class_generic_context.contains(db, typevar.identity(db))
-                            })
-                            .peekable();
-                        variables
-                            .peek()
-                            .is_some()
-                            .then(|| GenericContext::from_typevar_instances(db, env, variables))
+                            }),
+                        )
                     });
                     Signature::new_generic(
                         signature_generic_context,

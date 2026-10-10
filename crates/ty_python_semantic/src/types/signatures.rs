@@ -345,7 +345,7 @@ impl<'db> CallableSignature<'db> {
 
                     let env = visitor.env;
                     Some(CallableSignature::single(Signature {
-                        generic_context: self_signature.generic_context.map(|context| {
+                        generic_context: self_signature.generic_context.and_then(|context| {
                             type_mapping.update_signature_generic_context(db, env, context)
                         }),
                         definition: self_signature.definition,
@@ -376,7 +376,7 @@ impl<'db> CallableSignature<'db> {
                             generic_context: GenericContext::merge_optional(
                                 db,
                                 signature.generic_context,
-                                self_signature.generic_context.map(|context| {
+                                self_signature.generic_context.and_then(|context| {
                                     type_mapping.update_signature_generic_context(db, env, context)
                                 }),
                             ),
@@ -1070,9 +1070,9 @@ impl<'db> Signature<'db> {
     ) -> Self {
         let env = visitor.env;
         Self {
-            generic_context: self
-                .generic_context
-                .map(|context| type_mapping.update_signature_generic_context(db, env, context)),
+            generic_context: self.generic_context.and_then(|context| {
+                type_mapping.update_signature_generic_context(db, env, context)
+            }),
             definition: self.definition,
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),
@@ -1350,7 +1350,7 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self
                 .generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
+                .and_then(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             extras: SignatureExtras::new(
                 self.source_overload_index_raw(),

@@ -1316,7 +1316,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return self.infer_explicit_callable_specialization(
                 subscript,
                 alias,
-                parameters,
+                Some(parameters),
                 &|arguments| {
                     alias.apply_specialization(
                         db,
@@ -1688,7 +1688,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     self.infer_explicit_callable_specialization(
                                         subscript,
                                         value_ty,
-                                        generic_context,
+                                        Some(generic_context),
                                         specialize,
                                     )
                                 }
@@ -1768,17 +1768,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let mut variables = FxOrderSet::default();
         value_ty.find_legacy_typevars(db, env, None, &mut variables);
-        let generic_context = GenericContext::from_typevar_instances(db, env, variables);
+        let generic_context = GenericContext::try_from_typevar_instances(db, env, variables);
 
         let scope_id = self.scope();
         let current_typevar_binding_context = self.typevar_binding_context;
         let current_inference_flags = self.inference_flags();
 
         let specialize = &|types: &[Option<Type<'db>>]| {
-            let specialized = value_ty.apply_specialization(
-                db,
-                generic_context.specialize_partial(db, types.iter().copied()),
-            );
+            let specialized = generic_context.map_or(value_ty, |context| {
+                value_ty
+                    .apply_specialization(db, context.specialize_partial(db, types.iter().copied()))
+            });
 
             if in_type_expression {
                 specialized
