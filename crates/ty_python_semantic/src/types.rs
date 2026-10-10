@@ -240,19 +240,17 @@ pub fn check_types(db: &dyn Db, file: ProgramFile<'_>) -> Vec<Diagnostic> {
         }
         let inference =
             infer_implicit_alias_type(db, definition, implicit_alias_parameters(db, definition));
-        // Runtime-value inference can report the same error with different wording for its
-        // expression context. Keep that diagnostic when the rule and source location match.
-        // Compare with earlier inference results only: one alias can produce distinct errors
-        // for the same rule and location.
-        diagnostics.extend_filtered(&inference.diagnostics, |diagnostic| {
-            diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
-        });
-        reported.extend(
-            (&inference.diagnostics)
-                .into_iter()
-                .filter_map(diagnostic_key),
-        );
-        implicit_aliases.extend_from_slice(&inference.implicit_aliases);
+        if let Some(extra) = &inference.extra {
+            // Runtime-value inference can report the same error with different wording for its
+            // expression context. Keep that diagnostic when the rule and source location match.
+            // Compare with earlier inference results only: one alias can produce distinct errors
+            // for the same rule and location.
+            diagnostics.extend_filtered(&extra.diagnostics, |diagnostic| {
+                diagnostic_key(diagnostic).is_none_or(|key| !reported.contains(&key))
+            });
+            reported.extend((&extra.diagnostics).into_iter().filter_map(diagnostic_key));
+            implicit_aliases.extend_from_slice(&extra.implicit_aliases);
+        }
     }
 
     diagnostics.extend_diagnostics(

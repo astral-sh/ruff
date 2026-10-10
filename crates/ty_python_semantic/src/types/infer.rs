@@ -110,8 +110,7 @@ pub(super) struct CyclicTypeAliasError<'db> {
     cycle_initial=|db, id, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
         ImplicitAliasInference {
             ty: Ok(Type::Recursive(RecursiveType::initial(db, definition, id, parameters))),
-            diagnostics: TypeCheckDiagnostics::default(),
-            implicit_aliases: Box::default(),
+            extra: None,
         }
     },
     cycle_fn=|db, cycle: &salsa::Cycle, _: &ImplicitAliasInference<'db>, mut result: ImplicitAliasInference<'db>, definition: Definition<'db>, parameters: Option<crate::types::GenericContext<'db>>| {
@@ -134,8 +133,7 @@ pub(super) fn infer_implicit_alias_type<'db>(
     let Some(value) = definition.kind(db).value(&module) else {
         return ImplicitAliasInference {
             ty: Ok(Type::unknown()),
-            diagnostics: TypeCheckDiagnostics::default(),
-            implicit_aliases: Box::default(),
+            extra: None,
         };
     };
     let index = semantic_index(db, program_file);
@@ -160,6 +158,12 @@ pub(super) fn infer_implicit_alias_type<'db>(
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(super) struct ImplicitAliasInference<'db> {
     pub(super) ty: ImplicitAliasResult<'db>,
+    pub(super) extra: Option<Box<ImplicitAliasInferenceExtra<'db>>>,
+}
+
+/// Diagnostics and referenced aliases, which are absent from most alias inference results.
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
+pub(super) struct ImplicitAliasInferenceExtra<'db> {
     pub(super) diagnostics: TypeCheckDiagnostics,
     pub(super) implicit_aliases: Box<[Definition<'db>]>,
 }
