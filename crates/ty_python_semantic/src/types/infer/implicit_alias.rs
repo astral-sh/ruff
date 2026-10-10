@@ -2,11 +2,12 @@
 
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor as ast_visitor};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::semantic_index;
 
 use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
@@ -66,6 +67,22 @@ pub(in crate::types) fn implicit_alias_is_acyclic<'db>(
     ImplicitAliasAcyclicityProof { db, definition }.expression_is_acyclic(value)
 }
 
+/// Resolve a dependency once per name and scope, even when many aliases reference it.
+/// In particular, an ambiguous name must not enumerate all its assignments for every alias.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[allow(clippy::needless_pass_by_value, reason = "Salsa owns the query key")]
+fn unambiguous_alias_dependency<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: Name,
+) -> Option<Definition<'db>> {
+    let definitions = definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases);
+    let [resolved] = definitions.as_slice() else {
+        return None;
+    };
+    resolved.definition()
+}
+
 struct ImplicitAliasAcyclicityProof<'db> {
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -92,17 +109,7 @@ impl ImplicitAliasAcyclicityProof<'_> {
                         break;
                     }
                 }
-                let definitions = definitions_for_name(
-                    db,
-                    self.definition.scope(db),
-                    &name.id,
-                    ImportAliasResolution::ResolveAliases,
-                );
-                let [resolved] = definitions.as_slice() else {
-                    return false;
-                };
-                resolved
-                    .definition()
+                unambiguous_alias_dependency(db, self.definition.scope(db), name.id.clone())
                     .is_some_and(|definition| implicit_alias_is_acyclic(db, definition))
             }
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
