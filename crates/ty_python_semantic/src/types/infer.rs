@@ -1256,8 +1256,6 @@ impl<'db> InferredDeclaration<'db> {
 /// The inferred types for a definition region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct DefinitionInference<'db> {
-    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
-
     /// The types of every expression in this region.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -1477,6 +1475,8 @@ impl<'db> DefinitionTypes<'db> {
 /// `Other` stores uncommon combinations that require multiple fields.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
+    AliasInputs(Box<AliasInferenceInputs<'db>>),
+
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
 
@@ -1512,6 +1512,8 @@ struct DeferredAndUndecorated<'db> {
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, Default, salsa::SalsaValue)]
 struct OtherDefinitionInferenceExtra<'db> {
+    alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
+
     /// Aliases whose type-expression diagnostics are needed by this region.
     legacy_aliases: Box<[Definition<'db>]>,
 
@@ -1561,6 +1563,10 @@ struct OtherDefinitionInferenceExtra<'db> {
 impl<'db> DefinitionInferenceExtra<'db> {
     fn into_other(self) -> OtherDefinitionInferenceExtra<'db> {
         match self {
+            Self::AliasInputs(alias_inputs) => OtherDefinitionInferenceExtra {
+                alias_inputs: Some(alias_inputs),
+                ..OtherDefinitionInferenceExtra::default()
+            },
             Self::Qualifiers(qualifiers) => OtherDefinitionInferenceExtra {
                 qualifiers,
                 ..OtherDefinitionInferenceExtra::default()
@@ -1631,6 +1637,22 @@ impl<'db> DefinitionInferenceExtra<'db> {
 }
 
 impl<'db> DefinitionInference<'db> {
+    fn alias_inputs(&self) -> Option<&AliasInferenceInputs<'db>> {
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::AliasInputs(inputs)) => Some(inputs),
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.alias_inputs.as_deref(),
+            _ => None,
+        }
+    }
+
+    fn alias_inputs_mut(&mut self) -> Option<&mut AliasInferenceInputs<'db>> {
+        match self.extra.as_deref_mut() {
+            Some(DefinitionInferenceExtra::AliasInputs(inputs)) => Some(inputs),
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.alias_inputs.as_deref_mut(),
+            _ => None,
+        }
+    }
+
     fn cycle_initial(
         db: &'db dyn Db,
         definition: Definition<'db>,
@@ -1699,7 +1721,6 @@ impl<'db> DefinitionInference<'db> {
         }
 
         Self {
-            alias_inputs: None,
             expressions: FrozenMap::default(),
             types,
             #[cfg(debug_assertions)]
@@ -1725,8 +1746,8 @@ impl<'db> DefinitionInference<'db> {
             self.widen_comparison_truthiness(db, &env, previous_inference);
         }
 
-        if let Some(inputs) = &mut self.alias_inputs {
-            inputs.normalize_cycle(db, &env, previous_inference.alias_inputs.as_deref(), cycle);
+        if let Some(inputs) = self.alias_inputs_mut() {
+            inputs.normalize_cycle(db, &env, previous_inference.alias_inputs(), cycle);
         }
 
         for (expr, ty) in &mut self.expressions {
