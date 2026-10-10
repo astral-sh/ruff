@@ -419,19 +419,6 @@ impl<'db> RecursiveType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
-        if visitor.defer_recursive_aliases
-            && !matches!(
-                mapping,
-                TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
-            )
-            && !(self.mappings(db).is_none()
-                && matches!(mapping, TypeMapping::ApplySpecialization(_)))
-        {
-            return Type::Recursive(self.with_mappings(
-                db,
-                DeferredTypeMapping::append(db, self.mappings(db), mapping, tcx, visitor),
-            ));
-        }
         match mapping {
             TypeMapping::ApplyRecursiveSubstitution(RecursiveMapping(
                 RecursiveSubstitution::Bind(cycle),

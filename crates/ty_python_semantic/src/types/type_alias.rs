@@ -701,20 +701,6 @@ impl<'db> TypeAliasType<'db> {
         visitor: &ApplyTypeMappingVisitor<'_, 'db>,
     ) -> Type<'db> {
         let ty = Type::TypeAlias(self);
-        if visitor.defer_recursive_aliases
-            && self.is_recursive(db)
-            && !matches!(
-                type_mapping,
-                TypeMapping::ApplyRecursiveSubstitution(_) | TypeMapping::EagerExpansion
-            )
-            && !(self.mappings(db).is_none()
-                && matches!(type_mapping, TypeMapping::ApplySpecialization(_)))
-        {
-            return Type::TypeAlias(self.with_mappings(
-                db,
-                DeferredTypeMapping::append(db, self.mappings(db), type_mapping, tcx, visitor),
-            ));
-        }
         match type_mapping {
             TypeMapping::ApplyRecursiveSubstitution(_) => {
                 Type::TypeAlias(self.map_stored_specialization(db, type_mapping, visitor))

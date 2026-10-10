@@ -1398,3 +1398,27 @@ nested = callbacks[1][0][1][0][0](((2, "value"), "value"))
 reveal_type(nested)  # revealed: tuple[tuple[Literal[2], Literal["value"]], Literal["value"]]
 reveal_type(other(True))  # revealed: Literal[True]
 ```
+
+## Promotion through shared generic aliases
+
+The same callback alias can occur in parameter and return positions. Promotion preserves static
+recursive parameter types and widens inferred literals in results, including after recursive calls.
+
+```py
+from typing import Callable, TypeVar
+from ty_extensions._internal import TypeOf
+
+T = TypeVar("T")
+Leaf = Callable[[], T]
+Tree = Callable[[tuple["Tree[int]", Leaf[T]]], tuple[Leaf[T], "Tree[tuple[T]]"]]
+
+def collect(
+    tree: Tree[TypeOf[1]],
+    first: tuple[Tree[int], Leaf[TypeOf[1]]],
+    second: tuple[Tree[int], Leaf[tuple[TypeOf[1]]]],
+    third: tuple[Tree[int], Leaf[tuple[tuple[TypeOf[1]]]]],
+):
+    widened = [tree][0]
+    reveal_type(widened(first)[0]())  # revealed: int
+    reveal_type(widened(first)[1](second)[1](third)[0]())  # revealed: tuple[tuple[int]]
+```

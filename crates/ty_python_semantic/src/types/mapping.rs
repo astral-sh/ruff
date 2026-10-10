@@ -118,7 +118,6 @@ impl<'db> DeferredTypeMapping<'db> {
         // Each step has its own mapping identity, but materialization comparisons share a guard.
         let mut visitor = visitor.for_new_materialization_root();
         visitor.materialize_typevar_bounds_and_defaults = self.step(db).materialize_bounds;
-        visitor.defer_recursive_aliases = true;
         self.step(db).operation.with_mapping(&mut |mapping| {
             ty.apply_type_mapping_impl(db, &mapping, self.step(db).context, &visitor)
         })
