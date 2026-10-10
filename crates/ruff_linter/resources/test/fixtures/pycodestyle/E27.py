@@ -21,8 +21,12 @@ a and  2
 1  and  b
 #: E271 E272
 a  and  2
-#: E272
+#: Okay
 this  and False
+#: Okay
+aligned_none =    None
+aligned_true =    True
+aligned_false =    False
 #: E273
 a and	b
 #: E274

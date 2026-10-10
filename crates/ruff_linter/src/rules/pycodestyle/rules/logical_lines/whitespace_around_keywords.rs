@@ -1,4 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::LintContext;
@@ -132,7 +133,14 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &LintConte
     let mut after_keyword = false;
 
     for token in line.tokens() {
-        let is_keyword = token.kind().is_keyword();
+        // Keep pycodestyle parity: its keyword set deliberately excludes the
+        // singleton literals even though the tokenizer classifies them as
+        // keywords.
+        let is_keyword = token.kind().is_keyword()
+            && !matches!(
+                token.kind(),
+                TokenKind::None | TokenKind::True | TokenKind::False
+            );
         if is_keyword {
             if !after_keyword {
                 match line.leading_whitespace(token) {

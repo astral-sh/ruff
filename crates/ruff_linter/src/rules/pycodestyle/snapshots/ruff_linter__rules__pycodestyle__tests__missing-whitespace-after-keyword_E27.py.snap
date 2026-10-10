@@ -2,125 +2,125 @@
 source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
 ---
 E275 [*] Missing whitespace after keyword
-  --> E27.py:38:8
+  --> E27.py:42:8
    |
-36 | from w import  (e, f)
-37 | #: E275
-38 | from w import(e, f)
+40 | from w import  (e, f)
+41 | #: E275
+42 | from w import(e, f)
    |        ^^^^^^
-39 | #: E275
-40 | from importable.module import(e, f)
+43 | #: E275
+44 | from importable.module import(e, f)
    |
 help: Added missing whitespace after keyword
    |
-37 | #: E275
+41 | #: E275
    - from w import(e, f)
-38 + from w import (e, f)
-39 | #: E275
+42 + from w import (e, f)
+43 | #: E275
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:40:24
+  --> E27.py:44:24
    |
-38 | from w import(e, f)
-39 | #: E275
-40 | from importable.module import(e, f)
+42 | from w import(e, f)
+43 | #: E275
+44 | from importable.module import(e, f)
    |                        ^^^^^^
-41 | #: E275
-42 | try:
+45 | #: E275
+46 | try:
    |
 help: Added missing whitespace after keyword
    |
-39 | #: E275
+43 | #: E275
    - from importable.module import(e, f)
-40 + from importable.module import (e, f)
-41 | #: E275
+44 + from importable.module import (e, f)
+45 | #: E275
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:43:28
+  --> E27.py:47:28
    |
-41 | #: E275
-42 | try:
-43 |     from importable.module import(e, f)
+45 | #: E275
+46 | try:
+47 |     from importable.module import(e, f)
    |                            ^^^^^^
-44 | except ImportError:
-45 |     pass
+48 | except ImportError:
+49 |     pass
    |
 help: Added missing whitespace after keyword
    |
-42 | try:
+46 | try:
    -     from importable.module import(e, f)
-43 +     from importable.module import (e, f)
-44 | except ImportError:
+47 +     from importable.module import (e, f)
+48 | except ImportError:
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:47:1
+  --> E27.py:51:1
    |
-45 |     pass
-46 | #: E275
-47 | if(foo):
+49 |     pass
+50 | #: E275
+51 | if(foo):
    | ^^
-48 |     pass
-49 | else:
+52 |     pass
+53 | else:
    |
 help: Added missing whitespace after keyword
    |
-46 | #: E275
+50 | #: E275
    - if(foo):
-47 + if (foo):
-48 |     pass
+51 + if (foo):
+52 |     pass
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:55:5
+  --> E27.py:59:5
    |
-53 | #: E275:2:11
-54 | if True:
-55 |     assert(1)
+57 | #: E275:2:11
+58 | if True:
+59 |     assert(1)
    |     ^^^^^^
-56 | #: Okay
-57 | def f():
+60 | #: Okay
+61 | def f():
    |
 help: Added missing whitespace after keyword
    |
-54 | if True:
+58 | if True:
    -     assert(1)
-55 +     assert (1)
-56 | #: Okay
+59 +     assert (1)
+60 | #: Okay
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:77:1
+  --> E27.py:81:1
    |
-76 | #: E275
-77 | match(foo):
+80 | #: E275
+81 | match(foo):
    | ^^^^^
-78 |     case(1):
-79 |         pass
+82 |     case(1):
+83 |         pass
    |
 help: Added missing whitespace after keyword
    |
-76 | #: E275
+80 | #: E275
    - match(foo):
-77 + match (foo):
-78 |     case(1):
+81 + match (foo):
+82 |     case(1):
    |
 
 E275 [*] Missing whitespace after keyword
-  --> E27.py:78:5
+  --> E27.py:82:5
    |
-76 | #: E275
-77 | match(foo):
-78 |     case(1):
+80 | #: E275
+81 | match(foo):
+82 |     case(1):
    |     ^^^^
-79 |         pass
+83 |         pass
    |
 help: Added missing whitespace after keyword
    |
-77 | match(foo):
+81 | match(foo):
    -     case(1):
-78 +     case (1):
-79 |         pass
+82 +     case (1):
+83 |         pass
    |
