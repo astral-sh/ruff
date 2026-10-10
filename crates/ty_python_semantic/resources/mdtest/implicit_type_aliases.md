@@ -2914,8 +2914,8 @@ for tree in (legacy(1), modern(1)):
     if isinstance(tree, tuple):
         reveal_type(tree[0])  # revealed: Tree[Literal[1]]
 
-reveal_type([legacy(1)])  # revealed: list[int | tuple[Promote[Tree[Literal[1]]]]]
-reveal_type([modern(1)])  # revealed: list[int | tuple[Promote[Tree[Literal[1]]]]]
+reveal_type([legacy(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
+reveal_type([modern(1)])  # revealed: list[int | tuple[Tree[Literal[1]]]]
 take([legacy(1)])
 take([modern(1)])
 annotated: list[Tree[int]] = [legacy(1), modern(1)]
@@ -3285,7 +3285,7 @@ def inspect(
     reveal_type([bottom_growing])  # revealed: list[Bottom[Growing[Any]]]
 ```
 
-### Lazy promotion of recursive streams
+### Promotion of recursive streams
 
 Collecting a stream widens its inferred literals at every recursive depth. Collecting the result
 again applies the same widening without adding another transformation.
@@ -3298,7 +3298,7 @@ Stream = tuple[TypeOf[1], Callable[[], "Stream"]]
 
 def collect(value: Stream, flag: bool):
     stream = [value][0]
-    reveal_type(stream)  # revealed: Promote[Stream]
+    reveal_type(stream)  # revealed: Stream
     reveal_type(stream[0])  # revealed: int
     reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
     while flag:

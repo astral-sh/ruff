@@ -1799,7 +1799,7 @@ def foo(x: A):
     reveal_type(1 + x)  # revealed: int
 ```
 
-### Lazy promotion of recursive streams
+### Promotion of recursive streams
 
 Collecting a stream widens its inferred literals at every recursive depth. Collecting the result
 again applies the same widening without adding another transformation.
@@ -1812,7 +1812,7 @@ type Stream = tuple[TypeOf[1], Callable[[], Stream]]
 
 def collect(value: Stream, flag: bool):
     stream = [value][0]
-    reveal_type(stream)  # revealed: tuple[int, () -> Promote[Stream]]
+    reveal_type(stream)  # revealed: tuple[int, () -> Stream]
     reveal_type(stream[0])  # revealed: int
     reveal_type(stream[1]()[1]()[1]()[0])  # revealed: int
     while flag:

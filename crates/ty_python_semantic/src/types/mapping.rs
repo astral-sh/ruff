@@ -334,13 +334,6 @@ pub struct MappingStep<'db> {
 impl get_size2::GetSize for DeferredTypeMapping<'_> {}
 
 impl<'db> DeferredTypeMapping<'db> {
-    pub(super) fn operation(self, db: &'db dyn Db) -> &'db MappingOperation<'db> {
-        &self.step(db).operation
-    }
-
-    pub(super) fn preceding(self, db: &'db dyn Db) -> Option<Self> {
-        self.previous(db)
-    }
     pub(super) fn append(
         db: &'db dyn Db,
         previous: Option<Self>,
@@ -410,7 +403,7 @@ impl<'db> DeferredTypeMapping<'db> {
 
 /// Owns the data borrowed by a mapping, so an alias can retain it after inference returns.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) enum MappingOperation<'db> {
+enum MappingOperation<'db> {
     Specialize(OwnedSpecialization<'db>, Option<MaterializationKind>),
     Promote(PromotionMode, PromotionKind),
     BindLegacyTypevars(BindingContext<'db>),
@@ -491,7 +484,7 @@ impl<'db> MappingOperation<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::SalsaValue)]
-pub(super) enum OwnedSpecialization<'db> {
+enum OwnedSpecialization<'db> {
     Specialization(Specialization<'db>, bool),
     TypeAlias(Specialization<'db>),
     Partial(GenericContext<'db>, Box<[Type<'db>]>, Option<usize>),
@@ -501,43 +494,6 @@ pub(super) enum OwnedSpecialization<'db> {
 }
 
 impl<'db> OwnedSpecialization<'db> {
-    /// The substitutions shown in the marker, including overrides not in its generic context.
-    pub(super) fn bindings(
-        &self,
-        db: &'db dyn Db,
-    ) -> FxIndexMap<BoundTypeVarInstance<'db>, Type<'db>> {
-        match self {
-            Self::Specialization(specialization, _) | Self::TypeAlias(specialization) => {
-                specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db).iter().copied())
-                    .collect()
-            }
-            Self::Partial(context, types, skip) => context
-                .variables(db)
-                .enumerate()
-                .filter_map(|(index, variable)| {
-                    if skip == &Some(index) {
-                        Some((variable, Type::Never))
-                    } else {
-                        types.get(index).map(|ty| (variable, *ty))
-                    }
-                })
-                .collect(),
-            Self::ReturnCallables(replacements) => replacements
-                .iter()
-                .map(|(from, to)| (*from, Type::TypeVar(*to)))
-                .collect(),
-            Self::Single(variable, ty) => [(*variable, *ty)].into_iter().collect(),
-            Self::WithBindings(specialization, overrides) => {
-                let mut bindings = specialization.bindings(db);
-                bindings.extend(overrides.iter().copied());
-                bindings
-            }
-        }
-    }
-
     fn new(specialization: ApplySpecialization<'_, 'db>) -> Self {
         match specialization {
             ApplySpecialization::Specialization {

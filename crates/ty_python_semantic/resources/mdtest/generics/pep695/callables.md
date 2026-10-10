@@ -1534,8 +1534,8 @@ def collect(top: Top[Stream[Any]], bottom: Bottom[Stream[Any]], repetitions: int
 
 ## Display of specialization after recursive promotion
 
-A deferred specialization shows which types replace the promoted stream's parameters. Class names
-are qualified when different modules supply equally named classes.
+The recursive reference keeps its alias name and original arguments after promotion and
+specialization. Accessing a payload uses the specialized type, including its qualified class name.
 
 `a.py`:
 
@@ -1561,8 +1561,9 @@ type Stream[T] = tuple[TypeOf[1], T, Callable[[], Stream[T]]]
 type Promoted[T] = TypeOf[[cast(Stream[T], cast(Any, None))][0]]
 
 def inspect(first: Promoted[a.Widget], second: Promoted[b.Widget]):
-    # revealed: tuple[() -> Specialize[Promote[Stream[T@Promoted]], T@Promoted = a.Widget], () -> Specialize[Promote[Stream[T@Promoted]], T@Promoted = b.Widget]]
-    reveal_type((first[2], second[2]))
+    # revealed: tuple[() -> Stream[T@Promoted], () -> Stream[T@Promoted], a.Widget, b.Widget]
+    reveal_type((first[2], second[2], first[2]()[1], second[2]()[1]))
+    reveal_type((first[2], second[2]()[1]))  # revealed: tuple[() -> Stream[T@Promoted], Widget]
 ```
 
 ## Specialization after promotion with growing recursive arguments

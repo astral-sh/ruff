@@ -297,7 +297,7 @@ impl<'db> RecursiveType<'db> {
         )
     }
 
-    fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
+    pub(super) fn materialization_kind(self, db: &'db dyn Db) -> Option<MaterializationKind> {
         self.mappings(db)
             .and_then(|mapping| mapping.materialization_kind(db))
     }
