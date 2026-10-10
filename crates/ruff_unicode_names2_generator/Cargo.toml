@@ -12,8 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 phf_codegen = { workspace = true }
-# Preserve the RNG used by upstream's table generator.
-rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
+rand = { workspace = true }
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("timing"))'] }

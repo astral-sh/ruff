@@ -17,7 +17,7 @@ phf = { workspace = true }
 ruff_unicode_names2_generator = { workspace = true }
 
 [dev-dependencies]
-rand = { version = "0.8.5", default-features = false, features = ["std", "std_rng"] }
+rand = { workspace = true }
 
 [lints.rust]
 # Ruff uses std; retain upstream's optional no_std code without enabling it.

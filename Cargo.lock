@@ -2635,15 +2635,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ppv-lite86"
-version = "0.2.21"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
-dependencies = [
- "zerocopy",
-]
-
-[[package]]
 name = "predicates"
 version = "3.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2893,8 +2884,6 @@ version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
- "libc",
- "rand_chacha",
  "rand_core 0.6.4",
 ]
 
@@ -2910,23 +2899,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rand_chacha"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6c10a63a0fa32252be49d21e7709d4d4baf8d231c2dbce1eaa8141b9b127d88"
-dependencies = [
- "ppv-lite86",
- "rand_core 0.6.4",
-]
-
-[[package]]
 name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
-dependencies = [
- "getrandom 0.2.16",
-]
 
 [[package]]
 name = "rand_core"
@@ -3791,7 +3767,7 @@ name = "ruff_unicode_names2"
 version = "0.0.17"
 dependencies = [
  "phf 0.11.3",
- "rand 0.8.5",
+ "rand 0.10.2",
  "ruff_unicode_names2_generator",
 ]
 
@@ -3800,7 +3776,7 @@ name = "ruff_unicode_names2_generator"
 version = "0.0.17"
 dependencies = [
  "phf_codegen",
- "rand 0.8.5",
+ "rand 0.10.2",
 ]
 
 [[package]]
@@ -5891,26 +5867,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
  "synstructure",
-]
-
-[[package]]
-name = "zerocopy"
-version = "0.8.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0894878a5fa3edfd6da3f88c4805f4c8558e2b996227a3d864f47fe11e38282c"
-dependencies = [
- "zerocopy-derive",
-]
-
-[[package]]
-name = "zerocopy-derive"
-version = "0.8.27"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88d2b8d9c68ad2b9e4340d7832716a4d21a22a1154777ad56ea55c51a9cf3831"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
 ]
 
 [[package]]
