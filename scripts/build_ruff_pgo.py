@@ -227,7 +227,10 @@ def main() -> None:
     }
     profile = "debug" if args.debug else "release"
     print(f"Building instrumented {profile} Ruff", flush=True)
-    run(cargo_command(target, debug=args.debug), environment=instrumented_environment)
+    run(
+        cargo_command(target, debug=args.debug, instrumented=True),
+        environment=instrumented_environment,
+    )
 
     binary_name = "ruff.exe" if "windows" in target else "ruff"
     instrumented_binary = instrumented_target_dir / target / profile / binary_name
@@ -530,7 +533,9 @@ def write_corpus_arguments(target_directory: Path, corpus: list[str]) -> Path:
     return arguments
 
 
-def cargo_command(target: str, *, debug: bool = False) -> list[str]:
+def cargo_command(
+    target: str, *, debug: bool = False, instrumented: bool = False
+) -> list[str]:
     return [
         "cargo",
         "rustc",
@@ -545,6 +550,8 @@ def cargo_command(target: str, *, debug: bool = False) -> list[str]:
         "--",
         "-C",
         "strip=symbols",
+        # Override only the executable's LTO, leaving dependency compilation unchanged.
+        *(("-C", "lto=thin") if instrumented and not debug else ()),
     ]
 
 
