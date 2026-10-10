@@ -1,19 +1,137 @@
-//! Parameters of implicit type aliases, including parameters used only in forward references.
+//! Recursion and parameters of implicit type aliases.
 
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::source_text;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, visitor as ast_visitor};
 use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::definition::Definition;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, ScopeId};
 use ty_python_core::semantic_index;
 
+use crate::types::definition_resolution::{ImportAliasResolution, definitions_for_name};
 use crate::types::{
     BoundTypeVarInstance, GenericContext, KnownInstanceType, SpecialFormType, Type, TypeVarKind,
     binding_type,
 };
 use crate::{Db, FxOrderSet, ProgramEnvironment};
+
+/// Conservatively prove that an implicit alias has no recursive dependencies.
+///
+/// A resolved union can have lost a recursive member during value inference, so inspect the
+/// definitions it references rather than treating its recovered value as proof. Ordinary alias
+/// chains can then reuse their inferred values without a separate type-expression inference pass.
+/// String annotations and references that cannot be resolved unambiguously retain that full pass.
+///
+/// Read binding types inside this query so `cycle_result` rejects proofs that depend on provisional
+/// inference results. A `false` result means the proof is incomplete, not necessarily that the
+/// alias is recursive.
+#[salsa::tracked(
+    returns(copy),
+    cycle_result=|_, _, _| false,
+    heap_size=ruff_memory_usage::heap_size,
+)]
+pub(in crate::types) fn implicit_alias_is_acyclic<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> bool {
+    let file = definition.program_file(db);
+    let parsed = parsed_module(db, file.python_file(db)).load(db);
+    if !definition
+        .kind(db)
+        .category(definition.file(db).is_stub(db), &parsed)
+        .is_binding()
+    {
+        return false;
+    }
+    match binding_type(db, definition) {
+        Type::ClassLiteral(_)
+        | Type::KnownInstance(KnownInstanceType::TypeVar(_))
+        | Type::SpecialForm(_) => return true,
+        Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_) => {
+            return false;
+        }
+        _ => {}
+    }
+
+    // An eager class-body read can fall back to a global before a later class assignment.
+    // Looking up all definitions in that class would follow the later assignment instead.
+    if definition.scope(db).scope(db).kind().is_class() {
+        return false;
+    }
+
+    let Some(value) = definition.kind(db).value(&parsed) else {
+        return false;
+    };
+    ImplicitAliasAcyclicityProof { db, definition }.expression_is_acyclic(value)
+}
+
+/// Resolve a dependency once per name and scope, even when many aliases reference it.
+/// In particular, an ambiguous name must not enumerate all its assignments for every alias.
+#[salsa::tracked(returns(copy), heap_size=ruff_memory_usage::heap_size)]
+#[allow(clippy::needless_pass_by_value, reason = "Salsa owns the query key")]
+fn unambiguous_alias_dependency<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: Name,
+) -> Option<Definition<'db>> {
+    let definitions = definitions_for_name(db, scope, &name, ImportAliasResolution::ResolveAliases);
+    let [resolved] = definitions.as_slice() else {
+        return None;
+    };
+    resolved.definition()
+}
+
+struct ImplicitAliasAcyclicityProof<'db> {
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+}
+
+impl ImplicitAliasAcyclicityProof<'_> {
+    fn expression_is_acyclic(&self, expression: &ast::Expr) -> bool {
+        match expression {
+            ast::Expr::Name(name) => {
+                let db = self.db;
+                let index = semantic_index(db, self.definition.program_file(db));
+                // A forwarding scope can assign a different value from the outer definition
+                // returned by source-name lookup, including when read from a nested function.
+                for (scope, _) in index.visible_ancestor_scopes(self.definition.file_scope(db)) {
+                    let table = index.place_table(scope);
+                    let Some(symbol) = table.symbol_id(&name.id) else {
+                        continue;
+                    };
+                    let symbol = table.symbol(symbol);
+                    if symbol.is_global() || symbol.is_nonlocal() {
+                        return false;
+                    }
+                    if symbol.is_bound() || symbol.is_declared() {
+                        break;
+                    }
+                }
+                unambiguous_alias_dependency(db, self.definition.scope(db), name.id.clone())
+                    .is_some_and(|definition| implicit_alias_is_acyclic(db, definition))
+            }
+            ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
+                self.expression_is_acyclic(&binary.left)
+                    && self.expression_is_acyclic(&binary.right)
+            }
+            ast::Expr::Subscript(subscript) => {
+                self.expression_is_acyclic(&subscript.value)
+                    && self.expression_is_acyclic(&subscript.slice)
+            }
+            ast::Expr::Tuple(tuple) => tuple
+                .elts
+                .iter()
+                .all(|element| self.expression_is_acyclic(element)),
+            ast::Expr::NoneLiteral(_)
+            | ast::Expr::NumberLiteral(_)
+            | ast::Expr::BooleanLiteral(_)
+            | ast::Expr::EllipsisLiteral(_) => true,
+            _ => false,
+        }
+    }
+}
 
 /// Collect the formal type parameters of an implicit or PEP 613 alias from its right-hand side.
 ///
