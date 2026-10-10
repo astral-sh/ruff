@@ -13,15 +13,64 @@ use crate::{
         member::Member,
     },
 };
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ty_python_core::{
-    attribute_scopes,
+    SemanticIndex, attribute_scopes,
     definition::{Definition, DefinitionKind, DefinitionState, TargetKind},
     place_table,
     scope::{Scope, ScopeId},
     semantic_index, use_def_map,
 };
+
+/// Classifies a method in a class body as an instance method, classmethod, or staticmethod.
+///
+/// Returns `None` for scopes that are not functions, such as a comprehension nested in a method.
+pub(in crate::types) fn classify_method(
+    db: &dyn Db,
+    index: &SemanticIndex,
+    module: &ParsedModuleRef,
+    method_scope: &Scope,
+) -> Option<MethodDecorator> {
+    let method_def = method_scope.node().as_function()?;
+
+    // Check the decorators directly on the AST node to determine if this method
+    // is a classmethod or staticmethod. This is more reliable than checking the
+    // final evaluated type, which may be wrapped by other decorators like @cache.
+    let function_node = method_def.node(module);
+    let definition = index.expect_single_definition(method_def);
+
+    let mut is_classmethod = false;
+    let mut is_staticmethod = false;
+
+    for decorator in &function_node.decorator_list {
+        let decorator_ty = definition_expression_type(db, definition, &decorator.expression);
+        if let Type::ClassLiteral(class) = decorator_ty {
+            match class.known(db) {
+                Some(KnownClass::Classmethod) => is_classmethod = true,
+                Some(KnownClass::Staticmethod) => is_staticmethod = true,
+                _ => {}
+            }
+        }
+    }
+
+    // Also check for implicit classmethods/staticmethods based on method name.
+    let method_name = function_node.name.as_str();
+    if is_implicit_classmethod(method_name) {
+        is_classmethod = true;
+    }
+    if is_implicit_staticmethod(method_name) {
+        is_staticmethod = true;
+    }
+
+    Some(if is_classmethod {
+        MethodDecorator::ClassMethod
+    } else if is_staticmethod {
+        MethodDecorator::StaticMethod
+    } else {
+        MethodDecorator::None
+    })
+}
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
@@ -121,54 +170,14 @@ impl<'db> StaticClassLiteral<'db> {
         let index = semantic_index(db, program_file);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
-        let is_valid_scope = |method_scope: &Scope| {
-            let Some(method_def) = method_scope.node().as_function() else {
-                return true;
-            };
-
-            // Check the decorators directly on the AST node to determine if this method
-            // is a classmethod or staticmethod. This is more reliable than checking the
-            // final evaluated type, which may be wrapped by other decorators like @cache.
-            let function_node = method_def.node(&module);
-            let definition = index.expect_single_definition(method_def);
-
-            let mut is_classmethod = false;
-            let mut is_staticmethod = false;
-
-            for decorator in &function_node.decorator_list {
-                let decorator_ty =
-                    definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
-                    match class.known(db) {
-                        Some(KnownClass::Classmethod) => is_classmethod = true,
-                        Some(KnownClass::Staticmethod) => is_staticmethod = true,
-                        _ => {}
-                    }
-                }
-            }
-
-            // Also check for implicit classmethods/staticmethods based on method name
-            let method_name = function_node.name.as_str();
-            if is_implicit_classmethod(method_name) {
-                is_classmethod = true;
-            }
-            if is_implicit_staticmethod(method_name) {
-                is_staticmethod = true;
-            }
-
-            match target_method_decorator {
-                MethodDecorator::None => !is_classmethod && !is_staticmethod,
-                MethodDecorator::ClassMethod => is_classmethod,
-                MethodDecorator::StaticMethod => is_staticmethod,
-            }
-        };
-
         // First check declarations
         for (attribute_declarations, method_scope_id) in
             attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
-            if !is_valid_scope(method_scope) {
+            if classify_method(db, index, &module, method_scope)
+                .is_some_and(|decorator| decorator != target_method_decorator)
+            {
                 continue;
             }
 
@@ -234,7 +243,9 @@ impl<'db> StaticClassLiteral<'db> {
             attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
-            if !is_valid_scope(binding_scope) {
+            if classify_method(db, index, &module, binding_scope)
+                .is_some_and(|decorator| decorator != target_method_decorator)
+            {
                 continue;
             }
 
@@ -459,7 +470,7 @@ fn implicit_attribute_binding_type<'db>(
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(super) fn implicit_attribute_names<'db>(
+pub(in crate::types) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {
