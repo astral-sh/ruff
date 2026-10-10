@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E111 Indentation is not a multiple of 4
+ --> E11_indent_width.py:3:1
+  |
+1 | #: E111 with indent-width=4 or 8, ok with indent-width=2
+2 | if x > 2:
+3 |   print(x)
+  | ^^
+4 | #: E111 with any indent-width (3 is not a multiple of 2, 4, or 8)
+5 | if x > 2:
+  |
+
+E111 Indentation is not a multiple of 4
+ --> E11_indent_width.py:6:1
+  |
+4 | #: E111 with any indent-width (3 is not a multiple of 2, 4, or 8)
+5 | if x > 2:
+6 |    print(x)
+  | ^^^
+7 | #: E111 and E114 with indent-width=4 or 8, ok with indent-width=2
+8 | if True:
+  |
+
+E114 Indentation is not a multiple of 4 (comment)
+  --> E11_indent_width.py:9:1
+   |
+ 7 | #: E111 and E114 with indent-width=4 or 8, ok with indent-width=2
+ 8 | if True:
+ 9 |   # comment
+   | ^^
+10 |   print(x)
+11 | #: E111 with indent-width=8, ok with indent-width=2 or 4
+   |
+
+E111 Indentation is not a multiple of 4
+  --> E11_indent_width.py:10:1
+   |
+ 8 | if True:
+ 9 |   # comment
+10 |   print(x)
+   | ^^
+11 | #: E111 with indent-width=8, ok with indent-width=2 or 4
+12 | if x > 2:
+   |
