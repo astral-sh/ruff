@@ -132,7 +132,9 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &LintConte
     let mut after_keyword = false;
 
     for token in line.tokens() {
-        let is_keyword = token.kind().is_keyword();
+        // Exclude `True`, `False`, and `None`: pycodestyle builds its keyword
+        // set for these checks as `keyword.kwlist - SINGLETONS`.
+        let is_keyword = token.kind().is_keyword() && !token.kind().is_singleton();
         if is_keyword {
             if !after_keyword {
                 match line.leading_whitespace(token) {
