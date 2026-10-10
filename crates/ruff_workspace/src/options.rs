@@ -2447,6 +2447,78 @@ pub struct Flake8TypeCheckingOptions {
     )]
     runtime_evaluated_decorators: Option<AnnotationSemanticsSelection>,
 
+    /// Some libraries like SQLAlchemy or Injector rely on top-level generics
+    /// in annotations to mark the rest of the annotation as relevant, rather
+    /// than relying on a shared base class or a decorator.
+    ///
+    /// For function annotations the runtime semantics imposed by these top-level
+    /// generics are viral and spread to the other annotations (albeit with a
+    /// reduced strictness of runtime-ambiguous).
+    ///
+    /// Also note that this setting currently only applies to top-level generics
+    /// so nested generics will not work.
+    ///
+    /// For example, this will work and will mark both `Inject` and `Required`
+    /// runtime-required. Additionally it will make `Ambiguous` runtime-ambiguous:
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-generic-subscripts]
+    /// "injector.Inject" = "required"
+    /// ```
+    /// ```python
+    /// from injector import Inject
+    ///
+    /// def fun(x: Inject[Required]) -> Ambiguous:
+    ///     pass
+    /// ```
+    ///
+    /// But with this the default semantics will be used, since `Inject` isn't
+    /// used at the top-level it will not be considered by ruff and neither
+    /// `Inject` nor `Default` will be treated as runtime-required or runtime-ambiguous:
+    /// ```python
+    /// def fun(x: SomeOtherGeneric[Inject[Default]]) -> Default:
+    ///     pass
+    /// ```
+    ///
+    /// For class and module annotations the semantics apply to each annotation assignment
+    /// separately. This generally matches how these markers are used in the wild.
+    ///
+    /// For example, here `UUID`, and `Bar` are marked runtime-ambiguous, and `Mapped`
+    /// is marked runtime-required, but `Default` retains its default semantics:
+    /// ```toml
+    /// [tool.ruff.lint.flake8-type-checking.runtime-evaluated-generic-subscripts]
+    /// "sqlalchemy.orm.Mapped" = "ambiguous"
+    /// ```
+    /// ```python
+    /// from sqlalchemy.orm import BaseModel, Mapped, relationship
+    /// from typing import TYPE_CHECKING, ClassVar
+    /// from uuid import UUID
+    ///
+    /// if TYPE_CHECKING:
+    ///     from .bar import Bar
+    ///
+    /// class Foo(BaseModel):
+    ///     id: Mapped[UUID]
+    ///     bar: Mapped[Bar] = relationship()
+    ///     baz: ClassVar[Default]
+    /// ```
+    ///
+    /// Note how even with runtime-ambiguous semantics `Mapped` itself is still
+    /// runtime-required. This is because the library that needs to detect this marker
+    /// needs to be sure it's the correct one, so it can't be missing at runtime.
+    ///
+    /// If you need to target an entire class instead of individual annotations,
+    /// it's better to rely on `runtime-evaluated-based-classes` instead.
+    #[option(
+        default = "{}",
+        value_type = "list[str] | dict[str, \"required\" | \"ambiguous\"]",
+        scope = "runtime-evaluated-generic-subscripts",
+        example = r#"
+            "injector.Inject" = "required"
+            "sqlalchemy.orm.Mapped" = "ambiguous"
+        "#
+    )]
+    runtime_evaluated_generic_subscripts: Option<AnnotationSemanticsSelection>,
+
     /// Whether to add quotes around type annotations, if doing so would allow
     /// the corresponding import to be moved into a type-checking block.
     ///
@@ -2519,6 +2591,16 @@ impl Flake8TypeCheckingOptions {
             },
             runtime_evaluated_decorators: match self
                 .runtime_evaluated_decorators
+                .unwrap_or_default()
+            {
+                AnnotationSemanticsSelection::Table(map) => map,
+                AnnotationSemanticsSelection::List(vector) => vector
+                    .into_iter()
+                    .map(|name| (name, RuntimeSemantics::Required))
+                    .collect(),
+            },
+            runtime_evaluated_generic_subscripts: match self
+                .runtime_evaluated_generic_subscripts
                 .unwrap_or_default()
             {
                 AnnotationSemanticsSelection::Table(map) => map,

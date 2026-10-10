@@ -1570,6 +1570,17 @@
             }
           ]
         },
+        "runtime-evaluated-generic-subscripts": {
+          "description": "Some libraries like SQLAlchemy or Injector rely on top-level generics\nin annotations to mark the rest of the annotation as relevant, rather\nthan relying on a shared base class or a decorator.\n\nFor function annotations the runtime semantics imposed by these top-level\ngenerics are viral and spread to the other annotations (albeit with a\nreduced strictness of runtime-ambiguous).\n\nAlso note that this setting currently only applies to top-level generics\nso nested generics will not work.\n\nFor example, this will work and will mark both `Inject` and `Required`\nruntime-required. Additionally it will make `Ambiguous` runtime-ambiguous:\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-generic-subscripts]\n\"injector.Inject\" = \"required\"\n```\n```python\nfrom injector import Inject\n\ndef fun(x: Inject[Required]) -> Ambiguous:\n    pass\n```\n\nBut with this the default semantics will be used, since `Inject` isn't\nused at the top-level it will not be considered by ruff and neither\n`Inject` nor `Default` will be treated as runtime-required or runtime-ambiguous:\n```python\ndef fun(x: SomeOtherGeneric[Inject[Default]]) -> Default:\n    pass\n```\n\nFor class and module annotations the semantics apply to each annotation assignment\nseparately. This generally matches how these markers are used in the wild.\n\nFor example, here `UUID`, and `Bar` are marked runtime-ambiguous, and `Mapped`\nis marked runtime-required, but `Default` retains its default semantics:\n```toml\n[tool.ruff.lint.flake8-type-checking.runtime-evaluated-generic-subscripts]\n\"sqlalchemy.orm.Mapped\" = \"ambiguous\"\n```\n```python\nfrom sqlalchemy.orm import BaseModel, Mapped, relationship\nfrom typing import TYPE_CHECKING, ClassVar\nfrom uuid import UUID\n\nif TYPE_CHECKING:\n    from .bar import Bar\n\nclass Foo(BaseModel):\n    id: Mapped[UUID]\n    bar: Mapped[Bar] = relationship()\n    baz: ClassVar[Default]\n```\n\nNote how even with runtime-ambiguous semantics `Mapped` itself is still\nruntime-required. This is because the library that needs to detect this marker\nneeds to be sure it's the correct one, so it can't be missing at runtime.\n\nIf you need to target an entire class instead of individual annotations,\nit's better to rely on `runtime-evaluated-based-classes` instead.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AnnotationSemanticsSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "strict": {
           "description": "Enforce `TC001`, `TC002`, and `TC003` rules even when valid runtime imports\nare present for the same module.\n\nSee flake8-type-checking's [strict](https://github.com/snok/flake8-type-checking#strict) option.",
           "type": [
