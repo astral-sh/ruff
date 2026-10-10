@@ -44,6 +44,7 @@
 //! be considered a bug.)
 
 use crate::ProgramEnvironment;
+use crate::place::definitions::DefinitionResolution;
 use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -345,6 +346,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, Default, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct FunctionDecoratorInference<'db> {
+    reaching_definitions: Option<Box<FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>>>,
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
@@ -1066,6 +1068,8 @@ struct ScopeInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
+    /// Reaching definitions retained only when recording is enabled in the database.
+    reaching_definitions: Option<Box<FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1444,6 +1448,9 @@ impl<'db> DefinitionTypes<'db> {
 /// `Other` stores uncommon combinations that require multiple fields.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 enum DefinitionInferenceExtra<'db> {
+    /// Reaching definitions are the only extra data for some definitions.
+    ReachingDefinitions(FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>),
+
     /// Type qualifiers are the only extra data for most annotated definitions.
     Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
 
@@ -1482,6 +1489,9 @@ struct OtherDefinitionInferenceExtra<'db> {
     /// Condition truthiness retained for checks of enclosing conditions containing walrus expressions.
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
+
+    /// Reaching definitions retained only when recording is enabled in the database.
+    reaching_definitions: Option<Box<FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>>>,
 
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
@@ -1525,6 +1535,10 @@ struct OtherDefinitionInferenceExtra<'db> {
 impl<'db> DefinitionInferenceExtra<'db> {
     fn into_other(self) -> OtherDefinitionInferenceExtra<'db> {
         match self {
+            Self::ReachingDefinitions(reaching_definitions) => OtherDefinitionInferenceExtra {
+                reaching_definitions: Some(Box::new(reaching_definitions)),
+                ..OtherDefinitionInferenceExtra::default()
+            },
             Self::Qualifiers(qualifiers) => OtherDefinitionInferenceExtra {
                 qualifiers,
                 ..OtherDefinitionInferenceExtra::default()
@@ -1972,6 +1986,8 @@ struct ExpressionInferenceExtra<'db> {
     /// Aliases whose type-expression diagnostics are needed by this region.
     implicit_aliases: Box<[Definition<'db>]>,
 
+    /// Reaching definitions retained only when recording is enabled in the database.
+    reaching_definitions: Option<Box<FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -2226,6 +2242,8 @@ struct StatementInferenceInnerExtra<'db> {
     /// See [`ExpressionInferenceExtra::comparison_truthiness`] for the distinction from value types.
     comparison_truthiness: FrozenMap<ExpressionNodeKey, Truthiness>,
 
+    /// Reaching definitions retained only when recording is enabled in the database.
+    reaching_definitions: Option<Box<FrozenMap<ExpressionNodeKey, DefinitionResolution<'db>>>>,
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
