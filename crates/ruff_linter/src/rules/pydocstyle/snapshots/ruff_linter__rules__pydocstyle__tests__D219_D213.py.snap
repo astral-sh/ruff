@@ -1,0 +1,117 @@
+---
+source: crates/ruff_linter/src/rules/pydocstyle/mod.rs
+---
+D219 [*] One-line docstring should use multi-line quotes
+ --> D219.py:1:1
+  |
+1 | """Module docstring."""
+  | ^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Reformat to multi-line
+  - """Module docstring."""
+1 + """
+2 + Module docstring.
+3 + """
+4 | 
+5 | 
+6 | def function():
+note: This is an unsafe fix and may change runtime behavior
+
+D219 [*] One-line docstring should use multi-line quotes
+ --> D219.py:5:5
+  |
+4 | def function():
+5 |     """Hi."""
+  |     ^^^^^^^^^
+  |
+help: Reformat to multi-line
+2  | 
+3  | 
+4  | def function():
+   -     """Hi."""
+5  +     """
+6  +     Hi.
+7  +     """
+8  | 
+9  | 
+10 | class Example:
+note: This is an unsafe fix and may change runtime behavior
+
+D219 [*] One-line docstring should use multi-line quotes
+  --> D219.py:9:5
+   |
+ 8 | class Example:
+ 9 |     """Class docstring."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+10 |
+11 |     def method(self):
+   |
+help: Reformat to multi-line
+6  | 
+7  | 
+8  | class Example:
+   -     """Class docstring."""
+9  +     """
+10 +     Class docstring.
+11 +     """
+12 | 
+13 |     def method(self):
+14 |         """Method docstring."""
+note: This is an unsafe fix and may change runtime behavior
+
+D219 [*] One-line docstring should use multi-line quotes
+  --> D219.py:12:9
+   |
+11 |     def method(self):
+12 |         """Method docstring."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^
+13 |         return 1
+   |
+help: Reformat to multi-line
+9  |     """Class docstring."""
+10 | 
+11 |     def method(self):
+   -         """Method docstring."""
+12 +         """
+13 +         Method docstring.
+14 +         """
+15 |         return 1
+16 | 
+17 | 
+note: This is an unsafe fix and may change runtime behavior
+
+D219 [*] One-line docstring should use multi-line quotes
+  --> D219.py:23:5
+   |
+22 | def whitespace():
+23 |     """  Hi.  """
+   |     ^^^^^^^^^^^^^
+   |
+help: Reformat to multi-line
+20 | 
+21 | 
+22 | def whitespace():
+   -     """  Hi.  """
+23 +     """
+24 +       Hi.  
+25 +     """
+26 | 
+27 | 
+28 | class SameLine: """Same line docstring."""
+note: This is an unsafe fix and may change runtime behavior
+
+D219 [*] One-line docstring should use multi-line quotes
+  --> D219.py:26:17
+   |
+26 | class SameLine: """Same line docstring."""
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Reformat to multi-line
+23 |     """  Hi.  """
+24 | 
+25 | 
+   - class SameLine: """Same line docstring."""
+26 + class SameLine: """
+27 +     Same line docstring.
+28 +     """
+note: This is an unsafe fix and may change runtime behavior
