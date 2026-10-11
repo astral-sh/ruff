@@ -673,6 +673,18 @@ impl<'db> Type<'db> {
         env: &ProgramEnvironment<'db>,
         other: Type<'db>,
     ) -> bool {
+        self == other || self.is_redundant_with_distinct(db, env, other)
+    }
+
+    /// Check redundancy when the caller has already established that the types differ.
+    pub(super) fn is_redundant_with_distinct(
+        self,
+        db: &'db dyn Db,
+        env: &ProgramEnvironment<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        debug_assert_ne!(self, other);
+
         #[salsa::tracked(returns(copy), cycle_initial=|_, _, _| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_redundant_with_impl<'db>(db: &'db dyn Db, types: TypePair<'db>) -> bool {
             let program = types.program(db);
@@ -688,10 +700,6 @@ impl<'db> Type<'db> {
                     TypeRelation::Redundancy { pure: false },
                 )
                 .is_always_satisfied(db, &env, TypeVarSet::None)
-        }
-
-        if self == other {
-            return true;
         }
 
         let program = env.program(db);
