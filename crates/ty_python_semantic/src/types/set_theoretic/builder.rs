@@ -1085,7 +1085,9 @@ impl<'db> UnionBuilder<'db> {
             }
 
             // `object` already contains every possible union element.
-            if !self.cycle_recovery && element_type == Type::object() {
+            if !self.cycle_recovery
+                && matches!(element_type, Type::NominalInstance(instance) if instance.is_object())
+            {
                 return;
             }
 
