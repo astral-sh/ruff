@@ -160,7 +160,7 @@ fn is_single_member_import(stmt: &Stmt) -> bool {
 }
 
 /// Return the range from `lazy` through the whitespace before `import` or `from`.
-fn lazy_import_prefix_range(stmt: &Stmt, source_tokens: &Tokens) -> Option<TextRange> {
+pub(crate) fn lazy_import_prefix_range(stmt: &Stmt, source_tokens: &Tokens) -> Option<TextRange> {
     let mut tokens = source_tokens.after(stmt.start()).iter();
     let lazy = tokens.find(|token| !token.kind().is_trivia())?;
     if lazy.kind() != TokenKind::Lazy {

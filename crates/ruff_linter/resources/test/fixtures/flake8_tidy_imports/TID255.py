@@ -50,3 +50,9 @@ conditional_expression = foo.Value if enabled else None
 
 if TYPE_CHECKING:
     type_checking_only = foo.Value
+
+for _ in foo.ITERABLE:
+    loop_body = foo.Value
+
+while condition:
+    while_body = foo.Value

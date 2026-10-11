@@ -273,3 +273,20 @@ help: Convert to an eager import
 2 | lazy import package.submodule
   |
 note: This is an unsafe fix and may change runtime behavior
+
+TID255 [*] Lazy import `foo` is resolved immediately
+  --> TID255.py:54:10
+   |
+52 |     type_checking_only = foo.Value
+53 |
+54 | for _ in foo.ITERABLE:
+   |          ^^^
+55 |     loop_body = foo.Value
+   |
+help: Convert to an eager import
+  |
+  - lazy import foo
+1 + import foo
+2 | lazy import package.submodule
+  |
+note: This is an unsafe fix and may change runtime behavior

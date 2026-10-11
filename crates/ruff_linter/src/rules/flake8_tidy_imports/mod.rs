@@ -502,4 +502,44 @@ mod tests {
         assert_eq!(diagnostics.len(), 2);
         assert_eq!(fixed.source_code(), expected);
     }
+
+    #[test]
+    fn lazy_import_mismatch_ban_lazy_extra_whitespace() {
+        let source = dedent(
+            r#"
+            lazy  import typing
+            lazy	from foo import bar
+            "#,
+        );
+        let expected = dedent(
+            r#"
+            import typing
+            from foo import bar
+            "#,
+        );
+
+        let source_kind = SourceKind::Python {
+            code: source.to_string(),
+            is_stub: false,
+        };
+
+        let (diagnostics, fixed) = test_contents(
+            &source_kind,
+            Path::new("flake8_tidy_imports/TID254_ban_lazy_extra_whitespace.py"),
+            &LinterSettings {
+                flake8_tidy_imports: flake8_tidy_imports::settings::Settings {
+                    ban_lazy: ImportSelector::Settings(ImportSelectorSettings {
+                        include: ImportSelection::All(AllImports::All),
+                        exclude: vec![],
+                    }),
+                    ..Default::default()
+                },
+                ..LinterSettings::for_rule(Rule::LazyImportMismatch)
+                    .with_target_version(PythonVersion::PY315)
+            },
+        );
+
+        assert_eq!(diagnostics.len(), 2);
+        assert_eq!(fixed.source_code(), expected);
+    }
 }

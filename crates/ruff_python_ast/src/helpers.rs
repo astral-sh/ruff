@@ -1292,7 +1292,10 @@ pub fn body_without_leading_docstring(body: &[Stmt]) -> &[Stmt] {
 /// Check if a node is part of a conditional branch.
 pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
     parents.any(|parent| {
-        if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
+        if matches!(
+            parent,
+            Stmt::If(_) | Stmt::While(_) | Stmt::Match(_) | Stmt::For(_)
+        ) {
             return true;
         }
         if let Stmt::Expr(ast::StmtExpr {

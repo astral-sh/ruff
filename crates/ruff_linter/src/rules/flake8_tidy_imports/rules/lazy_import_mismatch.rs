@@ -1,11 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PythonVersion, Stmt};
 use ruff_python_semantic::ImportLaziness;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::codes::Category;
 use crate::rules::flake8_tidy_imports::rules::BannedModuleImportPolicies;
+use crate::rules::flake8_tidy_imports::rules::lazy_import_prefix_range;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -167,10 +168,9 @@ fn report_lazy_import_policy(
             )));
         }
         LazyImportPolicy::BanLazy => {
-            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(TextRange::at(
-                stmt.start(),
-                TextSize::from(5),
-            ))));
+            if let Some(range) = lazy_import_prefix_range(stmt, checker.source_tokens()) {
+                diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(range)));
+            }
         }
     }
 }
