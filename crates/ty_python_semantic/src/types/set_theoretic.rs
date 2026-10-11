@@ -85,7 +85,11 @@ impl<'db> TypeExpressionUnion<'db> {
 
 #[salsa::tracked]
 impl<'db> UnionType<'db> {
-    /// Normalize the operands of a union expression once for each expansion policy.
+    /// Normalize a union, sharing the result across value and type-expression inference.
+    ///
+    /// `unpack_aliases` selects [`Self::from_elements`] when true and
+    /// [`Self::from_elements_leave_aliases`] when false, preserving each constructor's
+    /// simplification rules, including its treatment of a single operand.
     pub(crate) fn from_type_expression_elements(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,

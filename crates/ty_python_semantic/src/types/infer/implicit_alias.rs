@@ -40,7 +40,8 @@ pub(super) fn imported_alias_definition<'db>(
     resolved.definition()
 }
 
-/// Whether an assignment's right-hand side can be interpreted as an implicit alias.
+/// Whether an assignment's right-hand side has syntax considered for implicit alias inference.
+/// The assignment context and type-expression validity are checked separately.
 pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
     matches!(
         value,
@@ -53,6 +54,7 @@ pub(super) fn is_implicit_alias_value(value: &ast::Expr) -> bool {
 }
 
 /// Whether interpreting a value as an alias can reveal additional recursive references.
+/// Value inference uses this to decide whether to retain inputs for later alias inference.
 pub(super) fn may_require_implicit_alias_inference<'db>(
     db: &'db dyn Db,
     env: &ProgramEnvironment<'db>,
