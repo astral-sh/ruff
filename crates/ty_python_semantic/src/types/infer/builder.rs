@@ -279,6 +279,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Collects resolved names and attributes during value inference and records
+    /// which runtime operand types can be reused. When interpreting an alias as a
+    /// type expression, reads those saved results from its definition inference.
     alias_cache: AliasInferenceCache<'db>,
 
     /// Truthiness overrides for evaluating comparison chains directly as conditions.
