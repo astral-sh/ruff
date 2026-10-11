@@ -1360,6 +1360,147 @@ fn parameter_default_presence_invalidates_caller() -> anyhow::Result<()> {
 }
 
 #[test]
+fn nominal_union_updates_after_base_change() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+class Parent: ...
+class Child(Parent): ...
+";
+    db.write_files([
+        ("/src/base.py", base),
+        (
+            "/src/main.py",
+            "\
+from typing_extensions import reveal_type
+from base import Parent, Child
+
+def choose(value: Parent | Child):
+    reveal_type(value)
+",
+        ),
+    ])?;
+    assert_revealed_type(&db, "/src/main.py", "Parent");
+
+    db.write_file(
+        "/src/base.py",
+        base.replace("Child(Parent)", "Child(object)"),
+    )?;
+    assert_revealed_type(&db, "/src/main.py", "Parent | Child");
+
+    db.write_file("/src/base.py", base)?;
+    assert_revealed_type(&db, "/src/main.py", "Parent");
+    Ok(())
+}
+
+#[test]
+fn nominal_union_updates_after_inheritance_cycle() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let base = "\
+class Parent: ...
+class Child(Parent): ...
+";
+    let cyclic = base.replace("class Parent:", "class Parent(Child):");
+    let main = "from base import Parent, Child\nvalue: Parent | Child";
+    let union_type = |db: &TestDb| -> anyhow::Result<String> {
+        let file = system_path_to_file(db, "/src/main.py")?;
+        Ok(global_symbol(db, file, "value")
+            .place
+            .expect_type()
+            .display(db, &db.program_environment())
+            .to_string())
+    };
+
+    for source in [base, cyclic.as_str(), base] {
+        db.write_files([("/src/base.py", source), ("/src/main.py", main)])?;
+
+        let mut fresh = setup_db();
+        fresh.write_files([("/src/base.py", source), ("/src/main.py", main)])?;
+
+        assert_eq!(union_type(&db)?, union_type(&fresh)?, "{source}");
+    }
+    Ok(())
+}
+
+#[test]
+fn static_and_general_class_relations_update_after_base_changes() -> anyhow::Result<()> {
+    let base = "\
+class Parent: ...
+class Child(Parent): ...
+class Box[T](Child): ...
+Dynamic = type('Dynamic', (Child,), {})
+";
+    let main = "\
+from base import Parent, Child, Box, Dynamic
+def choose_parent() -> bool:
+    return True
+parent = Parent()
+static_union: Parent | Child
+generic_union: Parent | Box[int]
+dynamic = Dynamic()
+dynamic_union = parent if choose_parent() else dynamic
+";
+    let state = |db: &TestDb| -> anyhow::Result<_> {
+        let file = system_path_to_file(db, "/src/main.py")?;
+        let types = ["static_union", "generic_union", "dynamic_union"].map(|name| {
+            global_symbol(db, file, name)
+                .place
+                .expect_type()
+                .display(db, &db.program_environment())
+                .to_string()
+        });
+        let diagnostics = ["/src/base.py", "/src/main.py"]
+            .into_iter()
+            .map(|path| {
+                let file = system_path_to_file(db, path).unwrap();
+                check_types(db, program_file(db, file))
+                    .iter()
+                    .map(|diagnostic| (diagnostic.id(), diagnostic.headline_message().to_owned()))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        Ok((types, diagnostics))
+    };
+    let mut db = setup_db();
+    db.write_file("/src/main.py", main)?;
+    let cyclic = base.replace("class Parent:", "class Parent(Child):");
+    let unrelated = base.replace("Child(Parent)", "Child(object)");
+    for (revision, source) in [base, &cyclic, &unrelated, base].into_iter().enumerate() {
+        db.write_file("/src/base.py", source)?;
+        let mut fresh = setup_db();
+        fresh.write_files([("/src/base.py", source), ("/src/main.py", main)])?;
+        let incremental = state(&db)?;
+        assert_eq!(incremental, state(&fresh)?, "revision {revision}: {source}");
+        match revision {
+            0 | 3 => assert_eq!(incremental.0, ["Parent"; 3]),
+            2 => assert_eq!(
+                incremental.0,
+                ["Parent | Child", "Parent | Box[int]", "Parent | Dynamic"]
+            ),
+            _ => {}
+        }
+
+        let events = db.take_salsa_events();
+        if revision == 0 {
+            for query in [
+                "is_redundant_with_static_classes",
+                "is_redundant_with_non_generic_",
+            ] {
+                assert!(
+                    events.iter().any(|event| matches!(
+                        event.kind,
+                        salsa::EventKind::WillExecute { database_key }
+                            if db.ingredient_debug_name(database_key.ingredient_index())
+                                .ends_with(query)
+                    )),
+                    "the fixture must execute {query}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn dynamic_class_metaclass_updates_after_base_change() -> anyhow::Result<()> {
     let mut db = setup_db();
     let base = "\
