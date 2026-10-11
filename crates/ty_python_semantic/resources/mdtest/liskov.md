@@ -2876,6 +2876,38 @@ class PropertyChild(PropertyParent):
         return True
 ```
 
+## Inherited attribute conflicts through instance assignments
+
+An ordinary assignment in an intermediate class does not introduce a new declaration. A later
+subclass can repeat the inherited annotation without reporting its existing conflict again, whether
+the annotation appears in the class body or in a method. New conflicts are still rejected.
+
+```py
+class Base:
+    value: int
+
+class Bad(Base):
+    value: str  # error: [invalid-attribute-override]
+
+class Bridge(Bad):
+    def reset(self) -> None:
+        self.value = ""
+
+class ClassBody(Bridge):
+    value: str  # no diagnostic
+
+class Receiver(Bridge):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+
+class NewClassBodyConflict(Bridge):
+    value: bytes  # error: [invalid-attribute-override]
+
+class NewReceiverConflict(Bridge):
+    def __init__(self) -> None:
+        self.value: bytes = b""  # error: [invalid-attribute-override]
+```
+
 ## Mutable attribute narrowing
 
 When enabled, `invalid-mutable-override` also rejects narrowing that prevents writes allowed by the
@@ -2936,6 +2968,26 @@ error[invalid-property-type-override]: Invalid override of attribute `value`
    |
  3 |     def value(self) -> int: ...
    |         ----- `Base.value` declared here
+```
+
+## Receiver annotations preserve property access
+
+An annotation in a method does not make a getter-only property writable. A subclass can repeat the
+property without adding a setter.
+
+```py
+class Base:
+    def __init__(self) -> None:
+        self.value: int
+
+    @property
+    def value(self) -> int:
+        return 0
+
+class Child(Base):
+    @property
+    def value(self) -> int:  # no diagnostic
+        return 1
 ```
 
 ## Methods and attributes with the same name
@@ -3402,6 +3454,100 @@ class Base:
 class Child(Base):
     def __init__(self) -> None:
         self.value: bool = True  # error: [invalid-mutable-override]
+```
+
+## Method annotations alongside slots and class defaults
+
+A slot or an unannotated class default does not hide an explicit receiver annotation. The receiver
+annotation must preserve the inherited attribute's type.
+
+```py
+class Base:
+    value: int
+
+class Slotted(Base):
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class WithDefault(Base):
+    value = 0
+
+    def __init__(self) -> None:
+        self.value: str = ""  # error: [invalid-attribute-override]
+
+class CompatibleSlot(Base):
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+
+class CompatibleDefault(Base):
+    value = 0
+
+    def __init__(self) -> None:
+        self.value: int = 0  # no diagnostic
+```
+
+When the class body declares the attribute, we check that declaration once, even if a method repeats
+the annotation.
+
+```py
+class AnnotatedDefault(Base):
+    value: str = ""  # error: [invalid-attribute-override]
+
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+```
+
+Further subclasses can repeat the receiver declaration without reporting its existing conflict
+again. The unannotated default does not replace the receiver declaration's contract when the class
+is used as a base. Overrides with a different incompatible type still produce an error.
+
+```py
+class RepeatedReceiver(WithDefault):
+    def __init__(self) -> None:
+        self.value: str = ""  # no diagnostic
+
+class RepeatedClassBody(WithDefault):
+    value: str  # no diagnostic
+
+class RepeatedDefault(WithDefault):
+    value = 0  # no diagnostic
+
+class NewReceiverConflict(WithDefault):
+    def __init__(self) -> None:
+        self.value: bytes = b""  # error: [invalid-attribute-override]
+
+class NewClassBodyConflict(WithDefault):
+    value: bytes  # error: [invalid-attribute-override]
+```
+
+## Method annotations overriding initialized class attributes
+
+The diagnostic points to the inherited declaration even when it includes a class-level default.
+
+```py
+class Base:
+    value: int = 0
+
+class Child(Base):
+    def __init__(self) -> None:
+        self.value: str = ""  # snapshot: invalid-attribute-override
+```
+
+```snapshot
+error[invalid-attribute-override]: Invalid override of attribute `value`
+ --> src/mdtest_snippet.py:6:9
+  |
+2 |     value: int = 0
+  |     ----- `Base.value` declared here
+3 |
+4 | class Child(Base):
+5 |     def __init__(self) -> None:
+6 |         self.value: str = ""  # snapshot: invalid-attribute-override
+  |         ^^^^^^^^^^ Type `str` is not assignable to inherited type `int`
 ```
 
 ## Slots preserve inherited declarations
