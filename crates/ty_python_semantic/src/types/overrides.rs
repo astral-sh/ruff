@@ -709,8 +709,6 @@ fn check_class_declaration<'db>(
                         // ```
                         //
                         // Keep this base as an override target even without a class-body symbol.
-                        // Inferred assignments do not introduce a declaration or take ownership
-                        // of a conflict inherited from an earlier declaration.
                         if superclass_literal
                             .own_synthesized_member(
                                 db,
@@ -720,16 +718,9 @@ fn check_class_declaration<'db>(
                                 &member.name,
                             )
                             .is_none()
-                            && !matches!(
-                                superclass
-                                    .own_instance_member(db, env, &member.name)
-                                    .inner
-                                    .place,
-                                Place::Defined(DefinedPlace {
-                                    origin: TypeOrigin::Declared,
-                                    ..
-                                })
-                            )
+                            && superclass
+                                .own_instance_member(db, env, &member.name)
+                                .is_undefined()
                         {
                             continue;
                         }
@@ -779,7 +770,24 @@ fn check_class_declaration<'db>(
                 ));
             }
 
-            inherited_member_owner.get_or_insert(superclass);
+            // An inferred receiver assignment is still an override target, but it does not
+            // take ownership of a conflict inherited from an earlier declaration.
+            if !superclass
+                .own_class_member(db, env, None, &member.name)
+                .is_undefined()
+                || matches!(
+                    superclass
+                        .own_instance_member(db, env, &member.name)
+                        .inner
+                        .place,
+                    Place::Defined(DefinedPlace {
+                        origin: TypeOrigin::Declared,
+                        ..
+                    })
+                )
+            {
+                inherited_member_owner.get_or_insert(superclass);
+            }
 
             if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
                 || (configuration.check_final_variable_overridden()

@@ -3251,6 +3251,25 @@ def check(slot: Slots, child: ReceiverDeclaration) -> None:
     reveal_type(child.value)  # revealed: int
 ```
 
+An inferred instance attribute is still a valid target for `@override`. If it is stored in a slot,
+replacing it with a getter-only property removes the ability to write it.
+
+```py
+from typing_extensions import override
+
+class InferredSlot:
+    __slots__ = ("value",)
+
+    def __init__(self) -> None:
+        self.value = 0
+
+class ReadOnlySlot(InferredSlot):
+    @property
+    @override
+    def value(self) -> int:  # error: [invalid-property-type-override]
+        return 0
+```
+
 An annotation whose type implements `__get__` can also describe an instance-stored descriptor
 object. Ordinary reads include that object alongside its getter result. Replacing this storage with
 a slot preserves those possible reads.
