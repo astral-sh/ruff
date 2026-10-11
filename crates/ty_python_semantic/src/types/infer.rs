@@ -1990,6 +1990,10 @@ fn widen_comparison_truthiness(
 /// The inferred types for an expression region.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::SalsaValue)]
 pub(crate) struct ExpressionInference<'db> {
+    /// Name and attribute resolutions retained from value inference for later
+    /// type-expression inference of an alias, including source definitions and
+    /// lookup contexts. Also records when runtime operand types in `expressions`
+    /// can be reused.
     alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
 
     /// The types of every expression in this region.
