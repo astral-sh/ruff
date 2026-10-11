@@ -1994,6 +1994,9 @@ pub(crate) struct ExpressionInference<'db> {
     /// type-expression inference of an alias, including source definitions and
     /// lookup contexts. Also records when runtime operand types in `expressions`
     /// can be reused.
+    ///
+    /// Kept separate from `extra` so regions with only alias inputs do not need
+    /// to allocate the larger `ExpressionInferenceExtra` struct.
     alias_inputs: Option<Box<AliasInferenceInputs<'db>>>,
 
     /// The types of every expression in this region.
